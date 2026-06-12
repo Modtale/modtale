@@ -173,8 +173,6 @@ public class Project {
 
     private List<String> types;
     private List<String> childProjectIds;
-
-    private List<String> modIds;
     private boolean allowModpacks = true;
     private boolean allowComments = true;
 
@@ -273,8 +271,6 @@ public class Project {
     public void setTypes(List<String> types) { this.types = types; }
     public List<String> getChildProjectIds() { return childProjectIds; }
     public void setChildProjectIds(List<String> childProjectIds) { this.childProjectIds = childProjectIds; }
-    public List<String> getModIds() { return modIds; }
-    public void setModIds(List<String> modIds) { this.modIds = modIds; }
     public boolean isAllowModpacks() { return allowModpacks; }
     public void setAllowModpacks(boolean allowModpacks) { this.allowModpacks = allowModpacks; }
     public boolean isAllowComments() { return allowComments; }

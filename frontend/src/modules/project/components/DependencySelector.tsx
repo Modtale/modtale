@@ -1,229 +1,20 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, Loader2, X, Plus, AlertTriangle, FileText, CheckSquare, ShieldCheck, RefreshCw, Check, AlertCircle, ChevronRight, ChevronDown, ToggleRight, ToggleLeft } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, CheckSquare, ChevronDown, ExternalLink, FileText, Loader2, PackagePlus, Plus, RefreshCw, Search, ShieldCheck, ToggleLeft, ToggleRight, X } from 'lucide-react';
 import { projectClient } from '@/modules/project/api/projectClient';
 import { compareSemVer } from '@/utils/modHelpers';
 import { theme } from '@/styles/theme';
 import { BACKEND_URL } from '@/utils/api';
-import type { Project, ProjectVersion, ProjectDependency } from '@/types';
+import type { DependencySource, DependencyType, ExternalProjectFile, ExternalProjectReference, Project, ProjectDependency, ProjectVersion } from '@/types';
 import { VersionRelationKind } from '@/types';
 import { useScrollLock } from '@/hooks/useScrollLock';
-import { parseDependencyEntry, serializeDependencyEntry } from '../utils/dependencyEntries';
+import { dependencyProjectKey, getDependencyType, isExternalDependency, isOptionalDependency, normalizeDependencyReference } from '../utils/dependencyEntries';
 import { useToast } from '@/components/ui/Toast';
 
-interface DependencyWizardProps {
-    previousDeps: ProjectDependency[];
-    targetGameVersion: string | undefined;
-    onConfirm: (newDeps: string[]) => void;
-    onClose: () => void;
-}
-
-const DependencyRow: React.FC<{ dep: ProjectDependency; targetGameVersion: string | undefined; onSelect: (id: string, version: string | null) => void; initialSelection?: string; }> = ({ dep, targetGameVersion, onSelect, initialSelection }) => {
-    const [versions, setVersions] = useState<ProjectVersion[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [selectedVer, setSelectedVer] = useState<string>(initialSelection || '');
-    const [isOpen, setIsOpen] = useState(false);
-    const buttonRef = useRef<HTMLButtonElement>(null);
-    const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
-
-    useEffect(() => {
-        const fetchVersions = async () => {
-            setLoading(true);
-            try {
-                const project = await projectClient.getProject(dep.projectId);
-                const sorted = (project.versions || []).sort((a, b) => compareSemVer(b.versionNumber, a.versionNumber));
-                setVersions(sorted);
-            } catch (e) {
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchVersions();
-    }, [dep.projectId]);
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (isOpen && buttonRef.current && !buttonRef.current.contains(event.target as Node)) {
-                const dropdownEl = document.getElementById(`dropdown-${dep.projectId}`);
-                if (dropdownEl && !dropdownEl.contains(event.target as Node)) setIsOpen(false);
-            }
-        };
-        const handleScroll = () => { if (isOpen) setIsOpen(false); };
-
-        if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-            document.addEventListener('scroll', handleScroll, true);
-            window.addEventListener('resize', handleScroll);
-        }
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-            document.removeEventListener('scroll', handleScroll, true);
-            window.removeEventListener('resize', handleScroll);
-        };
-    }, [isOpen, dep.projectId]);
-
-    const toggleOpen = () => {
-        if (!isOpen && buttonRef.current) {
-            const rect = buttonRef.current.getBoundingClientRect();
-            setDropdownStyle({
-                position: 'fixed',
-                top: `${rect.bottom + 4}px`,
-                left: `${rect.right - 256}px`,
-                width: '16rem',
-                zIndex: 9999
-            });
-        }
-        setIsOpen(!isOpen);
-    };
-
-    const compatibleVersions = useMemo(() => targetGameVersion ? versions.filter(v => v.gameVersions?.includes(targetGameVersion)) : versions, [versions, targetGameVersion]);
-    const incompatibleVersions = useMemo(() => targetGameVersion ? versions.filter(v => !v.gameVersions?.includes(targetGameVersion)) : [], [versions, targetGameVersion]);
-
-    const handleSelect = (ver: string) => {
-        setSelectedVer(ver);
-        onSelect(dep.projectId, ver);
-        setIsOpen(false);
-    };
-
-    return (
-        <div className={`flex items-center justify-between p-4 border-b border-slate-200 dark:border-white/10 last:border-0 bg-white dark:bg-slate-800 transition-colors`}>
-            <div className="flex-1 min-w-0 pr-4">
-                <div className={`font-bold ${theme.colors.textPrimary} truncate`}>{dep.projectTitle || dep.projectId}</div>
-                <div className={`text-xs ${theme.colors.textMuted} flex items-center gap-2`}>
-                    <span>Previous: <span className={`font-mono ${theme.colors.bgSurfaceAlt} px-1 rounded`}>{dep.versionNumber}</span></span>
-                    {dep.isOptional && <span className="text-[10px] uppercase bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-1.5 rounded">Optional</span>}
-                </div>
-            </div>
-
-            <div className="w-48 shrink-0">
-                {loading ? (
-                    <div className={`flex items-center gap-2 text-xs ${theme.colors.textMuted} justify-end`}><Loader2 className="w-3 h-3 animate-spin" /> Loading...</div>
-                ) : (
-                    <>
-                        <button
-                            ref={buttonRef}
-                            onClick={toggleOpen}
-                            className={`w-full text-xs px-3 py-2 rounded-lg border flex justify-between items-center transition-all ${
-                                selectedVer
-                                    ? `${theme.colors.borderFaint} ${theme.colors.bgSurfaceAlt} ${theme.colors.textPrimary}`
-                                    : 'border-amber-300 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 font-bold shadow-sm'
-                            } hover:border-modtale-accent focus:ring-2 focus:ring-modtale-accent/20 outline-none`}
-                        >
-                            <span className="truncate mr-2">{selectedVer || "Select Version..."}</span>
-                            <ChevronDown className={`w-3 h-3 opacity-50 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                        </button>
-
-                        {isOpen && (
-                            <div id={`dropdown-${dep.projectId}`} style={dropdownStyle} className={`max-h-60 overflow-y-auto ${theme.colors.bgBase} border ${theme.colors.border} rounded-lg shadow-2xl`}>
-                                {compatibleVersions.length > 0 ? (
-                                    <>
-                                        <div className={`px-3 py-2 text-[10px] font-bold ${theme.colors.textMuted} uppercase tracking-wider ${theme.colors.bgSurface} sticky top-0 z-10 backdrop-blur-sm`}>Compatible</div>
-                                        {compatibleVersions.map(v => (
-                                            <button
-                                                key={v.id}
-                                                onClick={() => handleSelect(v.versionNumber)}
-                                                className={`w-full text-left px-3 py-2 text-xs ${theme.colors.bgSurfaceHover} flex justify-between items-center ${selectedVer === v.versionNumber ? `${theme.colors.accent} font-bold ${theme.colors.accentAlpha}` : theme.colors.textSecondary}`}
-                                            >
-                                                <span>{v.versionNumber}</span>
-                                                {selectedVer === v.versionNumber && <Check className="w-3 h-3" />}
-                                            </button>
-                                        ))}
-                                    </>
-                                ) : (
-                                    <div className={`px-3 py-4 text-center text-xs ${theme.colors.textMuted} italic`}>No compatible versions found.</div>
-                                )}
-
-                                {incompatibleVersions.length > 0 && (
-                                    <>
-                                        <div className={`px-3 py-2 text-[10px] font-bold ${theme.colors.dangerText} uppercase tracking-wider ${theme.colors.dangerBg} border-t ${theme.colors.borderFaint} mt-1 sticky top-0 z-10`}>Incompatible</div>
-                                        {incompatibleVersions.map(v => (
-                                            <button
-                                                key={v.id}
-                                                onClick={() => handleSelect(v.versionNumber)}
-                                                className={`w-full text-left px-3 py-2 text-xs hover:${theme.colors.dangerBg} flex justify-between items-center opacity-75 ${selectedVer === v.versionNumber ? `${theme.colors.dangerText} font-bold` : theme.colors.textMuted}`}
-                                            >
-                                                <span>{v.versionNumber}</span>
-                                                {selectedVer === v.versionNumber && <Check className="w-3 h-3" />}
-                                            </button>
-                                        ))}
-                                    </>
-                                )}
-                            </div>
-                        )}
-                    </>
-                )}
-            </div>
-        </div>
-    );
-};
-
-const DependencyUpdateWizard: React.FC<DependencyWizardProps> = ({ previousDeps, targetGameVersion, onConfirm, onClose }) => {
-    useScrollLock(true);
-    const [selections, setSelections] = useState<Record<string, string | null>>({});
-
-    const handleRowSelect = (id: string, ver: string | null) => setSelections(prev => ({ ...prev, [id]: ver }));
-
-    const handleConfirm = () => {
-        const result: string[] = [];
-        previousDeps.forEach(dep => {
-            const newVer = selections[dep.projectId];
-            if (newVer) {
-                result.push(serializeDependencyEntry({
-                    projectId: dep.projectId,
-                    versionNumber: newVer,
-                    isOptional: Boolean(dep.isOptional),
-                    isEmbedded: Boolean(dep.isEmbedded)
-                }));
-            }
-        });
-        onConfirm(result);
-    };
-
-    const validCount = Object.values(selections).filter(v => v !== null).length;
-
-    return (
-        <div className={theme.components.modalOverlay}>
-            <div className={`fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-2xl max-h-[85dvh] flex flex-col z-[100] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 shadow-xl rounded-3xl overflow-hidden ring-1 ring-black/[0.02] dark:ring-white/[0.02]`} onClick={e => e.stopPropagation()}>
-                <div className={`p-4 sm:p-5 flex justify-between items-center shrink-0 bg-slate-50 dark:bg-slate-800/95 border-b border-slate-200 dark:border-white/10`}>
-                    <div>
-                        <h3 className={`text-xl font-black ${theme.colors.textPrimary} flex items-center gap-2`}>
-                            <RefreshCw className={`w-5 h-5 ${theme.colors.accent}`} /> Update Dependencies
-                        </h3>
-                        <p className={`text-sm ${theme.colors.textMuted} mt-1`}>Select versions for the <strong>{previousDeps.length}</strong> projects from the previous release.</p>
-                    </div>
-                    <button onClick={onClose} className={`p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors`}><X className="w-5 h-5" /></button>
-                </div>
-
-                <div className={`p-4 sm:p-5 overflow-y-auto flex-1`}>
-                    {!targetGameVersion && (
-                        <div className={`mb-4 p-3 ${theme.colors.warningBg} border ${theme.colors.warningBorder} rounded-lg text-xs ${theme.colors.warningText} flex items-start gap-2`}>
-                            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                            <span><strong>Note:</strong> No Game Version selected. Showing all available versions. Select a Game Version first to filter compatible projects.</span>
-                        </div>
-                    )}
-                    <div className={`border ${theme.colors.border} rounded-lg overflow-hidden ${theme.colors.bgSurface}`}>
-                        {previousDeps.map(dep => (
-                            <DependencyRow key={dep.projectId} dep={dep} targetGameVersion={targetGameVersion} onSelect={handleRowSelect} />
-                        ))}
-                    </div>
-                </div>
-
-                <div className={`p-4 sm:p-5 flex justify-between items-center shrink-0 bg-slate-50 dark:bg-slate-800/95 border-b border-slate-200 dark:border-white/10`}>
-                    <div className={`text-sm ${theme.colors.textMuted}`}><strong>{validCount}</strong> selected</div>
-                    <div className="flex gap-3">
-                        <button onClick={onClose} className={`px-4 py-2 font-bold ${theme.colors.textMuted} ${theme.colors.bgSurfaceHover} rounded-lg`}>Skip</button>
-                        <button onClick={handleConfirm} disabled={validCount === 0} className={`px-6 py-2 font-bold rounded-lg shadow-lg flex items-center gap-2 ${theme.components.buttonPrimary} disabled:opacity-50`}>
-                            <Check className="w-4 h-4" /> Import Selected
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
+type DependencyMeta = { title: string; author: string; icon: string; source?: string; url?: string };
 
 interface DependencySelectorProps {
-    selectedDeps: string[];
-    onChange: (deps: string[]) => void;
+    selectedDeps: ProjectDependency[] | string[];
+    onChange: (deps: any[]) => void;
     targetGameVersion?: string;
     label?: string;
     mode?: VersionRelationKind;
@@ -233,12 +24,121 @@ interface DependencySelectorProps {
     disabled?: boolean;
 }
 
+const createUuid = () => {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+        return crypto.randomUUID();
+    }
+    return `dep-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
+const getIconUrl = (path?: string) => {
+    if (!path) return '/assets/favicon.svg';
+    return path.startsWith('http') ? path : `${BACKEND_URL}${path}`;
+};
+
+const normalizeLookup = (value?: string) => (value || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+const getCurseForgeProjectSlug = (value: string): string | null => {
+    try {
+        const parsed = new URL(value);
+        const host = parsed.hostname.toLowerCase();
+        const path = parsed.pathname.toLowerCase();
+        if (!(host === 'curseforge.com' || host.endsWith('.curseforge.com'))) return null;
+        if (!path.startsWith('/hytale/') || !path.includes('/mods/')) return null;
+        const segments = parsed.pathname.split('/').filter(Boolean);
+        const modsIndex = segments.findIndex(segment => segment.toLowerCase() === 'mods');
+        const slug = modsIndex >= 0 ? segments[modsIndex + 1] : '';
+        return slug || null;
+    } catch {
+        return null;
+    }
+};
+
+const getSourceLabel = (source?: string) => {
+    switch (source) {
+        case 'CURSEFORGE': return 'CurseForge';
+        case 'GITHUB': return 'GitHub';
+        case 'WEBSITE': return 'Website';
+        case 'OTHER': return 'External';
+        case 'MODTALE': return 'Modtale';
+        default: return 'External';
+    }
+};
+
+const buildModtaleDependency = (project: Project, versionNumber: string, dependencyType: DependencyType): ProjectDependency => ({
+    id: createUuid(),
+    projectId: project.id,
+    projectTitle: project.title,
+    versionNumber,
+    dependencyType,
+    source: 'MODTALE'
+});
+
+const cloneDependencyForForm = (dependency: ProjectDependency, forceRequired = false): ProjectDependency => ({
+    id: dependency.id || createUuid(),
+    projectId: dependency.projectId,
+    projectTitle: dependency.projectTitle,
+    versionNumber: dependency.versionNumber,
+    dependencyType: forceRequired ? 'REQUIRED' : getDependencyType(dependency),
+    source: dependency.source || 'MODTALE',
+    externalId: dependency.externalId,
+    externalUrl: dependency.externalUrl,
+    externalFileUrl: dependency.externalFileUrl,
+    externalFileName: dependency.externalFileName,
+    cachedFileUrl: dependency.cachedFileUrl,
+    hytaleProjectConfirmed: dependency.hytaleProjectConfirmed
+});
+
+const DependencyPrompt = ({
+    projectTitle,
+    dependencies,
+    onAdd,
+    onClose
+}: {
+    projectTitle: string;
+    dependencies: ProjectDependency[];
+    onAdd: () => void;
+    onClose: () => void;
+}) => {
+    useScrollLock(true);
+    return (
+        <div className={theme.components.modalOverlay}>
+            <div className="fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-[min(92vw,34rem)] max-h-[85dvh] flex flex-col z-[100] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 shadow-xl rounded-3xl overflow-hidden">
+                <div className="p-5 flex items-start justify-between gap-4 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/95">
+                    <div>
+                        <h3 className={`text-lg font-black ${theme.colors.textPrimary}`}>Add Dependencies</h3>
+                        <p className={`text-sm ${theme.colors.textMuted} mt-1`}>{projectTitle} needs {dependencies.length} project{dependencies.length === 1 ? '' : 's'} that are not in this pack yet.</p>
+                    </div>
+                    <button type="button" onClick={onClose} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
+                </div>
+                <div className="p-4 space-y-2 overflow-y-auto">
+                    {dependencies.map(dep => (
+                        <div key={`${dep.projectId}:${dep.versionNumber}`} className={`p-3 rounded-xl border ${theme.colors.border} ${theme.colors.bgBase} flex items-center justify-between gap-3`}>
+                            <div className="min-w-0">
+                                <div className={`font-bold ${theme.colors.textPrimary} truncate`}>{dep.projectTitle || dep.projectId}</div>
+                                <div className={`text-xs ${theme.colors.textMuted} font-mono`}>v{dep.versionNumber}</div>
+                            </div>
+                            <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${isOptionalDependency(dep) ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'}`}>
+                                {getDependencyType(dep)}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+                <div className="p-4 flex justify-end gap-3 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/95">
+                    <button type="button" onClick={onClose} className={`px-4 py-2 font-bold rounded-lg ${theme.colors.textMuted} ${theme.colors.bgSurfaceHover}`}>Skip</button>
+                    <button type="button" onClick={onAdd} className={`px-5 py-2 font-bold rounded-lg ${theme.components.buttonPrimary} flex items-center gap-2`}><PackagePlus className="w-4 h-4" /> Add All</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export const DependencySelector: React.FC<DependencySelectorProps> = ({
     selectedDeps,
     onChange,
     targetGameVersion,
     label,
-    mode = 'dependency',
+    mode = VersionRelationKind.DEPENDENCY,
     previousDependencies,
     currentProjectId,
     isModpack = false,
@@ -247,276 +147,625 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
     const [search, setSearch] = useState('');
     const [results, setResults] = useState<Project[]>([]);
     const [loading, setLoading] = useState(false);
-    const [selectedModForVersion, setSelectedModForVersion] = useState<Project | null>(null);
+    const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const [loadingProjectVersions, setLoadingProjectVersions] = useState(false);
-    const [showIncompatible, setShowIncompatible] = useState(false);
+    const [showIncompatibleVersions, setShowIncompatibleVersions] = useState(false);
     const [showAlphaBeta, setShowAlphaBeta] = useState(false);
-    const [isOptional, setIsOptional] = useState(false);
-    const [isEmbedded, setIsEmbedded] = useState(false);
-    const [showWizard, setShowWizard] = useState(false);
+    const [dependencyType, setDependencyType] = useState<DependencyType>('REQUIRED');
+    const [showPreviousImport, setShowPreviousImport] = useState(false);
+    const [pendingPrompt, setPendingPrompt] = useState<{ projectTitle: string; dependencies: ProjectDependency[]; baseDeps: ProjectDependency[] } | null>(null);
+    const [projectCache, setProjectCache] = useState<Record<string, Project>>({});
+    const [metaCache, setMetaCache] = useState<Record<string, DependencyMeta>>({});
+    const [showExternalModal, setShowExternalModal] = useState(false);
+    const [externalTitle, setExternalTitle] = useState('');
+    const [externalVersion, setExternalVersion] = useState('');
+    const [externalUrl, setExternalUrl] = useState('');
+    const [externalSource, setExternalSource] = useState<DependencySource | ''>('');
+    const [externalResolved, setExternalResolved] = useState<ExternalProjectReference | null>(null);
+    const [externalSelectedFileId, setExternalSelectedFileId] = useState('');
+    const [externalConfirmed, setExternalConfirmed] = useState(false);
+    const [resolvingExternal, setResolvingExternal] = useState(false);
+    const [externalError, setExternalError] = useState<string | null>(null);
+    const [externalSuggestions, setExternalSuggestions] = useState<Project[]>([]);
+    const [loadingExternalSuggestions, setLoadingExternalSuggestions] = useState(false);
     const { showToast } = useToast();
+
     const isIncompatibilityMode = mode === VersionRelationKind.INCOMPATIBILITY;
+    const dependencies = useMemo(() => (isIncompatibilityMode ? [] : (selectedDeps as ProjectDependency[]).map(normalizeDependencyReference)), [isIncompatibilityMode, selectedDeps]);
+    const incompatibleIds = useMemo(() => (isIncompatibilityMode ? (selectedDeps as string[]) : []), [isIncompatibilityMode, selectedDeps]);
     const effectiveLabel = label ?? (isIncompatibilityMode ? 'Incompatible Mods' : 'Dependencies');
+    const selectedProjectIds = useMemo(() => new Set(isIncompatibilityMode ? incompatibleIds : dependencies.map(dep => dep.projectId)), [dependencies, incompatibleIds, isIncompatibilityMode]);
 
-    const [metaCache, setMetaCache] = useState<Record<string, { title: string; author: string; icon: string }>>({});
-
-    useEffect(() => {
-        const fetchMeta = async () => {
-            const missingIds = selectedDeps.map(d => d.split(':')[0]).filter(id => !metaCache[id]);
-            if (missingIds.length === 0) return;
-            const newCache = { ...metaCache };
-            await Promise.all(missingIds.map(async (id) => {
-                try {
-                    const data = await projectClient.getDependencyMeta(id);
-                    newCache[id] = { title: data.title, author: data.author, icon: data.icon };
-                } catch (e) { newCache[id] = { title: id, author: 'Unknown', icon: '' }; }
-            }));
-            setMetaCache(newCache);
-        };
-        fetchMeta();
-    }, [selectedDeps.length, metaCache, selectedDeps]);
-
-    useScrollLock(selectedModForVersion !== null);
+    useScrollLock(Boolean(selectedProject || pendingPrompt || showExternalModal));
 
     useEffect(() => {
-        if (selectedModForVersion && !isIncompatibilityMode) {
-            const compatible = (selectedModForVersion.versions || []).filter(v => !targetGameVersion || v.gameVersions?.includes(targetGameVersion));
-            const hasRelease = compatible.some(v => !v.channel || v.channel === 'RELEASE');
-            const hasAny = compatible.length > 0;
-            setShowAlphaBeta(hasAny && !hasRelease);
+        if (isIncompatibilityMode) return;
+
+        const missing = dependencies
+            .filter(dep => dep.source === 'MODTALE' && !metaCache[dep.projectId])
+            .map(dep => dep.projectId);
+        const externalCache: Record<string, DependencyMeta> = {};
+        dependencies
+            .filter(dep => isExternalDependency(dep) && !metaCache[dep.projectId])
+            .forEach(dep => {
+                externalCache[dep.projectId] = { title: dep.projectTitle, author: getSourceLabel(dep.source), icon: '', source: dep.source, url: dep.externalUrl };
+            });
+
+        if (Object.keys(externalCache).length) {
+            setMetaCache(prev => ({ ...prev, ...externalCache }));
         }
-    }, [selectedModForVersion, targetGameVersion, isIncompatibilityMode]);
+        if (!missing.length) return;
+
+        let cancelled = false;
+        Promise.all([...new Set(missing)].map(async id => {
+            try {
+                const data = await projectClient.getDependencyMeta(id);
+                return [id, { title: data.title, author: data.author, icon: data.icon }] as const;
+            } catch {
+                return [id, { title: id, author: 'Unknown', icon: '' }] as const;
+            }
+        })).then(entries => {
+            if (!cancelled) setMetaCache(prev => ({ ...prev, ...Object.fromEntries(entries) }));
+        });
+        return () => { cancelled = true; };
+    }, [dependencies, isIncompatibilityMode, metaCache]);
+
+    useEffect(() => {
+        if (isIncompatibilityMode) return;
+        const missing = dependencies
+            .filter(dep => dep.source === 'MODTALE' && !projectCache[dep.projectId])
+            .map(dep => dep.projectId);
+        if (!missing.length) return;
+
+        let cancelled = false;
+        Promise.all([...new Set(missing)].map(async id => {
+            try {
+                return [id, await projectClient.getProject(id)] as const;
+            } catch {
+                return null;
+            }
+        })).then(entries => {
+            if (cancelled) return;
+            const next = Object.fromEntries(entries.filter((entry): entry is readonly [string, Project] => Boolean(entry)));
+            if (Object.keys(next).length) setProjectCache(prev => ({ ...prev, ...next }));
+        });
+        return () => { cancelled = true; };
+    }, [dependencies, isIncompatibilityMode, projectCache]);
 
     useEffect(() => {
         const timer = setTimeout(async () => {
-            if (search.length < 2 || disabled) return;
+            if (search.length < 2 || disabled) {
+                setResults([]);
+                return;
+            }
             setLoading(true);
             try {
                 const data = await projectClient.searchProjects(search);
-                const filtered = data.filter((m: Project) => m.classification !== 'MODPACK' && m.classification !== 'SAVE' && m.id !== currentProjectId);
-                setResults(filtered);
-            } catch (e) { setResults([]); } finally { setLoading(false); }
+                setResults(data.filter((project: Project) => project.classification !== 'MODPACK' && project.classification !== 'SAVE' && project.id !== currentProjectId));
+            } catch {
+                setResults([]);
+            } finally {
+                setLoading(false);
+            }
         }, 300);
         return () => clearTimeout(timer);
     }, [search, currentProjectId, disabled]);
 
-    const selectedProjectIds = useMemo(() => new Set(
-        selectedDeps
-            .map((dep) => {
-                if (isIncompatibilityMode) return dep.trim();
-                return parseDependencyEntry(dep).projectId;
-            })
-            .filter((id): id is string => Boolean(id))
-    ), [selectedDeps, isIncompatibilityMode]);
+    useEffect(() => {
+        if (!selectedProject || isIncompatibilityMode) return;
+        const compatible = (selectedProject.versions || []).filter(v => !targetGameVersion || v.gameVersions?.includes(targetGameVersion));
+        setShowAlphaBeta(compatible.length > 0 && !compatible.some(v => !v.channel || v.channel === 'RELEASE'));
+    }, [selectedProject, targetGameVersion, isIncompatibilityMode]);
 
-    const addProjectSelection = (project: Project, versionNumber?: string) => {
-        if (disabled) return;
-        if (selectedProjectIds.has(project.id)) {
-            showToast("Project already added.", 'info');
+    useEffect(() => {
+        if (!showExternalModal || externalTitle.trim().length < 2) {
+            setExternalSuggestions([]);
             return;
         }
 
-        setMetaCache(prev => ({ ...prev, [project.id]: { title: project.title, author: project.author, icon: project.imageUrl } }));
+        let cancelled = false;
+        setLoadingExternalSuggestions(true);
+        const timer = setTimeout(async () => {
+            try {
+                const data = await projectClient.searchProjects(externalTitle.trim());
+                const titleKey = normalizeLookup(externalTitle);
+                const urlSlug = normalizeLookup(getCurseForgeProjectSlug(externalUrl) || '');
+                const suggestions = data
+                    .filter((project: Project) => project.classification !== 'MODPACK' && project.classification !== 'SAVE')
+                    .filter((project: Project) => {
+                        const projectTitle = normalizeLookup(project.title);
+                        const projectSlug = normalizeLookup(project.slug);
+                        return projectTitle === titleKey || projectSlug === titleKey || (urlSlug && projectSlug === urlSlug);
+                    })
+                    .slice(0, 3);
+                if (!cancelled) setExternalSuggestions(suggestions);
+            } catch {
+                if (!cancelled) setExternalSuggestions([]);
+            } finally {
+                if (!cancelled) setLoadingExternalSuggestions(false);
+            }
+        }, 250);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
+    }, [showExternalModal, externalTitle, externalUrl]);
 
-        if (isIncompatibilityMode) {
-            onChange([...selectedDeps, project.id]);
-        } else if (versionNumber) {
-            const finalOptional = isModpack ? false : isOptional;
-            const entry = serializeDependencyEntry({
-                projectId: project.id,
-                versionNumber,
-                isOptional: finalOptional,
-                isEmbedded
-            });
-            onChange([...selectedDeps, entry]);
+    useEffect(() => {
+        setExternalResolved(null);
+        setExternalSelectedFileId('');
+    }, [externalUrl]);
+
+    const availableVersions = useMemo(() => {
+        if (!selectedProject?.versions) return [];
+        return [...selectedProject.versions].sort((a, b) => compareSemVer(b.versionNumber, a.versionNumber));
+    }, [selectedProject]);
+
+    const filteredVersions = availableVersions.filter(version => {
+        const versionMatch = !targetGameVersion || version.gameVersions?.includes(targetGameVersion);
+        const channelMatch = showAlphaBeta || !version.channel || version.channel === 'RELEASE';
+        return (showIncompatibleVersions || versionMatch) && channelMatch;
+    });
+
+    const conflictWarnings = useMemo(() => {
+        if (isIncompatibilityMode) return [];
+        const internalDeps = dependencies.filter(dep => dep.source === 'MODTALE');
+        const selectedIds = new Set(internalDeps.map(dep => dep.projectId));
+        const warnings = new Map<string, { from: ProjectDependency; toId: string }>();
+
+        for (const dep of internalDeps) {
+            const project = projectCache[dep.projectId];
+            const version = project?.versions?.find(candidate => candidate.versionNumber === dep.versionNumber);
+            for (const incompatibleId of version?.incompatibleProjectIds || []) {
+                if (!selectedIds.has(incompatibleId)) continue;
+                const key = [dep.projectId, incompatibleId].sort().join(':');
+                if (!warnings.has(key)) warnings.set(key, { from: dep, toId: incompatibleId });
+            }
         }
 
-        setSelectedModForVersion(null);
-        setIsOptional(false);
-        setIsEmbedded(false);
+        return [...warnings.values()].map(({ from, toId }) => ({
+            from,
+            toId,
+            toTitle: metaCache[toId]?.title || projectCache[toId]?.title || toId
+        }));
+    }, [dependencies, isIncompatibilityMode, metaCache, projectCache]);
+
+    const externalDependencyWarnings = useMemo(() => {
+        if (isIncompatibilityMode) return [];
+        return dependencies.filter(isExternalDependency).map(dep => ({
+            dependency: dep,
+            sourceLabel: getSourceLabel(dep.source)
+        }));
+    }, [dependencies, isIncompatibilityMode]);
+
+    const addDependency = (dependency: ProjectDependency, sourceProject?: Project, sourceVersion?: ProjectVersion) => {
+        if (disabled) return;
+        const normalized = normalizeDependencyReference(dependency);
+        if (selectedProjectIds.has(normalized.projectId)) {
+            showToast('Project already added.', 'info');
+            return;
+        }
+        const nextDeps = [...dependencies, normalized];
+
+        const missingDependencies = !isIncompatibilityMode && sourceVersion?.dependencies
+            ? sourceVersion.dependencies
+                .map(dep => cloneDependencyForForm(dep, isModpack))
+                .filter(dep => !nextDeps.some(existing => dependencyProjectKey(existing) === dependencyProjectKey(dep)))
+                .filter(dep => dep.projectId !== currentProjectId)
+            : [];
+
+        onChange(nextDeps);
         setSearch('');
         setResults([]);
+        setSelectedProject(null);
+        setDependencyType('REQUIRED');
+
+        if (sourceProject) {
+            setMetaCache(prev => ({ ...prev, [sourceProject.id]: { title: sourceProject.title, author: sourceProject.author, icon: sourceProject.imageUrl } }));
+            setProjectCache(prev => ({ ...prev, [sourceProject.id]: sourceProject }));
+        }
+        if (missingDependencies.length) {
+            setPendingPrompt({ projectTitle: normalized.projectTitle, dependencies: missingDependencies, baseDeps: nextDeps });
+        }
     };
 
-    const confirmVersion = (versionNumber: string) => {
-        if (!selectedModForVersion || disabled) return;
-        addProjectSelection(selectedModForVersion, versionNumber);
+    const addIncompatibleProject = (project: Project) => {
+        if (selectedProjectIds.has(project.id)) {
+            showToast('Project already added.', 'info');
+            return;
+        }
+        onChange([...incompatibleIds, project.id]);
+        setSearch('');
+        setResults([]);
+        setMetaCache(prev => ({ ...prev, [project.id]: { title: project.title, author: project.author, icon: project.imageUrl } }));
     };
 
-    const openVersionPicker = async (mod: Project) => {
+    const openVersionPicker = async (project: Project) => {
         if (disabled) return;
         if (isIncompatibilityMode) {
-            addProjectSelection(mod);
+            addIncompatibleProject(project);
             return;
         }
         setLoadingProjectVersions(true);
         try {
-            const fullProject = mod.versions ? mod : await projectClient.getProject(mod.id);
-            setSelectedModForVersion({ ...fullProject, versions: fullProject.versions || [] });
-        } catch (e) {
-            setSelectedModForVersion({ ...mod, versions: mod.versions || [] });
+            const fullProject = project.versions ? project : await projectClient.getProject(project.id);
+            setSelectedProject({ ...fullProject, versions: fullProject.versions || [] });
+        } catch {
+            setSelectedProject({ ...project, versions: project.versions || [] });
         } finally {
             setLoadingProjectVersions(false);
         }
     };
 
-    const removeDep = (index: number) => {
-        if(disabled) return;
-        const next = [...selectedDeps]; next.splice(index, 1); onChange(next);
-    };
-
-    const toggleOptionalExisting = (index: number) => {
-        if (isModpack || disabled) return;
-        const next = [...selectedDeps];
-        const parsed = parseDependencyEntry(next[index]);
-        next[index] = serializeDependencyEntry({
-            ...parsed,
-            isOptional: !parsed.isOptional
-        });
-        onChange(next);
-    };
-
-    const toggleEmbeddedExisting = (index: number) => {
+    const removeSelected = (index: number) => {
         if (disabled) return;
         const next = [...selectedDeps];
-        const parsed = parseDependencyEntry(next[index]);
-        next[index] = serializeDependencyEntry({
-            ...parsed,
-            isEmbedded: !parsed.isEmbedded
-        });
+        next.splice(index, 1);
         onChange(next);
     };
 
-    const getIconUrl = (path?: string) => { if (!path) return '/assets/favicon.svg'; return path.startsWith('http') ? path : `${BACKEND_URL}${path}`; };
+    const cycleDependencyType = (index: number, nextType: DependencyType) => {
+        if (disabled || isModpack || isIncompatibilityMode) return;
+        const next = [...dependencies];
+        next[index] = { ...next[index], dependencyType: nextType };
+        onChange(next);
+    };
 
-    const availableVersions = useMemo(() => {
-        if (!selectedModForVersion?.versions) return [];
-        return [...selectedModForVersion.versions].sort((a, b) => compareSemVer(b.versionNumber, a.versionNumber));
-    }, [selectedModForVersion]);
+    const resolveExternalDetails = async () => {
+        if (!externalUrl.trim()) {
+            setExternalError('Enter an external project URL.');
+            return null;
+        }
 
-    const filteredVersions = availableVersions.filter(v => {
-        const versionMatch = !targetGameVersion || v.gameVersions?.includes(targetGameVersion);
-        const channelMatch = showAlphaBeta || !v.channel || v.channel === 'RELEASE';
-        return (showIncompatible || versionMatch) && channelMatch;
-    });
+        setResolvingExternal(true);
+        setExternalError(null);
+        try {
+            const resolved = await projectClient.resolveExternalProject(externalUrl.trim(), externalSource || undefined);
+            setExternalResolved(resolved);
+            setExternalSource(resolved.source);
+            setExternalTitle(current => current.trim() || resolved.title || '');
+            setExternalVersion(current => current.trim() || resolved.versionNumber || 'latest');
+            if (resolved.files?.length) {
+                const firstFile = resolved.files[0];
+                setExternalSelectedFileId(firstFile.id || '');
+                if (firstFile.versionNumber) setExternalVersion(firstFile.versionNumber);
+            }
+            return resolved;
+        } catch (error: any) {
+            setExternalError(error?.response?.data?.message || 'Could not resolve that external project.');
+            return null;
+        } finally {
+            setResolvingExternal(false);
+        }
+    };
+
+    const selectedExternalFile = useMemo(() => {
+        if (!externalResolved?.files?.length || !externalSelectedFileId) return null;
+        return externalResolved.files.find(file => file.id === externalSelectedFileId) || null;
+    }, [externalResolved, externalSelectedFileId]);
+
+    const addExternalReference = async () => {
+        const resolved = externalResolved || await resolveExternalDetails();
+        if (!resolved) return;
+
+        const hytaleProjectConfirmed = resolved.hytaleProjectConfirmed || externalConfirmed;
+        if (!hytaleProjectConfirmed) {
+            setExternalError('Confirm this external project is for Hytale before adding it.');
+            return;
+        }
+
+        const title = externalTitle.trim() || resolved.title;
+        const version = selectedExternalFile?.versionNumber || externalVersion.trim() || resolved.versionNumber || 'latest';
+        if (!title || !version) {
+            setExternalError('Title and version are required.');
+            return;
+        }
+
+        const source = resolved.source;
+        if (source === 'CURSEFORGE' && !selectedExternalFile?.downloadUrl) {
+            setExternalError('Choose a CurseForge file so Modtale can cache it.');
+            return;
+        }
+
+        const projectId = `${source.toLowerCase()}:${resolved.externalId}`;
+        if (selectedProjectIds.has(projectId)) {
+            setExternalError('That external reference is already added.');
+            return;
+        }
+        let referenceUrl = resolved.externalUrl;
+        if (source === 'CURSEFORGE' && selectedExternalFile?.id) {
+            const slug = getCurseForgeProjectSlug(resolved.externalUrl || externalUrl);
+            if (slug) referenceUrl = `https://www.curseforge.com/hytale/mods/${slug}/files/${selectedExternalFile.id}`;
+        }
+        const dependency: ProjectDependency = {
+            id: createUuid(),
+            projectId,
+            projectTitle: title,
+            versionNumber: version,
+            dependencyType: isModpack ? 'REQUIRED' : dependencyType,
+            source,
+            externalId: resolved.externalId,
+            externalUrl: referenceUrl,
+            externalFileUrl: selectedExternalFile?.downloadUrl,
+            externalFileName: selectedExternalFile?.fileName || selectedExternalFile?.displayName,
+            hytaleProjectConfirmed
+        };
+        onChange([...dependencies, dependency]);
+        setMetaCache(prev => ({ ...prev, [projectId]: { title: dependency.projectTitle, author: getSourceLabel(source), icon: resolved.iconUrl || '', source, url: dependency.externalUrl } }));
+        setShowExternalModal(false);
+        setExternalTitle('');
+        setExternalVersion('');
+        setExternalUrl('');
+        setExternalSource('');
+        setExternalResolved(null);
+        setExternalSelectedFileId('');
+        setExternalConfirmed(false);
+        setExternalError(null);
+    };
+
+    const selectedCount = selectedDeps.length;
 
     return (
         <div className={`space-y-4 border ${theme.colors.border} rounded-2xl p-6 ${theme.colors.bgSurface} ${disabled ? 'opacity-70' : ''}`}>
-            {showWizard && previousDependencies && !disabled && !isIncompatibilityMode && (
-                <DependencyUpdateWizard
-                    previousDeps={previousDependencies}
-                    targetGameVersion={targetGameVersion}
-                    onConfirm={(newDeps) => {
-                        const currentIds = new Set(selectedDeps.map(d => d.split(':')[0]));
-                        const toAdd = newDeps.filter(d => !currentIds.has(d.split(':')[0]));
-                        onChange([...selectedDeps, ...toAdd]);
-                        setShowWizard(false);
+            {pendingPrompt && (
+                <DependencyPrompt
+                    projectTitle={pendingPrompt.projectTitle}
+                    dependencies={pendingPrompt.dependencies}
+                    onClose={() => setPendingPrompt(null)}
+                    onAdd={() => {
+                        const existingKeys = new Set(pendingPrompt.baseDeps.map(dependencyProjectKey));
+                        const toAdd = pendingPrompt.dependencies.filter(dep => !existingKeys.has(dependencyProjectKey(dep)));
+                        onChange([...pendingPrompt.baseDeps, ...toAdd]);
+                        setPendingPrompt(null);
                     }}
-                    onClose={() => setShowWizard(false)}
                 />
             )}
 
-            {selectedModForVersion && !disabled && !isIncompatibilityMode && (
+            {selectedProject && !disabled && !isIncompatibilityMode && (
                 <div className={theme.components.modalOverlay}>
-                    <div className={`fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-md max-h-[85dvh] flex flex-col z-[100] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 shadow-xl rounded-3xl overflow-hidden ring-1 ring-black/[0.02] dark:ring-white/[0.02]`} onClick={e => e.stopPropagation()}>
-                        <div className={`p-4 sm:p-5 flex justify-between items-start shrink-0 bg-slate-50 dark:bg-slate-800/95 border-b border-slate-200 dark:border-white/10`}>
-                            <h3 className={`text-lg font-black text-slate-900 dark:text-white flex items-center gap-2`}>Select Version</h3>
-                            <button onClick={() => setSelectedModForVersion(null)} className={`p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors`}><X className="w-5 h-5" /></button>
+                    <div className="fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-md max-h-[85dvh] flex flex-col z-[100] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 shadow-xl rounded-3xl overflow-hidden">
+                        <div className="p-5 flex justify-between items-start border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/95">
+                            <div>
+                                <h3 className={`text-lg font-black ${theme.colors.textPrimary}`}>Select Version</h3>
+                                <p className={`text-xs ${theme.colors.textMuted} mt-1 truncate max-w-[20rem]`}>{selectedProject.title}</p>
+                            </div>
+                            <button type="button" onClick={() => setSelectedProject(null)} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
                         </div>
 
-                        <div className={`p-4 sm:p-5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 flex flex-col gap-3 shrink-0`}>
+                        <div className="p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 space-y-3">
                             <div className="flex items-center justify-between">
                                 <span className={`text-xs font-bold ${theme.colors.textMuted} uppercase tracking-wider`}>Show Alpha/Beta</span>
-                                <button onClick={() => setShowAlphaBeta(!showAlphaBeta)} className={`transition-colors ${showAlphaBeta ? theme.colors.accent : theme.colors.textMuted}`}>
+                                <button type="button" onClick={() => setShowAlphaBeta(!showAlphaBeta)} className={`transition-colors ${showAlphaBeta ? theme.colors.accent : theme.colors.textMuted}`}>
                                     {showAlphaBeta ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
                                 </button>
                             </div>
                             {!isModpack && (
-                                <div className={`flex items-center gap-2 cursor-pointer transition-colors ${isOptional ? 'text-blue-500' : theme.colors.textMuted}`} onClick={() => setIsOptional(!isOptional)}>
-                                    <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${isOptional ? 'bg-blue-500 border-blue-500 text-white' : theme.colors.border}`}>
-                                        {isOptional && <CheckSquare className="w-3 h-3" />}
-                                    </div>
-                                    <span className="text-xs font-bold">Optional Dependency</span>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {(['REQUIRED', 'OPTIONAL', 'EMBEDDED'] as DependencyType[]).map(type => (
+                                        <button
+                                            key={type}
+                                            type="button"
+                                            onClick={() => setDependencyType(type)}
+                                            className={`px-2 py-2 rounded-lg text-[10px] font-black border transition-colors ${dependencyType === type ? 'bg-modtale-accent text-white border-modtale-accent' : `${theme.colors.bgSurface} ${theme.colors.border} ${theme.colors.textMuted}`}`}
+                                        >
+                                            {type}
+                                        </button>
+                                    ))}
                                 </div>
                             )}
-                            <div className={`flex items-center gap-2 cursor-pointer transition-colors ${isEmbedded ? 'text-emerald-600 dark:text-emerald-400' : theme.colors.textMuted}`} onClick={() => setIsEmbedded(!isEmbedded)}>
-                                <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${isEmbedded ? 'bg-emerald-500 border-emerald-500 text-white' : theme.colors.border}`}>
-                                    {isEmbedded && <CheckSquare className="w-3 h-3" />}
-                                </div>
-                                <span className="text-xs font-bold">Embedded Dependency</span>
-                            </div>
                         </div>
 
-                        <div className="p-3 sm:p-4 overflow-y-auto flex-1 bg-slate-50/50 dark:bg-slate-900/50 space-y-2">
+                        <div className="p-4 overflow-y-auto flex-1 bg-slate-50/50 dark:bg-slate-900/50 space-y-2">
                             {loadingProjectVersions ? (
                                 <div className={`p-4 text-center text-xs ${theme.colors.textMuted} flex items-center justify-center gap-2`}>
                                     <Loader2 className="w-4 h-4 animate-spin" /> Loading versions...
                                 </div>
-                            ) : filteredVersions.length > 0 ? filteredVersions.map(v => {
-                                const isCompatible = !targetGameVersion || v.gameVersions?.includes(targetGameVersion);
+                            ) : filteredVersions.length > 0 ? filteredVersions.map(version => {
+                                const isCompatible = !targetGameVersion || version.gameVersions?.includes(targetGameVersion);
                                 return (
-                                    <button key={v.id} onClick={() => confirmVersion(v.versionNumber)} className={`w-full text-left px-4 py-3 flex justify-between items-center rounded-xl transition-all duration-300 shadow-sm border ${!isCompatible ? "bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-white/10 hover:border-modtale-accent/40 dark:hover:border-modtale-accent/50"}`}>
+                                    <button
+                                        key={version.id}
+                                        type="button"
+                                        onClick={() => addDependency(buildModtaleDependency(selectedProject, version.versionNumber, isModpack ? 'REQUIRED' : dependencyType), selectedProject, version)}
+                                        className={`w-full text-left px-4 py-3 flex justify-between items-center rounded-xl transition-all shadow-sm border ${!isCompatible ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-white/10 hover:border-modtale-accent/40 dark:hover:border-modtale-accent/50'}`}
+                                    >
                                         <div>
                                             <div className="flex items-center gap-2">
-                                                <span className={`font-bold text-sm ${!isCompatible ? theme.colors.dangerText : theme.colors.textPrimary}`}>{v.versionNumber}</span>
-                                                {v.channel !== 'RELEASE' && (
-                                                    <span className={`text-[9px] font-bold px-1.5 rounded border ${v.channel === 'BETA' ? 'text-blue-500 border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800' : 'text-orange-500 border-orange-200 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-800'}`}>
-                                                        {v.channel}
-                                                    </span>
+                                                <span className={`font-bold text-sm ${!isCompatible ? theme.colors.dangerText : theme.colors.textPrimary}`}>{version.versionNumber}</span>
+                                                {version.channel && version.channel !== 'RELEASE' && (
+                                                    <span className={`text-[9px] font-bold px-1.5 rounded border ${version.channel === 'BETA' ? 'text-blue-500 border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800' : 'text-orange-500 border-orange-200 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-800'}`}>{version.channel}</span>
                                                 )}
                                             </div>
-                                            <div className={`text-xs ${theme.colors.textMuted}`}>For {v.gameVersions?.join(', ')}</div>
+                                            <div className={`text-xs ${theme.colors.textMuted}`}>For {version.gameVersions?.join(', ')}</div>
                                         </div>
                                         {isCompatible ? <Plus className={`w-4 h-4 ${theme.colors.accent}`} /> : <AlertTriangle className="w-4 h-4 text-red-500" />}
                                     </button>
-                                )
+                                );
                             }) : (
                                 <div className={`p-4 text-center text-xs ${theme.colors.textMuted} italic`}>No compatible versions found with current filters.</div>
                             )}
                         </div>
                         {targetGameVersion && (
-                            <div className={`p-4 bg-slate-50 dark:bg-slate-800/95 border-t border-slate-200 dark:border-white/10 text-center shrink-0`}>
-                                <button onClick={() => { setShowIncompatible(!showIncompatible); }} className={`text-xs font-bold ${theme.colors.accent} hover:underline`}>{showIncompatible ? 'Hide' : 'Show'} incompatible versions</button>
+                            <div className="p-4 bg-slate-50 dark:bg-slate-800/95 border-t border-slate-200 dark:border-white/10 text-center">
+                                <button type="button" onClick={() => setShowIncompatibleVersions(!showIncompatibleVersions)} className={`text-xs font-bold ${theme.colors.accent} hover:underline`}>
+                                    {showIncompatibleVersions ? 'Hide' : 'Show'} incompatible versions
+                                </button>
                             </div>
                         )}
                     </div>
                 </div>
             )}
 
-            <div className="flex justify-between items-center">
+            {showExternalModal && !disabled && !isIncompatibilityMode && (
+                <div className={theme.components.modalOverlay}>
+                    <div className="fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-[min(92vw,34rem)] max-h-[85dvh] flex flex-col z-[100] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 shadow-xl rounded-3xl overflow-hidden">
+                        <div className="p-5 flex items-start justify-between gap-4 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/95">
+                            <div>
+                                <h3 className={`text-lg font-black ${theme.colors.textPrimary}`}>External Reference</h3>
+                                <p className={`text-sm ${theme.colors.textMuted} mt-1`}>CurseForge, GitHub, or another Hytale source.</p>
+                            </div>
+                            <button type="button" onClick={() => setShowExternalModal(false)} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
+                        </div>
+                        <div className="p-5 space-y-4 overflow-y-auto">
+                            <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
+                                <input value={externalUrl} onChange={event => setExternalUrl(event.target.value)} className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-modtale-accent ${theme.colors.textPrimary}`} placeholder="Paste an external project URL" />
+                                <button type="button" onClick={resolveExternalDetails} disabled={resolvingExternal || !externalUrl.trim()} className={`px-4 py-3 rounded-xl font-black text-sm ${theme.components.buttonSecondary} flex items-center justify-center gap-2 disabled:opacity-60`}>
+                                    {resolvingExternal ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                                    Fetch
+                                </button>
+                            </div>
+                            <select value={externalSource} onChange={event => setExternalSource(event.target.value as DependencySource | '')} className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-modtale-accent ${theme.colors.textPrimary}`}>
+                                <option value="">Auto-detect source</option>
+                                <option value="CURSEFORGE">CurseForge</option>
+                                <option value="GITHUB">GitHub</option>
+                                <option value="WEBSITE">Website</option>
+                                <option value="OTHER">Other</option>
+                            </select>
+
+                            {externalResolved && (
+                                <div className={`rounded-xl border ${theme.colors.border} ${theme.colors.bgBase} p-3 flex items-start gap-3`}>
+                                    <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-300 flex items-center justify-center shrink-0 overflow-hidden">
+                                        {externalResolved.iconUrl ? <img src={externalResolved.iconUrl} alt="" className="w-full h-full object-cover" /> : <ExternalLink className="w-4 h-4" />}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <div className={`font-black ${theme.colors.textPrimary} truncate`}>{externalResolved.title}</div>
+                                        <div className={`text-xs ${theme.colors.textMuted}`}>{getSourceLabel(externalResolved.source)} · {externalResolved.externalId}</div>
+                                        {externalResolved.summary && <p className={`text-xs ${theme.colors.textMuted} mt-1 line-clamp-2`}>{externalResolved.summary}</p>}
+                                    </div>
+                                </div>
+                            )}
+
+                            {externalResolved?.files && externalResolved.files.length > 0 && (
+                                <select value={externalSelectedFileId} onChange={event => {
+                                    const nextFile = externalResolved.files?.find(file => file.id === event.target.value);
+                                    setExternalSelectedFileId(event.target.value);
+                                    if (nextFile?.versionNumber) setExternalVersion(nextFile.versionNumber);
+                                }} className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-modtale-accent ${theme.colors.textPrimary}`}>
+                                    {externalResolved.files.map((file: ExternalProjectFile) => (
+                                        <option key={file.id || file.displayName} value={file.id || ''}>
+                                            {file.displayName || file.fileName || file.id} {file.versionNumber ? `(${file.versionNumber})` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
+
+                            {!isModpack && (
+                                <div className="grid grid-cols-3 gap-2">
+                                    {(['REQUIRED', 'OPTIONAL', 'EMBEDDED'] as DependencyType[]).map(type => (
+                                        <button
+                                            key={type}
+                                            type="button"
+                                            onClick={() => setDependencyType(type)}
+                                            className={`px-2 py-2 rounded-lg text-[10px] font-black border transition-colors ${dependencyType === type ? 'bg-modtale-accent text-white border-modtale-accent' : `${theme.colors.bgSurface} ${theme.colors.border} ${theme.colors.textMuted}`}`}
+                                        >
+                                            {type}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            <input value={externalTitle} onChange={event => setExternalTitle(event.target.value)} className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-modtale-accent ${theme.colors.textPrimary}`} placeholder="Project title" />
+                            <input value={externalVersion} onChange={event => setExternalVersion(event.target.value)} className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-modtale-accent ${theme.colors.textPrimary}`} placeholder="Version" />
+                            {externalResolved && !externalResolved.hytaleProjectConfirmed && (
+                                <label className={`flex items-start gap-3 rounded-xl border ${theme.colors.border} ${theme.colors.bgBase} p-3 text-sm ${theme.colors.textSecondary}`}>
+                                    <input type="checkbox" checked={externalConfirmed} onChange={event => setExternalConfirmed(event.target.checked)} className="mt-1" />
+                                    <span>I confirm this external project is for Hytale and is safe to reference from this modpack.</span>
+                                </label>
+                            )}
+
+                            {(loadingExternalSuggestions || externalSuggestions.length > 0) && (
+                                <div className={`rounded-xl border ${theme.colors.border} ${theme.colors.bgBase} overflow-hidden`}>
+                                    <div className={`px-3 py-2 text-[10px] font-black uppercase ${theme.colors.textMuted} ${theme.colors.bgSurfaceAlt}`}>Modtale Matches</div>
+                                    {loadingExternalSuggestions ? (
+                                        <div className={`p-3 text-xs ${theme.colors.textMuted} flex items-center gap-2`}><Loader2 className="w-3 h-3 animate-spin" /> Searching...</div>
+                                    ) : externalSuggestions.map(project => (
+                                        <button key={project.id} type="button" onClick={() => { setShowExternalModal(false); void openVersionPicker(project); }} className={`w-full p-3 flex items-center justify-between gap-3 text-left ${theme.colors.bgSurfaceHover}`}>
+                                            <div className="min-w-0">
+                                                <div className={`font-bold text-sm ${theme.colors.textPrimary} truncate`}>{project.title}</div>
+                                                <div className={`text-xs ${theme.colors.textMuted}`}>Use the Modtale project instead</div>
+                                            </div>
+                                            <ChevronDown className={`w-4 h-4 -rotate-90 ${theme.colors.accent}`} />
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {externalError && (
+                                <div className={`p-3 rounded-xl border ${theme.colors.dangerBorder} ${theme.colors.dangerBg} ${theme.colors.dangerText} text-xs font-bold flex items-start gap-2`}>
+                                    <AlertTriangle className="w-4 h-4 shrink-0" /> {externalError}
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 flex justify-end gap-3 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/95">
+                            <button type="button" onClick={() => setShowExternalModal(false)} className={`px-4 py-2 font-bold rounded-lg ${theme.colors.textMuted} ${theme.colors.bgSurfaceHover}`}>Cancel</button>
+                            <button type="button" onClick={addExternalReference} className={`px-5 py-2 font-bold rounded-lg ${theme.components.buttonPrimary} flex items-center gap-2`}><ExternalLink className="w-4 h-4" /> Add Reference</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <h3 className={`font-bold ${theme.colors.textPrimary} flex items-center gap-2 text-sm uppercase tracking-wide`}><Search className="w-4 h-4" /> {effectiveLabel}</h3>
+                {!isIncompatibilityMode && (
+                    <button type="button" disabled={disabled} onClick={() => setShowExternalModal(true)} className={`text-xs font-bold px-3 py-2 rounded-lg border ${theme.colors.border} ${theme.colors.bgBase} ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} flex items-center gap-2 ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                        <ExternalLink className="w-3.5 h-3.5" /> Add External
+                    </button>
+                )}
             </div>
 
-            {previousDependencies && previousDependencies.length > 0 && selectedDeps.length === 0 && !disabled && !isIncompatibilityMode && (
-                <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/20 p-4 rounded-xl flex items-center justify-between animate-in fade-in">
-                    <div className="flex items-center gap-3">
-                        <RefreshCw className="w-5 h-5 text-blue-500" />
-                        <div>
+            {previousDependencies && previousDependencies.length > 0 && selectedCount === 0 && !disabled && !isIncompatibilityMode && (
+                <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/20 p-4 rounded-xl flex items-center justify-between gap-4 animate-in fade-in">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <RefreshCw className="w-5 h-5 text-blue-500 shrink-0" />
+                        <div className="min-w-0">
                             <h4 className="text-sm font-bold text-blue-900 dark:text-blue-100">Updates Available</h4>
                             <p className="text-xs text-blue-700 dark:text-blue-300">Found {previousDependencies.length} projects from the previous release.</p>
                         </div>
                     </div>
-                    <button onClick={() => setShowWizard(true)} className="text-xs font-bold bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-1 shadow-sm">
-                        Import & Update <ChevronRight className="w-3 h-3" />
-                    </button>
+                    <button type="button" onClick={() => setShowPreviousImport(true)} className="text-xs font-bold bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors shadow-sm">Import</button>
+                </div>
+            )}
+
+            {showPreviousImport && previousDependencies && (
+                <div className={`rounded-xl border ${theme.colors.border} ${theme.colors.bgBase} overflow-hidden`}>
+                    <div className={`p-3 flex justify-between items-center ${theme.colors.bgSurfaceAlt}`}>
+                        <span className={`text-xs font-black uppercase ${theme.colors.textMuted}`}>Previous Dependencies</span>
+                        <button type="button" onClick={() => setShowPreviousImport(false)} className={`${theme.colors.textMuted}`}><X className="w-4 h-4" /></button>
+                    </div>
+                    <div className="p-3 space-y-2">
+                        {previousDependencies.map(dep => (
+                            <div key={`${dep.projectId}:${dep.versionNumber}`} className={`p-3 rounded-lg border ${theme.colors.border} flex items-center justify-between gap-3`}>
+                                <div className="min-w-0">
+                                    <div className={`font-bold ${theme.colors.textPrimary} text-sm truncate`}>{dep.projectTitle || dep.projectId}</div>
+                                    <div className={`text-xs ${theme.colors.textMuted} font-mono`}>v{dep.versionNumber}</div>
+                                </div>
+                                <button type="button" onClick={() => {
+                                    const dependency = cloneDependencyForForm(dep, isModpack);
+                                    if (!dependencies.some(existing => dependencyProjectKey(existing) === dependencyProjectKey(dependency))) {
+                                        onChange([...dependencies, dependency]);
+                                    }
+                                }} className={`text-xs font-bold ${theme.colors.accent} hover:underline`}>Add</button>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
 
             <div className="relative">
-                <input type="text" disabled={disabled} value={search} onChange={e => setSearch(e.target.value)} className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-modtale-accent outline-none shadow-sm transition-all ${theme.colors.textPrimary} ${disabled ? `cursor-not-allowed ${theme.colors.bgSurfaceAlt}` : ''}`} placeholder="Search for projects..." />
+                <input type="text" disabled={disabled} value={search} onChange={event => setSearch(event.target.value)} className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-modtale-accent outline-none shadow-sm transition-all ${theme.colors.textPrimary} ${disabled ? `cursor-not-allowed ${theme.colors.bgSurfaceAlt}` : ''}`} placeholder="Search for projects..." />
                 <Search className={`absolute left-3.5 top-3.5 w-4 h-4 ${theme.colors.textMuted}`} />
                 {loading && <div className="absolute right-4 top-3.5"><Loader2 className={`w-4 h-4 animate-spin ${theme.colors.accent}`} /></div>}
             </div>
 
             {results.length > 0 && !disabled && (
                 <div className={`max-h-56 overflow-y-auto ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl shadow-lg divide-y ${theme.colors.borderFaint}`}>
-                    {results.map(mod => (
-                        <button key={mod.id} onClick={(e) => { e.preventDefault(); void openVersionPicker(mod); }} className={`w-full text-left px-4 py-3 ${theme.colors.bgSurfaceHover} flex justify-between items-center text-sm transition-colors group`}>
-                            <div className="flex items-center gap-3">
-                                <img src={getIconUrl(mod.imageUrl)} className="w-8 h-8 rounded-md bg-slate-200 object-cover" alt="" onError={(e) => e.currentTarget.src='/assets/favicon.svg'} />
-                                <div>
-                                    <div className={`font-bold ${theme.colors.textPrimary} group-hover:${theme.colors.accent}`}>{mod.title}</div>
-                                    <div className={`text-xs ${theme.colors.textMuted}`}>by {mod.author}</div>
+                    {results.map(project => (
+                        <button key={project.id} type="button" onClick={event => { event.preventDefault(); void openVersionPicker(project); }} className={`w-full text-left px-4 py-3 ${theme.colors.bgSurfaceHover} flex justify-between items-center text-sm transition-colors group`}>
+                            <div className="flex items-center gap-3 min-w-0">
+                                <img src={getIconUrl(project.imageUrl)} className="w-8 h-8 rounded-md bg-slate-200 object-cover shrink-0" alt="" onError={event => event.currentTarget.src='/assets/favicon.svg'} />
+                                <div className="min-w-0">
+                                    <div className={`font-bold ${theme.colors.textPrimary} group-hover:${theme.colors.accent} truncate`}>{project.title}</div>
+                                    <div className={`text-xs ${theme.colors.textMuted}`}>by {project.author}</div>
                                 </div>
                             </div>
                             <Plus className={`w-5 h-5 text-slate-300 group-hover:${theme.colors.accent}`} />
@@ -525,57 +774,89 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                 </div>
             )}
 
+            {conflictWarnings.length > 0 && (
+                <div className={`rounded-xl border ${theme.colors.warningBorder} ${theme.colors.warningBg} p-4 space-y-2`}>
+                    <div className={`flex items-center gap-2 text-sm font-black ${theme.colors.warningText}`}>
+                        <AlertTriangle className="w-4 h-4" /> Incompatible projects in this set
+                    </div>
+                    {conflictWarnings.map(warning => (
+                        <div key={`${warning.from.projectId}:${warning.toId}`} className={`text-xs ${theme.colors.warningText}`}>
+                            <strong>{warning.from.projectTitle}</strong> marks <strong>{warning.toTitle}</strong> as incompatible.
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {externalDependencyWarnings.length > 0 && (
+                <div className="rounded-xl border border-orange-200 dark:border-orange-900/40 bg-orange-50 dark:bg-orange-950/20 p-4 space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-black text-orange-800 dark:text-orange-200">
+                        <AlertTriangle className="w-4 h-4" /> External service references
+                    </div>
+                    {externalDependencyWarnings.map(({ dependency, sourceLabel }) => (
+                        <div key={dependency.id || dependency.projectId} className="text-xs text-orange-800 dark:text-orange-200">
+                            <strong>{dependency.projectTitle || dependency.projectId}</strong> is an external {isModpack ? 'modpack entry' : 'dependency'} from <strong>{sourceLabel}</strong>
+                            {dependency.externalFileUrl ? <>; its file is also sourced from <strong>{sourceLabel}</strong>.</> : <>.</>}
+                        </div>
+                    ))}
+                </div>
+            )}
+
             <div className="mt-6">
                 <div className="flex justify-between items-center mb-3">
-                    <h4 className={`text-xs font-bold uppercase ${theme.colors.textMuted}`}>Selected ({selectedDeps.length})</h4>
+                    <h4 className={`text-xs font-bold uppercase ${theme.colors.textMuted}`}>Selected ({selectedCount})</h4>
                 </div>
-                {selectedDeps.length === 0 ? (
+                {selectedCount === 0 ? (
                     <div className={`text-center p-8 border-2 border-dashed ${theme.colors.border} rounded-xl ${theme.colors.textMuted} text-sm italic`}>
                         {isIncompatibilityMode ? 'No incompatible mods added.' : 'No dependencies added.'}
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-2">
-                        {selectedDeps.map((entry, idx) => {
-                            const parsed = isIncompatibilityMode ? null : parseDependencyEntry(entry);
-                            const id = isIncompatibilityMode ? entry : (parsed?.projectId || '');
-                            const ver = isIncompatibilityMode ? '' : (parsed?.versionNumber || '');
-                            const isOpt = isIncompatibilityMode ? false : Boolean(parsed?.isOptional);
-                            const embedded = isIncompatibilityMode ? false : Boolean(parsed?.isEmbedded);
+                        {(isIncompatibilityMode ? incompatibleIds : dependencies).map((entry: string | ProjectDependency, index: number) => {
+                            const dependency = typeof entry === 'string' ? null : entry;
+                            const id = typeof entry === 'string' ? entry : entry.projectId;
                             const meta = metaCache[id];
+                            const isExternal = dependency ? isExternalDependency(dependency) : false;
+                            const depType = dependency ? getDependencyType(dependency) : 'REQUIRED';
                             return (
-                                <div key={idx} className={`flex items-center justify-between ${theme.colors.bgBase} p-3 rounded-xl border ${theme.colors.border} text-sm shadow-sm group`}>
-                                    <div className="flex items-center gap-3 overflow-hidden">
+                                <div key={dependency?.id || id} className={`flex items-center justify-between ${theme.colors.bgBase} p-3 rounded-xl border ${theme.colors.border} text-sm shadow-sm group gap-3`}>
+                                    <div className="flex items-center gap-3 overflow-hidden min-w-0">
                                         {!isIncompatibilityMode && (
-                                            <div className={`p-1 flex-shrink-0 rounded-lg ${isOpt ? `${theme.colors.bgSurfaceAlt} ${theme.colors.textMuted}` : 'bg-amber-100 text-amber-600 dark:bg-amber-900/20'}`}>
-                                                {isOpt ? <FileText className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
+                                            <div className={`p-1 shrink-0 rounded-lg ${depType === 'OPTIONAL' ? `${theme.colors.bgSurfaceAlt} ${theme.colors.textMuted}` : depType === 'EMBEDDED' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-amber-100 text-amber-600 dark:bg-amber-900/20'}`}>
+                                                {depType === 'OPTIONAL' ? <FileText className="w-4 h-4" /> : depType === 'EMBEDDED' ? <CheckSquare className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
                                             </div>
                                         )}
-                                        <img src={getIconUrl(meta?.icon)} alt="" className={`w-8 h-8 rounded ${theme.colors.bgSurfaceAlt} object-cover flex-shrink-0`} onError={(e) => e.currentTarget.src='/assets/favicon.svg'} />
+                                        {isExternal ? (
+                                            <div className="w-8 h-8 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-300 flex items-center justify-center shrink-0">
+                                                <ExternalLink className="w-4 h-4" />
+                                            </div>
+                                        ) : (
+                                            <img src={getIconUrl(meta?.icon)} alt="" className={`w-8 h-8 rounded ${theme.colors.bgSurfaceAlt} object-cover shrink-0`} onError={event => event.currentTarget.src='/assets/favicon.svg'} />
+                                        )}
                                         <div className="min-w-0">
-                                            <div className={`font-bold ${theme.colors.textPrimary} truncate`}>{meta?.title || id}</div>
+                                            <div className={`font-bold ${theme.colors.textPrimary} truncate`}>{dependency?.projectTitle || meta?.title || id}</div>
                                             {isIncompatibilityMode ? (
                                                 <div className={`text-xs ${theme.colors.textMuted}`}>Marked as incompatible</div>
                                             ) : (
-                                                <div className={`text-xs ${theme.colors.textMuted} flex items-center gap-1.5`}>
-                                                    <span className="truncate max-w-[100px]">by {meta?.author || '...'}</span>
+                                                <div className={`text-xs ${theme.colors.textMuted} flex items-center gap-1.5 min-w-0`}>
+                                                    <span className="truncate max-w-[110px]">{isExternal ? `External: ${getSourceLabel(dependency?.source)}` : `by ${meta?.author || '...'}`}</span>
                                                     <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-white/20"></span>
-                                                    <span className={`font-mono ${theme.colors.bgSurfaceAlt} px-1.5 py-0.5 rounded`}>v{ver}</span>
+                                                    <span className={`font-mono ${theme.colors.bgSurfaceAlt} px-1.5 py-0.5 rounded`}>v{dependency?.versionNumber}</span>
                                                 </div>
                                             )}
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                                        {!isIncompatibilityMode && !isModpack && (
-                                            <button type="button" disabled={disabled} onClick={() => toggleOptionalExisting(idx)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${isOpt ? `border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50` : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/20 dark:border-amber-900/30 dark:text-amber-400'} ${disabled ? 'cursor-not-allowed opacity-70' : ''}`}>
-                                                {isOpt ? 'Optional' : 'Required'}
-                                            </button>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {dependency && !isModpack && !isIncompatibilityMode && (
+                                            <select value={depType} disabled={disabled} onChange={event => cycleDependencyType(index, event.target.value as DependencyType)} className={`text-xs font-bold px-2 py-1.5 rounded-lg border ${theme.colors.border} ${theme.colors.bgSurface} ${theme.colors.textPrimary}`}>
+                                                <option value="REQUIRED">Required</option>
+                                                <option value="OPTIONAL">Optional</option>
+                                                <option value="EMBEDDED">Embedded</option>
+                                            </select>
                                         )}
-                                        {!isIncompatibilityMode && (
-                                            <button type="button" disabled={disabled} onClick={() => toggleEmbeddedExisting(idx)} className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-all ${embedded ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-900/30 dark:text-emerald-400' : `border-slate-200 ${theme.colors.textMuted} hover:${theme.colors.textPrimary} hover:bg-slate-50`} ${disabled ? 'cursor-not-allowed opacity-70' : ''}`}>
-                                                {embedded ? 'Embedded' : 'Standalone'}
-                                            </button>
+                                        {dependency && isExternal && dependency.externalUrl && (
+                                            <a href={dependency.externalUrl} target="_blank" rel="noreferrer" className={`p-2 rounded-lg ${theme.colors.textMuted} hover:${theme.colors.accent}`}><ExternalLink className="w-4 h-4" /></a>
                                         )}
-                                        <button type="button" disabled={disabled} onClick={() => removeDep(idx)} className={`${theme.colors.textMuted} p-2 rounded-lg transition-colors ${disabled ? 'cursor-not-allowed opacity-50' : `hover:${theme.colors.dangerText} hover:${theme.colors.dangerBg}`}`}><X className="w-4 h-4" /></button>
+                                        <button type="button" disabled={disabled} onClick={() => removeSelected(index)} className={`${theme.colors.textMuted} p-2 rounded-lg transition-colors ${disabled ? 'cursor-not-allowed opacity-50' : `hover:${theme.colors.dangerText} hover:${theme.colors.dangerBg}`}`}><X className="w-4 h-4" /></button>
                                     </div>
                                 </div>
                             );

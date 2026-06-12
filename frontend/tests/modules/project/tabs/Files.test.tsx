@@ -4,20 +4,19 @@ import { createRoot, type Root } from 'react-dom/client';
 import { Files } from '@/modules/project/tabs/Files';
 import type { VersionFormData } from '@/modules/project/components/FormShared';
 
-const mockVersionFields = vi.fn(() => <div data-testid="version-fields" />);
+const mockVersionFields = vi.fn((props: any) => <div data-testid="version-fields" />);
 
 vi.mock('@/modules/project/components/VersionFields', () => ({
     VersionFields: (props: any) => mockVersionFields(props)
 }));
 
 const versionData: VersionFormData = {
-    projectIds: [],
     versionNumber: '',
     gameVersions: [],
     changelog: '',
     file: null,
     dependencies: [],
-    modIds: [],
+    incompatibleProjectIds: [],
     channel: 'RELEASE'
 };
 
@@ -132,9 +131,9 @@ describe('Files upload rules for drafts', () => {
         });
 
         expect(mockVersionFields).toHaveBeenCalled();
-        const props = mockVersionFields.mock.calls.at(-1)?.[0];
-        expect(props.existingVersions).toEqual(['1.0.0']);
-        expect(props.previousDependencies).toEqual([{
+        const props = mockVersionFields.mock.calls.at(-1)?.[0] as any;
+        expect(props?.existingVersions).toEqual(['1.0.0']);
+        expect(props?.previousDependencies).toEqual([{
             projectId: 'dep-1',
             projectTitle: 'Dependency One',
             versionNumber: '2.0.0'
@@ -144,7 +143,13 @@ describe('Files upload rules for drafts', () => {
     it('hides previous dependency import when dependencies are already selected', async () => {
         const populatedVersionData: VersionFormData = {
             ...versionData,
-            projectIds: ['dep-2:3.0.0']
+            dependencies: [{
+                projectId: 'dep-2',
+                projectTitle: 'Dependency Two',
+                versionNumber: '3.0.0',
+                dependencyType: 'REQUIRED',
+                source: 'MODTALE'
+            }]
         };
 
         await act(async () => {
@@ -180,8 +185,8 @@ describe('Files upload rules for drafts', () => {
             );
         });
 
-        const props = mockVersionFields.mock.calls.at(-1)?.[0];
-        expect(props.previousDependencies).toBeUndefined();
+        const props = mockVersionFields.mock.calls.at(-1)?.[0] as any;
+        expect(props?.previousDependencies).toBeUndefined();
     });
 
     it('lets creators reuse the latest setup in one click', async () => {
@@ -201,7 +206,8 @@ describe('Files upload rules for drafts', () => {
                                 projectId: 'dep-1',
                                 projectTitle: 'Dependency One',
                                 versionNumber: '2.0.0',
-                                isOptional: true
+                                dependencyType: 'OPTIONAL',
+                                source: 'MODTALE'
                             }],
                             channel: 'BETA',
                             fileUrl: '/download.jar',
@@ -235,7 +241,13 @@ describe('Files upload rules for drafts', () => {
         expect(updater(versionData)).toMatchObject({
             gameVersions: ['1.21'],
             channel: 'BETA',
-            projectIds: ['dep-1:2.0.0:optional']
+            dependencies: [{
+                projectId: 'dep-1',
+                projectTitle: 'Dependency One',
+                versionNumber: '2.0.0',
+                dependencyType: 'OPTIONAL',
+                source: 'MODTALE'
+            }]
         });
     });
 });

@@ -146,7 +146,6 @@ public class ProjectMapper {
         if (!isSummary) {
             dto.setAbout(project.getAbout());
             dto.setChildProjectIds(project.getChildProjectIds());
-            dto.setModIds(project.getModIds());
 
             dto.setProjectRoles(project.getProjectRoles());
             dto.setTeamMembers(project.getTeamMembers());
@@ -272,11 +271,18 @@ public class ProjectMapper {
     public static ProjectDependencyDTO toDependencyDTO(ProjectDependency dependency) {
         if (dependency == null) return null;
         return new ProjectDependencyDTO(
-                dependency.getModId(),
-                dependency.getModTitle(),
+                dependency.getId(),
+                dependency.getProjectId(),
+                dependency.getProjectTitle(),
                 dependency.getVersionNumber(),
-                dependency.isOptional(),
-                dependency.isEmbedded()
+                dependency.getDependencyType(),
+                dependency.getSource(),
+                dependency.getExternalId(),
+                dependency.getExternalUrl(),
+                dependency.getExternalFileUrl(),
+                dependency.getExternalFileName(),
+                dependency.getCachedFileUrl(),
+                dependency.isHytaleProjectConfirmed()
         );
     }
 }

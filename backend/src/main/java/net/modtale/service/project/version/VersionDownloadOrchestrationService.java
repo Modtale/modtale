@@ -135,10 +135,13 @@ public class VersionDownloadOrchestrationService {
         List<String> selectedDependencies = downloadToken.getSelectedDependencies();
         if (targetVersion.getDependencies() != null) {
             targetVersion.getDependencies().forEach(dep -> {
+                if (dep.isExternal()) {
+                    return;
+                }
                 if (dep.isEmbedded()) {
                     return;
                 }
-                if (selectedDependencies == null || selectedDependencies.contains(dep.getModId())) {
+                if (selectedDependencies == null || selectedDependencies.contains(dep.getProjectId())) {
                     trackDependencyDownload(dep, context);
                 }
             });
@@ -202,10 +205,14 @@ public class VersionDownloadOrchestrationService {
     }
 
     private void trackDependencyDownload(ProjectDependency dependency, DownloadContext context) {
-        Project dependencyProject = projectService.getRawProjectById(dependency.getModId());
+        if (dependency.isExternal()) {
+            return;
+        }
+
+        Project dependencyProject = projectService.getRawProjectById(dependency.getProjectId());
         if (dependencyProject == null || analyticsEligibilityService.shouldCountProjectEngagement(dependencyProject, context.currentUser())) {
             trackingService.logDownload(
-                    dependency.getModId(),
+                    dependency.getProjectId(),
                     null,
                     dependencyProject != null ? dependencyProject.getAuthor() : null,
                     context.apiRequest(),

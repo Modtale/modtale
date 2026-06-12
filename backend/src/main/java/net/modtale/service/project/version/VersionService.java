@@ -5,6 +5,7 @@ import java.util.Optional;
 import net.modtale.exception.InvalidVersionRequestException;
 import net.modtale.exception.VersionNotFoundException;
 import net.modtale.model.dto.project.ManifestInspectionResult;
+import net.modtale.model.dto.request.project.DependencyReferenceRequest;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
@@ -83,14 +84,14 @@ public class VersionService {
     public void updateVersion(
             String id,
             String versionId,
-            List<String> projectIds,
+            List<DependencyReferenceRequest> dependencies,
             List<String> incompatibleProjectIds,
             List<String> gameVersions,
             String changelog,
             ProjectVersion.Channel channel,
             User user
     ) {
-        versionUpdateCommandHandler.updateVersion(id, versionId, projectIds, incompatibleProjectIds, gameVersions, changelog, channel, user);
+        versionUpdateCommandHandler.updateVersion(id, versionId, dependencies, incompatibleProjectIds, gameVersions, changelog, channel, user);
     }
 
     public void addVersion(
@@ -99,12 +100,12 @@ public class VersionService {
             List<String> gameVersions,
             MultipartFile file,
             String changelog,
-            List<String> projectIds,
+            List<DependencyReferenceRequest> dependencies,
             List<String> incompatibleProjectIds,
             ProjectVersion.Channel channel,
             User user
     ) {
-        versionCreationCommandHandler.addVersion(id, versionNumber, gameVersions, file, changelog, projectIds, incompatibleProjectIds, channel, user);
+        versionCreationCommandHandler.addVersion(id, versionNumber, gameVersions, file, changelog, dependencies, incompatibleProjectIds, channel, user);
     }
 
     public ManifestInspectionResult inspectManifest(String id, MultipartFile file, User user) {

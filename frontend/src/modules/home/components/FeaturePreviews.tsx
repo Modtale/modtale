@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Download, List, X, ChevronDown, ChevronRight, Check, Box, Link as LinkIcon, AlertCircle, Bell, Search, ArrowUpRight, MessageSquare, Send, Save, PieChart, TrendingUp, Eye, ArrowBigUp, ArrowBigDown, Settings } from 'lucide-react';
+import { Download, List, X, ChevronDown, ChevronRight, Check, Box, Link as LinkIcon, AlertCircle, Bell, Search, ArrowUpRight, MessageSquare, Send, Save, PieChart, TrendingUp, Eye, ArrowBigUp, ArrowBigDown, Settings, Layers } from 'lucide-react';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { api, BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
@@ -18,9 +18,9 @@ import { HistoryModal } from '@/modules/project/components/dialogs/HistoryModal'
 
 export const InlineDependencyUI = ({ randomProject }: { randomProject?: Project }) => {
     const mockDeps = useMemo(() => [
-        { projectId: 'hytale-core', projectTitle: 'Hytale Core Library', isOptional: false, isEmbedded: false, versionNumber: '1.2.0' },
-        { projectId: 'mathlib', projectTitle: 'MathLib', isOptional: false, isEmbedded: false, versionNumber: '2.1.0' },
-        ...(randomProject ? [{ projectId: randomProject.id, projectTitle: randomProject.title, isOptional: true, isEmbedded: false, versionNumber: randomProject.versions?.[0]?.versionNumber || '1.0.0' }] : [])
+        { projectId: 'hytale-core', projectTitle: 'Hytale Core Library', dependencyType: 'REQUIRED', source: 'MODTALE', versionNumber: '1.2.0' },
+        { projectId: 'mathlib', projectTitle: 'MathLib', dependencyType: 'REQUIRED', source: 'MODTALE', versionNumber: '2.1.0' },
+        ...(randomProject ? [{ projectId: randomProject.id, projectTitle: randomProject.title, dependencyType: 'OPTIONAL', source: 'MODTALE', versionNumber: randomProject.versions?.[0]?.versionNumber || '1.0.0' }] : [])
     ], [randomProject]);
 
     const initialMetaCache = useMemo(() => {
@@ -48,6 +48,99 @@ export const InlineDependencyUI = ({ randomProject }: { randomProject?: Project 
             initialMetaCache={initialMetaCache}
             initialSelected={['hytale-core']}
         />
+    );
+};
+
+const ModpackProjectRow = ({
+    title,
+    version,
+    source,
+    tone,
+}: {
+    title: string;
+    version: string;
+    source: string;
+    tone: 'local' | 'external' | 'warning';
+}) => {
+    const toneClass = tone === 'external'
+        ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/20'
+        : tone === 'warning'
+            ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20'
+            : 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20';
+
+    return (
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/65 dark:bg-black/15 p-3 shadow-sm">
+            <div className={`h-9 w-9 shrink-0 rounded-lg border flex items-center justify-center ${toneClass}`}>
+                {tone === 'warning' ? <AlertCircle className="h-4 w-4" /> : tone === 'external' ? <ArrowUpRight className="h-4 w-4" /> : <Check className="h-4 w-4" />}
+            </div>
+            <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-black text-slate-900 dark:text-white">{title}</div>
+                <div className="mt-0.5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    <span>{source}</span>
+                    <span className="font-mono normal-case tracking-normal">v{version}</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export const InlineModpackBuilderUI = ({ randomProject }: { randomProject?: Project }) => {
+    const highlightedProject = randomProject?.title || 'Skylands Expansion';
+
+    return (
+        <div className={`${GLASS_CARD} w-full overflow-hidden`}>
+            <div className={`${GLASS_HEADER} p-4 sm:p-5 flex items-center justify-between gap-4`}>
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-10 w-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
+                        <Layers className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                        <h3 className="truncate text-base sm:text-lg font-black text-slate-900 dark:text-white">Modpack Builder</h3>
+                        <p className="truncate text-xs font-bold text-slate-500 dark:text-slate-400">Vanilla+ Adventure Pack</p>
+                    </div>
+                </div>
+                <span className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
+                    6 projects
+                </span>
+            </div>
+
+            <div className="p-4 sm:p-5 space-y-4">
+                <div className="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-black/20 px-3 py-2.5">
+                    <Search className="h-4 w-4 text-slate-400" />
+                    <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Add a Hytale project or CurseForge URL</span>
+                </div>
+
+                <div className="space-y-2">
+                    <ModpackProjectRow title="Hytale Core Library" version="1.2.0" source="Modtale" tone="local" />
+                    <ModpackProjectRow title={highlightedProject} version={randomProject?.versions?.[0]?.versionNumber || '1.0.0'} source="Modtale" tone="local" />
+                    <ModpackProjectRow title="WorldEdit Hytale Tools" version="latest" source="CurseForge reference" tone="external" />
+                </div>
+
+                <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 dark:border-amber-500/20 dark:bg-amber-500/10">
+                    <div className="flex items-start gap-3">
+                        <LinkIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" />
+                        <div className="min-w-0 flex-1">
+                            <div className="text-sm font-black text-amber-900 dark:text-amber-100">Add 2 required dependencies?</div>
+                            <div className="mt-1 text-xs font-medium leading-relaxed text-amber-800 dark:text-amber-200/90">QuestAPI and Terrain Shapes are required by selected projects.</div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                <button type="button" className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-black text-white shadow-sm">Add selected</button>
+                                <button type="button" className="rounded-lg border border-amber-300 bg-white/70 px-3 py-1.5 text-xs font-black text-amber-800 dark:border-amber-400/30 dark:bg-white/10 dark:text-amber-100">Skip</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="rounded-xl border border-red-200 bg-red-50/80 p-3 dark:border-red-500/20 dark:bg-red-500/10">
+                    <div className="flex items-start gap-3">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-300" />
+                        <div className="min-w-0">
+                            <div className="text-sm font-black text-red-900 dark:text-red-100">WeatherFX conflicts with Clear Skies</div>
+                            <div className="mt-1 text-xs font-medium leading-relaxed text-red-700 dark:text-red-200/90">Resolve before publishing this pack.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 };
 
@@ -684,6 +777,28 @@ export const NewReleasesSection = ({
                 </ScrollContainer>
             )}
         </section>
+    );
+};
+
+export const ModpackPreviewSection = ({ randomProject }: { randomProject?: Project }) => {
+    return (
+        <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                    Modpacks, Upgraded
+                </h2>
+                <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-emerald-500 dark:from-blue-400 dark:to-emerald-400">
+                    Curated packs with dependency intelligence.
+                </p>
+                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                    Build complete Hytale experiences with required dependency prompts, incompatibility warnings, and CurseForge references when a project is not on Modtale yet.
+                </p>
+            </div>
+            <div className="flex-1 w-full max-w-xl relative overflow-visible">
+                <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/5 via-transparent to-emerald-500/5 dark:from-blue-500/10 dark:via-transparent dark:to-emerald-500/10 rounded-3xl blur-2xl pointer-events-none" />
+                <InlineModpackBuilderUI randomProject={randomProject} />
+            </div>
+        </div>
     );
 };
 

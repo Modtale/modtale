@@ -7,7 +7,7 @@ import type { Project, ProjectVersion } from '@/types';
 import type { VersionFormData } from '../components/FormShared';
 import { Permission } from '@/modules/permissions/permissions';
 import { compareSemVer } from '@/utils/modHelpers';
-import { parseDependencyEntry, serializeProjectDependency } from '../utils/dependencyEntries';
+import { dependencyProjectKey } from '../utils/dependencyEntries';
 
 interface FilesProps {
     projectData: Project | null;
@@ -30,7 +30,7 @@ export const Files: React.FC<FilesProps> = ({ projectData, versionData, setVersi
         ? [...projectData.versions].sort((a, b) => compareSemVer(b.versionNumber, a.versionNumber))[0]
         : null;
     const canReuseLatestSetup = Boolean(latestVersion) && !readOnly && hasProjectPermission(Permission.VERSION_CREATE) && !reuseLatestSetupDismissed;
-    const hasSelectedDependencies = (versionData.projectIds || []).length > 0;
+    const hasSelectedDependencies = (versionData.dependencies || []).length > 0;
 
     useEffect(() => {
         setReuseLatestSetupDismissed(false);
@@ -39,9 +39,9 @@ export const Files: React.FC<FilesProps> = ({ projectData, versionData, setVersi
     const handleReuseLatestSetup = () => {
         if (!latestVersion) return;
 
-        const nextDependencyEntries = (latestVersion.dependencies || []).map(serializeProjectDependency);
-        const dependencyIds = new Set(nextDependencyEntries.map((entry) => parseDependencyEntry(entry).projectId));
-        const preservedEntries = (versionData.projectIds || []).filter((entry) => !dependencyIds.has(parseDependencyEntry(entry).projectId));
+        const nextDependencies = latestVersion.dependencies || [];
+        const dependencyKeys = new Set(nextDependencies.map(dependencyProjectKey));
+        const preservedDependencies = (versionData.dependencies || []).filter((dependency) => !dependencyKeys.has(dependencyProjectKey(dependency)));
         const nextIncompatibleIds = latestVersion.incompatibleProjectIds || [];
         const incompatibleIds = new Set(nextIncompatibleIds);
         const preservedIncompatibles = (versionData.incompatibleProjectIds || []).filter((projectId) => !incompatibleIds.has(projectId));
@@ -50,7 +50,7 @@ export const Files: React.FC<FilesProps> = ({ projectData, versionData, setVersi
             ...prev,
             gameVersions: latestVersion.gameVersions || (latestVersion.gameVersion ? [latestVersion.gameVersion] : prev.gameVersions),
             channel: latestVersion.channel || prev.channel || 'RELEASE',
-            projectIds: [...nextDependencyEntries, ...preservedEntries],
+            dependencies: [...nextDependencies, ...preservedDependencies],
             incompatibleProjectIds: [...nextIncompatibleIds, ...preservedIncompatibles]
         }));
         setReuseLatestSetupDismissed(true);

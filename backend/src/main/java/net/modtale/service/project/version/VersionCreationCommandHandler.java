@@ -8,6 +8,7 @@ import java.util.UUID;
 import net.modtale.config.properties.AppLimitProperties;
 import net.modtale.exception.InvalidVersionRequestException;
 import net.modtale.exception.VersionStateConflictException;
+import net.modtale.model.dto.request.project.DependencyReferenceRequest;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectVersion;
@@ -51,7 +52,7 @@ public class VersionCreationCommandHandler {
             List<String> gameVersions,
             MultipartFile file,
             String changelog,
-            List<String> projectIds,
+            List<DependencyReferenceRequest> dependencies,
             List<String> incompatibleProjectIds,
             ProjectVersion.Channel channel,
             User user
@@ -73,9 +74,9 @@ public class VersionCreationCommandHandler {
         ProjectVersion version = buildVersion(project, versionNumber, gameVersions, changelog, channel, preparedArtifact, file, modpack);
 
         List<String> simpleProjectIds = new ArrayList<>();
-        if (projectIds != null) {
+        if (dependencies != null) {
             VersionDependencyService.ResolvedDependencies resolvedDependencies =
-                    versionMutationOrchestrationService.resolveRequestedDependencies(projectIds, modpack, false);
+                    versionMutationOrchestrationService.resolveRequestedDependencies(dependencies, modpack, false);
             version.setDependencies(new ArrayList<>(resolvedDependencies.dependencies()));
             simpleProjectIds.addAll(resolvedDependencies.simpleProjectIds());
         }
@@ -87,7 +88,7 @@ public class VersionCreationCommandHandler {
         }
 
         if (modpack) {
-            project.setModIds(simpleProjectIds);
+            project.setChildProjectIds(simpleProjectIds);
         }
 
         project.getVersions().add(0, version);

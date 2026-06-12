@@ -159,7 +159,7 @@ class VersionDownloadOrchestrationServiceTest {
         version.setDependencies(List.of(
                 new ProjectDependency("dep-1", "Dependency One", "1.0.0"),
                 new ProjectDependency("dep-2", "Dependency Two", "1.0.0"),
-                new ProjectDependency("embedded", "Embedded", "1.0.0", false, true)
+                new ProjectDependency("embedded", "Embedded", "1.0.0", ProjectDependency.DependencyType.EMBEDDED)
         ));
         Project dependencyProject = project("dep-1", "Dependency One", ProjectClassification.DATA);
 
