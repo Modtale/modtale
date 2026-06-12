@@ -1,5 +1,6 @@
 import React from 'react';
 import { theme } from '@/styles/theme';
+import type { ProjectDependency } from '@/types';
 
 export type MetadataFormData = {
     title: string;
@@ -15,15 +16,13 @@ export type MetadataFormData = {
 };
 
 export type VersionFormData = {
-    projectIds: string[];
+    dependencies: ProjectDependency[];
     incompatibleProjectIds: string[];
     channel?: 'RELEASE' | 'BETA' | 'ALPHA';
     versionNumber: string;
     gameVersions: string[];
     changelog: string;
     file: File | null;
-    dependencies: string[];
-    modIds: any[];
 };
 
 export const Label = ({ children, required, className }: { children: React.ReactNode, required?: boolean, className?: string }) => (

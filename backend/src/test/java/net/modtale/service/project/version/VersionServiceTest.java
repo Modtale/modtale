@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import net.modtale.config.properties.AppLimitProperties;
 import net.modtale.exception.InvalidVersionRequestException;
+import net.modtale.model.dto.request.project.DependencyReferenceRequest;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
@@ -128,7 +129,8 @@ class VersionServiceTest {
         when(versionArtifactService.prepareVersionArtifact(project, file))
                 .thenReturn(new VersionArtifactService.PreparedVersionArtifact(ProjectClassification.DATA, "/files/data/bundle.zip", "sha-256"));
         when(scanService.createQueuedScanResult(1, "Initial scan queued.")).thenReturn(queuedScan);
-        when(versionDependencyService.resolveRequestedDependencies(List.of("dep-1:2.0.0"), false, false))
+        DependencyReferenceRequest dependency = dependency("dep-1", "2.0.0");
+        when(versionDependencyService.resolveRequestedDependencies(List.of(dependency), false, false))
                 .thenReturn(new VersionDependencyService.ResolvedDependencies(List.of(), List.of("dep-1")));
 
         service.addVersion(
@@ -137,7 +139,7 @@ class VersionServiceTest {
                 List.of("1.21.0"),
                 file,
                 "Release notes",
-                List.of("dep-1:2.0.0"),
+                List.of(dependency),
                 List.of(),
                 ProjectVersion.Channel.RELEASE,
                 user
@@ -199,7 +201,7 @@ class VersionServiceTest {
         project.setId("project-1");
         project.setStatus(ProjectStatus.PUBLISHED);
         project.setClassification(ProjectClassification.MODPACK);
-        project.setModIds(new ArrayList<>(List.of("old-dep")));
+        project.setChildProjectIds(new ArrayList<>(List.of("old-dep")));
 
         ProjectVersion version = new ProjectVersion();
         version.setId("version-1");
@@ -212,7 +214,8 @@ class VersionServiceTest {
 
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
         when(accessControlService.hasProjectPermission(project, user, "VERSION_EDIT")).thenReturn(true);
-        when(versionDependencyService.resolveRequestedDependencies(List.of("new-dep:2.0.0"), true, true))
+        DependencyReferenceRequest dependency = dependency("new-dep", "2.0.0");
+        when(versionDependencyService.resolveRequestedDependencies(List.of(dependency), true, true))
                 .thenReturn(new VersionDependencyService.ResolvedDependencies(
                         List.of(new ProjectDependency("new-dep", "New Dependency", "2.0.0")),
                         List.of("new-dep")
@@ -221,7 +224,7 @@ class VersionServiceTest {
         service.updateVersion(
                 "project-1",
                 "version-1",
-                List.of("new-dep:2.0.0"),
+                List.of(dependency),
                 List.of(),
                 null,
                 null,
@@ -230,8 +233,8 @@ class VersionServiceTest {
         );
 
         assertNull(version.getFileUrl());
-        assertEquals(List.of("new-dep"), project.getModIds());
-        assertEquals("new-dep", version.getDependencies().getFirst().getModId());
+        assertEquals(List.of("new-dep"), project.getChildProjectIds());
+        assertEquals("new-dep", version.getDependencies().getFirst().getProjectId());
         verify(projectDeletionService).deleteStoredFile("modpacks/sky-pack-1.0.0.zip");
         verify(projectRepository).save(project);
         verify(projectService).evictProjectCache(project);
@@ -281,5 +284,12 @@ class VersionServiceTest {
 
         assertThrows(InvalidVersionRequestException.class, () -> service.deleteVersion("project-1", "version-1", user));
         verify(projectDeletionService, never()).deleteVersionFile(version);
+    }
+
+    private static DependencyReferenceRequest dependency(String projectId, String versionNumber) {
+        DependencyReferenceRequest request = new DependencyReferenceRequest();
+        request.setProjectId(projectId);
+        request.setVersionNumber(versionNumber);
+        return request;
     }
 }

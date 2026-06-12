@@ -407,9 +407,16 @@ public class DataSeeder implements CommandLineRunner {
                 if (!(dependencyObj instanceof Document dependencyDoc)) {
                     continue;
                 }
-                Object rawModId = dependencyDoc.get("modId");
-                if (rawModId != null) {
-                    dependencyIds.add(rawModId.toString());
+                Object rawSource = dependencyDoc.get("source");
+                if (rawSource != null && !"MODTALE".equalsIgnoreCase(rawSource.toString())) {
+                    continue;
+                }
+                Object rawProjectId = dependencyDoc.get("projectId");
+                if (rawProjectId == null) {
+                    rawProjectId = dependencyDoc.get("modId");
+                }
+                if (rawProjectId != null) {
+                    dependencyIds.add(rawProjectId.toString());
                 }
             }
         }

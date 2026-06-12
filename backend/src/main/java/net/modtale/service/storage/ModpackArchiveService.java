@@ -3,6 +3,7 @@ package net.modtale.service.storage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import net.modtale.exception.StorageDownloadException;
@@ -65,12 +66,30 @@ final class ModpackArchiveService {
         ZipEntry readme = new ZipEntry("modpack.json");
         zos.putNextEntry(readme);
 
-        StringBuilder json = new StringBuilder("{\n  \"name\": \"" + pack.getTitle() + "\",\n  \"files\": [\n");
+        StringBuilder json = new StringBuilder("{\n  \"name\": \"")
+                .append(jsonEscape(pack.getTitle()))
+                .append("\",\n  \"files\": [\n");
         if (version.getDependencies() != null) {
             for (int i = 0; i < version.getDependencies().size(); i++) {
                 ProjectDependency dep = version.getDependencies().get(i);
-                json.append("    { \"id\": \"").append(dep.getModId())
-                        .append("\", \"version\": \"").append(dep.getVersionNumber()).append("\" }");
+                json.append("    { \"id\": \"").append(jsonEscape(dep.getProjectId()))
+                        .append("\", \"title\": \"").append(jsonEscape(dep.getProjectTitle()))
+                        .append("\", \"version\": \"").append(jsonEscape(dep.getVersionNumber()))
+                        .append("\", \"source\": \"").append(jsonEscape(dep.getSource().name())).append("\"");
+                if (dep.isExternal()) {
+                    json.append(", \"externalId\": \"").append(jsonEscape(dep.getExternalId()))
+                            .append("\", \"url\": \"").append(jsonEscape(dep.getExternalUrl())).append("\"");
+                    if (dep.getExternalFileUrl() != null) {
+                        json.append(", \"externalFileUrl\": \"").append(jsonEscape(dep.getExternalFileUrl())).append("\"");
+                    }
+                    if (dep.getExternalFileName() != null) {
+                        json.append(", \"externalFileName\": \"").append(jsonEscape(dep.getExternalFileName())).append("\"");
+                    }
+                    if (dep.getCachedFileUrl() != null) {
+                        json.append(", \"cachedFileUrl\": \"").append(jsonEscape(dep.getCachedFileUrl())).append("\"");
+                    }
+                }
+                json.append(" }");
                 if (i < version.getDependencies().size() - 1) {
                     json.append(",");
                 }
@@ -89,6 +108,11 @@ final class ModpackArchiveService {
         }
 
         for (ProjectDependency dependency : version.getDependencies()) {
+            if (dependency.isExternal()) {
+                writeExternalDependencyFile(zos, dependency);
+                continue;
+            }
+
             DownloadArchiveSupport.ResolvedDependency resolvedDependency = archiveSupport.resolveDependency(dependency);
             if (resolvedDependency == null || resolvedDependency.version().getFileUrl() == null) {
                 continue;
@@ -105,6 +129,63 @@ final class ModpackArchiveService {
             zos.write(fileData);
             zos.closeEntry();
         }
+    }
+
+    private void writeExternalDependencyFile(ZipOutputStream zos, ProjectDependency dependency) throws IOException {
+        String cachedFileUrl = trimToNull(dependency.getCachedFileUrl());
+        if (cachedFileUrl == null) {
+            return;
+        }
+
+        try {
+            byte[] fileData = archiveSupport.download(cachedFileUrl);
+            if (fileData == null || fileData.length == 0) {
+                return;
+            }
+
+            zos.putNextEntry(new ZipEntry("external/" + externalSourceFolder(dependency) + "/" + externalFilename(dependency)));
+            zos.write(fileData);
+            zos.closeEntry();
+        } catch (StorageDownloadException ex) {
+            logger.warn("Unable to include cached external dependency {} from {} in generated modpack archive.",
+                    dependency.getProjectTitle(), cachedFileUrl, ex);
+        }
+    }
+
+    private String externalSourceFolder(ProjectDependency dependency) {
+        return dependency.getSource().name().toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9._-]+", "-")
+                .replaceAll("-+", "-")
+                .replaceAll("(^-|-$)", "");
+    }
+
+    private String externalFilename(ProjectDependency dependency) {
+        String filename = trimToNull(dependency.getExternalFileName());
+        if (filename == null && trimToNull(dependency.getCachedFileUrl()) != null) {
+            filename = archiveSupport.extractOriginalFilename(dependency.getCachedFileUrl());
+        }
+        if (filename != null) {
+            return sanitizeArchiveFilename(filename);
+        }
+
+        String title = dependency.getProjectTitle() == null ? dependency.getProjectId() : dependency.getProjectTitle();
+        String version = dependency.getVersionNumber() == null ? "latest" : dependency.getVersionNumber();
+        String base = (title + "-" + version)
+                .replaceAll("[^A-Za-z0-9._-]+", "-")
+                .replaceAll("-+", "-")
+                .replaceAll("(^-|-$)", "");
+        return (base.isBlank() ? "external-dependency" : base) + ".jar";
+    }
+
+    private String sanitizeArchiveFilename(String filename) {
+        String sanitized = filename.replaceAll("[^A-Za-z0-9._-]+", "-")
+                .replaceAll("-+", "-")
+                .replaceAll("(^-|-$)", "");
+        if (sanitized.isBlank()) {
+            return "external-dependency.jar";
+        }
+        String lower = sanitized.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".jar") || lower.endsWith(".zip") ? sanitized : sanitized + ".jar";
     }
 
     private void cacheArchive(Project pack, ProjectVersion version, byte[] zipBytes) {
@@ -124,5 +205,19 @@ final class ModpackArchiveService {
             logger.warn("Generated modpack archive could not be cached for project={} version={}",
                     pack.getId(), version.getVersionNumber(), ex);
         }
+    }
+
+    private String jsonEscape(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
+    private String trimToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 }

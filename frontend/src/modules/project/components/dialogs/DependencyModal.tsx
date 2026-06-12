@@ -4,6 +4,7 @@ import { theme } from '@/styles/theme';
 import { api, BACKEND_URL } from '@/utils/api';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import type { ProjectVersion } from '@/types';
+import { isEmbeddedDependency, isExternalDependency, isOptionalDependency } from '@/modules/project/utils/dependencyEntries';
 
 interface DependencyModalProps {
     dependencies: NonNullable<ProjectVersion['dependencies']>;
@@ -27,10 +28,10 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({
     useScrollLock(!isInline);
     const [selected, setSelected] = useState<Set<string>>(() => {
         if (initialSelected) return new Set(initialSelected);
-        return new Set(dependencies.filter(d => !d.isEmbedded).map(d => d.projectId));
+        return new Set(dependencies.filter(d => !isEmbeddedDependency(d) && !isExternalDependency(d)).map(d => d.projectId));
     });
     const [metaCache, setMetaCache] = useState<Record<string, { title: string; author: string; icon: string }>>(() => initialMetaCache || {});
-    const selectableDependencies = dependencies.filter(dep => !dep.isEmbedded);
+    const selectableDependencies = dependencies.filter(dep => !isEmbeddedDependency(dep) && !isExternalDependency(dep));
 
     useEffect(() => {
         const fetchMeta = async () => {
@@ -51,7 +52,7 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({
         fetchMeta();
     }, [selectableDependencies, metaCache]);
 
-    const missingRequired = selectableDependencies.filter(d => !d.isOptional && !selected.has(d.projectId)).length > 0;
+    const missingRequired = selectableDependencies.filter(d => !isOptionalDependency(d) && !selected.has(d.projectId)).length > 0;
 
     const toggleDep = (id: string) => {
         const next = new Set(selected);
@@ -97,7 +98,7 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({
                     {selectableDependencies.map(dep => {
                         const meta = metaCache[dep.projectId];
                         const isSelected = selected.has(dep.projectId);
-                        const isRequiredMissing = !dep.isOptional && !isSelected;
+                        const isRequiredMissing = !isOptionalDependency(dep) && !isSelected;
 
                         return (
                             <div
@@ -151,7 +152,7 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({
                                 <div className="flex-shrink-0 ml-4 flex items-center">
                                     {isRequiredMissing ? (
                                         <span className="text-[10px] font-black uppercase bg-red-500 text-white px-2.5 py-1 rounded-md shadow-md flex items-center gap-1"><AlertCircle className="w-3 h-3"/> Required</span>
-                                    ) : !dep.isOptional ? (
+                                    ) : !isOptionalDependency(dep) ? (
                                         <span className={`text-[10px] font-bold uppercase bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 px-2.5 py-1 rounded-md border border-blue-200 dark:border-blue-500/30`}>Required</span>
                                     ) : (
                                         <span className={`text-[10px] font-bold uppercase ${theme.colors.bgSurfaceAlt} ${theme.colors.textSecondary} px-2.5 py-1 rounded-md border ${theme.colors.border}`}>Optional</span>

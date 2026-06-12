@@ -4,6 +4,7 @@ import { SiteRoutes } from '@/utils/routes';
 import { consumePrefetchedProject } from '@/utils/prefetch';
 import type { Project, User } from '@/types';
 import { mergeProjectVersionChangelogs, projectNeedsChangelogHydration } from '../utils/changelogHydration';
+import { isExternalDependency } from '../utils/dependencyEntries';
 
 const consumeProjectBootstrap = async (routeKey: string) => {
     const prefetched = await consumePrefetchedProject(routeKey);
@@ -187,7 +188,10 @@ export const useProjectDetail = (
     }, [project?.versions]);
 
     useEffect(() => {
-        const latestProjectIds = [...latestDependencies.map(dep => dep.projectId), ...latestIncompatibleProjectIds];
+        const latestProjectIds = [
+            ...latestDependencies.filter(dep => !isExternalDependency(dep)).map(dep => dep.projectId),
+            ...latestIncompatibleProjectIds
+        ];
         if (!latestProjectIds.length) return;
         const fetchMeta = async () => {
             const missing = latestProjectIds.filter((projectId) => projectId && !depMeta[projectId] && !fetchedDepMeta.current.has(projectId));

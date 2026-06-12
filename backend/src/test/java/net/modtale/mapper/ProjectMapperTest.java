@@ -74,7 +74,6 @@ class ProjectMapperTest {
         Project project = baseProject();
         project.setAbout("Deep project details");
         project.setChildProjectIds(List.of("child-1"));
-        project.setModIds(List.of("mod-1"));
         project.setGalleryImages(List.of("https://example.com/one.png"));
         project.setProjectRoles(List.of(new Project.ProjectRole("role-1", "Editor", "#fff", Set.of(ApiKey.ApiPermission.PROJECT_EDIT_METADATA))));
         project.setTeamMembers(List.of(new Project.ProjectMember("user-1", "role-1")));
@@ -86,7 +85,6 @@ class ProjectMapperTest {
 
         assertEquals("Deep project details", dto.getAbout());
         assertEquals(List.of("child-1"), dto.getChildProjectIds());
-        assertEquals(List.of("mod-1"), dto.getModIds());
         assertEquals(1, dto.getComments().size());
         assertEquals(1, dto.getVersions().size());
         assertEquals(1, dto.getProjectRoles().size());
@@ -119,15 +117,20 @@ class ProjectMapperTest {
         ProjectVersionSummaryDTO withoutReview = ProjectMapper.toVersionSummaryDTO(version, false);
         ProjectVersionSummaryDTO withReview = ProjectMapper.toVersionSummaryDTO(version, true);
         AdminProjectVersionSummaryDTO adminVersion = ProjectMapper.toAdminVersionSummaryDTO(version);
-        ProjectDependency dependency = new ProjectDependency("modtale:core", "Core", "1.0.0", true, true);
+        ProjectDependency dependency = new ProjectDependency(
+                "modtale:core",
+                "Core",
+                "1.0.0",
+                ProjectDependency.DependencyType.EMBEDDED
+        );
 
         assertNull(withoutReview.reviewStatus());
         assertEquals(ProjectVersion.ReviewStatus.APPROVED, withReview.reviewStatus());
         assertEquals("Security review cleared", withReview.rejectionReason());
         assertNotNull(adminVersion.scanResult());
         assertEquals("modtale:core", ProjectMapper.toDependencyDTO(dependency).projectId());
-        assertTrue(ProjectMapper.toDependencyDTO(dependency).isOptional());
-        assertTrue(ProjectMapper.toDependencyDTO(dependency).isEmbedded());
+        assertEquals(ProjectDependency.DependencyType.EMBEDDED, ProjectMapper.toDependencyDTO(dependency).dependencyType());
+        assertEquals(ProjectDependency.Source.MODTALE, ProjectMapper.toDependencyDTO(dependency).source());
         assertEquals("Lock in complete", ProjectMapper.toVersionDTO(version).getChangelog());
         assertEquals(List.of("modtale:legacy"), ProjectMapper.toVersionDTO(version).getIncompatibleProjectIds());
     }
@@ -196,7 +199,7 @@ class ProjectMapperTest {
         version.setDownloadCount(12);
         version.setReleaseDate("2026-01-01T10:00:00");
         version.setChangelog("Lock in complete");
-        version.setDependencies(List.of(new ProjectDependency("modtale:core", "Core", "1.0.0", false, false)));
+        version.setDependencies(List.of(new ProjectDependency("modtale:core", "Core", "1.0.0")));
         version.setIncompatibleProjectIds(List.of("modtale:legacy"));
         version.setChannel(ProjectVersion.Channel.RELEASE);
         version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
