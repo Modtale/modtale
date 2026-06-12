@@ -36,6 +36,10 @@ public class ProjectService {
         return projectViewService.getRawProjectById(id);
     }
 
+    public Project getRawProjectByRouteKey(String routeKey) {
+        return projectViewService.getRawProjectByRouteKey(routeKey);
+    }
+
     public Project getProjectById(String id) {
         return getPublicProjectById(id);
     }
@@ -47,13 +51,28 @@ public class ProjectService {
         return projectViewService.getProjectById(id, viewer);
     }
 
+    public Project getProjectByRouteKey(String routeKey, User viewer) {
+        if (viewer == null) {
+            return projectViewService.getPublicProjectByRouteKey(routeKey);
+        }
+        return projectViewService.getProjectByRouteKey(routeKey, viewer);
+    }
+
     @Cacheable(value = "projectDetails", key = "'public:' + #id")
     public Project getPublicProjectById(String id) {
         return projectViewService.getPublicProjectById(id);
     }
 
+    public Project getPublicProjectByRouteKey(String routeKey) {
+        return projectViewService.getPublicProjectByRouteKey(routeKey);
+    }
+
     public Project getAdminProjectDetails(String id) {
         return projectViewService.getAdminProjectDetails(id);
+    }
+
+    public Project getAdminProjectDetailsByRouteKey(String routeKey) {
+        return projectViewService.getAdminProjectDetailsByRouteKey(routeKey);
     }
 
     public String getProjectLink(Project project) {

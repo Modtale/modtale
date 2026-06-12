@@ -41,12 +41,22 @@ describe('prefetchProject', () => {
         expect(get).toHaveBeenCalledWith('/projects/p1');
     });
 
-    it('evicts failed prefetches so they can be retried', async () => {
-        get.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce({});
-        const { prefetchProject } = await loadModule();
+    it('lets the detail view consume a prefetched project once it resolves', async () => {
+        get.mockResolvedValue({ data: { id: 'p1', title: 'Prefetched' } });
+        const { consumePrefetchedProject, prefetchProject } = await loadModule();
 
         prefetchProject('p1');
-        await get.mock.results[0]?.value.catch(() => undefined);
+
+        await expect(consumePrefetchedProject('p1')).resolves.toEqual({ id: 'p1', title: 'Prefetched' });
+        await expect(consumePrefetchedProject('p1')).resolves.toBeNull();
+    });
+
+    it('evicts failed prefetches so they can be retried', async () => {
+        get.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce({});
+        const { prefetchProject, consumePrefetchedProject } = await loadModule();
+
+        prefetchProject('p1');
+        await consumePrefetchedProject('p1');
         prefetchProject('p1');
 
         expect(get).toHaveBeenCalledTimes(2);

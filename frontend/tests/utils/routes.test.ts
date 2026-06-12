@@ -21,7 +21,7 @@ describe('SiteRoutes', () => {
             title: 'Ignored Title',
             slug: 'custom-slug',
             classification: 'MODPACK'
-        })).toBe('/modpack/custom-slug~abc123');
+        })).toBe('/modpack/custom-slug');
     });
 
     it('generates project routes from title and classification when slug is blank', () => {
@@ -42,15 +42,29 @@ describe('SiteRoutes', () => {
         const project = {
             id: 'abc123',
             title: 'Amazing Plugin',
-            classification: 'PLUGIN'
+            classification: 'PLUGIN',
+            slug: 'amazing-plugin'
         };
 
-        expect(SiteRoutes.projectDownload(project)).toBe('/mod/amazing-plugin~abc123/download');
-        expect(SiteRoutes.projectChangelog(project)).toBe('/mod/amazing-plugin~abc123/changelog');
-        expect(SiteRoutes.projectGallery(project)).toBe('/mod/amazing-plugin~abc123/gallery');
-        expect(SiteRoutes.projectWiki(project)).toBe('/mod/amazing-plugin~abc123/wiki');
-        expect(SiteRoutes.projectWiki(project, 'docs/install')).toBe('/mod/amazing-plugin~abc123/wiki/docs/install');
-        expect(SiteRoutes.projectEdit(project)).toBe('/mod/amazing-plugin~abc123/edit');
+        expect(SiteRoutes.projectDownload(project)).toBe('/mod/amazing-plugin/download');
+        expect(SiteRoutes.projectChangelog(project)).toBe('/mod/amazing-plugin/changelog');
+        expect(SiteRoutes.projectGallery(project)).toBe('/mod/amazing-plugin/gallery');
+        expect(SiteRoutes.projectWiki(project)).toBe('/mod/amazing-plugin/wiki');
+        expect(SiteRoutes.projectWiki(project, 'docs/install')).toBe('/mod/amazing-plugin/wiki/docs/install');
+        expect(SiteRoutes.projectEdit(project)).toBe('/mod/amazing-plugin/edit');
+    });
+
+    it('matches canonical slug routes and legacy id-suffixed routes', () => {
+        const project = {
+            id: 'abc123',
+            title: 'Amazing Plugin',
+            slug: 'custom-slug'
+        };
+
+        expect(SiteRoutes.matchesProjectRoute(project, 'custom-slug')).toBe(true);
+        expect(SiteRoutes.matchesProjectRoute(project, 'custom-slug~abc123')).toBe(true);
+        expect(SiteRoutes.matchesProjectRoute(project, 'custom-slug-abc123')).toBe(false);
+        expect(SiteRoutes.matchesProjectRoute(project, 'abc123')).toBe(true);
     });
 
     it('creates clean slugs and truncates long titles', () => {

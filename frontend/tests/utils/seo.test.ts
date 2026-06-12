@@ -32,6 +32,7 @@ describe('seo utils', () => {
 
     it('marks project subroutes and filtered queries as noindex', () => {
         expect(isProjectSubrouteNoIndex('/mod/cool-project~id/download')).toBe(true);
+        expect(isProjectSubrouteNoIndex('/mod/cool-project/download')).toBe(true);
         expect(isProjectSubrouteNoIndex('/world/world-builder~id/wiki/getting-started')).toBe(true);
         expect(isProjectSubrouteNoIndex('/mod/cool-project~id')).toBe(false);
 

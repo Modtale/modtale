@@ -29,6 +29,8 @@ public interface ProjectRepository extends MongoRepository<Project, String>, Pro
 
     boolean existsBySlug(String slug);
 
+    Optional<Project> findBySlug(String slug);
+
     @Query(value = "{ 'authorId': ?0, 'deletedAt': null }", count = true)
     long countByAuthorId(String authorId);
 

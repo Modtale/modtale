@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { ChevronLeft, ChevronRight, Github, Globe } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
-import type { User } from '@/types';
+import type { Project, User } from '@/types';
 import { theme } from '@/styles/theme';
 import { SiteRoutes } from '@/utils/routes';
 import { generateProjectMeta } from '@/utils/meta';
@@ -62,9 +62,12 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const navigate = useNavigate();
     const location = useLocation();
     const { isMobile } = useMobile();
-    const { initialData } = useSSRData();
+    const { initialData: ssrInitialData } = useSSRData();
+    const routeStateProject = (location.state as { project?: Project | null } | null)?.project ?? null;
+    const initialData = ssrInitialData || routeStateProject;
+    const backgroundRefresh = Boolean(routeStateProject && !ssrInitialData);
 
-    const { project, setProject, loading, isNotFound, authorProfile, orgMembers, contributors, depMeta, latestDependencies, latestIncompatibleProjectIds, isFollowing, handleFollowToggle } = useProjectDetail(id, initialData, currentUser);
+    const { project, setProject, loading, isNotFound, authorProfile, orgMembers, contributors, depMeta, latestDependencies, latestIncompatibleProjectIds, isFollowing, handleFollowToggle } = useProjectDetail(id, initialData, currentUser, { backgroundRefresh });
 
     const [statusModal, setStatusModal] = useState<{ type: 'success' | 'error' | 'warning' | 'info'; title: string; message: string } | null>(null);
     const [isShareOpen, setIsShareOpen] = useState(false);
