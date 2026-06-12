@@ -11,7 +11,6 @@ public class CreateProjectRequest {
     @Size(max = 100, message = "Project titles must be 100 characters or fewer.")
     private String title;
 
-    @NotBlank(message = "A project classification is required before we can create a draft.")
     @NotNull(message = "A project classification is required before we can create a draft.")
     private ProjectClassification classification;
 

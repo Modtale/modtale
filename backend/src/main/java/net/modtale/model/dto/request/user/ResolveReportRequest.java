@@ -1,13 +1,11 @@
 package net.modtale.model.dto.request.user;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import net.modtale.model.user.Report;
 
 public class ResolveReportRequest {
 
-    @NotBlank(message = "A report status is required.")
     @NotNull(message = "A report status is required.")
     private Report.ReportStatus status;
 
