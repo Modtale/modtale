@@ -4,7 +4,6 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
-import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.user.AccountService;
 import org.springframework.context.annotation.Lazy;
@@ -17,16 +16,16 @@ public class AccessControlService {
 
     private final AccountService accountService;
     private final UserRepository userRepository;
-    private final ProjectRepository projectRepository;
+    private final PermissionProjectLookupService permissionProjectLookupService;
 
     public AccessControlService(
             @Lazy AccountService accountService,
             UserRepository userRepository,
-            ProjectRepository projectRepository
+            PermissionProjectLookupService permissionProjectLookupService
     ) {
         this.accountService = accountService;
         this.userRepository = userRepository;
-        this.projectRepository = projectRepository;
+        this.permissionProjectLookupService = permissionProjectLookupService;
     }
 
     public boolean isAdmin(User user) {
@@ -97,7 +96,7 @@ public class AccessControlService {
     }
 
     public boolean hasProjectPerm(String projectId, String permStr, Authentication authentication) {
-        Project project = projectRepository.findById(projectId).orElse(null);
+        Project project = permissionProjectLookupService.findProject(projectId);
         if (project == null) return true;
 
         if (isProjectReadPermission(permStr) && isPubliclyReadable(project)) {

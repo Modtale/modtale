@@ -1,6 +1,7 @@
 package net.modtale.controller.project;
 
 import net.modtale.exception.ResourceNotFoundException;
+import net.modtale.mapper.ProjectMapper;
 import net.modtale.model.dto.project.ProjectDTO;
 import net.modtale.model.dto.project.ProjectSummaryDTO;
 import net.modtale.model.dto.request.project.UpdateProjectRequest;
@@ -14,6 +15,7 @@ import net.modtale.service.project.GameVersionService;
 import net.modtale.service.project.LifecycleService;
 import net.modtale.service.project.MetadataService;
 import net.modtale.service.project.ProjectRetentionService;
+import net.modtale.service.project.ProjectResponseCacheService;
 import net.modtale.service.project.ProjectService;
 import net.modtale.service.project.SearchService;
 import net.modtale.service.project.ValidationService;
@@ -54,6 +56,7 @@ class ProjectControllerTest {
     private MetadataService metadataService;
     private ValidationService validationService;
     private GameVersionService gameVersionService;
+    private ProjectResponseCacheService projectResponseCacheService;
     private AccessControlService accessControlService;
     private AccountService accountService;
 
@@ -66,6 +69,7 @@ class ProjectControllerTest {
         metadataService = mock(MetadataService.class);
         validationService = mock(ValidationService.class);
         gameVersionService = mock(GameVersionService.class);
+        projectResponseCacheService = mock(ProjectResponseCacheService.class);
         accessControlService = mock(AccessControlService.class);
         accountService = mock(AccountService.class);
 
@@ -77,6 +81,7 @@ class ProjectControllerTest {
                 metadataService,
                 validationService,
                 gameVersionService,
+                projectResponseCacheService,
                 accessControlService,
                 accountService
         );
@@ -134,10 +139,9 @@ class ProjectControllerTest {
                 null,
                 List.of(new SimpleGrantedAuthority("ROLE_API"))
         );
-        Page<Project> page = new PageImpl<>(List.of(project("project-2", "Cloud Pack", ProjectStatus.PUBLISHED)));
+        Page<ProjectSummaryDTO> page = new PageImpl<>(List.of(ProjectMapper.toSummaryDTO(project("project-2", "Cloud Pack", ProjectStatus.PUBLISHED))));
 
-        when(accountService.getCurrentUser(authentication)).thenReturn(null);
-        when(searchService.searchProjects(
+        when(projectResponseCacheService.searchPublicProjectSummaries(
                 isNull(),
                 isNull(),
                 eq(0),
@@ -149,8 +153,7 @@ class ProjectControllerTest {
                 isNull(),
                 eq(ProjectViewCategory.ALL),
                 isNull(),
-                eq("creator-name"),
-                isNull()
+                eq("creator-name")
         )).thenReturn(page);
 
         var response = controller.getProjects(
@@ -172,7 +175,7 @@ class ProjectControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertTrue(response.getHeaders().getCacheControl().contains("max-age=3600"));
         verify(accountService, never()).getCurrentUser(authentication);
-        verify(searchService).searchProjects(
+        verify(projectResponseCacheService).searchPublicProjectSummaries(
                 isNull(),
                 isNull(),
                 eq(0),
@@ -184,8 +187,7 @@ class ProjectControllerTest {
                 isNull(),
                 eq(ProjectViewCategory.ALL),
                 isNull(),
-                eq("creator-name"),
-                isNull()
+                eq("creator-name")
         );
     }
 
@@ -196,9 +198,9 @@ class ProjectControllerTest {
                 null,
                 List.of()
         );
-        Page<Project> page = new PageImpl<>(List.of(project("project-3", "Sorted Tags", ProjectStatus.PUBLISHED)));
+        Page<ProjectSummaryDTO> page = new PageImpl<>(List.of(ProjectMapper.toSummaryDTO(project("project-3", "Sorted Tags", ProjectStatus.PUBLISHED))));
 
-        when(searchService.searchProjects(
+        when(projectResponseCacheService.searchPublicProjectSummaries(
                 eq(List.of("adventure", "tools")),
                 eq(""),
                 eq(0),
@@ -210,7 +212,6 @@ class ProjectControllerTest {
                 isNull(),
                 eq(ProjectViewCategory.ALL),
                 eq("all"),
-                isNull(),
                 isNull()
         )).thenReturn(page);
 
@@ -233,7 +234,7 @@ class ProjectControllerTest {
         assertEquals(200, response.getStatusCode().value());
         assertEquals("project-3", response.getBody().getContent().getFirst().id());
         verify(accountService, never()).getCurrentUser(authentication);
-        verify(searchService).searchProjects(
+        verify(projectResponseCacheService).searchPublicProjectSummaries(
                 eq(List.of("adventure", "tools")),
                 eq(""),
                 eq(0),
@@ -245,7 +246,6 @@ class ProjectControllerTest {
                 isNull(),
                 eq(ProjectViewCategory.ALL),
                 eq("all"),
-                isNull(),
                 isNull()
         );
     }
@@ -284,8 +284,7 @@ class ProjectControllerTest {
         Project project = project("project-1", "Sky Tools", ProjectStatus.PUBLISHED);
 
         when(accountService.getCurrentUser((Authentication) null)).thenReturn(null);
-        when(projectService.getProjectById("project-1", null)).thenReturn(project);
-        when(accessControlService.isPubliclyReadable(project)).thenReturn(true);
+        when(projectResponseCacheService.getPublicProjectDto("project-1")).thenReturn(ProjectMapper.toDTO(project, false));
 
         var response = controller.getProject("project-1", null);
 

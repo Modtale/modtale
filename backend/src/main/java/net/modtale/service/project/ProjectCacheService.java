@@ -26,32 +26,53 @@ public class ProjectCacheService {
     public void evictProjectDetailsCache(Project project) {
         if (project == null) return;
         Cache cache = cacheManager.getCache("projectDetails");
-        if (cache == null) return;
+        Cache detailDtoCache = cacheManager.getCache("projectDetailDtos");
+        Cache metaDtoCache = cacheManager.getCache("projectMetaDtos");
+        Cache permissionCache = cacheManager.getCache("projectPermissionSnapshots");
 
-        if (project.getId() != null) cache.evict(project.getId());
-        if (project.getId() != null) cache.evict("public:" + project.getId());
+        if (cache != null && project.getId() != null) cache.evict(project.getId());
+        if (cache != null && project.getId() != null) cache.evict("public:" + project.getId());
+        if (detailDtoCache != null && project.getId() != null) detailDtoCache.evict("public:" + project.getId());
+        if (metaDtoCache != null && project.getId() != null) metaDtoCache.evict("public:" + project.getId());
+        if (permissionCache != null && project.getId() != null) permissionCache.evict(project.getId());
 
         String routeHandle = projectRouteService.buildProjectHandle(project);
-        if (routeHandle != null) cache.evict(routeHandle);
-        if (routeHandle != null) cache.evict("public:" + routeHandle);
-        if (project.getSlug() != null) cache.evict(project.getSlug());
-        if (project.getSlug() != null) cache.evict("public:" + project.getSlug());
+        if (cache != null && routeHandle != null) cache.evict(routeHandle);
+        if (cache != null && routeHandle != null) cache.evict("public:" + routeHandle);
+        if (detailDtoCache != null && routeHandle != null) detailDtoCache.evict("public:" + routeHandle);
+        if (metaDtoCache != null && routeHandle != null) metaDtoCache.evict("public:" + routeHandle);
+        if (cache != null && project.getSlug() != null) cache.evict(project.getSlug());
+        if (cache != null && project.getSlug() != null) cache.evict("public:" + project.getSlug());
+        if (detailDtoCache != null && project.getSlug() != null) detailDtoCache.evict("public:" + project.getSlug());
+        if (metaDtoCache != null && project.getSlug() != null) metaDtoCache.evict("public:" + project.getSlug());
     }
 
     public void evictProjectDetailsCacheById(String projectId) {
         if (projectId == null || projectId.isBlank()) return;
         Cache cache = cacheManager.getCache("projectDetails");
-        if (cache == null) return;
-
-        cache.evict(projectId);
-        cache.evict("public:" + projectId);
+        if (cache != null) {
+            cache.evict(projectId);
+            cache.evict("public:" + projectId);
+        }
+        Cache detailDtoCache = cacheManager.getCache("projectDetailDtos");
+        if (detailDtoCache != null) {
+            detailDtoCache.evict("public:" + projectId);
+        }
+        Cache metaDtoCache = cacheManager.getCache("projectMetaDtos");
+        if (metaDtoCache != null) {
+            metaDtoCache.evict("public:" + projectId);
+        }
+        Cache permissionCache = cacheManager.getCache("projectPermissionSnapshots");
+        if (permissionCache != null) {
+            permissionCache.evict(projectId);
+        }
     }
 
     public void evictProjectSearchCache() {
-        Cache cache = cacheManager.getCache("projectSearch");
-        if (cache != null) {
-            cache.clear();
-        }
+        clearCache("projectSearch");
+        clearCache("projectSummarySearch");
+        clearCache("sitemapData");
+        clearCache("platformStats");
     }
 
     public void evictProjectDetailsCaches(Collection<Project> projects, Collection<String> fallbackProjectIds) {
@@ -62,5 +83,12 @@ public class ProjectCacheService {
             fallbackProjectIds.forEach(this::evictProjectDetailsCacheById);
         }
         evictProjectSearchCache();
+    }
+
+    private void clearCache(String cacheName) {
+        Cache cache = cacheManager.getCache(cacheName);
+        if (cache != null) {
+            cache.clear();
+        }
     }
 }

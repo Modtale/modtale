@@ -33,7 +33,11 @@ class AccessControlServiceTest {
         accountService = mock(AccountService.class);
         userRepository = mock(UserRepository.class);
         projectRepository = mock(ProjectRepository.class);
-        accessControlService = new AccessControlService(accountService, userRepository, projectRepository);
+        accessControlService = new AccessControlService(
+                accountService,
+                userRepository,
+                new PermissionProjectLookupService(projectRepository)
+        );
     }
 
     @Test

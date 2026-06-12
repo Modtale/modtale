@@ -2,8 +2,9 @@ package net.modtale.controller.system;
 
 import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.model.project.Project;
+import net.modtale.repository.project.ProjectRepository;
 import net.modtale.service.project.ProjectService;
-import net.modtale.service.project.SearchService;
+import net.modtale.service.system.SitemapService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -15,15 +16,20 @@ import static org.mockito.Mockito.when;
 
 class SitemapControllerTest {
 
-    private SearchService searchService;
+    private ProjectRepository projectRepository;
     private ProjectService projectService;
     private SitemapController controller;
 
     @BeforeEach
     void setUp() {
-        searchService = mock(SearchService.class);
+        projectRepository = mock(ProjectRepository.class);
         projectService = mock(ProjectService.class);
-        controller = new SitemapController(searchService, projectService, new AppFrontendProperties("https://modtale.test"));
+        SitemapService sitemapService = new SitemapService(
+                projectRepository,
+                projectService,
+                new AppFrontendProperties("https://modtale.test")
+        );
+        controller = new SitemapController(sitemapService);
     }
 
     @Test
@@ -33,7 +39,7 @@ class SitemapControllerTest {
         project.setAuthorId("author-1");
         project.setUpdatedAt("2026-06-01");
 
-        when(searchService.getPublishedProjects()).thenReturn(List.of(project));
+        when(projectRepository.findAllForSitemap()).thenReturn(List.of(project));
         when(projectService.getProjectLink(project)).thenReturn("/mod/sky-tools~project-1");
 
         String xml = controller.generateSitemap();
