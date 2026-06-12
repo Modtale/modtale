@@ -133,10 +133,8 @@ public class ProjectPublicationService {
                     version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
                     version.setScheduledPublishDate(null);
                 }
-                if (version.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED) {
-                    securityIssueAnalysisService.markIssuesAcceptedForApprovedVersion(version);
-                }
             });
+            securityIssueAnalysisService.pruneApprovedScanResults(project);
         }
 
         if (isNew) {

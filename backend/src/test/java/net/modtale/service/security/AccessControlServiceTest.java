@@ -9,6 +9,8 @@ import net.modtale.repository.user.UserRepository;
 import net.modtale.service.user.AccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.security.core.Authentication;
 
 import java.util.List;
@@ -17,6 +19,8 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -27,16 +31,19 @@ class AccessControlServiceTest {
     private AccountService accountService;
     private UserRepository userRepository;
     private ProjectRepository projectRepository;
+    private MongoTemplate mongoTemplate;
 
     @BeforeEach
     void setUp() {
         accountService = mock(AccountService.class);
         userRepository = mock(UserRepository.class);
         projectRepository = mock(ProjectRepository.class);
+        mongoTemplate = mock(MongoTemplate.class);
         accessControlService = new AccessControlService(
                 accountService,
                 userRepository,
-                new PermissionProjectLookupService(projectRepository, new net.modtale.service.project.ProjectRouteService())
+                new PermissionProjectLookupService(projectRepository, new net.modtale.service.project.ProjectRouteService()),
+                mongoTemplate
         );
     }
 
@@ -111,7 +118,7 @@ class AccessControlServiceTest {
         Project project = new Project();
         project.setId("project-1");
         project.setStatus(ProjectStatus.PUBLISHED);
-        when(projectRepository.findById("project-1")).thenReturn(Optional.of(project));
+        when(projectRepository.findPermissionSnapshotById("project-1")).thenReturn(Optional.of(project));
 
         assertTrue(accessControlService.hasProjectPerm("project-1", "PROJECT_READ", null));
         assertTrue(accessControlService.hasProjectPerm("project-1", "VERSION_READ", null));
@@ -133,7 +140,7 @@ class AccessControlServiceTest {
         project.setId("project-1");
         project.setSlug("levelingcore");
         project.setStatus(ProjectStatus.PUBLISHED);
-        when(projectRepository.findBySlug("levelingcore")).thenReturn(Optional.of(project));
+        when(projectRepository.findPermissionSnapshotBySlug("levelingcore")).thenReturn(Optional.of(project));
 
         assertTrue(accessControlService.hasProjectPerm("levelingcore", "PROJECT_READ", null));
     }
@@ -150,7 +157,7 @@ class AccessControlServiceTest {
         Project project = new Project();
         project.setAuthorId("org-1");
 
-        when(userRepository.findById("org-1")).thenReturn(Optional.of(org));
+        when(mongoTemplate.findOne(any(Query.class), eq(User.class))).thenReturn(org);
 
         assertTrue(accessControlService.isOwner(project, member));
         assertTrue(accessControlService.hasEditPermission(project, member));

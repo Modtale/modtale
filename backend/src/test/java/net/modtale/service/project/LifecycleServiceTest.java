@@ -269,8 +269,7 @@ class LifecycleServiceTest {
         assertNull(scheduled.getScheduledPublishDate());
         assertEquals(ProjectVersion.ReviewStatus.APPROVED, approved.getReviewStatus());
 
-        verify(securityIssueAnalysisService).markIssuesAcceptedForApprovedVersion(scheduled);
-        verify(securityIssueAnalysisService).markIssuesAcceptedForApprovedVersion(approved);
+        verify(securityIssueAnalysisService).pruneApprovedScanResults(project);
         verify(projectService).evictProjectCache(project);
         verify(projectNotificationService).notifyNewProject(project);
         verify(webhookService).triggerWebhook(project);

@@ -36,4 +36,12 @@ public class SecurityIssueClassificationService {
     public String fingerprint(ScanResult.ScanIssue issue) {
         return evaluationService.fingerprint(issue);
     }
+
+    public String looseFingerprint(ScanResult.ScanIssue issue) {
+        return evaluationService.looseFingerprint(issue);
+    }
+
+    public String normalizeSeverity(String severity) {
+        return evaluationService.normalizeSeverity(severity);
+    }
 }

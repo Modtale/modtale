@@ -44,7 +44,7 @@ class ProjectViewServiceTest {
         Project project = projectWithScanResult();
         User contributor = user("user-1", "ada");
 
-        when(projectRepository.findById("project-1")).thenReturn(Optional.of(project));
+        when(projectRepository.findViewerDetailById("project-1")).thenReturn(Optional.of(project));
         when(userRepository.findById("author-1")).thenReturn(Optional.of(user("author-1", "author")));
         when(accessControlService.hasEditPermission(project, contributor)).thenReturn(true);
         when(accessControlService.isAdmin(contributor)).thenReturn(false);
@@ -56,11 +56,11 @@ class ProjectViewServiceTest {
     }
 
     @Test
-    void getProjectByIdRetainsScanResultsForAdmins() {
+    void getProjectByIdOmitsScanResultsForAdminsOnRegularProjectReads() {
         Project project = projectWithScanResult();
         User admin = user("admin-1", "mod");
 
-        when(projectRepository.findById("project-1")).thenReturn(Optional.of(project));
+        when(projectRepository.findViewerDetailById("project-1")).thenReturn(Optional.of(project));
         when(userRepository.findById("author-1")).thenReturn(Optional.of(user("author-1", "author")));
         when(accessControlService.hasEditPermission(project, admin)).thenReturn(false);
         when(accessControlService.isAdmin(admin)).thenReturn(true);
@@ -68,7 +68,7 @@ class ProjectViewServiceTest {
         Project result = service.getProjectById("project-1", admin);
 
         assertNotNull(result);
-        assertNotNull(result.getVersions().getFirst().getScanResult());
+        assertNull(result.getVersions().getFirst().getScanResult());
     }
 
     @Test
@@ -77,7 +77,7 @@ class ProjectViewServiceTest {
         project.setSlug("levelingcore");
         project.setStatus(ProjectStatus.PUBLISHED);
 
-        when(projectRepository.findBySlug("levelingcore")).thenReturn(Optional.of(project));
+        when(projectRepository.findPublicDetailBySlug("levelingcore")).thenReturn(Optional.of(project));
         when(userRepository.findById("author-1")).thenReturn(Optional.of(user("author-1", "author")));
         when(accessControlService.isPubliclyReadable(project)).thenReturn(true);
 
@@ -93,7 +93,7 @@ class ProjectViewServiceTest {
         project.setStatus(ProjectStatus.PUBLISHED);
         User viewer = user("viewer-1", "viewer");
 
-        when(projectRepository.findById("project-1")).thenReturn(Optional.of(project));
+        when(projectRepository.findViewerDetailById("project-1")).thenReturn(Optional.of(project));
         when(userRepository.findById("author-1")).thenReturn(Optional.of(user("author-1", "author")));
         when(accessControlService.hasEditPermission(project, viewer)).thenReturn(false);
         when(accessControlService.isAdmin(viewer)).thenReturn(false);

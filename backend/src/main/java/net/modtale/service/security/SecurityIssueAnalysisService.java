@@ -36,6 +36,10 @@ public class SecurityIssueAnalysisService {
         securityIssueApprovalService.markIssuesAcceptedForApprovedVersion(version);
     }
 
+    public int pruneApprovedScanResults(Project project) {
+        return securityIssueApprovalService.pruneApprovedScanResults(project);
+    }
+
     public void normalizeScanResult(ScanResult scanResult) {
         securityIssueClassificationService.normalizeScanResult(scanResult);
     }

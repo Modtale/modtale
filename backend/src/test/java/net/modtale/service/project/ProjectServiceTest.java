@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -33,12 +36,13 @@ class ProjectServiceTest {
     private ProjectRepository projectRepository;
     private UserRepository userRepository;
     private AccessControlService accessControlService;
+    private MongoTemplate mongoTemplate;
 
     @BeforeEach
     void setUp() {
         projectRepository = mock(ProjectRepository.class);
         userRepository = mock(UserRepository.class);
-        MongoTemplate mongoTemplate = mock(MongoTemplate.class);
+        mongoTemplate = mock(MongoTemplate.class);
         accessControlService = mock(AccessControlService.class);
         ProjectRouteService projectRouteService = new ProjectRouteService();
         ProjectCacheService projectCacheService = new ProjectCacheService(new ConcurrentMapCacheManager("projectDetails"), projectRouteService);
@@ -56,7 +60,7 @@ class ProjectServiceTest {
         Project project = project("project-1", ProjectStatus.DRAFT, ProjectClassification.PLUGIN);
         User viewer = user("viewer-1", "Ada");
 
-        when(projectRepository.findById("project-1")).thenReturn(Optional.of(project));
+        when(projectRepository.findViewerDetailById("project-1")).thenReturn(Optional.of(project));
         when(accessControlService.hasEditPermission(project, viewer)).thenReturn(false);
         when(accessControlService.canReadProject(project, viewer)).thenReturn(false);
 
@@ -68,7 +72,7 @@ class ProjectServiceTest {
         Project project = project("project-1", ProjectStatus.DRAFT, ProjectClassification.PLUGIN);
         User viewer = user("viewer-1", "Ada");
 
-        when(projectRepository.findById("project-1")).thenReturn(Optional.of(project));
+        when(projectRepository.findViewerDetailById("project-1")).thenReturn(Optional.of(project));
         when(accessControlService.hasEditPermission(project, viewer)).thenReturn(false);
         when(accessControlService.canReadProject(project, viewer)).thenReturn(true);
 
@@ -97,8 +101,8 @@ class ProjectServiceTest {
         project.setVersions(new ArrayList<>(List.of(approved, pending)));
 
         User author = user("author-1", "SkyDev");
-        when(projectRepository.findById("project-1")).thenReturn(Optional.of(project));
-        when(userRepository.findById("author-1")).thenReturn(Optional.of(author));
+        when(projectRepository.findPublicDetailById("project-1")).thenReturn(Optional.of(project));
+        when(mongoTemplate.findOne(any(Query.class), eq(User.class))).thenReturn(author);
         when(accessControlService.isPubliclyReadable(project)).thenReturn(true);
 
         Project resolved = service.getPublicProjectById("project-1");

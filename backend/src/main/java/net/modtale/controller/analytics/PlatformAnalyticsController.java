@@ -1,7 +1,7 @@
 package net.modtale.controller.analytics;
 
 import jakarta.validation.constraints.Pattern;
-import net.modtale.model.analytics.PlatformAnalyticsSummary;
+import net.modtale.model.dto.response.analytics.PlatformAnalyticsSummaryView;
 import net.modtale.model.dto.response.analytics.PlatformStatsView;
 import net.modtale.service.analytics.PlatformStatsService;
 import net.modtale.service.analytics.QueryService;
@@ -43,13 +43,14 @@ public class PlatformAnalyticsController {
 
     @GetMapping("/full")
     @PreAuthorize("@apiSecurity.isSuperAdmin(authentication)")
-    public ResponseEntity<PlatformAnalyticsSummary> getPlatformAnalytics(
+    public ResponseEntity<PlatformAnalyticsSummaryView> getPlatformAnalytics(
             @RequestParam(defaultValue = "30d")
             @Pattern(regexp = "7d|30d|90d|1y", message = "Analytics ranges must be 7d, 30d, 90d, or 1y.")
             String range
     ) {
+        var summary = queryService.getPlatformAnalytics(range);
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.maxAge(getSecondsUntilMidnight(), TimeUnit.SECONDS).cachePrivate())
-                .body(queryService.getPlatformAnalytics(range));
+                .body(PlatformAnalyticsSummaryView.from(summary));
     }
 }

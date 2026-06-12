@@ -13,6 +13,7 @@ vi.mock('@/modules/project/api/projectClient', () => ({
         getOrgMembers: vi.fn(),
         getUsersBatch: vi.fn(),
         getDependencyMeta: vi.fn(),
+        getDependencyMetaBatch: vi.fn(),
         followUser: vi.fn(),
         unfollowUser: vi.fn()
     }
@@ -76,6 +77,7 @@ describe('useProjectDetail', () => {
         mockedProjectClient.getOrgMembers.mockResolvedValue([]);
         mockedProjectClient.getUsersBatch.mockResolvedValue([]);
         mockedProjectClient.getDependencyMeta.mockResolvedValue({ icon: '', title: '', classification: 'MOD', slug: 'dep' } as any);
+        mockedProjectClient.getDependencyMetaBatch.mockResolvedValue({});
         mockedProjectClient.followUser.mockResolvedValue(undefined);
         mockedProjectClient.unfollowUser.mockResolvedValue(undefined);
     });
@@ -204,6 +206,10 @@ describe('useProjectDetail', () => {
         } as User);
         mockedProjectClient.getOrgMembers.mockResolvedValue([{ id: 'member-1', username: 'Builder', avatarUrl: '', likedProjectIds: [] } as User]);
         mockedProjectClient.getUsersBatch.mockResolvedValue([{ id: 'contrib-1', username: 'Contributor', avatarUrl: '', likedProjectIds: [] } as User]);
+        mockedProjectClient.getDependencyMetaBatch.mockResolvedValue({
+            'dep-1': { icon: '/dep.png', title: 'Dependency One', classification: 'MOD', slug: 'dependency-one' },
+            'bad-1': { icon: '/bad.png', title: 'Bad Mod', classification: 'MOD', slug: 'bad-mod' }
+        } as any);
         mockedProjectClient.getDependencyMeta.mockImplementation(async (projectId: string) => {
             if (projectId === 'bad-1') {
                 return { icon: '/bad.png', title: 'Bad Mod', classification: 'MOD', slug: 'bad-mod' } as any;
@@ -242,8 +248,8 @@ describe('useProjectDetail', () => {
         expect(mockedProjectClient.getUserProfile).toHaveBeenCalledWith('org-1');
         expect(mockedProjectClient.getOrgMembers).toHaveBeenCalledWith('org-1');
         expect(mockedProjectClient.getUsersBatch).toHaveBeenCalledWith(['contrib-1']);
-        expect(mockedProjectClient.getDependencyMeta).toHaveBeenCalledWith('dep-1');
-        expect(mockedProjectClient.getDependencyMeta).toHaveBeenCalledWith('bad-1');
+        expect(mockedProjectClient.getDependencyMetaBatch).toHaveBeenCalledWith(['dep-1', 'bad-1']);
+        expect(mockedProjectClient.getDependencyMeta).not.toHaveBeenCalled();
         expect(latestSnapshot.latestDependencies).toEqual([
             { projectId: 'dep-1', projectTitle: 'Dependency One', versionNumber: '2.0.0' }
         ]);

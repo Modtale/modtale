@@ -6,9 +6,15 @@ import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.user.AccountService;
+import net.modtale.util.MongoIdUtils;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service("apiSecurity")
 public class AccessControlService {
@@ -17,15 +23,18 @@ public class AccessControlService {
     private final AccountService accountService;
     private final UserRepository userRepository;
     private final PermissionProjectLookupService permissionProjectLookupService;
+    private final MongoTemplate mongoTemplate;
 
     public AccessControlService(
             @Lazy AccountService accountService,
             UserRepository userRepository,
-            PermissionProjectLookupService permissionProjectLookupService
+            PermissionProjectLookupService permissionProjectLookupService,
+            MongoTemplate mongoTemplate
     ) {
         this.accountService = accountService;
         this.userRepository = userRepository;
         this.permissionProjectLookupService = permissionProjectLookupService;
+        this.mongoTemplate = mongoTemplate;
     }
 
     public boolean isAdmin(User user) {
@@ -149,12 +158,13 @@ public class AccessControlService {
     }
 
     public boolean hasProjectPermission(Project project, User user, ApiKey.ApiPermission perm) {
+        return hasProjectPermission(project, user, perm, findAuthorForPermission(project != null ? project.getAuthorId() : null));
+    }
+
+    private boolean hasProjectPermission(Project project, User user, ApiKey.ApiPermission perm, User authorUser) {
         if (project == null || user == null) return false;
         if (project.getAuthorId() != null && project.getAuthorId().equals(user.getId())) return true;
 
-        User authorUser = userRepository.findById(project.getAuthorId())
-                .filter(author -> !author.isDeleted())
-                .orElse(null);
         if (authorUser != null && authorUser.getAccountType() == User.AccountType.ORGANIZATION) {
             if (hasOrgPermission(authorUser, user.getId(), perm)) return true;
             if (hasOrgProjectManagementAccess(authorUser, user.getId())) return true;
@@ -177,20 +187,39 @@ public class AccessControlService {
     }
 
     public boolean hasEditPermission(Project project, User user) {
-        return isOwner(project, user) || hasProjectPermission(project, user, ApiKey.ApiPermission.PROJECT_EDIT_METADATA);
+        if (project == null || user == null) return false;
+        if (project.getAuthorId() != null && project.getAuthorId().equals(user.getId())) return true;
+
+        User authorUser = findAuthorForPermission(project.getAuthorId());
+        if (authorUser != null
+                && authorUser.getAccountType() == User.AccountType.ORGANIZATION
+                && hasOrgProjectManagementAccess(authorUser, user.getId())) {
+            return true;
+        }
+        return hasProjectPermission(project, user, ApiKey.ApiPermission.PROJECT_EDIT_METADATA, authorUser);
     }
 
     public boolean isOwner(Project project, User user) {
         if (project == null || user == null) return false;
         if (project.getAuthorId() != null && project.getAuthorId().equals(user.getId())) return true;
 
-        User authorUser = userRepository.findById(project.getAuthorId())
-                .filter(author -> !author.isDeleted())
-                .orElse(null);
+        User authorUser = findAuthorForPermission(project.getAuthorId());
         if (authorUser != null && authorUser.getAccountType() == User.AccountType.ORGANIZATION) {
             return hasOrgProjectManagementAccess(authorUser, user.getId());
         }
         return false;
+    }
+
+    private User findAuthorForPermission(String authorId) {
+        if (authorId == null || authorId.isBlank()) return null;
+
+        Query query = new Query(Criteria.where("_id").in(MongoIdUtils.expandIds(List.of(authorId))).and("deletedAt").is(null));
+        query.fields()
+                .include("_id")
+                .include("accountType")
+                .include("organizationMembers")
+                .include("organizationRoles");
+        return mongoTemplate.findOne(query, User.class);
     }
 
     private User.OrganizationMember getOrgMember(User org, String userId) {

@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -56,7 +57,6 @@ class SearchServiceTest {
                 projectSearchResultDecorator
         );
         ProjectListingQueryService projectListingQueryService = new ProjectListingQueryService(
-                projectRepository,
                 userRepository,
                 mongoTemplate,
                 projectSearchResultDecorator
@@ -238,24 +238,57 @@ class SearchServiceTest {
 
         assertTrue(result.isEmpty());
         verify(projectRepository, never()).findByAuthorIdAndStatusExact(any(), any(), any());
+        verify(mongoTemplate, never()).find(any(Query.class), eq(Project.class));
     }
 
     @Test
-    void getCreatorProjectsUsesPublishedOnlyAndDecoratesTheResults() {
+    void getCreatorProjectsUsesProjectedPublishedQueryAndDecoratesTheResults() {
         User creator = user("author-1", "Ada");
         Project project = project("project-1", "Sky Tools", ProjectStatus.PUBLISHED);
         project.setVersions(List.of(version("1.0.0", scanResult(ScanStatus.CLEAN))));
-        Page<Project> page = new PageImpl<>(List.of(project));
 
         when(userRepository.findById("author-1")).thenReturn(Optional.of(creator));
-        when(projectRepository.findByAuthorIdAndStatusExact("author-1", ProjectStatus.PUBLISHED, PageRequest.of(0, 10)))
-                .thenReturn(page);
+        when(mongoTemplate.find(any(Query.class), eq(Project.class))).thenReturn(List.of(project));
 
         Page<Project> result = searchService.getCreatorProjects("author-1", PageRequest.of(0, 10));
 
         Project decorated = result.getContent().getFirst();
         assertEquals("Ada", decorated.getAuthor());
         assertNull(decorated.getVersions().getFirst().getScanResult());
+        assertEquals(1, result.getTotalElements());
+
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).find(queryCaptor.capture(), eq(Project.class));
+        Query query = queryCaptor.getValue();
+        assertEquals("author-1", query.getQueryObject().get("authorId"));
+        assertEquals(ProjectStatus.PUBLISHED, query.getQueryObject().get("status"));
+        assertTrue(query.getQueryObject().containsKey("deletedAt"));
+        assertTrue(query.getFieldsObject().containsKey("title"));
+        assertTrue(query.getFieldsObject().containsKey("teamMembers"));
+        assertFalse(query.getFieldsObject().containsKey("versions._id"));
+        verify(projectRepository, never()).findByAuthorIdAndStatusExact(any(), any(), any());
+    }
+
+    @Test
+    void getPrivilegedCreatorProjectsIncludesManagementProjection() {
+        User creator = user("author-1", "Ada");
+        Project project = project("project-1", "Sky Tools", ProjectStatus.DRAFT);
+
+        when(userRepository.findById("author-1")).thenReturn(Optional.of(creator));
+        when(mongoTemplate.find(any(Query.class), eq(Project.class))).thenReturn(List.of(project));
+
+        Page<Project> result = searchService.getPrivilegedCreatorProjects("author-1", PageRequest.of(0, 10));
+
+        assertEquals("Ada", result.getContent().getFirst().getAuthor());
+
+        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
+        verify(mongoTemplate).find(queryCaptor.capture(), eq(Project.class));
+        Query query = queryCaptor.getValue();
+        assertEquals("author-1", query.getQueryObject().get("authorId"));
+        assertFalse(query.getQueryObject().containsKey("status"));
+        assertTrue(query.getFieldsObject().containsKey("status"));
+        assertTrue(query.getFieldsObject().containsKey("versions._id"));
+        assertTrue(query.getFieldsObject().containsKey("versions.reviewStatus"));
     }
 
     @Test

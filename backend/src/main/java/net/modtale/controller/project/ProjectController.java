@@ -12,6 +12,7 @@ import net.modtale.model.dto.project.ProjectMetaDTO;
 import net.modtale.model.dto.project.ProjectSummaryDTO;
 import net.modtale.model.dto.request.project.CreateProjectRequest;
 import net.modtale.model.dto.request.project.UpdateProjectRequest;
+import net.modtale.model.dto.response.project.GameVersionCatalogView;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectSort;
@@ -26,6 +27,7 @@ import net.modtale.service.project.ProjectService;
 import net.modtale.service.project.SearchService;
 import net.modtale.service.project.ValidationService;
 import net.modtale.service.security.AccessControlService;
+import net.modtale.service.security.PermissionProjectLookupService;
 import net.modtale.service.user.AccountService;
 import org.springframework.data.domain.Page;
 import org.springframework.http.CacheControl;
@@ -45,7 +47,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -64,6 +69,7 @@ public class ProjectController {
     private final ProjectResponseCacheService projectResponseCacheService;
     private final AccessControlService accessControlService;
     private final AccountService accountService;
+    private final PermissionProjectLookupService permissionProjectLookupService;
 
     public ProjectController(
             ProjectService projectService,
@@ -75,7 +81,8 @@ public class ProjectController {
             GameVersionService gameVersionService,
             ProjectResponseCacheService projectResponseCacheService,
             AccessControlService accessControlService,
-            AccountService accountService
+            AccountService accountService,
+            PermissionProjectLookupService permissionProjectLookupService
     ) {
         this.projectService = projectService;
         this.searchService = searchService;
@@ -87,6 +94,7 @@ public class ProjectController {
         this.projectResponseCacheService = projectResponseCacheService;
         this.accessControlService = accessControlService;
         this.accountService = accountService;
+        this.permissionProjectLookupService = permissionProjectLookupService;
     }
 
     @GetMapping("/projects")
@@ -189,12 +197,28 @@ public class ProjectController {
                     .body(project);
         }
 
+        Project permissionSnapshot = permissionProjectLookupService.findProject(id);
+        boolean privilegedViewer = permissionSnapshot != null
+                && (accessControlService.isAdmin(currentUser) || accessControlService.hasEditPermission(permissionSnapshot, currentUser));
+
+        if (permissionSnapshot != null
+                && accessControlService.isPubliclyReadable(permissionSnapshot)
+                && !privilegedViewer) {
+            ProjectDTO project = projectResponseCacheService.getPublicProjectDtoByRouteKey(id);
+            if (project == null) {
+                throw new ResourceNotFoundException("We couldn't find a project with that ID.");
+            }
+            return ResponseEntity.ok()
+                    .cacheControl(CacheControl.maxAge(5, TimeUnit.MINUTES).cachePublic())
+                    .body(project);
+        }
+
         Project project = projectService.getProjectByRouteKey(id, currentUser);
         if (project == null) {
             throw new ResourceNotFoundException("We couldn't find a project with that ID.");
         }
 
-        if (currentUser != null) {
+        if (privilegedViewer) {
             project.setCanEdit(accessControlService.hasEditPermission(project, currentUser));
             project.setIsOwner(accessControlService.isOwner(project, currentUser));
         }
@@ -218,11 +242,50 @@ public class ProjectController {
                     .body(meta);
         }
 
+        Project permissionSnapshot = permissionProjectLookupService.findProject(id);
+        boolean privilegedViewer = permissionSnapshot != null
+                && (accessControlService.isAdmin(currentUser) || accessControlService.hasEditPermission(permissionSnapshot, currentUser));
+
+        if (permissionSnapshot != null
+                && accessControlService.isPubliclyReadable(permissionSnapshot)
+                && !privilegedViewer) {
+            ProjectMetaDTO meta = projectResponseCacheService.getPublicProjectMetaByRouteKey(id);
+            if (meta == null) {
+                throw new ResourceNotFoundException("We couldn't find a project with that ID.");
+            }
+            return ResponseEntity.ok()
+                    .cacheControl(CacheControl.maxAge(5, TimeUnit.MINUTES).cachePublic())
+                    .body(meta);
+        }
+
         Project project = projectService.getProjectByRouteKey(id, currentUser);
         if (project == null) {
             throw new ResourceNotFoundException("We couldn't find a project with that ID.");
         }
         return ResponseEntity.ok(ProjectMapper.toMetaDTO(project));
+    }
+
+    @GetMapping("/projects/meta")
+    @PreAuthorize("@apiSecurity.hasAnyPerm('PROJECT_READ', authentication)")
+    public ResponseEntity<Map<String, ProjectMetaDTO>> getProjectMetaBatch(@RequestParam String ids) {
+        if (ids == null || ids.isBlank()) {
+            return ResponseEntity.ok(Collections.emptyMap());
+        }
+
+        List<String> projectIds = Arrays.stream(ids.split(","))
+                .map(String::trim)
+                .filter(id -> !id.isEmpty())
+                .distinct()
+                .limit(50)
+                .collect(Collectors.toList());
+
+        Map<String, ProjectMetaDTO> metas = projectIds.isEmpty()
+                ? Collections.emptyMap()
+                : projectResponseCacheService.getPublicProjectMetaByIds(projectIds);
+
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.maxAge(5, TimeUnit.MINUTES).cachePublic())
+                .body(new LinkedHashMap<>(metas));
     }
 
     @GetMapping("/tags")
@@ -247,10 +310,10 @@ public class ProjectController {
     }
 
     @GetMapping("/meta/game-versions/catalog")
-    public ResponseEntity<GameVersionService.GameVersionCatalog> getGameVersionCatalog() {
+    public ResponseEntity<GameVersionCatalogView> getGameVersionCatalog() {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.maxAge(24, TimeUnit.HOURS).cachePublic())
-                .body(gameVersionService.getCatalog());
+                .body(GameVersionCatalogView.from(gameVersionService.getCatalog()));
     }
 
     @PostMapping("/projects")
