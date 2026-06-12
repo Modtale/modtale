@@ -24,14 +24,14 @@ public class PermissionProjectLookupService {
         String normalized = projectId.trim();
         if (projectRouteService.hasExplicitProjectHandle(normalized)) {
             String extractedId = projectRouteService.extractProjectId(normalized);
-            Project byId = projectRepository.findById(extractedId).orElse(null);
+            Project byId = projectRepository.findPermissionSnapshotById(extractedId).orElse(null);
             if (byId != null) return byId;
-            return projectRepository.findBySlug(normalized).orElse(null);
+            return projectRepository.findPermissionSnapshotBySlug(normalized).orElse(null);
         }
 
-        Project bySlug = projectRepository.findBySlug(normalized).orElse(null);
+        Project bySlug = projectRepository.findPermissionSnapshotBySlug(normalized).orElse(null);
         if (bySlug != null) return bySlug;
 
-        return projectRepository.findById(normalized).orElse(null);
+        return projectRepository.findPermissionSnapshotById(normalized).orElse(null);
     }
 }

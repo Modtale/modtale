@@ -108,14 +108,18 @@ public class ScanCompletionService {
 
         notifyProjectSubmissionIfReady(projectId, versionId);
 
-        if (approvedImmediately && refreshed != null && refreshed.getStatus() == ProjectStatus.PUBLISHED) {
+        if (approvedImmediately && refreshed != null) {
             ProjectVersion approvedVersion = projectVersionAccessService.findById(refreshed, versionId);
             if (approvedVersion != null) {
-                securityIssueAnalysisService.markIssuesAcceptedForApprovedVersion(approvedVersion);
-                projectRepository.save(refreshed);
-                projectService.evictProjectCache(refreshed);
-                projectNotificationService.notifyUpdates(refreshed, approvedVersion.getVersionNumber());
-                projectNotificationService.notifyDependents(refreshed, approvedVersion.getVersionNumber());
+                int pruned = securityIssueAnalysisService.pruneApprovedScanResults(refreshed);
+                if (pruned > 0) {
+                    projectRepository.save(refreshed);
+                    projectService.evictProjectCache(refreshed);
+                }
+                if (refreshed.getStatus() == ProjectStatus.PUBLISHED) {
+                    projectNotificationService.notifyUpdates(refreshed, approvedVersion.getVersionNumber());
+                    projectNotificationService.notifyDependents(refreshed, approvedVersion.getVersionNumber());
+                }
             }
         }
     }

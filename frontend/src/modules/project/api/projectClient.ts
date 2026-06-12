@@ -29,6 +29,14 @@ export const projectClient = {
         const res = await api.get(`/projects/${projectId}/meta`);
         return res.data;
     },
+    getDependencyMetaBatch: async (projectIds: string[]) => {
+        const ids = [...new Set(projectIds.filter(Boolean))];
+        if (!ids.length) return {};
+        const res = await api.get('/projects/meta', {
+            params: { ids: ids.join(',') }
+        });
+        return res.data || {};
+    },
     followUser: async (targetId: string) => {
         await api.post(`/user/follow/${targetId}`);
     },

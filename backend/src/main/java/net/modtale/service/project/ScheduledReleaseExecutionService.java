@@ -44,7 +44,6 @@ public class ScheduledReleaseExecutionService {
 
             version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
             version.setScheduledPublishDate(null);
-            securityIssueAnalysisService.markIssuesAcceptedForApprovedVersion(version);
             releasedVersions.add(version.getVersionNumber());
         }
 
@@ -53,6 +52,7 @@ public class ScheduledReleaseExecutionService {
         }
 
         project.setUpdatedAt(publishTime.toString());
+        securityIssueAnalysisService.pruneApprovedScanResults(project);
         projectRepository.save(project);
         projectService.evictProjectCache(project);
         releasedVersions.forEach(versionNumber -> {

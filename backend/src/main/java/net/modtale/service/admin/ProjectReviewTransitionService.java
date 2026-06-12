@@ -49,10 +49,10 @@ public class ProjectReviewTransitionService {
         Project project = requireProject(id);
         ProjectVersion version = projectVersionAccessService.requireById(project, versionId,
                 () -> new ResourceNotFoundException("Version not found."));
-        securityIssueAnalysisService.markIssuesAcceptedForApprovedVersion(version);
         version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
         version.setRejectionReason(null);
         version.setScheduledPublishDate(null);
+        securityIssueAnalysisService.pruneApprovedScanResults(project);
         project.setUpdatedAt(LocalDateTime.now().toString());
         projectRepository.save(project);
         projectService.evictProjectCache(project);

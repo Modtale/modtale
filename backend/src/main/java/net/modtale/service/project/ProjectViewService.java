@@ -58,7 +58,8 @@ public class ProjectViewService {
             return getPublicProjectById(id);
         }
 
-        Project project = getRawProjectById(id);
+        if (id == null || id.isBlank()) return null;
+        Project project = projectRepository.findViewerDetailById(id).orElse(null);
         if (project == null || project.getDeletedAt() != null) return null;
 
         boolean privileged = accessControlService.hasEditPermission(project, viewer) || accessControlService.isAdmin(viewer);
@@ -74,7 +75,7 @@ public class ProjectViewService {
             return getPublicProjectByRouteKey(routeKey);
         }
 
-        Project project = resolveProjectByRouteKey(routeKey);
+        Project project = resolveViewerProjectByRouteKey(routeKey);
         if (project == null || project.getDeletedAt() != null) return null;
 
         boolean privileged = accessControlService.hasEditPermission(project, viewer) || accessControlService.isAdmin(viewer);
@@ -87,14 +88,15 @@ public class ProjectViewService {
 
     @Cacheable(value = "projectDetails", key = "'public:' + #id")
     public Project getPublicProjectById(String id) {
-        Project project = getRawProjectById(id);
+        if (id == null || id.isBlank()) return null;
+        Project project = projectRepository.findPublicDetailById(id).orElse(null);
         if (project == null || project.getDeletedAt() != null || !accessControlService.isPubliclyReadable(project)) return null;
         return prepareProjectForViewer(project, null, false);
     }
 
     @Cacheable(value = "projectDetails", key = "'public:' + #routeKey")
     public Project getPublicProjectByRouteKey(String routeKey) {
-        Project project = resolveProjectByRouteKey(routeKey);
+        Project project = resolvePublicProjectByRouteKey(routeKey);
         if (project == null || project.getDeletedAt() != null || !accessControlService.isPubliclyReadable(project)) return null;
         return prepareProjectForViewer(project, null, false);
     }
@@ -134,10 +136,42 @@ public class ProjectViewService {
         return projectRepository.findById(normalized).orElse(null);
     }
 
-    private Project prepareProjectForViewer(Project project, User viewer, boolean privileged) {
-        if (project.getAuthorId() != null) {
-            userRepository.findById(project.getAuthorId()).ifPresent(u -> project.setAuthor(u.getUsername()));
+    private Project resolvePublicProjectByRouteKey(String routeKey) {
+        if (routeKey == null || routeKey.isBlank()) return null;
+
+        String normalized = routeKey.trim();
+        if (projectRouteService.hasExplicitProjectHandle(normalized)) {
+            String projectId = projectRouteService.extractProjectId(normalized);
+            Project project = projectRepository.findPublicDetailById(projectId).orElse(null);
+            if (project != null) return project;
+            return projectRepository.findPublicDetailBySlug(normalized).orElse(null);
         }
+
+        Project project = projectRepository.findPublicDetailBySlug(normalized).orElse(null);
+        if (project != null) return project;
+
+        return projectRepository.findPublicDetailById(normalized).orElse(null);
+    }
+
+    private Project resolveViewerProjectByRouteKey(String routeKey) {
+        if (routeKey == null || routeKey.isBlank()) return null;
+
+        String normalized = routeKey.trim();
+        if (projectRouteService.hasExplicitProjectHandle(normalized)) {
+            String projectId = projectRouteService.extractProjectId(normalized);
+            Project project = projectRepository.findViewerDetailById(projectId).orElse(null);
+            if (project != null) return project;
+            return projectRepository.findViewerDetailBySlug(normalized).orElse(null);
+        }
+
+        Project project = projectRepository.findViewerDetailBySlug(normalized).orElse(null);
+        if (project != null) return project;
+
+        return projectRepository.findViewerDetailById(normalized).orElse(null);
+    }
+
+    private Project prepareProjectForViewer(Project project, User viewer, boolean privileged) {
+        populateAuthorName(project);
 
         if (project.getVersions() != null) {
             if (!privileged) {
@@ -147,15 +181,26 @@ public class ProjectViewService {
                 project.setVersions(visibleVersions);
             }
 
-            if (!accessControlService.isAdmin(viewer)) {
-                project.getVersions().forEach(v -> v.setScanResult(null));
-            }
+            project.getVersions().forEach(v -> v.setScanResult(null));
         }
 
         if (!project.isAllowComments() && !privileged) project.setComments(new ArrayList<>());
         populateRelatedUsers(project);
 
         return project;
+    }
+
+    private void populateAuthorName(Project project) {
+        if (project.getAuthorId() == null || (project.getAuthor() != null && !project.getAuthor().isBlank())) {
+            return;
+        }
+
+        Query query = new Query(Criteria.where("_id").in(MongoIdUtils.expandIds(List.of(project.getAuthorId()))));
+        query.fields().include("_id").include("username");
+        User author = mongoTemplate.findOne(query, User.class);
+        if (author != null) {
+            project.setAuthor(author.getUsername());
+        }
     }
 
     private void populateRelatedUsers(Project project) {
@@ -178,7 +223,7 @@ public class ProjectViewService {
         }
 
         List<User> users = mongoTemplate.find(
-                new Query(Criteria.where("_id").in(MongoIdUtils.expandIds(userIdsToFetch))),
+                relatedUserQuery(userIdsToFetch),
                 User.class
         );
 
@@ -202,5 +247,11 @@ public class ProjectViewService {
                 }
             });
         }
+    }
+
+    private Query relatedUserQuery(Set<String> userIdsToFetch) {
+        Query query = new Query(Criteria.where("_id").in(MongoIdUtils.expandIds(userIdsToFetch)));
+        query.fields().include("_id").include("username").include("avatarUrl");
+        return query;
     }
 }

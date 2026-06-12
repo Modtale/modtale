@@ -41,8 +41,9 @@ export class SiteRoutes {
 
     static creator(userId: string, username?: string) {
         if (!userId) return '/';
-        if (!username) return `/creator/${userId}`;
-        return `/creator/${this.createHandle(username, userId)}`;
+        const handle = username?.trim();
+        if (!handle) return `/creator/${userId}`;
+        return `/creator/${handle}`;
     }
 
     static dashboard() { return '/dashboard'; }

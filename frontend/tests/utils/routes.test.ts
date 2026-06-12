@@ -24,6 +24,12 @@ describe('SiteRoutes', () => {
         })).toBe('/modpack/custom-slug');
     });
 
+    it('uses clean creator usernames when available', () => {
+        expect(SiteRoutes.creator('user-1', 'AzureDoom')).toBe('/creator/AzureDoom');
+        expect(SiteRoutes.creator('user-1', '  azuredoom  ')).toBe('/creator/azuredoom');
+        expect(SiteRoutes.creator('user-1')).toBe('/creator/user-1');
+    });
+
     it('generates project routes from title and classification when slug is blank', () => {
         expect(SiteRoutes.project({
             id: 'abc123',

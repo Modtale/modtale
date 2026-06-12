@@ -68,7 +68,7 @@ class VersionPublishingServiceTest {
         assertEquals("2999-01-01T00:00:00", futureVersion.getScheduledPublishDate());
         assertNotNull(project.getUpdatedAt());
 
-        verify(securityIssueAnalysisService).markIssuesAcceptedForApprovedVersion(dueVersion);
+        verify(securityIssueAnalysisService).pruneApprovedScanResults(project);
         verify(projectRepository).save(project);
         verify(projectService).evictProjectCache(project);
         verify(projectNotificationService).notifyUpdates(project, "1.0.0");

@@ -90,7 +90,7 @@ class ProjectReviewDecisionServiceTest {
         assertNull(version.getScheduledPublishDate());
         assertNotNull(project.getUpdatedAt());
 
-        verify(securityIssueAnalysisService).markIssuesAcceptedForApprovedVersion(version);
+        verify(securityIssueAnalysisService).pruneApprovedScanResults(project);
         verify(projectRepository).save(project);
         verify(projectService).evictProjectCache(project);
         verify(projectNotificationService).notifyUpdates(project, "1.0.0");

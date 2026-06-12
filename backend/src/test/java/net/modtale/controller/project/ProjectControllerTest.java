@@ -20,6 +20,7 @@ import net.modtale.service.project.ProjectService;
 import net.modtale.service.project.SearchService;
 import net.modtale.service.project.ValidationService;
 import net.modtale.service.security.AccessControlService;
+import net.modtale.service.security.PermissionProjectLookupService;
 import net.modtale.service.user.AccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,6 +60,7 @@ class ProjectControllerTest {
     private ProjectResponseCacheService projectResponseCacheService;
     private AccessControlService accessControlService;
     private AccountService accountService;
+    private PermissionProjectLookupService permissionProjectLookupService;
 
     @BeforeEach
     void setUp() {
@@ -72,6 +74,7 @@ class ProjectControllerTest {
         projectResponseCacheService = mock(ProjectResponseCacheService.class);
         accessControlService = mock(AccessControlService.class);
         accountService = mock(AccountService.class);
+        permissionProjectLookupService = mock(PermissionProjectLookupService.class);
 
         controller = new ProjectController(
                 projectService,
@@ -83,7 +86,8 @@ class ProjectControllerTest {
                 gameVersionService,
                 projectResponseCacheService,
                 accessControlService,
-                accountService
+                accountService,
+                permissionProjectLookupService
         );
     }
 
@@ -254,9 +258,56 @@ class ProjectControllerTest {
     void getProjectThrowsWhenViewerCannotResolveVisibleProject() {
         User currentUser = user("user-1", "ada");
         when(accountService.getCurrentUser((Authentication) null)).thenReturn(currentUser);
+        when(permissionProjectLookupService.findProject("project-1")).thenReturn(project("project-1", "Sky Tools", ProjectStatus.PUBLISHED));
         when(projectService.getProjectByRouteKey("project-1", currentUser)).thenReturn(null);
 
         assertThrows(ResourceNotFoundException.class, () -> controller.getProject("project-1", null));
+    }
+
+    @Test
+    void getProjectUsesCachedPublicProjectForSignedInReaders() {
+        User currentUser = user("user-1", "ada");
+        Project snapshot = project("project-1", "Sky Tools", ProjectStatus.PUBLISHED);
+        ProjectDTO cachedProject = ProjectMapper.toDTO(project("project-1", "Sky Tools", ProjectStatus.PUBLISHED), false);
+
+        when(accountService.getCurrentUser((Authentication) null)).thenReturn(currentUser);
+        when(permissionProjectLookupService.findProject("project-1")).thenReturn(snapshot);
+        when(accessControlService.isAdmin(currentUser)).thenReturn(false);
+        when(accessControlService.hasEditPermission(snapshot, currentUser)).thenReturn(false);
+        when(accessControlService.isPubliclyReadable(snapshot)).thenReturn(true);
+        when(projectResponseCacheService.getPublicProjectDtoByRouteKey("project-1")).thenReturn(cachedProject);
+
+        var response = controller.getProject("project-1", null);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("project-1", response.getBody().getId());
+        assertTrue(response.getHeaders().getCacheControl().contains("max-age=300"));
+        assertTrue(response.getHeaders().getCacheControl().contains("public"));
+        verify(projectResponseCacheService).getPublicProjectDtoByRouteKey("project-1");
+        verify(projectService, never()).getProjectByRouteKey("project-1", currentUser);
+    }
+
+    @Test
+    void getProjectMetaUsesCachedPublicMetaForSignedInReaders() {
+        User currentUser = user("user-1", "ada");
+        Project snapshot = project("project-1", "Sky Tools", ProjectStatus.PUBLISHED);
+
+        when(accountService.getCurrentUser((Authentication) null)).thenReturn(currentUser);
+        when(permissionProjectLookupService.findProject("project-1")).thenReturn(snapshot);
+        when(accessControlService.isAdmin(currentUser)).thenReturn(false);
+        when(accessControlService.hasEditPermission(snapshot, currentUser)).thenReturn(false);
+        when(accessControlService.isPubliclyReadable(snapshot)).thenReturn(true);
+        when(projectResponseCacheService.getPublicProjectMetaByRouteKey("project-1"))
+                .thenReturn(new net.modtale.model.dto.project.ProjectMetaDTO("Sky Tools", "Fast path", "/icon.png", "Ada", ProjectClassification.MODPACK, 10, "", "project-1"));
+
+        var response = controller.getProjectMeta("project-1", null);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("Sky Tools", response.getBody().title());
+        assertTrue(response.getHeaders().getCacheControl().contains("max-age=300"));
+        assertTrue(response.getHeaders().getCacheControl().contains("public"));
+        verify(projectResponseCacheService).getPublicProjectMetaByRouteKey("project-1");
+        verify(projectService, never()).getProjectByRouteKey("project-1", currentUser);
     }
 
     @Test
@@ -265,6 +316,9 @@ class ProjectControllerTest {
         User currentUser = user("user-1", "ada");
 
         when(accountService.getCurrentUser((Authentication) null)).thenReturn(currentUser);
+        when(permissionProjectLookupService.findProject("project-1")).thenReturn(project);
+        when(accessControlService.isAdmin(currentUser)).thenReturn(false);
+        when(accessControlService.isPubliclyReadable(project)).thenReturn(true);
         when(projectService.getProjectByRouteKey("project-1", currentUser)).thenReturn(project);
         when(accessControlService.hasEditPermission(project, currentUser)).thenReturn(true);
         when(accessControlService.isOwner(project, currentUser)).thenReturn(false);

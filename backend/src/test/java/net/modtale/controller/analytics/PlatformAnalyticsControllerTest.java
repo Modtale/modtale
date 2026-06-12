@@ -1,5 +1,6 @@
 package net.modtale.controller.analytics;
 
+import net.modtale.model.analytics.AnalyticsDataPoint;
 import net.modtale.model.analytics.PlatformAnalyticsSummary;
 import net.modtale.model.dto.response.analytics.PlatformStatsView;
 import net.modtale.model.project.Project;
@@ -17,7 +18,6 @@ import org.springframework.data.mongodb.core.query.Query;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -57,11 +57,14 @@ class PlatformAnalyticsControllerTest {
     @Test
     void getPlatformAnalyticsReturnsSummary() {
         PlatformAnalyticsSummary summary = new PlatformAnalyticsSummary();
+        summary.setTotalDownloads(42);
+        summary.setDownloadsChart(List.of(new AnalyticsDataPoint("2026-06-01", 7)));
         when(queryService.getPlatformAnalytics("30d")).thenReturn(summary);
 
         var response = controller.getPlatformAnalytics("30d");
 
         assertEquals(200, response.getStatusCode().value());
-        assertSame(summary, response.getBody());
+        assertEquals(42, response.getBody().totalDownloads());
+        assertEquals(7, response.getBody().downloadsChart().getFirst().count());
     }
 }

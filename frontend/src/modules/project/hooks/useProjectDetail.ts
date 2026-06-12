@@ -53,6 +53,7 @@ export const useProjectDetail = (
 
     const analyticsFired = useRef(false);
     const fetchedDepMeta = useRef<Set<string>>(new Set());
+    const fetchedTeamDataKey = useRef('');
 
     useEffect(() => {
         if (!isInitialDataValid) {
@@ -62,6 +63,7 @@ export const useProjectDetail = (
             setOrgMembers([]);
             setContributors([]);
             analyticsFired.current = false;
+            fetchedTeamDataKey.current = '';
         }
     }, [routeKey, isInitialDataValid]);
 
@@ -114,18 +116,27 @@ export const useProjectDetail = (
             try {
                 const authorIdToFetch = (project as any).authorId;
                 if (!authorIdToFetch) return;
-                const authorData = await projectClient.getUserProfile(authorIdToFetch);
+
+                const contributorIds = project.teamMembers?.map(m => m.userId) || [];
+                const teamDataKey = `${authorIdToFetch}:${[...contributorIds].sort().join(',')}`;
+                if (fetchedTeamDataKey.current === teamDataKey) return;
+                fetchedTeamDataKey.current = teamDataKey;
+
+                const [authorData, contribs] = await Promise.all([
+                    projectClient.getUserProfile(authorIdToFetch),
+                    contributorIds.length ? projectClient.getUsersBatch(contributorIds) : Promise.resolve<User[]>([])
+                ]);
+
                 setAuthorProfile(authorData);
+                setContributors(contribs);
+
                 if (authorData.accountType === 'ORGANIZATION') {
                     const members = await projectClient.getOrgMembers(authorData.id);
                     setOrgMembers(members);
                 }
-                if (project.teamMembers?.length) {
-                    const userIds = project.teamMembers.map(m => m.userId);
-                    const contribs = await projectClient.getUsersBatch(userIds);
-                    setContributors(contribs);
-                }
-            } catch (e) {}
+            } catch (e) {
+                fetchedTeamDataKey.current = '';
+            }
         };
         fetchTeamData();
     }, [project?.id, project?.authorId, project?.teamMembers]);
@@ -151,7 +162,21 @@ export const useProjectDetail = (
 
             missing.forEach(projectId => fetchedDepMeta.current.add(projectId));
             const newMeta = { ...depMeta };
-            await Promise.all(missing.map(async (projectId) => {
+            try {
+                const batchMeta = await projectClient.getDependencyMetaBatch(missing);
+                Object.entries(batchMeta || {}).forEach(([projectId, data]) => {
+                    const meta = data as { icon?: string; title?: string; classification?: string; slug?: string };
+                    newMeta[projectId] = {
+                        icon: meta.icon || '',
+                        title: meta.title || projectId,
+                        classification: meta.classification,
+                        slug: meta.slug
+                    };
+                });
+            } catch (e) {}
+
+            const stillMissing = missing.filter(projectId => !newMeta[projectId]);
+            await Promise.all(stillMissing.map(async (projectId) => {
                 try {
                     const data = await projectClient.getDependencyMeta(projectId);
                     newMeta[projectId] = {

@@ -28,6 +28,7 @@ vi.mock('@/modules/project/api/projectClient', () => ({
         getOrgMembers: vi.fn(),
         getUsersBatch: vi.fn(),
         getDependencyMeta: vi.fn(),
+        getDependencyMetaBatch: vi.fn(),
         getMetaGameVersionCatalog: vi.fn(),
         followUser: vi.fn(),
         unfollowUser: vi.fn()
@@ -134,6 +135,7 @@ describe('critical page render budgets', () => {
         mockedProjectClient.getOrgMembers.mockResolvedValue([]);
         mockedProjectClient.getUsersBatch.mockResolvedValue([]);
         mockedProjectClient.getDependencyMeta.mockResolvedValue({ icon: '', title: 'Dependency' } as any);
+        mockedProjectClient.getDependencyMetaBatch.mockResolvedValue({});
         mockedProjectClient.getMetaGameVersionCatalog.mockResolvedValue({ orderedVersions: ['2026.03.11'] } as any);
         mockedDiscoveryClient.searchProjects.mockResolvedValue(page);
         mockedDiscoveryClient.getGameVersions.mockResolvedValue(['2026.03.11']);
