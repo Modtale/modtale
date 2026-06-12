@@ -4,15 +4,18 @@ import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.repository.project.ProjectRepository;
+import net.modtale.repository.user.UserRepository;
 import net.modtale.service.project.ProjectCacheService;
 import net.modtale.service.project.ProjectRouteService;
 import net.modtale.service.project.ProjectViewService;
 import net.modtale.service.project.ProjectService;
 import net.modtale.service.system.SitemapService;
+import net.modtale.model.user.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -21,12 +24,14 @@ import static org.mockito.Mockito.when;
 class SitemapControllerTest {
 
     private ProjectRepository projectRepository;
+    private UserRepository userRepository;
     private ProjectService projectService;
     private SitemapController controller;
 
     @BeforeEach
     void setUp() {
         projectRepository = mock(ProjectRepository.class);
+        userRepository = mock(UserRepository.class);
         projectService = new ProjectService(
                 mock(ProjectViewService.class),
                 mock(ProjectCacheService.class),
@@ -34,6 +39,7 @@ class SitemapControllerTest {
         );
         SitemapService sitemapService = new SitemapService(
                 projectRepository,
+                userRepository,
                 projectService,
                 new AppFrontendProperties("https://modtale.test")
         );
@@ -46,6 +52,9 @@ class SitemapControllerTest {
         Project modpack = project("project-2", "mega-pack", "Mega Pack", ProjectClassification.MODPACK, "author-2");
         Project world = project("project-3", "sky-world", "Sky World", ProjectClassification.SAVE, "author-3");
 
+        when(userRepository.findById("author-1")).thenReturn(Optional.of(user("author-1", "AzureDoom")));
+        when(userRepository.findById("author-2")).thenReturn(Optional.of(user("author-2", "BuilderBee")));
+        when(userRepository.findById("author-3")).thenReturn(Optional.of(user("author-3", "CloudCrafter")));
         when(projectRepository.findAllForSitemap()).thenReturn(List.of(plugin, modpack, world));
 
         String xml = controller.generateSitemap();
@@ -53,9 +62,9 @@ class SitemapControllerTest {
         assertTrue(xml.contains("https://modtale.test/mod/levelingcore"));
         assertTrue(xml.contains("https://modtale.test/modpack/mega-pack"));
         assertTrue(xml.contains("https://modtale.test/world/sky-world"));
-        assertTrue(xml.contains("https://modtale.test/creator/author-1"));
-        assertTrue(xml.contains("https://modtale.test/creator/author-2"));
-        assertTrue(xml.contains("https://modtale.test/creator/author-3"));
+        assertTrue(xml.contains("https://modtale.test/creator/AzureDoom"));
+        assertTrue(xml.contains("https://modtale.test/creator/BuilderBee"));
+        assertTrue(xml.contains("https://modtale.test/creator/CloudCrafter"));
         assertTrue(xml.contains("https://modtale.test/api-docs"));
     }
 
@@ -68,5 +77,12 @@ class SitemapControllerTest {
         project.setAuthorId(authorId);
         project.setUpdatedAt("2026-06-01");
         return project;
+    }
+
+    private static User user(String id, String username) {
+        User user = new User();
+        user.setId(id);
+        user.setUsername(username);
+        return user;
     }
 }

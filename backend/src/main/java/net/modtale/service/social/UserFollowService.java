@@ -60,7 +60,9 @@ final class UserFollowService {
                         List.of(target.getId()),
                         "New Follower",
                         currentUser.getUsername() + " started following you.",
-                        URI.create("/creator/" + currentUser.getId()),
+                        URI.create("/creator/" + (currentUser.getUsername() != null && !currentUser.getUsername().isBlank()
+                                ? currentUser.getUsername()
+                                : currentUser.getId())),
                         currentUser.getAvatarUrl()
                 );
             }

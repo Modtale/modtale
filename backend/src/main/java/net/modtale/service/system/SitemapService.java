@@ -3,6 +3,7 @@ package net.modtale.service.system;
 import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.model.project.Project;
 import net.modtale.repository.project.ProjectRepository;
+import net.modtale.repository.user.UserRepository;
 import net.modtale.service.project.ProjectService;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -18,15 +19,18 @@ import java.util.Set;
 public class SitemapService {
 
     private final ProjectRepository projectRepository;
+    private final UserRepository userRepository;
     private final ProjectService projectService;
     private final String baseUrl;
 
     public SitemapService(
             ProjectRepository projectRepository,
+            UserRepository userRepository,
             ProjectService projectService,
             AppFrontendProperties frontendProperties
     ) {
         this.projectRepository = projectRepository;
+        this.userRepository = userRepository;
         this.projectService = projectService;
         this.baseUrl = frontendProperties.url();
     }
@@ -52,8 +56,9 @@ public class SitemapService {
         for (Project project : projects) {
             if (project.getUpdatedAt() != null) {
                 addUrl(xml, baseUrl + projectService.getProjectLink(project), "0.8", parseDate(project.getUpdatedAt(), today));
-                if (project.getAuthorId() != null && !project.getAuthorId().isBlank()) {
-                    activeAuthors.add(project.getAuthorId());
+                String authorHandle = resolveAuthorHandle(project);
+                if (authorHandle != null && !authorHandle.isBlank()) {
+                    activeAuthors.add(authorHandle);
                 }
             }
         }
@@ -83,5 +88,19 @@ public class SitemapService {
         } catch (DateTimeParseException e) {
             return fallback;
         }
+    }
+
+    private String resolveAuthorHandle(Project project) {
+        if (project == null) return null;
+        if (project.getAuthor() != null && !project.getAuthor().isBlank()) {
+            return project.getAuthor().trim();
+        }
+        if (project.getAuthorId() == null || project.getAuthorId().isBlank()) {
+            return null;
+        }
+
+        return userRepository.findById(project.getAuthorId())
+                .map(user -> user.getUsername() != null && !user.getUsername().isBlank() ? user.getUsername().trim() : project.getAuthorId())
+                .orElse(project.getAuthorId());
     }
 }

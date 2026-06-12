@@ -81,13 +81,22 @@ public class AccountService {
         if (userId == null || userId.isBlank()) {
             return null;
         }
-        User user = userRepository.findById(userId).orElse(null);
-        if (user != null && user.isDeleted()) {
+        User user = userRepository.findByUsernameIgnoreCase(userId).orElse(null);
+        if (user == null) {
+            user = userRepository.findById(userId).orElse(null);
+        }
+        if (user == null && userId.contains("~")) {
+            String legacyHandle = userId.substring(0, userId.lastIndexOf('~'));
+            String legacyId = userId.substring(userId.lastIndexOf('~') + 1);
+            user = userRepository.findById(legacyId).orElse(null);
+            if (user == null) {
+                user = userRepository.findByUsernameIgnoreCase(legacyHandle).orElse(null);
+            }
+        }
+        if (user == null || user.isDeleted()) {
             return null;
         }
-        if (user != null) {
-            oauthAvatarHealingService.maybeHealOAuthAvatar(user);
-        }
+        oauthAvatarHealingService.maybeHealOAuthAvatar(user);
         return user;
     }
 
