@@ -11,6 +11,7 @@ import { dependencyProjectKey, getDependencyType, isExternalDependency, isOption
 import { useToast } from '@/components/ui/Toast';
 
 type DependencyMeta = { title: string; author: string; icon: string; source?: string; url?: string };
+type DropdownOption<T extends string> = { value: T; label: string; detail?: string };
 
 interface DependencySelectorProps {
     selectedDeps: ProjectDependency[] | string[];
@@ -63,6 +64,88 @@ const getSourceLabel = (source?: string) => {
         case 'MODTALE': return 'Modtale';
         default: return 'External';
     }
+};
+
+const EXTERNAL_SOURCE_OPTIONS: DropdownOption<DependencySource | ''>[] = [
+    { value: '', label: 'Auto-detect source', detail: 'Let Modtale infer the service from the URL' },
+    { value: 'CURSEFORGE', label: 'CurseForge', detail: 'Hytale project or file page' },
+    { value: 'GITHUB', label: 'GitHub', detail: 'Repository, release, or raw file URL' },
+    { value: 'WEBSITE', label: 'Website', detail: 'Public Hytale project page' },
+    { value: 'OTHER', label: 'Other', detail: 'Another public Hytale source' }
+];
+
+const DEPENDENCY_TYPE_OPTIONS: DropdownOption<DependencyType>[] = [
+    { value: 'REQUIRED', label: 'Required' },
+    { value: 'OPTIONAL', label: 'Optional' },
+    { value: 'EMBEDDED', label: 'Embedded' }
+];
+
+const CustomDropdown = <T extends string>({
+    value,
+    options,
+    onChange,
+    disabled,
+    className = '',
+    buttonClassName = ''
+}: {
+    value: T;
+    options: DropdownOption<T>[];
+    onChange: (value: T) => void;
+    disabled?: boolean;
+    className?: string;
+    buttonClassName?: string;
+}) => {
+    const [open, setOpen] = useState(false);
+    const selected = options.find(option => option.value === value) || options[0];
+
+    return (
+        <div className={`relative ${className}`} onBlur={event => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                setOpen(false);
+            }
+        }}>
+            <button
+                type="button"
+                disabled={disabled}
+                onClick={() => setOpen(current => !current)}
+                className={`w-full border ${theme.colors.border} ${theme.colors.bgBase} ${theme.colors.textPrimary} rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-modtale-accent flex items-center justify-between gap-3 disabled:opacity-60 disabled:cursor-not-allowed ${buttonClassName}`}
+                aria-haspopup="listbox"
+                aria-expanded={open}
+            >
+                <span className="min-w-0 text-left">
+                    <span className="block truncate font-bold">{selected?.label || 'Select'}</span>
+                    {selected?.detail && <span className={`block truncate text-xs font-normal ${theme.colors.textMuted}`}>{selected.detail}</span>}
+                </span>
+                <ChevronDown className={`w-4 h-4 shrink-0 ${theme.colors.textMuted} transition-transform ${open ? 'rotate-180' : ''}`} />
+            </button>
+            {open && (
+                <div
+                    role="listbox"
+                    className={`absolute z-[120] mt-2 max-h-56 w-full overflow-y-auto rounded-xl border ${theme.colors.border} ${theme.colors.bgSurface} shadow-xl p-1`}
+                >
+                    {options.map(option => {
+                        const selectedOption = option.value === value;
+                        return (
+                            <button
+                                key={option.value || option.label}
+                                type="button"
+                                role="option"
+                                aria-selected={selectedOption}
+                                onClick={() => {
+                                    onChange(option.value);
+                                    setOpen(false);
+                                }}
+                                className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${selectedOption ? 'bg-modtale-accent text-white' : `${theme.colors.textPrimary} ${theme.colors.bgSurfaceHover}`}`}
+                            >
+                                <span className="block truncate font-bold">{option.label}</span>
+                                {option.detail && <span className={`block truncate text-xs ${selectedOption ? 'text-white/75' : theme.colors.textMuted}`}>{option.detail}</span>}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
 };
 
 const buildModtaleDependency = (project: Project, versionNumber: string, dependencyType: DependencyType): ProjectDependency => ({
@@ -441,8 +524,16 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
 
     const selectedExternalFile = useMemo(() => {
         if (!externalResolved?.files?.length || !externalSelectedFileId) return null;
-        return externalResolved.files.find(file => file.id === externalSelectedFileId) || null;
+        return externalResolved.files.find(file => (file.id || file.downloadUrl || file.displayName || file.fileName || '') === externalSelectedFileId) || null;
     }, [externalResolved, externalSelectedFileId]);
+
+    const externalFileOptions = useMemo<DropdownOption<string>[]>(() => (
+        (externalResolved?.files || []).map((file: ExternalProjectFile) => ({
+            value: file.id || file.downloadUrl || file.displayName || file.fileName || '',
+            label: file.displayName || file.fileName || file.id || 'External file',
+            detail: file.versionNumber ? `Version ${file.versionNumber}` : file.fileName || file.releaseType
+        }))
+    ), [externalResolved]);
 
     const addExternalReference = async () => {
         const resolved = externalResolved || await resolveExternalDetails();
@@ -614,13 +705,11 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                                     Fetch
                                 </button>
                             </div>
-                            <select value={externalSource} onChange={event => setExternalSource(event.target.value as DependencySource | '')} className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-modtale-accent ${theme.colors.textPrimary}`}>
-                                <option value="">Auto-detect source</option>
-                                <option value="CURSEFORGE">CurseForge</option>
-                                <option value="GITHUB">GitHub</option>
-                                <option value="WEBSITE">Website</option>
-                                <option value="OTHER">Other</option>
-                            </select>
+                            <CustomDropdown
+                                value={externalSource}
+                                options={EXTERNAL_SOURCE_OPTIONS}
+                                onChange={setExternalSource}
+                            />
 
                             {externalResolved && (
                                 <div className={`rounded-xl border ${theme.colors.border} ${theme.colors.bgBase} p-3 flex items-start gap-3`}>
@@ -635,18 +724,16 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                                 </div>
                             )}
 
-                            {externalResolved?.files && externalResolved.files.length > 0 && (
-                                <select value={externalSelectedFileId} onChange={event => {
-                                    const nextFile = externalResolved.files?.find(file => file.id === event.target.value);
-                                    setExternalSelectedFileId(event.target.value);
-                                    if (nextFile?.versionNumber) setExternalVersion(nextFile.versionNumber);
-                                }} className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-modtale-accent ${theme.colors.textPrimary}`}>
-                                    {externalResolved.files.map((file: ExternalProjectFile) => (
-                                        <option key={file.id || file.displayName} value={file.id || ''}>
-                                            {file.displayName || file.fileName || file.id} {file.versionNumber ? `(${file.versionNumber})` : ''}
-                                        </option>
-                                    ))}
-                                </select>
+                            {externalFileOptions.length > 0 && (
+                                <CustomDropdown
+                                    value={externalSelectedFileId || externalFileOptions[0]?.value || ''}
+                                    options={externalFileOptions}
+                                    onChange={nextFileId => {
+                                        const nextFile = externalResolved?.files?.find(file => (file.id || file.downloadUrl || file.displayName || file.fileName || '') === nextFileId);
+                                        setExternalSelectedFileId(nextFileId);
+                                        if (nextFile?.versionNumber) setExternalVersion(nextFile.versionNumber);
+                                    }}
+                                />
                             )}
 
                             {!isModpack && (
@@ -847,11 +934,14 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0">
                                         {dependency && !isModpack && !isIncompatibilityMode && (
-                                            <select value={depType} disabled={disabled} onChange={event => cycleDependencyType(index, event.target.value as DependencyType)} className={`text-xs font-bold px-2 py-1.5 rounded-lg border ${theme.colors.border} ${theme.colors.bgSurface} ${theme.colors.textPrimary}`}>
-                                                <option value="REQUIRED">Required</option>
-                                                <option value="OPTIONAL">Optional</option>
-                                                <option value="EMBEDDED">Embedded</option>
-                                            </select>
+                                            <CustomDropdown
+                                                value={depType}
+                                                options={DEPENDENCY_TYPE_OPTIONS}
+                                                onChange={nextType => cycleDependencyType(index, nextType)}
+                                                disabled={disabled}
+                                                className="w-32"
+                                                buttonClassName="rounded-lg px-2 py-1.5 text-xs"
+                                            />
                                         )}
                                         {dependency && isExternal && dependency.externalUrl && (
                                             <a href={dependency.externalUrl} target="_blank" rel="noreferrer" className={`p-2 rounded-lg ${theme.colors.textMuted} hover:${theme.colors.accent}`}><ExternalLink className="w-4 h-4" /></a>

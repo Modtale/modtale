@@ -512,6 +512,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                         onToggleExperimental={toggleExperimental}
                         onDownload={handleDownloadClick}
                         hasStableVersions={hasStableBuilds}
+                        isModpack={project.classification === 'MODPACK'}
                     />
                 )}
                 {isDownloadOpen && (
@@ -525,6 +526,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                         showExperimental={showExperimental}
                         onToggleExperimental={toggleExperimental}
                         onViewHistory={() => navigate(projectUrl + '/changelog')}
+                        isModpack={project.classification === 'MODPACK'}
                     />
                 )}
                 {isDepModalOpen && pendingDownload && (
