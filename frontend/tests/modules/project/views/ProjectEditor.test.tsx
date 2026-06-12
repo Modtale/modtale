@@ -155,4 +155,51 @@ describe('ProjectEditorView route smoke test', () => {
         expect(container.textContent).toContain('Game Versions');
         expect(mockedProjectClient.getMetaGameVersions).toHaveBeenCalledTimes(1);
     });
+
+    it('opens custom license inputs when the custom license option is selected', async () => {
+        await act(async () => {
+            root.render(
+                <ToastProvider>
+                    <MemoryRouter initialEntries={['/projects/project-1/edit']}>
+                        <Routes>
+                            <Route
+                                path="/projects/:id/edit"
+                                element={
+                                    <ProjectEditorView
+                                        currentUser={{ id: 'user-1', username: 'tester' } as any}
+                                        onShowStatus={vi.fn()}
+                                    />
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </ToastProvider>
+            );
+        });
+
+        await waitForText(container, 'Test Project');
+
+        const licenseSectionButton = Array.from(container.querySelectorAll('button')).find((button) => (
+            button.textContent?.trim() === 'License'
+        ));
+
+        expect(licenseSectionButton, 'expected the editor sidebar to render the License section').toBeDefined();
+
+        await act(async () => {
+            licenseSectionButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitForText(container, 'Custom License');
+
+        const customLicenseButton = Array.from(container.querySelectorAll('button')).find((button) => (
+            button.textContent?.includes('Custom License')
+        ));
+
+        await act(async () => {
+            customLicenseButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(container.querySelector('input[placeholder="License Name"]')).not.toBeNull();
+        expect(container.querySelector('input[placeholder="License URL"]')).not.toBeNull();
+    });
 });
