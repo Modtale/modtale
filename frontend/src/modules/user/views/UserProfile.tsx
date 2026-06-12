@@ -28,11 +28,12 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     const navigate = useNavigate();
     const location = useLocation();
     const projectsTitleRef = useRef<HTMLHeadingElement>(null);
-    const userId = SiteRoutes.extractId(id);
-
+    const profileHandle = id?.trim() || '';
+    const userId = profileHandle;
+    const matchesHandle = (value?: string | null) => !!value && value.trim().toLowerCase() === userId.toLowerCase();
 
     const [profileUser, setProfileUser] = useState<User | null>(() => {
-        if (initialData && initialData.id === userId) {
+        if (initialData && (initialData.id === userId || matchesHandle(initialData.username))) {
             return initialData;
         }
         return null;
@@ -80,7 +81,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     useEffect(() => {
         const fetchUserData = async () => {
             if (!userId) return;
-            if (profileUser && profileUser.id === userId) {
+            if (profileUser && (profileUser.id === userId || matchesHandle(profileUser.username))) {
                 setLoadingUser(false);
                 return;
             }
