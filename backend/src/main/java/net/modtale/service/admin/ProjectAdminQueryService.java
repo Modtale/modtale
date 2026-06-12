@@ -45,8 +45,10 @@ public class ProjectAdminQueryService {
 
     public void updateRawProject(String adminId, String id, Project updatedProject) {
         Project existing = requireProject(id);
+        projectService.evictProjectCache(existing);
         updatedProject.setId(existing.getId());
         projectRepository.save(updatedProject);
+        projectService.evictProjectCache(updatedProject);
         adminAuditLogger.logAction(adminId, "RAW_UPDATE_PROJECT", existing.getId(), "PROJECT", "Updated via Raw JSON");
     }
 

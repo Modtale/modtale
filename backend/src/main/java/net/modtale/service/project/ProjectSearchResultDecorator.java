@@ -50,6 +50,7 @@ public class ProjectSearchResultDecorator {
 
     private void hydrateAuthors(List<Project> projects) {
         Set<String> authorIds = projects.stream()
+                .filter(project -> project.getAuthor() == null || project.getAuthor().isBlank())
                 .map(Project::getAuthorId)
                 .filter(id -> id != null && !id.isBlank())
                 .collect(Collectors.toSet());
