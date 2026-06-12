@@ -2,10 +2,9 @@ package net.modtale.model.dto.request.project;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.util.List;
 import net.modtale.model.project.ProjectVersion;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.List;
 
 public class CreateVersionRequest {
 

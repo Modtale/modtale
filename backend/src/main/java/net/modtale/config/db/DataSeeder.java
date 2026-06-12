@@ -6,6 +6,7 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import java.util.stream.Collectors;
 import net.modtale.config.properties.AppSeedingProperties;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectStatus;
@@ -24,7 +25,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Component
 public class DataSeeder implements CommandLineRunner {

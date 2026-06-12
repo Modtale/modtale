@@ -1,16 +1,15 @@
 package net.modtale.controller.user;
 
+import java.util.List;
 import net.modtale.mapper.UserResponseMapper;
-import net.modtale.model.user.User;
 import net.modtale.model.dto.user.NotificationDTO;
+import net.modtale.model.user.User;
 import net.modtale.service.communication.NotificationService;
-import net.modtale.service.user.AccountService;
+import net.modtale.service.user.account.AccountService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/notifications")

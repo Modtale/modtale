@@ -1,5 +1,7 @@
 package net.modtale.service.auth;
 
+import java.time.LocalDateTime;
+import java.util.Optional;
 import net.modtale.exception.UnauthorizedException;
 import net.modtale.model.user.User;
 import net.modtale.repository.admin.BannedEmailRepository;
@@ -8,9 +10,6 @@ import net.modtale.service.communication.EmailService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.password.PasswordEncoder;
-
-import java.time.LocalDateTime;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

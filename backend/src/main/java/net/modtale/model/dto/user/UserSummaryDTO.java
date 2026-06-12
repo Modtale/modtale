@@ -1,10 +1,9 @@
 package net.modtale.model.dto.user;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.util.List;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
-
-import java.util.List;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record UserSummaryDTO(

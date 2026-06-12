@@ -1,5 +1,9 @@
 package net.modtale.service.communication;
 
+import java.net.URI;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.Notification;
 import net.modtale.model.user.NotificationType;
@@ -15,11 +19,6 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-
-import java.net.URI;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
 
 @Service
 public class NotificationService {

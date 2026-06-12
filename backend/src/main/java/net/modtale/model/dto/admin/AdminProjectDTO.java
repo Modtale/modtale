@@ -1,13 +1,12 @@
 package net.modtale.model.dto.admin;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import net.modtale.model.project.Project;
-import net.modtale.model.project.ProjectClassification;
-import net.modtale.model.project.ProjectStatus;
-
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import net.modtale.model.project.Project;
+import net.modtale.model.project.ProjectClassification;
+import net.modtale.model.project.ProjectStatus;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record AdminProjectDTO(

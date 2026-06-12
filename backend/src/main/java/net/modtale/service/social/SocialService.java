@@ -1,16 +1,15 @@
 package net.modtale.service.social;
 
+import java.util.List;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.analytics.ScoringService;
 import net.modtale.service.communication.NotificationService;
-import net.modtale.service.project.ProjectService;
-import net.modtale.service.security.SanitizationService;
+import net.modtale.service.project.query.ProjectService;
+import net.modtale.service.security.validation.SanitizationService;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 public class SocialService {

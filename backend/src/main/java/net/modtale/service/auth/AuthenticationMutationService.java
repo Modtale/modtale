@@ -1,5 +1,10 @@
 package net.modtale.service.auth;
 
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.regex.Pattern;
 import net.modtale.exception.ForbiddenOperationException;
 import net.modtale.exception.InvalidAuthenticationRequestException;
 import net.modtale.exception.ResourceNotFoundException;
@@ -11,12 +16,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.regex.Pattern;
 
 @Service
 public class AuthenticationMutationService {

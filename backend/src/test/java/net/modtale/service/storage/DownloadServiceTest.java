@@ -1,5 +1,13 @@
 package net.modtale.service.storage;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import net.modtale.config.properties.AppLimitProperties;
 import net.modtale.exception.RateLimitExceededException;
 import net.modtale.exception.StorageDownloadException;
@@ -9,20 +17,11 @@ import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
-import net.modtale.service.project.ProjectService;
+import net.modtale.service.project.query.ProjectService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;

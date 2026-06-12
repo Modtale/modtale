@@ -1,12 +1,11 @@
 package net.modtale.service.auth;
 
+import java.util.Optional;
 import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.exception.ReservedAccountAccessException;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
 import org.junit.jupiter.api.Test;
-
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;

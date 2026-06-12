@@ -2,9 +2,8 @@ package net.modtale.model.dto.request.project;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import net.modtale.model.project.ProjectVersion;
-
 import java.util.List;
+import net.modtale.model.project.ProjectVersion;
 
 public class UpdateVersionRequest {
     private List<@NotBlank(message = "Dependency entries cannot be blank.") String> modIds;

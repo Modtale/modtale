@@ -1,11 +1,10 @@
 package net.modtale.service.auth;
 
+import java.util.Map;
 import net.modtale.exception.InvalidAuthenticationRequestException;
 import net.modtale.model.user.OAuthProvider;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
-
-import java.util.Map;
 
 @Service
 public class OAuthProviderProfileService {

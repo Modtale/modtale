@@ -1,12 +1,11 @@
 package net.modtale.controller.system;
 
+import java.util.List;
 import net.modtale.config.properties.AppBackendProperties;
 import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.model.dto.response.system.ClientMetadataView;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 @RestController
 public class ClientMetadataController {

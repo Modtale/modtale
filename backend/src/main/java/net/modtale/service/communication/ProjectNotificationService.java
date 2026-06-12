@@ -1,18 +1,17 @@
 package net.modtale.service.communication;
 
+import java.net.URI;
+import java.util.List;
+import java.util.concurrent.Executor;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
-import net.modtale.service.project.ProjectService;
+import net.modtale.service.project.query.ProjectService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
-
-import java.net.URI;
-import java.util.List;
-import java.util.concurrent.Executor;
 
 @Service
 public class ProjectNotificationService {

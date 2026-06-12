@@ -1,10 +1,9 @@
 package net.modtale.service.media;
 
+import java.util.function.Consumer;
 import net.modtale.service.storage.StorageService;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.function.Consumer;
 
 @Service
 public class MediaUploadService {

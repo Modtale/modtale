@@ -1,11 +1,10 @@
 package net.modtale.model.dto.response.analytics;
 
-import net.modtale.model.analytics.AnalyticsDataPoint;
-import net.modtale.model.analytics.ProjectAnalyticsDetail;
-
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import net.modtale.model.analytics.AnalyticsDataPoint;
+import net.modtale.model.analytics.ProjectAnalyticsDetail;
 
 public record ProjectAnalyticsDetailView(
         String projectId,

@@ -1,5 +1,10 @@
 package net.modtale.service.auth;
 
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.Executor;
 import net.modtale.config.properties.AppLimitProperties;
 import net.modtale.exception.ApiKeyOperationForbiddenException;
 import net.modtale.exception.ResourceNotFoundException;
@@ -8,17 +13,11 @@ import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.ApiKeyRepository;
 import net.modtale.repository.user.UserRepository;
-import net.modtale.service.security.AccessControlService;
-import net.modtale.service.user.OrganizationApiKeyContextService;
+import net.modtale.service.security.access.AccessControlService;
+import net.modtale.service.user.organization.OrganizationApiKeyContextService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.Executor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;

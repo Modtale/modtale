@@ -1,6 +1,8 @@
 package net.modtale.config.auth;
 
 import jakarta.servlet.FilterChain;
+import java.util.EnumSet;
+import java.util.Map;
 import net.modtale.exception.UnauthorizedException;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
@@ -13,9 +15,6 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.servlet.HandlerExceptionResolver;
-
-import java.util.EnumSet;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;

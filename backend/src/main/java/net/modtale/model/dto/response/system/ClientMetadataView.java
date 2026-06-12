@@ -1,7 +1,6 @@
 package net.modtale.model.dto.response.system;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.util.List;
 
 public record ClientMetadataView(

@@ -1,14 +1,13 @@
 package net.modtale.repository.project;
 
+import java.time.LocalDate;
+import java.util.List;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectSort;
 import net.modtale.model.project.ProjectViewCategory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-
-import java.time.LocalDate;
-import java.util.List;
 
 public interface ProjectRepositoryCustom {
     Page<Project> searchProjects(

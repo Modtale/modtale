@@ -1,5 +1,11 @@
 package net.modtale.service.auth;
 
+import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Executor;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.user.ApiKey;
@@ -7,13 +13,6 @@ import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.ApiKeyRepository;
 import net.modtale.repository.user.UserRepository;
-
-import java.util.EnumSet;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Executor;
 
 final class ApiKeyStaleContextPruningService {
 

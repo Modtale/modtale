@@ -1,11 +1,10 @@
 package net.modtale.model.dto.auth;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import net.modtale.model.user.ApiKey;
-
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Set;
+import net.modtale.model.user.ApiKey;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ApiKeyDTO(

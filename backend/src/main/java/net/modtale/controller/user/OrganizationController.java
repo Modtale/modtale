@@ -1,6 +1,7 @@
 package net.modtale.controller.user;
 
 import jakarta.validation.Valid;
+import java.util.List;
 import net.modtale.model.dto.request.organization.AddOrganizationMemberRequest;
 import net.modtale.model.dto.request.organization.CreateOrganizationRequest;
 import net.modtale.model.dto.request.organization.OrganizationRoleRequest;
@@ -10,8 +11,8 @@ import net.modtale.model.dto.response.common.ResourceUrlResponse;
 import net.modtale.model.dto.user.UserDTO;
 import net.modtale.model.dto.user.UserSummaryDTO;
 import net.modtale.model.user.User;
-import net.modtale.service.user.AccountService;
-import net.modtale.service.user.OrganizationApplicationService;
+import net.modtale.service.user.account.AccountService;
+import net.modtale.service.user.organization.OrganizationApplicationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -24,8 +25,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1")

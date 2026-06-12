@@ -1,5 +1,9 @@
 package net.modtale.service.social;
 
+import java.net.URI;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import net.modtale.exception.ForbiddenOperationException;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.model.project.Comment;
@@ -7,15 +11,10 @@ import net.modtale.model.project.Project;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
-import net.modtale.service.communication.NotificationService;
 import net.modtale.service.analytics.ScoringService;
-import net.modtale.service.project.ProjectService;
-import net.modtale.service.security.SanitizationService;
-
-import java.net.URI;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import net.modtale.service.communication.NotificationService;
+import net.modtale.service.project.query.ProjectService;
+import net.modtale.service.security.validation.SanitizationService;
 
 final class ProjectSocialService {
 

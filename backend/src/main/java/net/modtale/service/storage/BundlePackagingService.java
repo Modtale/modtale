@@ -1,14 +1,13 @@
 package net.modtale.service.storage;
 
-import net.modtale.model.project.Project;
-import net.modtale.model.project.ProjectDependency;
-import net.modtale.model.project.ProjectVersion;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+import net.modtale.model.project.Project;
+import net.modtale.model.project.ProjectDependency;
+import net.modtale.model.project.ProjectVersion;
 
 final class BundlePackagingService {
 

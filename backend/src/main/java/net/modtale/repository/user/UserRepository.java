@@ -1,14 +1,14 @@
 package net.modtale.repository.user;
 
-import net.modtale.model.user.User;
-import net.modtale.model.user.OAuthProvider;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.data.mongodb.repository.Query;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import net.modtale.model.user.OAuthProvider;
+import net.modtale.model.user.User;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
 
 public interface UserRepository extends MongoRepository<User, String> {
 

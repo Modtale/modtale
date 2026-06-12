@@ -1,5 +1,8 @@
 package net.modtale.service.auth;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.concurrent.Executor;
 import net.modtale.exception.ApiKeyOperationForbiddenException;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.model.user.ApiKey;
@@ -10,10 +13,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.concurrent.Executor;
 
 @Service
 public class ApiKeyResolutionService {

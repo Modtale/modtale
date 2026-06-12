@@ -1,9 +1,9 @@
 package net.modtale.repository.user;
 
+import java.util.List;
 import net.modtale.model.user.Report;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
-import java.util.List;
 
 public interface ReportRepository extends MongoRepository<Report, String> {
     List<Report> findByStatus(Report.ReportStatus status);

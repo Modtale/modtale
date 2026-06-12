@@ -1,6 +1,9 @@
 package net.modtale.controller.analytics;
 
 import jakarta.validation.constraints.Pattern;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
 import net.modtale.model.dto.response.analytics.PlatformAnalyticsSummaryView;
 import net.modtale.model.dto.response.analytics.PlatformStatsView;
 import net.modtale.service.analytics.PlatformStatsService;
@@ -10,10 +13,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.time.Duration;
-import java.time.LocalDateTime;
-import java.util.concurrent.TimeUnit;
 
 @RestController
 @Validated

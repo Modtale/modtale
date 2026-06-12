@@ -2,6 +2,10 @@ package net.modtale.controller.analytics;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.Pattern;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 import net.modtale.model.dto.response.analytics.CreatorAnalyticsView;
 import net.modtale.model.dto.response.analytics.ProjectAnalyticsDetailView;
 import net.modtale.model.project.Project;
@@ -10,19 +14,14 @@ import net.modtale.service.analytics.AnalyticsAccessService;
 import net.modtale.service.analytics.AnalyticsEligibilityService;
 import net.modtale.service.analytics.QueryService;
 import net.modtale.service.analytics.TrackingService;
-import net.modtale.service.project.ProjectService;
-import net.modtale.service.user.AccountService;
+import net.modtale.service.project.query.ProjectService;
+import net.modtale.service.user.account.AccountService;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.time.Duration;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 @RestController
 @Validated

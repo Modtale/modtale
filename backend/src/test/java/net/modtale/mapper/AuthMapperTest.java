@@ -1,12 +1,11 @@
 package net.modtale.mapper;
 
-import net.modtale.model.dto.auth.ApiKeyDTO;
-import net.modtale.model.user.ApiKey;
-import org.junit.jupiter.api.Test;
-
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Set;
+import net.modtale.model.dto.auth.ApiKeyDTO;
+import net.modtale.model.user.ApiKey;
+import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;

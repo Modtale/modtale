@@ -1,9 +1,10 @@
 package net.modtale.repository.project;
 
+import java.util.List;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectSort;
 import net.modtale.model.project.ProjectViewCategory;
-import net.modtale.service.project.ProjectSearchResultDecorator;
+import net.modtale.service.project.query.ProjectSearchResultDecorator;
 import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,8 +12,6 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
-
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

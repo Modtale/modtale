@@ -1,15 +1,14 @@
 package net.modtale.service.storage;
 
+import java.io.IOException;
+import java.util.List;
 import net.modtale.config.properties.AppLimitProperties;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
-import net.modtale.service.project.ProjectService;
+import net.modtale.service.project.query.ProjectService;
 import org.springframework.stereotype.Service;
-
-import java.io.IOException;
-import java.util.List;
 
 @Service
 public class DownloadService {

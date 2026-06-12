@@ -1,11 +1,16 @@
 package net.modtale.repository.project;
 
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
-import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectSort;
+import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectViewCategory;
-import net.modtale.service.project.ProjectSearchResultDecorator;
+import net.modtale.service.project.query.ProjectSearchResultDecorator;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -14,12 +19,6 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Repository;
-
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.regex.Pattern;
 
 @Repository
 public class ProjectRepositoryImpl implements ProjectRepositoryCustom {

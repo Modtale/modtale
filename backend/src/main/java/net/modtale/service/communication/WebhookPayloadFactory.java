@@ -1,5 +1,9 @@
 package net.modtale.service.communication;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import net.modtale.config.properties.AppAdminDiscordWebhookProperties;
 import net.modtale.config.properties.AppBackendProperties;
 import net.modtale.config.properties.AppDiscordWebhookProperties;
@@ -11,13 +15,8 @@ import net.modtale.model.project.ScanResult;
 import net.modtale.model.project.ScanStatus;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
-import net.modtale.service.project.ProjectService;
+import net.modtale.service.project.query.ProjectService;
 import org.springframework.stereotype.Service;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 @Service
 public class WebhookPayloadFactory {

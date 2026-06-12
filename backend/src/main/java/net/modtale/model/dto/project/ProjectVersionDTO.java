@@ -1,9 +1,9 @@
 package net.modtale.model.dto.project;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.util.List;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
-import java.util.List;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ProjectVersionDTO {

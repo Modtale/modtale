@@ -3,12 +3,11 @@ package net.modtale.service.storage;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Refill;
-import net.modtale.exception.RateLimitExceededException;
-import net.modtale.model.user.User;
-
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import net.modtale.exception.RateLimitExceededException;
+import net.modtale.model.user.User;
 
 final class DownloadRateLimitService {
 

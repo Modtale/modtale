@@ -1,9 +1,11 @@
 package net.modtale.controller.user;
 
-import net.modtale.exception.ApiKeyOperationForbiddenException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
+import java.util.List;
+import java.util.stream.Collectors;
+import net.modtale.exception.ApiKeyOperationForbiddenException;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.mapper.ProjectMapper;
 import net.modtale.mapper.UserMapper;
@@ -16,12 +18,12 @@ import net.modtale.model.dto.user.UserSummaryDTO;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
-import net.modtale.service.project.SearchService;
-import net.modtale.service.security.AccessControlService;
-import net.modtale.service.security.FileValidationService;
-import net.modtale.service.social.SocialService;
-import net.modtale.service.user.AccountService;
 import net.modtale.service.media.MediaUploadService;
+import net.modtale.service.project.query.SearchService;
+import net.modtale.service.security.access.AccessControlService;
+import net.modtale.service.security.validation.FileValidationService;
+import net.modtale.service.social.SocialService;
+import net.modtale.service.user.account.AccountService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -42,9 +44,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1")
