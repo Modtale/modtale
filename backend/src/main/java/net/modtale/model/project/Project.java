@@ -32,7 +32,6 @@ import java.time.LocalDateTime;
         @CompoundIndex(name = "status_trending_score_idx", def = "{'status': 1, 'trendScore': -1}"),
         @CompoundIndex(name = "status_popular_score_idx", def = "{'status': 1, 'popularScore': -1}"),
         @CompoundIndex(name = "status_relevance_score_idx", def = "{'status': 1, 'relevanceScore': -1}"),
-        @CompoundIndex(name = "status_hidden_gem_score_idx", def = "{'status': 1, 'hiddenGemScore': -1}"),
         @CompoundIndex(name = "status_class_trending_rank_idx", def = "{'status': 1, 'classification': 1, 'trendingRank': 1}"),
         @CompoundIndex(name = "status_class_popular_rank_idx", def = "{'status': 1, 'classification': 1, 'popularRank': 1}"),
         @CompoundIndex(name = "status_class_relevance_rank_idx", def = "{'status': 1, 'classification': 1, 'relevanceRank': 1}"),
