@@ -28,6 +28,7 @@ describe('category data', () => {
             'MODPACK'
         ]);
         expect(LICENSES.some(license => license.id === 'MIT')).toBe(true);
+        expect(LICENSES.some(license => license.id === 'CC-BY-NC-SA-4.0')).toBe(true);
         expect(LICENSES.some(license => license.id === 'Unlicense')).toBe(true);
     });
 });

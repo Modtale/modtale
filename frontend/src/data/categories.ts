@@ -41,5 +41,6 @@ export const LICENSES = [
     { id: 'CC0-1.0', name: 'CC0 1.0 Universal' },
     { id: 'CC-BY-4.0', name: 'CC BY 4.0' },
     { id: 'CC-BY-SA-4.0', name: 'CC BY-SA 4.0' },
+    { id: 'CC-BY-NC-SA-4.0', name: 'CC BY-NC-SA 4.0' },
     { id: 'Unlicense', name: 'The Unlicense' },
 ];
