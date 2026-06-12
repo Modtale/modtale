@@ -42,7 +42,7 @@ class ProjectServiceTest {
         accessControlService = mock(AccessControlService.class);
         ProjectRouteService projectRouteService = new ProjectRouteService();
         ProjectCacheService projectCacheService = new ProjectCacheService(new ConcurrentMapCacheManager("projectDetails"), projectRouteService);
-        ProjectViewService projectViewService = new ProjectViewService(projectRepository, userRepository, mongoTemplate, accessControlService);
+        ProjectViewService projectViewService = new ProjectViewService(projectRepository, userRepository, mongoTemplate, accessControlService, projectRouteService);
 
         service = new ProjectService(
                 projectViewService,
@@ -116,7 +116,16 @@ class ProjectServiceTest {
         Project project = project("project-1", ProjectStatus.PUBLISHED, ProjectClassification.SAVE);
         project.setSlug("sky-world");
 
-        assertEquals("/world/sky-world~project-1", service.getProjectLink(project));
+        assertEquals("/world/sky-world", service.getProjectLink(project));
+    }
+
+    @Test
+    void getProjectLinkFallsBackToGeneratedHandlesWhenSlugIsMissing() {
+        Project project = project("project-1", ProjectStatus.PUBLISHED, ProjectClassification.PLUGIN);
+        project.setSlug(null);
+        project.setTitle("Sky Tools Deluxe");
+
+        assertEquals("/mod/sky-tools-deluxe~project-1", service.getProjectLink(project));
     }
 
     private static Project project(String id, ProjectStatus status, ProjectClassification classification) {

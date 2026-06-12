@@ -36,7 +36,7 @@ class AccessControlServiceTest {
         accessControlService = new AccessControlService(
                 accountService,
                 userRepository,
-                new PermissionProjectLookupService(projectRepository)
+                new PermissionProjectLookupService(projectRepository, new net.modtale.service.project.ProjectRouteService())
         );
     }
 
@@ -125,6 +125,17 @@ class AccessControlServiceTest {
 
         assertTrue(accessControlService.hasProjectPerm("project-1", "PROJECT_EDIT_METADATA", null));
         assertFalse(accessControlService.hasProjectPerm("project-1", "PROJECT_DELETE", null));
+    }
+
+    @Test
+    void hasProjectPermResolvesCanonicalSlugRoutes() {
+        Project project = new Project();
+        project.setId("project-1");
+        project.setSlug("levelingcore");
+        project.setStatus(ProjectStatus.PUBLISHED);
+        when(projectRepository.findBySlug("levelingcore")).thenReturn(Optional.of(project));
+
+        assertTrue(accessControlService.hasProjectPerm("levelingcore", "PROJECT_READ", null));
     }
 
     @Test

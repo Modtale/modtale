@@ -3,8 +3,13 @@ package net.modtale.service.project;
 import net.modtale.model.project.Project;
 import org.springframework.stereotype.Service;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 @Service
 public class ProjectRouteService {
+
+    private static final Pattern LEGACY_UUID_SUFFIX = Pattern.compile("([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$", Pattern.CASE_INSENSITIVE);
 
     public String getProjectLink(Project project) {
         String handle = buildProjectHandle(project);
@@ -15,17 +20,36 @@ public class ProjectRouteService {
 
     public String buildProjectHandle(Project project) {
         if (project == null || project.getId() == null || project.getId().isBlank()) return null;
-        String base = project.getSlug();
-        if (base == null || base.isBlank()) {
-            base = createSlug(project.getTitle());
+        String customSlug = project.getSlug();
+        if (customSlug != null && !customSlug.isBlank()) {
+            return customSlug.trim();
         }
-        if (base != null && project.getId() != null) {
-            if (base.equals(project.getId())) return project.getId();
-            if (base.endsWith("~" + project.getId())) base = base.substring(0, base.length() - project.getId().length() - 1);
-            else if (base.endsWith("-" + project.getId())) base = base.substring(0, base.length() - project.getId().length() - 1);
-        }
+        String base = createSlug(project.getTitle());
         if (base == null || base.isBlank()) return project.getId();
         return base + "~" + project.getId();
+    }
+
+    public String extractProjectId(String routeKey) {
+        if (routeKey == null || routeKey.isBlank()) return null;
+
+        String normalized = routeKey.trim();
+        int tildeIndex = normalized.lastIndexOf('~');
+        if (tildeIndex >= 0 && tildeIndex < normalized.length() - 1) {
+            return normalized.substring(tildeIndex + 1);
+        }
+
+        Matcher matcher = LEGACY_UUID_SUFFIX.matcher(normalized);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+
+        return normalized;
+    }
+
+    public boolean hasExplicitProjectHandle(String routeKey) {
+        String extractedId = extractProjectId(routeKey);
+        if (extractedId == null) return false;
+        return !extractedId.equals(routeKey == null ? null : routeKey.trim());
     }
 
     private String createSlug(String title) {
