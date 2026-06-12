@@ -7,6 +7,7 @@ import net.modtale.model.project.ProjectSort;
 import net.modtale.model.project.ProjectViewCategory;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -31,6 +32,12 @@ public class ProjectCatalogSearchService {
         this.projectSearchResultDecorator = projectSearchResultDecorator;
     }
 
+    @Cacheable(
+            value = "projectSearch",
+            key = "T(java.util.Arrays).asList(#tags, #search, #page, #size, #sortBy, #gameVersion, #contentType, #minDownloads, #minFavorites, #viewCategory, #dateRange, #authorId)",
+            condition = "#currentUser == null && (#viewCategory == null || !#viewCategory.personalView)",
+            sync = true
+    )
     public Page<Project> searchProjects(
             List<String> tags,
             String search,
@@ -47,13 +54,17 @@ public class ProjectCatalogSearchService {
             User currentUser
     ) {
         if (viewCategory == ProjectViewCategory.FAVORITES) {
+            PageRequest favoritesPageable = PageRequest.of(page, size, Sort.by("title"));
             List<String> likedIds = (currentUser != null && currentUser.getLikedModIds() != null)
                     ? currentUser.getLikedModIds()
                     : new ArrayList<>();
+            if (likedIds.isEmpty()) {
+                return Page.empty(favoritesPageable);
+            }
             return projectRepository.findFavorites(
                     likedIds,
                     search != null ? search : "",
-                    PageRequest.of(page, size, Sort.by("title"))
+                    favoritesPageable
             );
         }
 

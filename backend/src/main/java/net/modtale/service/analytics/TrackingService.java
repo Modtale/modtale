@@ -31,7 +31,6 @@ public class TrackingService {
         this.trackingBufferService = bufferService;
         this.trackingFlushService = new TrackingFlushService(
                 mongoTemplate,
-                projectRepository,
                 projectService,
                 bufferService
         );

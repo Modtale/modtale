@@ -40,6 +40,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -123,6 +124,7 @@ class ProjectControllerTest {
         ProjectSummaryDTO dto = response.getBody().getContent().getFirst();
         assertEquals("project-1", dto.id());
         assertEquals("Sky Tools", dto.title());
+        verify(accountService).getCurrentUser((Authentication) null);
     }
 
     @Test
@@ -169,6 +171,7 @@ class ProjectControllerTest {
 
         assertEquals(200, response.getStatusCode().value());
         assertTrue(response.getHeaders().getCacheControl().contains("max-age=3600"));
+        verify(accountService, never()).getCurrentUser(authentication);
         verify(searchService).searchProjects(
                 isNull(),
                 isNull(),
@@ -182,6 +185,67 @@ class ProjectControllerTest {
                 eq(ProjectViewCategory.ALL),
                 isNull(),
                 eq("creator-name"),
+                isNull()
+        );
+    }
+
+    @Test
+    void getProjectsDoesNotResolveCurrentUserForPublicCatalogViews() {
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                user("user-1", "ada"),
+                null,
+                List.of()
+        );
+        Page<Project> page = new PageImpl<>(List.of(project("project-3", "Sorted Tags", ProjectStatus.PUBLISHED)));
+
+        when(searchService.searchProjects(
+                eq(List.of("adventure", "tools")),
+                eq(""),
+                eq(0),
+                eq(12),
+                eq(ProjectSort.RELEVANCE),
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                eq(ProjectViewCategory.ALL),
+                eq("all"),
+                isNull(),
+                isNull()
+        )).thenReturn(page);
+
+        var response = controller.getProjects(
+                "tools, adventure, tools",
+                "",
+                0,
+                12,
+                "relevance",
+                null,
+                null,
+                null,
+                null,
+                "all",
+                "all",
+                null,
+                authentication
+        );
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("project-3", response.getBody().getContent().getFirst().id());
+        verify(accountService, never()).getCurrentUser(authentication);
+        verify(searchService).searchProjects(
+                eq(List.of("adventure", "tools")),
+                eq(""),
+                eq(0),
+                eq(12),
+                eq(ProjectSort.RELEVANCE),
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                eq(ProjectViewCategory.ALL),
+                eq("all"),
+                isNull(),
                 isNull()
         );
     }

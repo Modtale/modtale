@@ -118,16 +118,18 @@ public class ProjectController {
             Authentication authentication
     ) {
         List<String> tagList = tags != null && !tags.trim().isEmpty()
-                ? Arrays.stream(tags.split(",")).map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList())
+                ? Arrays.stream(tags.split(",")).map(String::trim).filter(s -> !s.isEmpty()).distinct().sorted().collect(Collectors.toList())
                 : null;
 
-        User currentUser = accountService.getCurrentUser(authentication);
         boolean apiKeyRequest = hasApiRole(authentication);
         ProjectSort sortEnum = ProjectSort.fromQueryValue(sort);
         ProjectViewCategory effectiveCategory = apiKeyRequest
                 ? ProjectViewCategory.ALL
                 : ProjectViewCategory.fromQueryValue(category);
         ProjectClassification classificationEnum = classification != null ? resolveClassification(classification) : null;
+        User currentUser = shouldResolveCatalogViewer(effectiveCategory)
+                ? accountService.getCurrentUser(authentication)
+                : null;
 
         Page<Project> data = searchService.searchProjects(
                 tagList,
@@ -326,6 +328,10 @@ public class ProjectController {
         return authentication != null
                 && authentication.getAuthorities().stream()
                 .anyMatch(authority -> authority.getAuthority().equals("ROLE_API"));
+    }
+
+    private boolean shouldResolveCatalogViewer(ProjectViewCategory viewCategory) {
+        return viewCategory.isPersonalView();
     }
 
     private ProjectClassification resolveClassification(String rawClassification) {

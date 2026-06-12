@@ -74,11 +74,6 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
         if (minDownloads != null) criteriaList.add(Criteria.where("downloadCount").gte(minDownloads));
         if (minFavorites != null) criteriaList.add(Criteria.where("favoriteCount").gte(minFavorites));
 
-        String rankField = resolveRankField(sortBy, viewCategory);
-        if (rankField != null) {
-            criteriaList.add(Criteria.where(rankField).gt(0));
-        }
-
         boolean isTimeBasedDownloadSort = sortBy == ProjectSort.DOWNLOADS && dateCutoff != null;
         if (dateCutoff != null && !isTimeBasedDownloadSort) {
             criteriaList.add(Criteria.where("updatedAt").gte(dateCutoff.toString()));
@@ -102,15 +97,32 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
 
     private Sort resolveSort(ProjectSort sortBy, ProjectViewCategory viewCategory, LocalDate dateCutoff, Pageable pageable) {
         if (viewCategory == ProjectViewCategory.TRENDING || sortBy == ProjectSort.TRENDING) {
-            return Sort.by(Sort.Order.asc("trendingRank"));
+            return Sort.by(
+                    Sort.Order.asc("trendingRank"),
+                    Sort.Order.desc("trendScore"),
+                    Sort.Order.desc("downloads7d"),
+                    Sort.Order.desc("downloadCount"),
+                    Sort.Order.desc("updatedAt")
+            );
         }
 
         if (viewCategory == ProjectViewCategory.POPULAR || sortBy == ProjectSort.POPULAR) {
-            return Sort.by(Sort.Order.asc("popularRank"));
+            return Sort.by(
+                    Sort.Order.asc("popularRank"),
+                    Sort.Order.desc("popularScore"),
+                    Sort.Order.desc("downloadCount"),
+                    Sort.Order.desc("favoriteCount"),
+                    Sort.Order.desc("updatedAt")
+            );
         }
 
         if (viewCategory == ProjectViewCategory.HIDDEN_GEMS) {
-            return Sort.by(Sort.Order.asc("hiddenGemRank"));
+            return Sort.by(
+                    Sort.Order.asc("hiddenGemRank"),
+                    Sort.Order.desc("hiddenGemScore"),
+                    Sort.Order.desc("favoriteCount"),
+                    Sort.Order.desc("updatedAt")
+            );
         }
 
         if (sortBy == ProjectSort.DOWNLOADS && dateCutoff != null) {
@@ -127,7 +139,28 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
         }
 
         if (sortBy == ProjectSort.RELEVANCE) {
-            return Sort.by(Sort.Order.asc("relevanceRank"));
+            return Sort.by(
+                    Sort.Order.asc("relevanceRank"),
+                    Sort.Order.desc("relevanceScore"),
+                    Sort.Order.desc("downloads30d"),
+                    Sort.Order.desc("updatedAt")
+            );
+        }
+
+        if (sortBy == ProjectSort.DOWNLOADS) {
+            return Sort.by(Sort.Order.desc("downloadCount"), Sort.Order.desc("updatedAt"));
+        }
+
+        if (sortBy == ProjectSort.FAVORITES) {
+            return Sort.by(Sort.Order.desc("favoriteCount"), Sort.Order.desc("updatedAt"));
+        }
+
+        if (sortBy == ProjectSort.NEWEST) {
+            return Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("updatedAt"));
+        }
+
+        if (sortBy == ProjectSort.UPDATED) {
+            return Sort.by(Sort.Order.desc("updatedAt"));
         }
 
         if (pageable.getSort().isSorted()) {
@@ -135,22 +168,6 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
         }
 
         return Sort.by(Sort.Order.desc("updatedAt"));
-    }
-
-    private String resolveRankField(ProjectSort sortBy, ProjectViewCategory viewCategory) {
-        if (viewCategory == ProjectViewCategory.TRENDING || sortBy == ProjectSort.TRENDING) {
-            return "trendingRank";
-        }
-        if (viewCategory == ProjectViewCategory.POPULAR || sortBy == ProjectSort.POPULAR) {
-            return "popularRank";
-        }
-        if (viewCategory == ProjectViewCategory.HIDDEN_GEMS) {
-            return "hiddenGemRank";
-        }
-        if (sortBy == ProjectSort.RELEVANCE) {
-            return "relevanceRank";
-        }
-        return null;
     }
 
     private void applyCatalogSummaryProjection(Query query) {
@@ -189,6 +206,7 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
         }
 
         Query countQuery = Query.of(query).limit(0).skip(0);
+        applyCatalogSummaryProjection(query);
         query.with(pageable);
         List<Project> list = mongoTemplate.find(query, Project.class);
         return projectSearchResultDecorator.decorateCatalogResults(PageableExecutionUtils.getPage(

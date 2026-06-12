@@ -3,7 +3,6 @@ package net.modtale.service.analytics;
 import net.modtale.model.analytics.PlatformMonthlyStats;
 import net.modtale.model.analytics.ProjectMonthlyStats;
 import net.modtale.model.project.Project;
-import net.modtale.repository.project.ProjectRepository;
 import net.modtale.service.project.ProjectService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -26,18 +26,15 @@ public class TrackingFlushService {
     private static final Logger logger = LoggerFactory.getLogger(TrackingFlushService.class);
 
     private final MongoTemplate mongoTemplate;
-    private final ProjectRepository projectRepository;
     private final ProjectService projectService;
     private final TrackingBufferService trackingBufferService;
 
     public TrackingFlushService(
             MongoTemplate mongoTemplate,
-            ProjectRepository projectRepository,
             ProjectService projectService,
             TrackingBufferService trackingBufferService
     ) {
         this.mongoTemplate = mongoTemplate;
-        this.projectRepository = projectRepository;
         this.projectService = projectService;
         this.trackingBufferService = trackingBufferService;
     }
@@ -81,13 +78,35 @@ public class TrackingFlushService {
 
         try {
             bulkOps.execute();
-            for (String id : allIdsToEvict) {
-                projectService.evictProjectCache(projectRepository.findById(id).orElse(null));
-            }
+            evictUpdatedProjectCaches(allIdsToEvict);
         } catch (Exception e) {
             logger.error("Failed to bulk flush metrics", e);
             trackingBufferService.restoreMetricIncrements(batch);
         }
+    }
+
+    private void evictUpdatedProjectCaches(Set<String> projectIds) {
+        if (projectIds == null || projectIds.isEmpty()) {
+            return;
+        }
+
+        Query query = Query.query(Criteria.where("_id").in(projectIds));
+        query.fields()
+                .include("_id")
+                .include("slug")
+                .include("title")
+                .include("classification");
+
+        List<Project> projects = mongoTemplate.find(query, Project.class);
+        Set<String> foundIds = new HashSet<>();
+        projects.stream()
+                .map(Project::getId)
+                .filter(id -> id != null && !id.isBlank())
+                .forEach(foundIds::add);
+
+        Set<String> missingIds = new HashSet<>(projectIds);
+        missingIds.removeAll(foundIds);
+        projectService.evictProjectDetailsCaches(projects, missingIds);
     }
 
     private void flushMonthlyStats() {

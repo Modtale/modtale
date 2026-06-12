@@ -32,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -80,6 +81,21 @@ class SearchServiceTest {
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         verify(projectRepository).findFavorites(eq(List.of("project-1", "project-2")), eq(""), pageableCaptor.capture());
         assertEquals(PageRequest.of(0, 12, Sort.by("title")), pageableCaptor.getValue());
+        verify(projectRepository, never()).searchProjects(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void searchProjectsReturnsEmptyFavoritesWithoutQueryingWhenViewerHasNoFavoriteIds() {
+        User currentUser = user("user-1", "viewer");
+        currentUser.setLikedModIds(List.of());
+
+        Page<Project> result = searchService.searchProjects(
+                null, null, 0, 12, ProjectSort.RELEVANCE, null, null, null, null, ProjectViewCategory.FAVORITES, null, null, currentUser
+        );
+
+        assertTrue(result.isEmpty());
+        assertEquals(PageRequest.of(0, 12, Sort.by("title")), result.getPageable());
+        verify(projectRepository, never()).findFavorites(any(), any(), any());
         verify(projectRepository, never()).searchProjects(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
@@ -146,6 +162,48 @@ class SearchServiceTest {
         assertEquals(LocalDate.now().minusDays(30), cutoffCaptor.getValue());
         assertEquals("Ada", result.getContent().getFirst().getAuthor());
         assertNull(result.getContent().getFirst().getVersions().getFirst().getScanResult());
+    }
+
+    @Test
+    void searchProjectsSkipsAuthorHydrationWhenProjectedResultsAlreadyHaveAuthors() {
+        Project project = project("project-1", "Sky Tools", ProjectStatus.PUBLISHED);
+        project.setAuthorId("author-1");
+        project.setAuthor("Ada");
+        Page<Project> page = new PageImpl<>(List.of(project));
+
+        when(projectRepository.searchProjects(
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                any(Pageable.class),
+                isNull(),
+                eq(ProjectSort.RELEVANCE),
+                eq(ProjectViewCategory.ALL),
+                isNull(),
+                isNull()
+        )).thenReturn(page);
+
+        Page<Project> result = searchService.searchProjects(
+                null,
+                null,
+                0,
+                12,
+                ProjectSort.RELEVANCE,
+                null,
+                null,
+                null,
+                null,
+                ProjectViewCategory.ALL,
+                null,
+                null,
+                null
+        );
+
+        assertEquals("Ada", result.getContent().getFirst().getAuthor());
+        verify(userRepository, never()).findAllById(any(Iterable.class));
     }
 
     @Test

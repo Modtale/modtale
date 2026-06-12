@@ -5,6 +5,8 @@ import net.modtale.model.user.User;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import java.util.Collection;
+
 @Service
 public class ProjectService {
 
@@ -24,6 +26,10 @@ public class ProjectService {
 
     public void evictProjectCache(Project project) {
         projectCacheService.evictProjectCache(project);
+    }
+
+    public void evictProjectDetailsCaches(Collection<Project> projects, Collection<String> fallbackProjectIds) {
+        projectCacheService.evictProjectDetailsCaches(projects, fallbackProjectIds);
     }
 
     public Project getRawProjectById(String id) {
