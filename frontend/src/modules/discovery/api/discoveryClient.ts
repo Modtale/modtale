@@ -11,6 +11,7 @@ export interface SearchParams {
     minDownloads?: number;
     minFavorites?: number;
     dateRange?: string;
+    category?: string;
 }
 
 export const discoveryClient = {
