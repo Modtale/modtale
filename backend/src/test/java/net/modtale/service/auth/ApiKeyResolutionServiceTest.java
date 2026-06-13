@@ -68,6 +68,17 @@ class ApiKeyResolutionServiceTest {
     }
 
     @Test
+    void resolveKeyNormalizesWhitespaceAndCommonHeaderSchemes() {
+        String plainKey = "md_valid-secret";
+        ApiKey storedKey = new ApiKey("user-1", "CI", new BCryptPasswordEncoder().encode(plainKey), plainKey.substring(0, 10));
+        when(apiKeyRepository.findByPrefix(plainKey.substring(0, 10))).thenReturn(Optional.of(storedKey));
+
+        assertSame(storedKey, service.resolveKey("  " + plainKey + "  "));
+        assertSame(storedKey, service.resolveKey("Bearer " + plainKey));
+        assertSame(storedKey, service.resolveKey("ApiKey " + plainKey));
+    }
+
+    @Test
     void getMyKeysAndGetUserFromKeyDelegateToRepositories() {
         ApiKey key = new ApiKey("user-1", "CI", "hash", "prefix");
         User user = new User();

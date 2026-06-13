@@ -435,20 +435,18 @@ export const generateDynamicSEO = (
     baseSEO: { title: string; description: string },
     page: number,
     sort: string,
-    view: string,
     query: string,
 ) => {
     let dynamicTitle = baseSEO.title;
     let dynamicDesc = baseSEO.description;
 
     let prefix = '';
-    if (sort === 'popular' || view === 'popular') prefix = 'Popular ';
-    else if (sort === 'trending' || view === 'trending') prefix = 'Trending ';
+    if (sort === 'popular') prefix = 'Popular ';
+    else if (sort === 'trending') prefix = 'Trending ';
     else if (sort === 'downloads') prefix = 'Most Downloaded ';
     else if (sort === 'favorites') prefix = 'Most Favorited ';
     else if (sort === 'newest') prefix = 'Newest ';
     else if (sort === 'updated') prefix = 'Recently Updated ';
-    else if (view === 'hidden_gems') prefix = 'Hidden Gems: ';
 
     if (prefix) {
         dynamicTitle = `${prefix}${dynamicTitle.replace(' | Modtale', '')} | Modtale`;

@@ -13,6 +13,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 @Service("apiSecurity")
@@ -60,12 +61,19 @@ public class AccessControlService {
 
     public boolean hasAnyPerm(String perm, Authentication authentication) {
         if (isPublicReadPermission(perm)) return true;
+        if (isApiKey(authentication)) {
+            return hasApiKeyScope(authentication, "PERSONAL", perm);
+        }
         return accountService.getCurrentUser(authentication) != null;
     }
 
     public boolean hasPersonalPerm(String permStr, Authentication authentication) {
         User user = accountService.getCurrentUser(authentication);
-        return user != null;
+        if (user == null) return false;
+        if (isApiKey(authentication)) {
+            return hasApiKeyScope(authentication, "PERSONAL", permStr);
+        }
+        return true;
     }
 
     public boolean isApiKey(Authentication authentication) {
@@ -78,6 +86,9 @@ public class AccessControlService {
     public boolean hasOrgPerm(String orgId, String permStr, Authentication authentication) {
         User user = accountService.getCurrentUser(authentication);
         if (user == null) return false;
+        if (isApiKey(authentication)) {
+            return hasApiKeyScope(authentication, orgId, permStr);
+        }
         if (isAdmin(user)) return true;
 
         User org = userRepository.findById(orgId).orElse(null);
@@ -94,9 +105,21 @@ public class AccessControlService {
     public boolean hasCreateProjectPerm(String ownerId, Authentication authentication) {
         User user = accountService.getCurrentUser(authentication);
         if (user == null) return false;
+
+        if (isApiKey(authentication)) {
+            if (ownerId == null || ownerId.isEmpty() || ownerId.equals(user.getId())) {
+                return hasApiKeyScope(authentication, "PERSONAL", ApiKey.ApiPermission.PROJECT_CREATE.name());
+            }
+
+            User org = userRepository.findById(ownerId).orElse(null);
+            return org != null
+                    && org.getAccountType() == User.AccountType.ORGANIZATION
+                    && hasApiKeyScope(authentication, ownerId, ApiKey.ApiPermission.PROJECT_CREATE.name())
+                    && hasOrgProjectManagementAccess(org, user.getId());
+        }
+
         if (isAdmin(user)) return true;
         if (ownerId == null || ownerId.isEmpty() || ownerId.equals(user.getId())) return true;
-
         User org = userRepository.findById(ownerId).orElse(null);
         if (org == null || org.getAccountType() != User.AccountType.ORGANIZATION) return false;
 
@@ -104,11 +127,18 @@ public class AccessControlService {
     }
 
     public boolean hasProjectPerm(String projectId, String permStr, Authentication authentication) {
+        Project project = permissionProjectLookupService.findProject(projectId);
+        if (isApiKey(authentication)) {
+            if (isProjectReadPermission(permStr) && isPubliclyReadable(project)) {
+                return true;
+            }
+            return hasApiKeyProjectScope(project, projectId, permStr, authentication);
+        }
+
         if (isProjectReadPermission(permStr)) {
             return true;
         }
 
-        Project project = permissionProjectLookupService.findProject(projectId);
         if (project == null) return true;
 
         User user = accountService.getCurrentUser(authentication);
@@ -157,6 +187,11 @@ public class AccessControlService {
     }
 
     public boolean hasProjectPermission(Project project, User user, ApiKey.ApiPermission perm) {
+        if (perm == null) return false;
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (isApiKeyAuthenticationForUser(authentication, user)) {
+            return hasApiKeyProjectScope(project, project != null ? project.getId() : null, perm.name(), authentication);
+        }
         return hasProjectPermission(project, user, perm, findAuthorForPermission(project != null ? project.getAuthorId() : null));
     }
 
@@ -187,6 +222,17 @@ public class AccessControlService {
 
     public boolean hasEditPermission(Project project, User user) {
         if (project == null || user == null) return false;
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (isApiKeyAuthenticationForUser(authentication, user)) {
+            return hasApiKeyProjectScope(
+                    project,
+                    project.getId(),
+                    ApiKey.ApiPermission.PROJECT_EDIT_METADATA.name(),
+                    authentication
+            );
+        }
+
         if (project.getAuthorId() != null && project.getAuthorId().equals(user.getId())) return true;
 
         User authorUser = findAuthorForPermission(project.getAuthorId());
@@ -251,6 +297,46 @@ public class AccessControlService {
         }
 
         return "ADMIN".equalsIgnoreCase(member.getRole());
+    }
+
+    private boolean hasApiKeyProjectScope(Project project, String projectId, String permStr, Authentication authentication) {
+        if (project != null) {
+            if (hasApiKeyScope(authentication, project.getId(), permStr)) {
+                return true;
+            }
+
+            User user = accountService.getCurrentUser(authentication);
+            if (user != null && project.getAuthorId() != null && project.getAuthorId().equals(user.getId())) {
+                return hasApiKeyScope(authentication, "PERSONAL", permStr);
+            }
+
+            if (project.getAuthorId() != null && hasApiKeyScope(authentication, project.getAuthorId(), permStr)) {
+                return true;
+            }
+        }
+
+        return hasApiKeyScope(authentication, projectId, permStr);
+    }
+
+    private boolean hasApiKeyScope(Authentication authentication, String contextId, String permStr) {
+        if (authentication == null || contextId == null || contextId.isBlank() || permStr == null || permStr.isBlank()) {
+            return false;
+        }
+
+        String expectedAuthority = "SCOPE_" + contextId + "_" + permStr;
+        return authentication.getAuthorities() != null
+                && authentication.getAuthorities().stream()
+                .anyMatch(authority -> expectedAuthority.equals(authority.getAuthority()));
+    }
+
+    private boolean isApiKeyAuthenticationForUser(Authentication authentication, User user) {
+        if (!isApiKey(authentication) || user == null || user.getId() == null) {
+            return false;
+        }
+
+        Object principal = authentication.getPrincipal();
+        return principal instanceof User authenticatedUser
+                && user.getId().equals(authenticatedUser.getId());
     }
 
     private boolean isProjectReadPermission(String permStr) {

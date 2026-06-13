@@ -320,7 +320,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
     const previewSummary = metaData.summary.trim() || projectData.description || '';
     const previewProject: Project = { ...projectData, title: previewTitle, description: previewSummary };
 
-    const isCustomLicense = metaData.license && !LICENSES.some(l => l.id === metaData.license);
+    const isCustomLicense = typeof metaData.license === 'string' && !LICENSES.some(l => l.id === metaData.license);
     const hasTitle = metaData.title && metaData.title.trim().length > 0;
     const hasTags = metaData.tags.length > 0;
     const hasSummary = metaData.summary && metaData.summary.length >= 10 && metaData.summary.length <= 250;
@@ -354,6 +354,13 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
 
     const isPublishable = publishRequirements.every(r => r.met);
     const metCount = publishRequirements.filter(r => r.met).length;
+
+    const handleSelectStandardLicense = (licenseId: string) => {
+        markDirty();
+        const linksWithoutCustomLicense = { ...metaData.links };
+        delete linksWithoutCustomLicense.LICENSE;
+        setMetaData({ ...metaData, license: licenseId, links: linksWithoutCustomLicense });
+    };
 
     const handleUploadVersion = async () => {
         if (!projectData?.id) return;
@@ -891,7 +898,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                         <button
                                             key={lic.id}
                                             disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
-                                            onClick={() => { markDirty(); setMetaData({ ...metaData, license: lic.id }); }}
+                                            onClick={() => handleSelectStandardLicense(lic.id)}
                                             className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-between ${metaData.license === lic.id ? 'bg-modtale-accent text-white' : `${theme.colors.textSecondary} hover:bg-slate-200 dark:hover:bg-white/10`}`}
                                         >
                                             <span>{lic.name}</span>
@@ -900,7 +907,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                     ))}
                                     <button
                                         disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
-                                        onClick={() => { markDirty(); if (!metaData.license || LICENSES.some(l => l.id === metaData.license)) setMetaData({ ...metaData, license: '' }); }}
+                                        onClick={() => { markDirty(); if (!isCustomLicense) setMetaData({ ...metaData, license: '' }); }}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-between border-t ${theme.colors.border} mt-1 pt-2 ${isCustomLicense ? 'bg-modtale-accent text-white' : `${theme.colors.textSecondary} hover:bg-slate-200 dark:hover:bg-white/10`}`}
                                     >
                                         <span>Custom License</span>

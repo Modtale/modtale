@@ -1,5 +1,6 @@
 package net.modtale.service.security.access;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -11,11 +12,15 @@ import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.project.query.ProjectRouteService;
 import net.modtale.service.user.account.AccountService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -35,6 +40,7 @@ class AccessControlServiceTest {
 
     @BeforeEach
     void setUp() {
+        SecurityContextHolder.clearContext();
         accountService = mock(AccountService.class);
         userRepository = mock(UserRepository.class);
         projectRepository = mock(ProjectRepository.class);
@@ -45,6 +51,11 @@ class AccessControlServiceTest {
                 new PermissionProjectLookupService(projectRepository, new net.modtale.service.project.query.ProjectRouteService()),
                 mongoTemplate
         );
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -135,6 +146,152 @@ class AccessControlServiceTest {
     }
 
     @Test
+    void hasProjectPermHonorsApiKeyProjectScopesForMutations() {
+        Project project = new Project();
+        project.setId("project-1");
+        project.setStatus(ProjectStatus.DRAFT);
+        when(projectRepository.findPermissionSnapshotById("project-1")).thenReturn(Optional.of(project));
+
+        Authentication uploadKey = apiAuthentication(
+                user("u-key", "key-user", List.of("USER")),
+                "SCOPE_project-1_VERSION_CREATE"
+        );
+
+        assertTrue(accessControlService.hasProjectPerm("project-1", "VERSION_CREATE", uploadKey));
+
+        Authentication readOnlyKey = apiAuthentication(
+                user("u-key", "key-user", List.of("USER")),
+                "SCOPE_project-1_PROJECT_READ"
+        );
+
+        assertFalse(accessControlService.hasProjectPerm("project-1", "VERSION_CREATE", readOnlyKey));
+    }
+
+    @Test
+    void hasProjectPermDoesNotLetApiKeysInheritOwnerProjectAccessWithoutScope() {
+        User owner = user("owner-1", "owner", List.of("USER"));
+        Project project = new Project();
+        project.setId("project-1");
+        project.setAuthorId("owner-1");
+        project.setStatus(ProjectStatus.DRAFT);
+        when(projectRepository.findPermissionSnapshotById("project-1")).thenReturn(Optional.of(project));
+
+        Authentication unscopedKey = apiAuthentication(owner);
+        when(accountService.getCurrentUser(unscopedKey)).thenReturn(owner);
+
+        assertFalse(accessControlService.hasProjectPerm("project-1", "VERSION_CREATE", unscopedKey));
+    }
+
+    @Test
+    void hasProjectPermAllowsApiKeyOrganizationAndPersonalProjectContexts() {
+        User owner = user("owner-1", "owner", List.of("USER"));
+        Project personalProject = new Project();
+        personalProject.setId("personal-project");
+        personalProject.setAuthorId("owner-1");
+        personalProject.setStatus(ProjectStatus.DRAFT);
+        when(projectRepository.findPermissionSnapshotById("personal-project")).thenReturn(Optional.of(personalProject));
+
+        Authentication personalKey = apiAuthentication(owner, "SCOPE_PERSONAL_VERSION_CREATE");
+        when(accountService.getCurrentUser(personalKey)).thenReturn(owner);
+
+        assertTrue(accessControlService.hasProjectPerm("personal-project", "VERSION_CREATE", personalKey));
+
+        Project orgProject = new Project();
+        orgProject.setId("org-project");
+        orgProject.setAuthorId("org-1");
+        orgProject.setStatus(ProjectStatus.DRAFT);
+        when(projectRepository.findPermissionSnapshotById("org-project")).thenReturn(Optional.of(orgProject));
+
+        Authentication orgKey = apiAuthentication(owner, "SCOPE_org-1_VERSION_CREATE");
+
+        assertTrue(accessControlService.hasProjectPerm("org-project", "VERSION_CREATE", orgKey));
+    }
+
+    @Test
+    void serviceProjectPermissionHonorsCurrentApiKeyProjectScope() {
+        User keyUser = user("u-key", "key-user", List.of("USER"));
+        Project project = new Project();
+        project.setId("project-1");
+        project.setAuthorId("owner-1");
+        project.setStatus(ProjectStatus.DRAFT);
+
+        Authentication uploadKey = apiAuthentication(keyUser, "SCOPE_project-1_VERSION_CREATE");
+        SecurityContextHolder.getContext().setAuthentication(uploadKey);
+
+        assertTrue(accessControlService.hasProjectPermission(project, keyUser, "VERSION_CREATE"));
+    }
+
+    @Test
+    void serviceProjectPermissionHonorsCurrentApiKeyOrganizationScope() {
+        User keyUser = user("u-key", "key-user", List.of("USER"));
+        Project project = new Project();
+        project.setId("project-1");
+        project.setAuthorId("org-1");
+        project.setStatus(ProjectStatus.DRAFT);
+
+        Authentication uploadKey = apiAuthentication(keyUser, "SCOPE_org-1_VERSION_CREATE");
+        SecurityContextHolder.getContext().setAuthentication(uploadKey);
+
+        assertTrue(accessControlService.hasProjectPermission(project, keyUser, "VERSION_CREATE"));
+    }
+
+    @Test
+    void serviceProjectPermissionDoesNotLetApiKeysBorrowUserOwnerAccessWithoutScope() {
+        User owner = user("owner-1", "owner", List.of("USER"));
+        Project project = new Project();
+        project.setId("project-1");
+        project.setAuthorId("owner-1");
+        project.setStatus(ProjectStatus.DRAFT);
+
+        Authentication unscopedKey = apiAuthentication(owner);
+        SecurityContextHolder.getContext().setAuthentication(unscopedKey);
+
+        assertFalse(accessControlService.hasProjectPermission(project, owner, "VERSION_CREATE"));
+    }
+
+    @Test
+    void serviceProjectPermissionDoesNotApplyApiKeyScopeToDifferentUser() {
+        User keyUser = user("u-key", "key-user", List.of("USER"));
+        User otherUser = user("u-other", "other-user", List.of("USER"));
+        Project project = new Project();
+        project.setId("project-1");
+        project.setAuthorId("owner-1");
+        project.setStatus(ProjectStatus.DRAFT);
+
+        Authentication uploadKey = apiAuthentication(keyUser, "SCOPE_project-1_VERSION_CREATE");
+        SecurityContextHolder.getContext().setAuthentication(uploadKey);
+
+        assertFalse(accessControlService.hasProjectPermission(project, otherUser, "VERSION_CREATE"));
+    }
+
+    @Test
+    void hasCreateProjectPermRequiresApiKeyCreateScope() {
+        User currentUser = user("u-1", "Ada", List.of("USER"));
+        Authentication personalKey = apiAuthentication(currentUser, "SCOPE_PERSONAL_PROJECT_CREATE");
+        when(accountService.getCurrentUser(personalKey)).thenReturn(currentUser);
+
+        assertTrue(accessControlService.hasCreateProjectPerm(null, personalKey));
+
+        Authentication unscopedKey = apiAuthentication(currentUser);
+        when(accountService.getCurrentUser(unscopedKey)).thenReturn(currentUser);
+
+        assertFalse(accessControlService.hasCreateProjectPerm(null, unscopedKey));
+
+        User org = organization(
+                "org-1",
+                "SkyOrg",
+                List.of(orgRole("manager", false, Set.of(ApiKey.ApiPermission.PROJECT_CREATE))),
+                List.of(orgMember("u-1", "manager", null))
+        );
+        when(userRepository.findById("org-1")).thenReturn(Optional.of(org));
+
+        Authentication orgKey = apiAuthentication(currentUser, "SCOPE_org-1_PROJECT_CREATE");
+        when(accountService.getCurrentUser(orgKey)).thenReturn(currentUser);
+
+        assertTrue(accessControlService.hasCreateProjectPerm("org-1", orgKey));
+    }
+
+    @Test
     void hasProjectPermResolvesCanonicalSlugRoutes() {
         Project project = new Project();
         project.setId("project-1");
@@ -189,5 +346,14 @@ class AccessControlServiceTest {
         User.OrganizationMember member = new User.OrganizationMember(userId, roleId);
         member.setRole(role);
         return member;
+    }
+
+    private static Authentication apiAuthentication(User user, String... scopes) {
+        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority("ROLE_API"));
+        for (String scope : scopes) {
+            authorities.add(new SimpleGrantedAuthority(scope));
+        }
+        return new UsernamePasswordAuthenticationToken(user, null, authorities);
     }
 }

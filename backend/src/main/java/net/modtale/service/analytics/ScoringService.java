@@ -59,7 +59,6 @@ public class ScoringService {
                         .set("trendScore", score.trendScore())
                         .set("relevanceScore", score.relevanceScore())
                         .set("popularScore", score.popularScore())
-                        .set("hiddenGemScore", score.hiddenGemScore())
                         .set("downloads7d", score.downloads7d())
                         .set("downloads30d", score.downloads30d())
                         .set("downloads90d", score.downloads90d())
@@ -224,7 +223,6 @@ public class ScoringService {
             int trendScore = 0;
             double popularScore = 0.0;
             double relevanceScore = 0.0;
-            double hiddenGemScore = 0.0;
 
             if (downloadCount >= MIN_DOWNLOADS_FOR_SCORED_RANKING) {
                 if (downloads7d > previousWeek) {
@@ -236,7 +234,6 @@ public class ScoringService {
                 popularScore = downloadCount + (favoriteCount * 10.0);
                 double engagementRatio = downloadCount < dampeningK * 2 ? 0 : (double) favoriteCount / Math.max(1, downloadCount);
                 relevanceScore = downloads30d * (1.0 + (engagementRatio * 5.0));
-                hiddenGemScore = (double) favoriteCount / Math.max(1, downloadCount);
             }
 
             refreshedScores.put(projectId, new ScoreRefresh(
@@ -246,8 +243,7 @@ public class ScoringService {
                     downloads90d,
                     trendScore,
                     relevanceScore,
-                    popularScore,
-                    hiddenGemScore
+                    popularScore
             ));
         }
 
@@ -266,8 +262,7 @@ public class ScoringService {
                 .include("popularScore")
                 .include("trendingRank")
                 .include("popularRank")
-                .include("relevanceRank")
-                .include("hiddenGemRank");
+                .include("relevanceRank");
 
         return mongoTemplate.find(query, Project.class).stream()
                 .map(project -> new RankableProject(
@@ -280,8 +275,7 @@ public class ScoringService {
                         project.getPopularScore(),
                         project.getTrendingRank(),
                         project.getPopularRank(),
-                        project.getRelevanceRank(),
-                        project.getHiddenGemRank()
+                        project.getRelevanceRank()
                 ))
                 .toList();
     }
@@ -293,7 +287,6 @@ public class ScoringService {
         assignTrendingRanks(projects, builders);
         assignPopularRanks(projects, builders);
         assignRelevanceRanks(projects, builders);
-        assignHiddenGemRanks(projects, builders);
 
         return builders.entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().build()));
@@ -334,39 +327,6 @@ public class ScoringService {
         assignRanks(ranked, builders, RankSnapshotBuilder::setRelevanceRank);
     }
 
-    private void assignHiddenGemRanks(List<RankableProject> projects, Map<String, RankSnapshotBuilder> builders) {
-        List<RankableProject> eligible = projects.stream()
-                .filter(project -> project.downloads30d() >= MIN_DOWNLOADS_FOR_SCORED_RANKING)
-                .sorted(Comparator
-                        .comparingInt(RankableProject::downloads30d)
-                        .thenComparing(RankableProject::projectId))
-                .toList();
-
-        if (eligible.isEmpty()) {
-            return;
-        }
-
-        int totalDocs = eligible.size();
-        int p5Index = Math.min((int) (totalDocs * 0.05), totalDocs - 1);
-        int p20Index = Math.min((int) (totalDocs * 0.20), totalDocs - 1);
-        int minDl = eligible.get(p5Index).downloads30d();
-        int maxDl = eligible.get(p20Index).downloads30d();
-        if (maxDl <= minDl) {
-            maxDl = minDl + 500;
-        }
-
-        int finalMaxDl = maxDl;
-        List<RankableProject> ranked = eligible.stream()
-                .filter(project -> project.downloads30d() > minDl)
-                .filter(project -> project.downloads30d() < finalMaxDl)
-                .sorted(Comparator
-                        .comparingDouble(this::hiddenGemRatio).reversed()
-                        .thenComparing(RankableProject::projectId))
-                .toList();
-
-        assignRanks(ranked, builders, RankSnapshotBuilder::setHiddenGemRank);
-    }
-
     private void assignRanks(
             List<RankableProject> ranked,
             Map<String, RankSnapshotBuilder> builders,
@@ -389,16 +349,14 @@ public class ScoringService {
             RankSnapshot rank = ranks.getOrDefault(project.projectId(), RankSnapshot.UNRANKED);
             if (project.trendingRank() == rank.trendingRank()
                     && project.popularRank() == rank.popularRank()
-                    && project.relevanceRank() == rank.relevanceRank()
-                    && project.hiddenGemRank() == rank.hiddenGemRank()) {
+                    && project.relevanceRank() == rank.relevanceRank()) {
                 continue;
             }
 
             bulkWriter.update(project.projectId(), new Update()
                     .set("trendingRank", rank.trendingRank())
                     .set("popularRank", rank.popularRank())
-                    .set("relevanceRank", rank.relevanceRank())
-                    .set("hiddenGemRank", rank.hiddenGemRank()));
+                    .set("relevanceRank", rank.relevanceRank()));
         }
 
         Query staleRankQuery = new Query(new Criteria().andOperator(
@@ -407,7 +365,6 @@ public class ScoringService {
                         Criteria.where("trendingRank").gt(0),
                         Criteria.where("popularRank").gt(0),
                         Criteria.where("relevanceRank").gt(0),
-                        Criteria.where("hiddenGemRank").gt(0),
                         Criteria.where("rankingDirty").is(true)
                 )
         ));
@@ -437,10 +394,6 @@ public class ScoringService {
         return project.relevanceScore();
     }
 
-    private double hiddenGemRatio(RankableProject project) {
-        return (double) project.favoriteCount() / project.downloads30d();
-    }
-
     private double calculatePercentileDownloads(long totalCount, double percentile) {
         if (totalCount == 0) {
             return 10.0;
@@ -462,11 +415,9 @@ public class ScoringService {
                 .set("trendScore", 0)
                 .set("relevanceScore", 0.0)
                 .set("popularScore", 0.0)
-                .set("hiddenGemScore", 0.0)
                 .set("trendingRank", UNRANKED)
                 .set("popularRank", UNRANKED)
                 .set("relevanceRank", UNRANKED)
-                .set("hiddenGemRank", UNRANKED)
                 .set("downloads7d", 0)
                 .set("downloads30d", 0)
                 .set("downloads90d", 0)
@@ -480,8 +431,7 @@ public class ScoringService {
             int downloads90d,
             int trendScore,
             double relevanceScore,
-            double popularScore,
-            double hiddenGemScore
+            double popularScore
     ) {}
 
     private record RankableProject(
@@ -494,18 +444,15 @@ public class ScoringService {
             double popularScore,
             long trendingRank,
             long popularRank,
-            long relevanceRank,
-            long hiddenGemRank
+            long relevanceRank
     ) {}
 
     private record RankSnapshot(
             long trendingRank,
             long popularRank,
-            long relevanceRank,
-            long hiddenGemRank
+            long relevanceRank
     ) {
         private static final RankSnapshot UNRANKED = new RankSnapshot(
-                ScoringService.UNRANKED,
                 ScoringService.UNRANKED,
                 ScoringService.UNRANKED,
                 ScoringService.UNRANKED
@@ -516,7 +463,6 @@ public class ScoringService {
         private long trendingRank = UNRANKED;
         private long popularRank = UNRANKED;
         private long relevanceRank = UNRANKED;
-        private long hiddenGemRank = UNRANKED;
 
         private void setTrendingRank(long trendingRank) {
             this.trendingRank = trendingRank;
@@ -530,12 +476,8 @@ public class ScoringService {
             this.relevanceRank = relevanceRank;
         }
 
-        private void setHiddenGemRank(long hiddenGemRank) {
-            this.hiddenGemRank = hiddenGemRank;
-        }
-
         private RankSnapshot build() {
-            return new RankSnapshot(trendingRank, popularRank, relevanceRank, hiddenGemRank);
+            return new RankSnapshot(trendingRank, popularRank, relevanceRank);
         }
     }
 

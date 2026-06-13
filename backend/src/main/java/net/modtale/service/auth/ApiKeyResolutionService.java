@@ -37,6 +37,7 @@ public class ApiKeyResolutionService {
     }
 
     public ApiKey resolveKey(String plainKey) {
+        plainKey = normalizePlainKey(plainKey);
         if (plainKey == null || plainKey.length() < 10) {
             return null;
         }
@@ -80,5 +81,20 @@ public class ApiKeyResolutionService {
             key.setLastUsed(LocalDateTime.now());
             apiKeyRepository.save(key);
         });
+    }
+
+    private String normalizePlainKey(String plainKey) {
+        if (plainKey == null) {
+            return null;
+        }
+
+        String normalized = plainKey.trim();
+        if (normalized.regionMatches(true, 0, "Bearer ", 0, "Bearer ".length())) {
+            return normalized.substring("Bearer ".length()).trim();
+        }
+        if (normalized.regionMatches(true, 0, "ApiKey ", 0, "ApiKey ".length())) {
+            return normalized.substring("ApiKey ".length()).trim();
+        }
+        return normalized;
     }
 }

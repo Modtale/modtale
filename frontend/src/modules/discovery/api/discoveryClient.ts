@@ -1,5 +1,4 @@
 import { api } from '@/utils/api';
-import type { Project } from '@/types';
 
 export interface SearchParams {
     page: number;

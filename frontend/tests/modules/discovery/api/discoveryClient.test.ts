@@ -20,7 +20,7 @@ describe('discoveryClient', () => {
 
     it('forwards search params and abort signals to the shared api client', async () => {
         const signal = new AbortController().signal;
-        const params = { page: 2, size: 24, search: 'sky', sort: 'relevance', category: 'trending' };
+        const params = { page: 2, size: 24, search: 'sky', sort: 'trending' };
         mockedApi.get.mockResolvedValue({ data: { content: [] } } as any);
 
         await discoveryClient.searchProjects(params, signal);
