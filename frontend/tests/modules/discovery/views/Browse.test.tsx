@@ -137,6 +137,8 @@ describe('Browse SSR fallback recovery', () => {
         await settle(12);
 
         expect(container.textContent).toContain('My Favorites');
+        const browseLinks = Array.from(container.querySelectorAll('a')).map(link => link.textContent?.trim());
+        expect(browseLinks.indexOf('Recently Updated')).toBeLessThan(browseLinks.indexOf('My Favorites'));
         expect(mockedDiscoveryClient.searchProjects).toHaveBeenCalledWith(
             expect.objectContaining({ category: 'favorites' }),
             expect.any(AbortSignal)
