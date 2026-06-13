@@ -32,13 +32,13 @@ export const Browse: React.FC<BrowseViewProps> = ({
     const { isMobile } = useMobile();
     const { initialData } = useSSRData();
 
-    const hasComplexParams = searchParams.has('q') || searchParams.has('tags') || searchParams.has('version') || searchParams.has('minDl') || searchParams.has('minFav') || searchParams.has('date') || (searchParams.get('page') && parseInt(searchParams.get('page')!, 10) > 0);
+    const hasComplexParams = searchParams.has('q') || searchParams.has('tags') || searchParams.has('version') || searchParams.has('minDl') || searchParams.has('minFav') || searchParams.has('date') || searchParams.has('category') || (searchParams.get('page') && parseInt(searchParams.get('page')!, 10) > 0);
     const hasUsableBrowseSSRData = Boolean(initialData?.browseData) && initialData?.browseDataReady !== false;
     const useSSR = hasUsableBrowseSSRData && !hasComplexParams;
 
     const {
         page, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, selectedTags, urlSearchTerm,
-        searchTerm, setSearchTerm, selectedClassification, setSelectedClassification, totalPages, totalItems, loading, isPending, items,
+        viewCategory, searchTerm, setSearchTerm, selectedClassification, setSelectedClassification, totalPages, totalItems, loading, isPending, items,
         itemsPerPage, setItemsPerPage, updateParams
     } = useProjectSearch(initialClassification || 'All', !!useSSR, useSSR ? initialData.browseData.content : [], useSSR ? initialData.browseData.totalPages : 0, useSSR ? initialData.browseData.totalElements : 0);
 
@@ -123,8 +123,22 @@ export const Browse: React.FC<BrowseViewProps> = ({
     }, [setSearchParams]);
 
     const handleSortChange = useCallback((nextSort: string) => {
-        updateParams({ sort: nextSort });
+        updateParams({ sort: nextSort, category: null });
     }, [updateParams]);
+
+    const getBrowseLink = useCallback((updates: Record<string, string | null>) => {
+        const s = new URLSearchParams(searchParams);
+        Object.entries(updates).forEach(([key, value]) => {
+            if (value === null || value === 'all' || (key === 'sort' && value === 'relevance')) {
+                s.delete(key);
+            } else {
+                s.set(key, value);
+            }
+        });
+        s.delete('page');
+        const query = s.toString();
+        return query ? `?${query}` : '?';
+    }, [searchParams]);
 
     const getPageNumbers = () => {
         const total = totalPages;
@@ -149,11 +163,12 @@ export const Browse: React.FC<BrowseViewProps> = ({
     };
 
     const getPageTitle = useCallback(() => {
+        if (viewCategory === 'favorites') return 'My Favorites';
         if (selectedTags.length > 0) return `Tagged: ${selectedTags[0]}${selectedTags.length > 1 ? ` (+${selectedTags.length - 1})` : ''}`;
         const sort = BROWSE_SORTS.find(v => v.id === sortBy);
         if (sort && sort.id !== 'relevance') return sort.label;
         return selectedClassification === 'All' ? 'All Projects' : getCategorySEO(selectedClassification).h1 || `All ${PROJECT_TYPES.find(t=>t.id===selectedClassification)?.label}`;
-    }, [selectedTags, sortBy, selectedClassification]);
+    }, [viewCategory, selectedTags, sortBy, selectedClassification]);
 
     const seoContent = getCategorySEO(selectedClassification);
     const dynamicSEO = generateDynamicSEO({ title: seoContent.title, description: seoContent.description }, page, sortBy, urlSearchTerm);
@@ -191,15 +206,16 @@ export const Browse: React.FC<BrowseViewProps> = ({
                         <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-sm animate-in fade-in slide-in-from-left-4 duration-700">
                             <span className="block text-xs font-black uppercase text-slate-500 dark:text-slate-400 mb-3 tracking-widest px-2 drop-shadow-sm">Browse</span>
                             <div className="space-y-1.5">
+                                {isLoggedIn && (
+                                    <Link to={getBrowseLink({ category: 'favorites', sort: 'relevance' })} className={`block w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all ${viewCategory === 'favorites' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}`}>
+                                        <span className="pointer-events-none">My Favorites</span>
+                                    </Link>
+                                )}
                                 {BROWSE_SORTS.filter(v => !['downloads', 'favorites'].includes(v.id)).map(v => {
-                                    const s = new URLSearchParams(searchParams);
-                                    if (v.id === 'relevance') s.delete('sort');
-                                    else s.set('sort', v.id);
-                                    s.delete('page');
-                                    const query = s.toString() ? `?${s.toString()}` : '?';
+                                    const query = getBrowseLink({ sort: v.id, category: null });
 
                                     return (
-                                        <Link key={v.id} to={query} className={`block w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all ${sortBy === v.id ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}`}>
+                                        <Link key={v.id} to={query} className={`block w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all ${viewCategory === 'all' && sortBy === v.id ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}`}>
                                             <span className="pointer-events-none">{v.label}</span>
                                         </Link>
                                     );

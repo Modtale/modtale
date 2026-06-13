@@ -87,7 +87,7 @@ public class ProjectDeletionService {
 
         projectArtifactDeletionService.deleteProjectMedia(project);
 
-        mongoTemplate.updateMulti(new Query(Criteria.where("likedProjectIds").is(project.getId())), new Update().pull("likedProjectIds", project.getId()), net.modtale.model.user.User.class);
+        mongoTemplate.updateMulti(new Query(Criteria.where("likedModIds").is(project.getId())), new Update().pull("likedModIds", project.getId()), net.modtale.model.user.User.class);
         scoringService.markProjectRankingDirty(project.getId());
         projectRepository.delete(project);
         projectService.evictProjectCache(project);

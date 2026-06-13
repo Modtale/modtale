@@ -6,6 +6,7 @@ import type { Project } from '@/types';
 import type { Classification } from '@/data/categories';
 
 export type SortOption = 'relevance' | 'popular' | 'trending' | 'downloads' | 'favorites' | 'newest' | 'updated';
+export type ViewCategory = 'all' | 'favorites' | 'your_projects';
 const BROWSE_CACHE_PREFIX = 'modtale.browse-cache:';
 
 const normalizeSort = (sort: string | null): SortOption => {
@@ -24,6 +25,16 @@ const normalizeSort = (sort: string | null): SortOption => {
     }
 };
 
+const normalizeViewCategory = (category: string | null): ViewCategory => {
+    switch (category) {
+        case 'favorites':
+        case 'your_projects':
+            return category;
+        default:
+            return 'all';
+    }
+};
+
 export const useProjectSearch = (initialClassification: Classification | 'All', useSSRData: boolean, initialItems: Project[], initialTotalPages: number, initialTotalItems: number) => {
     const [searchParams, setSearchParams] = useSearchParams();
 
@@ -34,6 +45,7 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
     const minDownloads = parseInt(searchParams.get('minDl') || '0');
     const minFavorites = parseInt(searchParams.get('minFav') || '0');
     const filterDate = searchParams.get('date');
+    const viewCategory = normalizeViewCategory(searchParams.get('category'));
     const rawTags = searchParams.get('tags');
     const selectedTags = useMemo(() => rawTags ? rawTags.split(',').filter(Boolean) : [], [rawTags]);
     const urlSearchTerm = searchParams.get('q') || '';
@@ -61,7 +73,8 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
         minDownloads,
         minFavorites,
         filterDate,
-    })}`, [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate]);
+        viewCategory,
+    })}`, [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, viewCategory]);
     const queryKey = useMemo(() => JSON.stringify({
         page,
         itemsPerPage,
@@ -73,7 +86,8 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
         minDownloads,
         minFavorites,
         filterDate,
-    }), [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate]);
+        viewCategory,
+    }), [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, viewCategory]);
 
     useEffect(() => {
         if (urlSearchTerm !== searchTerm) {
@@ -169,6 +183,7 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
                 minDownloads: minDownloads > 0 ? minDownloads : undefined,
                 minFavorites: minFavorites > 0 ? minFavorites : undefined,
                 dateRange: filterDate || 'all',
+                category: viewCategory !== 'all' ? viewCategory : undefined,
             }, controller.signal);
 
             const nextTotalPages = data?.totalPages || 0;
@@ -209,7 +224,7 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
                 setIsPending(false);
             }
         }
-    }, [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, useSSRData, setSearchParams]);
+    }, [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, viewCategory, useSSRData, setSearchParams]);
 
     useEffect(() => {
         fetchData();
@@ -228,6 +243,7 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
                     value === null ||
                     (key === 'page' && value === '0') ||
                     (key === 'sort' && value === 'relevance') ||
+                    (key === 'category' && value === 'all') ||
                     (key === 'version' && value === 'Any') ||
                     (key === 'minDl' && value === '0') ||
                     (key === 'minFav' && value === '0')
@@ -246,6 +262,7 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
 
     return {
         page, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, selectedTags, urlSearchTerm,
+        viewCategory,
         searchTerm, setSearchTerm, selectedClassification, setSelectedClassification, totalPages, totalItems, loading, isPending, items, setItems,
         itemsPerPage, setItemsPerPage, updateParams, searchParams, setSearchParams
     };

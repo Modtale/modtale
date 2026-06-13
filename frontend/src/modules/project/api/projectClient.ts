@@ -1,5 +1,6 @@
 import { api } from '@/utils/api';
 import type { ManifestInspectionResult, Project, ProjectVersionChangelog, User, ProjectRole, GameVersionCatalog } from '@/types';
+import { normalizeUser, normalizeUsers } from '@/utils/users';
 
 export const projectClient = {
     getProject: async (id: string) => {
@@ -19,15 +20,15 @@ export const projectClient = {
     },
     getUserProfile: async (id: string) => {
         const res = await api.get<User>(`/user/profile/${id}`);
-        return res.data;
+        return normalizeUser(res.data);
     },
     getOrgMembers: async (orgId: string) => {
         const res = await api.get<User[]>(`/orgs/${orgId}/members`);
-        return res.data;
+        return normalizeUsers(res.data || []);
     },
     getUsersBatch: async (userIds: string[]) => {
         const res = await api.post<User[]>('/users/batch', { userIds });
-        return res.data;
+        return normalizeUsers(res.data || []);
     },
     getDependencyMeta: async (projectId: string) => {
         const res = await api.get(`/projects/${projectId}/meta`);
