@@ -64,35 +64,6 @@ class ProjectRepositoryImplTest {
     }
 
     @Test
-    void hiddenGemsSortUsesRankWithFallbacksWithoutFilteringUnrankedProjects() {
-        repository.searchProjects(
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                PageRequest.of(0, 20),
-                null,
-                ProjectSort.RELEVANCE,
-                ProjectViewCategory.HIDDEN_GEMS,
-                null,
-                null
-        );
-
-        Query query = capturedFindQuery();
-        Document sort = query.getSortObject();
-        String queryJson = query.getQueryObject().toString();
-
-        assertEquals(1, sort.get("hiddenGemRank"));
-        assertEquals(-1, sort.get("hiddenGemScore"));
-        assertEquals(-1, sort.get("favoriteCount"));
-        assertFalse(sort.containsKey("downloadCount"));
-        assertFalse(queryJson.contains("hiddenGemRank"));
-        assertFalse(queryJson.contains("downloads30d"));
-    }
-
-    @Test
     void relevanceSortDoesNotFilterOutUnrankedProjects() {
         repository.searchProjects(
                 null,

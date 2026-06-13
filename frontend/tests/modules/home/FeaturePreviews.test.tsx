@@ -67,6 +67,21 @@ describe('FeaturePreviews ProjectAnalyticsSection', () => {
         const gridContainer = container.querySelector('.grid');
         expect(gridContainer?.className).not.toContain('md:grid-cols-3');
     });
+
+    it('balances multiline body copy for feature preview text', async () => {
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <ProjectAnalyticsSection />
+                </MemoryRouter>
+            );
+        });
+
+        const bodyCopy = Array.from(container.querySelectorAll('p'))
+            .find((paragraph) => paragraph.textContent?.includes('Keep tabs on how your Hytale uploads perform'));
+
+        expect(bodyCopy?.className).toContain('[text-wrap:balance]');
+    });
 });
 
 describe('FeaturePreviews project sections', () => {

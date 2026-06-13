@@ -107,4 +107,40 @@ describe('Browse SSR fallback recovery', () => {
         expect(container.textContent).toContain('Skyforge Utilities');
         expect(container.textContent).not.toContain('No matches found');
     });
+
+    it('keeps the My Favorites browse view wired to the favorites category request', async () => {
+        mockedDiscoveryClient.searchProjects.mockResolvedValue({
+            content: [{
+                id: 'project-1',
+                slug: 'skyforge-1',
+                title: 'Skyforge Utilities',
+                imageUrl: '/assets/favicon.svg'
+            }],
+            totalPages: 1,
+            totalElements: 1
+        } as any);
+
+        await act(async () => {
+            root.render(
+                <SSRProvider data={{}} initialPath="/mods?category=favorites">
+                    <HelmetProvider>
+                        <MobileProvider>
+                            <MemoryRouter initialEntries={['/mods?category=favorites']}>
+                                <Browse likedProjectIds={['project-1']} onToggleFavorite={vi.fn()} isLoggedIn={true} />
+                            </MemoryRouter>
+                        </MobileProvider>
+                    </HelmetProvider>
+                </SSRProvider>
+            );
+        });
+
+        await settle(12);
+
+        expect(container.textContent).toContain('My Favorites');
+        expect(mockedDiscoveryClient.searchProjects).toHaveBeenCalledWith(
+            expect.objectContaining({ category: 'favorites' }),
+            expect.any(AbortSignal)
+        );
+        expect(container.textContent).toContain('Skyforge Utilities');
+    });
 });

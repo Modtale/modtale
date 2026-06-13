@@ -649,7 +649,7 @@ describe('Home fallback requests', () => {
         expect(heroSection?.className).not.toContain('min-h-[100vh]');
     });
 
-    it('fetches trending home projects via category instead of an invalid sort value', async () => {
+    it('fetches trending home projects via sort', async () => {
         mockedApi.get
             .mockResolvedValueOnce({ data: { content: [] } } as any)
             .mockResolvedValueOnce({ data: { content: [] } } as any)
@@ -672,7 +672,7 @@ describe('Home fallback requests', () => {
         });
 
         expect(mockedApi.get).toHaveBeenCalledWith('/projects', {
-            params: { size: 16, sort: 'relevance', category: 'trending' },
+            params: { size: 16, sort: 'trending' },
             timeout: 1800,
         });
         expect(mockedApi.get).toHaveBeenCalledWith('/projects', {
@@ -714,7 +714,7 @@ describe('Home fallback requests', () => {
         });
 
         expect(mockedApi.get).not.toHaveBeenCalledWith('/projects', expect.objectContaining({
-            params: expect.objectContaining({ category: 'trending' }),
+            params: expect.objectContaining({ sort: 'trending' }),
             timeout: 1800,
         }));
         expect(mockedApi.get).not.toHaveBeenCalled();

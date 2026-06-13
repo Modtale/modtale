@@ -130,11 +130,17 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
     const classification = project.classification || 'PLUGIN';
 
     const downloads = (project.downloadCount || 0).toLocaleString();
-    const favorites = (project.favoriteCount || 0).toLocaleString();
 
     const timeAgo = project.updatedAt ? formatTimeAgo(project.updatedAt) : null;
     const childCount = (project.childProjectIds || []).length;
     const displayClassification = toTitleCase(classification);
+    const baseFavoriteCount = project.favoriteCount || 0;
+    const [displayFavoriteCount, setDisplayFavoriteCount] = useState(baseFavoriteCount);
+    const favoriteSyncRef = useRef({
+        projectId: project.id,
+        favoriteCount: baseFavoriteCount,
+        isFavorite
+    });
 
     const resolveUrl = (url: string) => {
         if (!url) return '';
@@ -169,6 +175,35 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
     }, [project.id]);
 
     useEffect(() => {
+        const nextFavoriteCount = project.favoriteCount || 0;
+        setDisplayFavoriteCount(nextFavoriteCount);
+        favoriteSyncRef.current = {
+            projectId: project.id,
+            favoriteCount: nextFavoriteCount,
+            isFavorite
+        };
+    }, [project.id, project.favoriteCount]);
+
+    useEffect(() => {
+        const previous = favoriteSyncRef.current;
+        if (previous.projectId !== project.id) {
+            favoriteSyncRef.current = {
+                projectId: project.id,
+                favoriteCount: project.favoriteCount || 0,
+                isFavorite
+            };
+            return;
+        }
+        if (previous.isFavorite === isFavorite) return;
+
+        setDisplayFavoriteCount(current => Math.max(0, current + (isFavorite ? 1 : -1)));
+        favoriteSyncRef.current = {
+            ...previous,
+            isFavorite
+        };
+    }, [isFavorite, project.id, project.favoriteCount]);
+
+    useEffect(() => {
         if (!resolvedBanner || !isVisible || typeof window === 'undefined') {
             setShouldLoadBanner(false);
             return;
@@ -195,6 +230,8 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
             }
         };
     }, [isVisible, priority, resolvedBanner]);
+
+    const favorites = displayFavoriteCount.toLocaleString();
 
     if (viewStyle === 'compact') {
         return (

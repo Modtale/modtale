@@ -14,7 +14,7 @@ export interface ConnectedAccount {
     username: string;
     profileUrl: string;
     visible: boolean;
-}
+} 
 
 export interface OrganizationRole {
     id: string;

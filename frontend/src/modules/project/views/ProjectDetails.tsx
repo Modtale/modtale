@@ -314,6 +314,19 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         });
     }, []);
 
+    const handleProjectFavoriteToggle = useCallback(() => {
+        if (!project) return;
+        const wasLiked = isLiked(project.id);
+        setProject(previous => {
+            if (!previous || previous.id !== project.id) return previous;
+            return {
+                ...previous,
+                favoriteCount: Math.max(0, (previous.favoriteCount || 0) + (wasLiked ? -1 : 1))
+            };
+        });
+        onToggleFavorite(project.id);
+    }, [isLiked, onToggleFavorite, project, setProject]);
+
     const sanitizeDownloadName = (input: string) => input.replace(/[^a-zA-Z0-9.-]/g, '_');
 
     const extractFileNameFromUrl = (rawUrl?: string) => {
@@ -557,7 +570,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 headerActions={
                     <HeaderActions
                         project={project} currentUser={currentUser} isLiked={isLiked(project.id)} isFollowing={isFollowing} canEdit={Boolean(canEdit)} projectUrl={projectUrl}
-                        onToggleFavorite={() => onToggleFavorite(project.id)} onShare={() => setIsShareOpen(true)} onReport={() => setIsReportOpen(true)} onFollowToggle={handleFollowToggle}
+                        onToggleFavorite={handleProjectFavoriteToggle} onShare={() => setIsShareOpen(true)} onReport={() => setIsReportOpen(true)} onFollowToggle={handleFollowToggle}
                     />
                 }
                 headerContent={<HeaderContent project={project} currentUser={currentUser} isLiked={isLiked(project.id)} isFollowing={isFollowing} onFollowToggle={handleFollowToggle} canEdit={Boolean(canEdit)} projectUrl={projectUrl} onToggleFavorite={() => {}} onShare={() => {}} onReport={() => {}} />}

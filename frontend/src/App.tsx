@@ -21,6 +21,7 @@ import { MobileProvider } from '@/context/MobileContext';
 import type { User } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
 import type { Classification } from '@/data/categories';
+import { normalizeUser } from '@/utils/users';
 
 const StatusModal = lazy(() => import('@/components/ui/StatusModal').then((module) => ({ default: module.StatusModal })));
 const Onboarding = lazy(() => import('@/modules/user/components/Onboarding').then((module) => ({ default: module.Onboarding })));
@@ -110,7 +111,7 @@ const AppContent: React.FC = () => {
         try {
             const res = await api.get(`/user/me?t=${Date.now()}`);
             if (res.data) {
-                setUser(res.data);
+                setUser(normalizeUser(res.data));
                 if ((res.data as any).is_new_account) {
                     setShowOnboarding(true);
                 }
@@ -142,10 +143,17 @@ const AppContent: React.FC = () => {
 
     const handleToggleFavorite = async (id: string) => {
         if (!user) return;
-        const isLiked = user.likedProjectIds?.includes(id);
-        const newProjectLikes = isLiked ? (user.likedProjectIds || []).filter(lid => lid !== id) : [...(user.likedProjectIds || []), id];
+        const previousUser = user;
+        const likedProjectIds = user.likedProjectIds || [];
+        const isLiked = likedProjectIds.includes(id);
+        const newProjectLikes = isLiked ? likedProjectIds.filter(lid => lid !== id) : [...likedProjectIds, id];
         setUser({ ...user, likedProjectIds: newProjectLikes });
-        try { await api.post(`/projects/${id}/favorite`); } catch (e) { fetchUser(); }
+        try {
+            await api.post(`/projects/${id}/favorite`);
+        } catch (e) {
+            setUser(previousUser);
+            fetchUser();
+        }
     };
 
     const handleDownload = (id: string) => { if (!downloadedSessionIds.has(id)) setDownloadedSessionIds(prev => new Set(prev).add(id)); };
