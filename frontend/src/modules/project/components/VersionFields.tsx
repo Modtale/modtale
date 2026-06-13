@@ -13,6 +13,13 @@ const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supp
 
 const STRICT_VERSION_REGEX = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
 
+const createDependencyId = () => {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+        return crypto.randomUUID();
+    }
+    return `dep-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
 interface VersionFieldsProps {
     data: VersionFormData;
     onChange: (d: VersionFormData) => void;
@@ -127,13 +134,21 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
     };
 
     const addManifestSuggestions = (suggestions: ManifestDependencySuggestion[]) => {
-        const existingIds = new Set((data.projectIds || []).map(dep => dep.split(':')[0]));
+        const existingIds = new Set((data.dependencies || []).map(dep => dep.projectId));
         const nextSuggestions = suggestions
             .filter(suggestion => !existingIds.has(suggestion.projectId))
-            .map(suggestion => suggestion.dependencyEntry);
+            .map<ProjectDependency>(suggestion => ({
+                id: createDependencyId(),
+                projectId: suggestion.projectId,
+                projectTitle: suggestion.projectTitle,
+                versionNumber: suggestion.versionNumber,
+                dependencyType: suggestion.optional ? 'OPTIONAL' : 'REQUIRED',
+                source: 'MODTALE'
+            }));
         if (nextSuggestions.length === 0) return;
-        onChange({ ...data, projectIds: [...(data.projectIds || []), ...nextSuggestions] });
-        setManifestSuggestions(prev => prev.filter(suggestion => !nextSuggestions.includes(suggestion.dependencyEntry)));
+        onChange({ ...data, dependencies: [...(data.dependencies || []), ...nextSuggestions] });
+        const addedIds = new Set(nextSuggestions.map(suggestion => suggestion.projectId));
+        setManifestSuggestions(prev => prev.filter(suggestion => !addedIds.has(suggestion.projectId)));
     };
 
     useEffect(() => {
@@ -316,8 +331,8 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                         </div>
                     )}
                     <DependencySelector
-                        selectedDeps={data.projectIds || []}
-                        onChange={(deps) => onChange({ ...data, projectIds: deps })}
+                        selectedDeps={data.dependencies || []}
+                        onChange={(deps) => onChange({ ...data, dependencies: deps as ProjectDependency[] })}
                         targetGameVersion={data.gameVersions?.[0]}
                         label="Add Dependency"
                         previousDependencies={previousDependencies}
@@ -333,8 +348,8 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                     <Label required>Included Projects</Label>
                     <p className={`text-xs ${theme.colors.textSecondary} mb-2`}>Select the projects to include in this modpack version.</p>
                     <DependencySelector
-                        selectedDeps={data.projectIds || []}
-                        onChange={(deps) => onChange({ ...data, projectIds: deps })}
+                        selectedDeps={data.dependencies || []}
+                        onChange={(deps) => onChange({ ...data, dependencies: deps as ProjectDependency[] })}
                         targetGameVersion={data.gameVersions?.[0]}
                         label="Add Projects"
                         isModpack={true}
@@ -349,7 +364,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                     <p className={`text-xs ${theme.colors.textSecondary} mb-2`}>Mark mods that should not be used alongside this version.</p>
                     <DependencySelector
                         selectedDeps={data.incompatibleProjectIds || []}
-                        onChange={(deps) => onChange({ ...data, incompatibleProjectIds: deps })}
+                        onChange={(deps) => onChange({ ...data, incompatibleProjectIds: deps as string[] })}
                         label="Add Incompatible Mod"
                         mode={VersionRelationKind.INCOMPATIBILITY}
                         currentProjectId={currentProjectId}

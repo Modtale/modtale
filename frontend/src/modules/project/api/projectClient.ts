@@ -1,5 +1,5 @@
 import { api } from '@/utils/api';
-import type { ManifestInspectionResult, Project, ProjectVersionChangelog, User, ProjectRole, GameVersionCatalog } from '@/types';
+import type { ManifestInspectionResult, Project, ProjectVersionChangelog, User, ProjectRole, GameVersionCatalog, DependencySource, ExternalProjectReference } from '@/types';
 import { normalizeUser, normalizeUsers } from '@/utils/users';
 
 export const projectClient = {
@@ -41,6 +41,12 @@ export const projectClient = {
             params: { ids: ids.join(',') }
         });
         return res.data || {};
+    },
+    resolveExternalProject: async (url: string, source?: DependencySource) => {
+        const res = await api.get<ExternalProjectReference>('/projects/external/resolve', {
+            params: { url, source }
+        });
+        return res.data;
     },
     followUser: async (targetId: string) => {
         await api.post(`/user/follow/${targetId}`);

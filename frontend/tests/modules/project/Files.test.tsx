@@ -32,13 +32,11 @@ const projectData = {
 } as any;
 
 const versionData = {
-    projectIds: [],
     versionNumber: '1.0.1',
     gameVersions: ['2026.03.11'],
     changelog: '',
     file: null,
     dependencies: [],
-    modIds: [],
     channel: 'RELEASE'
 } as any;
 

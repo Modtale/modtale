@@ -1,39 +1,50 @@
 import { describe, expect, it } from 'vitest';
-import { parseDependencyEntry, serializeDependencyEntry, serializeProjectDependency } from '@/modules/project/utils/dependencyEntries';
+import {
+    dependencyProjectKey,
+    getDependencyType,
+    isEmbeddedDependency,
+    isExternalDependency,
+    isOptionalDependency,
+    normalizeDependencyReference
+} from '@/modules/project/utils/dependencyEntries';
+import type { ProjectDependency } from '@/types';
 
 describe('dependencyEntries', () => {
-    it('parses optional and embedded flags in any order', () => {
-        expect(parseDependencyEntry('dep-1:1.2.3:embedded:optional')).toEqual({
-            projectId: 'dep-1',
-            versionNumber: '1.2.3',
-            isOptional: true,
-            isEmbedded: true
-        });
-    });
-
-    it('serializes dependency flags without dropping compatibility for empty flags', () => {
-        expect(serializeDependencyEntry({
-            projectId: 'dep-1',
-            versionNumber: '1.2.3',
-            isOptional: false,
-            isEmbedded: false
-        })).toBe('dep-1:1.2.3');
-
-        expect(serializeDependencyEntry({
-            projectId: 'dep-1',
-            versionNumber: '1.2.3',
-            isOptional: true,
-            isEmbedded: true
-        })).toBe('dep-1:1.2.3:optional:embedded');
-    });
-
-    it('serializes project dependency objects from API data', () => {
-        expect(serializeProjectDependency({
+    it('normalizes missing dependency shape defaults', () => {
+        const dependency = normalizeDependencyReference({
             projectId: 'dep-1',
             projectTitle: 'Dependency One',
-            versionNumber: '1.2.3',
-            isOptional: true,
-            isEmbedded: true
-        })).toBe('dep-1:1.2.3:optional:embedded');
+            versionNumber: '1.2.3'
+        });
+
+        expect(dependency.dependencyType).toBe('REQUIRED');
+        expect(dependency.source).toBe('MODTALE');
     });
+
+    it('classifies dependency types from structured fields', () => {
+        const optional = dependency('OPTIONAL');
+        const embedded = dependency('EMBEDDED');
+
+        expect(getDependencyType(optional)).toBe('OPTIONAL');
+        expect(isOptionalDependency(optional)).toBe(true);
+        expect(isEmbeddedDependency(optional)).toBe(false);
+        expect(isEmbeddedDependency(embedded)).toBe(true);
+    });
+
+    it('keeps source in the dependency key so external IDs do not collide with Modtale IDs', () => {
+        expect(dependencyProjectKey(dependency('REQUIRED', 'MODTALE'))).toBe('MODTALE:dep-1');
+        expect(dependencyProjectKey(dependency('REQUIRED', 'GITHUB'))).toBe('GITHUB:dep-1');
+        expect(isExternalDependency(dependency('REQUIRED', 'GITHUB'))).toBe(true);
+    });
+});
+
+const dependency = (
+    dependencyType: ProjectDependency['dependencyType'],
+    source: ProjectDependency['source'] = 'MODTALE'
+): ProjectDependency => ({
+    projectId: 'dep-1',
+    projectTitle: 'Dependency One',
+    versionNumber: '1.2.3',
+    dependencyType,
+    source
 });

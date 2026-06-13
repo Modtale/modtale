@@ -132,7 +132,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
     const downloads = (project.downloadCount || 0).toLocaleString();
 
     const timeAgo = project.updatedAt ? formatTimeAgo(project.updatedAt) : null;
-    const childCount = (project.projectIds || project.childProjectIds || []).length;
+    const childCount = (project.childProjectIds || []).length;
     const displayClassification = toTitleCase(classification);
     const baseFavoriteCount = project.favoriteCount || 0;
     const [displayFavoriteCount, setDisplayFavoriteCount] = useState(baseFavoriteCount);

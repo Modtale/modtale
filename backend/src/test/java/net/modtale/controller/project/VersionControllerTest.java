@@ -3,6 +3,7 @@ package net.modtale.controller.project;
 import java.time.Instant;
 import java.util.List;
 import net.modtale.config.properties.AppFrontendProperties;
+import net.modtale.model.dto.request.project.DependencyReferenceRequest;
 import net.modtale.model.dto.request.project.CreateVersionRequest;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
@@ -100,15 +101,18 @@ class VersionControllerTest {
     }
 
     @Test
-    void addVersionSplitsCommaSeparatedDependencyIdsBeforeDelegating() throws Exception {
+    void addVersionDelegatesStructuredDependenciesAndSplitsIncompatibleIds() throws Exception {
         User currentUser = user("user-1");
         Authentication authentication = mock(Authentication.class);
         MockMultipartFile file = new MockMultipartFile("file", "mod.jar", "application/java-archive", new byte[]{1, 2, 3});
+        DependencyReferenceRequest dependencyA = dependency("dep-a", "1.0.0");
+        DependencyReferenceRequest dependencyB = dependency("dep-b", "2.0.0");
         CreateVersionRequest requestPayload = new CreateVersionRequest();
         requestPayload.setVersionNumber("1.0.0");
         requestPayload.setGameVersions(List.of("1.0.0"));
         requestPayload.setFile(file);
-        requestPayload.setModIds(List.of("dep-a, dep-b, , dep-c"));
+        requestPayload.setDependencies(List.of(dependencyA, dependencyB));
+        requestPayload.setIncompatibleProjectIds(List.of("dep-a, dep-b, , dep-c"));
         requestPayload.setChangelog("Release notes");
         requestPayload.setChannel(ProjectVersion.Channel.BETA);
 
@@ -123,8 +127,8 @@ class VersionControllerTest {
                 eq(List.of("1.0.0")),
                 eq(file),
                 eq("Release notes"),
+                eq(List.of(dependencyA, dependencyB)),
                 eq(List.of("dep-a", "dep-b", "dep-c")),
-                isNull(),
                 eq(ProjectVersion.Channel.BETA),
                 eq(currentUser)
         );
@@ -204,7 +208,7 @@ class VersionControllerTest {
         version.setDependencies(List.of(
                 new ProjectDependency("dep-a", "Dependency A", "1.0.0"),
                 new ProjectDependency("dep-b", "Dependency B", "2.0.0"),
-                new ProjectDependency("dep-c", "Dependency C", "3.0.0", false, true)
+                new ProjectDependency("dep-c", "Dependency C", "3.0.0", ProjectDependency.DependencyType.EMBEDDED)
         ));
 
         when(downloadTokenService.validateAndConsume("bundle-token")).thenReturn(
@@ -284,5 +288,12 @@ class VersionControllerTest {
         User user = new User();
         user.setId(id);
         return user;
+    }
+
+    private static DependencyReferenceRequest dependency(String projectId, String versionNumber) {
+        DependencyReferenceRequest request = new DependencyReferenceRequest();
+        request.setProjectId(projectId);
+        request.setVersionNumber(versionNumber);
+        return request;
     }
 }

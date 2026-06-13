@@ -126,7 +126,7 @@ class ProjectDeletionServiceTest {
         project.setImageUrl("https://cdn.modtale.net/icon.png");
         project.setBannerUrl("https://cdn.modtale.net/banner.png");
         project.setGalleryImages(new ArrayList<>(List.of("https://cdn.modtale.net/one.png")));
-        project.setModIds(new ArrayList<>(List.of("dep-2")));
+        project.setChildProjectIds(new ArrayList<>(List.of("dep-2")));
 
         ProjectVersion version = version("1.0.0");
         version.setFileUrl("files/project-1/main.jar");
