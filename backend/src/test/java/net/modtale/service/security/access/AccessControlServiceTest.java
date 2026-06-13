@@ -12,6 +12,7 @@ import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.project.query.ProjectRouteService;
 import net.modtale.service.user.account.AccountService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -19,6 +20,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -38,6 +40,7 @@ class AccessControlServiceTest {
 
     @BeforeEach
     void setUp() {
+        SecurityContextHolder.clearContext();
         accountService = mock(AccountService.class);
         userRepository = mock(UserRepository.class);
         projectRepository = mock(ProjectRepository.class);
@@ -48,6 +51,11 @@ class AccessControlServiceTest {
                 new PermissionProjectLookupService(projectRepository, new net.modtale.service.project.query.ProjectRouteService()),
                 mongoTemplate
         );
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -197,6 +205,63 @@ class AccessControlServiceTest {
         Authentication orgKey = apiAuthentication(owner, "SCOPE_org-1_VERSION_CREATE");
 
         assertTrue(accessControlService.hasProjectPerm("org-project", "VERSION_CREATE", orgKey));
+    }
+
+    @Test
+    void serviceProjectPermissionHonorsCurrentApiKeyProjectScope() {
+        User keyUser = user("u-key", "key-user", List.of("USER"));
+        Project project = new Project();
+        project.setId("project-1");
+        project.setAuthorId("owner-1");
+        project.setStatus(ProjectStatus.DRAFT);
+
+        Authentication uploadKey = apiAuthentication(keyUser, "SCOPE_project-1_VERSION_CREATE");
+        SecurityContextHolder.getContext().setAuthentication(uploadKey);
+
+        assertTrue(accessControlService.hasProjectPermission(project, keyUser, "VERSION_CREATE"));
+    }
+
+    @Test
+    void serviceProjectPermissionHonorsCurrentApiKeyOrganizationScope() {
+        User keyUser = user("u-key", "key-user", List.of("USER"));
+        Project project = new Project();
+        project.setId("project-1");
+        project.setAuthorId("org-1");
+        project.setStatus(ProjectStatus.DRAFT);
+
+        Authentication uploadKey = apiAuthentication(keyUser, "SCOPE_org-1_VERSION_CREATE");
+        SecurityContextHolder.getContext().setAuthentication(uploadKey);
+
+        assertTrue(accessControlService.hasProjectPermission(project, keyUser, "VERSION_CREATE"));
+    }
+
+    @Test
+    void serviceProjectPermissionDoesNotLetApiKeysBorrowUserOwnerAccessWithoutScope() {
+        User owner = user("owner-1", "owner", List.of("USER"));
+        Project project = new Project();
+        project.setId("project-1");
+        project.setAuthorId("owner-1");
+        project.setStatus(ProjectStatus.DRAFT);
+
+        Authentication unscopedKey = apiAuthentication(owner);
+        SecurityContextHolder.getContext().setAuthentication(unscopedKey);
+
+        assertFalse(accessControlService.hasProjectPermission(project, owner, "VERSION_CREATE"));
+    }
+
+    @Test
+    void serviceProjectPermissionDoesNotApplyApiKeyScopeToDifferentUser() {
+        User keyUser = user("u-key", "key-user", List.of("USER"));
+        User otherUser = user("u-other", "other-user", List.of("USER"));
+        Project project = new Project();
+        project.setId("project-1");
+        project.setAuthorId("owner-1");
+        project.setStatus(ProjectStatus.DRAFT);
+
+        Authentication uploadKey = apiAuthentication(keyUser, "SCOPE_project-1_VERSION_CREATE");
+        SecurityContextHolder.getContext().setAuthentication(uploadKey);
+
+        assertFalse(accessControlService.hasProjectPermission(project, otherUser, "VERSION_CREATE"));
     }
 
     @Test
