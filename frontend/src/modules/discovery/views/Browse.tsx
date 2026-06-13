@@ -206,11 +206,6 @@ export const Browse: React.FC<BrowseViewProps> = ({
                         <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-sm animate-in fade-in slide-in-from-left-4 duration-700">
                             <span className="block text-xs font-black uppercase text-slate-500 dark:text-slate-400 mb-3 tracking-widest px-2 drop-shadow-sm">Browse</span>
                             <div className="space-y-1.5">
-                                {isLoggedIn && (
-                                    <Link to={getBrowseLink({ category: 'favorites', sort: 'relevance' })} className={`block w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all ${viewCategory === 'favorites' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}`}>
-                                        <span className="pointer-events-none">My Favorites</span>
-                                    </Link>
-                                )}
                                 {BROWSE_SORTS.filter(v => !['downloads', 'favorites'].includes(v.id)).map(v => {
                                     const query = getBrowseLink({ sort: v.id, category: null });
 
@@ -220,6 +215,11 @@ export const Browse: React.FC<BrowseViewProps> = ({
                                         </Link>
                                     );
                                 })}
+                                {isLoggedIn && (
+                                    <Link to={getBrowseLink({ category: 'favorites', sort: 'relevance' })} className={`block w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all ${viewCategory === 'favorites' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}`}>
+                                        <span className="pointer-events-none">My Favorites</span>
+                                    </Link>
+                                )}
                             </div>
                         </div>
                     </div>
