@@ -23,17 +23,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Filter changed paths
-        uses: dorny/paths-filter@v3
+      - name: Detect changed components
         id: filter
-        with:
-          filters: |
-            backend:
-              - 'backend/**'
-              - '.github/workflows/ci-cd.yml'
-            frontend:
-              - 'frontend/**'
-              - '.github/workflows/ci-cd.yml'
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: bash .github/scripts/detect-component-changes.sh
 
       - name: Configure Environment
         id: config
