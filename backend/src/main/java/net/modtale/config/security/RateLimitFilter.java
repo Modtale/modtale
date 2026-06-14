@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import net.modtale.config.core.PublicApiEndpointMatcher;
 import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
@@ -103,7 +104,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             capacity = isWrite ? 40 : 3000;
             tierName = "Frontend-Public";
         } else {
-            if (isBlockedAgent(userAgent)) {
+            if (!PublicApiEndpointMatcher.isPublicOperation(path, req.getMethod()) && isBlockedAgent(userAgent)) {
                 sendError(res, 403, "Forbidden", "Automated access requires an API Key.");
                 return;
             }

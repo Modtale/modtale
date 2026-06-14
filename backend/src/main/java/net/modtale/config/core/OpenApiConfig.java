@@ -131,7 +131,7 @@ public class OpenApiConfig {
 
                 pathItem.readOperationsMap().forEach((httpMethod, operation) -> {
                     String method = httpMethod.name();
-                    boolean isPublic = isPublicOperation(path, method);
+                    boolean isPublic = PublicApiEndpointMatcher.isPublicOperation(path, method);
                     operation.addExtension("x-modtale-access", isPublic ? "public" : "auth");
                     operation.addExtension("x-modtale-rate-limit-tiers", rateLimitTiers(path));
 
@@ -610,49 +610,6 @@ public class OpenApiConfig {
         }
 
         return "Other";
-    }
-
-    private boolean isPublicOperation(String path, String method) {
-        String normalized = method.toUpperCase(Locale.ROOT);
-
-        if (normalized.equals("POST") && path.equals("/api/v1/users/batch")) {
-            return true;
-        }
-
-        if (path.equals("/api/v1/auth/register")
-                || path.equals("/api/v1/auth/verify")
-                || path.equals("/api/v1/auth/signin")
-                || path.equals("/api/v1/auth/mfa/validate-login")
-                || path.equals("/api/v1/auth/forgot-password")
-                || path.equals("/api/v1/auth/reset-password")) {
-            return true;
-        }
-
-        if (normalized.equals("GET") || normalized.equals("HEAD")) {
-            if (path.equals("/api/v1/tags")
-                    || path.equals("/api/v1/status")
-                    || path.equals("/api/v1/analytics/platform/stats")
-                    || path.startsWith("/api/v1/projects/")
-                    || path.equals("/api/v1/projects")
-                    || path.startsWith("/api/v1/files/")
-                    || path.startsWith("/api/v1/user/profile/")
-                    || path.startsWith("/api/v1/users/")
-                    || path.startsWith("/api/v1/creators/")
-                    || path.startsWith("/api/v1/og/")
-                    || path.startsWith("/api/v1/download/")
-                    || path.startsWith("/api/v1/download-bundle/")
-                    || path.startsWith("/api/v1/meta/")
-                    || path.startsWith("/api/v1/version/")
-                    || path.startsWith("/api/v1/wiki/")) {
-                return true;
-            }
-
-            if (path.matches("^/api/v1/orgs/[^/]+/members$")) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private List<Map<String, Object>> rateLimitTiers(String path) {
