@@ -18,6 +18,7 @@ const nodeContainsDescendantSlug = (node: any, slug?: string): boolean => {
 const isPageEmpty = (slug?: string, pageCache?: Record<string, any>): boolean => {
     if (!pageCache) return false;
     if (!slug) return true;
+    if (!Object.prototype.hasOwnProperty.call(pageCache, slug)) return false;
     const page = pageCache[slug];
     if (!page) return true;
     return !page.content || typeof page.content !== 'string' || page.content.trim().length === 0;

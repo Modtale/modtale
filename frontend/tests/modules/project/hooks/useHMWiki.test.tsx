@@ -13,6 +13,17 @@ vi.mock('@/modules/project/api/projectClient', () => ({
 
 const mockedProjectClient = vi.mocked(projectClient);
 
+const createDeferred = <T,>() => {
+    let resolve!: (value: T) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((promiseResolve, promiseReject) => {
+        resolve = promiseResolve;
+        reject = promiseReject;
+    });
+
+    return { promise, resolve, reject };
+};
+
 const settle = async (times = 8) => {
     for (let i = 0; i < times; i += 1) {
         await act(async () => {
@@ -67,7 +78,8 @@ describe('useHMWiki', () => {
         container.remove();
     });
 
-    it('preloads every wiki page when enabled and serves later navigation from the cache', async () => {
+    it('loads the active page first while prefetching the rest in the background', async () => {
+        const pageRequests = new Map<string, ReturnType<typeof createDeferred<any>>>();
         mockedProjectClient.getWikiData.mockResolvedValue({
             index: { slug: 'intro' },
             pages: [
@@ -81,10 +93,11 @@ describe('useHMWiki', () => {
                 }
             ]
         });
-        mockedProjectClient.getWikiPage.mockImplementation(async (_projectId, slug) => ({
-            title: slug === 'intro' ? 'Intro' : 'Install',
-            content: `content for ${slug}`
-        }));
+        mockedProjectClient.getWikiPage.mockImplementation((_projectId, slug) => {
+            const request = createDeferred<any>();
+            pageRequests.set(slug, request);
+            return request.promise;
+        });
 
         await act(async () => {
             root.render(
@@ -104,8 +117,21 @@ describe('useHMWiki', () => {
         expect(mockedProjectClient.getWikiPage).toHaveBeenCalledTimes(2);
         expect(mockedProjectClient.getWikiPage).toHaveBeenCalledWith('project-1', 'intro');
         expect(mockedProjectClient.getWikiPage).toHaveBeenCalledWith('project-1', 'guides/install');
+        expect(latestSnapshot.loading).toBe(true);
+
+        await act(async () => {
+            pageRequests.get('intro')?.resolve({
+                title: 'Intro',
+                content: 'content for intro'
+            });
+            await pageRequests.get('intro')?.promise;
+        });
+        await settle();
+
         expect(latestSnapshot.loading).toBe(false);
         expect(latestSnapshot.data?.content?.title).toBe('Intro');
+        expect(latestSnapshot.data?.pageCache).toHaveProperty('intro');
+        expect(latestSnapshot.data?.pageCache).not.toHaveProperty('guides/install');
 
         await act(async () => {
             root.render(
@@ -121,7 +147,51 @@ describe('useHMWiki', () => {
         });
         await settle();
 
+        expect(latestSnapshot.loading).toBe(true);
+        expect(mockedProjectClient.getWikiPage).toHaveBeenCalledTimes(2);
+
+        await act(async () => {
+            pageRequests.get('guides/install')?.resolve({
+                title: 'Install',
+                content: 'content for guides/install'
+            });
+            await pageRequests.get('guides/install')?.promise;
+        });
+        await settle();
+
+        expect(latestSnapshot.loading).toBe(false);
         expect(latestSnapshot.data?.content?.title).toBe('Install');
         expect(mockedProjectClient.getWikiPage).toHaveBeenCalledTimes(2);
+    });
+
+    it('fetches a selected page synchronously when it was not part of the prefetch set', async () => {
+        mockedProjectClient.getWikiData.mockResolvedValue({
+            index: { slug: 'intro' },
+            pages: [
+                { id: '1', slug: 'intro', title: 'Intro' }
+            ]
+        });
+        mockedProjectClient.getWikiPage.mockImplementation(async (_projectId, slug) => ({
+            title: slug === 'hidden/page' ? 'Hidden page' : 'Intro',
+            content: `content for ${slug}`
+        }));
+
+        await act(async () => {
+            root.render(
+                <Probe
+                    projectId="project-1"
+                    pageSlug="hidden/page"
+                    enabled={true}
+                    onRender={(snapshot) => {
+                        latestSnapshot = snapshot;
+                    }}
+                />
+            );
+        });
+        await settle();
+
+        expect(mockedProjectClient.getWikiPage).toHaveBeenCalledWith('project-1', 'hidden/page');
+        expect(latestSnapshot.loading).toBe(false);
+        expect(latestSnapshot.data?.content?.title).toBe('Hidden page');
     });
 });
