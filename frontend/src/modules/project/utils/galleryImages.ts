@@ -1,4 +1,7 @@
 import type { GalleryImage } from '@/types';
+import { getYouTubeEmbedUrl, getYouTubeThumbnailUrl, getYouTubeVideoId } from '@/utils/youtube';
+
+export { getYouTubeEmbedUrl, getYouTubeThumbnailUrl, getYouTubeVideoId } from '@/utils/youtube';
 
 export type GalleryImageInput = string | GalleryImage;
 export type GalleryMediaType = 'image' | 'youtube';
@@ -12,7 +15,7 @@ export interface ResolvedGalleryImage {
     thumbnailUrl?: string;
 }
 
-const YOUTUBE_VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
+const YOUTUBE_IFRAME_ALLOW = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
 
 export const getGalleryImageUrl = (image: GalleryImageInput | null | undefined) => {
     if (!image) return '';
@@ -28,43 +31,6 @@ export const getGalleryImageCaption = (
     if (image && typeof image === 'object' && image.caption) return image.caption;
     return captions[url] || '';
 };
-
-const getFirstPathSegment = (pathname: string) => pathname.replace(/^\/+/, '').split('/')[0] || '';
-
-export const getYouTubeVideoId = (url: string | null | undefined) => {
-    if (!url) return null;
-
-    try {
-        const parsed = new URL(url);
-        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
-
-        let host = parsed.hostname.toLowerCase();
-        if (host.startsWith('www.')) host = host.slice(4);
-        if (host.startsWith('m.')) host = host.slice(2);
-
-        let candidate = '';
-        if (host === 'youtu.be') {
-            candidate = getFirstPathSegment(parsed.pathname);
-        } else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
-            if (parsed.pathname === '/watch') {
-                candidate = parsed.searchParams.get('v') || '';
-            } else if (
-                parsed.pathname.startsWith('/embed/')
-                || parsed.pathname.startsWith('/shorts/')
-                || parsed.pathname.startsWith('/live/')
-            ) {
-                candidate = getFirstPathSegment(parsed.pathname.replace(/^\/(embed|shorts|live)\//, ''));
-            }
-        }
-
-        return YOUTUBE_VIDEO_ID_PATTERN.test(candidate) ? candidate : null;
-    } catch {
-        return null;
-    }
-};
-
-export const getYouTubeEmbedUrl = (videoId: string) => `https://www.youtube-nocookie.com/embed/${videoId}`;
-export const getYouTubeThumbnailUrl = (videoId: string) => `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
 
 export const resolveGalleryImages = (
     images: GalleryImageInput[] = [],
@@ -87,3 +53,33 @@ export const resolveGalleryImages = (
         })
         .filter((image): image is ResolvedGalleryImage => Boolean(image))
 );
+
+const collapseSnippetText = (value: string) => value.replace(/\s+/g, ' ').trim();
+
+const escapeMarkdownImageAlt = (value: string) => collapseSnippetText(value)
+    .replace(/\\/g, '\\\\')
+    .replace(/\[/g, '\\[')
+    .replace(/]/g, '\\]');
+
+const escapeMarkdownUrl = (value: string) => value
+    .replace(/\s/g, '%20')
+    .replace(/\)/g, '%29');
+
+const escapeHtmlAttribute = (value: string) => collapseSnippetText(value)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+export const getGalleryEmbedSnippet = (
+    image: ResolvedGalleryImage,
+    fallbackTitle = 'Project gallery media'
+) => {
+    const label = image.caption || fallbackTitle || (image.type === 'youtube' ? 'Project gallery video' : 'Project gallery image');
+
+    if (image.type === 'youtube' && image.youtubeVideoId) {
+        return `<iframe src="${getYouTubeEmbedUrl(image.youtubeVideoId)}" title="${escapeHtmlAttribute(label)}" allow="${YOUTUBE_IFRAME_ALLOW}" allowfullscreen></iframe>`;
+    }
+
+    return `![${escapeMarkdownImageAlt(label)}](${escapeMarkdownUrl(image.url)})`;
+};
