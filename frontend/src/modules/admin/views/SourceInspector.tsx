@@ -3,6 +3,7 @@ import { Search, FileCode, Terminal, FileText, X, Folder, FolderOpen, ChevronRig
 import { adminClient } from '../api/adminClient';
 import { extractApiErrorMessage } from '@/utils/api';
 import type { ScanIssue } from '@/types';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface SourceInspectorProps {
     modId: string;
@@ -325,6 +326,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
     );
 
     return (
+        <ModalPortal>
         <div className="fixed inset-0 z-[160] bg-slate-950/90 backdrop-blur-md flex flex-col animate-in fade-in duration-200">
             <div className="h-14 border-b border-white/10 bg-slate-900 flex items-center justify-between px-4 shrink-0">
                 <div className="flex items-center gap-4">
@@ -463,5 +465,6 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                 </div>
             </div>
         </div>
+        </ModalPortal>
     );
 };

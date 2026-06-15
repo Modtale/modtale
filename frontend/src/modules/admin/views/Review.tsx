@@ -5,6 +5,7 @@ import { adminClient } from '../api/adminClient';
 import { SourceInspector } from './SourceInspector';
 import { SiteRoutes } from '@/utils/routes';
 import type { ScanIssue, ProjectVersion, ScanReviewTarget } from '@/types';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface ReviewProps {
     reviewingProject: any;
@@ -213,6 +214,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     const licenseLink = mod.links?.LICENSE || mod.links?.license;
 
     return (
+        <ModalPortal>
         <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-200">
             {inspectorData && (
                 <SourceInspector
@@ -228,10 +230,11 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                 />
             )}
 
-            <div className="bg-slate-50 dark:bg-slate-900 w-full max-w-7xl h-[85dvh] rounded-3xl shadow-2xl border border-slate-200 dark:border-white/5 flex overflow-hidden ring-1 ring-white/10 relative">
+                <div className="bg-slate-50 dark:bg-slate-900 w-full max-w-7xl h-[85dvh] rounded-3xl shadow-2xl border border-slate-200 dark:border-white/5 flex overflow-hidden ring-1 ring-white/10 relative">
 
-                {showRejectPanel && (
-                    <div className="absolute inset-0 z-[150] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    {showRejectPanel && (
+                    <ModalPortal>
+                    <div className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
                         <div className="bg-white dark:bg-slate-900 w-full max-w-lg p-6 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10">
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
@@ -280,6 +283,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                             </div>
                         </div>
                     </div>
+                    </ModalPortal>
                 )}
 
                 <div className="w-64 bg-slate-100 dark:bg-slate-950/50 border-r border-slate-200 dark:border-white/5 p-6 flex flex-col">
@@ -898,5 +902,6 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                 </div>
             </div>
         </div>
+        </ModalPortal>
     );
 };

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { X, User as UserIcon, Loader2, ExternalLink } from 'lucide-react';
 import { api } from '@/utils/api';
 import type { User } from '@/types';
 import { Link } from 'react-router-dom';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { SiteRoutes } from '@/utils/routes';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface FollowingModalProps {
     userId: string;
@@ -30,7 +30,8 @@ export function FollowingModal({ userId, onClose }: FollowingModalProps) {
         fetchFollowing();
     }, [userId]);
 
-    return createPortal(
+    return (
+        <ModalPortal>
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="absolute inset-0" onClick={onClose}></div>
 
@@ -90,7 +91,7 @@ export function FollowingModal({ userId, onClose }: FollowingModalProps) {
                     )}
                 </div>
             </div>
-        </div>,
-        document.body
+        </div>
+        </ModalPortal>
     );
 }

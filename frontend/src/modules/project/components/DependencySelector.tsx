@@ -9,6 +9,7 @@ import { VersionRelationKind } from '@/types';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { parseDependencyEntry, serializeDependencyEntry } from '../utils/dependencyEntries';
 import { useToast } from '@/components/ui/Toast';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface DependencyWizardProps {
     previousDeps: ProjectDependency[];
@@ -181,6 +182,7 @@ const DependencyUpdateWizard: React.FC<DependencyWizardProps> = ({ previousDeps,
     const validCount = Object.values(selections).filter(v => v !== null).length;
 
     return (
+        <ModalPortal>
         <div className={theme.components.modalOverlay}>
             <div className={`fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-2xl max-h-[85dvh] flex flex-col z-[100] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 shadow-xl rounded-3xl overflow-hidden ring-1 ring-black/[0.02] dark:ring-white/[0.02]`} onClick={e => e.stopPropagation()}>
                 <div className={`p-4 sm:p-5 flex justify-between items-center shrink-0 bg-slate-50 dark:bg-slate-800/95 border-b border-slate-200 dark:border-white/10`}>
@@ -218,6 +220,7 @@ const DependencyUpdateWizard: React.FC<DependencyWizardProps> = ({ previousDeps,
                 </div>
             </div>
         </div>
+        </ModalPortal>
     );
 };
 
@@ -417,6 +420,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
             )}
 
             {selectedModForVersion && !disabled && !isIncompatibilityMode && (
+                <ModalPortal>
                 <div className={theme.components.modalOverlay}>
                     <div className={`fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-md max-h-[85dvh] flex flex-col z-[100] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 shadow-xl rounded-3xl overflow-hidden ring-1 ring-black/[0.02] dark:ring-white/[0.02]`} onClick={e => e.stopPropagation()}>
                         <div className={`p-4 sm:p-5 flex justify-between items-start shrink-0 bg-slate-50 dark:bg-slate-800/95 border-b border-slate-200 dark:border-white/10`}>
@@ -481,6 +485,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                         )}
                     </div>
                 </div>
+                </ModalPortal>
             )}
 
             <div className="flex justify-between items-center">

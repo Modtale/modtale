@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
 import { api } from '@/utils/api';
 import { extractApiErrorMessage } from '@/utils/api';
 import type { Project, User } from '@/types';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface TransferProjectModalProps {
     project: Project;
@@ -49,7 +50,8 @@ export const TransferProjectModal: React.FC<TransferProjectModalProps> = ({ proj
     };
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <ModalPortal>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 p-6 rounded-3xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90dvh]">
                 <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Transfer Ownership</h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
@@ -121,5 +123,6 @@ export const TransferProjectModal: React.FC<TransferProjectModalProps> = ({ proj
                 </div>
             </div>
         </div>
+        </ModalPortal>
     );
 };

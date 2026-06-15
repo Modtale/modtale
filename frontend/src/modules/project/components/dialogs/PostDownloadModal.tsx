@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Download, X, AlertCircle, Check, Copy } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { useScrollLock } from '@/hooks/useScrollLock';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface PostDownloadModalProps {
     isOpen: boolean;
@@ -108,6 +109,7 @@ export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
     };
 
     return (
+        <ModalPortal>
         <div className={theme.components.modalOverlay} onClick={handleClose}>
             <div className={`${theme.components.modalContent} max-w-xl ring-1 ring-slate-900/5 dark:ring-white/10`} onClick={e => e.stopPropagation()}>
                 <div className={theme.components.modalHeader}>
@@ -212,5 +214,6 @@ export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
                 </div>
             </div>
         </div>
+        </ModalPortal>
     );
 };

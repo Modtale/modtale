@@ -3,6 +3,7 @@ import { User as UserIcon, Search, Shield, Check, Zap, Trash2, Ban, Mail, Code, 
 import { adminClient } from '../api/adminClient';
 import { extractApiErrorMessage } from '@/utils/api';
 import { isSuperAdminUser } from '../utils/access';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
     const [viewMode, setViewMode] = useState<'users' | 'bans'>('users');
@@ -305,6 +306,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
             {viewMode === 'users' && (
                 <>
                     {showBanConfirm && foundUser?.email && (
+                        <ModalPortal>
                         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
                             <div className="bg-white dark:bg-slate-900 w-full max-w-md p-6 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10">
                                 <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 text-red-500 flex items-center gap-2"><Ban className="w-5 h-5"/> Ban Email & Delete Account</h3>
@@ -319,9 +321,11 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
                                 </div>
                             </div>
                         </div>
+                        </ModalPortal>
                     )}
 
                     {showDeleteConfirm && (
+                        <ModalPortal>
                         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
                             <div className="bg-white dark:bg-slate-900 w-full max-w-md p-6 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10">
                                 <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 text-red-500">Danger Zone</h3>
@@ -336,9 +340,11 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
                                 </div>
                             </div>
                         </div>
+                        </ModalPortal>
                     )}
 
                     {showRawModal && (
+                        <ModalPortal>
                         <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
                             <div className="bg-slate-900 w-full max-w-5xl rounded-3xl shadow-2xl border border-white/10 flex flex-col overflow-hidden h-[85vh]">
                                 <div className="px-6 py-4 border-b border-white/10 flex justify-between items-center bg-black/40">
@@ -361,6 +367,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
                                 </div>
                             </div>
                         </div>
+                        </ModalPortal>
                     )}
 
                     <form onSubmit={handleSearch} className="flex gap-4 mb-10 relative z-50">

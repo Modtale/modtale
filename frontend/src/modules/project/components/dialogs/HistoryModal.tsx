@@ -5,6 +5,7 @@ import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import { theme } from '@/styles/theme';
 import { formatTimeAgo } from '@/utils/modHelpers';
 import { useScrollLock } from '@/hooks/useScrollLock';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface HistoryModalProps {
     show: boolean;
@@ -167,8 +168,10 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
     if (isInline) return content;
 
     return (
+        <ModalPortal>
         <div className={theme.components.modalOverlay} onClick={onClose}>
             {content}
         </div>
+        </ModalPortal>
     );
 };
