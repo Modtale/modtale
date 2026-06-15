@@ -49,7 +49,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
     const [activeTab, setActiveTab] = useState<string>('details');
     const [editorMode, setEditorMode] = useState<'write' | 'preview'>('write');
 
-    const { project: projectData, setProject: setProjectData, loading, contributors } = useProjectDetail(id, null, currentUser, { hydrateChangelogs: true });
+    const { project: projectData, setProject: setProjectData, loading, contributors } = useProjectDetail(id, null, currentUser, { hydrateChangelogs: true, full: true });
 
     const [metaData, setMetaData] = useState<MetadataFormData>({
         title: '', summary: '', description: '', tags: [], links: {}, repositoryUrl: '', iconFile: null, iconPreview: null, slug: ''
@@ -198,7 +198,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         setIsInviting(true);
         try {
             await projectClient.inviteUser(projectData.id, inviteUserId, inviteRoleId);
-            const refreshed = await projectClient.getProject(projectData.id);
+            const refreshed = await projectClient.getProjectFull(projectData.id);
             setProjectData(refreshed);
             setInviteUsername('');
             setInviteUserId('');
@@ -218,7 +218,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
 
         try {
             await projectClient.removeContributor(projectData.id, memberToRemove);
-            const refreshed = await projectClient.getProject(projectData.id);
+            const refreshed = await projectClient.getProjectFull(projectData.id);
             setProjectData(refreshed);
             onShowStatus('success', memberToRemove === currentUser?.id ? 'Left Project' : 'Removed', memberToRemove === currentUser?.id ? 'You have left the project.' : 'Contributor removed successfully.');
         } catch (err: unknown) {
@@ -377,7 +377,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 
-            const refreshed = await projectClient.getProject(projectData.id);
+            const refreshed = await projectClient.getProjectFull(projectData.id);
             setProjectData(refreshed);
             setVersionData({
                 projectIds: versionData.projectIds || [],
@@ -428,7 +428,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                 changelog: editVersionData.changelog || '',
                 channel: editVersionData.channel || 'RELEASE'
             });
-            const refreshed = await projectClient.getProject(projectData.id);
+            const refreshed = await projectClient.getProjectFull(projectData.id);
             setProjectData(refreshed);
             setEditingVersion(null);
             setEditVersionData(null);
@@ -445,7 +445,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         setIsSavingVersion(true);
         try {
             await projectClient.deleteVersion(projectData.id, versionId);
-            const refreshed = await projectClient.getProject(projectData.id);
+            const refreshed = await projectClient.getProjectFull(projectData.id);
             setProjectData(refreshed);
             onShowStatus('success', 'Version Deleted', 'Version deleted successfully.');
         } catch (e: any) {

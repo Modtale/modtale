@@ -460,6 +460,9 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         return [...(project?.versions || [])].sort((a: any, b: any) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
     }, [project?.versions]);
 
+    const versionPayloadPending = Boolean((isHistoryOpen || isDownloadOpen) && !project?.versions);
+    const galleryPayloadPending = Boolean(isGalleryRoute && !project?.galleryImages);
+
     const toggleExperimental = useCallback(() => {
         setShowExperimental((prev) => !prev);
     }, []);
@@ -515,7 +518,16 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 {isReportOpen && <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetId={project.id} targetType="PROJECT" targetTitle={project.title} />}
                 {showPostDownloadModal && <PostDownloadModal isOpen={showPostDownloadModal} onClose={() => setShowPostDownloadModal(false)} classification={project.classification!} title={project.title} channel={lastDownloadChannel} isBundle={lastDownloadWasBundle} fileName={lastDownloadedFileName} />}
 
-                {isHistoryOpen && (
+                {(isHistoryOpen || isDownloadOpen) && versionPayloadPending && (
+                    <div className={theme.components.modalOverlay}>
+                        <div className={`${theme.components.modalContent} max-w-md`}>
+                            <div className="flex items-center justify-center p-12">
+                                <Spinner />
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {isHistoryOpen && !versionPayloadPending && (
                     <HistoryModal
                         show={isHistoryOpen}
                         onClose={() => navigate(projectUrl)}
@@ -526,7 +538,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                         hasStableVersions={hasStableBuilds}
                     />
                 )}
-                {isDownloadOpen && (
+                {isDownloadOpen && !versionPayloadPending && (
                     <DownloadModal
                         show={isDownloadOpen}
                         onClose={() => navigate(projectUrl)}
@@ -615,7 +627,11 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                             </button>
                         </div>
                         <div className={`${theme.components.modalBody} !p-0`}>
-                            {galleryImages.length > 0 ? (
+                            {galleryPayloadPending ? (
+                                <div className="flex items-center justify-center h-[72dvh]">
+                                    <Spinner />
+                                </div>
+                            ) : galleryImages.length > 0 ? (
                                 <div className="relative h-[72dvh] bg-black">
                                     <img
                                         src={galleryImages[galleryIndex]}

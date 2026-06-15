@@ -116,7 +116,7 @@ export const useProjectEditor = (
 
             let refreshed: Project | null = null;
             try {
-                refreshed = await projectClient.getProject(projectData.id);
+                refreshed = await projectClient.getProjectFull(projectData.id);
             } catch {
             }
 

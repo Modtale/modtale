@@ -14,9 +14,15 @@ import java.util.stream.Collectors;
 import net.modtale.exception.InvalidProjectRequestException;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.mapper.ProjectMapper;
+import net.modtale.model.dto.project.ProjectCommentsDTO;
 import net.modtale.model.dto.project.ProjectDTO;
+import net.modtale.model.dto.project.ProjectGalleryDTO;
+import net.modtale.model.dto.project.ProjectMarqueeDTO;
 import net.modtale.model.dto.project.ProjectMetaDTO;
+import net.modtale.model.dto.project.ProjectPageDTO;
 import net.modtale.model.dto.project.ProjectSummaryDTO;
+import net.modtale.model.dto.project.ProjectTeamDTO;
+import net.modtale.model.dto.project.ProjectVersionsDTO;
 import net.modtale.model.dto.project.ProjectVersionChangelogDTO;
 import net.modtale.model.dto.request.project.CreateProjectRequest;
 import net.modtale.model.dto.request.project.UpdateProjectRequest;
@@ -99,7 +105,7 @@ public class ProjectController {
 
     @GetMapping("/projects")
     @PreAuthorize("@apiSecurity.hasAnyPerm('PROJECT_READ', authentication)")
-    public ResponseEntity<Page<ProjectSummaryDTO>> getProjects(
+    public ResponseEntity<Page<?>> getProjects(
             @RequestParam(required = false) String tags,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "Page must be 0 or greater.") int page,
@@ -127,6 +133,12 @@ public class ProjectController {
             )
             String dateRange,
             @RequestParam(required = false) String authorId,
+            @RequestParam(required = false, defaultValue = "catalog")
+            @Pattern(
+                    regexp = "(?i)catalog|marquee",
+                    message = "View must be catalog or marquee."
+            )
+            String view,
             Authentication authentication
     ) {
         List<String> tagList = tags != null && !tags.trim().isEmpty()
@@ -143,7 +155,31 @@ public class ProjectController {
                 ? accountService.getCurrentUser(authentication)
                 : null;
 
-        Page<ProjectSummaryDTO> responsePage = currentUser == null && !effectiveCategory.isPersonalView()
+        boolean marqueeView = "marquee".equalsIgnoreCase(view);
+        boolean publicCatalogRequest = currentUser == null && !effectiveCategory.isPersonalView();
+
+        if (marqueeView && publicCatalogRequest) {
+            Page<ProjectMarqueeDTO> responsePage = projectResponseCacheService.searchPublicProjectMarquee(
+                    tagList,
+                    search,
+                    page,
+                    size,
+                    sortEnum,
+                    gameVersion,
+                    classificationEnum,
+                    minDownloads,
+                    minFavorites,
+                    effectiveCategory,
+                    dateRange,
+                    authorId
+            );
+
+            return ResponseEntity.ok()
+                    .cacheControl(CacheControl.maxAge(1, TimeUnit.HOURS).cachePublic())
+                    .body(responsePage);
+        }
+
+        Page<ProjectSummaryDTO> responsePage = publicCatalogRequest
                 ? projectResponseCacheService.searchPublicProjectSummaries(
                         tagList,
                         search,
@@ -185,47 +221,134 @@ public class ProjectController {
 
     @GetMapping("/projects/{id}")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_READ', authentication)")
-    public ResponseEntity<ProjectDTO> getProject(@PathVariable String id, Authentication authentication) {
-        User currentUser = accountService.getCurrentUser(authentication);
-        if (currentUser == null) {
-            ProjectDTO project = projectResponseCacheService.getPublicProjectDtoByRouteKey(id);
+    public ResponseEntity<ProjectPageDTO> getProject(@PathVariable String id, Authentication authentication) {
+        ProjectAccess access = resolveProjectAccess(id, authentication);
+        if (access.usePublicCache()) {
+            ProjectPageDTO project = projectResponseCacheService.getPublicProjectPageDtoByRouteKey(id);
             if (project == null) {
-                throw new ResourceNotFoundException("We couldn't find a project with that ID.");
+                throwProjectNotFound();
             }
-            return ResponseEntity.ok()
-                    .cacheControl(CacheControl.maxAge(5, TimeUnit.MINUTES).cachePublic())
-                    .body(project);
+            return publicProjectResponse(project);
         }
 
-        Project permissionSnapshot = permissionProjectLookupService.findProject(id);
-        boolean privilegedViewer = permissionSnapshot != null
-                && (accessControlService.isAdmin(currentUser) || accessControlService.hasEditPermission(permissionSnapshot, currentUser));
-
-        if (permissionSnapshot != null
-                && accessControlService.isPubliclyReadable(permissionSnapshot)
-                && !privilegedViewer) {
-            ProjectDTO project = projectResponseCacheService.getPublicProjectDtoByRouteKey(id);
-            if (project == null) {
-                throw new ResourceNotFoundException("We couldn't find a project with that ID.");
-            }
-            return ResponseEntity.ok()
-                    .cacheControl(CacheControl.maxAge(5, TimeUnit.MINUTES).cachePublic())
-                    .body(project);
-        }
-
-        Project project = projectService.getProjectPageByRouteKey(id, currentUser);
+        Project project = projectService.getProjectPageShellByRouteKey(id, access.currentUser());
         if (project == null) {
-            throw new ResourceNotFoundException("We couldn't find a project with that ID.");
+            throwProjectNotFound();
         }
 
-        if (privilegedViewer) {
-            project.setCanEdit(accessControlService.hasEditPermission(project, currentUser));
-            project.setIsOwner(accessControlService.isOwner(project, currentUser));
-        }
+        decoratePrivilegedProject(project, access);
 
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noCache())
-                .body(ProjectMapper.toDTO(project, false, currentUser != null ? currentUser.getId() : null, false));
+                .body(ProjectMapper.toPageDTO(project));
+    }
+
+    @GetMapping("/projects/{id}/details")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_READ', authentication)")
+    public ResponseEntity<ProjectDTO> getProjectDetails(@PathVariable String id, Authentication authentication) {
+        ProjectAccess access = resolveProjectAccess(id, authentication);
+        if (access.usePublicCache()) {
+            ProjectDTO project = projectResponseCacheService.getPublicProjectDtoByRouteKey(id);
+            if (project == null) {
+                throwProjectNotFound();
+            }
+            return publicProjectResponse(project);
+        }
+
+        Project project = projectService.getProjectDetailsByRouteKey(id, access.currentUser());
+        if (project == null) {
+            throwProjectNotFound();
+        }
+
+        decoratePrivilegedProject(project, access);
+
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noCache())
+                .body(ProjectMapper.toDTO(project, false, access.currentUser() != null ? access.currentUser().getId() : null, false));
+    }
+
+    @GetMapping("/projects/{id}/versions")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_READ', authentication)")
+    public ResponseEntity<ProjectVersionsDTO> getProjectVersions(@PathVariable String id, Authentication authentication) {
+        ProjectAccess access = resolveProjectAccess(id, authentication);
+        if (access.usePublicCache()) {
+            ProjectVersionsDTO versions = projectResponseCacheService.getPublicProjectVersionsByRouteKey(id);
+            if (versions == null) {
+                throwProjectNotFound();
+            }
+            return publicProjectResponse(versions);
+        }
+
+        Project project = projectService.getProjectVersionsByRouteKey(id, access.currentUser());
+        if (project == null) {
+            throwProjectNotFound();
+        }
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noCache())
+                .body(ProjectMapper.toVersionsDTO(project));
+    }
+
+    @GetMapping("/projects/{id}/comments")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_READ', authentication)")
+    public ResponseEntity<ProjectCommentsDTO> getProjectComments(@PathVariable String id, Authentication authentication) {
+        ProjectAccess access = resolveProjectAccess(id, authentication);
+        if (access.currentUser() == null) {
+            ProjectCommentsDTO comments = projectResponseCacheService.getPublicProjectCommentsByRouteKey(id);
+            if (comments == null) {
+                throwProjectNotFound();
+            }
+            return publicProjectResponse(comments);
+        }
+
+        Project project = projectService.getProjectCommentsByRouteKey(id, access.currentUser());
+        if (project == null) {
+            throwProjectNotFound();
+        }
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noCache())
+                .body(ProjectMapper.toCommentsDTO(project, access.currentUser() != null ? access.currentUser().getId() : null));
+    }
+
+    @GetMapping("/projects/{id}/gallery")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_READ', authentication)")
+    public ResponseEntity<ProjectGalleryDTO> getProjectGallery(@PathVariable String id, Authentication authentication) {
+        ProjectAccess access = resolveProjectAccess(id, authentication);
+        if (access.usePublicCache()) {
+            ProjectGalleryDTO gallery = projectResponseCacheService.getPublicProjectGalleryByRouteKey(id);
+            if (gallery == null) {
+                throwProjectNotFound();
+            }
+            return publicProjectResponse(gallery);
+        }
+
+        Project project = projectService.getProjectGalleryByRouteKey(id, access.currentUser());
+        if (project == null) {
+            throwProjectNotFound();
+        }
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noCache())
+                .body(ProjectMapper.toGalleryDTO(project));
+    }
+
+    @GetMapping("/projects/{id}/team")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_READ', authentication)")
+    public ResponseEntity<ProjectTeamDTO> getProjectTeam(@PathVariable String id, Authentication authentication) {
+        ProjectAccess access = resolveProjectAccess(id, authentication);
+        if (access.usePublicCache()) {
+            ProjectTeamDTO team = projectResponseCacheService.getPublicProjectTeamByRouteKey(id);
+            if (team == null) {
+                throwProjectNotFound();
+            }
+            return publicProjectResponse(team);
+        }
+
+        Project project = projectService.getProjectTeamByRouteKey(id, access.currentUser());
+        if (project == null) {
+            throwProjectNotFound();
+        }
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noCache())
+                .body(ProjectMapper.toTeamDTO(project));
     }
 
     @GetMapping("/projects/{id}/versions/changelogs")
@@ -441,6 +564,47 @@ public class ProjectController {
         User user = accountService.requireCurrentUser(authentication, "publishing a project");
         lifecycleService.publishProject(id, user);
         return ResponseEntity.ok().build();
+    }
+
+    private ProjectAccess resolveProjectAccess(String id, Authentication authentication) {
+        User currentUser = accountService.getCurrentUser(authentication);
+        if (currentUser == null) {
+            return new ProjectAccess(null, null, false, true);
+        }
+
+        Project permissionSnapshot = permissionProjectLookupService.findProject(id);
+        boolean privilegedViewer = permissionSnapshot != null
+                && (accessControlService.isAdmin(currentUser) || accessControlService.hasEditPermission(permissionSnapshot, currentUser));
+        boolean publicReader = permissionSnapshot != null
+                && accessControlService.isPubliclyReadable(permissionSnapshot)
+                && !privilegedViewer;
+
+        return new ProjectAccess(currentUser, permissionSnapshot, privilegedViewer, publicReader);
+    }
+
+    private void decoratePrivilegedProject(Project project, ProjectAccess access) {
+        if (!access.privilegedViewer() || access.currentUser() == null) {
+            return;
+        }
+
+        project.setCanEdit(accessControlService.hasEditPermission(project, access.currentUser()));
+        project.setIsOwner(accessControlService.isOwner(project, access.currentUser()));
+    }
+
+    private <T> ResponseEntity<T> publicProjectResponse(T body) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.maxAge(5, TimeUnit.MINUTES).cachePublic())
+                .body(body);
+    }
+
+    private void throwProjectNotFound() {
+        throw new ResourceNotFoundException("We couldn't find a project with that ID.");
+    }
+
+    private record ProjectAccess(User currentUser, Project permissionSnapshot, boolean privilegedViewer, boolean publicReader) {
+        boolean usePublicCache() {
+            return currentUser == null || publicReader;
+        }
     }
 
     private boolean hasApiRole(Authentication authentication) {

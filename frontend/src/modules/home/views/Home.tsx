@@ -170,18 +170,24 @@ export const Home: React.FC<{
 }) => {
     const { initialData: ssrData } = useSSRData();
     const homeSeo = ROUTE_SEO['/'];
+    const initialMarqueeProjects = ssrData?.homeMarqueeProjects || [];
     const initialTrendingProjects = ssrData?.homeTrendingProjects || ssrData?.homeProjects || [];
     const initialNewestProjects = ssrData?.homeNewestProjects || [];
     const initialProjectSeed = useMemo(
         () => dedupeProjects([...initialTrendingProjects, ...initialNewestProjects]),
         [initialNewestProjects, initialTrendingProjects]
     );
+    const initialMarqueeSeed = useMemo(
+        () => initialMarqueeProjects.length ? initialMarqueeProjects : initialProjectSeed.filter(isHeroMarqueeProject),
+        [initialMarqueeProjects, initialProjectSeed]
+    );
     const shouldFetchFallbackProjects = initialProjectSeed.length === 0;
+    const shouldFetchFallbackMarquee = initialMarqueeSeed.length === 0;
     const shouldRefreshTrendingProjects = !initialTrendingProjects.length && initialProjectSeed.length > 0;
-    const hasInitialHeroMarqueeProjects = initialProjectSeed.some(isHeroMarqueeProject);
+    const hasInitialHeroMarqueeProjects = initialMarqueeSeed.some(isHeroMarqueeProject);
     const initialProjects = initialTrendingProjects.length ? initialTrendingProjects : initialProjectSeed;
-    const initialHeroProjectsLoading = shouldFetchFallbackProjects || (shouldRefreshTrendingProjects && !hasInitialHeroMarqueeProjects);
-    const initialShouldReserveDesktopHeroMarquee = initialHeroProjectsLoading || initialProjects.some(isHeroMarqueeProject);
+    const initialHeroProjectsLoading = shouldFetchFallbackMarquee;
+    const initialShouldReserveDesktopHeroMarquee = initialHeroProjectsLoading || initialMarqueeSeed.some(isHeroMarqueeProject);
 
     const [isDesktop, setIsDesktop] = useState(() => getViewportSize().width >= DESKTOP_BREAKPOINT);
     const [viewportSize, setViewportSize] = useState(getViewportSize);
@@ -189,6 +195,7 @@ export const Home: React.FC<{
         const { width, height } = getViewportSize();
         return initialShouldReserveDesktopHeroMarquee && width >= DESKTOP_HERO_MIN_WIDTH_ENTER && height >= DESKTOP_HERO_MIN_HEIGHT;
     });
+    const [marqueeProjects, setMarqueeProjects] = useState<Project[]>(initialMarqueeSeed);
     const [projects, setProjects] = useState<Project[]>(initialProjects);
     const [newestProjects, setNewestProjects] = useState<Project[]>(initialNewestProjects.length ? initialNewestProjects : initialProjectSeed);
     const [isHeroProjectsLoading, setIsHeroProjectsLoading] = useState(initialHeroProjectsLoading);
@@ -270,29 +277,37 @@ export const Home: React.FC<{
             scheduledTasks.push(() => globalThis.clearTimeout(timeoutId));
         };
 
+        if (shouldFetchFallbackMarquee) {
+            void runHeroProjectRequest(async () => {
+                try {
+                    const res = await api.get('/projects', {
+                        params: { size: 16, sort: 'trending', view: 'marquee' },
+                        timeout: HOME_REQUEST_TIMEOUT_MS,
+                    });
+                    if (!isCancelled && res.data?.content) setMarqueeProjects(res.data.content);
+                } catch {}
+            }, true);
+        }
+
         if (shouldFetchFallbackProjects) {
             void runProjectRequest(async () => {
-                await runHeroProjectRequest(async () => {
-                    try {
-                        const res = await api.get('/projects', {
-                            params: { size: 16, sort: 'trending' },
-                            timeout: HOME_REQUEST_TIMEOUT_MS,
-                        });
-                        if (!isCancelled && res.data?.content) setProjects(res.data.content);
-                    } catch {}
-                }, true);
+                try {
+                    const res = await api.get('/projects', {
+                        params: { size: 12, sort: 'trending' },
+                        timeout: HOME_REQUEST_TIMEOUT_MS,
+                    });
+                    if (!isCancelled && res.data?.content) setProjects(res.data.content);
+                } catch {}
             }, setIsTrendingProjectsLoading, true);
         } else if (shouldRefreshTrendingProjects) {
             scheduleBackgroundRequest(async () => {
-                await runHeroProjectRequest(async () => {
-                    try {
-                        const res = await api.get('/projects', {
-                            params: { size: 16, sort: 'trending' },
-                            timeout: HOME_REQUEST_TIMEOUT_MS,
-                        });
-                        if (!isCancelled && res.data?.content?.length) setProjects(res.data.content);
-                    } catch {}
-                }, !hasInitialHeroMarqueeProjects);
+                try {
+                    const res = await api.get('/projects', {
+                        params: { size: 12, sort: 'trending' },
+                        timeout: HOME_REQUEST_TIMEOUT_MS,
+                    });
+                    if (!isCancelled && res.data?.content?.length) setProjects(res.data.content);
+                } catch {}
             });
         }
 
@@ -329,16 +344,18 @@ export const Home: React.FC<{
     }, [
         DESKTOP_BREAKPOINT,
         hasInitialHeroMarqueeProjects,
+        initialMarqueeSeed.length,
         initialNewestProjects.length,
         initialProjectSeed.length,
+        shouldFetchFallbackMarquee,
         shouldFetchFallbackProjects,
         shouldRefreshTrendingProjects,
         ssrData?.stats?.totalProjects
     ]);
 
     const validFeaturedProjects = useMemo(
-        () => projects.filter(isHeroMarqueeProject),
-        [projects]
+        () => marqueeProjects.filter(isHeroMarqueeProject),
+        [marqueeProjects]
     );
     const shouldReserveDesktopHeroMarquee = isHeroProjectsLoading || validFeaturedProjects.length > 0;
 
@@ -446,7 +463,7 @@ export const Home: React.FC<{
         DESKTOP_BREAKPOINT,
         DESKTOP_HERO_MIN_WIDTH_ENTER,
         DESKTOP_HERO_MIN_WIDTH_EXIT,
-        projects.length,
+        marqueeProjects.length,
         shouldReserveDesktopHeroMarquee,
         stats.totalDownloads,
         stats.totalProjects,

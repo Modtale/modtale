@@ -5,6 +5,9 @@ import java.util.Map;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.mapper.ProjectMapper;
 import net.modtale.model.dto.project.ProjectDTO;
+import net.modtale.model.dto.project.ProjectMarqueeDTO;
+import net.modtale.model.dto.project.ProjectPageDTO;
+import net.modtale.model.dto.project.ProjectVersionsDTO;
 import net.modtale.model.dto.project.ProjectSummaryDTO;
 import net.modtale.model.dto.request.project.UpdateProjectRequest;
 import net.modtale.model.project.Project;
@@ -125,12 +128,13 @@ class ProjectControllerTest {
                 "Favorites",
                 "30d",
                 "Ada",
+                "catalog",
                 null
         );
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals("no-cache", response.getHeaders().getCacheControl());
-        ProjectSummaryDTO dto = response.getBody().getContent().getFirst();
+        ProjectSummaryDTO dto = (ProjectSummaryDTO) response.getBody().getContent().getFirst();
         assertEquals("project-1", dto.id());
         assertEquals("Sky Tools", dto.title());
         verify(accountService).getCurrentUser((Authentication) null);
@@ -173,6 +177,7 @@ class ProjectControllerTest {
                 "Your Projects",
                 null,
                 "creator-name",
+                "catalog",
                 authentication
         );
 
@@ -232,11 +237,12 @@ class ProjectControllerTest {
                 "all",
                 "all",
                 null,
+                "catalog",
                 authentication
         );
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals("project-3", response.getBody().getContent().getFirst().id());
+        assertEquals("project-3", ((ProjectSummaryDTO) response.getBody().getContent().getFirst()).id());
         verify(accountService, never()).getCurrentUser(authentication);
         verify(projectResponseCacheService).searchPublicProjectSummaries(
                 eq(List.of("adventure", "tools")),
@@ -255,11 +261,81 @@ class ProjectControllerTest {
     }
 
     @Test
+    void getProjectsUsesMarqueeProjectionForPublicMarqueeViews() {
+        Page<ProjectMarqueeDTO> page = new PageImpl<>(List.of(ProjectMapper.toMarqueeDTO(project("project-4", "Hero Card", ProjectStatus.PUBLISHED))));
+
+        when(projectResponseCacheService.searchPublicProjectMarquee(
+                isNull(),
+                isNull(),
+                eq(0),
+                eq(16),
+                eq(ProjectSort.TRENDING),
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                eq(ProjectViewCategory.ALL),
+                isNull(),
+                isNull()
+        )).thenReturn(page);
+
+        var response = controller.getProjects(
+                null,
+                null,
+                0,
+                16,
+                "trending",
+                null,
+                null,
+                null,
+                null,
+                "all",
+                null,
+                null,
+                "marquee",
+                null
+        );
+
+        assertEquals(200, response.getStatusCode().value());
+        ProjectMarqueeDTO dto = (ProjectMarqueeDTO) response.getBody().getContent().getFirst();
+        assertEquals("project-4", dto.id());
+        assertEquals("Hero Card", dto.title());
+        verify(projectResponseCacheService).searchPublicProjectMarquee(
+                isNull(),
+                isNull(),
+                eq(0),
+                eq(16),
+                eq(ProjectSort.TRENDING),
+                isNull(),
+                isNull(),
+                isNull(),
+                isNull(),
+                eq(ProjectViewCategory.ALL),
+                isNull(),
+                isNull()
+        );
+        verify(projectResponseCacheService, never()).searchPublicProjectSummaries(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+        );
+    }
+
+    @Test
     void getProjectThrowsWhenViewerCannotResolveVisibleProject() {
         User currentUser = user("user-1", "ada");
         when(accountService.getCurrentUser((Authentication) null)).thenReturn(currentUser);
         when(permissionProjectLookupService.findProject("project-1")).thenReturn(project("project-1", "Sky Tools", ProjectStatus.PUBLISHED));
-        when(projectService.getProjectPageByRouteKey("project-1", currentUser)).thenReturn(null);
+        when(projectService.getProjectPageShellByRouteKey("project-1", currentUser)).thenReturn(null);
 
         assertThrows(ResourceNotFoundException.class, () -> controller.getProject("project-1", null));
     }
@@ -268,23 +344,23 @@ class ProjectControllerTest {
     void getProjectUsesCachedPublicProjectForSignedInReaders() {
         User currentUser = user("user-1", "ada");
         Project snapshot = project("project-1", "Sky Tools", ProjectStatus.PUBLISHED);
-        ProjectDTO cachedProject = ProjectMapper.toDTO(project("project-1", "Sky Tools", ProjectStatus.PUBLISHED), false);
+        ProjectPageDTO cachedProject = ProjectMapper.toPageDTO(project("project-1", "Sky Tools", ProjectStatus.PUBLISHED));
 
         when(accountService.getCurrentUser((Authentication) null)).thenReturn(currentUser);
         when(permissionProjectLookupService.findProject("project-1")).thenReturn(snapshot);
         when(accessControlService.isAdmin(currentUser)).thenReturn(false);
         when(accessControlService.hasEditPermission(snapshot, currentUser)).thenReturn(false);
         when(accessControlService.isPubliclyReadable(snapshot)).thenReturn(true);
-        when(projectResponseCacheService.getPublicProjectDtoByRouteKey("project-1")).thenReturn(cachedProject);
+        when(projectResponseCacheService.getPublicProjectPageDtoByRouteKey("project-1")).thenReturn(cachedProject);
 
         var response = controller.getProject("project-1", null);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals("project-1", response.getBody().getId());
+        assertEquals("project-1", response.getBody().id());
         assertTrue(response.getHeaders().getCacheControl().contains("max-age=300"));
         assertTrue(response.getHeaders().getCacheControl().contains("public"));
-        verify(projectResponseCacheService).getPublicProjectDtoByRouteKey("project-1");
-        verify(projectService, never()).getProjectPageByRouteKey("project-1", currentUser);
+        verify(projectResponseCacheService).getPublicProjectPageDtoByRouteKey("project-1");
+        verify(projectService, never()).getProjectPageShellByRouteKey("project-1", currentUser);
     }
 
     @Test
@@ -324,21 +400,74 @@ class ProjectControllerTest {
         when(permissionProjectLookupService.findProject("project-1")).thenReturn(project);
         when(accessControlService.isAdmin(currentUser)).thenReturn(false);
         when(accessControlService.isPubliclyReadable(project)).thenReturn(true);
-        when(projectService.getProjectPageByRouteKey("project-1", currentUser)).thenReturn(project);
+        when(projectService.getProjectPageShellByRouteKey("project-1", currentUser)).thenReturn(project);
         when(accessControlService.hasEditPermission(project, currentUser)).thenReturn(true);
         when(accessControlService.isOwner(project, currentUser)).thenReturn(false);
 
         var response = controller.getProject("project-1", null);
 
         assertEquals(200, response.getStatusCode().value());
+        ProjectPageDTO dto = assertInstanceOf(ProjectPageDTO.class, response.getBody());
+        assertEquals("project-1", dto.id());
+        assertTrue(dto.canEdit());
+        assertFalse(dto.isOwner());
+        assertEquals("no-cache", response.getHeaders().getCacheControl());
+    }
+
+    @Test
+    void getProjectDetailsKeepsFullProjectPayloadOnExplicitEndpoint() {
+        Project project = project("project-1", "Sky Tools", ProjectStatus.PUBLISHED);
+        ProjectVersion version = new ProjectVersion();
+        version.setId("version-1");
+        version.setVersionNumber("1.0.0");
+        version.setChangelog("Full details can still hydrate editor workflows.");
+        project.setVersions(List.of(version));
+        User currentUser = user("user-1", "ada");
+
+        when(accountService.getCurrentUser((Authentication) null)).thenReturn(currentUser);
+        when(permissionProjectLookupService.findProject("project-1")).thenReturn(project);
+        when(accessControlService.isAdmin(currentUser)).thenReturn(false);
+        when(accessControlService.isPubliclyReadable(project)).thenReturn(false);
+        when(accessControlService.hasEditPermission(project, currentUser)).thenReturn(true);
+        when(projectService.getProjectDetailsByRouteKey("project-1", currentUser)).thenReturn(project);
+
+        var response = controller.getProjectDetails("project-1", null);
+
+        assertEquals(200, response.getStatusCode().value());
         ProjectDTO dto = assertInstanceOf(ProjectDTO.class, response.getBody());
         assertEquals("project-1", dto.getId());
-        assertTrue(dto.isCanEdit());
-        assertFalse(dto.isOwner());
         assertEquals(1, dto.getVersions().size());
-        assertEquals("version-1", dto.getVersions().getFirst().getId());
         assertEquals(null, dto.getVersions().getFirst().getChangelog());
         assertEquals("no-cache", response.getHeaders().getCacheControl());
+        verify(projectService).getProjectDetailsByRouteKey("project-1", currentUser);
+    }
+
+    @Test
+    void getProjectVersionsUsesVersionSliceWithoutChangelogs() {
+        Project project = project("project-1", "Sky Tools", ProjectStatus.PUBLISHED);
+        ProjectVersion version = new ProjectVersion();
+        version.setId("version-1");
+        version.setVersionNumber("1.0.0");
+        version.setChangelog("Large changelog body");
+        project.setVersions(List.of(version));
+        User currentUser = user("user-1", "ada");
+
+        when(accountService.getCurrentUser((Authentication) null)).thenReturn(currentUser);
+        when(permissionProjectLookupService.findProject("project-1")).thenReturn(project);
+        when(accessControlService.isAdmin(currentUser)).thenReturn(false);
+        when(accessControlService.isPubliclyReadable(project)).thenReturn(false);
+        when(accessControlService.hasEditPermission(project, currentUser)).thenReturn(true);
+        when(projectService.getProjectVersionsByRouteKey("project-1", currentUser)).thenReturn(project);
+
+        var response = controller.getProjectVersions("project-1", null);
+
+        assertEquals(200, response.getStatusCode().value());
+        ProjectVersionsDTO dto = assertInstanceOf(ProjectVersionsDTO.class, response.getBody());
+        assertEquals(1, dto.versions().size());
+        assertEquals("version-1", dto.versions().getFirst().getId());
+        assertEquals(null, dto.versions().getFirst().getChangelog());
+        verify(projectService).getProjectVersionsByRouteKey("project-1", currentUser);
+        verify(projectService, never()).getProjectDetailsByRouteKey("project-1", currentUser);
     }
 
     @Test
@@ -346,7 +475,7 @@ class ProjectControllerTest {
         Project project = project("project-1", "Sky Tools", ProjectStatus.PUBLISHED);
 
         when(accountService.getCurrentUser((Authentication) null)).thenReturn(null);
-        when(projectResponseCacheService.getPublicProjectDtoByRouteKey("project-1")).thenReturn(ProjectMapper.toDTO(project, false));
+        when(projectResponseCacheService.getPublicProjectPageDtoByRouteKey("project-1")).thenReturn(ProjectMapper.toPageDTO(project));
 
         var response = controller.getProject("project-1", null);
 
@@ -361,15 +490,15 @@ class ProjectControllerTest {
         project.setSlug("levelingcore");
 
         when(accountService.getCurrentUser((Authentication) null)).thenReturn(null);
-        when(projectResponseCacheService.getPublicProjectDtoByRouteKey("levelingcore")).thenReturn(ProjectMapper.toDTO(project, false));
+        when(projectResponseCacheService.getPublicProjectPageDtoByRouteKey("levelingcore")).thenReturn(ProjectMapper.toPageDTO(project));
 
         var response = controller.getProject("levelingcore", null);
 
         assertEquals(200, response.getStatusCode().value());
         assertTrue(response.getHeaders().getCacheControl().contains("max-age=300"));
         assertTrue(response.getHeaders().getCacheControl().contains("public"));
-        ProjectDTO dto = assertInstanceOf(ProjectDTO.class, response.getBody());
-        assertEquals("levelingcore", dto.getSlug());
+        ProjectPageDTO dto = assertInstanceOf(ProjectPageDTO.class, response.getBody());
+        assertEquals("levelingcore", dto.slug());
     }
 
     @Test

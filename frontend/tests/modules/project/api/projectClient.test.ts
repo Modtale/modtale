@@ -26,6 +26,38 @@ describe('projectClient', () => {
         expect(mockedApi.get).toHaveBeenCalledWith('/projects/project-1');
     });
 
+    it('fetches full project details from the explicit details endpoint', async () => {
+        mockedApi.get.mockResolvedValueOnce({ data: { id: 'project-1', versions: [{ id: 'v1' }] } } as any);
+
+        await expect(projectClient.getProjectFull('project-1')).resolves.toEqual({ id: 'project-1', versions: [{ id: 'v1' }] });
+
+        expect(mockedApi.get).toHaveBeenCalledWith('/projects/project-1/details');
+    });
+
+    it('fetches project versions from the version slice', async () => {
+        mockedApi.get.mockResolvedValueOnce({ data: { versions: [{ id: 'version-1' }] } } as any);
+
+        await expect(projectClient.getProjectVersions('project-1')).resolves.toEqual([{ id: 'version-1' }]);
+
+        expect(mockedApi.get).toHaveBeenCalledWith('/projects/project-1/versions');
+    });
+
+    it('fetches gallery and team slices independently', async () => {
+        mockedApi.get
+            .mockResolvedValueOnce({ data: { galleryImages: ['one.png'] } } as any)
+            .mockResolvedValueOnce({ data: { projectRoles: [{ id: 'role-1' }], teamMembers: [{ userId: 'u1' }], teamInvites: [{ userId: 'u2' }] } } as any);
+
+        await expect(projectClient.getProjectGallery('project-1')).resolves.toEqual(['one.png']);
+        await expect(projectClient.getProjectTeam('project-1')).resolves.toEqual({
+            projectRoles: [{ id: 'role-1' }],
+            teamMembers: [{ userId: 'u1' }],
+            teamInvites: [{ userId: 'u2' }]
+        });
+
+        expect(mockedApi.get).toHaveBeenNthCalledWith(1, '/projects/project-1/gallery');
+        expect(mockedApi.get).toHaveBeenNthCalledWith(2, '/projects/project-1/team');
+    });
+
     it('fetches version changelogs separately', async () => {
         const changelogs = [{ id: 'version-1', versionNumber: '1.0.0', changelog: 'Changed things.' }];
         mockedApi.get.mockResolvedValueOnce({ data: changelogs } as any);
@@ -41,6 +73,9 @@ describe('projectClient', () => {
 
         mockedApi.get.mockResolvedValueOnce({ data: {} } as any);
         await expect(projectClient.getComments('project-1')).resolves.toEqual([]);
+
+        expect(mockedApi.get).toHaveBeenNthCalledWith(1, '/projects/project-1/comments');
+        expect(mockedApi.get).toHaveBeenNthCalledWith(2, '/projects/project-1/comments');
     });
 
     it('uses the correct vote endpoints for comments and replies', async () => {

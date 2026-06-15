@@ -176,13 +176,14 @@ export const Analytics: React.FC = () => {
                 } else {
                     const [analytics, info] = await Promise.all([
                         api.get(`/projects/${id}/analytics?range=${range}`),
-                        api.get(`/projects/${id}`)
+                        api.get(`/projects/${id}/details`)
                     ]).then(r => [r[0].data, r[1].data as Project]);
                     const versionDownloads = normalizeSeriesMap(analytics?.versionDownloads);
                     const views = normalizePointSeries(analytics?.views);
                     setMeta({ title: info.title, subtitle: "Project Performance & Reach" });
 
-                    const vMap = new Map(info.versions.map((v: { id: any; }) => [v.id, v]));
+                    const versions = info.versions || [];
+                    const vMap = new Map(versions.map((v: { id: any; }) => [v.id, v]));
                     setSeriesData(versionDownloads);
                     setViewsData({ 'overall': views });
                     setItems(Object.keys(versionDownloads).sort((a, b) => {
@@ -192,7 +193,7 @@ export const Analytics: React.FC = () => {
                     }));
 
                     const vMeta: Record<string, any> = {};
-                    info.versions.forEach((v: { id: string | number; versionNumber: any; gameVersions: any[]; releaseDate: any; downloadCount: any; }) => vMeta[v.id] = {
+                    versions.forEach((v: { id: string | number; versionNumber: any; gameVersions: any[]; releaseDate: any; downloadCount: any; }) => vMeta[v.id] = {
                         label: v.versionNumber,
                         gameVer: v.gameVersions?.join(', ') || 'Unknown',
                         date: v.releaseDate,
@@ -206,7 +207,7 @@ export const Analytics: React.FC = () => {
                         downloads: { value: analytics.totalDownloads, total: info.downloadCount, trend: 0 },
                         views: { value: analytics.totalViews, total: analytics.totalViews, trend: 0 },
                         conversion: analytics.totalViews > 0 ? (analytics.totalDownloads / analytics.totalViews) * 100 : 0,
-                        contentCount: { value: info.versions.length, label: "Versions" }
+                        contentCount: { value: versions.length, label: "Versions" }
                     });
 
                     setTableConfig({

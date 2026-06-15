@@ -31,6 +31,7 @@ const consumeProjectBootstrap = async (routeKey: string) => {
 interface UseProjectDetailOptions {
     backgroundRefresh?: boolean;
     hydrateChangelogs?: boolean;
+    full?: boolean;
 }
 
 export const useProjectDetail = (
@@ -39,7 +40,7 @@ export const useProjectDetail = (
     currentUser: User | null,
     options: UseProjectDetailOptions = {}
 ) => {
-    const { backgroundRefresh = false, hydrateChangelogs = false } = options;
+    const { backgroundRefresh = false, hydrateChangelogs = false, full = false } = options;
     const routeKey = rawId?.trim() || '';
 
     const isInitialDataValid = initialData && SiteRoutes.matchesProjectRoute(initialData, routeKey);
@@ -57,6 +58,10 @@ export const useProjectDetail = (
     const fetchedDepMeta = useRef<Set<string>>(new Set());
     const fetchedTeamDataKey = useRef('');
     const fetchedChangelogKey = useRef('');
+    const fetchedVersionsKey = useRef('');
+    const fetchedGalleryKey = useRef('');
+    const fetchedProjectTeamKey = useRef('');
+    const fetchedCommentsKey = useRef('');
 
     useEffect(() => {
         if (!isInitialDataValid) {
@@ -68,6 +73,10 @@ export const useProjectDetail = (
             analyticsFired.current = false;
             fetchedTeamDataKey.current = '';
             fetchedChangelogKey.current = '';
+            fetchedVersionsKey.current = '';
+            fetchedGalleryKey.current = '';
+            fetchedProjectTeamKey.current = '';
+            fetchedCommentsKey.current = '';
         }
     }, [routeKey, isInitialDataValid]);
 
@@ -92,8 +101,8 @@ export const useProjectDetail = (
                     setLoading(false);
                 }
 
-                const bootstrapped = await consumeProjectBootstrap(routeKey);
-                const data = bootstrapped || await projectClient.getProject(routeKey);
+                const bootstrapped = full ? null : await consumeProjectBootstrap(routeKey);
+                const data = bootstrapped || (full ? await projectClient.getProjectFull(routeKey) : await projectClient.getProject(routeKey));
                 if (isMounted) setProject(data);
             } catch {
                 if (isMounted && !projectMatchesRoute) setIsNotFound(true);
@@ -105,7 +114,98 @@ export const useProjectDetail = (
         loadProject();
 
         return () => { isMounted = false; };
-    }, [routeKey, project?.id, backgroundRefresh]);
+    }, [routeKey, project?.id, backgroundRefresh, full]);
+
+    useEffect(() => {
+        if (full || !project?.id) return;
+
+        const sectionKey = `${project.id}:${routeKey || project.id}`;
+        if (fetchedVersionsKey.current === sectionKey) return;
+
+        let isMounted = true;
+        fetchedVersionsKey.current = sectionKey;
+
+        projectClient.getProjectVersions(routeKey || project.id)
+            .then((versions) => {
+                if (!isMounted) return;
+                setProject((previous) => previous && previous.id === project.id ? { ...previous, versions } : previous);
+            })
+            .catch(() => {
+                if (isMounted) fetchedVersionsKey.current = '';
+            });
+
+        return () => { isMounted = false; };
+    }, [full, project?.id, routeKey]);
+
+    useEffect(() => {
+        if (full || !project?.id) return;
+
+        const sectionKey = `${project.id}:${routeKey || project.id}`;
+        if (fetchedGalleryKey.current === sectionKey) return;
+
+        let isMounted = true;
+        fetchedGalleryKey.current = sectionKey;
+
+        projectClient.getProjectGallery(routeKey || project.id)
+            .then((galleryImages) => {
+                if (!isMounted) return;
+                setProject((previous) => previous && previous.id === project.id ? { ...previous, galleryImages } : previous);
+            })
+            .catch(() => {
+                if (isMounted) fetchedGalleryKey.current = '';
+            });
+
+        return () => { isMounted = false; };
+    }, [full, project?.id, routeKey]);
+
+    useEffect(() => {
+        if (full || !project?.id) return;
+
+        const sectionKey = `${project.id}:${routeKey || project.id}`;
+        if (fetchedProjectTeamKey.current === sectionKey) return;
+
+        let isMounted = true;
+        fetchedProjectTeamKey.current = sectionKey;
+
+        projectClient.getProjectTeam(routeKey || project.id)
+            .then((team) => {
+                if (!isMounted) return;
+                setProject((previous) => previous && previous.id === project.id
+                    ? {
+                        ...previous,
+                        projectRoles: team.projectRoles,
+                        teamMembers: team.teamMembers,
+                        teamInvites: team.teamInvites
+                    }
+                    : previous);
+            })
+            .catch(() => {
+                if (isMounted) fetchedProjectTeamKey.current = '';
+            });
+
+        return () => { isMounted = false; };
+    }, [full, project?.id, routeKey]);
+
+    useEffect(() => {
+        if (full || !project?.id) return;
+
+        const sectionKey = `${project.id}:${routeKey || project.id}`;
+        if (fetchedCommentsKey.current === sectionKey) return;
+
+        let isMounted = true;
+        fetchedCommentsKey.current = sectionKey;
+
+        projectClient.getComments(routeKey || project.id)
+            .then((comments) => {
+                if (!isMounted) return;
+                setProject((previous) => previous && previous.id === project.id ? { ...previous, comments } : previous);
+            })
+            .catch(() => {
+                if (isMounted) fetchedCommentsKey.current = '';
+            });
+
+        return () => { isMounted = false; };
+    }, [full, project?.id, routeKey]);
 
     useEffect(() => {
         if (project?.id && !analyticsFired.current) {
