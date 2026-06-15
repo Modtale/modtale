@@ -20,7 +20,9 @@ import {
 import { GLOBAL_TAGS } from '@/data/categories';
 import { projectClient } from '@/modules/project/api/projectClient';
 import { compareSemVer } from '@/utils/modHelpers';
+import { DropdownSelect } from '@/components/ui/DropdownSelect';
 import { SortDropdown } from './SortDropdown';
+import { BROWSE_ITEMS_PER_PAGE_OPTIONS, type BrowseViewStyle } from '../preferences';
 
 const CalendarWidget = ({ selectedDate, onSelect }: { selectedDate: Date | null, onSelect: (date: Date) => void }) => {
     const [viewDate, setViewDate] = useState(selectedDate || new Date());
@@ -192,8 +194,10 @@ export interface BrowseFiltersProps {
     setFilterDate: (d: string | null) => void;
     setPage: (p: number) => void;
     isMobile: boolean;
-    viewStyle: 'grid' | 'list' | 'compact';
-    onViewStyleChange: (style: 'grid' | 'list' | 'compact') => void;
+    viewStyle: BrowseViewStyle;
+    onViewStyleChange: (style: BrowseViewStyle) => void;
+    itemsPerPage: number;
+    onItemsPerPageChange: (size: number) => void;
     isScrolled: boolean;
 }
 
@@ -202,7 +206,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                                                                            selectedTags, onToggleTag, onClearTags, onResetFilters,
                                                                            isFilterOpen, onToggleFilterMenu, searchTerm, onSearchChange,
                                                                            selectedVersion, setSelectedVersion, minFavorites, setMinFavorites, minDownloads, setMinDownloads, filterDate, setFilterDate,
-                                                                           isMobile, viewStyle, onViewStyleChange, isScrolled
+                                                                           isMobile, viewStyle, onViewStyleChange, itemsPerPage, onItemsPerPageChange, isScrolled
                                                                        }) => {
     const [isTagsOpen, setIsTagsOpen] = useState(false);
     const tagRef = useRef<HTMLDivElement>(null);
@@ -336,6 +340,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
         setShowCalendar(false);
     };
     const displayFilterCount = [selectedVersions.length > 0, minFavorites > 0, minDownloads > 0, (filterDate !== null && !isDownloadSort)].filter(Boolean).length;
+    const resultCountLabel = totalItems === 1 ? '1 result' : `${totalItems.toLocaleString()} results`;
 
     const filterMenuBody = (
         <div className="space-y-5">
@@ -433,7 +438,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                     <div className="flex items-center gap-4 min-w-0 flex-1">
                         {categoryPills ? <div className="min-w-0 max-w-full">{categoryPills}</div> : <div className="hidden lg:block shrink-0 min-w-0"><h1 className="text-xl lg:text-2xl font-black text-slate-900 dark:text-white flex items-center gap-2 drop-shadow-sm truncate">{pageTitle}</h1></div>}
                         <div className="hidden 2xl:block shrink-0 border-l border-slate-200 dark:border-white/10 pl-4">
-                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide block drop-shadow-sm whitespace-nowrap">{loading ? 'Searching...' : `${totalItems.toLocaleString()} Results`}</span>
+                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 tracking-wide block drop-shadow-sm whitespace-nowrap">{loading ? 'Searching...' : resultCountLabel}</span>
                         </div>
                     </div>
                     <div className="flex flex-wrap lg:flex-nowrap items-center justify-start lg:justify-end gap-2 w-full lg:w-auto shrink-0 mt-1 lg:mt-0">
@@ -446,6 +451,22 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                                 </button>
                             ))}
                         </div>
+                        <DropdownSelect
+                            value={String(itemsPerPage)}
+                            onChange={(value) => onItemsPerPageChange(Number(value))}
+                            onOpen={() => setIsTagsOpen(false)}
+                            options={BROWSE_ITEMS_PER_PAGE_OPTIONS.map(size => ({
+                                value: String(size),
+                                label: `${size} per page`
+                            }))}
+                            placeholder="Per page"
+                            containerClassName="relative flex-1 lg:flex-none h-10 w-full lg:w-auto"
+                            buttonLabel={<span className="inline-flex items-center gap-1.5"><List className="w-3.5 h-3.5" />{itemsPerPage}/page</span>}
+                            buttonClassName="w-full lg:w-auto h-full flex items-center justify-center lg:justify-between gap-1.5 border rounded-xl px-3 text-xs font-bold transition-all whitespace-nowrap lg:min-w-[104px] bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm"
+                            menuAlign="right"
+                            menuClassName="w-40 max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl py-2 z-[70] animate-in fade-in zoom-in-95 duration-200 overflow-hidden"
+                            optionClassName="w-full text-left px-4 py-2.5 text-sm font-bold flex justify-between items-center transition-colors text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
+                        />
                         <div className="relative flex-1 lg:flex-none h-10" ref={tagRef}>
                             <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsTagsOpen(!isTagsOpen); if(isFilterOpen) onToggleFilterMenu(); }} className={`w-full lg:w-auto h-full flex items-center justify-center lg:justify-start gap-1.5 border rounded-xl px-3 text-xs font-bold transition-all whitespace-nowrap ${selectedTags.length > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
                                 <div className="flex items-center gap-1.5 pointer-events-none"><Tag className="w-3.5 h-3.5" /> <span>Tags</span></div>
