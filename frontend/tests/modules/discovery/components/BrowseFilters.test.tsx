@@ -21,7 +21,7 @@ const settle = async (times = 4) => {
     }
 };
 
-const renderFilters = (isFilterOpen: boolean) => (
+const renderFilters = (isFilterOpen: boolean, selectedVersion = 'Any', setSelectedVersion = vi.fn(), onResetFilters = vi.fn()) => (
     <BrowseFilters
         pageTitle="All Projects"
         totalItems={12}
@@ -32,13 +32,13 @@ const renderFilters = (isFilterOpen: boolean) => (
         onToggleTag={vi.fn()}
         onClearTags={vi.fn()}
         activeFilterCount={0}
-        onResetFilters={vi.fn()}
+        onResetFilters={onResetFilters}
         isFilterOpen={isFilterOpen}
         onToggleFilterMenu={vi.fn()}
         searchTerm=""
         onSearchChange={vi.fn()}
-        selectedVersion="Any"
-        setSelectedVersion={vi.fn()}
+        selectedVersion={selectedVersion}
+        setSelectedVersion={setSelectedVersion}
         minFavorites={0}
         setMinFavorites={vi.fn()}
         minDownloads={0}
@@ -93,5 +93,28 @@ describe('BrowseFilters performance behavior', () => {
         await settle();
 
         expect(mockedProjectClient.getMetaGameVersionCatalog).toHaveBeenCalledTimes(1);
+    });
+
+    it("reselects Any when filters are reset", async () => {
+        const setSelectedVersion = vi.fn();
+        const onResetFilters = vi.fn();
+
+        await act(async () => {
+            root.render(renderFilters(true, '2026.03.11', setSelectedVersion, onResetFilters));
+        });
+        await settle();
+
+        const resetButton = Array.from(container.querySelectorAll('button')).find(
+            (button) => button.textContent?.includes('Reset Filters')
+        );
+
+        expect(resetButton).toBeTruthy();
+
+        await act(async () => {
+            resetButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onResetFilters).toHaveBeenCalledTimes(1);
+        expect(setSelectedVersion).toHaveBeenCalledWith('Any');
     });
 });
