@@ -24,6 +24,7 @@ export type VersionFormData = {
     file: File | null;
     dependencies: string[];
     modIds: any[];
+    replaceExisting?: boolean;
 };
 
 export const Label = ({ children, required, className }: { children: React.ReactNode, required?: boolean, className?: string }) => (

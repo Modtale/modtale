@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { UploadCloud, Edit2, Trash2 } from 'lucide-react';
+import { AlertTriangle, UploadCloud, Edit2, Trash2 } from 'lucide-react';
 import { VersionFields } from '../components/VersionFields';
 import { Spinner } from '../../../components/ui/Spinner';
 import { theme } from '../../../styles/theme';
@@ -8,6 +8,24 @@ import type { VersionFormData } from '../components/FormShared';
 import { Permission } from '@/modules/permissions/permissions';
 import { compareSemVer } from '@/utils/modHelpers';
 import { parseDependencyEntry, serializeProjectDependency } from '../utils/dependencyEntries';
+
+const normalizeVersionKey = (value: string) => value.trim().toLowerCase();
+
+const getVersionGameVersions = (version: ProjectVersion) => (
+    version.gameVersions || (version.gameVersion ? [version.gameVersion] : [])
+);
+
+const gameVersionsOverlap = (existingGameVersions: string[], requestedGameVersions: string[]) => {
+    if (!existingGameVersions.length || !requestedGameVersions.length) return true;
+    const requested = new Set(requestedGameVersions.map(normalizeVersionKey));
+    return existingGameVersions.some(gameVersion => requested.has(normalizeVersionKey(gameVersion)));
+};
+
+const getOverlappingGameVersions = (existingGameVersions: string[], requestedGameVersions: string[]) => {
+    if (!existingGameVersions.length || !requestedGameVersions.length) return requestedGameVersions;
+    const existing = new Set(existingGameVersions.map(normalizeVersionKey));
+    return requestedGameVersions.filter(gameVersion => existing.has(normalizeVersionKey(gameVersion)));
+};
 
 interface FilesProps {
     projectData: Project | null;
@@ -31,10 +49,29 @@ export const Files: React.FC<FilesProps> = ({ projectData, versionData, setVersi
         : null;
     const canReuseLatestSetup = Boolean(latestVersion) && !readOnly && hasProjectPermission(Permission.VERSION_CREATE) && !reuseLatestSetupDismissed;
     const hasSelectedDependencies = (versionData.projectIds || []).length > 0;
+    const selectedVersionNumber = versionData.versionNumber.trim();
+    const selectedGameVersions = versionData.gameVersions || [];
+    const overlappingExistingVersions = (projectData?.versions || []).filter(version =>
+        gameVersionsOverlap(getVersionGameVersions(version), selectedGameVersions)
+    );
+    const replacementTargets = overlappingExistingVersions.filter(version =>
+        selectedVersionNumber.length > 0 && normalizeVersionKey(version.versionNumber || '') === normalizeVersionKey(selectedVersionNumber)
+    );
+    const canReplaceExistingVersion = replacementTargets.length > 0;
+    const replacementTargetGameVersions = Array.from(new Set(replacementTargets.flatMap(version =>
+        getOverlappingGameVersions(getVersionGameVersions(version), selectedGameVersions)
+    ))).join(', ');
+    const replacementCheckboxId = projectData?.id ? `replace-existing-version-${projectData.id}` : 'replace-existing-version';
 
     useEffect(() => {
         setReuseLatestSetupDismissed(false);
     }, [projectData?.id, latestVersion?.id]);
+
+    useEffect(() => {
+        if (!canReplaceExistingVersion && versionData.replaceExisting) {
+            setVersionData(prev => ({ ...prev, replaceExisting: false }));
+        }
+    }, [canReplaceExistingVersion, setVersionData, versionData.replaceExisting]);
 
     const handleReuseLatestSetup = () => {
         if (!latestVersion) return;
@@ -51,7 +88,8 @@ export const Files: React.FC<FilesProps> = ({ projectData, versionData, setVersi
             gameVersions: latestVersion.gameVersions || (latestVersion.gameVersion ? [latestVersion.gameVersion] : prev.gameVersions),
             channel: latestVersion.channel || prev.channel || 'RELEASE',
             projectIds: [...nextDependencyEntries, ...preservedEntries],
-            incompatibleProjectIds: [...nextIncompatibleIds, ...preservedIncompatibles]
+            incompatibleProjectIds: [...nextIncompatibleIds, ...preservedIncompatibles],
+            replaceExisting: false
         }));
         setReuseLatestSetupDismissed(true);
     };
@@ -78,11 +116,31 @@ export const Files: React.FC<FilesProps> = ({ projectData, versionData, setVersi
                         onChange={setVersionData}
                         isModpack={classification === 'MODPACK'}
                         projectType={typeof classification === 'string' ? classification : 'PLUGIN'}
-                        existingVersions={(projectData?.versions || []).map((version) => version.versionNumber)}
+                        existingVersions={versionData.replaceExisting ? [] : overlappingExistingVersions.map((version) => version.versionNumber)}
                         previousDependencies={!hasSelectedDependencies ? latestVersion?.dependencies || [] : undefined}
                         currentProjectId={projectData?.id}
                         disabled={readOnly}
                     />
+                    {canReplaceExistingVersion && (
+                        <div className={`mt-6 flex items-start gap-3 rounded-xl border ${theme.colors.warningBorder} ${theme.colors.warningBg} p-4`}>
+                            <input
+                                id={replacementCheckboxId}
+                                type="checkbox"
+                                checked={versionData.replaceExisting === true}
+                                onChange={() => setVersionData(prev => ({ ...prev, replaceExisting: prev.replaceExisting !== true }))}
+                                className="mt-1 h-4 w-4 rounded border-amber-400 text-modtale-accent focus:ring-modtale-accent"
+                            />
+                            <label htmlFor={replacementCheckboxId} className="min-w-0 cursor-pointer">
+                                <span className={`flex items-center gap-2 text-sm font-bold ${theme.colors.textPrimary}`}>
+                                    <AlertTriangle className={`h-4 w-4 ${theme.colors.warningText}`} />
+                                    Replace existing version
+                                </span>
+                                <span className={`mt-1 block text-xs ${theme.colors.textSecondary}`}>
+                                    This will replace v{selectedVersionNumber}{replacementTargetGameVersions ? ` for ${replacementTargetGameVersions}` : ''} and send the upload through review again.
+                                </span>
+                            </label>
+                        </div>
+                    )}
                     <div className="mt-6 flex justify-end">
                         <button type="button" onClick={handleUploadVersion} disabled={isLoading || readOnly} className={theme.components.buttonPrimary}>
                             {isLoading ? <Spinner className="w-5 h-5"/> : <UploadCloud className="w-5 h-5" />} Upload Version

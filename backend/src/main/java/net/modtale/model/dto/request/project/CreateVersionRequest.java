@@ -20,6 +20,7 @@ public class CreateVersionRequest {
     private String changelog;
 
     private ProjectVersion.Channel channel = ProjectVersion.Channel.RELEASE;
+    private boolean replaceExisting;
 
     public String getVersionNumber() {
         return versionNumber;
@@ -75,5 +76,13 @@ public class CreateVersionRequest {
 
     public void setChannel(ProjectVersion.Channel channel) {
         this.channel = channel;
+    }
+
+    public boolean isReplaceExisting() {
+        return replaceExisting;
+    }
+
+    public void setReplaceExisting(boolean replaceExisting) {
+        this.replaceExisting = replaceExisting;
     }
 }

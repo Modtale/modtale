@@ -96,7 +96,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
 
     const versionNum = data.versionNumber.trim();
     const isFormatValid = STRICT_VERSION_REGEX.test(versionNum);
-    const isDuplicate = existingVersions.includes(versionNum);
+    const isDuplicate = existingVersions.some(existingVersion => existingVersion.toLowerCase() === versionNum.toLowerCase());
     const isValid = versionNum.length > 0 && isFormatValid && !isDuplicate;
     const allowsAutoSwitch = projectType === 'PLUGIN' || projectType === 'DATA' || projectType === 'ART';
 
