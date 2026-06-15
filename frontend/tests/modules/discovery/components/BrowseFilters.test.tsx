@@ -214,7 +214,7 @@ describe('BrowseFilters performance behavior', () => {
         });
 
         const pageSizeButton = Array.from(container.querySelectorAll('button')).find(
-            (button) => button.textContent?.includes('12/page')
+            (button) => button.getAttribute('aria-label') === 'Results per page'
         );
 
         expect(pageSizeButton).toBeTruthy();
@@ -228,22 +228,21 @@ describe('BrowseFilters performance behavior', () => {
             .filter(Boolean);
 
         expect(optionLabels).toEqual(expect.arrayContaining([
-            '6 per page',
-            '12 per page',
-            '18 per page',
-            '24 per page',
-            '36 per page',
-            '48 per page'
+            '6',
+            '12',
+            '24',
+            '48',
+            '96'
         ]));
 
         const option = Array.from(container.querySelectorAll('button')).find(
-            (button) => button.textContent?.includes('24 per page')
+            (button) => button.textContent?.trim() === '96'
         );
 
         await act(async () => {
             option?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         });
 
-        expect(onItemsPerPageChange).toHaveBeenCalledWith(24);
+        expect(onItemsPerPageChange).toHaveBeenCalledWith(96);
     });
 });

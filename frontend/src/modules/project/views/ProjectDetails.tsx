@@ -40,6 +40,7 @@ const DownloadModal = lazy(() => import('../components/dialogs/DownloadModal').t
 const DependencyModal = lazy(() => import('../components/dialogs/DependencyModal').then((module) => ({ default: module.DependencyModal })));
 const Wiki = lazy(() => import('../tabs/Wiki').then((module) => ({ default: module.Wiki })));
 const WikiSidebar = lazy(() => import('../components/HMWiki').then((module) => ({ default: module.WikiSidebar })));
+const WikiMobileNavigation = lazy(() => import('../components/HMWiki').then((module) => ({ default: module.WikiMobileNavigation })));
 
 interface ProjectDetailViewProps {
     currentUser: User | null;
@@ -108,6 +109,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const [displayWikiData, setDisplayWikiData] = useState(wikiData);
     const [displaySlug, setDisplaySlug] = useState(wikiPageSlug);
     const wikiContentRef = useRef<HTMLDivElement>(null);
+    const pendingMobileWikiScrollRef = useRef(false);
     const [lockedHeight, setLockedHeight] = useState<number | undefined>(undefined);
 
     const prevPathnameRef = useRef(location.pathname);
@@ -221,7 +223,17 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     useEffect(() => {
         if (prevPathnameRef.current.includes('/wiki') && isWikiRoute && prevPathnameRef.current !== location.pathname) {
-            window.scrollTo(0, scrollPosRef.current);
+            if (pendingMobileWikiScrollRef.current) {
+                pendingMobileWikiScrollRef.current = false;
+                window.requestAnimationFrame(() => {
+                    const targetTop = wikiContentRef.current
+                        ? wikiContentRef.current.getBoundingClientRect().top + window.scrollY - 16
+                        : 0;
+                    window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+                });
+            } else {
+                window.scrollTo(0, scrollPosRef.current);
+            }
         }
         prevPathnameRef.current = location.pathname;
     }, [location.pathname, isWikiRoute]);
@@ -325,6 +337,12 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         });
         onToggleFavorite(project.id);
     }, [isLiked, onToggleFavorite, project, setProject]);
+
+    const handleMobileWikiNavigate = useCallback((slug: string) => {
+        if (!projectUrl) return;
+        pendingMobileWikiScrollRef.current = true;
+        navigate(`${projectUrl}/wiki/${slug}`);
+    }, [navigate, projectUrl]);
 
     const sanitizeDownloadName = (input: string) => input.replace(/[^a-zA-Z0-9.-]/g, '_');
 
@@ -603,6 +621,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 mainContent={
                     isWikiRoute ? (
                         <Suspense fallback={<div className="flex justify-center p-12"><Spinner /></div>}>
+                            <WikiMobileNavigation tree={displayWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={displaySlug} indexSlug={displayWikiData?.mod?.index?.slug} onNavigate={handleMobileWikiNavigate} pageCache={displayWikiData?.pageCache} />
                             <Wiki wikiLoading={wikiLoading} wikiError={wikiError} displayWikiData={displayWikiData} displaySlug={displaySlug} project={project} wikiContentRef={wikiContentRef} lockedHeight={lockedHeight} />
                         </Suspense>
                     ) : (
