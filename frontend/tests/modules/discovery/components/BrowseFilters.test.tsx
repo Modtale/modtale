@@ -53,6 +53,18 @@ const renderFilters = (isFilterOpen: boolean, selectedVersion = 'Any', setSelect
     />
 );
 
+const openGameVersionDropdown = async (container: HTMLDivElement) => {
+    const dropdownButton = Array.from(container.querySelectorAll('button')).find(
+        (button) => button.getAttribute('aria-label') === 'Game version filter'
+    );
+
+    expect(dropdownButton).toBeTruthy();
+
+    await act(async () => {
+        dropdownButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+};
+
 describe('BrowseFilters performance behavior', () => {
     let container: HTMLDivElement;
     let root: Root;
@@ -63,12 +75,12 @@ describe('BrowseFilters performance behavior', () => {
         root = createRoot(container);
         vi.clearAllMocks();
         mockedProjectClient.getMetaGameVersionCatalog.mockResolvedValue({
-            orderedVersions: ['2026.03.11'],
-            allVersions: ['2026.03.11'],
-            releaseVersions: ['2026.03.11'],
-            preReleaseVersions: []
+            orderedVersions: ['2026.03.11', '0.6.0', '0.5.4', '0.5.3', '0.5.2-pre.1'],
+            allVersions: ['2026.03.11', '0.6.0', '0.5.4', '0.5.3', '0.5.2-pre.1'],
+            releaseVersions: ['2026.03.11', '0.6.0', '0.5.4', '0.5.3'],
+            preReleaseVersions: ['0.5.2-pre.1']
         } as any);
-        mockedProjectClient.getProjectGameVersions.mockResolvedValue(['2026.03.11'] as any);
+        mockedProjectClient.getProjectGameVersions.mockResolvedValue(['2026.03.11', '0.6.0', '0.5.4', '0.5.3'] as any);
     });
 
     afterEach(async () => {
@@ -109,6 +121,7 @@ describe('BrowseFilters performance behavior', () => {
         );
 
         expect(resetButton).toBeTruthy();
+        setSelectedVersion.mockClear();
 
         await act(async () => {
             resetButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -116,5 +129,49 @@ describe('BrowseFilters performance behavior', () => {
 
         expect(onResetFilters).toHaveBeenCalledTimes(1);
         expect(setSelectedVersion).toHaveBeenCalledWith('Any');
+    });
+
+    it('adds individual game versions to the active filter', async () => {
+        const setSelectedVersion = vi.fn();
+
+        await act(async () => {
+            root.render(renderFilters(true, '0.5.4', setSelectedVersion));
+        });
+        await settle();
+        await openGameVersionDropdown(container);
+
+        const versionButton = Array.from(container.querySelectorAll('button')).find(
+            (button) => button.textContent?.trim() === '0.5.3'
+        );
+
+        expect(versionButton).toBeTruthy();
+
+        await act(async () => {
+            versionButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(setSelectedVersion).toHaveBeenCalledWith('0.5.4,0.5.3');
+    });
+
+    it('selects a whole minor version range from the quick range button', async () => {
+        const setSelectedVersion = vi.fn();
+
+        await act(async () => {
+            root.render(renderFilters(true, 'Any', setSelectedVersion));
+        });
+        await settle();
+        await openGameVersionDropdown(container);
+
+        const rangeButton = Array.from(container.querySelectorAll('button')).find(
+            (button) => button.textContent?.trim() === '0.5.x'
+        );
+
+        expect(rangeButton).toBeTruthy();
+
+        await act(async () => {
+            rangeButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(setSelectedVersion).toHaveBeenCalledWith('0.5.4,0.5.3');
     });
 });

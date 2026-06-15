@@ -52,25 +52,116 @@ const CalendarWidget = ({ selectedDate, onSelect }: { selectedDate: Date | null,
     );
 };
 
-const FilterDropdown = ({
-    label,
-    value,
-    options,
-    onChange,
-    hideLabel = false
+const parseSelectedVersions = (value: string) => {
+    if (!value || value === 'Any') return [];
+    return value.split(',').map(v => v.trim()).filter(v => v && v !== 'Any');
+};
+
+const getVersionRangeLabel = (version: string) => {
+    const [baseVersion] = version.split('-');
+    const parts = baseVersion.split('.');
+    if (parts.length < 2 || !parts[0] || !parts[1]) return null;
+    if (!/^\d+$/.test(parts[0]) || !/^\d+$/.test(parts[1])) return null;
+    return `${parts[0]}.${parts[1]}.x`;
+};
+
+const buildVersionRanges = (versions: string[]) => {
+    const ranges = new Map<string, string[]>();
+    for (const version of versions) {
+        const label = getVersionRangeLabel(version);
+        if (!label) continue;
+        ranges.set(label, [...(ranges.get(label) || []), version]);
+    }
+    return Array.from(ranges, ([label, rangeVersions]) => ({ label, versions: rangeVersions }))
+        .filter(range => range.versions.length > 1);
+};
+
+const VersionFilterDropdown = ({
+    selectedVersions,
+    versions,
+    ranges,
+    onChange
 }: {
-    label: string,
-    value: string,
-    options: string[],
-    onChange: (val: string) => void,
-    hideLabel?: boolean
+    selectedVersions: string[],
+    versions: string[],
+    ranges: { label: string, versions: string[] }[],
+    onChange: (val: string) => void
 }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const selectedSet = useMemo(() => new Set(selectedVersions), [selectedVersions]);
+    const selectedRange = ranges.find(range =>
+        range.versions.length === selectedVersions.length &&
+        range.versions.every(version => selectedSet.has(version))
+    );
+    const displayValue = selectedVersions.length === 0
+        ? 'Any'
+        : selectedRange
+            ? selectedRange.label
+            : selectedVersions.length === 1
+                ? selectedVersions[0]
+                : `${selectedVersions.length} versions`;
+
+    const commitSelection = (nextVersions: string[]) => {
+        const nextSet = new Set(nextVersions.filter(Boolean));
+        const ordered = versions.filter(version => nextSet.has(version));
+        onChange(ordered.length > 0 ? ordered.join(',') : 'Any');
+    };
+
+    const toggleVersion = (version: string) => {
+        commitSelection(selectedSet.has(version)
+            ? selectedVersions.filter(selected => selected !== version)
+            : [...selectedVersions, version]
+        );
+    };
+
+    const toggleRange = (rangeVersions: string[]) => {
+        const hasEntireRange = rangeVersions.every(version => selectedSet.has(version));
+        commitSelection(hasEntireRange
+            ? selectedVersions.filter(version => !rangeVersions.includes(version))
+            : [...selectedVersions, ...rangeVersions]
+        );
+    };
+
     return (
         <div className="relative">
-            {!hideLabel && <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">{label}</label>}
-            <button type="button" onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} className="w-full text-left px-3 py-2 rounded-xl text-sm font-bold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 flex justify-between items-center hover:bg-slate-100 dark:hover:bg-white/[0.05] transition-colors shadow-sm">{value}<ChevronDown className={`w-4 h-4 text-slate-400 transition-transform pointer-events-none ${isOpen ? 'rotate-180' : ''}`} /></button>
-            {isOpen && <div className="absolute top-full mt-1 left-0 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-[250] max-h-48 overflow-y-auto py-1">{options.map(opt => <button type="button" key={opt} onClick={(e) => { e.stopPropagation(); onChange(opt); setIsOpen(false); }} className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors flex justify-between items-center ${value === opt ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'}`}>{opt}{value === opt && <Check className="w-3 h-3" />}</button>)}</div>}
+            <button type="button" aria-label="Game version filter" onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }} className="w-full text-left px-3 py-2 rounded-xl text-sm font-bold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 flex justify-between items-center hover:bg-slate-100 dark:hover:bg-white/[0.05] transition-colors shadow-sm">
+                <span className="truncate">{displayValue}</span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform pointer-events-none ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isOpen && (
+                <div className="absolute top-full mt-1 left-0 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-[250] overflow-hidden py-1">
+                    <button type="button" onClick={(e) => { e.stopPropagation(); onChange('Any'); }} className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors flex justify-between items-center ${selectedVersions.length === 0 ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'}`}>
+                        Any
+                        {selectedVersions.length === 0 && <Check className="w-3 h-3" />}
+                    </button>
+                    {ranges.length > 0 && (
+                        <div className="px-3 py-2 border-y border-slate-100 dark:border-white/10">
+                            <div className="text-[10px] font-black uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1.5">Ranges</div>
+                            <div className="flex flex-wrap gap-1.5">
+                                {ranges.map(range => {
+                                    const isSelected = range.versions.every(version => selectedSet.has(version));
+                                    return (
+                                        <button key={range.label} type="button" onClick={(e) => { e.stopPropagation(); toggleRange(range.versions); }} className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-colors ${isSelected ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'}`}>
+                                            {range.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                    <div className="max-h-48 overflow-y-auto py-1">
+                        {versions.map(version => {
+                            const isSelected = selectedSet.has(version);
+                            return (
+                                <button type="button" key={version} onClick={(e) => { e.stopPropagation(); toggleVersion(version); }} className={`w-full text-left px-3 py-2 text-xs font-bold transition-colors flex justify-between items-center ${isSelected ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'}`}>
+                                    {version}
+                                    {isSelected && <Check className="w-3 h-3" />}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -123,7 +214,9 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
     const [allGameVersions, setAllGameVersions] = useState<string[]>([]);
     const [preReleaseVersionSet, setPreReleaseVersionSet] = useState<Set<string>>(new Set());
     const [showPreReleases, setShowPreReleases] = useState(false);
+    const [hasLoadedGameVersions, setHasLoadedGameVersions] = useState(false);
     const hasLoadedGameVersionsRef = useRef(false);
+    const selectedVersions = useMemo(() => parseSelectedVersions(selectedVersion), [selectedVersion]);
 
     useEffect(() => {
         if (isMobile && isFilterOpen) document.body.style.overflow = 'hidden';
@@ -163,39 +256,46 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
             }
             setAllGameVersions(ordered);
             setPreReleaseVersionSet(pre);
+            setHasLoadedGameVersions(true);
         }).catch(async () => {
             try {
                 const versions = await projectClient.getProjectGameVersions();
                 const sorted = versions.sort((a: string, b: string) => compareSemVer(b, a));
                 setAllGameVersions(sorted);
                 setPreReleaseVersionSet(new Set());
+                setHasLoadedGameVersions(true);
             } catch {
                 setAllGameVersions([]);
                 setPreReleaseVersionSet(new Set());
+                setHasLoadedGameVersions(true);
             }
         });
     }, [isFilterOpen, selectedVersion]);
 
     useEffect(() => {
-        if (selectedVersion !== 'Any' && preReleaseVersionSet.has(selectedVersion)) {
+        if (selectedVersions.some(version => preReleaseVersionSet.has(version))) {
             setShowPreReleases(true);
         }
-    }, [selectedVersion, preReleaseVersionSet]);
+    }, [selectedVersions, preReleaseVersionSet]);
 
-    const gameVersionOptions = useMemo(() => {
+    const visibleGameVersions = useMemo(() => {
         const preReleaseVersions = allGameVersions.filter(v => preReleaseVersionSet.has(v));
         const releaseVersions = allGameVersions.filter(v => !preReleaseVersionSet.has(v));
-        const ordered = showPreReleases
+        return showPreReleases
             ? [...preReleaseVersions, ...releaseVersions]
             : releaseVersions;
-        return ['Any', ...ordered];
     }, [allGameVersions, preReleaseVersionSet, showPreReleases]);
 
+    const gameVersionRanges = useMemo(() => buildVersionRanges(visibleGameVersions), [visibleGameVersions]);
+
     useEffect(() => {
-        if (selectedVersion !== 'Any' && !gameVersionOptions.includes(selectedVersion)) {
-            setSelectedVersion('Any');
+        if (!hasLoadedGameVersions || selectedVersions.length === 0) return;
+        const validVersionSet = new Set(allGameVersions);
+        const validSelectedVersions = selectedVersions.filter(version => validVersionSet.has(version));
+        if (validSelectedVersions.length !== selectedVersions.length) {
+            setSelectedVersion(validSelectedVersions.length > 0 ? validSelectedVersions.join(',') : 'Any');
         }
-    }, [selectedVersion, gameVersionOptions, setSelectedVersion]);
+    }, [hasLoadedGameVersions, selectedVersions, allGameVersions, setSelectedVersion]);
 
     const getDateStringDaysAgo = (days: number) => {
         const d = new Date();
@@ -235,7 +335,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
         setSelectedDateObj(null);
         setShowCalendar(false);
     };
-    const displayFilterCount = [(selectedVersion && selectedVersion !== 'Any'), minFavorites > 0, minDownloads > 0, (filterDate !== null && !isDownloadSort)].filter(Boolean).length;
+    const displayFilterCount = [selectedVersions.length > 0, minFavorites > 0, minDownloads > 0, (filterDate !== null && !isDownloadSort)].filter(Boolean).length;
 
     const filterMenuBody = (
         <div className="space-y-5">
@@ -258,7 +358,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                         </button>
                     )}
                 </div>
-                <FilterDropdown label="Game Version" hideLabel value={selectedVersion} options={gameVersionOptions} onChange={setSelectedVersion} />
+                <VersionFilterDropdown selectedVersions={selectedVersions} versions={visibleGameVersions} ranges={gameVersionRanges} onChange={setSelectedVersion} />
             </div>
             <div>
                 <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">Minimum Favorites</label>

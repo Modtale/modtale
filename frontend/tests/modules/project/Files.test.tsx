@@ -10,7 +10,8 @@ import { ToastProvider } from '@/components/ui/Toast';
 
 vi.mock('@/modules/project/api/projectClient', () => ({
     projectClient: {
-        getMetaGameVersions: vi.fn()
+        getMetaGameVersions: vi.fn(),
+        getMetaGameVersionCatalog: vi.fn()
     }
 }));
 
@@ -65,6 +66,12 @@ describe('Files tab loadability', () => {
         document.body.appendChild(container);
         root = createRoot(container);
         mockedProjectClient.getMetaGameVersions.mockResolvedValue(['2026.03.11']);
+        mockedProjectClient.getMetaGameVersionCatalog.mockResolvedValue({
+            releaseVersions: ['2026.03.11'],
+            preReleaseVersions: [],
+            allVersions: ['2026.03.11'],
+            versions: [{ version: '2026.03.11', preRelease: false, sourceUrl: 'test' }]
+        });
     });
 
     afterEach(async () => {
@@ -92,7 +99,46 @@ describe('Files tab loadability', () => {
 
         await waitForText(container, 'Version Number');
         expect(container.textContent).toContain('Game Versions');
-        expect(mockedProjectClient.getMetaGameVersions).toHaveBeenCalledTimes(1);
+        expect(mockedProjectClient.getMetaGameVersionCatalog).toHaveBeenCalledTimes(1);
+        expect(mockedProjectClient.getMetaGameVersions).not.toHaveBeenCalled();
+    });
+
+    it('defaults to the latest release game version when prereleases are newer', async () => {
+        const onChange = vi.fn();
+        mockedProjectClient.getMetaGameVersionCatalog.mockResolvedValue({
+            releaseVersions: ['2026.03.11'],
+            preReleaseVersions: ['2026.04.01-pre.1'],
+            allVersions: ['2026.04.01-pre.1', '2026.03.11'],
+            versions: [
+                { version: '2026.04.01-pre.1', preRelease: true, sourceUrl: 'test' },
+                { version: '2026.03.11', preRelease: false, sourceUrl: 'test' }
+            ]
+        });
+
+        await act(async () => {
+            root.render(
+                <ToastProvider>
+                    <VersionFields
+                        data={{ ...versionData, gameVersions: [] }}
+                        onChange={onChange}
+                        projectType="PLUGIN"
+                        currentProjectId="project-1"
+                        hideFilePicker={true}
+                    />
+                </ToastProvider>
+            );
+        });
+
+        for (let attempt = 0; attempt < 20 && onChange.mock.calls.length === 0; attempt += 1) {
+            await act(async () => {
+                await new Promise((resolve) => setTimeout(resolve, 0));
+            });
+        }
+
+        expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+            gameVersions: ['2026.03.11']
+        }));
+        expect(mockedProjectClient.getMetaGameVersions).not.toHaveBeenCalled();
     });
 
     it('still renders version history controls when the upload form is hidden', async () => {
