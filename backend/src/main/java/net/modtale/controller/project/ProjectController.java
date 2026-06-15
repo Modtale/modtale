@@ -506,6 +506,8 @@ public class ProjectController {
         else if (existing != null) updated.setHmWikiEnabled(existing.isHmWikiEnabled());
         if (requestPayload.getHmWikiSlug() != null) updated.setHmWikiSlug(requestPayload.getHmWikiSlug());
         else if (existing != null) updated.setHmWikiSlug(existing.getHmWikiSlug());
+        if (requestPayload.getGalleryCarouselEnabled() != null) updated.setGalleryCarouselEnabled(requestPayload.getGalleryCarouselEnabled());
+        else if (existing != null) updated.setGalleryCarouselEnabled(existing.isGalleryCarouselEnabled());
         metadataService.updateMetadata(id, updated, user);
         return ResponseEntity.ok().build();
     }

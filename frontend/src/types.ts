@@ -60,6 +60,10 @@ export interface ProjectDependency {
     projectId: string;
     projectTitle: string;
     versionNumber: string;
+    icon?: string;
+    title?: string;
+    classification?: string;
+    slug?: string;
     isOptional?: boolean;
     isEmbedded?: boolean;
 }

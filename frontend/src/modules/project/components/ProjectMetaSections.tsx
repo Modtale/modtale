@@ -60,14 +60,14 @@ export const ProjectMetaSections: React.FC<ProjectMetaSectionsProps> = React.mem
                     <div className="space-y-2">
                         {dependencies.map((dep, idx) => {
                             const meta = depMeta[dep.projectId];
-                            const iconUrl = getIconUrl(meta?.icon);
-                            const title = meta?.title || dep.projectTitle || dep.projectId;
+                            const iconUrl = getIconUrl(dep.icon || meta?.icon);
+                            const title = dep.title || dep.projectTitle || meta?.title || dep.projectId;
 
                             const targetProjectParams = {
                                 id: dep.projectId,
                                 title: title,
-                                slug: meta?.slug,
-                                classification: meta?.classification
+                                slug: dep.slug || meta?.slug,
+                                classification: dep.classification || meta?.classification
                             };
 
                             const path = SiteRoutes.project(targetProjectParams);

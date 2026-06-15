@@ -1,5 +1,7 @@
 package net.modtale.service.project.media;
 
+import java.util.HashMap;
+import java.util.Map;
 import net.modtale.config.properties.AppLimitProperties;
 import net.modtale.exception.InvalidProjectRequestException;
 import net.modtale.exception.ProjectMediaOperationException;
@@ -27,6 +29,7 @@ public class ProjectMediaService {
     private final ProjectDeletionService projectDeletionService;
     private final FileValidationService fileValidationService;
     private final int maxGalleryImages;
+    private static final int MAX_GALLERY_CAPTION_LENGTH = 240;
 
     public ProjectMediaService(
             ProjectRepository projectRepository,
@@ -102,8 +105,43 @@ public class ProjectMediaService {
                 "You do not have permission to remove gallery images from this project.");
         projectMutationGuard.ensureEditable(project);
         project.getGalleryImages().remove(imageUrl);
+        if (project.getGalleryImageCaptions() != null && project.getGalleryImageCaptions().containsKey(imageUrl)) {
+            Map<String, String> captions = new HashMap<>(project.getGalleryImageCaptions());
+            captions.remove(imageUrl);
+            project.setGalleryImageCaptions(captions);
+        }
         projectDeletionService.deleteStoredFile(imageUrl);
         projectRepository.save(project);
         projectService.evictProjectCache(project);
+    }
+
+    public Project updateGalleryImageCaption(String id, String imageUrl, String caption, User user) {
+        Project project = projectAccessService.requireProjectPermission(id, user, "PROJECT_GALLERY_ADD",
+                "You do not have permission to edit gallery image captions for this project.");
+        projectMutationGuard.ensureEditable(project);
+
+        if (project.getGalleryImages() == null || !project.getGalleryImages().contains(imageUrl)) {
+            throw new InvalidProjectRequestException("That gallery image does not exist on this project.");
+        }
+
+        String normalizedCaption = caption == null ? "" : caption.trim();
+        if (normalizedCaption.length() > MAX_GALLERY_CAPTION_LENGTH) {
+            throw new InvalidProjectRequestException("Gallery image captions must be " + MAX_GALLERY_CAPTION_LENGTH + " characters or fewer.");
+        }
+
+        Map<String, String> captions = new HashMap<>(
+                project.getGalleryImageCaptions() == null ? Map.of() : project.getGalleryImageCaptions()
+        );
+
+        if (normalizedCaption.isBlank()) {
+            captions.remove(imageUrl);
+        } else {
+            captions.put(imageUrl, normalizedCaption);
+        }
+        project.setGalleryImageCaptions(captions);
+
+        Project saved = projectRepository.save(project);
+        projectService.evictProjectCache(saved);
+        return saved;
     }
 }

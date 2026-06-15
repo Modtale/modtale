@@ -33,6 +33,7 @@ public class UpdateProjectRequest {
     private Boolean allowModpacks;
     private Boolean allowComments;
     private Boolean hmWikiEnabled;
+    private Boolean galleryCarouselEnabled;
 
     @Pattern(
             regexp = "^$|^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])?$",
@@ -62,6 +63,8 @@ public class UpdateProjectRequest {
     public void setAllowComments(Boolean allowComments) { this.allowComments = allowComments; }
     public Boolean getHmWikiEnabled() { return hmWikiEnabled; }
     public void setHmWikiEnabled(Boolean hmWikiEnabled) { this.hmWikiEnabled = hmWikiEnabled; }
+    public Boolean getGalleryCarouselEnabled() { return galleryCarouselEnabled; }
+    public void setGalleryCarouselEnabled(Boolean galleryCarouselEnabled) { this.galleryCarouselEnabled = galleryCarouselEnabled; }
     public String getHmWikiSlug() { return hmWikiSlug; }
     public void setHmWikiSlug(String hmWikiSlug) { this.hmWikiSlug = hmWikiSlug; }
 }
