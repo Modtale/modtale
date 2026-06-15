@@ -150,6 +150,16 @@ describe('BrowseFilters performance behavior', () => {
         await settle();
         await openGameVersionDropdown(container);
 
+        const expandRangeButton = Array.from(container.querySelectorAll('button')).find(
+            (button) => button.getAttribute('aria-label') === 'Expand 0.5.x versions'
+        );
+
+        expect(expandRangeButton).toBeTruthy();
+
+        await act(async () => {
+            expandRangeButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
         const versionButton = Array.from(container.querySelectorAll('button')).find(
             (button) => button.textContent?.trim() === '0.5.3'
         );
@@ -163,7 +173,7 @@ describe('BrowseFilters performance behavior', () => {
         expect(setSelectedVersion).toHaveBeenCalledWith('0.5.4,0.5.3');
     });
 
-    it('selects a whole minor version range from the quick range button', async () => {
+    it('selects a whole minor version group from the nested group row', async () => {
         const setSelectedVersion = vi.fn();
 
         await act(async () => {
@@ -172,8 +182,10 @@ describe('BrowseFilters performance behavior', () => {
         await settle();
         await openGameVersionDropdown(container);
 
+        expect(container.textContent).not.toContain('Ranges');
+
         const rangeButton = Array.from(container.querySelectorAll('button')).find(
-            (button) => button.textContent?.trim() === '0.5.x'
+            (button) => button.getAttribute('aria-label') === 'Select all 0.5.x versions'
         );
 
         expect(rangeButton).toBeTruthy();

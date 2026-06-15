@@ -210,7 +210,7 @@ class ProjectRepositoryImplTest {
     }
 
     @Test
-    void commaSeparatedGameVersionsMatchAnySelectedVersion() {
+    void commaSeparatedGameVersionsMatchAtLeastOneSelectedVersion() {
         repository.searchProjects(
                 null,
                 null,
@@ -229,6 +229,8 @@ class ProjectRepositoryImplTest {
         String queryJson = capturedFindQuery().getQueryObject().toString();
 
         assertTrue(queryJson.contains("versions.gameVersions"));
+        assertTrue(queryJson.contains("$in"));
+        assertFalse(queryJson.contains("$all"));
         assertTrue(queryJson.contains("0.5.4"));
         assertTrue(queryJson.contains("0.5.3"));
     }
