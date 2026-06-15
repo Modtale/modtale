@@ -55,4 +55,15 @@ describe('GalleryCarousel', () => {
 
         expect(container.textContent).toContain('First build screenshot');
     });
+
+    it('renders youtube gallery entries as embedded videos', async () => {
+        await act(async () => {
+            root.render(<GalleryCarousel images={['https://www.youtube.com/watch?v=dQw4w9WgXcQ']} title="Skyforge" />);
+        });
+
+        const iframe = container.querySelector('iframe[title="Skyforge gallery video 1"]') as HTMLIFrameElement;
+
+        expect(iframe).not.toBeNull();
+        expect(iframe.getAttribute('src')).toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
+    });
 });

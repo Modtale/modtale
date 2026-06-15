@@ -140,6 +140,8 @@ public class StorageService {
             fileName = fileName.replace("/api/files/proxy/", "");
         } else if (publicDomain != null && fileName.startsWith(publicDomain)) {
             fileName = fileName.replace(publicDomain + "/", "");
+        } else if (fileName.startsWith("http://") || fileName.startsWith("https://")) {
+            return;
         }
 
         if (fileName.contains(DEFAULT_IMAGE) || fileName.contains("placeholder.png")) {

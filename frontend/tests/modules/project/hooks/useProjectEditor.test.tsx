@@ -388,6 +388,25 @@ describe('useProjectEditor', () => {
         expect(showStatus).toHaveBeenLastCalledWith('success', 'Uploaded', 'Image added to gallery.');
     });
 
+    it('adds youtube gallery videos and replaces the project payload', async () => {
+        mockedApi.post.mockResolvedValue({
+            data: { id: 'project-1', title: 'Sky Tools', galleryImages: ['https://www.youtube.com/watch?v=dQw4w9WgXcQ'] }
+        } as any);
+
+        await renderHook();
+
+        await act(async () => {
+            await latestSnapshot.handleGalleryVideoAdd('https://youtu.be/dQw4w9WgXcQ');
+        });
+        await settle();
+
+        expect(mockedApi.post).toHaveBeenCalledWith('/projects/project-1/gallery/youtube', {
+            videoUrl: 'https://youtu.be/dQw4w9WgXcQ'
+        });
+        expect(latestSnapshot.projectData.galleryImages).toEqual(['https://www.youtube.com/watch?v=dQw4w9WgXcQ']);
+        expect(showStatus).toHaveBeenLastCalledWith('success', 'Added', 'Video added to gallery.');
+    });
+
     it('deletes gallery images using the request body payload and updates project state', async () => {
         mockedApi.delete.mockResolvedValue({
             data: { id: 'project-1', title: 'Sky Tools', galleryImages: [] }
