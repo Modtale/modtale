@@ -30,6 +30,7 @@ import { api, extractApiErrorMessage } from '@/utils/api';
 import { projectClient } from '../api/projectClient';
 import { mergeProjectVersionChangelogs, projectNeedsChangelogHydration } from '../utils/changelogHydration';
 import { resolveGalleryImages } from '../utils/galleryImages';
+import { countGalleryCarouselMarkers } from '../utils/galleryCarouselMarker';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import '../styles/downloadFx.css';
 
@@ -521,7 +522,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         project.links?.DISCORD && { type: 'DISCORD', url: project.links.DISCORD, icon: DiscordIcon, label: 'Discord', colorClass: 'text-[#5865F2] hover:bg-[#5865F2]/20 border-[#5865F2]/20' },
         project.links?.WEBSITE && { type: 'WEBSITE', url: project.links.WEBSITE, icon: Globe, label: 'Website', colorClass: 'text-blue-500 dark:text-blue-400 hover:bg-blue-500/20 border-blue-500/20' }
     ].filter(Boolean) as any[];
-    const showGalleryCarousel = Boolean(project.galleryCarouselEnabled);
+    const hasInlineGalleryCarousel = countGalleryCarouselMarkers(project.about || '') > 0;
     const activeGalleryItem = galleryItems[galleryIndex] || galleryItems[0];
 
     return (
@@ -621,7 +622,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                     />
                 }
                 headerContent={<HeaderContent project={project} currentUser={currentUser} isLiked={isLiked(project.id)} isFollowing={isFollowing} onFollowToggle={handleFollowToggle} canEdit={Boolean(canEdit)} projectUrl={projectUrl} onToggleFavorite={() => {}} onShare={() => {}} onReport={() => {}} />}
-                actionBar={<ActionBar project={project} projectUrl={projectUrl} links={links} commentsRef={commentsRef} showGalleryButton={!showGalleryCarousel} />}
+                actionBar={<ActionBar project={project} projectUrl={projectUrl} links={links} commentsRef={commentsRef} showGalleryButton={!hasInlineGalleryCarousel} />}
                 sidebarContent={
                     isWikiRoute ? (
                         <>
@@ -645,7 +646,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                             <Wiki wikiLoading={wikiLoading} wikiError={wikiError} displayWikiData={displayWikiData} displaySlug={displaySlug} project={project} wikiContentRef={wikiContentRef} lockedHeight={lockedHeight} />
                         </Suspense>
                     ) : (
-                        <ViewDetails project={project} authorProfile={authorProfile} currentUser={currentUser} canEdit={Boolean(canEdit)} commentsRef={commentsRef} setProject={setProject} setStatusModal={setStatusModal} onRefresh={onRefresh} dependencies={latestDependencies} incompatibleProjectIds={latestIncompatibleProjectIds} depMeta={depMeta} showMetaSections={isMobile} showGalleryCarousel={showGalleryCarousel} />
+                        <ViewDetails project={project} authorProfile={authorProfile} currentUser={currentUser} canEdit={Boolean(canEdit)} commentsRef={commentsRef} setProject={setProject} setStatusModal={setStatusModal} onRefresh={onRefresh} dependencies={latestDependencies} incompatibleProjectIds={latestIncompatibleProjectIds} depMeta={depMeta} showMetaSections={isMobile} />
                     )
                 }
             />

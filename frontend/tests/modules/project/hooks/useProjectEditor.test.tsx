@@ -156,7 +156,6 @@ describe('useProjectEditor', () => {
             allowComments: true,
             hmWikiEnabled: false,
             hmWikiSlug: null,
-            galleryCarouselEnabled: false,
             teamMembers: [],
             teamInvites: []
         },
@@ -298,8 +297,7 @@ describe('useProjectEditor', () => {
             allowModpacks: true,
             allowComments: true,
             hmWikiEnabled: false,
-            hmWikiSlug: null,
-            galleryCarouselEnabled: false
+            hmWikiSlug: null
         });
 
         const iconUpload = mockedApi.put.mock.calls[1];
@@ -320,6 +318,31 @@ describe('useProjectEditor', () => {
         expect(latestSnapshot.bannerPreview).toBe('/new-banner.png');
         expect(latestSnapshot.projectData.title).toBe('Sky Tools Reloaded');
         expect(showStatus).toHaveBeenLastCalledWith('success', 'Saved', 'Project details saved successfully.');
+    });
+
+    it('blocks saves when the gallery carousel marker is used more than once', async () => {
+        await renderHook({
+            metaData: {
+                title: 'Sky Tools',
+                slug: 'sky-tools',
+                summary: 'Summary',
+                description: 'Intro\n\n{{gallery-carousel}}\n\nMiddle\n\n{{ gallery-carousel }}',
+                tags: [],
+                links: {},
+                repositoryUrl: '',
+                iconFile: null,
+                iconPreview: null,
+                license: 'MIT'
+            }
+        });
+
+        await act(async () => {
+            await latestSnapshot.handleSave();
+        });
+        await settle();
+
+        expect(mockedApi.put).not.toHaveBeenCalled();
+        expect(showStatus).toHaveBeenCalledWith('error', 'Gallery Carousel Marker', 'Use {{gallery-carousel}} only once in the project description.');
     });
 
     it('records slug validation errors from failed saves', async () => {

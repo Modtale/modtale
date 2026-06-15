@@ -23,7 +23,7 @@ describe('Project settings gallery carousel option', () => {
         container.remove();
     });
 
-    it('toggles the single gallery carousel setting in project editor state', async () => {
+    it('explains marker-only carousel placement without rendering a toggle', async () => {
         const projectData = {
             id: 'project-1',
             title: 'Sky Tools',
@@ -31,7 +31,6 @@ describe('Project settings gallery carousel option', () => {
             status: 'DRAFT',
             allowModpacks: true,
             allowComments: true,
-            galleryCarouselEnabled: false,
             hmWikiEnabled: false
         } as any;
         const metaData: MetadataFormData = {
@@ -68,16 +67,14 @@ describe('Project settings gallery carousel option', () => {
         });
 
         const heading = Array.from(container.querySelectorAll('h3')).find((node) => node.textContent === 'Gallery Carousel');
-        const toggle = heading?.closest('.flex')?.querySelector('button');
+        const section = heading?.closest('.mb-4');
 
-        expect(toggle).toBeDefined();
-        await act(async () => {
-            toggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        });
-
-        expect(markDirty).toHaveBeenCalledTimes(1);
-        expect(setProjectData).toHaveBeenCalledTimes(1);
-        const updater = setProjectData.mock.calls[0][0];
-        expect(updater(projectData).galleryCarouselEnabled).toBe(true);
+        expect(heading).toBeDefined();
+        expect(section?.querySelector('button')).toBeNull();
+        expect(container.textContent).toContain('{{gallery-carousel}}');
+        expect(container.textContent).toContain('once in the description');
+        expect(container.textContent).toContain('Leave it out');
+        expect(markDirty).not.toHaveBeenCalled();
+        expect(setProjectData).not.toHaveBeenCalled();
     });
 });

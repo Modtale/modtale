@@ -21,6 +21,7 @@ describe('GalleryCarousel', () => {
         await act(async () => {
             root.unmount();
         });
+        vi.useRealTimers();
         container.remove();
         HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
     });
@@ -46,6 +47,39 @@ describe('GalleryCarousel', () => {
         });
 
         expect(container.querySelector('img[alt="Skyforge gallery image 2"]')?.getAttribute('src')).toBe('/two.png');
+    });
+
+    it('auto-advances through gallery images on a slow timer', async () => {
+        vi.useFakeTimers();
+
+        await act(async () => {
+            root.render(<GalleryCarousel images={['/one.png', '/two.png']} title="Skyforge" />);
+        });
+
+        expect(container.querySelector('img[alt="Skyforge gallery image 1"]')?.getAttribute('src')).toBe('/one.png');
+
+        await act(async () => {
+            vi.advanceTimersByTime(7999);
+        });
+
+        expect(container.querySelector('img[alt="Skyforge gallery image 1"]')?.getAttribute('src')).toBe('/one.png');
+
+        await act(async () => {
+            vi.advanceTimersByTime(1);
+        });
+
+        expect(container.querySelector('img[alt="Skyforge gallery image 2"]')?.getAttribute('src')).toBe('/two.png');
+    });
+
+    it('keeps only the main arrows and removes thumbnail rail arrows', async () => {
+        await act(async () => {
+            root.render(<GalleryCarousel images={['/one.png', '/two.png']} title="Skyforge" />);
+        });
+
+        expect(container.querySelector('button[aria-label="Previous gallery image"]')).not.toBeNull();
+        expect(container.querySelector('button[aria-label="Next gallery image"]')).not.toBeNull();
+        expect(container.querySelector('button[aria-label="Previous gallery thumbnail"]')).toBeNull();
+        expect(container.querySelector('button[aria-label="Next gallery thumbnail"]')).toBeNull();
     });
 
     it('renders captions from the gallery caption map', async () => {

@@ -509,6 +509,7 @@ class ProjectControllerTest {
         existing.setAllowComments(false);
         existing.setHmWikiEnabled(true);
         existing.setHmWikiSlug("existing-wiki");
+        existing.setGalleryCarouselEnabled(true);
 
         UpdateProjectRequest request = new UpdateProjectRequest();
         request.setTitle("Updated Title");
@@ -537,6 +538,7 @@ class ProjectControllerTest {
         assertFalse(updated.isAllowComments());
         assertTrue(updated.isHmWikiEnabled());
         assertEquals("existing-wiki", updated.getHmWikiSlug());
+        assertTrue(updated.isGalleryCarouselEnabled());
     }
 
     @Test
