@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { X, Github, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
 import { DiscordBrandIcon, GitLabBrandIcon, GoogleBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
 import { StatusModal } from '@/components/ui/StatusModal';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 import { useToast } from '@/components/ui/Toast';
 import { SiteRoutes } from '@/utils/routes';
 import { authClient, normalizeSignInResponse } from '../api/authClient';
@@ -105,7 +105,8 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
         }
     };
 
-    return createPortal(
+    return (
+        <ModalPortal>
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={onClose}>
             {statusModal && (
                 <StatusModal
@@ -265,7 +266,7 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                     </div>
                 </div>
             </div>
-        </div>,
-        document.body
+        </div>
+        </ModalPortal>
     );
 }

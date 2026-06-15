@@ -5,6 +5,7 @@ import { DropdownSelect, type DropdownOption } from '@/components/ui/DropdownSel
 import { theme } from '@/styles/theme';
 import { formatTimeAgo, compareSemVer } from '@/utils/modHelpers';
 import { useScrollLock } from '@/hooks/useScrollLock';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface DownloadModalProps {
     show: boolean;
@@ -324,8 +325,10 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
     if (isInline) return content;
 
     return (
+        <ModalPortal>
         <div className={theme.components.modalOverlay} onClick={onClose}>
             {content}
         </div>
+        </ModalPortal>
     );
 };

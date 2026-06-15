@@ -8,6 +8,7 @@ import { DownloadModal } from '@/modules/project/components/dialogs/DownloadModa
 describe('DownloadModal Toggle Visibility', () => {
     let container: HTMLDivElement;
     let root: Root;
+    const pageText = () => document.body.textContent ?? '';
 
     beforeEach(() => {
         container = document.createElement('div');
@@ -48,7 +49,7 @@ describe('DownloadModal Toggle Visibility', () => {
         });
 
         // "Show Beta/Alpha" toggle text should not be present
-        expect(container.textContent).not.toContain('Show Beta/Alpha');
+        expect(pageText()).not.toContain('Show Beta/Alpha');
     });
 
     it('shows both toggles when project has both release and experimental versions and pre-releases are available', async () => {
@@ -80,8 +81,8 @@ describe('DownloadModal Toggle Visibility', () => {
             );
         });
 
-        expect(container.textContent).toContain('Show Beta/Alpha');
-        expect(container.textContent).toContain('Show Pre-Release Game Versions');
+        expect(pageText()).toContain('Show Beta/Alpha');
+        expect(pageText()).toContain('Show Pre-Release Game Versions');
     });
 
     it('hides Alpha/Beta toggle if the project only has alpha/beta versions globally', async () => {
@@ -109,7 +110,7 @@ describe('DownloadModal Toggle Visibility', () => {
             );
         });
 
-        expect(container.textContent).not.toContain('Show Beta/Alpha');
+        expect(pageText()).not.toContain('Show Beta/Alpha');
     });
 
     it('hides Pre-Release toggle if the project has no pre-release versions at all', async () => {
@@ -137,6 +138,6 @@ describe('DownloadModal Toggle Visibility', () => {
             );
         });
 
-        expect(container.textContent).not.toContain('Show Pre-Release Game Versions');
+        expect(pageText()).not.toContain('Show Pre-Release Game Versions');
     });
 });
