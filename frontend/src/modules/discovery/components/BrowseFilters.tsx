@@ -225,7 +225,16 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
         return filterDate === getDateStringDaysAgo(days);
     };
 
-    const resetAll = () => { onResetFilters(); setCustomDl(''); setCustomFav(''); setFilterDate(null); setSelectedDateObj(null); setShowCalendar(false); };
+    const resetAll = () => {
+        onResetFilters();
+        setSelectedVersion('Any');
+        setShowPreReleases(false);
+        setCustomDl('');
+        setCustomFav('');
+        setFilterDate(null);
+        setSelectedDateObj(null);
+        setShowCalendar(false);
+    };
     const displayFilterCount = [(selectedVersion && selectedVersion !== 'Any'), minFavorites > 0, minDownloads > 0, (filterDate !== null && !isDownloadSort)].filter(Boolean).length;
 
     const filterMenuBody = (
