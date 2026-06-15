@@ -488,15 +488,18 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                             onOpen={() => setIsTagsOpen(false)}
                             options={BROWSE_ITEMS_PER_PAGE_OPTIONS.map(size => ({
                                 value: String(size),
-                                label: `${size} per page`
+                                label: String(size)
                             }))}
-                            placeholder="Per page"
-                            containerClassName="relative flex-1 lg:flex-none h-10 w-full lg:w-auto"
-                            buttonLabel={<span className="inline-flex items-center gap-1.5"><List className="w-3.5 h-3.5" />{itemsPerPage}/page</span>}
-                            buttonClassName="w-full lg:w-auto h-full flex items-center justify-center lg:justify-between gap-1.5 border rounded-xl px-3 text-xs font-bold transition-all whitespace-nowrap lg:min-w-[104px] bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm"
+                            placeholder="12"
+                            containerClassName="relative flex-none h-10 w-16"
+                            buttonLabel={itemsPerPage}
+                            buttonAriaLabel="Results per page"
+                            buttonTitle="Results per page"
+                            showSelectedCheck={false}
+                            buttonClassName="w-full h-full flex items-center justify-center gap-1 border rounded-xl px-2 text-xs font-black transition-all whitespace-nowrap bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm"
                             menuAlign="right"
-                            menuClassName="w-40 max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl py-2 z-[70] animate-in fade-in zoom-in-95 duration-200 overflow-hidden"
-                            optionClassName="w-full text-left px-4 py-2.5 text-sm font-bold flex justify-between items-center transition-colors text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
+                            menuClassName="w-16 max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl py-1 z-[70] animate-in fade-in zoom-in-95 duration-200 overflow-hidden"
+                            optionClassName="w-full px-2 py-2 text-sm font-bold flex justify-center items-center transition-colors text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
                         />
                         <div className="relative flex-1 lg:flex-none h-10" ref={tagRef}>
                             <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsTagsOpen(!isTagsOpen); if(isFilterOpen) onToggleFilterMenu(); }} className={`w-full lg:w-auto h-full flex items-center justify-center lg:justify-start gap-1.5 border rounded-xl px-3 text-xs font-bold transition-all whitespace-nowrap ${selectedTags.length > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
