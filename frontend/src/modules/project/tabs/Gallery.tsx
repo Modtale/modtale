@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { UploadCloud, Trash2, Image as ImageIcon, PlayCircle, Video } from 'lucide-react';
+import { Check, Copy, UploadCloud, Trash2, Image as ImageIcon, PlayCircle, Video } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { BACKEND_URL } from '@/utils/api';
 import { Spinner } from '@/components/ui/Spinner';
 import type { Project } from '@/types';
 import { Permission } from '@/modules/permissions/permissions';
-import { resolveGalleryImages } from '../utils/galleryImages';
+import { getGalleryEmbedSnippet, resolveGalleryImages, type ResolvedGalleryImage } from '../utils/galleryImages';
 
 interface GalleryProps {
     projectData: Project | null;
@@ -23,6 +23,7 @@ const resolveImageUrl = (url: string) => (url.startsWith('/api') ? `${BACKEND_UR
 export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProjectPermission, handleGalleryDelete, handleGalleryCaptionChange, handleGallerySelect, handleGalleryVideoAdd, isLoading }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [youtubeUrl, setYoutubeUrl] = useState('');
+    const [copiedEmbedUrl, setCopiedEmbedUrl] = useState<string | null>(null);
     const resolvedGalleryImages = useMemo(
         () => resolveGalleryImages(projectData?.galleryImages || [], projectData?.galleryImageCaptions || {}),
         [projectData?.galleryImageCaptions, projectData?.galleryImages]
@@ -54,6 +55,21 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
         setYoutubeUrl('');
     };
 
+    const copyGalleryEmbed = async (item: ResolvedGalleryImage) => {
+        if (!navigator.clipboard) return;
+
+        const fallbackTitle = `${projectData?.title || 'Project'} gallery ${item.type === 'youtube' ? 'video' : 'image'}`;
+        try {
+            await navigator.clipboard.writeText(getGalleryEmbedSnippet(item, fallbackTitle));
+            setCopiedEmbedUrl(item.url);
+            window.setTimeout(() => {
+                setCopiedEmbedUrl(current => current === item.url ? null : current);
+            }, 1800);
+        } catch {
+            return;
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div className={`flex items-center justify-between mb-4 pb-2 border-b ${theme.colors.borderFaint}`}>
@@ -77,6 +93,17 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
                                     <PlayCircle className="w-12 h-12 drop-shadow-lg" aria-hidden="true" />
                                 </div>
                             )}
+                            <div className="absolute right-2 top-2 z-10 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                                <button
+                                    type="button"
+                                    onClick={() => copyGalleryEmbed(item)}
+                                    className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-blue-950/80 text-white shadow-lg backdrop-blur-sm transition-colors hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-modtale-accent"
+                                    aria-label={`Copy gallery ${item.type === 'youtube' ? 'video' : 'image'} embed snippet`}
+                                    title="Copy embed"
+                                >
+                                    {copiedEmbedUrl === item.url ? <Check className="h-4 w-4 text-green-300" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />}
+                                </button>
+                            </div>
                             {!readOnly && hasProjectPermission(Permission.PROJECT_GALLERY_REMOVE) && (
                                 <div className="absolute inset-0 bg-blue-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                     <button type="button" onClick={() => handleGalleryDelete(item.url)} disabled={isLoading} className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg transform scale-90 group-hover:scale-100 transition-transform"><Trash2 className="w-5 h-5" /></button>

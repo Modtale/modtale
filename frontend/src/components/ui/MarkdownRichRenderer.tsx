@@ -4,10 +4,21 @@ import rehypeRaw from 'rehype-raw';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
 import { Check, Copy } from 'lucide-react';
+import { getYouTubeEmbedUrl, getYouTubeVideoId } from '@/utils/youtube';
 
 const HighlightedCode = lazy(() => import('./MarkdownSyntaxHighlighter').then((module) => ({ default: module.HighlightedCode })));
 
 const allowedTextAlignments = new Set(['left', 'center', 'right', 'justify']);
+const youtubeIframeAllow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+
+const getSafeYouTubeEmbedUrl = (src: unknown) => {
+    if (typeof src !== 'string') {
+        return null;
+    }
+
+    const videoId = getYouTubeVideoId(src);
+    return videoId ? getYouTubeEmbedUrl(videoId) : null;
+};
 
 const extractTextAlign = (value: unknown): React.CSSProperties['textAlign'] | undefined => {
     if (typeof value !== 'string') {
@@ -41,6 +52,37 @@ const rehypePreserveTextAlign = () => (tree: any) => {
             }
 
             delete node.properties.style;
+        }
+
+        if (Array.isArray(node?.children)) {
+            node.children.forEach(visit);
+        }
+    };
+
+    visit(tree);
+};
+
+const rehypeNormalizeYouTubeEmbeds = () => (tree: any) => {
+    const visit = (node: any) => {
+        if (node?.type === 'element' && node.tagName === 'iframe') {
+            const embedUrl = getSafeYouTubeEmbedUrl(node.properties?.src);
+
+            if (!embedUrl) {
+                node.tagName = 'span';
+                node.properties = {};
+                node.children = [];
+            } else {
+                node.properties = {
+                    src: embedUrl,
+                    title: typeof node.properties?.title === 'string' && node.properties.title.trim()
+                        ? node.properties.title
+                        : 'YouTube video',
+                    allow: youtubeIframeAllow,
+                    allowFullScreen: true,
+                    loading: 'lazy',
+                    referrerPolicy: 'strict-origin-when-cross-origin'
+                };
+            }
         }
 
         if (Array.isArray(node?.children)) {
@@ -189,6 +231,41 @@ const markdownComponents = {
     img({ node: _node, ...props }: any) {
         return <img className="inline-block align-middle max-w-full h-auto my-0" {...props} />;
     },
+    iframe({ node: _node, src, title }: any) {
+        const embedUrl = getSafeYouTubeEmbedUrl(src);
+        if (!embedUrl) return null;
+
+        return (
+            <div className="my-6 aspect-video w-full overflow-hidden rounded-xl bg-slate-950 shadow-lg ring-1 ring-slate-300 dark:ring-white/10">
+                <iframe
+                    src={embedUrl}
+                    title={typeof title === 'string' && title.trim() ? title : 'YouTube video'}
+                    className="h-full w-full"
+                    allow={youtubeIframeAllow}
+                    allowFullScreen
+                    loading="lazy"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                />
+            </div>
+        );
+    },
+};
+
+const markdownSanitizeSchema = {
+    ...defaultSchema,
+    tagNames: [
+        ...(defaultSchema.tagNames || []),
+        'iframe'
+    ],
+    attributes: {
+        ...defaultSchema.attributes,
+        code: ['className'],
+        iframe: ['src', 'title', 'allow', 'allowFullScreen', 'loading', 'referrerPolicy']
+    },
+    protocols: {
+        ...defaultSchema.protocols,
+        src: Array.from(new Set([...(defaultSchema.protocols?.src || []), 'http', 'https']))
+    }
 };
 
 export const MarkdownRichRenderer: React.FC<{ content: string }> = ({ content }) => {
@@ -198,15 +275,10 @@ export const MarkdownRichRenderer: React.FC<{ content: string }> = ({ content })
             rehypePlugins={[
                 rehypeRaw,
                 rehypePreserveTextAlign,
+                rehypeNormalizeYouTubeEmbeds,
                 [
                     rehypeSanitize,
-                    {
-                        ...defaultSchema,
-                        attributes: {
-                            ...defaultSchema.attributes,
-                            code: ['className']
-                        }
-                    }
+                    markdownSanitizeSchema
                 ]
             ]}
             components={markdownComponents}
