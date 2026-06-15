@@ -76,7 +76,8 @@ vi.mock('@/modules/project/hooks/useProjectEditor', () => ({
 
 vi.mock('@/modules/project/api/projectClient', () => ({
     projectClient: {
-        getMetaGameVersions: vi.fn()
+        getMetaGameVersions: vi.fn(),
+        getMetaGameVersionCatalog: vi.fn()
     }
 }));
 
@@ -108,6 +109,12 @@ describe('ProjectEditorView route smoke test', () => {
         document.body.appendChild(container);
         root = createRoot(container);
         mockedProjectClient.getMetaGameVersions.mockResolvedValue(['1.21.0']);
+        mockedProjectClient.getMetaGameVersionCatalog.mockResolvedValue({
+            releaseVersions: ['1.21.0'],
+            preReleaseVersions: [],
+            allVersions: ['1.21.0'],
+            versions: [{ version: '1.21.0', preRelease: false, sourceUrl: 'test' }]
+        });
     });
 
     afterEach(async () => {
@@ -153,7 +160,8 @@ describe('ProjectEditorView route smoke test', () => {
 
         await waitForText(container, 'Version Number');
         expect(container.textContent).toContain('Game Versions');
-        expect(mockedProjectClient.getMetaGameVersions).toHaveBeenCalledTimes(1);
+        expect(mockedProjectClient.getMetaGameVersionCatalog).toHaveBeenCalledTimes(1);
+        expect(mockedProjectClient.getMetaGameVersions).not.toHaveBeenCalled();
     });
 
     it('opens custom license inputs when the custom license option is selected', async () => {
