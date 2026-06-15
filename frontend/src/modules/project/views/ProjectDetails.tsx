@@ -20,7 +20,7 @@ import { HeaderActions, HeaderContent } from '../components/Header';
 import { ActionBar } from '../components/ActionBar';
 
 import { ViewDetails } from '../tabs/ViewDetails';
-import { useHMWiki } from '../hooks/useHMWiki';
+import { prefetchInitialWikiPage, useHMWiki } from '../hooks/useHMWiki';
 
 import { ProjectLayout } from '../components/ProjectLayout';
 import { Spinner } from '@/components/ui/Spinner';
@@ -104,8 +104,15 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const isGalleryRoute = /\/gallery\/?$/.test(location.pathname);
     const wikiMatch = location.pathname.match(/\/wiki\/?(.*)/);
     const wikiPageSlug = wikiMatch?.[1];
+    const projectRouteKey = id?.trim();
+    const wikiLookupKey = isWikiRoute ? (projectRouteKey || project?.id) : project?.id;
+    const shouldLoadWiki = Boolean(
+        isWikiRoute
+        && wikiLookupKey
+        && (project ? project.hmWikiEnabled : true)
+    );
 
-    const { data: wikiData, loading: wikiLoading, error: wikiError } = useHMWiki(project?.id, wikiPageSlug, isWikiRoute && !!project?.hmWikiEnabled);
+    const { data: wikiData, loading: wikiLoading, error: wikiError } = useHMWiki(wikiLookupKey, wikiPageSlug, shouldLoadWiki);
     const [displayWikiData, setDisplayWikiData] = useState(wikiData);
     const [displaySlug, setDisplaySlug] = useState(wikiPageSlug);
     const wikiContentRef = useRef<HTMLDivElement>(null);
@@ -151,6 +158,11 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             if (downloadFxTimeoutRef.current) window.clearTimeout(downloadFxTimeoutRef.current);
         };
     }, []);
+
+    useEffect(() => {
+        if (!project?.id || !project.hmWikiEnabled) return;
+        prefetchInitialWikiPage(projectRouteKey || project.id);
+    }, [project?.id, project?.hmWikiEnabled, projectRouteKey]);
 
     useEffect(() => {
         if (!isDownloadOpen) return;
@@ -480,6 +492,8 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const versionPayloadPending = Boolean((isHistoryOpen || isDownloadOpen) && !project?.versions);
     const galleryPayloadPending = Boolean(isGalleryRoute && !project?.galleryImages);
+    const navigationWikiData = wikiData?.mod?.pages?.length > 0 ? wikiData : displayWikiData;
+    const navigationWikiSlug = wikiPageSlug || displaySlug;
 
     const toggleExperimental = useCallback(() => {
         setShowExperimental((prev) => !prev);
@@ -606,7 +620,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                     isWikiRoute ? (
                         <>
                             <Suspense fallback={null}>
-                                <WikiSidebar tree={displayWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={displaySlug} indexSlug={displayWikiData?.mod?.index?.slug} pageCache={displayWikiData?.pageCache} />
+                                <WikiSidebar tree={navigationWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={navigationWikiSlug} indexSlug={navigationWikiData?.mod?.index?.slug} pageCache={navigationWikiData?.pageCache} />
                             </Suspense>
                             <div className="mt-4">
                                 <Link to={projectUrl} className={`block text-sm font-bold ${theme.colors.accent} hover:underline flex items-center gap-2`}>
@@ -621,7 +635,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 mainContent={
                     isWikiRoute ? (
                         <Suspense fallback={<div className="flex justify-center p-12"><Spinner /></div>}>
-                            <WikiMobileNavigation tree={displayWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={displaySlug} indexSlug={displayWikiData?.mod?.index?.slug} onNavigate={handleMobileWikiNavigate} pageCache={displayWikiData?.pageCache} />
+                            <WikiMobileNavigation tree={navigationWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={navigationWikiSlug} indexSlug={navigationWikiData?.mod?.index?.slug} onNavigate={handleMobileWikiNavigate} pageCache={navigationWikiData?.pageCache} />
                             <Wiki wikiLoading={wikiLoading} wikiError={wikiError} displayWikiData={displayWikiData} displaySlug={displaySlug} project={project} wikiContentRef={wikiContentRef} lockedHeight={lockedHeight} />
                         </Suspense>
                     ) : (

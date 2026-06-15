@@ -412,7 +412,7 @@ export const Wiki: React.FC<{ wikiLoading: boolean; wikiError: boolean; wikiData
             {wikiData.content?.content ? (
                 <>
                     <h1 className="text-3xl md:text-4xl font-black mb-6 break-words">{wikiData.content.title || wikiData.mod.name}</h1>
-                    <MarkdownRenderer content={wikiData.content.content} />
+                    <MarkdownRenderer content={wikiData.content.content} deferRich />
                 </>
             ) : (
                 <div className={`${theme.colors.textMuted} italic`}>Page content is empty.</div>

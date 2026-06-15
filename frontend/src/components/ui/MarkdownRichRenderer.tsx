@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
@@ -6,7 +6,6 @@ import remarkGfm from 'remark-gfm';
 import { Check, Copy } from 'lucide-react';
 
 const HighlightedCode = lazy(() => import('./MarkdownSyntaxHighlighter').then((module) => ({ default: module.HighlightedCode })));
-const MermaidChart = lazy(() => import('./MarkdownMermaidChart').then((module) => ({ default: module.MermaidChart })));
 
 const allowedTextAlignments = new Set(['left', 'center', 'right', 'justify']);
 
@@ -58,6 +57,52 @@ const CodeFallback = ({ content }: { content: string }) => (
     </pre>
 );
 
+const MermaidFallback = ({ content }: { content: string }) => (
+    <div className="relative w-full my-4 rounded-xl overflow-hidden bg-slate-900 ring-1 ring-slate-300 dark:ring-white/10 shadow-lg z-10">
+        <div className="px-4 py-1.5 bg-slate-800 border-b border-slate-950 text-xs font-sans text-slate-400 select-none">
+            mermaid
+        </div>
+        <CodeFallback content={content} />
+    </div>
+);
+
+const DeferredMermaidChart = ({ content }: { content: string }) => {
+    const [MermaidChart, setMermaidChart] = useState<React.ComponentType<{ chart: string }> | null>(null);
+    const [loadFailed, setLoadFailed] = useState(false);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        import('./MarkdownMermaidChart')
+            .then((module) => {
+                if (isMounted) {
+                    setMermaidChart(() => module.MermaidChart);
+                    setLoadFailed(false);
+                }
+            })
+            .catch(() => {
+                if (isMounted) {
+                    setMermaidChart(null);
+                    setLoadFailed(true);
+                }
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    if (loadFailed) {
+        return <MermaidFallback content={content} />;
+    }
+
+    if (!MermaidChart) {
+        return <div className="animate-pulse h-32 bg-slate-100 dark:bg-slate-800 rounded-xl my-4" />;
+    }
+
+    return <MermaidChart chart={content} />;
+};
+
 const CodeBlock = ({ node: _node, inline, className, children, ...props }: any) => {
     const [copied, setCopied] = useState(false);
     const match = /language-(\w+)/.exec(className || '');
@@ -68,11 +113,7 @@ const CodeBlock = ({ node: _node, inline, className, children, ...props }: any) 
         const content = String(children).replace(/\n$/, '');
 
         if (lang === 'mermaid') {
-            return (
-                <Suspense fallback={<div className="animate-pulse h-32 bg-slate-100 dark:bg-slate-800 rounded-xl my-4" />}>
-                    <MermaidChart chart={content} />
-                </Suspense>
-            );
+            return <DeferredMermaidChart content={content} />;
         }
 
         const handleCopy = () => {
