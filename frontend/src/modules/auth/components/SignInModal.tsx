@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Github, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
+import { X, Github, ArrowRight, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { DiscordBrandIcon, GitLabBrandIcon, GoogleBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
@@ -7,12 +7,22 @@ import { StatusModal } from '@/components/ui/StatusModal';
 import { ModalPortal } from '@/components/ui/ModalPortal';
 import { useToast } from '@/components/ui/Toast';
 import { SiteRoutes } from '@/utils/routes';
-import { authClient, normalizeSignInResponse } from '../api/authClient';
+import {
+    authClient,
+    completeSignInMethod,
+    getLastSignInMethod,
+    normalizeSignInResponse,
+    SIGN_IN_METHOD_LABELS,
+    stageSignInMethod,
+    type SignInMethod
+} from '../api/authClient';
 
 interface SignInModalProps {
     isOpen: boolean;
     onClose: () => void;
 }
+
+type OAuthSignInMethod = Exclude<SignInMethod, 'email'>;
 
 export function SignInModal({ isOpen, onClose }: SignInModalProps) {
     const { showToast } = useToast();
@@ -25,9 +35,11 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [statusModal, setStatusModal] = useState<{ title: string; msg: string } | null>(null);
+    const [lastSignInMethod, setLastSignInMethod] = useState<SignInMethod | null>(null);
 
     useEffect(() => {
         setMounted(true);
+        if (isOpen) setLastSignInMethod(getLastSignInMethod());
         if (isOpen) document.body.style.overflow = 'hidden';
         return () => { document.body.style.overflow = ''; };
     }, [isOpen]);
@@ -39,7 +51,34 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
         SiteRoutes.dashboardProfile()
     );
 
-    const handleOAuthLogin = (provider: string) => {
+    const isLastMethod = (method: SignInMethod) => mode === 'signin' && lastSignInMethod === method;
+    const lastMethodHighlightClass = (method: SignInMethod) => isLastMethod(method)
+        ? 'ring-2 ring-modtale-accent ring-offset-2 ring-offset-white dark:ring-offset-slate-900'
+        : '';
+    const providerTitle = (method: OAuthSignInMethod) => `${isLastMethod(method) ? 'Last used: ' : ''}Sign in with ${SIGN_IN_METHOD_LABELS[method]}`;
+
+    const renderLastUsedBadge = (method: SignInMethod, compact = false) => {
+        if (!isLastMethod(method)) return null;
+
+        if (compact) {
+            return (
+                <span className="absolute -right-2 -top-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-modtale-accent text-white shadow-lg shadow-modtale-accent/25">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <span className="sr-only">Last used</span>
+                </span>
+            );
+        }
+
+        return (
+            <span className="absolute right-3 top-1/2 hidden -translate-y-1/2 items-center gap-1 rounded-full bg-white/15 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-white sm:inline-flex">
+                <CheckCircle2 className="h-3 w-3" />
+                Last used
+            </span>
+        );
+    };
+
+    const handleOAuthLogin = (provider: OAuthSignInMethod) => {
+        stageSignInMethod(provider);
         window.location.href = `${BACKEND_URL}/oauth2/authorization/${provider}`;
     };
 
@@ -68,6 +107,7 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                 username: username || email,
                 password
             });
+            stageSignInMethod('email');
 
             const signInResult = normalizeSignInResponse(res.data);
 
@@ -81,6 +121,7 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                 return;
             }
 
+            completeSignInMethod('email');
             window.location.href = redirectTo;
         } catch (err: any) {
             console.error(err);
@@ -129,6 +170,12 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                         <p className="text-slate-600 dark:text-slate-400 text-sm">
                             {mode === 'signin' ? 'Tell the tale of your mods.' : (mode === 'register' ? 'Join the community today.' : 'Enter your email to receive a reset link.')}
                         </p>
+                        {mode === 'signin' && lastSignInMethod && (
+                            <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-modtale-accent/30 bg-modtale-accent/10 px-3 py-1.5 text-xs font-bold text-modtale-accent">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                <span>Last used: {SIGN_IN_METHOD_LABELS[lastSignInMethod]}</span>
+                            </div>
+                        )}
                     </div>
 
                     {mode !== 'forgot-password' && (
@@ -136,33 +183,42 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                             <div className="space-y-3 mb-6">
                                 <button
                                     onClick={() => handleOAuthLogin('github')}
-                                    className="w-full bg-[#24292e] text-white py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-[#2f363d] transition-colors active:scale-95 duration-200 shadow-lg shadow-black/10"
+                                    className={`relative w-full bg-[#24292e] text-white py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-[#2f363d] transition-colors active:scale-95 duration-200 shadow-lg shadow-black/10 ${lastMethodHighlightClass('github')}`}
+                                    title={providerTitle('github')}
+                                    aria-label={providerTitle('github')}
                                 >
                                     <Github className="w-5 h-5" />
                                     <span className="text-sm">GitHub</span>
+                                    {renderLastUsedBadge('github')}
                                 </button>
 
                                 <div className="grid grid-cols-3 gap-3">
                                     <button
                                         onClick={() => handleOAuthLogin('gitlab')}
-                                        className="w-full bg-[#FC6D26] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#e24329] transition-colors active:scale-95 duration-200 shadow-lg shadow-orange-500/20"
-                                        title="Sign in with GitLab"
+                                        className={`relative w-full bg-[#FC6D26] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#e24329] transition-colors active:scale-95 duration-200 shadow-lg shadow-orange-500/20 ${lastMethodHighlightClass('gitlab')}`}
+                                        title={providerTitle('gitlab')}
+                                        aria-label={providerTitle('gitlab')}
                                     >
                                         <GitLabBrandIcon className="w-5 h-5" />
+                                        {renderLastUsedBadge('gitlab', true)}
                                     </button>
                                     <button
                                         onClick={() => handleOAuthLogin('discord')}
-                                        className="w-full bg-[#5865F2] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#4752c4] transition-colors active:scale-95 duration-200 shadow-lg shadow-indigo-500/20"
-                                        title="Sign in with Discord"
+                                        className={`relative w-full bg-[#5865F2] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#4752c4] transition-colors active:scale-95 duration-200 shadow-lg shadow-indigo-500/20 ${lastMethodHighlightClass('discord')}`}
+                                        title={providerTitle('discord')}
+                                        aria-label={providerTitle('discord')}
                                     >
                                         <DiscordBrandIcon className="w-5 h-5" />
+                                        {renderLastUsedBadge('discord', true)}
                                     </button>
                                     <button
                                         onClick={() => handleOAuthLogin('google')}
-                                        className="w-full bg-white text-slate-700 border border-slate-200 py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-slate-50 transition-colors active:scale-95 duration-200 shadow-lg shadow-black/5"
-                                        title="Sign in with Google"
+                                        className={`relative w-full bg-white text-slate-700 border border-slate-200 py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-slate-50 transition-colors active:scale-95 duration-200 shadow-lg shadow-black/5 ${lastMethodHighlightClass('google')}`}
+                                        title={providerTitle('google')}
+                                        aria-label={providerTitle('google')}
                                     >
                                         <GoogleBrandIcon className="w-5 h-5" />
+                                        {renderLastUsedBadge('google', true)}
                                     </button>
                                 </div>
                             </div>
@@ -191,9 +247,17 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                         )}
 
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase pl-1">
-                                {mode === 'signin' ? 'Email or Username' : 'Email'}
-                            </label>
+                            <div className="flex items-center justify-between gap-3 pl-1">
+                                <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">
+                                    {mode === 'signin' ? 'Email or Username' : 'Email'}
+                                </label>
+                                {isLastMethod('email') && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-modtale-accent/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-modtale-accent">
+                                        <CheckCircle2 className="h-3 w-3" />
+                                        Last used
+                                    </span>
+                                )}
+                            </div>
                             <input
                                 type={mode === 'signin' ? "text" : "email"}
                                 required

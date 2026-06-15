@@ -22,6 +22,7 @@ import type { User } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
 import type { Classification } from '@/data/categories';
 import { normalizeUser } from '@/utils/users';
+import { clearPendingSignInMethod, completeSignInMethod } from '@/modules/auth/api/authClient';
 
 const StatusModal = lazy(() => import('@/components/ui/StatusModal').then((module) => ({ default: module.StatusModal })));
 const Onboarding = lazy(() => import('@/modules/user/components/Onboarding').then((module) => ({ default: module.Onboarding })));
@@ -76,6 +77,7 @@ const AppContent: React.FC = () => {
         if (oauthError) {
             const decodedError = decodeURIComponent(oauthError).replace(/\+/g, ' ');
             setGlobalError(decodedError);
+            clearPendingSignInMethod();
             navigate(location.pathname, { replace: true });
         }
     }, [location, navigate]);
@@ -112,6 +114,7 @@ const AppContent: React.FC = () => {
             const res = await api.get(`/user/me?t=${Date.now()}`);
             if (res.data) {
                 setUser(normalizeUser(res.data));
+                completeSignInMethod();
                 if ((res.data as any).is_new_account) {
                     setShowOnboarding(true);
                 }

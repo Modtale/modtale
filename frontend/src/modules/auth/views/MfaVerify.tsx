@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ShieldCheck, ArrowRight, Loader2, Smartphone } from 'lucide-react';
 import { SiteRoutes } from '@/utils/routes';
-import { authClient } from '../api/authClient';
+import { authClient, completeSignInMethod } from '../api/authClient';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { extractApiErrorMessage } from '@/utils/api';
 
@@ -35,6 +35,7 @@ export function MfaVerify() {
                 pre_auth_token: token,
                 code: code
             });
+            completeSignInMethod();
             window.location.href = redirectTo;
         } catch (err: unknown) {
             setStatusModal({
