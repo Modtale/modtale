@@ -138,7 +138,9 @@ export const useProjectDetail = (
     }, [full, project?.id, project?.versions, routeKey]);
 
     useEffect(() => {
-        if (full || !project?.id || project.galleryImages !== undefined) return;
+        const hasLoadedGallerySlice = project?.galleryImages !== undefined
+            && project?.galleryImageCaptions !== undefined;
+        if (full || !project?.id || hasLoadedGallerySlice) return;
 
         const sectionKey = `${project.id}:${routeKey || project.id}`;
         if (fetchedGalleryKey.current === sectionKey) return;
@@ -160,7 +162,7 @@ export const useProjectDetail = (
             });
 
         return () => { isMounted = false; };
-    }, [full, project?.galleryImages, project?.id, routeKey]);
+    }, [full, project?.galleryImageCaptions, project?.galleryImages, project?.id, routeKey]);
 
     useEffect(() => {
         const hasAnyTeamSection = project?.projectRoles !== undefined

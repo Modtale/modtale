@@ -272,6 +272,47 @@ describe('useProjectDetail', () => {
         expect(latestSnapshot.latestIncompatibleProjectIds).toEqual(['bad-1']);
     });
 
+    it('hydrates the gallery slice when lightweight project data starts with an empty gallery array', async () => {
+        const project = {
+            id: 'project-1',
+            authorId: 'author-1',
+            author: 'Ada',
+            versions: [],
+            galleryCarouselEnabled: false,
+            galleryImages: []
+        } as any satisfies Project;
+
+        mockedProjectClient.getProjectGallery.mockResolvedValue({
+            galleryImages: ['/gallery-one.png'],
+            galleryImageCaptions: { '/gallery-one.png': 'Opening shot' }
+        });
+        mockedProjectClient.getUserProfile.mockResolvedValue({
+            id: 'author-1',
+            username: 'Ada',
+            avatarUrl: '',
+            likedProjectIds: [],
+            accountType: 'USER'
+        } as User);
+
+        await act(async () => {
+            root.render(
+                <Probe
+                    rawId="project-1"
+                    initialData={project}
+                    currentUser={null}
+                    onRender={snapshot => {
+                        latestSnapshot = snapshot;
+                    }}
+                />
+            );
+        });
+        await settle();
+
+        expect(mockedProjectClient.getProjectGallery).toHaveBeenCalledWith('project-1');
+        expect(latestSnapshot.project?.galleryImages).toEqual(['/gallery-one.png']);
+        expect(latestSnapshot.project?.galleryImageCaptions).toEqual({ '/gallery-one.png': 'Opening shot' });
+    });
+
     it('marks the project as not found when the primary fetch fails', async () => {
         mockedProjectClient.getProject.mockRejectedValue(new Error('missing'));
 

@@ -1,7 +1,11 @@
 package net.modtale.controller.project;
 
 import jakarta.validation.Valid;
+import net.modtale.mapper.ProjectMapper;
+import net.modtale.model.dto.project.ProjectDTO;
 import net.modtale.model.dto.request.project.RemoveGalleryImageRequest;
+import net.modtale.model.dto.request.project.UpdateGalleryImageCaptionRequest;
+import net.modtale.model.project.Project;
 import net.modtale.model.user.User;
 import net.modtale.service.project.media.ProjectMediaService;
 import net.modtale.service.user.account.AccountService;
@@ -76,5 +80,17 @@ public class MediaController {
         User user = accountService.requireCurrentUser(authentication, "removing a gallery image");
         projectMediaService.removeGalleryImage(id, requestPayload.getImageUrl(), user);
         return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/{id}/gallery/caption")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_GALLERY_ADD', authentication)")
+    public ResponseEntity<ProjectDTO> updateGalleryImageCaption(
+            @PathVariable String id,
+            @Valid @RequestBody UpdateGalleryImageCaptionRequest requestPayload,
+            Authentication authentication
+    ) {
+        User user = accountService.requireCurrentUser(authentication, "updating a gallery image caption");
+        Project project = projectMediaService.updateGalleryImageCaption(id, requestPayload.getImageUrl(), requestPayload.getCaption(), user);
+        return ResponseEntity.ok(ProjectMapper.toDTO(project, false, user.getId()));
     }
 }

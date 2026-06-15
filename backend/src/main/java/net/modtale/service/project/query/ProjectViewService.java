@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 import net.modtale.model.dto.project.ProjectVersionChangelogDTO;
 import net.modtale.model.project.Comment;
 import net.modtale.model.project.Project;
+import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
@@ -131,6 +132,7 @@ public class ProjectViewService {
         if (!access.canRead()) return null;
 
         filterVisibleVersions(project, access.privileged());
+        populateDependencyMetadata(project, access.privileged());
         return project;
     }
 
@@ -216,6 +218,7 @@ public class ProjectViewService {
         Project project = resolvePublicProjectVersionsByRouteKey(routeKey);
         if (project == null || project.getDeletedAt() != null || !accessControlService.isPubliclyReadable(project)) return null;
         filterVisibleVersions(project, false);
+        populateDependencyMetadata(project, false);
         return project;
     }
 
@@ -534,12 +537,67 @@ public class ProjectViewService {
 
         if (project.getVersions() != null) {
             filterVisibleVersions(project, privileged);
+            populateDependencyMetadata(project, privileged);
         }
 
         if (!project.isAllowComments() && !privileged) project.setComments(new ArrayList<>());
         populateRelatedUsers(project);
 
         return project;
+    }
+
+    private void populateDependencyMetadata(Project project, boolean privileged) {
+        if (project == null || project.getVersions() == null) return;
+
+        Set<String> dependencyIds = project.getVersions().stream()
+                .filter(version -> version.getDependencies() != null)
+                .flatMap(version -> version.getDependencies().stream())
+                .map(ProjectDependency::getModId)
+                .filter(id -> id != null && !id.isBlank())
+                .collect(Collectors.toSet());
+
+        if (dependencyIds.isEmpty()) {
+            return;
+        }
+
+        Criteria criteria = Criteria.where("_id").in(MongoIdUtils.expandIds(dependencyIds))
+                .and("deletedAt").is(null);
+        if (!privileged) {
+            criteria.and("status").in("PUBLISHED", "UNLISTED", "ARCHIVED");
+        }
+
+        Query query = Query.query(criteria);
+        query.fields()
+                .include("_id")
+                .include("slug")
+                .include("title")
+                .include("imageUrl")
+                .include("classification")
+                .include("status");
+
+        Map<String, Project> dependencyProjects = mongoTemplate.find(query, Project.class).stream()
+                .collect(Collectors.toMap(Project::getId, Function.identity(), (existing, replacement) -> existing));
+
+        project.getVersions().stream()
+                .filter(version -> version.getDependencies() != null)
+                .flatMap(version -> version.getDependencies().stream())
+                .forEach(dependency -> {
+                    Project dependencyProject = dependencyProjects.get(dependency.getModId());
+                    if (dependencyProject == null) {
+                        dependency.setTitle(dependency.getModTitle());
+                        return;
+                    }
+
+                    if (dependency.getModTitle() == null || dependency.getModTitle().isBlank()) {
+                        dependency.setModTitle(dependencyProject.getTitle());
+                    }
+                    dependency.setTitle(dependencyProject.getTitle() != null ? dependencyProject.getTitle() : dependency.getModTitle());
+                    dependency.setIcon(dependencyProject.getImageUrl() != null ? dependencyProject.getImageUrl() : "");
+                    dependency.setClassification(dependencyProject.getClassification());
+                    dependency.setSlug(dependencyProject.getSlug() != null && !dependencyProject.getSlug().isBlank()
+                            ? dependencyProject.getSlug()
+                            : dependencyProject.getId());
+                });
     }
 
     private void populateAuthorName(Project project) {

@@ -30,6 +30,7 @@ public record ProjectPageDTO(
         boolean allowComments,
         boolean hmWikiEnabled,
         String hmWikiSlug,
+        boolean galleryCarouselEnabled,
         ProjectStatus status,
         String expiresAt,
         boolean canEdit,
