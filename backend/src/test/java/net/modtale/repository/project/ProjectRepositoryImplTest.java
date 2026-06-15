@@ -210,6 +210,30 @@ class ProjectRepositoryImplTest {
     }
 
     @Test
+    void commaSeparatedGameVersionsMatchAnySelectedVersion() {
+        repository.searchProjects(
+                null,
+                null,
+                "0.5.4, 0.5.3,,0.5.4",
+                null,
+                null,
+                null,
+                PageRequest.of(0, 20),
+                null,
+                ProjectSort.RELEVANCE,
+                ProjectViewCategory.ALL,
+                null,
+                null
+        );
+
+        String queryJson = capturedFindQuery().getQueryObject().toString();
+
+        assertTrue(queryJson.contains("versions.gameVersions"));
+        assertTrue(queryJson.contains("0.5.4"));
+        assertTrue(queryJson.contains("0.5.3"));
+    }
+
+    @Test
     void timeWindowDownloadsSortStillUsesWindowedDownloadFields() {
         repository.searchProjects(
                 null,

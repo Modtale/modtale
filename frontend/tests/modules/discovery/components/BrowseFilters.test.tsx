@@ -21,10 +21,18 @@ const settle = async (times = 4) => {
     }
 };
 
-const renderFilters = (isFilterOpen: boolean, selectedVersion = 'Any', setSelectedVersion = vi.fn(), onResetFilters = vi.fn()) => (
+const renderFilters = (
+    isFilterOpen: boolean,
+    selectedVersion = 'Any',
+    setSelectedVersion = vi.fn(),
+    onResetFilters = vi.fn(),
+    totalItems = 12,
+    itemsPerPage = 12,
+    onItemsPerPageChange = vi.fn()
+) => (
     <BrowseFilters
         pageTitle="All Projects"
-        totalItems={12}
+        totalItems={totalItems}
         loading={false}
         sortBy="relevance"
         onSortChange={vi.fn()}
@@ -49,6 +57,8 @@ const renderFilters = (isFilterOpen: boolean, selectedVersion = 'Any', setSelect
         isMobile={false}
         viewStyle="grid"
         onViewStyleChange={vi.fn()}
+        itemsPerPage={itemsPerPage}
+        onItemsPerPageChange={onItemsPerPageChange}
         isScrolled={false}
     />
 );
@@ -173,5 +183,55 @@ describe('BrowseFilters performance behavior', () => {
         });
 
         expect(setSelectedVersion).toHaveBeenCalledWith('0.5.4,0.5.3');
+    });
+
+    it('shows a singular result count when there is exactly one result', async () => {
+        await act(async () => {
+            root.render(renderFilters(false, 'Any', vi.fn(), vi.fn(), 1));
+        });
+
+        expect(container.textContent).toContain('1 result');
+        expect(container.textContent).not.toContain('1 results');
+    });
+
+    it('offers compact results-per-page choices from the toolbar dropdown', async () => {
+        const onItemsPerPageChange = vi.fn();
+
+        await act(async () => {
+            root.render(renderFilters(false, 'Any', vi.fn(), vi.fn(), 12, 12, onItemsPerPageChange));
+        });
+
+        const pageSizeButton = Array.from(container.querySelectorAll('button')).find(
+            (button) => button.textContent?.includes('12/page')
+        );
+
+        expect(pageSizeButton).toBeTruthy();
+
+        await act(async () => {
+            pageSizeButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        const optionLabels = Array.from(container.querySelectorAll('button'))
+            .map(button => button.textContent?.trim())
+            .filter(Boolean);
+
+        expect(optionLabels).toEqual(expect.arrayContaining([
+            '6 per page',
+            '12 per page',
+            '18 per page',
+            '24 per page',
+            '36 per page',
+            '48 per page'
+        ]));
+
+        const option = Array.from(container.querySelectorAll('button')).find(
+            (button) => button.textContent?.includes('24 per page')
+        );
+
+        await act(async () => {
+            option?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onItemsPerPageChange).toHaveBeenCalledWith(24);
     });
 });
