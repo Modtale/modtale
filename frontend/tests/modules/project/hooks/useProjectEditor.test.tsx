@@ -11,7 +11,7 @@ vi.mock('@/modules/project/api/projectClient', () => ({
         getGitRepos: vi.fn(),
         updateRole: vi.fn(),
         cancelInvite: vi.fn(),
-        getProject: vi.fn()
+        getProjectFull: vi.fn()
     }
 }));
 
@@ -127,7 +127,7 @@ describe('useProjectEditor', () => {
         mockedProjectClient.getGitRepos.mockResolvedValue([]);
         mockedProjectClient.updateRole.mockResolvedValue(undefined);
         mockedProjectClient.cancelInvite.mockResolvedValue(undefined);
-        mockedProjectClient.getProject.mockResolvedValue(null as any);
+        mockedProjectClient.getProjectFull.mockResolvedValue(null as any);
         mockedExtractApiErrorMessage.mockImplementation((error: any, fallback?: string) => {
             return error?.response?.data?.message ?? error?.response?.data ?? fallback ?? 'Unknown error';
         });
@@ -245,7 +245,7 @@ describe('useProjectEditor', () => {
         const iconFile = new File(['icon'], 'icon.png', { type: 'image/png' });
         const bannerFile = new File(['banner'], 'banner.png', { type: 'image/png' });
 
-        mockedProjectClient.getProject.mockResolvedValue({
+        mockedProjectClient.getProjectFull.mockResolvedValue({
             id: 'project-1',
             title: 'Sky Tools Reloaded',
             slug: 'sky-tools',
@@ -304,7 +304,7 @@ describe('useProjectEditor', () => {
         expect(bannerUpload[1]).toBeInstanceOf(FormData);
         expect((bannerUpload[1] as FormData).get('file')).toBe(bannerFile);
 
-        expect(mockedProjectClient.getProject).toHaveBeenCalledWith('project-1');
+        expect(mockedProjectClient.getProjectFull).toHaveBeenCalledWith('project-1');
         expect(latestSnapshot.isDirty).toBe(false);
         expect(latestSnapshot.metaData.iconFile).toBeNull();
         expect(latestSnapshot.metaData.iconPreview).toBe('/new-icon.png');
@@ -333,7 +333,7 @@ describe('useProjectEditor', () => {
     });
 
     it('submits the project after saving dirty changes and marks it pending', async () => {
-        mockedProjectClient.getProject.mockResolvedValue({
+        mockedProjectClient.getProjectFull.mockResolvedValue({
             id: 'project-1',
             title: 'Sky Tools',
             slug: 'sky-tools'

@@ -671,7 +671,7 @@ describe('Home fallback requests', () => {
         });
 
         expect(mockedApi.get).toHaveBeenCalledWith('/projects', {
-            params: { size: 16, sort: 'trending' },
+            params: { size: 16, sort: 'trending', view: 'marquee' },
             timeout: 1800,
         });
         expect(mockedApi.get).toHaveBeenCalledWith('/projects', {
