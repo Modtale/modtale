@@ -251,9 +251,9 @@ export interface Project {
     projectIds?: string[];
     childProjectIds?: string[];
     sizeBytes?: number;
-    comments: Comment[];
-    versions: ProjectVersion[];
-    galleryImages: string[];
+    comments?: Comment[];
+    versions?: ProjectVersion[];
+    galleryImages?: string[];
     repositoryUrl?: string;
 
     projectRoles?: ProjectRole[];

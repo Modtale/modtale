@@ -58,11 +58,34 @@ public class ProjectService {
         return projectViewService.getProjectByRouteKey(routeKey, viewer);
     }
 
-    public Project getProjectPageByRouteKey(String routeKey, User viewer) {
+    public Project getProjectDetailsByRouteKey(String routeKey, User viewer) {
         if (viewer == null) {
-            return projectViewService.getPublicProjectPageByRouteKey(routeKey);
+            return projectViewService.getPublicProjectDetailsByRouteKey(routeKey);
         }
-        return projectViewService.getProjectPageByRouteKey(routeKey, viewer);
+        return projectViewService.getProjectDetailsByRouteKey(routeKey, viewer);
+    }
+
+    public Project getProjectPageShellByRouteKey(String routeKey, User viewer) {
+        if (viewer == null) {
+            return projectViewService.getPublicProjectPageShellByRouteKey(routeKey);
+        }
+        return projectViewService.getProjectPageShellByRouteKey(routeKey, viewer);
+    }
+
+    public Project getProjectVersionsByRouteKey(String routeKey, User viewer) {
+        return projectViewService.getProjectVersionsByRouteKey(routeKey, viewer);
+    }
+
+    public Project getProjectCommentsByRouteKey(String routeKey, User viewer) {
+        return projectViewService.getProjectCommentsByRouteKey(routeKey, viewer);
+    }
+
+    public Project getProjectGalleryByRouteKey(String routeKey, User viewer) {
+        return projectViewService.getProjectGalleryByRouteKey(routeKey, viewer);
+    }
+
+    public Project getProjectTeamByRouteKey(String routeKey, User viewer) {
+        return projectViewService.getProjectTeamByRouteKey(routeKey, viewer);
     }
 
     @Cacheable(value = "projectDetails", key = "'public:' + #id")
@@ -74,12 +97,32 @@ public class ProjectService {
         return projectViewService.getPublicProjectByRouteKey(routeKey);
     }
 
-    public Project getPublicProjectPageById(String id) {
-        return projectViewService.getPublicProjectPageById(id);
+    public Project getPublicProjectDetailsById(String id) {
+        return projectViewService.getPublicProjectDetailsById(id);
     }
 
-    public Project getPublicProjectPageByRouteKey(String routeKey) {
-        return projectViewService.getPublicProjectPageByRouteKey(routeKey);
+    public Project getPublicProjectDetailsByRouteKey(String routeKey) {
+        return projectViewService.getPublicProjectDetailsByRouteKey(routeKey);
+    }
+
+    public Project getPublicProjectPageShellByRouteKey(String routeKey) {
+        return projectViewService.getPublicProjectPageShellByRouteKey(routeKey);
+    }
+
+    public Project getPublicProjectVersionsByRouteKey(String routeKey) {
+        return projectViewService.getPublicProjectVersionsByRouteKey(routeKey);
+    }
+
+    public Project getPublicProjectCommentsByRouteKey(String routeKey) {
+        return projectViewService.getPublicProjectCommentsByRouteKey(routeKey);
+    }
+
+    public Project getPublicProjectGalleryByRouteKey(String routeKey) {
+        return projectViewService.getPublicProjectGalleryByRouteKey(routeKey);
+    }
+
+    public Project getPublicProjectTeamByRouteKey(String routeKey) {
+        return projectViewService.getPublicProjectTeamByRouteKey(routeKey);
     }
 
     public java.util.List<ProjectVersionChangelogDTO> getVersionChangelogsByRouteKey(String routeKey, User viewer) {

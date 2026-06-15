@@ -40,6 +40,54 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
             String currentUserId, ProjectSort sortBy,
             ProjectViewCategory viewCategory, LocalDate dateCutoff, String authorId
     ) {
+        return searchProjectsInternal(
+                search,
+                tags,
+                gameVersion,
+                classification,
+                minDownloads,
+                minFavorites,
+                pageable,
+                currentUserId,
+                sortBy,
+                viewCategory,
+                dateCutoff,
+                authorId,
+                SearchProjection.CATALOG
+        );
+    }
+
+    @Override
+    public Page<Project> searchProjectMarquee(
+            String search, List<String> tags, String gameVersion, ProjectClassification classification,
+            Integer minDownloads, Integer minFavorites, Pageable pageable,
+            ProjectSort sortBy,
+            ProjectViewCategory viewCategory, LocalDate dateCutoff, String authorId
+    ) {
+        return searchProjectsInternal(
+                search,
+                tags,
+                gameVersion,
+                classification,
+                minDownloads,
+                minFavorites,
+                pageable,
+                null,
+                sortBy,
+                viewCategory,
+                dateCutoff,
+                authorId,
+                SearchProjection.MARQUEE
+        );
+    }
+
+    private Page<Project> searchProjectsInternal(
+            String search, List<String> tags, String gameVersion, ProjectClassification classification,
+            Integer minDownloads, Integer minFavorites, Pageable pageable,
+            String currentUserId, ProjectSort sortBy,
+            ProjectViewCategory viewCategory, LocalDate dateCutoff, String authorId,
+            SearchProjection projection
+    ) {
         List<Criteria> criteriaList = new ArrayList<>();
 
         if (viewCategory == ProjectViewCategory.YOUR_PROJECTS && currentUserId != null) {
@@ -85,7 +133,11 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
                 (criteriaList.size() == 1 ? criteriaList.get(0) : new Criteria().andOperator(criteriaList.toArray(new Criteria[0])));
         Sort sort = resolveSort(sortBy, viewCategory, dateCutoff, pageable);
         Query query = new Query(baseCriteria).with(sort);
-        applyCatalogSummaryProjection(query);
+        if (projection == SearchProjection.MARQUEE) {
+            applyMarqueeProjection(query);
+        } else {
+            applyCatalogSummaryProjection(query);
+        }
         query.skip((long) pageable.getPageNumber() * pageable.getPageSize());
         query.limit(pageable.getPageSize());
 
@@ -95,6 +147,11 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
                 pageable,
                 () -> mongoTemplate.count(new Query(baseCriteria), Project.class)
         );
+    }
+
+    private enum SearchProjection {
+        CATALOG,
+        MARQUEE
     }
 
     private Sort resolveSort(ProjectSort sortBy, ProjectViewCategory viewCategory, LocalDate dateCutoff, Pageable pageable) {
@@ -190,6 +247,19 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
                 .include("favoriteCount")
                 .include("updatedAt")
                 .include("childProjectIds");
+    }
+
+    private void applyMarqueeProjection(Query query) {
+        query.fields()
+                .include("_id")
+                .include("slug")
+                .include("title")
+                .include("authorId")
+                .include("author")
+                .include("imageUrl")
+                .include("bannerUrl")
+                .include("classification")
+                .include("downloadCount");
     }
 
     @Override

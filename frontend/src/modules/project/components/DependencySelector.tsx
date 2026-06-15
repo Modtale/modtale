@@ -30,8 +30,8 @@ const DependencyRow: React.FC<{ dep: ProjectDependency; targetGameVersion: strin
         const fetchVersions = async () => {
             setLoading(true);
             try {
-                const project = await projectClient.getProject(dep.projectId);
-                const sorted = (project.versions || []).sort((a, b) => compareSemVer(b.versionNumber, a.versionNumber));
+                const projectVersions = await projectClient.getProjectVersions(dep.projectId);
+                const sorted = projectVersions.sort((a, b) => compareSemVer(b.versionNumber, a.versionNumber));
                 setVersions(sorted);
             } catch (e) {
             } finally {
@@ -354,8 +354,8 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
         }
         setLoadingProjectVersions(true);
         try {
-            const fullProject = mod.versions ? mod : await projectClient.getProject(mod.id);
-            setSelectedModForVersion({ ...fullProject, versions: fullProject.versions || [] });
+            const versions = mod.versions || await projectClient.getProjectVersions(mod.id);
+            setSelectedModForVersion({ ...mod, versions });
         } catch (e) {
             setSelectedModForVersion({ ...mod, versions: mod.versions || [] });
         } finally {

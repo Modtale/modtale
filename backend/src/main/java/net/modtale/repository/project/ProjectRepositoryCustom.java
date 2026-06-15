@@ -25,6 +25,20 @@ public interface ProjectRepositoryCustom {
             String authorId
     );
 
+    Page<Project> searchProjectMarquee(
+            String search,
+            List<String> tags,
+            String gameVersion,
+            ProjectClassification classification,
+            Integer minDownloads,
+            Integer minFavorites,
+            Pageable pageable,
+            ProjectSort sortBy,
+            ProjectViewCategory viewCategory,
+            LocalDate dateCutoff,
+            String authorId
+    );
+
     Page<Project> findFavorites(List<String> projectIds, String search, Pageable pageable);
 
     Page<Project> searchDeletedProjects(String search, Pageable pageable);

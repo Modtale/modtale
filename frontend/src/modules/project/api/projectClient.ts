@@ -1,5 +1,5 @@
 import { api } from '@/utils/api';
-import type { ManifestInspectionResult, Project, ProjectVersionChangelog, User, ProjectRole, GameVersionCatalog } from '@/types';
+import type { Comment, ManifestInspectionResult, Project, ProjectMember, ProjectVersion, ProjectVersionChangelog, User, ProjectRole, GameVersionCatalog } from '@/types';
 import { normalizeUser, normalizeUsers } from '@/utils/users';
 
 export const projectClient = {
@@ -7,9 +7,33 @@ export const projectClient = {
         const res = await api.get<Project>(`/projects/${id}`);
         return res.data;
     },
+    getProjectFull: async (id: string) => {
+        const res = await api.get<Project>(`/projects/${id}/details`);
+        return res.data;
+    },
+    getProjectVersions: async (id: string) => {
+        const res = await api.get<{ versions?: ProjectVersion[] }>(`/projects/${id}/versions`);
+        return res.data?.versions || [];
+    },
     getProjectVersionChangelogs: async (id: string) => {
         const res = await api.get<ProjectVersionChangelog[]>(`/projects/${id}/versions/changelogs`);
         return res.data || [];
+    },
+    getProjectGallery: async (id: string) => {
+        const res = await api.get<{ galleryImages?: string[] }>(`/projects/${id}/gallery`);
+        return res.data?.galleryImages || [];
+    },
+    getProjectTeam: async (id: string) => {
+        const res = await api.get<{
+            projectRoles?: ProjectRole[];
+            teamMembers?: ProjectMember[];
+            teamInvites?: ProjectMember[];
+        }>(`/projects/${id}/team`);
+        return {
+            projectRoles: res.data?.projectRoles || [],
+            teamMembers: res.data?.teamMembers || [],
+            teamInvites: res.data?.teamInvites || []
+        };
     },
     getProjectGameVersions: async () => {
         const res = await api.get<string[]>('/meta/game-versions');
@@ -49,8 +73,8 @@ export const projectClient = {
         await api.post(`/user/unfollow/${targetId}`);
     },
     getComments: async (projectId: string) => {
-        const res = await api.get<Project>(`/projects/${projectId}`);
-        return res.data.comments || [];
+        const res = await api.get<{ comments?: Comment[] }>(`/projects/${projectId}/comments`);
+        return res.data?.comments || [];
     },
     postComment: async (projectId: string, content: string) => {
         await api.post(`/projects/${projectId}/comments`, { content });

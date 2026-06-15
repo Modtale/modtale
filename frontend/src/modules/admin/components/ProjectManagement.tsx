@@ -206,7 +206,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
             } else if (confirmAction === 'DELETE_VER' && targetVersionId) {
                 await adminClient.deleteVersion(foundProject.id, targetVersionId);
                 setStatus({ type: 'success', title: 'Version Deleted', msg: 'Version removed successfully.' });
-                const newVersions = foundProject.versions.filter(v => v.id !== targetVersionId);
+                const newVersions = (foundProject.versions || []).filter(v => v.id !== targetVersionId);
                 setFoundProject({ ...foundProject, versions: newVersions });
             }
             setConfirmAction(null);

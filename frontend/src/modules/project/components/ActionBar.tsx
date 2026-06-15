@@ -26,12 +26,13 @@ export const ActionBar: React.FC<ActionBarProps> = ({ project, projectUrl, links
 
     const hasWiki = Boolean(project.hmWikiEnabled && project.hmWikiSlug);
     const hasGallery = Boolean(project.galleryImages && project.galleryImages.length > 0);
+    const hasVersions = Boolean((project.versions?.length || 0) > 0);
     const mediaButtonClass = hasWiki && hasGallery ? 'col-span-1 md:col-span-1' : 'col-span-2 md:col-span-1';
 
     return (
         <div className="flex flex-col 2xl:flex-row items-start 2xl:items-center justify-between gap-3 2xl:gap-6 w-full">
             <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 md:gap-3 w-full 2xl:w-auto">
-                {(!project.versions || project.versions.length === 0) ? (
+                {!hasVersions ? (
                     <button disabled className="flex-shrink-0 bg-modtale-accent hover:bg-modtale-accentHover disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-500 text-white px-6 lg:px-8 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 group cursor-not-allowed">
                         <Download className="w-5 h-5 group-hover:animate-bounce" aria-hidden="true" /> Download
                     </button>
