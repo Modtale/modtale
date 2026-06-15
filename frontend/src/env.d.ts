@@ -3,6 +3,15 @@ interface Window {
     INITIAL_DATA?: any;
     __MODTALE_PROJECT_BOOTSTRAP?: Promise<any | null>;
     __MODTALE_PROJECT_BOOTSTRAP_URL?: string;
+    __MODTALE_WIKI_BOOTSTRAP?: {
+        projectId?: string;
+        metadataUrl?: string;
+        metadata?: Promise<any | null> | null;
+        pages?: Record<string, {
+            url?: string;
+            promise?: Promise<any | null> | null;
+        }>;
+    };
 }
 
 interface ImportMetaEnv {

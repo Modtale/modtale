@@ -15,6 +15,12 @@ interface Props {
     pageNext?: string;
     pagePrev?: string;
     projectBootstrapUrl?: string;
+    wikiBootstrap?: {
+        projectId?: string;
+        metadataUrl?: string;
+        pageUrl?: string;
+        pageSlug?: string;
+    };
     robots?: string;
 }
 
@@ -30,6 +36,7 @@ const {
     pageNext,
     pagePrev,
     projectBootstrapUrl,
+    wikiBootstrap,
     robots = 'index,follow'
 } = Astro.props;
 
@@ -38,6 +45,7 @@ const canonicalUrl = canonicalOverride || new URL(Astro.url.pathname, "https://m
 const initialDataString = initialData ? JSON.stringify(initialData).replace(/</g, '\\u003c') : 'null';
 const jsonLdString = jsonLd ? JSON.stringify(jsonLd).replace(/</g, '\\u003c') : null;
 const projectBootstrapUrlString = projectBootstrapUrl ? JSON.stringify(projectBootstrapUrl).replace(/</g, '\\u003c') : null;
+const wikiBootstrapString = wikiBootstrap ? JSON.stringify(wikiBootstrap).replace(/</g, '\\u003c') : null;
 ---
 
 <!DOCTYPE html>
@@ -106,6 +114,41 @@ const projectBootstrapUrlString = projectBootstrapUrl ? JSON.stringify(projectBo
             } catch (e) {}
         })();
     </script>
+    {wikiBootstrapString && (
+        <script is:inline set:html={`
+            (function() {
+                var bootstrap = ${wikiBootstrapString};
+                if (!bootstrap || typeof window === 'undefined' || window.__MODTALE_WIKI_BOOTSTRAP) return;
+
+                function fetchJson(url) {
+                    if (!url) return null;
+                    return fetch(url, {
+                        credentials: 'include',
+                        headers: { 'Accept': 'application/json' }
+                    }).then(function(response) {
+                        return response.ok ? response.json() : null;
+                    }).catch(function() {
+                        return null;
+                    });
+                }
+
+                var pages = {};
+                if (bootstrap.pageUrl && bootstrap.pageSlug) {
+                    pages[bootstrap.pageSlug] = {
+                        url: bootstrap.pageUrl,
+                        promise: fetchJson(bootstrap.pageUrl)
+                    };
+                }
+
+                window.__MODTALE_WIKI_BOOTSTRAP = {
+                    projectId: bootstrap.projectId,
+                    metadataUrl: bootstrap.metadataUrl,
+                    metadata: fetchJson(bootstrap.metadataUrl),
+                    pages: pages
+                };
+            })();
+        `} />
+    )}
     {projectBootstrapUrlString && (
         <script is:inline set:html={`
             (function() {
