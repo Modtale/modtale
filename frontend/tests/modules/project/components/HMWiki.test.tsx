@@ -160,7 +160,7 @@ describe('WikiSidebar', () => {
         expect(collapseButton).not.toBeNull();
     });
 
-    it('does not let category pages navigate if they are missing from the cache entirely', async () => {
+    it('lets category pages navigate if their content has not been fetched yet', async () => {
         const onNavigate = vi.fn();
 
         await act(async () => {
@@ -176,7 +176,13 @@ describe('WikiSidebar', () => {
         });
 
         const guidesButton = [...container.querySelectorAll('button')].find((node) => node.textContent === 'Guides');
-        expect(guidesButton).toBeUndefined();
+        expect(guidesButton).not.toBeNull();
+
+        await act(async () => {
+            guidesButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(onNavigate).toHaveBeenCalledWith('guides');
     });
 
     it('lets category pages navigate if they have non-empty content', async () => {
