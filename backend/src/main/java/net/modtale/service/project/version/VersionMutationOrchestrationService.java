@@ -148,4 +148,8 @@ public class VersionMutationOrchestrationService {
             version.setFileUrl(null);
         }
     }
+
+    public void deleteVersionFile(ProjectVersion version) {
+        projectDeletionService.deleteVersionFile(version);
+    }
 }

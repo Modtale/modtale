@@ -55,7 +55,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         title: '', summary: '', description: '', tags: [], links: {}, repositoryUrl: '', iconFile: null, iconPreview: null, slug: ''
     });
     const [versionData, setVersionData] = useState<VersionFormData>({
-        projectIds: [], incompatibleProjectIds: [], versionNumber: '', gameVersions: [], changelog: '', file: null, dependencies: [], modIds: [], channel: 'RELEASE'
+        projectIds: [], incompatibleProjectIds: [], versionNumber: '', gameVersions: [], changelog: '', file: null, dependencies: [], modIds: [], channel: 'RELEASE', replaceExisting: false
     });
 
     const [bannerFile, setBannerFile] = useState<File | null>(null);
@@ -372,6 +372,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             (versionData.incompatibleProjectIds || []).forEach(projectId => formData.append('incompatibleProjectIds', projectId));
             if (versionData.changelog) formData.append('changelog', versionData.changelog);
             formData.append('channel', versionData.channel || 'RELEASE');
+            formData.append('replaceExisting', versionData.replaceExisting ? 'true' : 'false');
 
             await api.post(`/projects/${projectData.id}/versions`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
@@ -388,7 +389,8 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                 file: null,
                 dependencies: [],
                 modIds: [],
-                channel: versionData.channel || 'RELEASE'
+                channel: versionData.channel || 'RELEASE',
+                replaceExisting: false
             });
             onShowStatus('success', 'Uploaded', 'Version uploaded successfully.');
         } catch (e: any) {
@@ -409,7 +411,8 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             file: null,
             dependencies: [],
             modIds: [],
-            channel: version.channel || 'RELEASE'
+            channel: version.channel || 'RELEASE',
+            replaceExisting: false
         });
     };
 

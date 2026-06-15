@@ -102,9 +102,10 @@ public class VersionService {
             List<String> projectIds,
             List<String> incompatibleProjectIds,
             ProjectVersion.Channel channel,
+            boolean replaceExisting,
             User user
     ) {
-        versionCreationCommandHandler.addVersion(id, versionNumber, gameVersions, file, changelog, projectIds, incompatibleProjectIds, channel, user);
+        versionCreationCommandHandler.addVersion(id, versionNumber, gameVersions, file, changelog, projectIds, incompatibleProjectIds, channel, replaceExisting, user);
     }
 
     public ManifestInspectionResult inspectManifest(String id, MultipartFile file, User user) {
