@@ -3,6 +3,7 @@ import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import type { Project, ProjectDependency, User } from '@/types';
 import { ProjectMetaSections } from '../components/ProjectMetaSections';
 import { GalleryCarousel } from '../components/GalleryCarousel';
+import { splitDescriptionByGalleryCarouselMarker } from '../utils/galleryCarouselMarker';
 
 const CommentSection = lazy(() => import('../components/CommentSection').then((module) => ({ default: module.CommentSection })));
 
@@ -19,18 +20,25 @@ interface ViewDetailsProps {
     incompatibleProjectIds?: string[];
     depMeta: Record<string, { icon: string, title: string, classification?: string, slug?: string }>;
     showMetaSections?: boolean;
-    showGalleryCarousel?: boolean;
 }
 
-export const ViewDetails: React.FC<ViewDetailsProps> = ({ project, authorProfile, currentUser, canEdit, commentsRef, setProject, setStatusModal, onRefresh, dependencies, incompatibleProjectIds, depMeta, showMetaSections = false, showGalleryCarousel = false }) => {
+export const ViewDetails: React.FC<ViewDetailsProps> = ({ project, authorProfile, currentUser, canEdit, commentsRef, setProject, setStatusModal, onRefresh, dependencies, incompatibleProjectIds, depMeta, showMetaSections = false }) => {
+    const descriptionParts = splitDescriptionByGalleryCarouselMarker(project.about || "*No description.*");
+    const renderGalleryCarousel = (key: string) => (
+        <GalleryCarousel key={key} images={project.galleryImages} captions={project.galleryImageCaptions} title={project.title} />
+    );
+
     return (
         <>
-            {showGalleryCarousel && (
-                <GalleryCarousel images={project.galleryImages} captions={project.galleryImageCaptions} title={project.title} />
-            )}
-            <div className="prose dark:prose-invert prose-lg max-w-none prose-code:before:hidden prose-code:after:hidden">
-                <MarkdownRenderer content={project.about || "*No description.*"} deferRich />
-            </div>
+            {descriptionParts.map((part, index) => (
+                part.type === 'gallery'
+                    ? renderGalleryCarousel(`gallery-${index}`)
+                    : (
+                        <div key={`description-${index}`} className="prose dark:prose-invert prose-lg max-w-none prose-code:before:hidden prose-code:after:hidden">
+                            <MarkdownRenderer content={part.content} deferRich />
+                        </div>
+                    )
+            ))}
             {showMetaSections && (
                 <div className="mt-8 pt-8 border-t border-slate-200 dark:border-white/5">
                     <ProjectMetaSections project={project} dependencies={dependencies} incompatibleProjectIds={incompatibleProjectIds} depMeta={depMeta} />

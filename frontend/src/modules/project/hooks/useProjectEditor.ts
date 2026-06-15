@@ -3,6 +3,7 @@ import { projectClient } from '@/modules/project/api/projectClient';
 import { api, extractApiErrorMessage } from '@/utils/api';
 import type { Project, User } from '@/types';
 import type { MetadataFormData } from '../components/FormShared';
+import { countGalleryCarouselMarkers, GALLERY_CAROUSEL_MARKER } from '../utils/galleryCarouselMarker';
 
 export const useProjectEditor = (
     projectData: Project | null,
@@ -78,6 +79,11 @@ export const useProjectEditor = (
 
     const handleSave = async () => {
         if (!projectData?.id) return;
+        if (countGalleryCarouselMarkers(metaData.description) > 1) {
+            onShowStatus('error', 'Gallery Carousel Marker', `Use ${GALLERY_CAROUSEL_MARKER} only once in the project description.`);
+            return;
+        }
+
         setIsSaving(true);
         setSlugError(null);
         try {
@@ -93,8 +99,7 @@ export const useProjectEditor = (
                 allowModpacks: projectData.allowModpacks,
                 allowComments: projectData.allowComments,
                 hmWikiEnabled: projectData.hmWikiEnabled,
-                hmWikiSlug: projectData.hmWikiSlug,
-                galleryCarouselEnabled: projectData.galleryCarouselEnabled
+                hmWikiSlug: projectData.hmWikiSlug
             };
 
             await api.put(`/projects/${projectData.id}`, payload);

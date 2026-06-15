@@ -962,7 +962,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                 mainContent={
                     <>
                         {activeTab === 'details' && (
-                            <EditDetails metaData={metaData} setMetaData={setMetaData} readOnly={readOnly} hasProjectPermission={hasProjectPermission} editorMode={editorMode} setEditorMode={setEditorMode} markDirty={markDirty} />
+                            <EditDetails metaData={metaData} projectData={projectData} setMetaData={setMetaData} readOnly={readOnly} hasProjectPermission={hasProjectPermission} editorMode={editorMode} setEditorMode={setEditorMode} markDirty={markDirty} />
                         )}
                         {activeTab === 'files' && (
                             <Files

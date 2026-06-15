@@ -11,6 +11,8 @@ interface GalleryCarouselProps {
     title: string;
 }
 
+const AUTO_ADVANCE_MS = 8000;
+
 const resolveGalleryUrl = (url: string) => {
     if (!url) return '';
     if (url.startsWith('http') || url.startsWith('blob:') || url.startsWith('data:')) return url;
@@ -45,6 +47,16 @@ export const GalleryCarousel: React.FC<GalleryCarouselProps> = ({ images = [], c
     useEffect(() => {
         if (activeIndex <= imageCount - 1) return;
         setActiveIndex(Math.max(0, imageCount - 1));
+    }, [activeIndex, imageCount]);
+
+    useEffect(() => {
+        if (imageCount <= 1) return;
+
+        const timer = window.setTimeout(() => {
+            setActiveIndex((prev) => (prev + 1) % imageCount);
+        }, AUTO_ADVANCE_MS);
+
+        return () => window.clearTimeout(timer);
     }, [activeIndex, imageCount]);
 
     useEffect(() => {
@@ -109,6 +121,7 @@ export const GalleryCarousel: React.FC<GalleryCarouselProps> = ({ images = [], c
                         src={activeImage.embedUrl}
                         title={`${title} gallery video ${activeIndex + 1}`}
                         className="h-full w-full"
+                        style={{ animation: 'gallery-carousel-media 420ms ease both' }}
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                         allowFullScreen
                     />
@@ -119,6 +132,7 @@ export const GalleryCarousel: React.FC<GalleryCarouselProps> = ({ images = [], c
                         srcSet={`${getGalleryImageUrl(activeImage.url, 1280, 86)} 1x, ${getGalleryImageUrl(activeImage.url, 1920, 86)} 2x`}
                         alt={`${title} gallery image ${activeIndex + 1}`}
                         className="h-full w-full object-contain"
+                        style={{ animation: 'gallery-carousel-media 420ms ease both' }}
                         loading="eager"
                         fetchPriority="high"
                         decoding="async"
@@ -146,6 +160,13 @@ export const GalleryCarousel: React.FC<GalleryCarouselProps> = ({ images = [], c
                         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-blue-950/80 px-3 py-1 text-xs font-black tracking-wider text-white shadow-lg sm:hidden">
                             {activeIndex + 1} / {imageCount}
                         </div>
+                        <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-950/40" aria-hidden="true">
+                            <div
+                                key={`${activeImage.url}-${activeIndex}`}
+                                className="h-full origin-left bg-modtale-accent"
+                                style={{ animation: `gallery-carousel-progress ${AUTO_ADVANCE_MS}ms linear forwards` }}
+                            />
+                        </div>
                     </>
                 )}
             </div>
@@ -158,15 +179,6 @@ export const GalleryCarousel: React.FC<GalleryCarouselProps> = ({ images = [], c
 
             {showControls && (
                 <div className="flex items-center gap-3 border-t border-blue-200 bg-slate-100 px-3 py-3 dark:border-blue-400/20 dark:bg-slate-900 sm:px-5">
-                    <button
-                        type="button"
-                        aria-label="Previous gallery thumbnail"
-                        onClick={previousImage}
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-blue-600 text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-modtale-accent dark:border-blue-400/30"
-                    >
-                        <ChevronLeft className="h-6 w-6" aria-hidden="true" />
-                    </button>
-
                     <div className="flex min-w-0 flex-1 gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                         {resolvedImages.map((image, index) => {
                             const isActive = index === activeIndex;
@@ -202,15 +214,6 @@ export const GalleryCarousel: React.FC<GalleryCarouselProps> = ({ images = [], c
                             );
                         })}
                     </div>
-
-                    <button
-                        type="button"
-                        aria-label="Next gallery thumbnail"
-                        onClick={nextImage}
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-blue-600 text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-modtale-accent dark:border-blue-400/30"
-                    >
-                        <ChevronRight className="h-6 w-6" aria-hidden="true" />
-                    </button>
                 </div>
             )}
         </section>

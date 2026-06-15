@@ -4,6 +4,7 @@ import { theme } from '@/styles/theme';
 import type { Project } from '@/types';
 import type { MetadataFormData } from '../components/FormShared';
 import { Permission } from '@/modules/permissions/permissions';
+import { GALLERY_CAROUSEL_MARKER } from '../utils/galleryCarouselMarker';
 
 interface SettingsProps {
     projectData: Project | null;
@@ -27,7 +28,7 @@ interface SettingsProps {
 export const Settings: React.FC<SettingsProps> = ({
                                                       projectData, metaData, setMetaData, setProjectData, readOnly, hasProjectPermission,
                                                       handleRestore, handlePrivate, handleUnlist, handleArchive, handleDelete, slugError, handleSlugChange, getUrlPrefix, markDirty, isLoading
-                                                  }) => {
+}) => {
     const canManageVisibility = projectData?.status !== 'PENDING';
     const canShowPublishedToggle = projectData?.status === 'PUBLISHED'
         || projectData?.status === 'UNLISTED'
@@ -97,9 +98,13 @@ export const Settings: React.FC<SettingsProps> = ({
                     <button type="button" disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)} onClick={() => { markDirty(); setProjectData(prev => prev ? {...prev, allowComments: !prev.allowComments} : null); }} className={`transition-colors ${readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA) ? 'opacity-50' : projectData?.allowComments ? 'text-green-500' : theme.colors.textSecondary}`}>{projectData?.allowComments ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
                 </div>
 
-                <div className="flex items-center justify-between mb-4">
-                    <div><h3 className={`text-sm font-bold ${theme.colors.textPrimary}`}>Gallery Carousel</h3><p className={`text-xs ${theme.colors.textMuted}`}>Show gallery inline on the project page.</p></div>
-                    <button type="button" disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)} onClick={() => { markDirty(); setProjectData(prev => prev ? {...prev, galleryCarouselEnabled: !prev.galleryCarouselEnabled} : null); }} className={`transition-colors ${readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA) ? 'opacity-50' : projectData?.galleryCarouselEnabled ? 'text-green-500' : theme.colors.textSecondary}`}>{projectData?.galleryCarouselEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
+                <div className="mb-4">
+                    <div>
+                        <h3 className={`text-sm font-bold ${theme.colors.textPrimary}`}>Gallery Carousel</h3>
+                        <p className={`text-xs ${theme.colors.textMuted}`}>
+                            Add <code className="font-mono">{GALLERY_CAROUSEL_MARKER}</code> once in the description where the inline carousel should appear. Leave it out if you do not want the carousel in the description.
+                        </p>
+                    </div>
                 </div>
 
                 <div className="flex items-center justify-between mb-4">
