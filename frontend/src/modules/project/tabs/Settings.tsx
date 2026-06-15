@@ -98,6 +98,11 @@ export const Settings: React.FC<SettingsProps> = ({
                 </div>
 
                 <div className="flex items-center justify-between mb-4">
+                    <div><h3 className={`text-sm font-bold ${theme.colors.textPrimary}`}>Gallery Carousel</h3><p className={`text-xs ${theme.colors.textMuted}`}>Show gallery inline on the project page.</p></div>
+                    <button type="button" disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)} onClick={() => { markDirty(); setProjectData(prev => prev ? {...prev, galleryCarouselEnabled: !prev.galleryCarouselEnabled} : null); }} className={`transition-colors ${readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA) ? 'opacity-50' : projectData?.galleryCarouselEnabled ? 'text-green-500' : theme.colors.textSecondary}`}>{projectData?.galleryCarouselEnabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}</button>
+                </div>
+
+                <div className="flex items-center justify-between mb-4">
                     <div>
                         <h3 className={`text-sm font-bold ${theme.colors.textPrimary}`}>HytaleModding Wiki</h3>
                         <p className={`text-xs ${theme.colors.textMuted} mt-0.5`}>Embed your wiki directly on your project page.</p>

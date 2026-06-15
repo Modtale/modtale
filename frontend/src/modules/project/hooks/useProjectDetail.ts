@@ -147,9 +147,13 @@ export const useProjectDetail = (
         fetchedGalleryKey.current = sectionKey;
 
         projectClient.getProjectGallery(routeKey || project.id)
-            .then((galleryImages) => {
+            .then((gallery) => {
                 if (!isMounted) return;
-                setProject((previous) => previous && previous.id === project.id ? { ...previous, galleryImages } : previous);
+                setProject((previous) => previous && previous.id === project.id ? {
+                    ...previous,
+                    galleryImages: gallery.galleryImages,
+                    galleryImageCaptions: gallery.galleryImageCaptions
+                } : previous);
             })
             .catch(() => {
                 if (isMounted) fetchedGalleryKey.current = '';

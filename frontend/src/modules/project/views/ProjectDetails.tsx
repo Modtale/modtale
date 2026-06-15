@@ -29,6 +29,7 @@ import { StatusModal } from '@/components/ui/StatusModal';
 import { api, extractApiErrorMessage } from '@/utils/api';
 import { projectClient } from '../api/projectClient';
 import { mergeProjectVersionChangelogs, projectNeedsChangelogHydration } from '../utils/changelogHydration';
+import { resolveGalleryImages } from '../utils/galleryImages';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import '../styles/downloadFx.css';
 
@@ -124,7 +125,10 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const downloadFxTimeoutRef = useRef<number | null>(null);
     const changelogFetchKeyRef = useRef('');
     const [galleryIndex, setGalleryIndex] = useState(0);
-    const galleryImages = project?.galleryImages || [];
+    const galleryItems = useMemo(
+        () => resolveGalleryImages(project?.galleryImages || [], project?.galleryImageCaptions || {}),
+        [project?.galleryImageCaptions, project?.galleryImages]
+    );
     const projectUrl = project ? SiteRoutes.project(project) : '';
 
     const isStableBuild = useCallback((version: any) => {
@@ -141,7 +145,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const openGalleryIndexFromHash = () => {
         const hashIndex = Number((location.hash || '').replace('#', ''));
         if (Number.isFinite(hashIndex) && hashIndex > 0) {
-            return Math.min(hashIndex - 1, Math.max(galleryImages.length - 1, 0));
+            return Math.min(hashIndex - 1, Math.max(galleryItems.length - 1, 0));
         }
         return 0;
     };
@@ -275,18 +279,18 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     useEffect(() => {
         if (!isGalleryRoute) return;
         setGalleryIndex(openGalleryIndexFromHash());
-    }, [isGalleryRoute, location.hash, project?.galleryImages]);
+    }, [isGalleryRoute, location.hash, galleryItems.length]);
 
     useEffect(() => {
-        if (!isGalleryRoute || galleryImages.length <= 1) return;
+        if (!isGalleryRoute || galleryItems.length <= 1) return;
 
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'ArrowLeft') {
                 event.preventDefault();
-                setGalleryIndex((prev) => (prev - 1 + galleryImages.length) % galleryImages.length);
+                setGalleryIndex((prev) => (prev - 1 + galleryItems.length) % galleryItems.length);
             } else if (event.key === 'ArrowRight') {
                 event.preventDefault();
-                setGalleryIndex((prev) => (prev + 1) % galleryImages.length);
+                setGalleryIndex((prev) => (prev + 1) % galleryItems.length);
             } else if (event.key === 'Escape') {
                 event.preventDefault();
                 navigate(projectUrl);
@@ -295,7 +299,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [isGalleryRoute, galleryImages.length, navigate, projectUrl]);
+    }, [isGalleryRoute, galleryItems.length, navigate, projectUrl]);
 
     useEffect(() => {
         if (project && id) {
@@ -517,6 +521,8 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         project.links?.DISCORD && { type: 'DISCORD', url: project.links.DISCORD, icon: DiscordIcon, label: 'Discord', colorClass: 'text-[#5865F2] hover:bg-[#5865F2]/20 border-[#5865F2]/20' },
         project.links?.WEBSITE && { type: 'WEBSITE', url: project.links.WEBSITE, icon: Globe, label: 'Website', colorClass: 'text-blue-500 dark:text-blue-400 hover:bg-blue-500/20 border-blue-500/20' }
     ].filter(Boolean) as any[];
+    const showGalleryCarousel = Boolean(project.galleryCarouselEnabled);
+    const activeGalleryItem = galleryItems[galleryIndex] || galleryItems[0];
 
     return (
         <>
@@ -615,7 +621,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                     />
                 }
                 headerContent={<HeaderContent project={project} currentUser={currentUser} isLiked={isLiked(project.id)} isFollowing={isFollowing} onFollowToggle={handleFollowToggle} canEdit={Boolean(canEdit)} projectUrl={projectUrl} onToggleFavorite={() => {}} onShare={() => {}} onReport={() => {}} />}
-                actionBar={<ActionBar project={project} projectUrl={projectUrl} links={links} commentsRef={commentsRef} />}
+                actionBar={<ActionBar project={project} projectUrl={projectUrl} links={links} commentsRef={commentsRef} showGalleryButton={!showGalleryCarousel} />}
                 sidebarContent={
                     isWikiRoute ? (
                         <>
@@ -639,7 +645,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                             <Wiki wikiLoading={wikiLoading} wikiError={wikiError} displayWikiData={displayWikiData} displaySlug={displaySlug} project={project} wikiContentRef={wikiContentRef} lockedHeight={lockedHeight} />
                         </Suspense>
                     ) : (
-                        <ViewDetails project={project} authorProfile={authorProfile} currentUser={currentUser} canEdit={Boolean(canEdit)} commentsRef={commentsRef} setProject={setProject} setStatusModal={setStatusModal} onRefresh={onRefresh} dependencies={latestDependencies} incompatibleProjectIds={latestIncompatibleProjectIds} depMeta={depMeta} showMetaSections={isMobile} />
+                        <ViewDetails project={project} authorProfile={authorProfile} currentUser={currentUser} canEdit={Boolean(canEdit)} commentsRef={commentsRef} setProject={setProject} setStatusModal={setStatusModal} onRefresh={onRefresh} dependencies={latestDependencies} incompatibleProjectIds={latestIncompatibleProjectIds} depMeta={depMeta} showMetaSections={isMobile} showGalleryCarousel={showGalleryCarousel} />
                     )
                 }
             />
@@ -664,36 +670,41 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                                 <div className="flex items-center justify-center h-[72dvh]">
                                     <Spinner />
                                 </div>
-                            ) : galleryImages.length > 0 ? (
-                                <div className="relative h-[72dvh] bg-black">
+                            ) : galleryItems.length > 0 && activeGalleryItem ? (
+                                <div className="relative h-[72dvh] bg-slate-100 dark:bg-slate-950">
                                     <img
-                                        src={galleryImages[galleryIndex]}
+                                        src={activeGalleryItem.url}
                                         alt={`${project.title} gallery image ${galleryIndex + 1}`}
                                         className="w-full h-full object-contain"
                                         loading="eager"
                                     />
-                                    {galleryImages.length > 1 && (
+                                    {galleryItems.length > 1 && (
                                         <>
                                             <button
                                                 type="button"
                                                 aria-label="Previous image"
-                                                onClick={() => setGalleryIndex((prev) => (prev - 1 + galleryImages.length) % galleryImages.length)}
-                                                className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/55 hover:bg-black/75 text-white transition-colors"
+                                                onClick={() => setGalleryIndex((prev) => (prev - 1 + galleryItems.length) % galleryItems.length)}
+                                                className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-blue-950/75 hover:bg-blue-900 text-white transition-colors"
                                             >
                                                 <ChevronLeft className="w-6 h-6" />
                                             </button>
                                             <button
                                                 type="button"
                                                 aria-label="Next image"
-                                                onClick={() => setGalleryIndex((prev) => (prev + 1) % galleryImages.length)}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/55 hover:bg-black/75 text-white transition-colors"
+                                                onClick={() => setGalleryIndex((prev) => (prev + 1) % galleryItems.length)}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-blue-950/75 hover:bg-blue-900 text-white transition-colors"
                                             >
                                                 <ChevronRight className="w-6 h-6" />
                                             </button>
                                         </>
                                     )}
-                                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 text-white text-sm font-semibold">
-                                        {galleryIndex + 1} / {galleryImages.length}
+                                    {activeGalleryItem.caption && (
+                                        <div className="absolute bottom-12 left-4 right-4 mx-auto max-w-3xl rounded-xl bg-blue-950/80 px-4 py-2 text-center text-sm font-semibold text-white shadow-lg">
+                                            {activeGalleryItem.caption}
+                                        </div>
+                                    )}
+                                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-blue-950/80 text-white text-sm font-semibold">
+                                        {galleryIndex + 1} / {galleryItems.length}
                                     </div>
                                 </div>
                             ) : (

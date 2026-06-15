@@ -6,6 +6,7 @@ import { SourceInspector } from './SourceInspector';
 import { SiteRoutes } from '@/utils/routes';
 import type { ScanIssue, ProjectVersion, ScanReviewTarget } from '@/types';
 import { ModalPortal } from '@/components/ui/ModalPortal';
+import { resolveGalleryImages } from '@/modules/project/utils/galleryImages';
 
 interface ReviewProps {
     reviewingProject: any;
@@ -450,15 +451,15 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                             <ImageIcon className="w-3 h-3" /> Project Gallery
                                         </label>
                                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                                            {mod.galleryImages.map((url: string, index: number) => (
+                                            {resolveGalleryImages(mod.galleryImages, mod.galleryImageCaptions || {}).map((item, index: number) => (
                                                 <a
                                                     key={index}
-                                                    href={url}
+                                                    href={item.url}
                                                     target="_blank"
                                                     rel="noreferrer"
                                                     className="aspect-video rounded-xl overflow-hidden bg-slate-200 dark:bg-white/10 border border-slate-200 dark:border-white/5 relative group block"
                                                 >
-                                                    <img src={url} className="w-full h-full object-cover" alt={`Gallery ${index + 1}`} />
+                                                    <img src={item.url} className="w-full h-full object-cover" alt={`Gallery ${index + 1}`} />
                                                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                         <ExternalLink className="w-6 h-6 text-white" />
                                                     </div>

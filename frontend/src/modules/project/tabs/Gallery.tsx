@@ -5,21 +5,25 @@ import { BACKEND_URL } from '@/utils/api';
 import { Spinner } from '@/components/ui/Spinner';
 import type { Project } from '@/types';
 import { Permission } from '@/modules/permissions/permissions';
+import { resolveGalleryImages } from '../utils/galleryImages';
 
 interface GalleryProps {
     projectData: Project | null;
     readOnly: boolean;
     hasProjectPermission: (perm: Permission) => boolean;
     handleGalleryDelete: (url: string) => Promise<void>;
+    handleGalleryCaptionChange: (url: string, caption: string) => Promise<void>;
     handleGallerySelect: (file: File) => void;
     isLoading: boolean;
 }
 
-export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProjectPermission, handleGalleryDelete, handleGallerySelect, isLoading }) => {
+const resolveImageUrl = (url: string) => (url.startsWith('/api') ? `${BACKEND_URL}${url}` : url);
+
+export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProjectPermission, handleGalleryDelete, handleGalleryCaptionChange, handleGallerySelect, isLoading }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const resolvedGalleryImages = useMemo(
-        () => (projectData?.galleryImages || []).map((img) => (img.startsWith('/api') ? `${BACKEND_URL}${img}` : img)),
-        [projectData?.galleryImages]
+        () => resolveGalleryImages(projectData?.galleryImages || [], projectData?.galleryImageCaptions || {}),
+        [projectData?.galleryImageCaptions, projectData?.galleryImages]
     );
 
     useEffect(() => {
@@ -28,7 +32,7 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
         const preloaded = warmup.map((src) => {
             const image = new Image();
             image.decoding = 'async';
-            image.src = src;
+            image.src = resolveImageUrl(src.url);
             return image;
         });
         return () => {
@@ -45,21 +49,44 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {resolvedGalleryImages.map((img, idx) => (
-                    <div key={idx} className={`relative group aspect-video bg-black/20 rounded-xl overflow-hidden border ${theme.colors.border}`}>
-                        <img
-                            src={img}
-                            alt=""
-                            className="w-full h-full object-cover"
-                            loading={idx < 2 ? 'eager' : 'lazy'}
-                            fetchPriority={idx === 0 ? 'high' : 'auto'}
-                            decoding="async"
-                        />
-                        {!readOnly && hasProjectPermission(Permission.PROJECT_GALLERY_REMOVE) && (
-                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <button type="button" onClick={() => handleGalleryDelete(projectData?.galleryImages?.[idx] || img)} disabled={isLoading} className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg transform scale-90 group-hover:scale-100 transition-transform"><Trash2 className="w-5 h-5" /></button>
+                {resolvedGalleryImages.map((item, idx) => (
+                    <div key={`${item.url}-${item.caption}`} className={`overflow-hidden rounded-xl border ${theme.colors.border} ${theme.colors.bgSurface}`}>
+                        <div className="relative group aspect-video bg-slate-100 dark:bg-slate-950 overflow-hidden">
+                            <img
+                                src={resolveImageUrl(item.url)}
+                                alt=""
+                                className="w-full h-full object-cover"
+                                loading={idx < 2 ? 'eager' : 'lazy'}
+                                fetchPriority={idx === 0 ? 'high' : 'auto'}
+                                decoding="async"
+                            />
+                            {!readOnly && hasProjectPermission(Permission.PROJECT_GALLERY_REMOVE) && (
+                                <div className="absolute inset-0 bg-blue-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <button type="button" onClick={() => handleGalleryDelete(item.url)} disabled={isLoading} className="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg shadow-lg transform scale-90 group-hover:scale-100 transition-transform"><Trash2 className="w-5 h-5" /></button>
+                                </div>
+                            )}
+                        </div>
+                        {!readOnly && hasProjectPermission(Permission.PROJECT_GALLERY_ADD) ? (
+                            <div className="p-3">
+                                <label className={`text-[10px] font-black uppercase ${theme.colors.textMuted} tracking-widest px-1 mb-1 block`}>Caption</label>
+                                <input
+                                    key={`${item.url}-${item.caption || 'empty'}`}
+                                    defaultValue={item.caption}
+                                    maxLength={240}
+                                    disabled={isLoading}
+                                    onBlur={(event) => {
+                                        const nextCaption = event.currentTarget.value.trim();
+                                        if (nextCaption !== item.caption) {
+                                            handleGalleryCaptionChange(item.url, nextCaption);
+                                        }
+                                    }}
+                                    className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-lg px-3 py-2 text-xs ${theme.colors.textPrimary} focus:border-modtale-accent focus:ring-1 focus:ring-modtale-accent outline-none transition-all`}
+                                    placeholder="Optional caption"
+                                />
                             </div>
-                        )}
+                        ) : item.caption ? (
+                            <p className={`p-3 text-xs font-semibold ${theme.colors.textSecondary}`}>{item.caption}</p>
+                        ) : null}
                     </div>
                 ))}
 

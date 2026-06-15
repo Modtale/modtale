@@ -1,5 +1,5 @@
 import { api } from '@/utils/api';
-import type { Comment, ManifestInspectionResult, Project, ProjectMember, ProjectVersion, ProjectVersionChangelog, User, ProjectRole, GameVersionCatalog } from '@/types';
+import type { Comment, GalleryImage, ManifestInspectionResult, Project, ProjectMember, ProjectVersion, ProjectVersionChangelog, User, ProjectRole, GameVersionCatalog } from '@/types';
 import { normalizeUser, normalizeUsers } from '@/utils/users';
 
 export const projectClient = {
@@ -20,8 +20,11 @@ export const projectClient = {
         return res.data || [];
     },
     getProjectGallery: async (id: string) => {
-        const res = await api.get<{ galleryImages?: string[] }>(`/projects/${id}/gallery`);
-        return res.data?.galleryImages || [];
+        const res = await api.get<{ galleryImages?: Array<string | GalleryImage>; galleryImageCaptions?: Record<string, string> }>(`/projects/${id}/gallery`);
+        return {
+            galleryImages: res.data?.galleryImages || [],
+            galleryImageCaptions: res.data?.galleryImageCaptions || {}
+        };
     },
     getProjectTeam: async (id: string) => {
         const res = await api.get<{

@@ -11,7 +11,14 @@ vi.mock('@/utils/api', () => ({
     }
 }));
 
-const mockedApi = vi.mocked(api);
+type MockApi = {
+    get: ReturnType<typeof vi.fn>;
+    post: ReturnType<typeof vi.fn>;
+    put: ReturnType<typeof vi.fn>;
+    delete: ReturnType<typeof vi.fn>;
+};
+
+const mockedApi = api as unknown as MockApi;
 
 describe('projectClient', () => {
     beforeEach(() => {
@@ -44,10 +51,13 @@ describe('projectClient', () => {
 
     it('fetches gallery and team slices independently', async () => {
         mockedApi.get
-            .mockResolvedValueOnce({ data: { galleryImages: ['one.png'] } } as any)
+            .mockResolvedValueOnce({ data: { galleryImages: ['one.png'], galleryImageCaptions: { 'one.png': 'Opening shot' } } } as any)
             .mockResolvedValueOnce({ data: { projectRoles: [{ id: 'role-1' }], teamMembers: [{ userId: 'u1' }], teamInvites: [{ userId: 'u2' }] } } as any);
 
-        await expect(projectClient.getProjectGallery('project-1')).resolves.toEqual(['one.png']);
+        await expect(projectClient.getProjectGallery('project-1')).resolves.toEqual({
+            galleryImages: ['one.png'],
+            galleryImageCaptions: { 'one.png': 'Opening shot' }
+        });
         await expect(projectClient.getProjectTeam('project-1')).resolves.toEqual({
             projectRoles: [{ id: 'role-1' }],
             teamMembers: [{ userId: 'u1' }],
