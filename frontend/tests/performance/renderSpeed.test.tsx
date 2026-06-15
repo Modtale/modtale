@@ -135,7 +135,10 @@ describe('critical page render budgets', () => {
         vi.stubGlobal('IntersectionObserver', MockObserver);
         vi.stubGlobal('ResizeObserver', MockObserver);
         mockedProjectClient.getProjectVersions.mockResolvedValue([]);
-        mockedProjectClient.getProjectGallery.mockResolvedValue([]);
+        mockedProjectClient.getProjectGallery.mockResolvedValue({
+            galleryImages: [],
+            galleryImageCaptions: {}
+        });
         mockedProjectClient.getProjectTeam.mockResolvedValue({
             projectRoles: [],
             teamMembers: [],

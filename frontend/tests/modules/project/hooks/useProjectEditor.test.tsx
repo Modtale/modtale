@@ -1,4 +1,4 @@
-import React, { act, useState } from 'react';
+import { act, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRoot, type Root } from 'react-dom/client';
 import { useProjectEditor } from '@/modules/project/hooks/useProjectEditor';
@@ -25,7 +25,13 @@ vi.mock('@/utils/api', () => ({
 }));
 
 const mockedProjectClient = vi.mocked(projectClient);
-const mockedApi = vi.mocked(api);
+type MockApi = {
+    put: ReturnType<typeof vi.fn>;
+    post: ReturnType<typeof vi.fn>;
+    delete: ReturnType<typeof vi.fn>;
+};
+
+const mockedApi = api as unknown as MockApi;
 const mockedExtractApiErrorMessage = vi.mocked(extractApiErrorMessage);
 
 const settle = async (times = 8) => {
@@ -150,6 +156,7 @@ describe('useProjectEditor', () => {
             allowComments: true,
             hmWikiEnabled: false,
             hmWikiSlug: null,
+            galleryCarouselEnabled: false,
             teamMembers: [],
             teamInvites: []
         },
@@ -291,7 +298,8 @@ describe('useProjectEditor', () => {
             allowModpacks: true,
             allowComments: true,
             hmWikiEnabled: false,
-            hmWikiSlug: null
+            hmWikiSlug: null,
+            galleryCarouselEnabled: false
         });
 
         const iconUpload = mockedApi.put.mock.calls[1];
@@ -397,5 +405,30 @@ describe('useProjectEditor', () => {
         });
         expect(latestSnapshot.projectData.galleryImages).toEqual([]);
         expect(showStatus).toHaveBeenLastCalledWith('success', 'Deleted', 'Image removed from gallery.');
+    });
+
+    it('updates gallery captions and refreshes project state', async () => {
+        mockedApi.put.mockResolvedValue({
+            data: {
+                id: 'project-1',
+                title: 'Sky Tools',
+                galleryImages: ['/gallery.png'],
+                galleryImageCaptions: { '/gallery.png': 'Opening shot' }
+            }
+        } as any);
+
+        await renderHook();
+
+        await act(async () => {
+            await latestSnapshot.handleGalleryCaptionChange('/gallery.png', 'Opening shot');
+        });
+        await settle();
+
+        expect(mockedApi.put).toHaveBeenCalledWith('/projects/project-1/gallery/caption', {
+            imageUrl: '/gallery.png',
+            caption: 'Opening shot'
+        });
+        expect(latestSnapshot.projectData.galleryImageCaptions).toEqual({ '/gallery.png': 'Opening shot' });
+        expect(showStatus).toHaveBeenLastCalledWith('success', 'Saved', 'Gallery caption updated.');
     });
 });

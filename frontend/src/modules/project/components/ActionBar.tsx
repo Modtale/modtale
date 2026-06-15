@@ -9,9 +9,10 @@ interface ActionBarProps {
     projectUrl: string;
     links: { type: string, url: string, icon: any, label: string, colorClass: string }[];
     commentsRef: React.RefObject<HTMLDivElement | null>;
+    showGalleryButton?: boolean;
 }
 
-export const ActionBar: React.FC<ActionBarProps> = ({ project, projectUrl, links, commentsRef }) => {
+export const ActionBar: React.FC<ActionBarProps> = ({ project, projectUrl, links, commentsRef, showGalleryButton = true }) => {
     const [showMobileLinks, setShowMobileLinks] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const location = useLocation();
@@ -26,8 +27,9 @@ export const ActionBar: React.FC<ActionBarProps> = ({ project, projectUrl, links
 
     const hasWiki = Boolean(project.hmWikiEnabled && project.hmWikiSlug);
     const hasGallery = Boolean(project.galleryImages && project.galleryImages.length > 0);
+    const shouldShowGalleryButton = showGalleryButton && hasGallery;
     const hasVersions = Boolean((project.versions?.length || 0) > 0);
-    const mediaButtonClass = hasWiki && hasGallery ? 'col-span-1 md:col-span-1' : 'col-span-2 md:col-span-1';
+    const mediaButtonClass = hasWiki && shouldShowGalleryButton ? 'col-span-1 md:col-span-1' : 'col-span-2 md:col-span-1';
 
     return (
         <div className="flex flex-col 2xl:flex-row items-start 2xl:items-center justify-between gap-3 2xl:gap-6 w-full">
@@ -50,7 +52,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({ project, projectUrl, links
                             <BookOpen className="w-4 h-4" aria-hidden="true" /> Wiki
                         </Link>
                     )}
-                    {hasGallery && (
+                    {shouldShowGalleryButton && (
                         <Link to={`${projectUrl}/gallery#1`} className={`${mediaButtonClass} flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-xl ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} ${theme.colors.bgSurfaceHover} transition-colors whitespace-nowrap`}>
                             <ImageIcon className="w-4 h-4" aria-hidden="true" /> Gallery
                         </Link>

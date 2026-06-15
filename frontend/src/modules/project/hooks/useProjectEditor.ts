@@ -93,7 +93,8 @@ export const useProjectEditor = (
                 allowModpacks: projectData.allowModpacks,
                 allowComments: projectData.allowComments,
                 hmWikiEnabled: projectData.hmWikiEnabled,
-                hmWikiSlug: projectData.hmWikiSlug
+                hmWikiSlug: projectData.hmWikiSlug,
+                galleryCarouselEnabled: projectData.galleryCarouselEnabled
             };
 
             await api.put(`/projects/${projectData.id}`, payload);
@@ -187,6 +188,20 @@ export const useProjectEditor = (
         }
     };
 
+    const handleGalleryCaptionChange = async (imageUrl: string, caption: string) => {
+        if (!projectData?.id) return;
+        try {
+            const res = await api.put(`/projects/${projectData.id}/gallery/caption`, {
+                imageUrl,
+                caption
+            });
+            setProjectData(res.data);
+            onShowStatus('success', 'Saved', 'Gallery caption updated.');
+        } catch (e: any) {
+            onShowStatus('error', 'Caption Save Failed', extractApiErrorMessage(e, 'Failed to update gallery caption.'));
+        }
+    };
+
     const handleGalleryDelete = async (url: string) => {
         if (!projectData?.id) return;
         try {
@@ -205,6 +220,6 @@ export const useProjectEditor = (
         repos, loadingRepos, manualRepo, setManualRepo, repoValid, isDirty, setIsDirty,
         slugError, setSlugError, userSearchResults, setUserSearchResults, provider,
         setProvider, markDirty, checkRepoUrl, fetchRepos, handleRoleUpdate, handleCancelInvite,
-        handleSave, handleSubmit, isSaving, handleGalleryUpload, handleGalleryDelete
+        handleSave, handleSubmit, isSaving, handleGalleryUpload, handleGalleryCaptionChange, handleGalleryDelete
     };
 };

@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import type { Project, ProjectDependency, User } from '@/types';
 import { ProjectMetaSections } from '../components/ProjectMetaSections';
+import { GalleryCarousel } from '../components/GalleryCarousel';
 
 const CommentSection = lazy(() => import('../components/CommentSection').then((module) => ({ default: module.CommentSection })));
 
@@ -18,11 +19,15 @@ interface ViewDetailsProps {
     incompatibleProjectIds?: string[];
     depMeta: Record<string, { icon: string, title: string, classification?: string, slug?: string }>;
     showMetaSections?: boolean;
+    showGalleryCarousel?: boolean;
 }
 
-export const ViewDetails: React.FC<ViewDetailsProps> = ({ project, authorProfile, currentUser, canEdit, commentsRef, setProject, setStatusModal, onRefresh, dependencies, incompatibleProjectIds, depMeta, showMetaSections = false }) => {
+export const ViewDetails: React.FC<ViewDetailsProps> = ({ project, authorProfile, currentUser, canEdit, commentsRef, setProject, setStatusModal, onRefresh, dependencies, incompatibleProjectIds, depMeta, showMetaSections = false, showGalleryCarousel = false }) => {
     return (
         <>
+            {showGalleryCarousel && (
+                <GalleryCarousel images={project.galleryImages} captions={project.galleryImageCaptions} title={project.title} />
+            )}
             <div className="prose dark:prose-invert prose-lg max-w-none prose-code:before:hidden prose-code:after:hidden">
                 <MarkdownRenderer content={project.about || "*No description.*"} deferRich />
             </div>

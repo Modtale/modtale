@@ -79,7 +79,10 @@ describe('useProjectDetail', () => {
 
         vi.clearAllMocks();
         mockedProjectClient.getProjectVersions.mockResolvedValue([]);
-        mockedProjectClient.getProjectGallery.mockResolvedValue([]);
+        mockedProjectClient.getProjectGallery.mockResolvedValue({
+            galleryImages: [],
+            galleryImageCaptions: {}
+        });
         mockedProjectClient.getProjectTeam.mockResolvedValue({
             projectRoles: [],
             teamMembers: [],

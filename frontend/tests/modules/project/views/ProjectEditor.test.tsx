@@ -1,4 +1,4 @@
-import React, { act } from 'react';
+import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -36,6 +36,7 @@ const mockHandleRoleUpdate = vi.fn();
 const mockHandleCancelInvite = vi.fn();
 const mockHandleGalleryUpload = vi.fn();
 const mockHandleGalleryDelete = vi.fn();
+const mockHandleGalleryCaptionChange = vi.fn();
 
 vi.mock('@/modules/project/hooks/useProjectDetail', () => ({
     useProjectDetail: () => ({
@@ -70,7 +71,8 @@ vi.mock('@/modules/project/hooks/useProjectEditor', () => ({
         handleSubmit: mockHandleSubmit,
         isSaving: false,
         handleGalleryUpload: mockHandleGalleryUpload,
-        handleGalleryDelete: mockHandleGalleryDelete
+        handleGalleryDelete: mockHandleGalleryDelete,
+        handleGalleryCaptionChange: mockHandleGalleryCaptionChange
     })
 }));
 
