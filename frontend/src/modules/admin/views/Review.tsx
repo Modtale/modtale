@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Shield, List, FileText, Box, User as UserIcon, Check, ArrowLeft, Copy, ExternalLink, AlertTriangle, Terminal, Download, ArrowRight, X, ImageIcon, ChevronDown, ChevronUp, ShieldAlert, Eye, RefreshCw } from 'lucide-react';
+import { Shield, List, FileText, Box, User as UserIcon, Check, ArrowLeft, Copy, ExternalLink, Terminal, Download, ArrowRight, X, ImageIcon, ChevronDown, ChevronUp, ShieldAlert, Eye, RefreshCw, PlayCircle } from 'lucide-react';
 import { API_BASE_URL, BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
 import { adminClient } from '../api/adminClient';
 import { SourceInspector } from './SourceInspector';
@@ -459,7 +459,12 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                     rel="noreferrer"
                                                     className="aspect-video rounded-xl overflow-hidden bg-slate-200 dark:bg-white/10 border border-slate-200 dark:border-white/5 relative group block"
                                                 >
-                                                    <img src={item.url} className="w-full h-full object-cover" alt={`Gallery ${index + 1}`} />
+                                                    <img src={item.type === 'youtube' && item.thumbnailUrl ? item.thumbnailUrl : item.url} className="w-full h-full object-cover" alt={`Gallery ${index + 1}`} />
+                                                    {item.type === 'youtube' && (
+                                                        <div className="absolute inset-0 flex items-center justify-center bg-blue-950/25 text-white">
+                                                            <PlayCircle className="w-10 h-10 drop-shadow-lg" aria-hidden="true" />
+                                                        </div>
+                                                    )}
                                                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                         <ExternalLink className="w-6 h-6 text-white" />
                                                     </div>

@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, PlayCircle } from 'lucide-react';
 
 import { BACKEND_URL } from '@/utils/api';
 import { getCloudflareUrl } from '@/utils/images';
-import { resolveGalleryImages, type GalleryImageInput } from '../utils/galleryImages';
+import { resolveGalleryImages, type GalleryImageInput, type ResolvedGalleryImage } from '../utils/galleryImages';
 
 interface GalleryCarouselProps {
     images?: GalleryImageInput[];
@@ -19,6 +19,12 @@ const resolveGalleryUrl = (url: string) => {
 
 const getGalleryImageUrl = (url: string, width: number, quality: number) => (
     url.startsWith('data:') ? url : getCloudflareUrl(url, width, quality)
+);
+
+const getGalleryPreviewUrl = (image: ResolvedGalleryImage, width: number, quality: number) => (
+    image.type === 'youtube' && image.thumbnailUrl
+        ? image.thumbnailUrl
+        : getGalleryImageUrl(image.url, width, quality)
 );
 
 export const GalleryCarousel: React.FC<GalleryCarouselProps> = ({ images = [], captions = {}, title }) => {
@@ -45,15 +51,15 @@ export const GalleryCarousel: React.FC<GalleryCarouselProps> = ({ images = [], c
         if (imageCount <= 1) return;
 
         const warmup = [
-            resolvedImages[(activeIndex + 1) % imageCount]?.url,
-            resolvedImages[(activeIndex - 1 + imageCount) % imageCount]?.url
+            resolvedImages[(activeIndex + 1) % imageCount],
+            resolvedImages[(activeIndex - 1 + imageCount) % imageCount]
         ];
 
-        const preloaded = warmup.filter((src): src is string => Boolean(src)).map((src) => {
-            const image = new Image();
-            image.decoding = 'async';
-            image.src = getGalleryImageUrl(src, 1280, 82);
-            return image;
+        const preloaded = warmup.filter((image): image is ResolvedGalleryImage => Boolean(image)).map((galleryImage) => {
+            const preloadedImage = new Image();
+            preloadedImage.decoding = 'async';
+            preloadedImage.src = getGalleryPreviewUrl(galleryImage, 1280, 82);
+            return preloadedImage;
         });
 
         return () => {
@@ -97,16 +103,27 @@ export const GalleryCarousel: React.FC<GalleryCarouselProps> = ({ images = [], c
                     }
                 }}
             >
-                <img
-                    key={activeImage.url}
-                    src={getGalleryImageUrl(activeImage.url, 1280, 86)}
-                    srcSet={`${getGalleryImageUrl(activeImage.url, 1280, 86)} 1x, ${getGalleryImageUrl(activeImage.url, 1920, 86)} 2x`}
-                    alt={`${title} gallery image ${activeIndex + 1}`}
-                    className="h-full w-full object-contain"
-                    loading="eager"
-                    fetchPriority="high"
-                    decoding="async"
-                />
+                {activeImage.type === 'youtube' && activeImage.embedUrl ? (
+                    <iframe
+                        key={activeImage.url}
+                        src={activeImage.embedUrl}
+                        title={`${title} gallery video ${activeIndex + 1}`}
+                        className="h-full w-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                    />
+                ) : (
+                    <img
+                        key={activeImage.url}
+                        src={getGalleryImageUrl(activeImage.url, 1280, 86)}
+                        srcSet={`${getGalleryImageUrl(activeImage.url, 1280, 86)} 1x, ${getGalleryImageUrl(activeImage.url, 1920, 86)} 2x`}
+                        alt={`${title} gallery image ${activeIndex + 1}`}
+                        className="h-full w-full object-contain"
+                        loading="eager"
+                        fetchPriority="high"
+                        decoding="async"
+                    />
+                )}
 
                 {showControls && (
                     <>
@@ -163,19 +180,24 @@ export const GalleryCarousel: React.FC<GalleryCarouselProps> = ({ images = [], c
                                     aria-label={`Show gallery image ${index + 1}`}
                                     aria-current={isActive ? 'true' : undefined}
                                     onClick={() => setActiveIndex(index)}
-                                    className={`h-16 w-28 shrink-0 overflow-hidden rounded-md border-2 bg-slate-900 transition-all focus:outline-none focus:ring-2 focus:ring-modtale-accent sm:h-20 sm:w-36 ${
+                                    className={`relative h-16 w-28 shrink-0 overflow-hidden rounded-md border-2 bg-slate-900 transition-all focus:outline-none focus:ring-2 focus:ring-modtale-accent sm:h-20 sm:w-36 ${
                                         isActive
                                             ? 'border-modtale-accent opacity-100 shadow-[0_0_0_1px_rgba(37,99,235,0.25)]'
                                             : 'border-blue-200 opacity-70 hover:border-blue-400 hover:opacity-100 dark:border-blue-400/20'
                                     }`}
                                 >
                                     <img
-                                        src={getGalleryImageUrl(image.url, 256, 74)}
+                                        src={getGalleryPreviewUrl(image, 256, 74)}
                                         alt=""
                                         className="h-full w-full object-cover"
                                         loading={index < 5 ? 'eager' : 'lazy'}
                                         decoding="async"
                                     />
+                                    {image.type === 'youtube' && (
+                                        <span className="absolute inset-0 flex items-center justify-center bg-blue-950/20 text-white">
+                                            <PlayCircle className="h-7 w-7 drop-shadow" aria-hidden="true" />
+                                        </span>
+                                    )}
                                 </button>
                             );
                         })}

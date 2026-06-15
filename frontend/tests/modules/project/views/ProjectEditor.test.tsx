@@ -35,6 +35,7 @@ const mockHandleSubmit = vi.fn();
 const mockHandleRoleUpdate = vi.fn();
 const mockHandleCancelInvite = vi.fn();
 const mockHandleGalleryUpload = vi.fn();
+const mockHandleGalleryVideoAdd = vi.fn();
 const mockHandleGalleryDelete = vi.fn();
 const mockHandleGalleryCaptionChange = vi.fn();
 
@@ -71,6 +72,7 @@ vi.mock('@/modules/project/hooks/useProjectEditor', () => ({
         handleSubmit: mockHandleSubmit,
         isSaving: false,
         handleGalleryUpload: mockHandleGalleryUpload,
+        handleGalleryVideoAdd: mockHandleGalleryVideoAdd,
         handleGalleryDelete: mockHandleGalleryDelete,
         handleGalleryCaptionChange: mockHandleGalleryCaptionChange
     })

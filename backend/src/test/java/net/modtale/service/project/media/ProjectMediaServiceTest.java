@@ -78,9 +78,66 @@ class ProjectMediaServiceTest {
                 () -> service.addGalleryImage("project-1", file, user)
         );
 
-        assertEquals("This project has already reached the gallery image limit of 2.", error.getMessage());
+        assertEquals("This project has already reached the gallery limit of 2 items.", error.getMessage());
         verify(fileValidationService, never()).validateGalleryImage(any());
         verify(mediaUploadService, never()).uploadPublicUrl(any(), eq("gallery"), any());
+    }
+
+    @Test
+    void addGalleryVideoStoresNormalizedYouTubeWatchUrls() {
+        Project project = new Project();
+        project.setId("project-1");
+        project.setGalleryImages(new ArrayList<>());
+        User user = user("user-1");
+
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.hasProjectPermission(project, user, "PROJECT_GALLERY_ADD")).thenReturn(true);
+        when(projectRepository.save(project)).thenReturn(project);
+
+        Project updated = service.addGalleryVideo("project-1", "https://youtu.be/dQw4w9WgXcQ?si=test", user);
+
+        assertEquals(project, updated);
+        assertEquals(List.of("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), project.getGalleryImages());
+        verify(projectRepository).save(project);
+        verify(projectService).evictProjectCache(project);
+    }
+
+    @Test
+    void addGalleryVideoRejectsNonYouTubeUrls() {
+        Project project = new Project();
+        project.setId("project-1");
+        project.setGalleryImages(new ArrayList<>());
+        User user = user("user-1");
+
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.hasProjectPermission(project, user, "PROJECT_GALLERY_ADD")).thenReturn(true);
+
+        InvalidProjectRequestException error = assertThrows(
+                InvalidProjectRequestException.class,
+                () -> service.addGalleryVideo("project-1", "https://example.com/watch?v=dQw4w9WgXcQ", user)
+        );
+
+        assertEquals("Gallery videos must be valid YouTube video URLs.", error.getMessage());
+        verify(projectRepository, never()).save(project);
+    }
+
+    @Test
+    void addGalleryVideoRejectsDuplicatesAfterNormalization() {
+        Project project = new Project();
+        project.setId("project-1");
+        project.setGalleryImages(new ArrayList<>(List.of("https://www.youtube.com/watch?v=dQw4w9WgXcQ")));
+        User user = user("user-1");
+
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.hasProjectPermission(project, user, "PROJECT_GALLERY_ADD")).thenReturn(true);
+
+        InvalidProjectRequestException error = assertThrows(
+                InvalidProjectRequestException.class,
+                () -> service.addGalleryVideo("project-1", "https://www.youtube.com/embed/dQw4w9WgXcQ", user)
+        );
+
+        assertEquals("That YouTube video is already in this project gallery.", error.getMessage());
+        verify(projectRepository, never()).save(project);
     }
 
     @Test
@@ -99,6 +156,27 @@ class ProjectMediaServiceTest {
         assertEquals(List.of("https://cdn.modtale.test/gallery/b.png"), project.getGalleryImages());
         assertFalse(project.getGalleryImageCaptions().containsKey("https://cdn.modtale.test/gallery/a.png"));
         verify(projectDeletionService).deleteStoredFile("https://cdn.modtale.test/gallery/a.png");
+        verify(projectRepository).save(project);
+        verify(projectService).evictProjectCache(project);
+    }
+
+    @Test
+    void removeGalleryImageDoesNotDeleteYoutubeVideosFromStorage() {
+        Project project = new Project();
+        project.setId("project-1");
+        project.setGalleryImages(new ArrayList<>(List.of("https://www.youtube.com/watch?v=dQw4w9WgXcQ")));
+        project.setGalleryImageCaptions(Map.of("https://www.youtube.com/watch?v=dQw4w9WgXcQ", "Launch trailer"));
+        User user = user("user-1");
+
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.hasProjectPermission(project, user, "PROJECT_GALLERY_REMOVE")).thenReturn(true);
+        when(projectRepository.save(project)).thenReturn(project);
+
+        service.removeGalleryImage("project-1", "https://www.youtube.com/watch?v=dQw4w9WgXcQ", user);
+
+        assertEquals(List.of(), project.getGalleryImages());
+        assertFalse(project.getGalleryImageCaptions().containsKey("https://www.youtube.com/watch?v=dQw4w9WgXcQ"));
+        verify(projectDeletionService, never()).deleteStoredFile(any());
         verify(projectRepository).save(project);
         verify(projectService).evictProjectCache(project);
     }

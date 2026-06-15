@@ -3,6 +3,7 @@ package net.modtale.controller.project;
 import jakarta.validation.Valid;
 import net.modtale.mapper.ProjectMapper;
 import net.modtale.model.dto.project.ProjectDTO;
+import net.modtale.model.dto.request.project.AddGalleryVideoRequest;
 import net.modtale.model.dto.request.project.RemoveGalleryImageRequest;
 import net.modtale.model.dto.request.project.UpdateGalleryImageCaptionRequest;
 import net.modtale.model.project.Project;
@@ -60,26 +61,38 @@ public class MediaController {
 
     @PostMapping("/{id}/gallery")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_GALLERY_ADD', authentication)")
-    public ResponseEntity<Void> addGalleryImage(
+    public ResponseEntity<ProjectDTO> addGalleryImage(
             @PathVariable String id,
             @RequestParam("file") MultipartFile file,
             Authentication authentication
     ) {
         User user = accountService.requireCurrentUser(authentication, "uploading a gallery image");
-        projectMediaService.addGalleryImage(id, file, user);
-        return ResponseEntity.ok().build();
+        Project project = projectMediaService.addGalleryImage(id, file, user);
+        return ResponseEntity.ok(ProjectMapper.toDTO(project, false, user.getId()));
+    }
+
+    @PostMapping("/{id}/gallery/youtube")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_GALLERY_ADD', authentication)")
+    public ResponseEntity<ProjectDTO> addGalleryVideo(
+            @PathVariable String id,
+            @Valid @RequestBody AddGalleryVideoRequest requestPayload,
+            Authentication authentication
+    ) {
+        User user = accountService.requireCurrentUser(authentication, "adding a gallery video");
+        Project project = projectMediaService.addGalleryVideo(id, requestPayload.getVideoUrl(), user);
+        return ResponseEntity.ok(ProjectMapper.toDTO(project, false, user.getId()));
     }
 
     @DeleteMapping("/{id}/gallery")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_GALLERY_REMOVE', authentication)")
-    public ResponseEntity<Void> removeGalleryImage(
+    public ResponseEntity<ProjectDTO> removeGalleryImage(
             @PathVariable String id,
             @Valid @RequestBody RemoveGalleryImageRequest requestPayload,
             Authentication authentication
     ) {
         User user = accountService.requireCurrentUser(authentication, "removing a gallery image");
-        projectMediaService.removeGalleryImage(id, requestPayload.getImageUrl(), user);
-        return ResponseEntity.ok().build();
+        Project project = projectMediaService.removeGalleryImage(id, requestPayload.getImageUrl(), user);
+        return ResponseEntity.ok(ProjectMapper.toDTO(project, false, user.getId()));
     }
 
     @PutMapping("/{id}/gallery/caption")

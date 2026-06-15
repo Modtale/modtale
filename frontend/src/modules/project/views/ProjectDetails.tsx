@@ -672,12 +672,22 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                                 </div>
                             ) : galleryItems.length > 0 && activeGalleryItem ? (
                                 <div className="relative h-[72dvh] bg-slate-100 dark:bg-slate-950">
-                                    <img
-                                        src={activeGalleryItem.url}
-                                        alt={`${project.title} gallery image ${galleryIndex + 1}`}
-                                        className="w-full h-full object-contain"
-                                        loading="eager"
-                                    />
+                                    {activeGalleryItem.type === 'youtube' && activeGalleryItem.embedUrl ? (
+                                        <iframe
+                                            src={activeGalleryItem.embedUrl}
+                                            title={`${project.title} gallery video ${galleryIndex + 1}`}
+                                            className="h-full w-full"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                            allowFullScreen
+                                        />
+                                    ) : (
+                                        <img
+                                            src={activeGalleryItem.url}
+                                            alt={`${project.title} gallery image ${galleryIndex + 1}`}
+                                            className="w-full h-full object-contain"
+                                            loading="eager"
+                                        />
+                                    )}
                                     {galleryItems.length > 1 && (
                                         <>
                                             <button
@@ -708,7 +718,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                                     </div>
                                 </div>
                             ) : (
-                                <div className={`p-10 text-center ${theme.colors.textMuted}`}>No images in this gallery.</div>
+                                <div className={`p-10 text-center ${theme.colors.textMuted}`}>No media in this gallery.</div>
                             )}
                         </div>
                     </div>

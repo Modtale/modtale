@@ -188,6 +188,19 @@ export const useProjectEditor = (
         }
     };
 
+    const handleGalleryVideoAdd = async (videoUrl: string) => {
+        if (!projectData?.id) return;
+        try {
+            const res = await api.post(`/projects/${projectData.id}/gallery/youtube`, {
+                videoUrl
+            });
+            setProjectData(res.data);
+            onShowStatus('success', 'Added', 'Video added to gallery.');
+        } catch (e: any) {
+            onShowStatus('error', 'Video Add Failed', extractApiErrorMessage(e, 'Failed to add video.'));
+        }
+    };
+
     const handleGalleryCaptionChange = async (imageUrl: string, caption: string) => {
         if (!projectData?.id) return;
         try {
@@ -220,6 +233,6 @@ export const useProjectEditor = (
         repos, loadingRepos, manualRepo, setManualRepo, repoValid, isDirty, setIsDirty,
         slugError, setSlugError, userSearchResults, setUserSearchResults, provider,
         setProvider, markDirty, checkRepoUrl, fetchRepos, handleRoleUpdate, handleCancelInvite,
-        handleSave, handleSubmit, isSaving, handleGalleryUpload, handleGalleryCaptionChange, handleGalleryDelete
+        handleSave, handleSubmit, isSaving, handleGalleryUpload, handleGalleryVideoAdd, handleGalleryCaptionChange, handleGalleryDelete
     };
 };
