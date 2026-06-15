@@ -117,7 +117,7 @@ export const useProjectDetail = (
     }, [routeKey, project?.id, backgroundRefresh, full]);
 
     useEffect(() => {
-        if (full || !project?.id) return;
+        if (full || !project?.id || project.versions !== undefined) return;
 
         const sectionKey = `${project.id}:${routeKey || project.id}`;
         if (fetchedVersionsKey.current === sectionKey) return;
@@ -135,10 +135,10 @@ export const useProjectDetail = (
             });
 
         return () => { isMounted = false; };
-    }, [full, project?.id, routeKey]);
+    }, [full, project?.id, project?.versions, routeKey]);
 
     useEffect(() => {
-        if (full || !project?.id) return;
+        if (full || !project?.id || project.galleryImages !== undefined) return;
 
         const sectionKey = `${project.id}:${routeKey || project.id}`;
         if (fetchedGalleryKey.current === sectionKey) return;
@@ -156,10 +156,13 @@ export const useProjectDetail = (
             });
 
         return () => { isMounted = false; };
-    }, [full, project?.id, routeKey]);
+    }, [full, project?.galleryImages, project?.id, routeKey]);
 
     useEffect(() => {
-        if (full || !project?.id) return;
+        const hasAnyTeamSection = project?.projectRoles !== undefined
+            || project?.teamMembers !== undefined
+            || project?.teamInvites !== undefined;
+        if (full || !project?.id || hasAnyTeamSection) return;
 
         const sectionKey = `${project.id}:${routeKey || project.id}`;
         if (fetchedProjectTeamKey.current === sectionKey) return;
@@ -184,10 +187,10 @@ export const useProjectDetail = (
             });
 
         return () => { isMounted = false; };
-    }, [full, project?.id, routeKey]);
+    }, [full, project?.id, project?.projectRoles, project?.teamInvites, project?.teamMembers, routeKey]);
 
     useEffect(() => {
-        if (full || !project?.id) return;
+        if (full || !project?.id || project.comments !== undefined) return;
 
         const sectionKey = `${project.id}:${routeKey || project.id}`;
         if (fetchedCommentsKey.current === sectionKey) return;
@@ -205,7 +208,7 @@ export const useProjectDetail = (
             });
 
         return () => { isMounted = false; };
-    }, [full, project?.id, routeKey]);
+    }, [full, project?.comments, project?.id, routeKey]);
 
     useEffect(() => {
         if (project?.id && !analyticsFired.current) {

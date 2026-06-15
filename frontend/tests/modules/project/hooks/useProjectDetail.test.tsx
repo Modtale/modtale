@@ -8,13 +8,17 @@ import type { Project, User } from '@/types';
 vi.mock('@/modules/project/api/projectClient', () => ({
     projectClient: {
         getProject: vi.fn(),
+        getProjectVersions: vi.fn(),
         getProjectVersionChangelogs: vi.fn(),
+        getProjectGallery: vi.fn(),
+        getProjectTeam: vi.fn(),
         trackView: vi.fn(),
         getUserProfile: vi.fn(),
         getOrgMembers: vi.fn(),
         getUsersBatch: vi.fn(),
         getDependencyMeta: vi.fn(),
         getDependencyMetaBatch: vi.fn(),
+        getComments: vi.fn(),
         followUser: vi.fn(),
         unfollowUser: vi.fn()
     }
@@ -74,6 +78,14 @@ describe('useProjectDetail', () => {
         latestSnapshot = undefined as unknown as HookSnapshot;
 
         vi.clearAllMocks();
+        mockedProjectClient.getProjectVersions.mockResolvedValue([]);
+        mockedProjectClient.getProjectGallery.mockResolvedValue([]);
+        mockedProjectClient.getProjectTeam.mockResolvedValue({
+            projectRoles: [],
+            teamMembers: [],
+            teamInvites: []
+        });
+        mockedProjectClient.getComments.mockResolvedValue([]);
         mockedProjectClient.trackView.mockResolvedValue(undefined);
         mockedProjectClient.getOrgMembers.mockResolvedValue([]);
         mockedProjectClient.getUsersBatch.mockResolvedValue([]);

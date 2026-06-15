@@ -23,6 +23,10 @@ vi.mock('@/modules/discovery/api/discoveryClient', () => ({
 vi.mock('@/modules/project/api/projectClient', () => ({
     projectClient: {
         getProject: vi.fn(),
+        getProjectVersions: vi.fn(),
+        getProjectGallery: vi.fn(),
+        getProjectTeam: vi.fn(),
+        getComments: vi.fn(),
         trackView: vi.fn(),
         getUserProfile: vi.fn(),
         getOrgMembers: vi.fn(),
@@ -130,6 +134,14 @@ describe('critical page render budgets', () => {
     beforeEach(() => {
         vi.stubGlobal('IntersectionObserver', MockObserver);
         vi.stubGlobal('ResizeObserver', MockObserver);
+        mockedProjectClient.getProjectVersions.mockResolvedValue([]);
+        mockedProjectClient.getProjectGallery.mockResolvedValue([]);
+        mockedProjectClient.getProjectTeam.mockResolvedValue({
+            projectRoles: [],
+            teamMembers: [],
+            teamInvites: []
+        });
+        mockedProjectClient.getComments.mockResolvedValue([]);
         mockedProjectClient.trackView.mockResolvedValue(undefined);
         mockedProjectClient.getUserProfile.mockResolvedValue({ id: 'user-1', username: 'Ada', avatarUrl: '', likedProjectIds: [] } as any);
         mockedProjectClient.getOrgMembers.mockResolvedValue([]);
