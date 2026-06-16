@@ -551,7 +551,7 @@ export const Home: React.FC<{
     }, [combinedProjectPool, newestProjects]);
     const col1Projects = useMemo(() => heroMarqueeProjects.filter((_, i) => i % 2 === 0), [heroMarqueeProjects]);
     const col2Projects = useMemo(() => heroMarqueeProjects.filter((_, i) => i % 2 === 1), [heroMarqueeProjects]);
-    const col1Duration = `${Math.max(35, col1Projects.length * 9)}s`;
+    const col1Duration = `${Math.max(35, col1Projects.length * 7)}s`;
     const col2Duration = `${Math.max(45, col2Projects.length * 9)}s`;
     const isWideDesktopHeroViewport = viewportSize.width >= DESKTOP_HERO_MIN_WIDTH_ENTER && viewportSize.height >= DESKTOP_HERO_MIN_HEIGHT;
     const shouldUseWideDesktopHeroLayout = isWideDesktopHeroViewport;
