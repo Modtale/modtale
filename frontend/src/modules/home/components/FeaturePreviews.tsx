@@ -10,6 +10,7 @@ import { theme } from '@/styles/theme';
 import { GLASS_CARD, GLASS_HEADER } from '../styles';
 import { getClassificationIcon, toTitleCase, formatTimeAgo } from '@/utils/modHelpers';
 import { LineChart } from '@/components/ui/charts/LineChart';
+import { useChartVisibility } from '@/components/ui/charts/chartVisibility';
 import { FeaturedModCard } from './HeroMarquee';
 import { getCommentRoleBadge } from '@/modules/project/utils/commentRoles';
 import { DependencyModal } from '@/modules/project/components/dialogs/DependencyModal';
@@ -240,7 +241,7 @@ const FeatureBodyText = ({ children }: { children: React.ReactNode }) => (
 
 
 const InlineAnalyticsUI = ({ showConversionRate = true }: { showConversionRate?: boolean }) => {
-    const [hiddenDatasets, setHiddenDatasets] = useState<Set<string>>(new Set());
+    const { isHidden, toggleHandler } = useChartVisibility();
     const mockChartData = [
         { date: 'Jun 4', value: 1200 },
         { date: 'Jun 5', value: 1350 },
@@ -260,29 +261,20 @@ const InlineAnalyticsUI = ({ showConversionRate = true }: { showConversionRate?:
         { date: 'Jun 10', value: 2000 }
     ];
 
-    const handleToggle = (id: string) => {
-        setHiddenDatasets(prev => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-        });
-    };
-
     const mockChartDatasets = [
         {
             id: 'downloads',
             label: 'Downloads',
             color: '#3b82f6',
             data: mockChartData,
-            hidden: hiddenDatasets.has('downloads')
+            hidden: isHidden('inlineAnalytics', 'downloads')
         },
         {
             id: 'views',
             label: 'Views',
             color: '#8b5cf6',
             data: mockViewsData,
-            hidden: hiddenDatasets.has('views')
+            hidden: isHidden('inlineAnalytics', 'views')
         }
     ];
 
@@ -323,7 +315,7 @@ const InlineAnalyticsUI = ({ showConversionRate = true }: { showConversionRate?:
             </div>
             <div className="bg-white/40 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm flex flex-col backdrop-blur-md p-4 sm:p-5 mt-4">
                 <div className="h-[380px] w-full">
-                    <LineChart datasets={mockChartDatasets} onToggle={handleToggle} />
+                    <LineChart datasets={mockChartDatasets} onToggle={toggleHandler('inlineAnalytics')} />
                 </div>
             </div>
         </div>
