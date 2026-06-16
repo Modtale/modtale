@@ -8,6 +8,7 @@ import type { Project, User } from '@/types';
 vi.mock('@/modules/project/api/projectClient', () => ({
     projectClient: {
         getProject: vi.fn(),
+        getProjectFull: vi.fn(),
         getProjectVersions: vi.fn(),
         getProjectVersionChangelogs: vi.fn(),
         getProjectGallery: vi.fn(),
@@ -34,20 +35,31 @@ const settle = async (times = 8) => {
     }
 };
 
+const deferred = <T,>() => {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((promiseResolve) => {
+        resolve = promiseResolve;
+    });
+    return { promise, resolve };
+};
+
 type HookSnapshot = ReturnType<typeof useProjectDetail>;
+type HookOptions = Parameters<typeof useProjectDetail>[3];
 
 const Probe = ({
     rawId,
     initialData,
     currentUser,
+    options,
     onRender
 }: {
     rawId: string | undefined;
     initialData: Project | null;
     currentUser: User | null;
+    options?: HookOptions;
     onRender: (snapshot: HookSnapshot) => void;
 }) => {
-    const snapshot = useProjectDetail(rawId, initialData, currentUser);
+    const snapshot = useProjectDetail(rawId, initialData, currentUser, options);
     onRender(snapshot);
 
     return (
@@ -311,6 +323,70 @@ describe('useProjectDetail', () => {
         expect(mockedProjectClient.getProjectGallery).toHaveBeenCalledWith('project-1');
         expect(latestSnapshot.project?.galleryImages).toEqual(['/gallery-one.png']);
         expect(latestSnapshot.project?.galleryImageCaptions).toEqual({ '/gallery-one.png': 'Opening shot' });
+    });
+
+    it('keeps hydrated versions when a background shell refresh resolves afterward', async () => {
+        const projectShell = deferred<Project>();
+        const initialProject = {
+            id: 'project-1',
+            title: 'Sky Tools',
+            authorId: 'author-1',
+            author: 'Ada',
+            versions: []
+        } as any satisfies Project;
+        const hydratedVersion = {
+            id: 'version-1',
+            versionNumber: '1.0.0',
+            gameVersion: '2026.03.11',
+            gameVersions: ['2026.03.11'],
+            fileUrl: '/files/sky-tools.jar',
+            downloadCount: 0,
+            releaseDate: '2026-06-01T00:00:00Z',
+            dependencies: []
+        } as any;
+
+        mockedProjectClient.getProject.mockReturnValue(projectShell.promise);
+        mockedProjectClient.getProjectVersions.mockResolvedValue([hydratedVersion]);
+        mockedProjectClient.getUserProfile.mockResolvedValue({
+            id: 'author-1',
+            username: 'Ada',
+            avatarUrl: '',
+            likedProjectIds: [],
+            accountType: 'USER'
+        } as User);
+
+        await act(async () => {
+            root.render(
+                <Probe
+                    rawId="project-1"
+                    initialData={initialProject}
+                    currentUser={null}
+                    options={{ backgroundRefresh: true }}
+                    onRender={snapshot => {
+                        latestSnapshot = snapshot;
+                    }}
+                />
+            );
+        });
+        await settle();
+
+        expect(mockedProjectClient.getProjectVersions).toHaveBeenCalledWith('project-1');
+        expect(latestSnapshot.project?.versions).toEqual([hydratedVersion]);
+
+        await act(async () => {
+            projectShell.resolve({
+                id: 'project-1',
+                title: 'Sky Tools',
+                about: 'A refreshed project shell.',
+                authorId: 'author-1',
+                author: 'Ada'
+            } as any satisfies Project);
+            await projectShell.promise;
+        });
+        await settle();
+
+        expect(latestSnapshot.project?.about).toBe('A refreshed project shell.');
+        expect(latestSnapshot.project?.versions).toEqual([hydratedVersion]);
     });
 
     it('marks the project as not found when the primary fetch fails', async () => {

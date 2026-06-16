@@ -28,6 +28,21 @@ const consumeProjectBootstrap = async (routeKey: string) => {
     return null;
 };
 
+const mergeProjectSlices = (incoming: Project, previous: Project | null) => {
+    if (!previous || previous.id !== incoming.id) return incoming;
+
+    return {
+        ...incoming,
+        versions: incoming.versions ?? previous.versions,
+        galleryImages: incoming.galleryImages ?? previous.galleryImages,
+        galleryImageCaptions: incoming.galleryImageCaptions ?? previous.galleryImageCaptions,
+        projectRoles: incoming.projectRoles ?? previous.projectRoles,
+        teamMembers: incoming.teamMembers ?? previous.teamMembers,
+        teamInvites: incoming.teamInvites ?? previous.teamInvites,
+        comments: incoming.comments ?? previous.comments
+    };
+};
+
 interface UseProjectDetailOptions {
     backgroundRefresh?: boolean;
     hydrateChangelogs?: boolean;
@@ -59,6 +74,7 @@ export const useProjectDetail = (
     const fetchedTeamDataKey = useRef('');
     const fetchedChangelogKey = useRef('');
     const fetchedVersionsKey = useRef('');
+    const fetchingVersionsKey = useRef('');
     const fetchedGalleryKey = useRef('');
     const fetchedProjectTeamKey = useRef('');
     const fetchedCommentsKey = useRef('');
@@ -74,6 +90,7 @@ export const useProjectDetail = (
             fetchedTeamDataKey.current = '';
             fetchedChangelogKey.current = '';
             fetchedVersionsKey.current = '';
+            fetchingVersionsKey.current = '';
             fetchedGalleryKey.current = '';
             fetchedProjectTeamKey.current = '';
             fetchedCommentsKey.current = '';
@@ -103,7 +120,12 @@ export const useProjectDetail = (
 
                 const bootstrapped = full ? null : await consumeProjectBootstrap(routeKey);
                 const data = bootstrapped || (full ? await projectClient.getProjectFull(routeKey) : await projectClient.getProject(routeKey));
-                if (isMounted) setProject(data);
+                if (isMounted) {
+                    if (data.versions !== undefined) {
+                        fetchedVersionsKey.current = `${data.id}:${routeKey || data.id}`;
+                    }
+                    setProject((previous) => mergeProjectSlices(data, previous));
+                }
             } catch {
                 if (isMounted && !projectMatchesRoute) setIsNotFound(true);
             } finally {
@@ -117,24 +139,36 @@ export const useProjectDetail = (
     }, [routeKey, project?.id, backgroundRefresh, full]);
 
     useEffect(() => {
-        if (full || !project?.id || project.versions !== undefined) return;
+        if (full || !project?.id) return;
 
         const sectionKey = `${project.id}:${routeKey || project.id}`;
-        if (fetchedVersionsKey.current === sectionKey) return;
+        if (project.versions !== undefined && fetchedVersionsKey.current === sectionKey) return;
+        if (fetchingVersionsKey.current === sectionKey) return;
 
         let isMounted = true;
-        fetchedVersionsKey.current = sectionKey;
+        fetchingVersionsKey.current = sectionKey;
 
         projectClient.getProjectVersions(routeKey || project.id)
             .then((versions) => {
                 if (!isMounted) return;
+                fetchedVersionsKey.current = sectionKey;
                 setProject((previous) => previous && previous.id === project.id ? { ...previous, versions } : previous);
             })
             .catch(() => {
                 if (isMounted) fetchedVersionsKey.current = '';
+            })
+            .finally(() => {
+                if (fetchingVersionsKey.current === sectionKey) {
+                    fetchingVersionsKey.current = '';
+                }
             });
 
-        return () => { isMounted = false; };
+        return () => {
+            isMounted = false;
+            if (fetchingVersionsKey.current === sectionKey) {
+                fetchingVersionsKey.current = '';
+            }
+        };
     }, [full, project?.id, project?.versions, routeKey]);
 
     useEffect(() => {
