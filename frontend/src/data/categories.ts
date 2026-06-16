@@ -23,11 +23,11 @@ export const GLOBAL_TAGS = [
 
 export const PROJECT_TYPES = [
     { id: 'All', label: 'All Projects', icon: Layout },
+    { id: 'MODPACK', label: 'Modpacks', icon: Layers },
     { id: 'PLUGIN', label: 'Plugins', icon: FileCode },
-    { id: 'DATA', label: 'Data Assets', icon: Database },
-    { id: 'ART', label: 'Art Assets', icon: Palette },
     { id: 'SAVE', label: 'Worlds', icon: Save },
-    { id: 'MODPACK', label: 'Modpacks', icon: Layers }
+    { id: 'ART', label: 'Art Assets', icon: Palette },
+    { id: 'DATA', label: 'Data Assets', icon: Database }
 ];
 
 export const LICENSES = [
