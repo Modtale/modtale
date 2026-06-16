@@ -57,7 +57,11 @@ const DESKTOP_BREAKPOINT = 1024;
 const DESKTOP_HERO_MIN_WIDTH_ENTER = 1260;
 const DESKTOP_HERO_MIN_WIDTH_EXIT = 1180;
 const DESKTOP_HERO_MIN_HEIGHT = 720;
-const HERO_MARQUEE_PROJECT_LIMIT = 8;
+const HERO_MARQUEE_SORT = 'popular';
+const HERO_MARQUEE_INITIAL_PAGE_SIZE = 16;
+const HERO_MARQUEE_BACKGROUND_PAGE_SIZE = 16;
+const HERO_MARQUEE_BACKGROUND_MAX_PAGES = 2;
+const HERO_MARQUEE_PROJECT_LIMIT = 24;
 const WIDE_DESKTOP_GRID_CLASSES = '[@media(min-width:1260px)_and_(min-height:720px)]:grid-cols-2 [@media(min-width:1260px)_and_(min-height:720px)]:justify-items-stretch';
 const WIDE_DESKTOP_COPY_CLASSES = '[@media(min-width:1260px)_and_(min-height:720px)]:items-start [@media(min-width:1260px)_and_(min-height:720px)]:text-left [@media(min-width:1260px)_and_(min-height:720px)]:mx-0 [@media(min-width:1260px)_and_(min-height:720px)]:max-w-xl';
 const WIDE_DESKTOP_PRIMARY_CLASSES = '[@media(min-width:1260px)_and_(min-height:720px)]:items-start';
@@ -141,7 +145,7 @@ const DesktopHeroMarqueeSkeleton = () => (
             maskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)',
             WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)'
         }}
-        aria-label="Loading trending Hytale projects showcase"
+        aria-label="Loading popular Hytale projects showcase"
         data-testid="home-hero-marquee-skeleton"
     >
         <div className="flex flex-col w-[260px] 2xl:w-[320px] shrink-0 gap-6">
@@ -277,16 +281,66 @@ export const Home: React.FC<{
             scheduledTasks.push(() => globalThis.clearTimeout(timeoutId));
         };
 
+        const fetchMarqueeProjects = async (page: number) => {
+            const res = await api.get('/projects', {
+                params: {
+                    size: page === 0 ? HERO_MARQUEE_INITIAL_PAGE_SIZE : HERO_MARQUEE_BACKGROUND_PAGE_SIZE,
+                    sort: HERO_MARQUEE_SORT,
+                    view: 'marquee',
+                    ...(page > 0 ? { page } : {}),
+                },
+                timeout: HOME_REQUEST_TIMEOUT_MS,
+            });
+            return Array.isArray(res.data?.content) ? res.data.content as Project[] : [];
+        };
+
+        const appendMarqueeProjects = (nextProjects: Project[]) => {
+            if (isCancelled || nextProjects.length === 0) return;
+            setMarqueeProjects((currentProjects) => dedupeProjects([...currentProjects, ...nextProjects]));
+        };
+
+        const loadAdditionalMarqueeProjects = async (seedProjects: Project[]) => {
+            let accumulatedProjects = dedupeProjects(seedProjects);
+
+            for (let page = 1; page <= HERO_MARQUEE_BACKGROUND_MAX_PAGES; page += 1) {
+                if (isCancelled || accumulatedProjects.filter(isHeroMarqueeProject).length >= HERO_MARQUEE_PROJECT_LIMIT) {
+                    return;
+                }
+
+                try {
+                    const nextProjects = await fetchMarqueeProjects(page);
+                    if (nextProjects.length === 0) return;
+
+                    accumulatedProjects = dedupeProjects([...accumulatedProjects, ...nextProjects]);
+                    appendMarqueeProjects(nextProjects);
+                } catch {}
+            }
+        };
+
         if (shouldFetchFallbackMarquee) {
             void runHeroProjectRequest(async () => {
                 try {
-                    const res = await api.get('/projects', {
-                        params: { size: 16, sort: 'trending', view: 'marquee' },
-                        timeout: HOME_REQUEST_TIMEOUT_MS,
-                    });
-                    if (!isCancelled && res.data?.content) setMarqueeProjects(res.data.content);
+                    const nextProjects = await fetchMarqueeProjects(0);
+                    if (!isCancelled && nextProjects.length > 0) {
+                        const uniqueProjects = dedupeProjects(nextProjects);
+                        setMarqueeProjects(uniqueProjects);
+                        scheduleBackgroundRequest(() => loadAdditionalMarqueeProjects(uniqueProjects));
+                    }
                 } catch {}
             }, true);
+        } else if (initialMarqueeProjects.length > 0) {
+            scheduleBackgroundRequest(() => loadAdditionalMarqueeProjects(initialMarqueeSeed));
+        } else if (hasInitialHeroMarqueeProjects) {
+            scheduleBackgroundRequest(async () => {
+                try {
+                    const nextProjects = await fetchMarqueeProjects(0);
+                    if (!isCancelled && nextProjects.length > 0) {
+                        const uniqueProjects = dedupeProjects(nextProjects);
+                        setMarqueeProjects(uniqueProjects);
+                        await loadAdditionalMarqueeProjects(uniqueProjects);
+                    }
+                } catch {}
+            });
         }
 
         if (shouldFetchFallbackProjects) {
@@ -344,6 +398,7 @@ export const Home: React.FC<{
     }, [
         DESKTOP_BREAKPOINT,
         hasInitialHeroMarqueeProjects,
+        initialMarqueeProjects.length,
         initialMarqueeSeed.length,
         initialNewestProjects.length,
         initialProjectSeed.length,
@@ -496,6 +551,8 @@ export const Home: React.FC<{
     }, [combinedProjectPool, newestProjects]);
     const col1Projects = useMemo(() => heroMarqueeProjects.filter((_, i) => i % 2 === 0), [heroMarqueeProjects]);
     const col2Projects = useMemo(() => heroMarqueeProjects.filter((_, i) => i % 2 === 1), [heroMarqueeProjects]);
+    const col1Duration = `${Math.max(35, col1Projects.length * 9)}s`;
+    const col2Duration = `${Math.max(45, col2Projects.length * 9)}s`;
     const isWideDesktopHeroViewport = viewportSize.width >= DESKTOP_HERO_MIN_WIDTH_ENTER && viewportSize.height >= DESKTOP_HERO_MIN_HEIGHT;
     const shouldUseWideDesktopHeroLayout = isWideDesktopHeroViewport;
     const isDesktopHeroLayout = isDesktop && useDesktopHeroLayout;
@@ -1029,10 +1086,10 @@ export const Home: React.FC<{
                                             maskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)',
                                             WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)'
                                         }}
-                                        aria-label="Trending Hytale Projects Showcase"
+                                        aria-label="Popular Hytale Projects Showcase"
                                     >
-                                        <MarqueeColumn projects={col1Projects} duration="35s" />
-                                        <MarqueeColumn projects={col2Projects} duration="45s" />
+                                        <MarqueeColumn projects={col1Projects} duration={col1Duration} />
+                                        <MarqueeColumn projects={col2Projects} duration={col2Duration} />
                                     </aside>
                                 ) : (
                                     <DesktopHeroMarqueeSkeleton />
