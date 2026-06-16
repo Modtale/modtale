@@ -13,6 +13,7 @@ interface GalleryCarouselViewerProps {
     defaultActiveIndex?: number;
     onActiveIndexChange?: (index: number) => void;
     autoAdvance?: boolean;
+    keyboardNavigationDirection?: 'standard' | 'inverted';
     className?: string;
     mediaClassName?: string;
     emptyFallback?: React.ReactNode;
@@ -51,6 +52,7 @@ export const GalleryCarouselViewer: React.FC<GalleryCarouselViewerProps> = ({
     defaultActiveIndex = 0,
     onActiveIndexChange,
     autoAdvance = true,
+    keyboardNavigationDirection = 'standard',
     className = DEFAULT_CONTAINER_CLASS_NAME,
     mediaClassName = DEFAULT_MEDIA_CLASS_NAME,
     emptyFallback = null
@@ -156,11 +158,21 @@ export const GalleryCarouselViewer: React.FC<GalleryCarouselViewerProps> = ({
                     if (!showControls) return;
                     if (event.key === 'ArrowLeft') {
                         event.preventDefault();
-                        previousImage();
+                        event.stopPropagation();
+                        if (keyboardNavigationDirection === 'inverted') {
+                            nextImage();
+                        } else {
+                            previousImage();
+                        }
                     }
                     if (event.key === 'ArrowRight') {
                         event.preventDefault();
-                        nextImage();
+                        event.stopPropagation();
+                        if (keyboardNavigationDirection === 'inverted') {
+                            previousImage();
+                        } else {
+                            nextImage();
+                        }
                     }
                 }}
             >

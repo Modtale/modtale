@@ -297,10 +297,10 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
             if (event.key === 'ArrowLeft') {
                 event.preventDefault();
-                setGalleryIndex((prev) => (prev - 1 + galleryItems.length) % galleryItems.length);
+                setGalleryIndex((prev) => (prev + 1) % galleryItems.length);
             } else if (event.key === 'ArrowRight') {
                 event.preventDefault();
-                setGalleryIndex((prev) => (prev + 1) % galleryItems.length);
+                setGalleryIndex((prev) => (prev - 1 + galleryItems.length) % galleryItems.length);
             }
         };
 
@@ -683,6 +683,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                                     title={project.title}
                                     activeIndex={galleryIndex}
                                     onActiveIndexChange={setGalleryIndex}
+                                    keyboardNavigationDirection="inverted"
                                     className="mb-0 overflow-hidden rounded-2xl border border-blue-200 bg-slate-50 shadow-xl shadow-blue-950/20 dark:border-blue-400/20 dark:bg-[#0B1120]"
                                     mediaClassName="relative aspect-video max-h-[calc(90dvh-8rem)] bg-slate-200 outline-none dark:bg-slate-950"
                                 />

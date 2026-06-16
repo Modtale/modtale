@@ -126,4 +126,28 @@ describe('GalleryCarousel', () => {
 
         expect(onActiveIndexChange).toHaveBeenCalledWith(0);
     });
+
+    it('can invert keyboard direction for the gallery popup without changing controls', async () => {
+        const onActiveIndexChange = vi.fn();
+
+        await act(async () => {
+            root.render(
+                <GalleryCarouselViewer
+                    images={['/one.png', '/two.png', '/three.png']}
+                    title="Skyforge"
+                    activeIndex={1}
+                    onActiveIndexChange={onActiveIndexChange}
+                    autoAdvance={false}
+                    keyboardNavigationDirection="inverted"
+                />
+            );
+        });
+
+        const mediaRegion = container.querySelector('section[aria-label="Skyforge gallery"] > div') as HTMLDivElement;
+        await act(async () => {
+            mediaRegion.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+        });
+
+        expect(onActiveIndexChange).toHaveBeenCalledWith(0);
+    });
 });
