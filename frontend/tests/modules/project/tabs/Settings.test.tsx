@@ -6,7 +6,7 @@ import { Settings } from '@/modules/project/tabs/Settings';
 import { Permission } from '@/modules/permissions/permissions';
 import type { MetadataFormData } from '@/modules/project/components/FormShared';
 
-describe('Project settings gallery carousel option', () => {
+describe('Project settings tab', () => {
     let container: HTMLDivElement;
     let root: Root;
 
@@ -23,7 +23,7 @@ describe('Project settings gallery carousel option', () => {
         container.remove();
     });
 
-    it('explains marker-only carousel placement without rendering a toggle', async () => {
+    it('does not show gallery carousel placement guidance', async () => {
         const projectData = {
             id: 'project-1',
             title: 'Sky Tools',
@@ -66,14 +66,9 @@ describe('Project settings gallery carousel option', () => {
             );
         });
 
-        const heading = Array.from(container.querySelectorAll('h3')).find((node) => node.textContent === 'Gallery Carousel');
-        const section = heading?.closest('.mb-4');
-
-        expect(heading).toBeDefined();
-        expect(section?.querySelector('button')).toBeNull();
-        expect(container.textContent).toContain('{{gallery-carousel}}');
-        expect(container.textContent).toContain('once in the description');
-        expect(container.textContent).toContain('Leave it out');
+        expect(container.textContent).not.toContain('Gallery Carousel');
+        expect(container.textContent).not.toContain('{{gallery-carousel}}');
+        expect(container.textContent).not.toContain('inline carousel');
         expect(markDirty).not.toHaveBeenCalled();
         expect(setProjectData).not.toHaveBeenCalled();
     });
