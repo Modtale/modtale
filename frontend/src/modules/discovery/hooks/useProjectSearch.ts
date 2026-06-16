@@ -231,34 +231,37 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
     }, [fetchData]);
 
     const updateParams = useCallback((updates: Record<string, string | null>) => {
+        const next = new URLSearchParams(searchParams);
+        Object.entries(updates).forEach(([key, value]) => {
+            if (
+                value === null ||
+                (key === 'page' && value === '0') ||
+                (key === 'sort' && value === 'relevance') ||
+                (key === 'category' && value === 'all') ||
+                (key === 'version' && value === 'Any') ||
+                (key === 'minDl' && value === '0') ||
+                (key === 'minFav' && value === '0')
+            ) {
+                next.delete(key);
+            } else {
+                next.set(key, value);
+            }
+        });
+        if (!updates.hasOwnProperty('page')) {
+            next.delete('page');
+        }
+
+        if (next.toString() === searchParams.toString()) {
+            return;
+        }
+
         setItems([]);
         setTotalPages(0);
         setTotalItems(0);
         setLoading(true);
         setIsPending(true);
-        setSearchParams(prev => {
-            const next = new URLSearchParams(prev);
-            Object.entries(updates).forEach(([key, value]) => {
-                if (
-                    value === null ||
-                    (key === 'page' && value === '0') ||
-                    (key === 'sort' && value === 'relevance') ||
-                    (key === 'category' && value === 'all') ||
-                    (key === 'version' && value === 'Any') ||
-                    (key === 'minDl' && value === '0') ||
-                    (key === 'minFav' && value === '0')
-                ) {
-                    next.delete(key);
-                } else {
-                    next.set(key, value);
-                }
-            });
-            if (!updates.hasOwnProperty('page')) {
-                next.delete('page');
-            }
-            return next;
-        });
-    }, [setSearchParams]);
+        setSearchParams(next);
+    }, [searchParams, setSearchParams]);
 
     return {
         page, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, selectedTags, urlSearchTerm,
