@@ -214,4 +214,58 @@ describe('ProjectEditorView route smoke test', () => {
         expect(container.querySelector('input[placeholder="License Name"]')).not.toBeNull();
         expect(container.querySelector('input[placeholder="License URL"]')).not.toBeNull();
     });
+
+    it('expands the card preview without exposing project links', async () => {
+        await act(async () => {
+            root.render(
+                <ToastProvider>
+                    <MemoryRouter initialEntries={['/projects/project-1/edit']}>
+                        <Routes>
+                            <Route
+                                path="/projects/:id/edit"
+                                element={
+                                    <ProjectEditorView
+                                        currentUser={{ id: 'user-1', username: 'tester' } as any}
+                                        onShowStatus={vi.fn()}
+                                    />
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </ToastProvider>
+            );
+        });
+
+        await waitForText(container, 'Test Project');
+
+        const previewTrigger = container.querySelector('[aria-label="Expand project card preview"]') as HTMLElement | null;
+        expect(previewTrigger, 'expected the editor sidebar to render the card preview trigger').not.toBeNull();
+        expect(previewTrigger?.querySelector('a[href]')).toBeNull();
+
+        await act(async () => {
+            previewTrigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitForText(document.body, 'Project Card Preview');
+
+        const previewDialog = document.body.querySelector('[role="dialog"][aria-label="Project card preview"]') as HTMLElement | null;
+        expect(previewDialog).not.toBeNull();
+        expect(previewDialog?.querySelector('a[href]')).toBeNull();
+        expect(previewDialog?.textContent).toContain('Test Project');
+
+        const previewFrame = previewDialog?.querySelector('[data-testid="project-card-preview-frame"]') as HTMLElement | null;
+        expect(previewFrame).not.toBeNull();
+
+        await act(async () => {
+            previewFrame?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(document.body.querySelector('[role="dialog"][aria-label="Project card preview"]')).not.toBeNull();
+
+        await act(async () => {
+            previewDialog?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(document.body.querySelector('[role="dialog"][aria-label="Project card preview"]')).toBeNull();
+    });
 });
