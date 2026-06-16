@@ -117,7 +117,7 @@ describe('BrowseFilters performance behavior', () => {
         expect(mockedProjectClient.getMetaGameVersionCatalog).toHaveBeenCalledTimes(1);
     });
 
-    it("reselects Any when filters are reset", async () => {
+    it('delegates reset as a single batched filter reset', async () => {
         const setSelectedVersion = vi.fn();
         const onResetFilters = vi.fn();
 
@@ -138,7 +138,7 @@ describe('BrowseFilters performance behavior', () => {
         });
 
         expect(onResetFilters).toHaveBeenCalledTimes(1);
-        expect(setSelectedVersion).toHaveBeenCalledWith('Any');
+        expect(setSelectedVersion).not.toHaveBeenCalled();
     });
 
     it('adds individual game versions to the active filter', async () => {

@@ -362,11 +362,9 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
 
     const resetAll = () => {
         onResetFilters();
-        setSelectedVersion('Any');
         setShowPreReleases(false);
         setCustomDl('');
         setCustomFav('');
-        setFilterDate(null);
         setSelectedDateObj(null);
         setShowCalendar(false);
     };
