@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -12,7 +13,6 @@ import net.modtale.config.properties.AppGameVersionProperties;
 final class GameVersionCatalogOrderingService {
 
     private static final Pattern GAME_VERSION_PATTERN = Pattern.compile("^(\\d{4})\\.(\\d{2})\\.(\\d{2})-([a-zA-Z0-9]+)$");
-    private static final Pattern EXPLICIT_PRE_RELEASE_PATTERN = Pattern.compile("^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)-pre\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$");
     private static final Pattern SEMVER_PATTERN = Pattern.compile(
             "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)"
                     + "(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?"
@@ -41,18 +41,23 @@ final class GameVersionCatalogOrderingService {
         Set<String> releaseSet = new HashSet<>(release);
         Set<String> preReleaseSet = new HashSet<>(preRelease);
 
-        List<String> sortedRelease = sortDescDistinct(release);
-        List<String> sortedPreRelease = sortDescDistinct(preRelease);
-        List<String> sortedAll = sortDescDistinct(mergeLists(mergeLists(sortedRelease, sortedPreRelease), indexed));
+        List<String> sortedAll = sortDescDistinct(mergeLists(mergeLists(release, preRelease), indexed));
+        List<String> sortedRelease = sortedAll.stream()
+                .filter(version -> !isPreRelease(version, preReleaseSet))
+                .toList();
+        List<String> sortedPreRelease = sortedAll.stream()
+                .filter(version -> isPreRelease(version, preReleaseSet))
+                .toList();
 
         List<GameVersionService.GameVersionEntry> entries = new ArrayList<>(sortedAll.size());
         for (String version : sortedAll) {
+            boolean preReleaseVersion = isPreRelease(version, preReleaseSet);
             if (releaseSet.contains(version)) {
-                entries.add(new GameVersionService.GameVersionEntry(version, false, gameVersionProperties.releaseUrl()));
+                entries.add(new GameVersionService.GameVersionEntry(version, preReleaseVersion, gameVersionProperties.releaseUrl()));
             } else if (preReleaseSet.contains(version)) {
                 entries.add(new GameVersionService.GameVersionEntry(version, true, gameVersionProperties.preReleaseUrl()));
             } else {
-                entries.add(new GameVersionService.GameVersionEntry(version, isExplicitPreRelease(version), "indexed"));
+                entries.add(new GameVersionService.GameVersionEntry(version, preReleaseVersion, "indexed"));
             }
         }
 
@@ -177,8 +182,9 @@ final class GameVersionCatalogOrderingService {
         return merged;
     }
 
-    private boolean isExplicitPreRelease(String version) {
-        return version != null && EXPLICIT_PRE_RELEASE_PATTERN.matcher(version.trim()).matches();
+    private boolean isPreRelease(String version, Set<String> preReleaseSet) {
+        return preReleaseSet.contains(version)
+                || (version != null && version.trim().toLowerCase(Locale.ROOT).contains("pre"));
     }
 
     private record ParsedVersion(String dateKey, String hash) {}
