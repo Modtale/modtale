@@ -536,6 +536,13 @@ export const Home: React.FC<{
     );
 
     const previewProject = combinedProjectPool.find((project) => Boolean(project.imageUrl)) || validFeaturedProjects[0];
+    const dependencyPreviewProjects = useMemo(
+        () => dedupeProjects(
+            [previewProject, ...combinedProjectPool, ...validFeaturedProjects]
+                .filter((project): project is Project => Boolean(project?.id && project?.title))
+        ).slice(0, 3),
+        [combinedProjectPool, previewProject, validFeaturedProjects]
+    );
     const trendingSpotlightProjects = useMemo(
         () => dedupeProjects(projects).slice(0, 6),
         [projects]
@@ -1126,7 +1133,7 @@ export const Home: React.FC<{
                     </FeatureShowcaseSection>
 
                     <FeatureShowcaseSection glowFrom="rgba(16, 185, 129, 0.1)" glowTo="rgba(20, 184, 166, 0.08)" align="right">
-                        <SmartDependenciesSection randomProject={previewProject} />
+                        <SmartDependenciesSection randomProject={previewProject} previewProjects={dependencyPreviewProjects} />
                     </FeatureShowcaseSection>
 
                     <FeatureShowcaseSection glowFrom="rgba(59, 130, 246, 0.1)" glowTo="rgba(99, 102, 241, 0.08)" align="left">
