@@ -1,9 +1,10 @@
 import React, { lazy, Suspense, useState, useRef, useEffect } from 'react';
-import { Menu, X, Upload, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn, Code2, ChevronDown, Layout, FileCode, Database, Palette, Save, Layers, LayoutGrid } from 'lucide-react';
+import { Menu, X, Upload, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn, Code2, ChevronDown, LayoutGrid } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatedThemeToggler } from '@/components/ui/AnimatedThemeToggler';
 import { useMobile } from '@/context/MobileContext';
 import { SiteRoutes } from '@/utils/routes';
+import { PROJECT_TYPES } from '@/data/categories';
 import type { User } from "@/types.ts";
 
 const NotificationMenu = lazy(() => import('@/modules/user/components/NotificationMenu').then((module) => ({ default: module.NotificationMenu })));
@@ -141,55 +142,22 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                                     {isBrowseDropdownOpen && (
                                         <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
-                                            <Link
-                                                to={SiteRoutes.browse()}
-                                                onClick={() => setIsBrowseDropdownOpen(false)}
-                                                className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
-                                            >
-                                                <Layout className="w-4 h-4 mr-3 text-slate-400" />
-                                                All Projects
-                                            </Link>
-                                            <div className="h-px bg-slate-100 dark:bg-white/5 my-1 mx-2"></div>
-                                            <Link
-                                                to={SiteRoutes.browse('MODPACK')}
-                                                onClick={() => setIsBrowseDropdownOpen(false)}
-                                                className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
-                                            >
-                                                <Layers className="w-4 h-4 mr-3 text-slate-400" />
-                                                Modpacks
-                                            </Link>
-                                            <Link
-                                                to={SiteRoutes.browse('PLUGIN')}
-                                                onClick={() => setIsBrowseDropdownOpen(false)}
-                                                className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
-                                            >
-                                                <FileCode className="w-4 h-4 mr-3 text-slate-400" />
-                                                Plugins
-                                            </Link>
-                                            <Link
-                                                to={SiteRoutes.browse('SAVE')}
-                                                onClick={() => setIsBrowseDropdownOpen(false)}
-                                                className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
-                                            >
-                                                <Save className="w-4 h-4 mr-3 text-slate-400" />
-                                                Worlds
-                                            </Link>
-                                            <Link
-                                                to={SiteRoutes.browse('ART')}
-                                                onClick={() => setIsBrowseDropdownOpen(false)}
-                                                className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
-                                            >
-                                                <Palette className="w-4 h-4 mr-3 text-slate-400" />
-                                                Art Assets
-                                            </Link>
-                                            <Link
-                                                to={SiteRoutes.browse('DATA')}
-                                                onClick={() => setIsBrowseDropdownOpen(false)}
-                                                className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
-                                            >
-                                                <Database className="w-4 h-4 mr-3 text-slate-400" />
-                                                Data Assets
-                                            </Link>
+                                            {PROJECT_TYPES.map((type, index) => {
+                                                const Icon = type.icon;
+                                                return (
+                                                    <React.Fragment key={type.id}>
+                                                        {index === 1 && <div className="h-px bg-slate-100 dark:bg-white/5 my-1 mx-2"></div>}
+                                                        <Link
+                                                            to={SiteRoutes.browse(type.id === 'All' ? undefined : type.id)}
+                                                            onClick={() => setIsBrowseDropdownOpen(false)}
+                                                            className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                                                        >
+                                                            <Icon className="w-4 h-4 mr-3 text-slate-400" />
+                                                            {type.label}
+                                                        </Link>
+                                                    </React.Fragment>
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </div>
@@ -330,12 +298,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <div id="mobile-nav-menu" ref={mobileMenuRef} className="absolute top-24 left-0 right-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 shadow-2xl p-4 flex flex-col gap-2 animate-in slide-in-from-top-2 z-50">
                     <div className="space-y-1">
                         <div className="px-3 py-2 text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Browse</div>
-                        <Link to={SiteRoutes.browse()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Layout className="w-4 h-4 mr-3" /> All Projects</Link>
-                        <Link to={SiteRoutes.browse('MODPACK')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Layers className="w-4 h-4 mr-3" /> Modpacks</Link>
-                        <Link to={SiteRoutes.browse('PLUGIN')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><FileCode className="w-4 h-4 mr-3" /> Plugins</Link>
-                        <Link to={SiteRoutes.browse('SAVE')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Save className="w-4 h-4 mr-3" /> Worlds</Link>
-                        <Link to={SiteRoutes.browse('ART')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Palette className="w-4 h-4 mr-3" /> Art Assets</Link>
-                        <Link to={SiteRoutes.browse('DATA')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Database className="w-4 h-4 mr-3" /> Data Assets</Link>
+                        {PROJECT_TYPES.map((type) => {
+                            const Icon = type.icon;
+                            return (
+                                <Link
+                                    key={type.id}
+                                    to={SiteRoutes.browse(type.id === 'All' ? undefined : type.id)}
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"
+                                >
+                                    <Icon className="w-4 h-4 mr-3" />
+                                    {type.label}
+                                </Link>
+                            );
+                        })}
                     </div>
 
                     <div className="h-px bg-slate-100 dark:bg-white/5 my-2"></div>
