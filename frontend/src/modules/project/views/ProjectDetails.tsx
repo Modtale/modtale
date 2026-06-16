@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { ChevronLeft, ChevronRight, Github, Globe } from 'lucide-react';
+import { ChevronLeft, Github, Globe, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
 import type { Project, User } from '@/types';
@@ -23,6 +23,7 @@ import { ViewDetails } from '../tabs/ViewDetails';
 import { prefetchInitialWikiPage, useHMWiki } from '../hooks/useHMWiki';
 
 import { ProjectLayout } from '../components/ProjectLayout';
+import { GalleryCarouselViewer } from '../components/GalleryCarouselViewer';
 import { Spinner } from '@/components/ui/Spinner';
 import NotFound from '@/components/ui/error/NotFound';
 import { StatusModal } from '@/components/ui/StatusModal';
@@ -283,18 +284,23 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     }, [isGalleryRoute, location.hash, galleryItems.length]);
 
     useEffect(() => {
-        if (!isGalleryRoute || galleryItems.length <= 1) return;
+        if (!isGalleryRoute) return;
 
         const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                navigate(projectUrl);
+                return;
+            }
+
+            if (galleryItems.length <= 1) return;
+
             if (event.key === 'ArrowLeft') {
                 event.preventDefault();
                 setGalleryIndex((prev) => (prev - 1 + galleryItems.length) % galleryItems.length);
             } else if (event.key === 'ArrowRight') {
                 event.preventDefault();
                 setGalleryIndex((prev) => (prev + 1) % galleryItems.length);
-            } else if (event.key === 'Escape') {
-                event.preventDefault();
-                navigate(projectUrl);
             }
         };
 
@@ -523,7 +529,6 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         project.links?.WEBSITE && { type: 'WEBSITE', url: project.links.WEBSITE, icon: Globe, label: 'Website', colorClass: 'text-blue-500 dark:text-blue-400 hover:bg-blue-500/20 border-blue-500/20' }
     ].filter(Boolean) as any[];
     const hasInlineGalleryCarousel = countGalleryCarouselMarkers(project.about || '') > 0;
-    const activeGalleryItem = galleryItems[galleryIndex] || galleryItems[0];
 
     return (
         <>
@@ -653,75 +658,40 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             {isGalleryRoute && typeof document !== 'undefined' && createPortal(
                 <div className={theme.components.modalOverlay} onClick={() => navigate(projectUrl)}>
                     <div
-                        className={`${theme.components.modalContent} w-full max-w-6xl h-[90dvh]`}
+                        className="relative w-full max-w-6xl"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className={theme.components.modalHeader}>
-                            <h2 className={`text-lg font-black ${theme.colors.textPrimary}`}>Gallery</h2>
-                            <button
-                                type="button"
-                                onClick={() => navigate(projectUrl)}
-                                className={`px-3 py-1.5 rounded-lg border ${theme.colors.border} ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} ${theme.colors.bgSurfaceHover} transition-colors text-sm font-bold`}
-                            >
-                                Close
-                            </button>
-                        </div>
-                        <div className={`${theme.components.modalBody} !p-0`}>
-                            {galleryPayloadPending ? (
-                                <div className="flex items-center justify-center h-[72dvh]">
+                        {galleryPayloadPending ? (
+                            <div className={`${theme.components.modalContent} mx-auto max-w-md`}>
+                                <div className="flex items-center justify-center p-12">
                                     <Spinner />
                                 </div>
-                            ) : galleryItems.length > 0 && activeGalleryItem ? (
-                                <div className="relative h-[72dvh] bg-slate-100 dark:bg-slate-950">
-                                    {activeGalleryItem.type === 'youtube' && activeGalleryItem.embedUrl ? (
-                                        <iframe
-                                            src={activeGalleryItem.embedUrl}
-                                            title={`${project.title} gallery video ${galleryIndex + 1}`}
-                                            className="h-full w-full"
-                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                            allowFullScreen
-                                        />
-                                    ) : (
-                                        <img
-                                            src={activeGalleryItem.url}
-                                            alt={`${project.title} gallery image ${galleryIndex + 1}`}
-                                            className="w-full h-full object-contain"
-                                            loading="eager"
-                                        />
-                                    )}
-                                    {galleryItems.length > 1 && (
-                                        <>
-                                            <button
-                                                type="button"
-                                                aria-label="Previous image"
-                                                onClick={() => setGalleryIndex((prev) => (prev - 1 + galleryItems.length) % galleryItems.length)}
-                                                className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-blue-950/75 hover:bg-blue-900 text-white transition-colors"
-                                            >
-                                                <ChevronLeft className="w-6 h-6" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                aria-label="Next image"
-                                                onClick={() => setGalleryIndex((prev) => (prev + 1) % galleryItems.length)}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-blue-950/75 hover:bg-blue-900 text-white transition-colors"
-                                            >
-                                                <ChevronRight className="w-6 h-6" />
-                                            </button>
-                                        </>
-                                    )}
-                                    {activeGalleryItem.caption && (
-                                        <div className="absolute bottom-12 left-4 right-4 mx-auto max-w-3xl rounded-xl bg-blue-950/80 px-4 py-2 text-center text-sm font-semibold text-white shadow-lg">
-                                            {activeGalleryItem.caption}
-                                        </div>
-                                    )}
-                                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-blue-950/80 text-white text-sm font-semibold">
-                                        {galleryIndex + 1} / {galleryItems.length}
-                                    </div>
-                                </div>
-                            ) : (
+                            </div>
+                        ) : galleryItems.length > 0 ? (
+                            <>
+                                <button
+                                    type="button"
+                                    aria-label="Close gallery"
+                                    onClick={() => navigate(projectUrl)}
+                                    className="absolute right-3 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-blue-200/50 bg-blue-950/75 text-white shadow-lg backdrop-blur-sm transition-colors hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-modtale-accent"
+                                >
+                                    <X className="h-5 w-5" aria-hidden="true" />
+                                </button>
+                                <GalleryCarouselViewer
+                                    images={project.galleryImages}
+                                    captions={project.galleryImageCaptions}
+                                    title={project.title}
+                                    activeIndex={galleryIndex}
+                                    onActiveIndexChange={setGalleryIndex}
+                                    className="mb-0 overflow-hidden rounded-2xl border border-blue-200 bg-slate-50 shadow-xl shadow-blue-950/20 dark:border-blue-400/20 dark:bg-[#0B1120]"
+                                    mediaClassName="relative aspect-video max-h-[calc(90dvh-8rem)] bg-slate-200 outline-none dark:bg-slate-950"
+                                />
+                            </>
+                        ) : (
+                            <div className={`${theme.components.modalContent} mx-auto max-w-md`}>
                                 <div className={`p-10 text-center ${theme.colors.textMuted}`}>No media in this gallery.</div>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </div>
                 </div>,
                 document.body

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRoot, type Root } from 'react-dom/client';
 
 import { GalleryCarousel } from '@/modules/project/components/GalleryCarousel';
+import { GalleryCarouselViewer } from '@/modules/project/components/GalleryCarouselViewer';
 
 describe('GalleryCarousel', () => {
     let container: HTMLDivElement;
@@ -99,5 +100,30 @@ describe('GalleryCarousel', () => {
 
         expect(iframe).not.toBeNull();
         expect(iframe.getAttribute('src')).toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
+    });
+
+    it('supports a controlled active index for the gallery popup', async () => {
+        const onActiveIndexChange = vi.fn();
+
+        await act(async () => {
+            root.render(
+                <GalleryCarouselViewer
+                    images={['/one.png', '/two.png']}
+                    title="Skyforge"
+                    activeIndex={1}
+                    onActiveIndexChange={onActiveIndexChange}
+                    autoAdvance={false}
+                />
+            );
+        });
+
+        expect(container.querySelector('img[alt="Skyforge gallery image 2"]')?.getAttribute('src')).toBe('/two.png');
+
+        const previousButton = container.querySelector('button[aria-label="Previous gallery image"]') as HTMLButtonElement;
+        await act(async () => {
+            previousButton.click();
+        });
+
+        expect(onActiveIndexChange).toHaveBeenCalledWith(0);
     });
 });
