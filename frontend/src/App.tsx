@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, Suspense, lazy, useRef } from 'react';
 import { Route, Routes, useNavigate, useLocation, Navigate, BrowserRouter } from 'react-router-dom';
 import { StaticRouter } from 'react-router-dom/server';
 import { HelmetProvider } from 'react-helmet-async';
@@ -50,11 +50,39 @@ const hasLikelyAuthCookie = () => {
     return /(?:^|;\s*)(SESSION|JSESSIONID|XSRF-TOKEN)=/.test(cookies);
 };
 
+const projectRouteBase = (pathname: string) => {
+    const match = pathname.match(/^\/(project|mod|modpack|world)\/[^/]+/i);
+    return match ? match[0].toLowerCase() : '';
+};
+
+const isProjectModalSubroute = (pathname: string) => (
+    /^\/(project|mod|modpack|world)\/[^/]+\/(download|changelog|gallery)\/?$/i.test(pathname)
+);
+
 const ScrollToTop = () => {
     const { pathname } = useLocation();
+    const previousPathRef = useRef<string | null>(null);
+
     useEffect(() => {
+        const previousPath = previousPathRef.current;
+        const previousProjectBase = previousPath ? projectRouteBase(previousPath) : '';
+        const nextProjectBase = projectRouteBase(pathname);
+        const isSameProjectModalTransition = Boolean(
+            previousPath
+            && previousProjectBase
+            && previousProjectBase === nextProjectBase
+            && (isProjectModalSubroute(previousPath) || isProjectModalSubroute(pathname))
+        );
+
+        previousPathRef.current = pathname;
+
+        if (isSameProjectModalTransition) {
+            return;
+        }
+
         window.scrollTo(0, 0);
     }, [pathname]);
+
     return null;
 };
 
