@@ -257,6 +257,16 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     }, [location.pathname, isWikiRoute]);
 
     useEffect(() => {
+        if (location.hash !== '#comments' || isDownloadOpen || isHistoryOpen || isGalleryRoute) return;
+
+        window.requestAnimationFrame(() => {
+            if (!commentsRef.current) return;
+            const y = commentsRef.current.getBoundingClientRect().top + window.scrollY - 100;
+            window.scrollTo({ top: y, behavior: 'smooth' });
+        });
+    }, [location.hash, location.pathname, isDownloadOpen, isHistoryOpen, isGalleryRoute, project?.comments]);
+
+    useEffect(() => {
         if (wikiData && !wikiLoading) {
             setDisplayWikiData(wikiData);
             setDisplaySlug(wikiPageSlug);

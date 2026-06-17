@@ -39,7 +39,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({ project, projectUrl, links
                         <Download className="w-5 h-5 group-hover:animate-bounce" aria-hidden="true" /> Download
                     </button>
                 ) : (
-                    <Link to={`${projectUrl}/download`} className="flex-shrink-0 bg-modtale-accent hover:bg-modtale-accentHover text-white px-6 lg:px-8 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 group">
+                    <Link to={`${projectUrl}/download`} state={{ project }} className="flex-shrink-0 bg-modtale-accent hover:bg-modtale-accentHover text-white px-6 lg:px-8 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 transition-all active:scale-95 group">
                         <Download className="w-5 h-5 group-hover:animate-bounce" aria-hidden="true" /> Download
                     </Link>
                 )}
@@ -48,21 +48,21 @@ export const ActionBar: React.FC<ActionBarProps> = ({ project, projectUrl, links
 
                 <div className="grid grid-cols-2 md:flex md:flex-row gap-2 w-full md:w-auto shrink-0">
                     {hasWiki && (
-                        <Link to={`${projectUrl}/wiki`} className={`${mediaButtonClass} flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-xl ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} ${theme.colors.bgSurfaceHover} transition-colors whitespace-nowrap`}>
+                        <Link to={`${projectUrl}/wiki`} state={{ project }} className={`${mediaButtonClass} flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-xl ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} ${theme.colors.bgSurfaceHover} transition-colors whitespace-nowrap`}>
                             <BookOpen className="w-4 h-4" aria-hidden="true" /> Wiki
                         </Link>
                     )}
                     {shouldShowGalleryButton && (
-                        <Link to={`${projectUrl}/gallery#1`} className={`${mediaButtonClass} flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-xl ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} ${theme.colors.bgSurfaceHover} transition-colors whitespace-nowrap`}>
+                        <Link to={`${projectUrl}/gallery#1`} state={{ project }} className={`${mediaButtonClass} flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-xl ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} ${theme.colors.bgSurfaceHover} transition-colors whitespace-nowrap`}>
                             <ImageIcon className="w-4 h-4" aria-hidden="true" /> Gallery
                         </Link>
                     )}
-                    <Link to={`${projectUrl}/changelog`} className={`flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-xl ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} ${theme.colors.bgSurfaceHover} transition-colors whitespace-nowrap`}>
+                    <Link to={`${projectUrl}/changelog`} state={{ project }} className={`flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-xl ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} ${theme.colors.bgSurfaceHover} transition-colors whitespace-nowrap`}>
                         <List className="w-4 h-4" aria-hidden="true" /> Changelog
                     </Link>
-                    <a href={`${projectUrl}#comments`} onClick={(e) => { if (location.pathname === projectUrl) { e.preventDefault(); if (commentsRef.current) { const y = commentsRef.current.getBoundingClientRect().top + window.scrollY - 100; window.scrollTo({top: y, behavior: 'smooth'}); } } }} className={`flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-xl ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} ${theme.colors.bgSurfaceHover} transition-colors whitespace-nowrap`}>
+                    <Link to={`${projectUrl}#comments`} state={{ project }} onClick={(e) => { if (location.pathname === projectUrl && location.hash === '#comments') { e.preventDefault(); if (commentsRef.current) { const y = commentsRef.current.getBoundingClientRect().top + window.scrollY - 100; window.scrollTo({top: y, behavior: 'smooth'}); } } }} className={`flex items-center justify-center gap-1.5 lg:gap-2 px-4 lg:px-5 py-3 md:py-2.5 text-xs lg:text-sm font-bold ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} rounded-xl ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} ${theme.colors.bgSurfaceHover} transition-colors whitespace-nowrap`}>
                         <MessageSquare className="w-4 h-4" aria-hidden="true" /> Comments
-                    </a>
+                    </Link>
                 </div>
             </div>
 

@@ -4,6 +4,13 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { DownloadModal } from '@/modules/project/components/dialogs/DownloadModal';
+import { HistoryModal } from '@/modules/project/components/dialogs/HistoryModal';
+
+const settle = async () => {
+    await act(async () => {
+        await Promise.resolve();
+    });
+};
 
 describe('DownloadModal Toggle Visibility', () => {
     let container: HTMLDivElement;
@@ -139,5 +146,91 @@ describe('DownloadModal Toggle Visibility', () => {
         });
 
         expect(pageText()).not.toContain('Show Pre-Release Game Versions');
+    });
+
+    it('uses buttons instead of hash links for download actions', async () => {
+        const onDownload = vi.fn();
+        const versionsByGame = {
+            '0.5.4': [
+                {
+                    id: 'v1',
+                    versionNumber: '1.0.0',
+                    channel: 'RELEASE',
+                    gameVersion: '0.5.4',
+                    gameVersions: ['0.5.4'],
+                    fileUrl: '/files/skyforge.jar',
+                    dependencies: [],
+                    releaseDate: new Date().toISOString()
+                }
+            ]
+        };
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <DownloadModal
+                        show={true}
+                        onClose={vi.fn()}
+                        versionsByGame={versionsByGame}
+                        preReleaseGameVersions={[]}
+                        orderedGameVersions={['0.5.4']}
+                        onDownload={onDownload}
+                        showExperimental={false}
+                        onToggleExperimental={vi.fn()}
+                        onViewHistory={vi.fn()}
+                    />
+                </MemoryRouter>
+            );
+        });
+        await settle();
+
+        expect(document.body.querySelector('a[href="#"]')).toBeNull();
+
+        const latestButton = Array.from(document.body.querySelectorAll('button'))
+            .find((button) => button.textContent?.includes('Download Latest')) as HTMLButtonElement;
+
+        await act(async () => {
+            latestButton.click();
+        });
+
+        expect(onDownload).toHaveBeenCalledWith('/files/skyforge.jar', '1.0.0', '0.5.4', [], 'RELEASE');
+    });
+
+    it('uses a button for changelog download actions', async () => {
+        const onDownload = vi.fn();
+
+        await act(async () => {
+            root.render(
+                <HistoryModal
+                    show={true}
+                    onClose={vi.fn()}
+                    history={[{
+                        id: 'v1',
+                        versionNumber: '1.0.0',
+                        channel: 'RELEASE',
+                        gameVersions: ['0.5.4'],
+                        fileUrl: '/files/skyforge.jar',
+                        dependencies: [],
+                        downloadCount: 0,
+                        releaseDate: new Date().toISOString(),
+                        changelog: 'Stable release.'
+                    }]}
+                    showExperimental={false}
+                    onToggleExperimental={vi.fn()}
+                    onDownload={onDownload}
+                />
+            );
+        });
+
+        expect(document.body.querySelector('a[href="#"]')).toBeNull();
+
+        const downloadButton = Array.from(document.body.querySelectorAll('button'))
+            .find((button) => button.textContent?.trim() === 'Download') as HTMLButtonElement;
+
+        await act(async () => {
+            downloadButton.click();
+        });
+
+        expect(onDownload).toHaveBeenCalledWith('/files/skyforge.jar', '1.0.0', '0.5.4', [], 'RELEASE');
     });
 });
