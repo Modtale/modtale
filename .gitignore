@@ -15,6 +15,7 @@ frontend/.astro/
 frontend/.next/
 frontend/dist/
 frontend/build/
+frontend/.lighthouseci/
 frontend/.env
 frontend/.env.local
 frontend/npm-debug.log*
