@@ -10,7 +10,8 @@
     "preview": "astro preview",
     "check": "astro check",
     "postinstall": "node scripts/patch-vitest-entry.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "audit:lighthouse": "npx --yes @lhci/cli@0.15.1 autorun"
   },
   "dependencies": {
     "@astrojs/node": "^8.3.4",
