@@ -1,0 +1,79 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import App from '../../App';
+import {
+    NEWS_INDEX_PATH,
+    NEWS_POSTS,
+    SITE_URL,
+    getAbsoluteUrl,
+    getNewsPostUrl,
+} from '../../data/news';
+import { BACKEND_URL } from '@/utils/api';
+
+const [featuredPost] = NEWS_POSTS;
+const title = 'Modtale News | Product Updates and Creator Notes';
+const description = 'Read Modtale product updates, creator notes, feature tours, and platform news for Hytale mods, plugins, worlds, assets, and modpacks.';
+const image = getAbsoluteUrl(featuredPost.socialImage);
+const path = Astro.url.pathname;
+
+const fetchNewsProjects = async () => {
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/v1/projects?size=10&sort=trending&view=marquee`, {
+            headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=86400' },
+            signal: AbortSignal.timeout(1500),
+        });
+        if (!response.ok) return [];
+        const data = await response.json();
+        return Array.isArray(data?.content) ? data.content : [];
+    } catch {
+        return [];
+    }
+};
+
+const initialData = {
+    newsProjects: await fetchNewsProjects(),
+};
+
+const jsonLd = [
+    {
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        name: 'Modtale News',
+        url: getAbsoluteUrl(NEWS_INDEX_PATH),
+        description,
+        publisher: {
+            '@type': 'Organization',
+            name: 'Modtale',
+            logo: {
+                '@type': 'ImageObject',
+                url: `${SITE_URL}/assets/logo.svg`,
+            },
+        },
+        hasPart: NEWS_POSTS.map((post) => ({
+            '@type': 'NewsArticle',
+            headline: post.title,
+            description: post.description,
+            datePublished: post.publishedAt,
+            dateModified: post.updatedAt,
+            author: { '@type': 'Organization', name: post.author },
+            url: getNewsPostUrl(post),
+            image: getAbsoluteUrl(post.socialImage),
+        })),
+    },
+];
+---
+
+<BaseLayout
+    title={title}
+    description={description}
+    image={image}
+    imageAlt="Modtale news feature preview"
+    imageWidth="1200"
+    imageHeight="630"
+    imageType="image/png"
+    jsonLd={jsonLd}
+    canonicalOverride={getAbsoluteUrl(NEWS_INDEX_PATH)}
+    initialData={initialData}
+>
+    <App client:load initialPath={path} ssrData={initialData} />
+</BaseLayout>

@@ -4,6 +4,8 @@ export class SiteRoutes {
     static admin() { return '/admin'; }
     static apiDocs() { return '/api-docs'; }
     static swaggerDocs() { return '/api-docs/swagger'; }
+    static news() { return '/news'; }
+    static newsPost(slug: string) { return `/news/${slug}`; }
     static login(redirectTo?: string) {
         const params = new URLSearchParams();
         if (redirectTo) params.set('redirect', redirectTo);
