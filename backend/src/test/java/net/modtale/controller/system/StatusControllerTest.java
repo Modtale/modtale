@@ -4,7 +4,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import net.modtale.model.dto.response.system.SystemStatusView;
 import net.modtale.model.system.StatusHistory;
+import net.modtale.model.system.SystemStatus;
 import net.modtale.repository.system.StatusHistoryRepository;
+import net.modtale.service.system.StatusDiscordNotifierService;
+import net.modtale.service.system.StatusIncidentService;
 import net.modtale.service.system.StatusSnapshotService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +28,8 @@ class StatusControllerTest {
     private MongoTemplate mongoTemplate;
     private S3Client s3Client;
     private StatusHistoryRepository historyRepository;
+    private StatusDiscordNotifierService statusDiscordNotifierService;
+    private StatusIncidentService statusIncidentService;
     private StatusSnapshotService statusSnapshotService;
 
     @BeforeEach
@@ -32,14 +37,19 @@ class StatusControllerTest {
         mongoTemplate = mock(MongoTemplate.class);
         s3Client = mock(S3Client.class);
         historyRepository = mock(StatusHistoryRepository.class);
-        statusSnapshotService = new StatusSnapshotService(mongoTemplate, s3Client, historyRepository);
+        statusDiscordNotifierService = mock(StatusDiscordNotifierService.class);
+        statusIncidentService = mock(StatusIncidentService.class);
+        when(statusIncidentService.getActiveIncidents()).thenReturn(List.of());
+        when(statusIncidentService.getScheduledMaintenances()).thenReturn(List.of());
+        when(statusIncidentService.getIncidentHistory()).thenReturn(List.of());
+        statusSnapshotService = new StatusSnapshotService(mongoTemplate, s3Client, historyRepository, statusDiscordNotifierService, statusIncidentService);
         controller = new StatusController(statusSnapshotService);
     }
 
     @Test
     void getSystemStatusReturnsTheLatestEntryAndHistorySeries() {
-        StatusHistory latest = history("operational", 20, 10, 5, LocalDateTime.now().minusMinutes(5));
-        StatusHistory previous = history("operational", 22, 12, 6, LocalDateTime.now().minusHours(1));
+        StatusHistory latest = history(SystemStatus.OPERATIONAL, 20, 10, 5, LocalDateTime.now().minusMinutes(5));
+        StatusHistory previous = history(SystemStatus.OPERATIONAL, 22, 12, 6, LocalDateTime.now().minusHours(1));
 
         when(historyRepository.findTopByOrderByTimestampDesc()).thenReturn(latest);
         when(historyRepository.findByTimestampAfterOrderByTimestampAsc(any())).thenReturn(List.of(previous, latest));
@@ -48,14 +58,14 @@ class StatusControllerTest {
 
         assertEquals(200, response.getStatusCode().value());
         SystemStatusView body = response.getBody();
-        assertEquals("operational", body.overall());
+        assertEquals(SystemStatus.OPERATIONAL, body.overall());
         assertEquals(3, body.services().size());
         assertEquals(2, body.history().size());
     }
 
     @Test
     void getSystemStatusPerformsAHealthCheckWhenHistoryIsEmpty() {
-        StatusHistory saved = history("operational", 15, 8, 4, LocalDateTime.now());
+        StatusHistory saved = history(SystemStatus.OPERATIONAL, 15, 8, 4, LocalDateTime.now());
 
         when(historyRepository.findTopByOrderByTimestampDesc()).thenReturn(null);
         when(historyRepository.save(any(StatusHistory.class))).thenReturn(saved);
@@ -64,13 +74,13 @@ class StatusControllerTest {
         var response = controller.getSystemStatus("24h");
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals("operational", response.getBody().overall());
+        assertEquals(SystemStatus.OPERATIONAL, response.getBody().overall());
         verify(mongoTemplate).executeCommand("{ ping: 1 }");
         verify(historyRepository).save(any(StatusHistory.class));
         assertFalse(response.getBody().history().isEmpty());
     }
 
-    private static StatusHistory history(String overall, int api, int db, int storage, LocalDateTime timestamp) {
+    private static StatusHistory history(SystemStatus overall, int api, int db, int storage, LocalDateTime timestamp) {
         StatusHistory history = new StatusHistory(api, db, storage, overall);
         ReflectionTestUtils.setField(history, "timestamp", timestamp);
         return history;

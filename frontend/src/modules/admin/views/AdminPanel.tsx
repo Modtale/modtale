@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText } from 'lucide-react';
+import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText, CalendarClock } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { extractApiErrorMessage } from '@/utils/api';
@@ -10,6 +10,7 @@ import { ReportQueue } from '../components/ReportQueue';
 import { ProjectManagement } from '../components/ProjectManagement';
 import { PlatformAnalytics } from '../components/PlatformAnalytics';
 import { AuditLogs } from '../components/AuditLogs';
+import { StatusIncidents } from '../components/StatusIncidents';
 import { isAdminUser, isSuperAdminUser } from '../utils/access';
 import type { Project } from '@/types';
 
@@ -18,7 +19,7 @@ interface AdminPanelProps {
 }
 
 export function AdminPanel({ currentUser }: AdminPanelProps) {
-    const [activeTab, setActiveTab] = useState<'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'logs'>('verification');
+    const [activeTab, setActiveTab] = useState<'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'logs' | 'status'>('verification');
     const [status, setStatus] = useState<any>(null);
 
     const [pendingProjects, setPendingProjects] = useState<Project[]>([]);
@@ -108,7 +109,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         );
     }
 
-    const SidebarButton = ({ tab, icon: Icon, label, badge }: { tab: 'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'logs', icon: any, label: string, badge?: number }) => (
+    const SidebarButton = ({ tab, icon: Icon, label, badge }: { tab: 'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'logs' | 'status', icon: any, label: string, badge?: number }) => (
         <button
             onClick={() => setActiveTab(tab)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold transition-all ${
@@ -169,11 +170,18 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                     badge={reports.length}
                                 />
                                 {isSuperAdmin && (
-                                    <SidebarButton
-                                        tab="analytics"
-                                        icon={Activity}
-                                        label="Platform Analytics"
-                                    />
+                                    <>
+                                        <SidebarButton
+                                            tab="status"
+                                            icon={CalendarClock}
+                                            label="Status"
+                                        />
+                                        <SidebarButton
+                                            tab="analytics"
+                                            icon={Activity}
+                                            label="Platform Analytics"
+                                        />
+                                    </>
                                 )}
                                 {isSuperAdmin && (
                                     <>
@@ -239,6 +247,12 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                             {activeTab === 'analytics' && isSuperAdmin && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <PlatformAnalytics />
+                                </div>
+                            )}
+
+                            {activeTab === 'status' && isSuperAdmin && (
+                                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <StatusIncidents setStatus={setStatus} />
                                 </div>
                             )}
 

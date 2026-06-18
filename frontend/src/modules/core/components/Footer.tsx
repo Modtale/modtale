@@ -1,5 +1,5 @@
 import React from 'react';
-import {Github, FileText, Shield, Layers, Box, Database, Palette, Save, Code, Layout} from 'lucide-react';
+import {Activity, Github, FileText, Shield, Layers, Box, Database, Palette, Save, Code, Layout} from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { BlueskyBrandIcon, DiscordBrandIcon, XBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { SiteRoutes } from '@/utils/routes';
@@ -74,6 +74,9 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
                         <div className="flex flex-col space-y-3">
                             <Link to={SiteRoutes.apiDocs()} className={linkClass}>
                                 <Code className="w-4 h-4 mr-2 opacity-70" /> API Docs
+                            </Link>
+                            <Link to={SiteRoutes.status()} className={linkClass}>
+                                <Activity className="w-4 h-4 mr-2 opacity-70" /> Status
                             </Link>
                             <div className="h-px bg-slate-100 dark:bg-white/5 my-1"></div>
                             <Link to={SiteRoutes.terms()} className={linkClass}>

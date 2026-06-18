@@ -44,7 +44,7 @@ jobs:
             echo "FRONTEND_SERVICE=modtale-frontend" >> $GITHUB_ENV
             echo "DB_NAME=modtale" >> $GITHUB_ENV
             echo "SEEDING_ENABLED=false" >> $GITHUB_ENV
-            echo "FIXED_BACKEND_URL=https://api.modtale.net/api/v1" >> $GITHUB_ENV
+            echo "BACKEND_DOMAIN=https://api.modtale.net" >> $GITHUB_ENV
             echo "FRONTEND_DOMAIN=https://modtale.net" >> $GITHUB_ENV
             echo "TAG=latest" >> $GITHUB_ENV
             echo "R2_BUCKET_NAME=modtale-binaries" >> $GITHUB_ENV
@@ -57,6 +57,7 @@ jobs:
             echo "FRONTEND_SERVICE=modtale-frontend-dev" >> $GITHUB_ENV
             echo "DB_NAME=modtale" >> $GITHUB_ENV
             echo "SEEDING_ENABLED=false" >> $GITHUB_ENV
+            echo "BACKEND_DOMAIN=https://dev.api.modtale.net" >> $GITHUB_ENV
             echo "FRONTEND_DOMAIN=https://dev.modtale.net" >> $GITHUB_ENV
             echo "TAG=dev" >> $GITHUB_ENV
             echo "R2_BUCKET_NAME=modtale-binaries" >> $GITHUB_ENV
@@ -110,6 +111,7 @@ jobs:
           fi
 
       - name: Build and Deploy Backend
+        id: deploy_backend
         if: steps.filter.outputs.backend == 'true' || env.BACKEND_EXISTS == 'false'
         run: |
           cd backend
@@ -140,6 +142,7 @@ jobs:
             ARGS+=("--update-secrets" "WIKI_API_KEY=WIKI_API_KEY:latest")
             ARGS+=("--update-secrets" "DISCORD_WEBHOOK_URL=DISCORD_WEBHOOK_URL:latest")
             ARGS+=("--update-secrets" "ADMIN_DISCORD_WEBHOOK_URL=ADMIN_DISCORD_WEBHOOK_URL:latest")
+            ARGS+=("--update-secrets" "STATUS_DISCORD_WEBHOOK_URL=STATUS_DISCORD_WEBHOOK_URL:latest")
           else
             ARGS+=("--update-secrets" "MONGODB_URI=MONGODB_URI:latest")
             ARGS+=("--update-secrets" "R2_ACCESS_KEY=R2_ACCESS_KEY:latest")
@@ -166,32 +169,53 @@ jobs:
 
           gcloud run deploy ${{ env.BACKEND_SERVICE }} "${ARGS[@]}" --format="value(status.url)" > backend_url.txt
 
+          if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
+            BACKEND_REVISION=$(gcloud run services describe "$BACKEND_SERVICE" --region "$REGION" --format="value(status.latestReadyRevisionName)")
+            echo "revision=$BACKEND_REVISION" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Determine API URL
         run: |
-          if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
-            echo "API_URL=${{ env.FIXED_BACKEND_URL }}" >> $GITHUB_ENV
+          if [ -n "${BACKEND_DOMAIN:-}" ]; then
+            echo "API_URL=$BACKEND_DOMAIN/api/v1" >> $GITHUB_ENV
           else
             if [ -f backend/backend_url.txt ]; then
               echo "API_URL=$(cat backend/backend_url.txt)/api/v1" >> $GITHUB_ENV
             else
-              echo "API_URL=${{ env.EXISTING_BACKEND_URL }}/api/v1" >> $GITHUB_ENV
+              echo "API_URL=$EXISTING_BACKEND_URL/api/v1" >> $GITHUB_ENV
             fi
           fi
 
       - name: Build and Deploy Frontend
+        id: deploy_frontend
         if: steps.filter.outputs.frontend == 'true' || env.FRONTEND_EXISTS == 'false'
         run: |
           cd frontend
           gcloud builds submit \
             --config=cloudbuild.yml \
-            --substitutions=_PUBLIC_API_URL=${{ env.API_URL }},_TAG=${{ env.TAG }} .
+            --substitutions=_PUBLIC_API_URL=$API_URL,_TAG=$TAG .
           
-          gcloud run deploy ${{ env.FRONTEND_SERVICE }} \
-            --image gcr.io/$PROJECT_ID/modtale-frontend:${{ env.TAG }} \
+          gcloud run deploy $FRONTEND_SERVICE \
+            --image gcr.io/$PROJECT_ID/modtale-frontend:$TAG \
             --region $REGION \
             --allow-unauthenticated \
-            --set-env-vars PUBLIC_API_URL=${{ env.API_URL }} \
+            --set-env-vars "PUBLIC_API_URL=$API_URL" \
             --format="value(status.url)" > frontend_url.txt
+
+          if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
+            FRONTEND_REVISION=$(gcloud run services describe "$FRONTEND_SERVICE" --region "$REGION" --format="value(status.latestReadyRevisionName)")
+            echo "revision=$FRONTEND_REVISION" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Notify Status Bot of Frontend Production Deploy
+        if: env.ENV_TYPE == 'prod' && steps.deploy_frontend.outputs.revision != ''
+        env:
+          STATUS_DISCORD_WEBHOOK_URL: ${{ secrets.STATUS_DISCORD_WEBHOOK_URL }}
+          COMPONENT_NAME: Frontend
+          SERVICE_NAME: ${{ env.FRONTEND_SERVICE }}
+          SERVICE_URL: ${{ env.FRONTEND_DOMAIN }}
+          DEPLOYED_REVISION: ${{ steps.deploy_frontend.outputs.revision }}
+        run: bash .github/scripts/notify-status-deploy.sh
 
       - name: Determine Frontend URL
         run: |
@@ -206,21 +230,49 @@ jobs:
           fi
 
       - name: Update Backend CORS and Self-Awareness
+        id: update_backend_self_awareness
         if: (steps.filter.outputs.backend == 'true' || env.BACKEND_EXISTS == 'false' || steps.filter.outputs.frontend == 'true' || env.FRONTEND_EXISTS == 'false')
         run: |
+          BEFORE_REVISION=$(gcloud run services describe "${{ env.BACKEND_SERVICE }}" --region "$REGION" --format="value(status.latestReadyRevisionName)" 2>/dev/null || true)
+
           if [ -f backend/backend_url.txt ]; then
             B_URL=$(cat backend/backend_url.txt)
           else
-            B_URL=${{ env.EXISTING_BACKEND_URL }}
+            B_URL=${EXISTING_BACKEND_URL:-}
+          fi
+
+          if [ -n "${BACKEND_DOMAIN:-}" ]; then
+            PUBLIC_BACKEND_URL=$BACKEND_DOMAIN
+          else
+            PUBLIC_BACKEND_URL=$B_URL
           fi
           
           gcloud run services update ${{ env.BACKEND_SERVICE }} \
             --region $REGION \
-            --update-env-vars FRONTEND_URL=${{ env.FINAL_FRONTEND_URL }},BACKEND_URL=$B_URL
+            --update-env-vars "FRONTEND_URL=$FINAL_FRONTEND_URL,BACKEND_URL=$PUBLIC_BACKEND_URL"
+
+          if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
+            BACKEND_REVISION=$(gcloud run services describe "$BACKEND_SERVICE" --region "$REGION" --format="value(status.latestReadyRevisionName)")
+            if [ "$BACKEND_REVISION" != "$BEFORE_REVISION" ]; then
+              echo "revision=$BACKEND_REVISION" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Notify Status Bot of Backend Production Deploy
+        if: env.ENV_TYPE == 'prod' && (steps.update_backend_self_awareness.outputs.revision != '' || steps.deploy_backend.outputs.revision != '')
+        env:
+          STATUS_DISCORD_WEBHOOK_URL: ${{ secrets.STATUS_DISCORD_WEBHOOK_URL }}
+          COMPONENT_NAME: Backend
+          SERVICE_NAME: ${{ env.BACKEND_SERVICE }}
+          SERVICE_URL: ${{ env.BACKEND_DOMAIN }}
+          DEPLOYED_REVISION: ${{ steps.update_backend_self_awareness.outputs.revision || steps.deploy_backend.outputs.revision }}
+        run: bash .github/scripts/notify-status-deploy.sh
 
       - name: Generate Deployment Summary
         if: always()
         run: |
+          PUBLIC_API_URL="${API_URL:-}"
+
           # Define status emojis and labels
           if [ "${{ steps.filter.outputs.backend }}" = "true" ] || [ "${{ env.BACKEND_EXISTS }}" = "false" ]; then
             if [ "${{ steps.filter.outcome }}" = "success" ]; then
@@ -265,7 +317,9 @@ jobs:
           echo "| Component | Status | Target Service | Service URL |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
           
-          if [ -n "$B_URL" ]; then
+          if [ -n "$PUBLIC_API_URL" ]; then
+            echo "| **Backend API** | $BACKEND_STATUS | \`${{ env.BACKEND_SERVICE }}\` | [API Endpoint]($PUBLIC_API_URL) |" >> $GITHUB_STEP_SUMMARY
+          elif [ -n "$B_URL" ]; then
             echo "| **Backend API** | $BACKEND_STATUS | \`${{ env.BACKEND_SERVICE }}\` | [API Endpoint]($B_URL/api/v1) |" >> $GITHUB_STEP_SUMMARY
           else
             echo "| **Backend API** | $BACKEND_STATUS | \`${{ env.BACKEND_SERVICE }}\` | *N/A* |" >> $GITHUB_STEP_SUMMARY

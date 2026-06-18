@@ -44,4 +44,8 @@ export const adminClient = {
     getVerificationQueue: async () => (await api.get('/admin/verification/queue')).data,
     getReviewDetails: async (id: string) => (await api.get(`/admin/projects/${id}/review-details`)).data,
     getCurrentAdmin: async () => (await api.get('/user/me')).data,
+
+    getStatusIncidents: async () => (await api.get('/admin/status/incidents')).data,
+    createStatusIncident: async (data: any) => (await api.post('/admin/status/incidents', data)).data,
+    updateStatusIncident: async (id: string, data: any) => (await api.post(`/admin/status/incidents/${id}/updates`, data)).data,
 };

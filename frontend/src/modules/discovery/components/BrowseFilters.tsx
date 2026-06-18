@@ -13,46 +13,15 @@ import {
     Download,
     LayoutGrid,
     List,
-    AlignJustify,
-    ChevronLeft,
-    ChevronRight
+    AlignJustify
 } from 'lucide-react';
 import { GLOBAL_TAGS } from '@/data/categories';
 import { projectClient } from '@/modules/project/api/projectClient';
 import { compareSemVer } from '@/utils/modHelpers';
 import { DropdownSelect } from '@/components/ui/DropdownSelect';
+import { CalendarWidget } from '@/components/ui/CalendarWidget';
 import { SortDropdown } from './SortDropdown';
 import { BROWSE_ITEMS_PER_PAGE_OPTIONS, type BrowseViewStyle } from '../preferences';
-
-const CalendarWidget = ({ selectedDate, onSelect }: { selectedDate: Date | null, onSelect: (date: Date) => void }) => {
-    const [viewDate, setViewDate] = useState(selectedDate || new Date());
-    const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
-    const getFirstDay = (year: number, month: number) => new Date(year, month, 1).getDay();
-    const year = viewDate.getFullYear();
-    const month = viewDate.getMonth();
-    const daysInMonth = getDaysInMonth(year, month);
-    const startDay = getFirstDay(year, month);
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    const days = [];
-    for (let i = 0; i < startDay; i++) days.push(null);
-    for (let i = 1; i <= daysInMonth; i++) days.push(i);
-    const changeMonth = (delta: number) => { setViewDate(new Date(year, month + delta, 1)); };
-    const isSelected = (d: number) => { return selectedDate && selectedDate.getDate() === d && selectedDate.getMonth() === month && selectedDate.getFullYear() === year; };
-    const isDisabled = (d: number) => { const checkDate = new Date(year, month, d); return checkDate > today; };
-
-    return (
-        <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-white/10 animate-in fade-in zoom-in-95 duration-200 shadow-sm">
-            <div className="flex justify-between items-center mb-3">
-                <button type="button" onClick={() => changeMonth(-1)} aria-label="Previous month" className="p-1 hover:bg-slate-200 dark:hover:bg-white/[0.05] rounded-full transition-colors flex items-center justify-center"><ChevronLeft className="w-4 h-4 text-slate-500" /></button>
-                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{viewDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</span>
-                <button type="button" onClick={() => changeMonth(1)} disabled={viewDate.getMonth() === today.getMonth() && viewDate.getFullYear() === today.getFullYear()} aria-label="Next month" className="p-1 hover:bg-slate-200 dark:hover:bg-white/[0.05] rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"><ChevronRight className="w-4 h-4 text-slate-500" /></button>
-            </div>
-            <div className="grid grid-cols-7 gap-1 text-center mb-2">{['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (<div key={d} className="text-[10px] font-bold text-slate-400 uppercase">{d}</div>))}</div>
-            <div className="grid grid-cols-7 gap-1">{days.map((d, i) => (d ? (<button type="button" key={i} disabled={isDisabled(d)} onClick={() => !isDisabled(d) && onSelect(new Date(year, month, d))} aria-label={new Date(year, month, d).toDateString()} className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-medium transition-all ${isDisabled(d) ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40' : isSelected(d) ? 'bg-modtale-accent text-white shadow-md shadow-modtale-accent/30' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/[0.05]'}`}>{d}</button>) : <div key={i} />))}</div>
-        </div>
-    );
-};
 
 const parseSelectedVersions = (value: string) => {
     if (!value || value === 'Any') return [];
