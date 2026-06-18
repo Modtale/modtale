@@ -4,6 +4,7 @@ import {
     Filter,
     Tag,
     ChevronDown,
+    ChevronRight,
     Check,
     X,
     Search,
