@@ -5,48 +5,128 @@ import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { api, BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
 import { ProjectCard, ProjectCardSkeleton } from '@/modules/project/components/ProjectCard';
-import type { Project, User } from '@/types';
+import type { Project, ProjectDependency, User } from '@/types';
 import { theme } from '@/styles/theme';
 import { GLASS_CARD, GLASS_HEADER } from '../styles';
 import { getClassificationIcon, toTitleCase, formatTimeAgo } from '@/utils/modHelpers';
 import { LineChart } from '@/components/ui/charts/LineChart';
+import { useChartVisibility } from '@/components/ui/charts/chartVisibility';
 import { FeaturedModCard } from './HeroMarquee';
 import { getCommentRoleBadge } from '@/modules/project/utils/commentRoles';
 import { DependencyModal } from '@/modules/project/components/dialogs/DependencyModal';
 import { DownloadModal } from '@/modules/project/components/dialogs/DownloadModal';
 import { HistoryModal } from '@/modules/project/components/dialogs/HistoryModal';
 
-export const InlineDependencyUI = ({ randomProject }: { randomProject?: Project }) => {
-    const mockDeps = useMemo(() => [
-        { projectId: 'hytale-core', projectTitle: 'Hytale Core Library', dependencyType: 'REQUIRED', source: 'MODTALE', versionNumber: '1.2.0' },
-        { projectId: 'mathlib', projectTitle: 'MathLib', dependencyType: 'REQUIRED', source: 'MODTALE', versionNumber: '2.1.0' },
-        ...(randomProject ? [{ projectId: randomProject.id, projectTitle: randomProject.title, dependencyType: 'OPTIONAL', source: 'MODTALE', versionNumber: randomProject.versions?.[0]?.versionNumber || '1.0.0' }] : [])
-    ], [randomProject]);
+const DEPENDENCY_PREVIEW_LIMIT = 3;
+const DEPENDENCY_PREVIEW_VERSION_TIMEOUT_MS = 1800;
+
+const getDependencyPreviewProjects = (projects?: Project[], fallbackProject?: Project) => {
+    const sourceProjects = projects?.length ? projects : fallbackProject ? [fallbackProject] : [];
+    return Array.from(
+        new Map(
+            sourceProjects
+                .filter((project): project is Project => Boolean(project?.id && project?.title))
+                .map(project => [project.id, project])
+        ).values()
+    ).slice(0, DEPENDENCY_PREVIEW_LIMIT);
+};
+
+const getPreviewVersionNumberFromVersions = (versions?: Project['versions']) => {
+    if (!versions?.length) return 'latest';
+    const [latestVersion] = [...versions].sort((a, b) => {
+        const aTime = new Date(a.releaseDate || 0).getTime();
+        const bTime = new Date(b.releaseDate || 0).getTime();
+        return bTime - aTime;
+    });
+    return latestVersion?.versionNumber || versions[0]?.versionNumber || 'latest';
+};
+
+const getPreviewVersionNumber = (project: Project, versionCache: Record<string, string>) => {
+    if (project.versions?.length) return getPreviewVersionNumberFromVersions(project.versions);
+    return versionCache[project.id] || 'latest';
+};
+
+export const InlineDependencyUI = ({ randomProject, projects }: { randomProject?: Project; projects?: Project[] }) => {
+    const previewProjects = useMemo(() => getDependencyPreviewProjects(projects, randomProject), [projects, randomProject]);
+    const [versionCache, setVersionCache] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        const missingVersionProjects = previewProjects.filter(project => !project.versions?.length && !versionCache[project.id]);
+        if (!missingVersionProjects.length) return;
+
+        let isCancelled = false;
+
+        Promise.all(missingVersionProjects.map(async (project) => {
+            try {
+                const res = await api.get<{ versions?: Project['versions'] }>(`/projects/${project.id}/versions`, {
+                    timeout: DEPENDENCY_PREVIEW_VERSION_TIMEOUT_MS
+                });
+                return [project.id, getPreviewVersionNumberFromVersions(res.data?.versions)] as const;
+            } catch {
+                return [project.id, 'latest'] as const;
+            }
+        })).then((entries) => {
+            if (isCancelled) return;
+
+            setVersionCache((current) => {
+                let didChange = false;
+                const next = { ...current };
+                for (const [projectId, versionNumber] of entries) {
+                    if (next[projectId] !== versionNumber) {
+                        next[projectId] = versionNumber;
+                        didChange = true;
+                    }
+                }
+                return didChange ? next : current;
+            });
+        });
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [previewProjects, versionCache]);
+
+    const previewDependencies = useMemo<ProjectDependency[]>(() => (
+        previewProjects.map((project, index) => ({
+            projectId: project.id,
+            projectTitle: project.title,
+            title: project.title,
+            icon: project.imageUrl || '',
+            classification: project.classification,
+            slug: project.slug,
+            isOptional: previewProjects.length > 1 && index === previewProjects.length - 1,
+            isEmbedded: false,
+            versionNumber: getPreviewVersionNumber(project, versionCache)
+        }))
+    ), [previewProjects, versionCache]);
 
     const initialMetaCache = useMemo(() => {
-        const cache: Record<string, { title: string; author: string; icon: string }> = {
-            'hytale-core': { title: 'Hytale Core Library', author: 'Modtale Team', icon: '/assets/favicon.svg' },
-            'mathlib': { title: 'MathLib', author: 'Unknown', icon: '' }
-        };
-        if (randomProject) {
-            cache[randomProject.id] = {
-                title: randomProject.title,
-                author: randomProject.author || 'Unknown',
-                icon: randomProject.imageUrl || ''
+        return previewProjects.reduce<Record<string, { title: string; author: string; icon: string }>>((cache, project) => {
+            cache[project.id] = {
+                title: project.title,
+                author: project.author || 'Unknown',
+                icon: project.imageUrl || ''
             };
-        }
-        return cache;
-    }, [randomProject]);
+            return cache;
+        }, {});
+    }, [previewProjects]);
+
+    const initialSelected = useMemo(
+        () => previewDependencies.slice(0, 1).map(dep => dep.projectId),
+        [previewDependencies]
+    );
+    const dependencyKey = previewDependencies.map(dep => `${dep.projectId}:${dep.versionNumber}`).join('|');
 
     return (
         <DependencyModal
-            dependencies={mockDeps as any}
+            key={dependencyKey}
+            dependencies={previewDependencies}
             onClose={() => {}}
             onDownloadBundle={() => {}}
             onDownloadProjectOnly={() => {}}
             isInline={true}
             initialMetaCache={initialMetaCache}
-            initialSelected={['hytale-core']}
+            initialSelected={initialSelected}
         />
     );
 };
@@ -333,7 +413,7 @@ const FeatureBodyText = ({ children }: { children: React.ReactNode }) => (
 
 
 const InlineAnalyticsUI = ({ showConversionRate = true }: { showConversionRate?: boolean }) => {
-    const [hiddenDatasets, setHiddenDatasets] = useState<Set<string>>(new Set());
+    const { isHidden, toggleHandler } = useChartVisibility();
     const mockChartData = [
         { date: 'Jun 4', value: 1200 },
         { date: 'Jun 5', value: 1350 },
@@ -353,29 +433,20 @@ const InlineAnalyticsUI = ({ showConversionRate = true }: { showConversionRate?:
         { date: 'Jun 10', value: 2000 }
     ];
 
-    const handleToggle = (id: string) => {
-        setHiddenDatasets(prev => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-        });
-    };
-
     const mockChartDatasets = [
         {
             id: 'downloads',
             label: 'Downloads',
             color: '#3b82f6',
             data: mockChartData,
-            hidden: hiddenDatasets.has('downloads')
+            hidden: isHidden('inlineAnalytics', 'downloads')
         },
         {
             id: 'views',
             label: 'Views',
             color: '#8b5cf6',
             data: mockViewsData,
-            hidden: hiddenDatasets.has('views')
+            hidden: isHidden('inlineAnalytics', 'views')
         }
     ];
 
@@ -416,7 +487,7 @@ const InlineAnalyticsUI = ({ showConversionRate = true }: { showConversionRate?:
             </div>
             <div className="bg-white/40 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm flex flex-col backdrop-blur-md p-4 sm:p-5 mt-4">
                 <div className="h-[380px] w-full">
-                    <LineChart datasets={mockChartDatasets} onToggle={handleToggle} />
+                    <LineChart datasets={mockChartDatasets} onToggle={toggleHandler('inlineAnalytics')} />
                 </div>
             </div>
         </div>
@@ -830,7 +901,7 @@ export const DirectDownloadsSection = () => {
     );
 };
 
-export const SmartDependenciesSection = ({ randomProject }: { randomProject?: Project }) => {
+export const SmartDependenciesSection = ({ randomProject, previewProjects }: { randomProject?: Project; previewProjects?: Project[] }) => {
     return (
         <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
             <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
@@ -846,7 +917,7 @@ export const SmartDependenciesSection = ({ randomProject }: { randomProject?: Pr
             </div>
             <div className="flex-1 w-full max-w-xl relative overflow-visible">
                 <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/5 via-transparent to-teal-500/5 dark:from-emerald-500/10 dark:via-transparent dark:to-teal-500/10 rounded-3xl blur-2xl pointer-events-none" />
-                <InlineDependencyUI randomProject={randomProject} />
+                <InlineDependencyUI randomProject={randomProject} projects={previewProjects} />
             </div>
         </div>
     );

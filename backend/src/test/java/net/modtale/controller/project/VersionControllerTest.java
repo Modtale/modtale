@@ -115,6 +115,7 @@ class VersionControllerTest {
         requestPayload.setIncompatibleProjectIds(List.of("dep-a, dep-b, , dep-c"));
         requestPayload.setChangelog("Release notes");
         requestPayload.setChannel(ProjectVersion.Channel.BETA);
+        requestPayload.setReplaceExisting(true);
 
         when(accountService.requireCurrentUser(authentication, "uploading a project version")).thenReturn(currentUser);
 
@@ -130,6 +131,7 @@ class VersionControllerTest {
                 eq(List.of(dependencyA, dependencyB)),
                 eq(List.of("dep-a", "dep-b", "dep-c")),
                 eq(ProjectVersion.Channel.BETA),
+                eq(true),
                 eq(currentUser)
         );
     }

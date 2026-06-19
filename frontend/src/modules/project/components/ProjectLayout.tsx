@@ -8,6 +8,11 @@ import { StatusModal } from '@/components/ui/StatusModal';
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
 const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
+const supportsNativeScrollLinkedBanner = () => (
+    typeof CSS !== 'undefined'
+    && typeof CSS.supports === 'function'
+    && CSS.supports('animation-timeline: scroll(root block)')
+);
 
 interface SidebarSectionProps {
     title: string;
@@ -89,12 +94,14 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
     const bannerFadeRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+        if (supportsNativeScrollLinkedBanner()) return;
+
         let rafId: number | null = null;
         const applyParallax = () => {
             const scrollY = Math.min(Math.max(0, window.scrollY), 1500);
             const parallaxOffset = 500 * (1 - Math.exp(-scrollY / 600));
             if (bannerParallaxRef.current) {
-                bannerParallaxRef.current.style.transform = `translateY(${parallaxOffset}px)`;
+                bannerParallaxRef.current.style.transform = `translate3d(0, ${parallaxOffset}px, 0)`;
             }
             if (bannerFadeRef.current) {
                 bannerFadeRef.current.style.height = `calc(var(--fade-base) + ${parallaxOffset}px)`;
@@ -187,8 +194,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
 
             <div
                 ref={bannerParallaxRef}
-                className={`absolute top-0 left-0 right-0 w-full aspect-[3/1] z-0 will-change-transform ${finalBanner ? 'bg-transparent' : 'bg-slate-200 dark:bg-slate-800'}`}
-                style={{ transform: 'translateY(0px)' }}
+                className={`modtale-project-banner-parallax absolute top-0 left-0 right-0 w-full aspect-[3/1] z-0 will-change-transform ${finalBanner ? 'bg-transparent' : 'bg-slate-200 dark:bg-slate-800'}`}
             >
                 <div className="absolute inset-0 z-0">
                     {finalBanner ? (
@@ -206,8 +212,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
 
                 <div
                     ref={bannerFadeRef}
-                    className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-50 dark:from-[#0B1120] to-transparent z-10 pointer-events-none will-change-[height] [--fade-base:0.5rem] md:[--fade-base:8rem]"
-                    style={{ height: 'var(--fade-base)' }}
+                    className="modtale-project-banner-fade absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-50 dark:from-[#0B1120] to-transparent z-10 pointer-events-none will-change-[height] [--fade-base:0.5rem] md:[--fade-base:8rem]"
                 />
 
                 {isEditing && (

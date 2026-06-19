@@ -1,6 +1,7 @@
 package net.modtale.service.project.metadata;
 
 import java.util.List;
+import java.util.regex.Pattern;
 import net.modtale.exception.InvalidProjectRequestException;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
@@ -21,6 +22,7 @@ public class MetadataService {
             ProjectClassification.DATA,
             ProjectClassification.ART
     );
+    private static final Pattern GALLERY_CAROUSEL_MARKER_PATTERN = Pattern.compile("\\{\\{\\s*gallery-carousel\\s*\\}\\}", Pattern.CASE_INSENSITIVE);
 
     private final ProjectRepository projectRepository;
     private final ProjectService projectService;
@@ -64,7 +66,10 @@ public class MetadataService {
         if (updated.getRepositoryUrl() != null && !updated.getRepositoryUrl().isEmpty()) validationService.validateRepositoryUrl(updated.getRepositoryUrl());
         existing.setTitle(sanitizer.sanitizePlainText(updated.getTitle()));
         existing.setDescription(sanitizer.sanitizePlainText(updated.getDescription()));
-        if (updated.getAbout() != null) existing.setAbout(updated.getAbout());
+        if (updated.getAbout() != null) {
+            validateSingleGalleryCarouselMarker(updated.getAbout());
+            existing.setAbout(updated.getAbout());
+        }
         existing.setCategories(updated.getCategories());
 
         if (updated.getSlug() != null) {
@@ -88,10 +93,22 @@ public class MetadataService {
         existing.setAllowComments(updated.isAllowComments());
         existing.setHmWikiEnabled(updated.isHmWikiEnabled());
         existing.setHmWikiSlug(updated.getHmWikiSlug() != null ? updated.getHmWikiSlug().trim() : null);
+        existing.setGalleryCarouselEnabled(updated.isGalleryCarouselEnabled());
         if (updated.getLinks() != null) existing.setLinks(updated.getLinks());
         if (updated.getImageUrl() != null) existing.setImageUrl(updated.getImageUrl());
 
         projectRepository.save(existing);
         projectService.evictProjectCache(existing);
+    }
+
+    private void validateSingleGalleryCarouselMarker(String about) {
+        int markerCount = 0;
+        var matcher = GALLERY_CAROUSEL_MARKER_PATTERN.matcher(about);
+        while (matcher.find()) {
+            markerCount += 1;
+            if (markerCount > 1) {
+                throw new InvalidProjectRequestException("Use {{gallery-carousel}} only once in the project description.");
+            }
+        }
     }
 }

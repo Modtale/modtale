@@ -18,6 +18,7 @@ interface ProjectCardProps {
     viewStyle?: ProjectCardViewStyle;
     onReady?: (projectId: string) => void;
     isVisible?: boolean;
+    disableNavigation?: boolean;
 }
 
 export type ProjectCardViewStyle = 'grid' | 'list' | 'compact';
@@ -119,7 +120,7 @@ export const ProjectCardSkeletons: React.FC<ProjectCardSkeletonsProps> = ({ view
     );
 };
 
-export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, path, isFavorite, onToggleFavorite, isLoggedIn, priority = false, viewStyle = 'grid', onReady, isVisible = true }) => {
+export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, path, isFavorite, onToggleFavorite, isLoggedIn, priority = false, viewStyle = 'grid', onReady, isVisible = true, disableNavigation = false }) => {
     const title = project.title || 'Untitled Project';
     const author = project.author || 'Unknown';
     const authorPath = project.authorId ? SiteRoutes.creator(project.authorId, author) : null;
@@ -151,7 +152,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
     const resolvedImage = project.imageUrl ? resolveUrl(project.imageUrl) : '/assets/favicon.svg';
     const resolvedBanner = project.bannerUrl ? resolveUrl(project.bannerUrl) : null;
     const handleMouseEnter = () => {
-        prefetchProject(project.id);
+        if (!disableNavigation) {
+            prefetchProject(project.id);
+        }
     };
 
     const BASE_HOVER_CLASSES = "hover:border-transparent transition-all duration-300 z-0 hover:z-10";
@@ -240,21 +243,33 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                 className={`group relative flex items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm transform-gpu hover:shadow-md hover:shadow-modtale-accent/5 hover:-translate-y-1.5 transition-[opacity,transform] duration-300 ${BASE_HOVER_CLASSES} ${VISIBILITY_CLASSES}`}
             >
                 <div className="absolute inset-0 z-50 pointer-events-none rounded-xl ring-0 group-hover:ring-2 group-hover:ring-inset group-hover:ring-blue-600 dark:group-hover:ring-blue-500 transition-all duration-300" aria-hidden="true" />
-                <Link to={canonicalPath} state={{ project }} className="absolute inset-0 z-10" />
+                {!disableNavigation && <Link to={canonicalPath} state={{ project }} className="absolute inset-0 z-10" />}
 
-                <Link to={canonicalPath} state={{ project }} aria-label={`View ${title}`} className="w-12 h-12 rounded-lg bg-transparent backdrop-blur-md shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30 focus:outline-none">
-                    <OptimizedImage src={resolvedImage} alt={title} baseWidth={48} priority={priority} className="w-full h-full bg-transparent object-cover" initialQuality="standard" onFirstLoad={reportReady} />
-                </Link>
+                {disableNavigation ? (
+                    <span className="w-12 h-12 rounded-lg bg-transparent backdrop-blur-md shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30">
+                        <OptimizedImage src={resolvedImage} alt={title} baseWidth={48} priority={priority} className="w-full h-full bg-transparent object-cover" initialQuality="standard" onFirstLoad={reportReady} />
+                    </span>
+                ) : (
+                    <Link to={canonicalPath} state={{ project }} aria-label={`View ${title}`} className="w-12 h-12 rounded-lg bg-transparent backdrop-blur-md shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30 focus:outline-none">
+                        <OptimizedImage src={resolvedImage} alt={title} baseWidth={48} priority={priority} className="w-full h-full bg-transparent object-cover" initialQuality="standard" onFirstLoad={reportReady} />
+                    </Link>
+                )}
                 <div className="flex-1 min-w-0 relative z-20 pointer-events-none">
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-all">
+                    <h2 className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-all">
                         {title}
-                    </h3>
+                    </h2>
                     <div className="flex items-center gap-1 text-xs font-medium text-slate-500 mt-1">
                         <span>by</span>
                         {authorPath ? (
-                            <Link to={authorPath} onClick={(e) => e.stopPropagation()} className="relative z-30 font-bold hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate pointer-events-auto">
-                                {author}
-                            </Link>
+                            disableNavigation ? (
+                                <span className="relative z-30 font-bold truncate">
+                                    {author}
+                                </span>
+                            ) : (
+                                <Link to={authorPath} onClick={(e) => e.stopPropagation()} className="relative z-30 font-bold hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate pointer-events-auto">
+                                    {author}
+                                </Link>
+                            )
                         ) : (
                             <span className="font-bold truncate">{author}</span>
                         )}
@@ -279,26 +294,40 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                 className={`group relative flex flex-row items-center sm:items-start gap-4 sm:gap-6 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-2xl overflow-hidden transform-gpu hover:-translate-y-1.5 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 p-4 sm:p-5 transition-[opacity,transform] duration-300 ${BASE_HOVER_CLASSES} ${VISIBILITY_CLASSES}`}
             >
                 <div className="absolute inset-0 z-50 pointer-events-none rounded-2xl ring-0 group-hover:ring-[3px] group-hover:ring-inset group-hover:ring-blue-600 dark:group-hover:ring-blue-500 transition-all duration-300" aria-hidden="true" />
-                <Link to={canonicalPath} state={{ project }} className="absolute inset-0 z-10" />
+                {!disableNavigation && <Link to={canonicalPath} state={{ project }} className="absolute inset-0 z-10" />}
 
-                <Link to={canonicalPath} state={{ project }} aria-label={`View ${title}`} className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-transparent backdrop-blur-md shadow-xl border-2 sm:border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30 focus:outline-none">
-                    <OptimizedImage src={resolvedImage} alt={title} baseWidth={128} priority={priority} className="w-full h-full bg-transparent object-cover group-hover:scale-105 transition-transform duration-700" initialQuality="standard" onFirstLoad={reportReady} />
-                </Link>
+                {disableNavigation ? (
+                    <span className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-transparent backdrop-blur-md shadow-xl border-2 sm:border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30">
+                        <OptimizedImage src={resolvedImage} alt={title} baseWidth={128} priority={priority} className="w-full h-full bg-transparent object-cover group-hover:scale-105 transition-transform duration-700" initialQuality="standard" onFirstLoad={reportReady} />
+                    </span>
+                ) : (
+                    <Link to={canonicalPath} state={{ project }} aria-label={`View ${title}`} className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-transparent backdrop-blur-md shadow-xl border-2 sm:border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30 focus:outline-none">
+                        <OptimizedImage src={resolvedImage} alt={title} baseWidth={128} priority={priority} className="w-full h-full bg-transparent object-cover group-hover:scale-105 transition-transform duration-700" initialQuality="standard" onFirstLoad={reportReady} />
+                    </Link>
+                )}
 
                 <div className="flex-1 min-w-0 flex flex-col justify-center sm:justify-start relative z-20 pointer-events-none">
                     <div className="flex justify-between items-start gap-2 sm:gap-4">
                         <div className="min-w-0 flex-1">
-                            <h3 className="text-base sm:text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight">
-                                <Link to={canonicalPath} className="focus:outline-none relative z-30 pointer-events-auto">
-                                    {title}
-                                </Link>
-                            </h3>
+                            <h2 className="text-base sm:text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight">
+                                {disableNavigation ? (
+                                    <span className="relative z-30">{title}</span>
+                                ) : (
+                                    <Link to={canonicalPath} className="focus:outline-none relative z-30 pointer-events-auto">
+                                        {title}
+                                    </Link>
+                                )}
+                            </h2>
                             <div className="flex items-center gap-1 text-xs sm:text-sm font-bold text-slate-500 mt-0.5 sm:mt-1">
                                 <span>by</span>
                                 {authorPath ? (
-                                    <Link to={authorPath} onClick={(e) => e.stopPropagation()} className="relative z-30 hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate block pointer-events-auto">
-                                        {author}
-                                    </Link>
+                                    disableNavigation ? (
+                                        <span className="relative z-30 truncate block">{author}</span>
+                                    ) : (
+                                        <Link to={authorPath} onClick={(e) => e.stopPropagation()} className="relative z-30 hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate block pointer-events-auto">
+                                            {author}
+                                        </Link>
+                                    )
                                 ) : (
                                     <span className="truncate block">{author}</span>
                                 )}
@@ -313,6 +342,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                     <div className="mt-3 sm:mt-5 flex items-center gap-4 sm:gap-6 text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest">
                         <span className="flex items-center gap-1 sm:gap-1.5 pointer-events-none"><Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {downloads}</span>
                         <button
+                            aria-label={`${favorites} favorites`}
                             disabled={!isLoggedIn}
                             onClick={(e) => {
                                 e.preventDefault();
@@ -345,13 +375,15 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
         >
             <div className="absolute inset-0 z-50 pointer-events-none rounded-2xl ring-0 group-hover:ring-[3px] group-hover:ring-inset group-hover:ring-blue-600 dark:group-hover:ring-blue-500 transition-all duration-300" aria-hidden="true" />
 
-            <Link
-                to={canonicalPath}
-                state={{ project }}
-                className="absolute inset-0 z-10 focus:outline-none"
-                aria-hidden="true"
-                tabIndex={-1}
-            />
+            {!disableNavigation && (
+                <Link
+                    to={canonicalPath}
+                    state={{ project }}
+                    className="absolute inset-0 z-10 focus:outline-none"
+                    aria-hidden="true"
+                    tabIndex={-1}
+                />
+            )}
 
             <div className={`w-full aspect-[3/1] relative border-b border-slate-100 dark:border-white/5 overflow-hidden rounded-t-2xl transform-gpu shrink-0 z-20 ${resolvedBanner ? 'bg-slate-200 dark:bg-slate-800' : 'bg-slate-200 dark:bg-slate-800'} pointer-events-none`}>
                 {resolvedBanner && shouldLoadBanner ? (
@@ -377,43 +409,70 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
             </div>
 
             <div className="px-6 pb-6 relative flex flex-col flex-1 bg-transparent z-20 pointer-events-none">
-                <Link to={canonicalPath} aria-label={`View ${title}`} className="w-20 h-20 rounded-2xl bg-transparent backdrop-blur-md shadow-xl border-4 border-white dark:border-slate-800 overflow-hidden absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10 z-30 pointer-events-auto focus:outline-none">
-                    <OptimizedImage
-                        src={resolvedImage}
-                        alt={title}
-                        baseWidth={80}
-                        priority={priority}
-                        className="w-full h-full bg-transparent object-cover"
-                        initialQuality="standard"
-                        onFirstLoad={reportReady}
-                    />
-                    {classification === 'MODPACK' && childCount > 0 && (
-                        <div className="absolute bottom-0 right-0 bg-slate-900/75 backdrop-blur-sm text-white text-[10px] font-bold px-1 py-0.5 rounded-tl-xl flex items-center">
-                            <Box className="w-3 h-3 mr-0.5" /> {childCount}
-                        </div>
-                    )}
-                </Link>
+                {disableNavigation ? (
+                    <span className="w-20 h-20 rounded-2xl bg-transparent backdrop-blur-md shadow-xl border-4 border-white dark:border-slate-800 overflow-hidden absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10 z-30 pointer-events-auto">
+                        <OptimizedImage
+                            src={resolvedImage}
+                            alt={title}
+                            baseWidth={80}
+                            priority={priority}
+                            className="w-full h-full bg-transparent object-cover"
+                            initialQuality="standard"
+                            onFirstLoad={reportReady}
+                        />
+                        {classification === 'MODPACK' && childCount > 0 && (
+                            <div className="absolute bottom-0 right-0 bg-slate-900/75 backdrop-blur-sm text-white text-[10px] font-bold px-1 py-0.5 rounded-tl-xl flex items-center">
+                                <Box className="w-3 h-3 mr-0.5" /> {childCount}
+                            </div>
+                        )}
+                    </span>
+                ) : (
+                    <Link to={canonicalPath} aria-label={`View ${title}`} className="w-20 h-20 rounded-2xl bg-transparent backdrop-blur-md shadow-xl border-4 border-white dark:border-slate-800 overflow-hidden absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10 z-30 pointer-events-auto focus:outline-none">
+                        <OptimizedImage
+                            src={resolvedImage}
+                            alt={title}
+                            baseWidth={80}
+                            priority={priority}
+                            className="w-full h-full bg-transparent object-cover"
+                            initialQuality="standard"
+                            onFirstLoad={reportReady}
+                        />
+                        {classification === 'MODPACK' && childCount > 0 && (
+                            <div className="absolute bottom-0 right-0 bg-slate-900/75 backdrop-blur-sm text-white text-[10px] font-bold px-1 py-0.5 rounded-tl-xl flex items-center">
+                                <Box className="w-3 h-3 mr-0.5" /> {childCount}
+                            </div>
+                        )}
+                    </Link>
+                )}
 
                 <div className="mt-12">
-                    <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight" title={title}>
-                        <Link
-                            to={canonicalPath}
-                            className="relative z-30 focus:outline-none pointer-events-auto"
-                        >
-                            {title}
-                        </Link>
-                    </h3>
+                    <h2 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight" title={title}>
+                        {disableNavigation ? (
+                            <span className="relative z-30">{title}</span>
+                        ) : (
+                            <Link
+                                to={canonicalPath}
+                                className="relative z-30 focus:outline-none pointer-events-auto"
+                            >
+                                {title}
+                            </Link>
+                        )}
+                    </h2>
 
                     <div className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 font-medium truncate mt-1">
                         <span>By</span>
                         {authorPath ? (
-                            <Link
-                                to={authorPath}
-                                onClick={(e) => e.stopPropagation()}
-                                className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none relative z-30 pointer-events-auto"
-                            >
-                                {author}
-                            </Link>
+                            disableNavigation ? (
+                                <span className="relative z-30">{author}</span>
+                            ) : (
+                                <Link
+                                    to={authorPath}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none relative z-30 pointer-events-auto"
+                                >
+                                    {author}
+                                </Link>
+                            )
                         ) : (
                             <span>{author}</span>
                         )}
@@ -431,6 +490,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                         <span className="flex items-center gap-1.5 pointer-events-none"><Download className="w-4 h-4" /> {downloads}</span>
 
                         <button
+                            aria-label={`${favorites} favorites`}
                             disabled={!isLoggedIn}
                             onClick={(e) => {
                                 e.preventDefault();
@@ -460,13 +520,26 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
 }, (p, n) => {
     return (
         p.project.id === n.project.id &&
+        p.project.title === n.project.title &&
+        p.project.description === n.project.description &&
+        p.project.slug === n.project.slug &&
+        p.project.author === n.project.author &&
+        p.project.authorId === n.project.authorId &&
+        p.project.imageUrl === n.project.imageUrl &&
+        p.project.bannerUrl === n.project.bannerUrl &&
+        p.project.classification === n.project.classification &&
+        p.project.downloadCount === n.project.downloadCount &&
         p.project.updatedAt === n.project.updatedAt &&
         p.project.favoriteCount === n.project.favoriteCount &&
+        p.project.projectIds === n.project.projectIds &&
+        p.project.childProjectIds === n.project.childProjectIds &&
+        p.path === n.path &&
         p.isFavorite === n.isFavorite &&
         p.isLoggedIn === n.isLoggedIn &&
         p.priority === n.priority &&
         p.viewStyle === n.viewStyle &&
-        p.isVisible === n.isVisible
+        p.isVisible === n.isVisible &&
+        p.disableNavigation === n.disableNavigation
     );
 });
 

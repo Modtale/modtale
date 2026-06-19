@@ -58,7 +58,11 @@ const DESKTOP_BREAKPOINT = 1024;
 const DESKTOP_HERO_MIN_WIDTH_ENTER = 1260;
 const DESKTOP_HERO_MIN_WIDTH_EXIT = 1180;
 const DESKTOP_HERO_MIN_HEIGHT = 720;
-const HERO_MARQUEE_PROJECT_LIMIT = 8;
+const HERO_MARQUEE_SORT = 'popular';
+const HERO_MARQUEE_INITIAL_PAGE_SIZE = 16;
+const HERO_MARQUEE_BACKGROUND_PAGE_SIZE = 16;
+const HERO_MARQUEE_BACKGROUND_MAX_PAGES = 2;
+const HERO_MARQUEE_PROJECT_LIMIT = 24;
 const WIDE_DESKTOP_GRID_CLASSES = '[@media(min-width:1260px)_and_(min-height:720px)]:grid-cols-2 [@media(min-width:1260px)_and_(min-height:720px)]:justify-items-stretch';
 const WIDE_DESKTOP_COPY_CLASSES = '[@media(min-width:1260px)_and_(min-height:720px)]:items-start [@media(min-width:1260px)_and_(min-height:720px)]:text-left [@media(min-width:1260px)_and_(min-height:720px)]:mx-0 [@media(min-width:1260px)_and_(min-height:720px)]:max-w-xl';
 const WIDE_DESKTOP_PRIMARY_CLASSES = '[@media(min-width:1260px)_and_(min-height:720px)]:items-start';
@@ -142,7 +146,7 @@ const DesktopHeroMarqueeSkeleton = () => (
             maskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)',
             WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)'
         }}
-        aria-label="Loading trending Hytale projects showcase"
+        aria-label="Loading popular Hytale projects showcase"
         data-testid="home-hero-marquee-skeleton"
     >
         <div className="flex flex-col w-[260px] 2xl:w-[320px] shrink-0 gap-6">
@@ -171,18 +175,30 @@ export const Home: React.FC<{
 }) => {
     const { initialData: ssrData } = useSSRData();
     const homeSeo = ROUTE_SEO['/'];
+    const initialMarqueeProjects = ssrData?.homeMarqueeProjects || [];
     const initialTrendingProjects = ssrData?.homeTrendingProjects || ssrData?.homeProjects || [];
     const initialNewestProjects = ssrData?.homeNewestProjects || [];
+    const hasHomeSSRData = Boolean(
+        ssrData?.homeDataReady
+        || initialMarqueeProjects.length
+        || initialTrendingProjects.length
+        || initialNewestProjects.length
+    );
     const initialProjectSeed = useMemo(
         () => dedupeProjects([...initialTrendingProjects, ...initialNewestProjects]),
         [initialNewestProjects, initialTrendingProjects]
     );
-    const shouldFetchFallbackProjects = initialProjectSeed.length === 0;
+    const initialMarqueeSeed = useMemo(
+        () => initialMarqueeProjects.length ? initialMarqueeProjects : initialProjectSeed.filter(isHeroMarqueeProject),
+        [initialMarqueeProjects, initialProjectSeed]
+    );
+    const shouldFetchFallbackProjects = !hasHomeSSRData && initialProjectSeed.length === 0;
+    const shouldFetchFallbackMarquee = !hasHomeSSRData && initialMarqueeSeed.length === 0;
     const shouldRefreshTrendingProjects = !initialTrendingProjects.length && initialProjectSeed.length > 0;
-    const hasInitialHeroMarqueeProjects = initialProjectSeed.some(isHeroMarqueeProject);
+    const hasInitialHeroMarqueeProjects = initialMarqueeSeed.some(isHeroMarqueeProject);
     const initialProjects = initialTrendingProjects.length ? initialTrendingProjects : initialProjectSeed;
-    const initialHeroProjectsLoading = shouldFetchFallbackProjects || (shouldRefreshTrendingProjects && !hasInitialHeroMarqueeProjects);
-    const initialShouldReserveDesktopHeroMarquee = initialHeroProjectsLoading || initialProjects.some(isHeroMarqueeProject);
+    const initialHeroProjectsLoading = shouldFetchFallbackMarquee;
+    const initialShouldReserveDesktopHeroMarquee = initialHeroProjectsLoading || initialMarqueeSeed.some(isHeroMarqueeProject);
 
     const [isDesktop, setIsDesktop] = useState(() => getViewportSize().width >= DESKTOP_BREAKPOINT);
     const [viewportSize, setViewportSize] = useState(getViewportSize);
@@ -190,6 +206,7 @@ export const Home: React.FC<{
         const { width, height } = getViewportSize();
         return initialShouldReserveDesktopHeroMarquee && width >= DESKTOP_HERO_MIN_WIDTH_ENTER && height >= DESKTOP_HERO_MIN_HEIGHT;
     });
+    const [marqueeProjects, setMarqueeProjects] = useState<Project[]>(initialMarqueeSeed);
     const [projects, setProjects] = useState<Project[]>(initialProjects);
     const [newestProjects, setNewestProjects] = useState<Project[]>(initialNewestProjects.length ? initialNewestProjects : initialProjectSeed);
     const [isHeroProjectsLoading, setIsHeroProjectsLoading] = useState(initialHeroProjectsLoading);
@@ -212,9 +229,9 @@ export const Home: React.FC<{
         handleResize();
         window.addEventListener('resize', handleResize, { passive: true });
 
-        const shouldFetchFallbackNewest = !initialNewestProjects.length && initialProjectSeed.length === 0;
+        const shouldFetchFallbackNewest = !hasHomeSSRData && !initialNewestProjects.length && initialProjectSeed.length === 0;
         const shouldRefreshNewestProjects = !initialNewestProjects.length && initialProjectSeed.length > 0;
-        const shouldFetchFallbackStats = !ssrData?.stats?.totalProjects;
+        const shouldFetchFallbackStats = !hasHomeSSRData || !ssrData?.stats;
         let isCancelled = false;
         const scheduledTasks: Array<() => void> = [];
 
@@ -271,29 +288,87 @@ export const Home: React.FC<{
             scheduledTasks.push(() => globalThis.clearTimeout(timeoutId));
         };
 
+        const fetchMarqueeProjects = async (page: number) => {
+            const res = await api.get('/projects', {
+                params: {
+                    size: page === 0 ? HERO_MARQUEE_INITIAL_PAGE_SIZE : HERO_MARQUEE_BACKGROUND_PAGE_SIZE,
+                    sort: HERO_MARQUEE_SORT,
+                    view: 'marquee',
+                    ...(page > 0 ? { page } : {}),
+                },
+                timeout: HOME_REQUEST_TIMEOUT_MS,
+            });
+            return Array.isArray(res.data?.content) ? res.data.content as Project[] : [];
+        };
+
+        const appendMarqueeProjects = (nextProjects: Project[]) => {
+            if (isCancelled || nextProjects.length === 0) return;
+            setMarqueeProjects((currentProjects) => dedupeProjects([...currentProjects, ...nextProjects]));
+        };
+
+        const loadAdditionalMarqueeProjects = async (seedProjects: Project[]) => {
+            let accumulatedProjects = dedupeProjects(seedProjects);
+
+            for (let page = 1; page <= HERO_MARQUEE_BACKGROUND_MAX_PAGES; page += 1) {
+                if (isCancelled || accumulatedProjects.filter(isHeroMarqueeProject).length >= HERO_MARQUEE_PROJECT_LIMIT) {
+                    return;
+                }
+
+                try {
+                    const nextProjects = await fetchMarqueeProjects(page);
+                    if (nextProjects.length === 0) return;
+
+                    accumulatedProjects = dedupeProjects([...accumulatedProjects, ...nextProjects]);
+                    appendMarqueeProjects(nextProjects);
+                } catch {}
+            }
+        };
+
+        if (shouldFetchFallbackMarquee) {
+            void runHeroProjectRequest(async () => {
+                try {
+                    const nextProjects = await fetchMarqueeProjects(0);
+                    if (!isCancelled && nextProjects.length > 0) {
+                        const uniqueProjects = dedupeProjects(nextProjects);
+                        setMarqueeProjects(uniqueProjects);
+                        scheduleBackgroundRequest(() => loadAdditionalMarqueeProjects(uniqueProjects));
+                    }
+                } catch {}
+            }, true);
+        } else if (initialMarqueeProjects.length > 0) {
+            scheduleBackgroundRequest(() => loadAdditionalMarqueeProjects(initialMarqueeSeed));
+        } else if (hasInitialHeroMarqueeProjects) {
+            scheduleBackgroundRequest(async () => {
+                try {
+                    const nextProjects = await fetchMarqueeProjects(0);
+                    if (!isCancelled && nextProjects.length > 0) {
+                        const uniqueProjects = dedupeProjects(nextProjects);
+                        setMarqueeProjects(uniqueProjects);
+                        await loadAdditionalMarqueeProjects(uniqueProjects);
+                    }
+                } catch {}
+            });
+        }
+
         if (shouldFetchFallbackProjects) {
             void runProjectRequest(async () => {
-                await runHeroProjectRequest(async () => {
-                    try {
-                        const res = await api.get('/projects', {
-                            params: { size: 16, sort: 'trending' },
-                            timeout: HOME_REQUEST_TIMEOUT_MS,
-                        });
-                        if (!isCancelled && res.data?.content) setProjects(res.data.content);
-                    } catch {}
-                }, true);
+                try {
+                    const res = await api.get('/projects', {
+                        params: { size: 12, sort: 'trending' },
+                        timeout: HOME_REQUEST_TIMEOUT_MS,
+                    });
+                    if (!isCancelled && res.data?.content) setProjects(res.data.content);
+                } catch {}
             }, setIsTrendingProjectsLoading, true);
         } else if (shouldRefreshTrendingProjects) {
             scheduleBackgroundRequest(async () => {
-                await runHeroProjectRequest(async () => {
-                    try {
-                        const res = await api.get('/projects', {
-                            params: { size: 16, sort: 'trending' },
-                            timeout: HOME_REQUEST_TIMEOUT_MS,
-                        });
-                        if (!isCancelled && res.data?.content?.length) setProjects(res.data.content);
-                    } catch {}
-                }, !hasInitialHeroMarqueeProjects);
+                try {
+                    const res = await api.get('/projects', {
+                        params: { size: 12, sort: 'trending' },
+                        timeout: HOME_REQUEST_TIMEOUT_MS,
+                    });
+                    if (!isCancelled && res.data?.content?.length) setProjects(res.data.content);
+                } catch {}
             });
         }
 
@@ -330,16 +405,20 @@ export const Home: React.FC<{
     }, [
         DESKTOP_BREAKPOINT,
         hasInitialHeroMarqueeProjects,
+        hasHomeSSRData,
+        initialMarqueeProjects.length,
+        initialMarqueeSeed.length,
         initialNewestProjects.length,
         initialProjectSeed.length,
+        shouldFetchFallbackMarquee,
         shouldFetchFallbackProjects,
         shouldRefreshTrendingProjects,
         ssrData?.stats?.totalProjects
     ]);
 
     const validFeaturedProjects = useMemo(
-        () => projects.filter(isHeroMarqueeProject),
-        [projects]
+        () => marqueeProjects.filter(isHeroMarqueeProject),
+        [marqueeProjects]
     );
     const shouldReserveDesktopHeroMarquee = isHeroProjectsLoading || validFeaturedProjects.length > 0;
 
@@ -447,7 +526,7 @@ export const Home: React.FC<{
         DESKTOP_BREAKPOINT,
         DESKTOP_HERO_MIN_WIDTH_ENTER,
         DESKTOP_HERO_MIN_WIDTH_EXIT,
-        projects.length,
+        marqueeProjects.length,
         shouldReserveDesktopHeroMarquee,
         stats.totalDownloads,
         stats.totalProjects,
@@ -465,6 +544,13 @@ export const Home: React.FC<{
     );
 
     const previewProject = combinedProjectPool.find((project) => Boolean(project.imageUrl)) || validFeaturedProjects[0];
+    const dependencyPreviewProjects = useMemo(
+        () => dedupeProjects(
+            [previewProject, ...combinedProjectPool, ...validFeaturedProjects]
+                .filter((project): project is Project => Boolean(project?.id && project?.title))
+        ).slice(0, 3),
+        [combinedProjectPool, previewProject, validFeaturedProjects]
+    );
     const trendingSpotlightProjects = useMemo(
         () => dedupeProjects(projects).slice(0, 6),
         [projects]
@@ -480,6 +566,8 @@ export const Home: React.FC<{
     }, [combinedProjectPool, newestProjects]);
     const col1Projects = useMemo(() => heroMarqueeProjects.filter((_, i) => i % 2 === 0), [heroMarqueeProjects]);
     const col2Projects = useMemo(() => heroMarqueeProjects.filter((_, i) => i % 2 === 1), [heroMarqueeProjects]);
+    const col1Duration = `${Math.max(35, col1Projects.length * 7)}s`;
+    const col2Duration = `${Math.max(45, col2Projects.length * 9)}s`;
     const isWideDesktopHeroViewport = viewportSize.width >= DESKTOP_HERO_MIN_WIDTH_ENTER && viewportSize.height >= DESKTOP_HERO_MIN_HEIGHT;
     const shouldUseWideDesktopHeroLayout = isWideDesktopHeroViewport;
     const isDesktopHeroLayout = isDesktop && useDesktopHeroLayout;
@@ -512,7 +600,9 @@ export const Home: React.FC<{
                 <meta name="description" content={homeSeo.description} />
                 <meta name="keywords" content={homeSeo.keywords} />
                 <link rel="preload" as="image" href="/assets/logo.svg" />
-                <style>{`
+            </Helmet>
+
+            <style>{`
                     @keyframes marquee-up {
                         from { transform: translateY(20px); }
                         to { transform: translateY(calc(-50% + 20px)); }
@@ -908,7 +998,6 @@ export const Home: React.FC<{
                         }
                     }
                 `}</style>
-            </Helmet>
 
             <main className="relative z-10 contain-content">
                 <section className={`home-hero home-hero-desktop ${isHeroProjectsLoading ? 'home-hero-loading-state' : ''} lg:min-h-[92vh] 2xl:min-h-[90vh] lg:pt-[7vh] 2xl:pt-36 lg:pb-[6vh] ${isDesktopStackedHeroLayout ? 'home-hero-desktop-stacked lg:min-h-[calc(100dvh-6rem)] lg:pt-6 lg:pb-6' : ''} relative w-full min-h-[100dvh] flex flex-col items-center justify-center pt-12 sm:pt-[7vh] pb-6 sm:pb-[5vh] overflow-hidden`}>
@@ -1013,10 +1102,10 @@ export const Home: React.FC<{
                                             maskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)',
                                             WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, black 120px, black calc(100% - 120px), transparent 100%)'
                                         }}
-                                        aria-label="Trending Hytale Projects Showcase"
+                                        aria-label="Popular Hytale Projects Showcase"
                                     >
-                                        <MarqueeColumn projects={col1Projects} duration="35s" />
-                                        <MarqueeColumn projects={col2Projects} duration="45s" />
+                                        <MarqueeColumn projects={col1Projects} duration={col1Duration} />
+                                        <MarqueeColumn projects={col2Projects} duration={col2Duration} />
                                     </aside>
                                 ) : (
                                     <DesktopHeroMarqueeSkeleton />
@@ -1057,7 +1146,7 @@ export const Home: React.FC<{
                     </FeatureShowcaseSection>
 
                     <FeatureShowcaseSection glowFrom="rgba(16, 185, 129, 0.1)" glowTo="rgba(20, 184, 166, 0.08)" align="right">
-                        <SmartDependenciesSection randomProject={previewProject} />
+                        <SmartDependenciesSection randomProject={previewProject} previewProjects={dependencyPreviewProjects} />
                     </FeatureShowcaseSection>
 
                     <FeatureShowcaseSection glowFrom="rgba(59, 130, 246, 0.1)" glowTo="rgba(99, 102, 241, 0.08)" align="left">

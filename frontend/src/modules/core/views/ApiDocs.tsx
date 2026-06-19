@@ -583,6 +583,47 @@ const sampleProject = {
     ],
 };
 
+const sampleProjectShell = {
+    id: sampleProject.id,
+    slug: sampleProject.slug,
+    title: sampleProject.title,
+    about: sampleProject.about,
+    description: sampleProject.description,
+    authorId: sampleProject.authorId,
+    author: sampleProject.author,
+    imageUrl: sampleProject.imageUrl,
+    bannerUrl: sampleProject.bannerUrl,
+    classification: sampleProject.classification,
+    tags: sampleProject.tags,
+    downloadCount: sampleProject.downloadCount,
+    favoriteCount: sampleProject.favoriteCount,
+    repositoryUrl: sampleProject.repositoryUrl,
+    updatedAt: sampleProject.updatedAt,
+    createdAt: sampleProject.createdAt,
+    license: sampleProject.license,
+    links: sampleProject.links,
+    allowModpacks: sampleProject.allowModpacks,
+    allowComments: sampleProject.allowComments,
+    hmWikiEnabled: sampleProject.hmWikiEnabled,
+    hmWikiSlug: sampleProject.hmWikiSlug,
+    status: sampleProject.status,
+    canEdit: sampleProject.canEdit,
+    isOwner: sampleProject.isOwner,
+};
+
+const sampleVersionWithoutChangelog = {
+    ...sampleVersionSummary,
+    fileUrl: 'projects/skyforge-utilities/2.4.1.jar',
+    dependencies: [
+        {
+            modId: '67f70e06d5de9b5f94b6a111',
+            modTitle: 'Skyforge Core',
+            versionNumber: '3.1.0',
+            optional: false,
+        },
+    ],
+};
+
 const samplePage = (content: unknown[]) => ({
     content,
     pageable: {
@@ -652,7 +693,18 @@ const endpointSpecificExample = (method: string, path: string, code: string): un
     }
 
     if (path === '/api/v1/projects' && method === 'GET' && code === '200') return samplePage([sampleProjectSummary]);
-    if (path === '/api/v1/projects/{id}' && method === 'GET' && code === '200') return sampleProject;
+    if (path === '/api/v1/projects/{id}' && method === 'GET' && code === '200') return sampleProjectShell;
+    if (path === '/api/v1/projects/{id}/details' && method === 'GET' && code === '200') return sampleProject;
+    if (path === '/api/v1/projects/{id}/versions' && method === 'GET' && code === '200') return { versions: [sampleVersionWithoutChangelog] };
+    if (path === '/api/v1/projects/{id}/comments' && method === 'GET' && code === '200') return { comments: sampleProject.comments };
+    if (path === '/api/v1/projects/{id}/gallery' && method === 'GET' && code === '200') return { galleryImages: sampleProject.galleryImages };
+    if (path === '/api/v1/projects/{id}/team' && method === 'GET' && code === '200') {
+        return {
+            projectRoles: sampleProject.projectRoles,
+            teamMembers: sampleProject.teamMembers,
+            teamInvites: sampleProject.teamInvites,
+        };
+    }
     if (path === '/api/v1/projects/{id}/meta' && code === '200') {
         return {
             title: sampleProject.title,

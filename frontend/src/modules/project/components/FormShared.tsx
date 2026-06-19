@@ -23,6 +23,7 @@ export type VersionFormData = {
     gameVersions: string[];
     changelog: string;
     file: File | null;
+    replaceExisting?: boolean;
 };
 
 export const Label = ({ children, required, className }: { children: React.ReactNode, required?: boolean, className?: string }) => (

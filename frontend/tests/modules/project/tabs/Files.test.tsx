@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { Files } from '@/modules/project/tabs/Files';
 import type { VersionFormData } from '@/modules/project/components/FormShared';
 
-const mockVersionFields = vi.fn((props: any) => <div data-testid="version-fields" />);
+const mockVersionFields = vi.fn((_props: any) => <div data-testid="version-fields" />);
 
 vi.mock('@/modules/project/components/VersionFields', () => ({
     VersionFields: (props: any) => mockVersionFields(props)
@@ -17,7 +17,8 @@ const versionData: VersionFormData = {
     file: null,
     dependencies: [],
     incompatibleProjectIds: [],
-    channel: 'RELEASE'
+    channel: 'RELEASE',
+    replaceExisting: false
 };
 
 const renderFiles = (projectData: any) => (
@@ -131,9 +132,9 @@ describe('Files upload rules for drafts', () => {
         });
 
         expect(mockVersionFields).toHaveBeenCalled();
-        const props = mockVersionFields.mock.calls.at(-1)?.[0] as any;
-        expect(props?.existingVersions).toEqual(['1.0.0']);
-        expect(props?.previousDependencies).toEqual([{
+        const props = mockVersionFields.mock.calls.at(-1)![0];
+        expect(props.existingVersions).toEqual(['1.0.0']);
+        expect(props.previousDependencies).toEqual([{
             projectId: 'dep-1',
             projectTitle: 'Dependency One',
             versionNumber: '2.0.0'
@@ -185,8 +186,8 @@ describe('Files upload rules for drafts', () => {
             );
         });
 
-        const props = mockVersionFields.mock.calls.at(-1)?.[0] as any;
-        expect(props?.previousDependencies).toBeUndefined();
+        const props = mockVersionFields.mock.calls.at(-1)![0];
+        expect(props.previousDependencies).toBeUndefined();
     });
 
     it('lets creators reuse the latest setup in one click', async () => {
@@ -249,5 +250,55 @@ describe('Files upload rules for drafts', () => {
                 source: 'MODTALE'
             }]
         });
+    });
+
+    it('offers explicit replacement consent for matching version and game targets', async () => {
+        const setVersionData = vi.fn();
+        const duplicateVersionData: VersionFormData = {
+            ...versionData,
+            versionNumber: '1.0.0',
+            gameVersions: ['1.21']
+        };
+
+        await act(async () => {
+            root.render(
+                <Files
+                    projectData={{
+                        id: 'project-1',
+                        status: 'PRIVATE',
+                        versions: [{
+                            id: 'version-1',
+                            versionNumber: '1.0.0',
+                            gameVersions: ['1.21'],
+                            fileUrl: '/download.jar',
+                            downloadCount: 0,
+                            releaseDate: '2026-06-09T12:00:00'
+                        }]
+                    } as any}
+                    versionData={duplicateVersionData}
+                    setVersionData={setVersionData}
+                    readOnly={false}
+                    hasProjectPermission={() => true}
+                    classification="PLUGIN"
+                    handleUploadVersion={vi.fn()}
+                    handleEditVersion={vi.fn()}
+                    handleDeleteVersion={vi.fn()}
+                    isLoading={false}
+                />
+            );
+        });
+
+        expect(container.textContent).toContain('Replace existing version');
+        expect(container.textContent).toContain('This will replace v1.0.0 for 1.21');
+        expect(mockVersionFields.mock.calls.at(-1)![0].existingVersions).toEqual(['1.0.0']);
+
+        await act(async () => {
+            const checkbox = container.querySelector('input[type="checkbox"]') as HTMLInputElement;
+            checkbox.click();
+        });
+
+        expect(setVersionData).toHaveBeenCalled();
+        const updater = setVersionData.mock.calls.at(-1)?.[0];
+        expect(updater(duplicateVersionData)).toMatchObject({ replaceExisting: true });
     });
 });

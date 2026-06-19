@@ -72,6 +72,12 @@ export interface ProjectDependency {
     externalFileName?: string;
     cachedFileUrl?: string;
     hytaleProjectConfirmed?: boolean;
+    icon?: string;
+    title?: string;
+    classification?: string;
+    slug?: string;
+    isOptional?: boolean;
+    isEmbedded?: boolean;
 }
 
 export interface ExternalProjectFile {
@@ -260,6 +266,12 @@ export interface ProjectMember {
     avatarUrl?: string;
 }
 
+export interface GalleryImage {
+    url?: string;
+    imageUrl?: string;
+    caption?: string;
+}
+
 export interface Project {
     id: string;
     slug?: string;
@@ -280,9 +292,10 @@ export interface Project {
     createdAt?: string;
     childProjectIds?: string[];
     sizeBytes?: number;
-    comments: Comment[];
-    versions: ProjectVersion[];
-    galleryImages: string[];
+    comments?: Comment[];
+    versions?: ProjectVersion[];
+    galleryImages?: Array<string | GalleryImage>;
+    galleryImageCaptions?: Record<string, string>;
     repositoryUrl?: string;
 
     projectRoles?: ProjectRole[];
@@ -294,6 +307,7 @@ export interface Project {
     allowComments?: boolean;
     hmWikiEnabled?: boolean;
     hmWikiSlug?: string;
+    galleryCarouselEnabled?: boolean;
     status?: 'DRAFT' | 'PRIVATE' | 'PENDING' | 'PUBLISHED' | 'UNLISTED' | 'DELETED' | 'ARCHIVED';
     expiresAt?: string;
     canEdit?: boolean;

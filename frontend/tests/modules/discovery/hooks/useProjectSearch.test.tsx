@@ -274,6 +274,39 @@ describe('useProjectSearch', () => {
         expect(latestSnapshot.loading).toBe(false);
     });
 
+    it('does not enter a pending state when browse params are already reset', async () => {
+        await act(async () => {
+            root.render(
+                <MemoryRouter initialEntries={['/mods']}>
+                    <Probe
+                        initialClassification="All"
+                        useSSRData={true}
+                        initialItems={[{ id: 'project-1' }]}
+                        initialTotalPages={1}
+                        initialTotalItems={1}
+                        onRender={snapshot => {
+                            latestSnapshot = snapshot;
+                        }}
+                    />
+                </MemoryRouter>
+            );
+        });
+        await settle();
+
+        await act(async () => {
+            latestSnapshot.updateParams({ version: null, minDl: null, minFav: null, date: null, tags: null });
+        });
+        await settle();
+
+        expect(mockedDiscoveryClient.searchProjects).not.toHaveBeenCalled();
+        expect(latestSnapshot.locationSearch).toBe('');
+        expect(latestSnapshot.loading).toBe(false);
+        expect(latestSnapshot.isPending).toBe(false);
+        expect(latestSnapshot.items).toEqual([{ id: 'project-1' }]);
+        expect(latestSnapshot.totalPages).toBe(1);
+        expect(latestSnapshot.totalItems).toBe(1);
+    });
+
     it('enters a pending state immediately when browse params change, before the fetch resolves', async () => {
         let resolveSearch: ((value: any) => void) | undefined;
         mockedDiscoveryClient.searchProjects.mockImplementation(() => new Promise((resolve) => {

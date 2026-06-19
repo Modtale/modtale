@@ -16,6 +16,13 @@ import { BrowseFilters } from '../components/BrowseFilters';
 import { CategoryPillNav } from '../components/CategoryPillNav';
 import { ProjectGrid } from '../components/ProjectGrid';
 import { ProjectCardSkeletons } from '@/modules/project/components/ProjectCard';
+import {
+    BROWSE_ITEMS_PER_PAGE_STORAGE_KEY,
+    BROWSE_VIEW_STYLE_STORAGE_KEY,
+    type BrowseViewStyle,
+    isBrowseItemsPerPage,
+    isBrowseViewStyle
+} from '../preferences';
 
 interface BrowseViewProps {
     likedProjectIds: string[];
@@ -23,6 +30,28 @@ interface BrowseViewProps {
     isLoggedIn: boolean;
     initialClassification?: Classification;
 }
+
+const DEFAULT_ITEMS_PER_PAGE = 12;
+const COMPACT_ITEMS_PER_PAGE = 48;
+
+const getInitialBrowsePreferences = (): { viewStyle: BrowseViewStyle; itemsPerPage: number } => {
+    if (typeof window === 'undefined') {
+        return { viewStyle: 'grid', itemsPerPage: DEFAULT_ITEMS_PER_PAGE };
+    }
+
+    const savedViewStyle = window.localStorage.getItem(BROWSE_VIEW_STYLE_STORAGE_KEY);
+    const viewStyle = isBrowseViewStyle(savedViewStyle) ? savedViewStyle : 'grid';
+
+    const savedItemsPerPage = parseInt(window.localStorage.getItem(BROWSE_ITEMS_PER_PAGE_STORAGE_KEY) || '', 10);
+    if (Number.isFinite(savedItemsPerPage) && isBrowseItemsPerPage(savedItemsPerPage)) {
+        return { viewStyle, itemsPerPage: savedItemsPerPage };
+    }
+
+    return {
+        viewStyle,
+        itemsPerPage: viewStyle === 'compact' ? COMPACT_ITEMS_PER_PAGE : DEFAULT_ITEMS_PER_PAGE
+    };
+};
 
 export const Browse: React.FC<BrowseViewProps> = ({
                                                       likedProjectIds, onToggleFavorite, isLoggedIn, initialClassification
@@ -33,16 +62,17 @@ export const Browse: React.FC<BrowseViewProps> = ({
     const { initialData } = useSSRData();
 
     const hasComplexParams = searchParams.has('q') || searchParams.has('tags') || searchParams.has('version') || searchParams.has('minDl') || searchParams.has('minFav') || searchParams.has('date') || searchParams.has('category') || (searchParams.get('page') && parseInt(searchParams.get('page')!, 10) > 0);
-    const hasUsableBrowseSSRData = Boolean(initialData?.browseData) && initialData?.browseDataReady !== false;
+    const hasUsableBrowseSSRData = Boolean(initialData?.browseData && initialData?.browseDataReady !== false);
     const useSSR = hasUsableBrowseSSRData && !hasComplexParams;
+    const initialPreferences = useMemo(() => getInitialBrowsePreferences(), []);
+    const [viewStyle, setViewStyle] = useState<BrowseViewStyle>(initialPreferences.viewStyle);
 
     const {
         page, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, selectedTags, urlSearchTerm,
         viewCategory, searchTerm, setSearchTerm, selectedClassification, setSelectedClassification, totalPages, totalItems, loading, isPending, items,
         itemsPerPage, setItemsPerPage, updateParams
-    } = useProjectSearch(initialClassification || 'All', !!useSSR, useSSR ? initialData.browseData.content : [], useSSR ? initialData.browseData.totalPages : 0, useSSR ? initialData.browseData.totalElements : 0);
+    } = useProjectSearch(initialClassification || 'All', !!useSSR, useSSR ? initialData.browseData.content : [], useSSR ? initialData.browseData.totalPages : 0, useSSR ? initialData.browseData.totalElements : 0, initialPreferences.itemsPerPage);
 
-    const [viewStyle, setViewStyle] = useState<'grid' | 'list' | 'compact'>('grid');
     const [isFilterOpen, setIsFilterOpen] = useState(false);
 
     const [isScrolled, setIsScrolled] = useState(false);
@@ -56,17 +86,6 @@ export const Browse: React.FC<BrowseViewProps> = ({
         const currentBrowseUrl = `${window.location.pathname}${query ? `?${query}` : ''}`;
         window.sessionStorage.setItem('modtale.lastBrowseUrl', currentBrowseUrl);
     }, [location.pathname, searchParams]);
-
-    useEffect(() => {
-        const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('modtale_view_style') : null;
-        if (saved === 'grid' || saved === 'list' || saved === 'compact') {
-            setViewStyle(saved as 'grid' | 'list' | 'compact');
-        }
-    }, []);
-
-    useEffect(() => {
-        setItemsPerPage(viewStyle === 'compact' ? 48 : 12);
-    }, [viewStyle, setItemsPerPage]);
 
     const itemListSchema = useMemo(() => generateItemListSchema(items), [items]);
     const breadcrumbSchema = useMemo(() => {
@@ -112,15 +131,29 @@ export const Browse: React.FC<BrowseViewProps> = ({
         }
     }, [totalPages, setSearchParams, handleScrollTop]);
 
-    const handleViewStyleChange = useCallback((style: 'grid' | 'list' | 'compact') => {
+    const handleViewStyleChange = useCallback((style: BrowseViewStyle) => {
         setViewStyle(style);
-        if (typeof window !== 'undefined') localStorage.setItem('modtale_view_style', style);
+        if (typeof window !== 'undefined') localStorage.setItem(BROWSE_VIEW_STYLE_STORAGE_KEY, style);
         setSearchParams(prev => {
             const next = new URLSearchParams(prev);
             next.delete('page');
             return next;
         });
     }, [setSearchParams]);
+
+    const handleItemsPerPageChange = useCallback((nextSize: number) => {
+        if (nextSize === itemsPerPage || !isBrowseItemsPerPage(nextSize)) {
+            return;
+        }
+
+        setItemsPerPage(nextSize);
+        if (typeof window !== 'undefined') localStorage.setItem(BROWSE_ITEMS_PER_PAGE_STORAGE_KEY, String(nextSize));
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            next.delete('page');
+            return next;
+        });
+    }, [itemsPerPage, setItemsPerPage, setSearchParams]);
 
     const handleSortChange = useCallback((nextSort: string) => {
         updateParams({ sort: nextSort, category: null });
@@ -257,6 +290,8 @@ export const Browse: React.FC<BrowseViewProps> = ({
                                 isMobile={isMobile}
                                 viewStyle={viewStyle}
                                 onViewStyleChange={handleViewStyleChange}
+                                itemsPerPage={itemsPerPage}
+                                onItemsPerPageChange={handleItemsPerPageChange}
                                 isScrolled={isScrolled}
                             />
                         </div>

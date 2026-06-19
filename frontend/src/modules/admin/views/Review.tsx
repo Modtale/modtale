@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Shield, List, FileText, Box, User as UserIcon, Check, ArrowLeft, Copy, ExternalLink, AlertTriangle, Terminal, Download, ArrowRight, X, ImageIcon, ChevronDown, ChevronUp, ShieldAlert, Eye, RefreshCw } from 'lucide-react';
+import { Shield, List, FileText, Box, User as UserIcon, Check, ArrowLeft, Copy, ExternalLink, Terminal, Download, ArrowRight, X, ImageIcon, ChevronDown, ChevronUp, ShieldAlert, Eye, RefreshCw, PlayCircle } from 'lucide-react';
 import { API_BASE_URL, BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
 import { adminClient } from '../api/adminClient';
 import { SourceInspector } from './SourceInspector';
 import { SiteRoutes } from '@/utils/routes';
 import type { ScanIssue, ProjectVersion, ScanReviewTarget } from '@/types';
+import { ModalPortal } from '@/components/ui/ModalPortal';
+import { resolveGalleryImages } from '@/modules/project/utils/galleryImages';
 
 interface ReviewProps {
     reviewingProject: any;
@@ -213,6 +215,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     const licenseLink = mod.links?.LICENSE || mod.links?.license;
 
     return (
+        <ModalPortal>
         <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-200">
             {inspectorData && (
                 <SourceInspector
@@ -228,10 +231,11 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                 />
             )}
 
-            <div className="bg-slate-50 dark:bg-slate-900 w-full max-w-7xl h-[85dvh] rounded-3xl shadow-2xl border border-slate-200 dark:border-white/5 flex overflow-hidden ring-1 ring-white/10 relative">
+                <div className="bg-slate-50 dark:bg-slate-900 w-full max-w-7xl h-[85dvh] rounded-3xl shadow-2xl border border-slate-200 dark:border-white/5 flex overflow-hidden ring-1 ring-white/10 relative">
 
-                {showRejectPanel && (
-                    <div className="absolute inset-0 z-[150] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    {showRejectPanel && (
+                    <ModalPortal>
+                    <div className="fixed inset-0 z-[150] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
                         <div className="bg-white dark:bg-slate-900 w-full max-w-lg p-6 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10">
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
@@ -280,6 +284,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                             </div>
                         </div>
                     </div>
+                    </ModalPortal>
                 )}
 
                 <div className="w-64 bg-slate-100 dark:bg-slate-950/50 border-r border-slate-200 dark:border-white/5 p-6 flex flex-col">
@@ -446,15 +451,20 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                             <ImageIcon className="w-3 h-3" /> Project Gallery
                                         </label>
                                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                                            {mod.galleryImages.map((url: string, index: number) => (
+                                            {resolveGalleryImages(mod.galleryImages, mod.galleryImageCaptions || {}).map((item, index: number) => (
                                                 <a
                                                     key={index}
-                                                    href={url}
+                                                    href={item.url}
                                                     target="_blank"
                                                     rel="noreferrer"
                                                     className="aspect-video rounded-xl overflow-hidden bg-slate-200 dark:bg-white/10 border border-slate-200 dark:border-white/5 relative group block"
                                                 >
-                                                    <img src={url} className="w-full h-full object-cover" alt={`Gallery ${index + 1}`} />
+                                                    <img src={item.type === 'youtube' && item.thumbnailUrl ? item.thumbnailUrl : item.url} className="w-full h-full object-cover" alt={`Gallery ${index + 1}`} />
+                                                    {item.type === 'youtube' && (
+                                                        <div className="absolute inset-0 flex items-center justify-center bg-blue-950/25 text-white">
+                                                            <PlayCircle className="w-10 h-10 drop-shadow-lg" aria-hidden="true" />
+                                                        </div>
+                                                    )}
                                                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                         <ExternalLink className="w-6 h-6 text-white" />
                                                     </div>
@@ -898,5 +908,6 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                 </div>
             </div>
         </div>
+        </ModalPortal>
     );
 };

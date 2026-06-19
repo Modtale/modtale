@@ -19,19 +19,20 @@ export const TermsOfService: React.FC = () => {
                         </div>
                         <div>
                             <h1 className="text-3xl font-black text-slate-900 dark:text-white">Terms of Service</h1>
-                            <p className="text-slate-500 dark:text-slate-400 font-medium">Last updated: January 2, 2026</p>
+                            <p className="text-slate-500 dark:text-slate-400 font-medium">Last updated: June 16, 2026</p>
                         </div>
                     </div>
 
                     <div className="bg-slate-50 dark:bg-black/20 p-6 rounded-xl border border-slate-200 dark:border-white/5 mb-8">
                         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
-                            <HeartHandshake className="w-5 h-5 text-modtale-accent" /> The "Be Nice" Summary
+                            <HeartHandshake className="w-5 h-5 text-modtale-accent" /> Plain-English Summary
                         </h3>
                         <ul className="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300 text-sm">
-                            <li><strong>We aren't Hypixel:</strong> This is a fan project. Don't blame them for us, or us for them.</li>
-                            <li><strong>Be cool:</strong> Don't upload viruses, stolen content, or hate speech.</li>
-                            <li><strong>Use at your own risk:</strong> If a mod breaks your save file, we are sorry, but we aren't liable.</li>
-                            <li><strong>You own your stuff:</strong> You keep the rights to your mods, you just let us host them.</li>
+                            <li><strong>Modtale is independent:</strong> We are not affiliated with Hypixel Studios, Hytale, or their affiliates.</li>
+                            <li><strong>You own your projects:</strong> You keep your rights, and you give Modtale LLC the permissions needed to host, scan, display, distribute, and promote them.</li>
+                            <li><strong>Keep the community safe:</strong> Do not upload malware, stolen work, abusive content, spam, or anything unlawful.</li>
+                            <li><strong>Downloads are your choice:</strong> We scan and review uploads, but user-made mods can still be risky or incompatible.</li>
+                            <li><strong>We can enforce these rules:</strong> We may reject, remove, unlist, preserve, or restrict content and accounts when needed.</li>
                         </ul>
                     </div>
 
@@ -42,68 +43,138 @@ export const TermsOfService: React.FC = () => {
                                 <AlertTriangle className="w-5 h-5" /> Unofficial Fan Project
                             </h3>
                             <p className="text-sm text-red-800 dark:text-red-200">
-                                Modtale is NOT affiliated with, endorsed by, or associated with Hypixel Studios or their affiliates. "Hytale" is a trademark of Hypixel Studios.
+                                Modtale is not affiliated with, endorsed by, sponsored by, or associated with Hypixel Studios or their affiliates. "Hytale" and related names belong to their respective owners.
                             </p>
                         </div>
 
-                        <h3>1. Acceptance of Terms</h3>
+                        <h3>1. Accepting These Terms</h3>
                         <p>
-                            By using Modtale (logging in via Email, GitHub, GitLab, Discord, Google, downloading content, or uploading content), you agree to these rules. If you don't agree, please don't use the site.
+                            These Terms of Service are the rules for using Modtale, a US, North Carolina-based service operated by Modtale LLC. They apply to the website, API, accounts, organizations, project pages, downloads, comments, reports, notifications, and related services.
+                        </p>
+                        <p>
+                            By using Modtale, creating an account, signing in through an identity provider, uploading content, downloading content, or using an API key, you agree to these terms. If you do not agree, please do not use Modtale. If you are under the age of majority where you live, your parent or guardian must agree to these terms for you. Modtale is a general-audience service and is not intended for children under 13.
                         </p>
 
-                        <h3>2. User Accounts</h3>
+                        <h3>2. Accounts and Security</h3>
                         <p>
-                            To upload content or post comments, you need to create an account. You can do this via standard email/password registration or by linking a third-party account (GitHub, GitLab, Discord, Google).
+                            You need an account for features such as uploading projects, commenting, favoriting projects, following creators, managing organizations, receiving notifications, and creating API keys. Modtale supports email/password sign-in and third-party sign-in or account linking through providers such as GitHub, GitLab, Discord, Google, Twitter/X, and Bluesky when those options are enabled.
                         </p>
                         <ul>
-                            <li><strong>Security:</strong> If you use an email/password, you are responsible for keeping your password complex and secure. If you use a social login, you are responsible for securing that third-party account.</li>
-                            <li><strong>Responsibility:</strong> You are responsible for all activity that occurs under your account.</li>
-                            <li><strong>Termination:</strong> We reserve the right to ban or suspend accounts that violate these terms (e.g., spamming, uploading malware).</li>
+                            <li><strong>Keep your account safe:</strong> Use a strong password, protect your third-party accounts, keep API keys private, and consider enabling MFA.</li>
+                            <li><strong>You are responsible for activity:</strong> You are responsible for actions taken through your account, organization, project roles, sessions, and API keys unless the activity was caused by our security failure.</li>
+                            <li><strong>Tell us about problems:</strong> If you believe your account or API key was compromised, contact us and revoke affected keys as soon as possible.</li>
+                            <li><strong>No impersonation:</strong> Do not pretend to be another person, organization, Modtale staff member, Hypixel Studios, or any other company or project.</li>
                         </ul>
 
-                        <h3>3. Uploading Content (Your Rights)</h3>
+                        <h3>3. Your Content and Project Licenses</h3>
                         <p>
-                            When you upload a mod, plugin, art asset, or modpack:
+                            "Your content" means anything you upload, submit, publish, or make available through Modtale, including mods, plugins, modpacks, project metadata, descriptions, changelogs, source links, images, videos, comments, reports, organization information, and profile information.
                         </p>
                         <ul>
-                            <li><strong>You keep ownership:</strong> You are still the owner of your creation.</li>
-                            <li><strong>You give us permission:</strong> You grant Modtale a license to host, display, and distribute your content to other users.</li>
-                            <li><strong>You promise it's yours:</strong> You represent that you actually created the content or have explicit permission/license to upload it. Do not upload other people's work without consent.</li>
+                            <li><strong>You keep ownership:</strong> These terms do not transfer ownership of your content to Modtale.</li>
+                            <li><strong>You choose the project license:</strong> If you select or state a license for a project, users may rely on that license for the content you publish under it. Make sure you have the rights to offer that license.</li>
+                            <li><strong>You give Modtale hosting permission:</strong> You grant Modtale LLC a worldwide, non-exclusive, royalty-free license to host, store, scan, copy, resize, transcode, cache, display, distribute, make available for download, index, and promote your content as needed to operate, secure, improve, and advertise the service.</li>
+                            <li><strong>You let us handle technical copies:</strong> This license includes backups, CDN copies, generated previews, image optimization, search snippets, API responses, security review copies, and copies needed for moderation or legal compliance.</li>
+                            <li><strong>You can remove content:</strong> You may delete or unpublish your own projects when the product allows it, subject to dependency, safety, legal, moderation, and backup limits described in these terms and the Privacy Policy.</li>
                         </ul>
-
-                        <h3>4. Prohibited Content</h3>
                         <p>
-                            We want to keep this community safe and high-quality. The following is strictly prohibited:
+                            You promise that you have all rights and permissions needed for the content you upload, including third-party code, libraries, assets, screenshots, trademarks, and game-related materials. Do not upload Hytale game files, leaked materials, proprietary assets, or anyone else's work unless you are allowed to do so.
+                        </p>
+
+                        <h3>4. Uploads, Security Scanning, and Review</h3>
+                        <p>
+                            Modtale may scan uploaded files, generate hashes, inspect metadata, queue releases for review, and block or delay publishing when a file is suspicious, unscanned, unsupported, or awaiting manual review. Scanning helps reduce risk, but it cannot prove that every file is safe, lawful, or compatible.
                         </p>
                         <ul>
-                            <li><strong>Malware:</strong> Viruses, spyware, zip bombs, or code designed to harm users or infrastructure.</li>
-                            <li><strong>Illegal Content:</strong> Anything that violates applicable laws.</li>
-                            <li><strong>Hate Speech:</strong> Content that promotes violence, discrimination, or harassment.</li>
-                            <li><strong>NSFW Content:</strong> Modtale is for a general gaming audience; keep it appropriate.</li>
+                            <li><strong>No bypassing review:</strong> Do not try to evade file limits, rate limits, scans, holds, rejections, or moderation decisions.</li>
+                            <li><strong>No harmful files:</strong> Do not upload malware, spyware, credential stealers, destructive code, exploit payloads, zip bombs, hidden miners, or files designed to damage users, games, accounts, devices, or infrastructure.</li>
+                            <li><strong>We may preserve evidence:</strong> If content appears unsafe, unlawful, abusive, or rights-infringing, we may preserve copies, logs, reports, and related account information for investigation and enforcement.</li>
                         </ul>
-                        <p>We reserve the right to remove ANY content for ANY reason, without warning.</p>
 
-                        <h3>5. Copyright & DMCA</h3>
+                        <h3>5. Community Rules</h3>
                         <p>
-                            If you believe a mod hosted here infringes on your copyright, please let us know immediately at <strong>legal@modtale.net</strong> or via our GitHub Issues. We comply with the DMCA and will remove infringing content.
+                            Keep Modtale safe, useful, and welcoming. You may not use Modtale to upload, publish, link to, encourage, or coordinate:
+                        </p>
+                        <ul>
+                            <li>illegal content or activity;</li>
+                            <li>copyright, trademark, privacy, publicity, or license violations;</li>
+                            <li>harassment, threats, hate speech, or content promoting violence or discrimination;</li>
+                            <li>sexual content, especially any content involving minors;</li>
+                            <li>doxxing, non-consensual personal information, or invasive tracking;</li>
+                            <li>spam, scams, phishing, deceptive downloads, fake metadata, manipulated statistics, or search abuse;</li>
+                            <li>content that interferes with Modtale, other users, third-party services, or game infrastructure; or</li>
+                            <li>anything that otherwise creates legal, security, operational, or community risk for Modtale or its users.</li>
+                        </ul>
+
+                        <h3>6. Moderation and Enforcement</h3>
+                        <p>
+                            We may investigate reports and take action when we believe it is appropriate. Actions may include warning users, rejecting releases, requiring changes, removing comments, unlisting or archiving projects, disabling downloads, deleting files, suspending or deleting accounts, banning email addresses, revoking API keys, limiting features, preserving evidence, or contacting service providers or authorities.
+                        </p>
+                        <p>
+                            We are not required to host or keep hosting any content. We try to be fair, but we may act without advance notice when needed for safety, security, legal compliance, platform integrity, or user protection.
                         </p>
 
-                        <h3>6. Disclaimer of Warranties (The "No Warranty" Clause)</h3>
+                        <h3>7. Downloads, Dependencies, and Modpacks</h3>
                         <p>
-                            THE SERVICE IS PROVIDED "AS IS". We try our best to keep Modtale running and safe, but we cannot guarantee that every mod is bug-free, compatible with your game version, or that the site will never go down.
+                            User-uploaded content is provided by its creators, not by Modtale. You are responsible for deciding whether to download, install, trust, and run a project. Back up your worlds, servers, and files before installing mods or plugins.
                         </p>
+                        <ul>
+                            <li><strong>No compatibility promise:</strong> We do not promise that a project works with a particular game version, loader, dependency, modpack, server, client, or operating system.</li>
+                            <li><strong>Dependency placeholders:</strong> If deleting a project would break dependency resolution for other projects or modpacks, we may retain a minimal, scrubbed, or placeholder record instead of removing every trace immediately.</li>
+                            <li><strong>Third-party links:</strong> Repository links, YouTube embeds, Discord links, project websites, and other external services are controlled by their own operators and terms.</li>
+                        </ul>
+
+                        <h3>8. API and Automated Use</h3>
                         <p>
-                            <strong>Risk of Downloading:</strong> You download and use mods at your own risk. Modtale is not responsible for corrupted save files, game crashes, or other issues caused by user-uploaded content. Always back up your worlds!
+                            Modtale provides API access for community tooling and project workflows. Use API keys only for accounts, organizations, and projects you are authorized to manage. You may not overload the service, bypass rate limits, scrape private or restricted data, share API keys publicly, use the API for spam or abuse, or use automation to manipulate rankings, downloads, favorites, views, comments, reports, or reviews. We may rate-limit, revoke, rotate, or block API access at any time to protect the service.
                         </p>
 
-                        <h3>7. Liability</h3>
+                        <h3>9. Copyright and Takedowns</h3>
                         <p>
-                            To the maximum extent permitted by law, Modtale and its maintainers shall not be liable for any damages (direct, indirect, incidental) arising from your use of the service.
+                            If you believe content on Modtale infringes your copyright or other rights, contact <strong>legal@modtale.net</strong> with enough detail for us to identify the content, understand your claim, and reach you. We may remove or restrict content while reviewing a rights complaint. If your content was removed and you believe it was a mistake, you may send a counter-explanation with supporting information.
                         </p>
 
-                        <h3>8. Changes</h3>
+                        <h3>10. Privacy</h3>
                         <p>
-                            We may update these terms from time to time. We will try to notify you of major changes, but continuing to use the site means you accept the new terms.
+                            Our Privacy Policy explains what information we collect, how we use it, who we share it with, and what choices you have. By using Modtale, you also agree that we may process information as described in the Privacy Policy.
+                        </p>
+
+                        <h3>11. Service Changes and Availability</h3>
+                        <p>
+                            Modtale is provided as a community platform and may change over time. We may add, change, pause, limit, or remove features, integrations, storage behavior, review rules, API endpoints, project categories, and eligibility rules. We do not promise that the service, every feature, every file, or every API endpoint will always be available.
+                        </p>
+
+                        <h3>12. Disclaimers</h3>
+                        <p>
+                            To the maximum extent permitted by law, Modtale is provided <strong>AS IS</strong> and <strong>AS AVAILABLE</strong>, without warranties of any kind. We do not guarantee that Modtale will be uninterrupted, secure, error-free, free of harmful content, or that user-uploaded content will be safe, lawful, accurate, complete, or compatible with your setup.
+                        </p>
+
+                        <h3>13. Limitation of Liability</h3>
+                        <p>
+                            To the maximum extent permitted by law, Modtale LLC, its maintainers, contributors, operators, affiliates, officers, employees, contractors, and agents will not be liable for indirect, incidental, special, consequential, exemplary, or punitive damages, or for lost profits, lost data, lost saves, corrupted worlds, security incidents caused by user-uploaded content, downtime, loss of goodwill, or other damages arising from your use of or inability to use Modtale.
+                        </p>
+                        <p>
+                            Some laws do not allow certain limitations. In those places, our liability is limited only to the extent the law allows.
+                        </p>
+
+                        <h3>14. Your Responsibility to Modtale</h3>
+                        <p>
+                            If your content, account activity, API use, or violation of these terms causes claims, losses, damages, costs, or expenses for Modtale, you agree to be responsible for them to the extent allowed by law. This includes claims that your content infringes someone else's rights, contains harmful code, violates law, or violates a license.
+                        </p>
+
+                        <h3>15. Governing Law</h3>
+                        <p>
+                            These terms are governed by the laws of the State of North Carolina and applicable US federal law, without regard to conflict-of-law rules. This does not limit consumer protection rights that you cannot waive under the laws where you live.
+                        </p>
+
+                        <h3>16. Changes to These Terms</h3>
+                        <p>
+                            We may update these terms as Modtale changes. We will update the "Last updated" date and try to give reasonable notice for material changes. If you continue using Modtale after changes take effect, the updated terms apply to your continued use.
+                        </p>
+
+                        <h3>17. Contact</h3>
+                        <p>
+                            Questions, rights complaints, and legal notices can be sent to <strong>legal@modtale.net</strong>. You can also reach the maintainers through the <a href="https://github.com/Modtale/modtale" className="text-modtale-accent hover:underline" target="_blank" rel="noreferrer">Modtale GitHub repository</a>.
                         </p>
                     </div>
                 </div>

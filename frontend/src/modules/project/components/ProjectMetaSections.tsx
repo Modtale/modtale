@@ -93,8 +93,8 @@ export const ProjectMetaSections: React.FC<ProjectMetaSectionsProps> = React.mem
                         {dependencies.map((dep, idx) => {
                             const isExternal = isExternalDependency(dep);
                             const meta = depMeta[dep.projectId];
-                            const iconUrl = isExternal ? null : getIconUrl(meta?.icon);
-                            const title = meta?.title || dep.projectTitle || dep.projectId;
+                            const iconUrl = isExternal ? null : getIconUrl(dep.icon || meta?.icon);
+                            const title = dep.title || meta?.title || dep.projectTitle || dep.projectId;
                             const dependencyType = getDependencyType(dep);
                             const sourceLabel = getSourceLabel(dep.source);
                             const className = "w-full flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 hover:border-modtale-accent/50 hover:shadow-md transition-all group text-left block";
@@ -139,8 +139,8 @@ export const ProjectMetaSections: React.FC<ProjectMetaSectionsProps> = React.mem
                             const targetProjectParams = {
                                 id: dep.projectId,
                                 title,
-                                slug: meta?.slug,
-                                classification: meta?.classification
+                                slug: dep.slug || meta?.slug,
+                                classification: dep.classification || meta?.classification
                             };
 
                             return (

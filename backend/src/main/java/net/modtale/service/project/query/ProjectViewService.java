@@ -4,11 +4,14 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import net.modtale.model.dto.project.ProjectVersionChangelogDTO;
 import net.modtale.model.project.Comment;
 import net.modtale.model.project.Project;
+import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
@@ -86,12 +89,12 @@ public class ProjectViewService {
         return prepareProjectForViewer(project, viewer, privileged);
     }
 
-    public Project getProjectPageByRouteKey(String routeKey, User viewer) {
+    public Project getProjectDetailsByRouteKey(String routeKey, User viewer) {
         if (viewer == null) {
-            return getPublicProjectPageByRouteKey(routeKey);
+            return getPublicProjectDetailsByRouteKey(routeKey);
         }
 
-        Project project = resolveViewerProjectPageByRouteKey(routeKey);
+        Project project = resolveViewerProjectDetailsByRouteKey(routeKey);
         if (project == null || project.getDeletedAt() != null) return null;
 
         boolean privileged = accessControlService.hasEditPermission(project, viewer) || accessControlService.isAdmin(viewer);
@@ -100,6 +103,78 @@ public class ProjectViewService {
         }
 
         return prepareProjectForViewer(project, viewer, privileged);
+    }
+
+    public Project getProjectPageShellByRouteKey(String routeKey, User viewer) {
+        if (viewer == null) {
+            return getPublicProjectPageShellByRouteKey(routeKey);
+        }
+
+        Project project = resolveViewerProjectPageShellByRouteKey(routeKey);
+        if (project == null || project.getDeletedAt() != null) return null;
+
+        boolean privileged = accessControlService.hasEditPermission(project, viewer) || accessControlService.isAdmin(viewer);
+        if (!privileged && !accessControlService.canReadProject(project, viewer)) {
+            return null;
+        }
+
+        populateAuthorName(project);
+        return project;
+    }
+
+    public Project getProjectVersionsByRouteKey(String routeKey, User viewer) {
+        if (viewer == null) {
+            return getPublicProjectVersionsByRouteKey(routeKey);
+        }
+
+        Project project = resolveViewerProjectVersionsByRouteKey(routeKey);
+        ProjectAccess access = resolveAccess(project, viewer);
+        if (!access.canRead()) return null;
+
+        filterVisibleVersions(project, access.privileged());
+        populateDependencyMetadata(project, access.privileged());
+        return project;
+    }
+
+    public Project getProjectCommentsByRouteKey(String routeKey, User viewer) {
+        if (viewer == null) {
+            return getPublicProjectCommentsByRouteKey(routeKey);
+        }
+
+        Project project = resolveViewerProjectCommentsByRouteKey(routeKey);
+        ProjectAccess access = resolveAccess(project, viewer);
+        if (!access.canRead()) return null;
+
+        if (!project.isAllowComments() && !access.privileged()) {
+            project.setComments(new ArrayList<>());
+        }
+        return project;
+    }
+
+    public Project getProjectGalleryByRouteKey(String routeKey, User viewer) {
+        if (viewer == null) {
+            return getPublicProjectGalleryByRouteKey(routeKey);
+        }
+
+        Project project = resolveViewerProjectGalleryByRouteKey(routeKey);
+        ProjectAccess access = resolveAccess(project, viewer);
+        return access.canRead() ? project : null;
+    }
+
+    public Project getProjectTeamByRouteKey(String routeKey, User viewer) {
+        if (viewer == null) {
+            return getPublicProjectTeamByRouteKey(routeKey);
+        }
+
+        Project project = resolveViewerProjectTeamByRouteKey(routeKey);
+        ProjectAccess access = resolveAccess(project, viewer);
+        if (!access.canRead()) return null;
+
+        if (!access.privileged()) {
+            project.setTeamInvites(new ArrayList<>());
+        }
+        populateRelatedUsers(project);
+        return project;
     }
 
     @Cacheable(value = "projectDetails", key = "'public:' + #id")
@@ -118,18 +193,55 @@ public class ProjectViewService {
     }
 
     @Cacheable(value = "projectDetails", key = "'public-page:' + #id")
-    public Project getPublicProjectPageById(String id) {
+    public Project getPublicProjectDetailsById(String id) {
         if (id == null || id.isBlank()) return null;
-        Project project = projectRepository.findPublicPageDetailById(id).orElse(null);
+        Project project = projectRepository.findPublicDetailsPayloadById(id).orElse(null);
         if (project == null || project.getDeletedAt() != null || !accessControlService.isPubliclyReadable(project)) return null;
         return prepareProjectForViewer(project, null, false);
     }
 
     @Cacheable(value = "projectDetails", key = "'public-page:' + #routeKey")
-    public Project getPublicProjectPageByRouteKey(String routeKey) {
-        Project project = resolvePublicProjectPageByRouteKey(routeKey);
+    public Project getPublicProjectDetailsByRouteKey(String routeKey) {
+        Project project = resolvePublicProjectDetailsByRouteKey(routeKey);
         if (project == null || project.getDeletedAt() != null || !accessControlService.isPubliclyReadable(project)) return null;
         return prepareProjectForViewer(project, null, false);
+    }
+
+    public Project getPublicProjectPageShellByRouteKey(String routeKey) {
+        Project project = resolvePublicProjectPageShellByRouteKey(routeKey);
+        if (project == null || project.getDeletedAt() != null || !accessControlService.isPubliclyReadable(project)) return null;
+        populateAuthorName(project);
+        return project;
+    }
+
+    public Project getPublicProjectVersionsByRouteKey(String routeKey) {
+        Project project = resolvePublicProjectVersionsByRouteKey(routeKey);
+        if (project == null || project.getDeletedAt() != null || !accessControlService.isPubliclyReadable(project)) return null;
+        filterVisibleVersions(project, false);
+        populateDependencyMetadata(project, false);
+        return project;
+    }
+
+    public Project getPublicProjectCommentsByRouteKey(String routeKey) {
+        Project project = resolvePublicProjectCommentsByRouteKey(routeKey);
+        if (project == null || project.getDeletedAt() != null || !accessControlService.isPubliclyReadable(project)) return null;
+        if (!project.isAllowComments()) {
+            project.setComments(new ArrayList<>());
+        }
+        return project;
+    }
+
+    public Project getPublicProjectGalleryByRouteKey(String routeKey) {
+        Project project = resolvePublicProjectGalleryByRouteKey(routeKey);
+        if (project == null || project.getDeletedAt() != null || !accessControlService.isPubliclyReadable(project)) return null;
+        return project;
+    }
+
+    public Project getPublicProjectTeamByRouteKey(String routeKey) {
+        Project project = resolvePublicProjectTeamByRouteKey(routeKey);
+        if (project == null || project.getDeletedAt() != null || !accessControlService.isPubliclyReadable(project)) return null;
+        populateRelatedUsers(project);
+        return project;
     }
 
     @Cacheable(
@@ -213,24 +325,24 @@ public class ProjectViewService {
         return projectRepository.findPublicDetailById(normalized).orElse(null);
     }
 
-    private Project resolvePublicProjectPageByRouteKey(String routeKey) {
+    private Project resolvePublicProjectDetailsByRouteKey(String routeKey) {
         if (routeKey == null || routeKey.isBlank()) return null;
 
         String normalized = routeKey.trim();
         if (projectRouteService.hasExplicitProjectHandle(normalized)) {
             String projectId = projectRouteService.extractProjectId(normalized);
-            Project project = projectRepository.findPublicPageDetailById(projectId).orElse(null);
+            Project project = projectRepository.findPublicDetailsPayloadById(projectId).orElse(null);
             if (project != null) return project;
-            return projectRepository.findPublicPageDetailBySlug(normalized).orElse(null);
+            return projectRepository.findPublicDetailsPayloadBySlug(normalized).orElse(null);
         }
 
         Project route = projectRepository.findPublicRouteBySlug(normalized).orElse(null);
         if (route != null && route.getId() != null) {
-            Project project = projectRepository.findPublicPageDetailById(route.getId()).orElse(null);
+            Project project = projectRepository.findPublicDetailsPayloadById(route.getId()).orElse(null);
             if (project != null) return project;
         }
 
-        return projectRepository.findPublicPageDetailById(normalized).orElse(null);
+        return projectRepository.findPublicDetailsPayloadById(normalized).orElse(null);
     }
 
     private Project resolveViewerProjectByRouteKey(String routeKey) {
@@ -250,27 +362,27 @@ public class ProjectViewService {
         return projectRepository.findViewerDetailById(normalized).orElse(null);
     }
 
-    private Project resolveViewerProjectPageByRouteKey(String routeKey) {
+    private Project resolveViewerProjectDetailsByRouteKey(String routeKey) {
         if (routeKey == null || routeKey.isBlank()) return null;
 
         String normalized = routeKey.trim();
         if (projectRouteService.hasExplicitProjectHandle(normalized)) {
             String projectId = projectRouteService.extractProjectId(normalized);
-            Project project = projectRepository.findViewerPageDetailById(projectId).orElse(null);
+            Project project = projectRepository.findViewerDetailsPayloadById(projectId).orElse(null);
             if (project != null) return project;
-            return projectRepository.findViewerPageDetailBySlug(normalized).orElse(null);
+            return projectRepository.findViewerDetailsPayloadBySlug(normalized).orElse(null);
         }
 
         Project route = projectRepository.findPublicRouteBySlug(normalized).orElse(null);
         if (route != null && route.getId() != null) {
-            Project project = projectRepository.findViewerPageDetailById(route.getId()).orElse(null);
+            Project project = projectRepository.findViewerDetailsPayloadById(route.getId()).orElse(null);
             if (project != null) return project;
         }
 
-        Project project = projectRepository.findViewerPageDetailBySlug(normalized).orElse(null);
+        Project project = projectRepository.findViewerDetailsPayloadBySlug(normalized).orElse(null);
         if (project != null) return project;
 
-        return projectRepository.findViewerPageDetailById(normalized).orElse(null);
+        return projectRepository.findViewerDetailsPayloadById(normalized).orElse(null);
     }
 
     private Project resolveChangelogProjectByRouteKey(String routeKey) {
@@ -296,24 +408,196 @@ public class ProjectViewService {
         return projectRepository.findChangelogsById(normalized).orElse(null);
     }
 
+    private Project resolvePublicProjectPageShellByRouteKey(String routeKey) {
+        return resolveProjectedProjectByRouteKey(
+                routeKey,
+                projectRepository::findPublicPageShellById,
+                projectRepository::findPublicPageShellBySlug
+        );
+    }
+
+    private Project resolveViewerProjectPageShellByRouteKey(String routeKey) {
+        return resolveProjectedProjectByRouteKey(
+                routeKey,
+                projectRepository::findViewerPageShellById,
+                projectRepository::findViewerPageShellBySlug
+        );
+    }
+
+    private Project resolvePublicProjectVersionsByRouteKey(String routeKey) {
+        return resolveProjectedProjectByRouteKey(
+                routeKey,
+                projectRepository::findPublicVersionsById,
+                projectRepository::findPublicVersionsBySlug
+        );
+    }
+
+    private Project resolveViewerProjectVersionsByRouteKey(String routeKey) {
+        return resolveProjectedProjectByRouteKey(
+                routeKey,
+                projectRepository::findViewerVersionsById,
+                projectRepository::findViewerVersionsBySlug
+        );
+    }
+
+    private Project resolvePublicProjectCommentsByRouteKey(String routeKey) {
+        return resolveProjectedProjectByRouteKey(
+                routeKey,
+                projectRepository::findPublicCommentsById,
+                projectRepository::findPublicCommentsBySlug
+        );
+    }
+
+    private Project resolveViewerProjectCommentsByRouteKey(String routeKey) {
+        return resolveProjectedProjectByRouteKey(
+                routeKey,
+                projectRepository::findViewerCommentsById,
+                projectRepository::findViewerCommentsBySlug
+        );
+    }
+
+    private Project resolvePublicProjectGalleryByRouteKey(String routeKey) {
+        return resolveProjectedProjectByRouteKey(
+                routeKey,
+                projectRepository::findPublicGalleryById,
+                projectRepository::findPublicGalleryBySlug
+        );
+    }
+
+    private Project resolveViewerProjectGalleryByRouteKey(String routeKey) {
+        return resolveProjectedProjectByRouteKey(
+                routeKey,
+                projectRepository::findViewerGalleryById,
+                projectRepository::findViewerGalleryBySlug
+        );
+    }
+
+    private Project resolvePublicProjectTeamByRouteKey(String routeKey) {
+        return resolveProjectedProjectByRouteKey(
+                routeKey,
+                projectRepository::findPublicTeamById,
+                projectRepository::findPublicTeamBySlug
+        );
+    }
+
+    private Project resolveViewerProjectTeamByRouteKey(String routeKey) {
+        return resolveProjectedProjectByRouteKey(
+                routeKey,
+                projectRepository::findViewerTeamById,
+                projectRepository::findViewerTeamBySlug
+        );
+    }
+
+    private Project resolveProjectedProjectByRouteKey(
+            String routeKey,
+            Function<String, Optional<Project>> byId,
+            Function<String, Optional<Project>> bySlug
+    ) {
+        if (routeKey == null || routeKey.isBlank()) return null;
+
+        String normalized = routeKey.trim();
+        if (projectRouteService.hasExplicitProjectHandle(normalized)) {
+            String projectId = projectRouteService.extractProjectId(normalized);
+            Project project = byId.apply(projectId).orElse(null);
+            if (project != null) return project;
+            return bySlug.apply(normalized).orElse(null);
+        }
+
+        Project project = bySlug.apply(normalized).orElse(null);
+        if (project != null) return project;
+
+        return byId.apply(normalized).orElse(null);
+    }
+
+    private ProjectAccess resolveAccess(Project project, User viewer) {
+        if (project == null || project.getDeletedAt() != null) {
+            return new ProjectAccess(false, false);
+        }
+
+        boolean privileged = viewer != null && (accessControlService.hasEditPermission(project, viewer) || accessControlService.isAdmin(viewer));
+        boolean canRead = privileged || accessControlService.canReadProject(project, viewer);
+        return new ProjectAccess(privileged, canRead);
+    }
+
+    private void filterVisibleVersions(Project project, boolean privileged) {
+        if (project == null || project.getVersions() == null) return;
+
+        if (!privileged) {
+            List<ProjectVersion> visibleVersions = project.getVersions().stream()
+                    .filter(v -> v.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED)
+                    .collect(Collectors.toList());
+            project.setVersions(visibleVersions);
+        }
+
+        project.getVersions().forEach(v -> v.setScanResult(null));
+    }
+
     private Project prepareProjectForViewer(Project project, User viewer, boolean privileged) {
         populateAuthorName(project);
 
         if (project.getVersions() != null) {
-            if (!privileged) {
-                List<ProjectVersion> visibleVersions = project.getVersions().stream()
-                        .filter(v -> v.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED)
-                        .collect(Collectors.toList());
-                project.setVersions(visibleVersions);
-            }
-
-            project.getVersions().forEach(v -> v.setScanResult(null));
+            filterVisibleVersions(project, privileged);
+            populateDependencyMetadata(project, privileged);
         }
 
         if (!project.isAllowComments() && !privileged) project.setComments(new ArrayList<>());
         populateRelatedUsers(project);
 
         return project;
+    }
+
+    private void populateDependencyMetadata(Project project, boolean privileged) {
+        if (project == null || project.getVersions() == null) return;
+
+        Set<String> dependencyIds = project.getVersions().stream()
+                .filter(version -> version.getDependencies() != null)
+                .flatMap(version -> version.getDependencies().stream())
+                .map(ProjectDependency::getProjectId)
+                .filter(id -> id != null && !id.isBlank())
+                .collect(Collectors.toSet());
+
+        if (dependencyIds.isEmpty()) {
+            return;
+        }
+
+        Criteria criteria = Criteria.where("_id").in(MongoIdUtils.expandIds(dependencyIds))
+                .and("deletedAt").is(null);
+        if (!privileged) {
+            criteria.and("status").in("PUBLISHED", "UNLISTED", "ARCHIVED");
+        }
+
+        Query query = Query.query(criteria);
+        query.fields()
+                .include("_id")
+                .include("slug")
+                .include("title")
+                .include("imageUrl")
+                .include("classification")
+                .include("status");
+
+        Map<String, Project> dependencyProjects = mongoTemplate.find(query, Project.class).stream()
+                .collect(Collectors.toMap(Project::getId, Function.identity(), (existing, replacement) -> existing));
+
+        project.getVersions().stream()
+                .filter(version -> version.getDependencies() != null)
+                .flatMap(version -> version.getDependencies().stream())
+                .forEach(dependency -> {
+                    Project dependencyProject = dependencyProjects.get(dependency.getProjectId());
+                    if (dependencyProject == null) {
+                        dependency.setTitle(dependency.getProjectTitle());
+                        return;
+                    }
+
+                    if (dependency.getProjectTitle() == null || dependency.getProjectTitle().isBlank()) {
+                        dependency.setProjectTitle(dependencyProject.getTitle());
+                    }
+                    dependency.setTitle(dependencyProject.getTitle() != null ? dependencyProject.getTitle() : dependency.getProjectTitle());
+                    dependency.setIcon(dependencyProject.getImageUrl() != null ? dependencyProject.getImageUrl() : "");
+                    dependency.setClassification(dependencyProject.getClassification());
+                    dependency.setSlug(dependencyProject.getSlug() != null && !dependencyProject.getSlug().isBlank()
+                            ? dependencyProject.getSlug()
+                            : dependencyProject.getId());
+                });
     }
 
     private void populateAuthorName(Project project) {
@@ -379,5 +663,8 @@ public class ProjectViewService {
         Query query = new Query(Criteria.where("_id").in(MongoIdUtils.expandIds(userIdsToFetch)));
         query.fields().include("_id").include("username").include("avatarUrl");
         return query;
+    }
+
+    private record ProjectAccess(boolean privileged, boolean canRead) {
     }
 }

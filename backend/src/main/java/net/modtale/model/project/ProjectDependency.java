@@ -1,7 +1,11 @@
 package net.modtale.model.project;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.UUID;
+import org.springframework.data.annotation.Transient;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class ProjectDependency {
 
     public enum Source {
@@ -22,6 +26,14 @@ public class ProjectDependency {
     private String projectId;
     private String projectTitle;
     private String versionNumber;
+    @Transient
+    private String icon;
+    @Transient
+    private String title;
+    @Transient
+    private ProjectClassification classification;
+    @Transient
+    private String slug;
     private DependencyType dependencyType = DependencyType.REQUIRED;
     private Source source = Source.MODTALE;
     private String externalId;
@@ -88,6 +100,18 @@ public class ProjectDependency {
     public String getVersionNumber() { return versionNumber; }
     public void setVersionNumber(String versionNumber) { this.versionNumber = versionNumber; }
 
+    public String getIcon() { return icon; }
+    public void setIcon(String icon) { this.icon = icon; }
+
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+
+    public ProjectClassification getClassification() { return classification; }
+    public void setClassification(ProjectClassification classification) { this.classification = classification; }
+
+    public String getSlug() { return slug; }
+    public void setSlug(String slug) { this.slug = slug; }
+
     public DependencyType getDependencyType() { return dependencyType == null ? DependencyType.REQUIRED : dependencyType; }
     public void setDependencyType(DependencyType dependencyType) {
         this.dependencyType = dependencyType == null ? DependencyType.REQUIRED : dependencyType;
@@ -120,11 +144,9 @@ public class ProjectDependency {
         this.hytaleProjectConfirmed = hytaleProjectConfirmed;
     }
 
-    public boolean isEmbedded() {
-        return getDependencyType() == DependencyType.EMBEDDED;
-    }
+    @JsonProperty("isEmbedded")
+    public boolean isEmbedded() { return getDependencyType() == DependencyType.EMBEDDED; }
 
-    public boolean isOptional() {
-        return getDependencyType() == DependencyType.OPTIONAL;
-    }
+    @JsonProperty("isOptional")
+    public boolean isOptional() { return getDependencyType() == DependencyType.OPTIONAL; }
 }

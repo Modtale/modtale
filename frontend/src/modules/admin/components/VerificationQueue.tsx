@@ -30,8 +30,9 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
     }
 
     const scanPriority = (mod: Project) => {
-        const pendingVersions = mod.versions.filter(v => v.reviewStatus === 'PENDING');
-        const targetVersion = pendingVersions[0] || mod.versions[0];
+        const versions = mod.versions || [];
+        const pendingVersions = versions.filter(v => v.reviewStatus === 'PENDING');
+        const targetVersion = pendingVersions[0] || versions[0];
         const scan = targetVersion?.scanResult;
         const verdict = scan?.verdict?.toUpperCase();
         const status = scan?.status?.toUpperCase();
@@ -57,8 +58,9 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
 
     const renderQueueItem = (mod: Project) => {
         const isProjectPending = mod.status === 'PENDING';
-        const pendingVersions = mod.versions.filter(v => v.reviewStatus === 'PENDING');
-        const targetVersion = pendingVersions[0] || mod.versions[0];
+        const versions = mod.versions || [];
+        const pendingVersions = versions.filter(v => v.reviewStatus === 'PENDING');
+        const targetVersion = pendingVersions[0] || versions[0];
         const scan = targetVersion?.scanResult;
         const hasIssues = scan && scan.status !== 'CLEAN';
         const newIssues = scan?.newIssueCount || 0;

@@ -2,16 +2,23 @@ package net.modtale.mapper;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import net.modtale.model.dto.admin.AdminProjectDTO;
 import net.modtale.model.dto.admin.AdminProjectVersionSummaryDTO;
+import net.modtale.model.dto.project.ProjectCommentsDTO;
 import net.modtale.model.dto.project.ProjectCommentDTO;
 import net.modtale.model.dto.project.ProjectCommentReplyDTO;
 import net.modtale.model.dto.project.ProjectDTO;
 import net.modtale.model.dto.project.ProjectDependencyDTO;
+import net.modtale.model.dto.project.ProjectGalleryDTO;
+import net.modtale.model.dto.project.ProjectMarqueeDTO;
 import net.modtale.model.dto.project.ProjectMetaDTO;
+import net.modtale.model.dto.project.ProjectPageDTO;
 import net.modtale.model.dto.project.ProjectSummaryDTO;
+import net.modtale.model.dto.project.ProjectTeamDTO;
 import net.modtale.model.dto.project.ProjectVersionDTO;
+import net.modtale.model.dto.project.ProjectVersionsDTO;
 import net.modtale.model.dto.project.ProjectVersionSummaryDTO;
 import net.modtale.model.project.Comment;
 import net.modtale.model.project.Project;
@@ -47,6 +54,21 @@ public class ProjectMapper {
         );
     }
 
+    public static ProjectMarqueeDTO toMarqueeDTO(Project project) {
+        if (project == null) return null;
+        return new ProjectMarqueeDTO(
+                project.getId(),
+                project.getSlug(),
+                project.getTitle(),
+                project.getAuthorId(),
+                project.getAuthor(),
+                project.getImageUrl(),
+                project.getBannerUrl(),
+                project.getClassification(),
+                project.getDownloadCount()
+        );
+    }
+
     public static ProjectMetaDTO toMetaDTO(Project project) {
         if (project == null) return null;
         return new ProjectMetaDTO(
@@ -58,6 +80,74 @@ public class ProjectMapper {
                 project.getDownloadCount(),
                 project.getRepositoryUrl() != null ? project.getRepositoryUrl() : "",
                 project.getSlug() != null ? project.getSlug() : project.getId()
+        );
+    }
+
+    public static ProjectPageDTO toPageDTO(Project project) {
+        if (project == null) return null;
+        return new ProjectPageDTO(
+                project.getId(),
+                project.getSlug(),
+                project.getTitle(),
+                project.getAbout(),
+                project.getDescription(),
+                project.getAuthorId(),
+                project.getAuthor(),
+                project.getImageUrl(),
+                project.getBannerUrl(),
+                project.getClassification(),
+                project.getTags(),
+                project.getDownloadCount(),
+                project.getFavoriteCount(),
+                project.getRepositoryUrl(),
+                project.getUpdatedAt(),
+                project.getCreatedAt(),
+                project.getLicense(),
+                project.getLinks(),
+                project.isAllowModpacks(),
+                project.isAllowComments(),
+                project.isHmWikiEnabled(),
+                project.getHmWikiSlug(),
+                project.isGalleryCarouselEnabled(),
+                project.getStatus(),
+                project.getExpiresAt(),
+                project.isCanEdit(),
+                project.isOwner()
+        );
+    }
+
+    public static ProjectVersionsDTO toVersionsDTO(Project project) {
+        if (project == null) return null;
+        return new ProjectVersionsDTO(project.getVersions() != null
+                ? project.getVersions().stream()
+                        .map(version -> toVersionDTO(version, false))
+                        .collect(Collectors.toList())
+                : new ArrayList<>());
+    }
+
+    public static ProjectCommentsDTO toCommentsDTO(Project project, String currentUserId) {
+        if (project == null) return null;
+        return new ProjectCommentsDTO(project.getComments() != null
+                ? project.getComments().stream()
+                        .map(comment -> toCommentDTO(comment, currentUserId))
+                        .collect(Collectors.toList())
+                : new ArrayList<>());
+    }
+
+    public static ProjectGalleryDTO toGalleryDTO(Project project) {
+        if (project == null) return null;
+        return new ProjectGalleryDTO(
+                project.getGalleryImages() != null ? project.getGalleryImages() : new ArrayList<>(),
+                project.getGalleryImageCaptions() != null ? project.getGalleryImageCaptions() : Map.of()
+        );
+    }
+
+    public static ProjectTeamDTO toTeamDTO(Project project) {
+        if (project == null) return null;
+        return new ProjectTeamDTO(
+                project.getProjectRoles() != null ? project.getProjectRoles() : new ArrayList<>(),
+                project.getTeamMembers() != null ? project.getTeamMembers() : new ArrayList<>(),
+                project.getTeamInvites() != null ? project.getTeamInvites() : new ArrayList<>()
         );
     }
 
@@ -87,11 +177,13 @@ public class ProjectMapper {
                 project.isAllowComments(),
                 project.isHmWikiEnabled(),
                 project.getHmWikiSlug(),
+                project.isGalleryCarouselEnabled(),
                 project.getStatus(),
                 project.getExpiresAt(),
                 project.getDeletedAt(),
                 project.getApprovedBy(),
                 project.getGalleryImages(),
+                project.getGalleryImageCaptions(),
                 project.getProjectRoles(),
                 project.getTeamMembers(),
                 project.getTeamInvites(),
@@ -138,6 +230,7 @@ public class ProjectMapper {
         dto.setAllowComments(project.isAllowComments());
         dto.setHmWikiEnabled(project.isHmWikiEnabled());
         dto.setHmWikiSlug(project.getHmWikiSlug());
+        dto.setGalleryCarouselEnabled(project.isGalleryCarouselEnabled());
         dto.setStatus(project.getStatus());
         dto.setExpiresAt(project.getExpiresAt());
         dto.setCanEdit(project.isCanEdit());
@@ -151,6 +244,7 @@ public class ProjectMapper {
             dto.setTeamMembers(project.getTeamMembers());
             dto.setTeamInvites(project.getTeamInvites());
             dto.setGalleryImages(project.getGalleryImages());
+            dto.setGalleryImageCaptions(project.getGalleryImageCaptions());
             dto.setComments(project.getComments() != null
                     ? project.getComments().stream()
                             .map(comment -> toCommentDTO(comment, currentUserId))
@@ -219,7 +313,7 @@ public class ProjectMapper {
         if (includeChangelog) {
             dto.setChangelog(version.getChangelog());
         }
-        dto.setDependencies(version.getDependencies());
+        dto.setDependencies(toDependencyDTOs(version.getDependencies()));
         dto.setIncompatibleProjectIds(version.getIncompatibleProjectIds());
         dto.setChannel(version.getChannel());
         return dto;
@@ -282,7 +376,20 @@ public class ProjectMapper {
                 dependency.getExternalFileUrl(),
                 dependency.getExternalFileName(),
                 dependency.getCachedFileUrl(),
-                dependency.isHytaleProjectConfirmed()
+                dependency.isHytaleProjectConfirmed(),
+                dependency.getIcon(),
+                dependency.getTitle() != null ? dependency.getTitle() : dependency.getProjectTitle(),
+                dependency.getClassification(),
+                dependency.getSlug(),
+                dependency.isOptional(),
+                dependency.isEmbedded()
         );
+    }
+
+    public static List<ProjectDependencyDTO> toDependencyDTOs(List<ProjectDependency> dependencies) {
+        if (dependencies == null) return new ArrayList<>();
+        return dependencies.stream()
+                .map(ProjectMapper::toDependencyDTO)
+                .collect(Collectors.toList());
     }
 }

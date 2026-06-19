@@ -56,6 +56,36 @@ public class SearchService {
         );
     }
 
+    public Page<Project> searchProjectMarquee(
+            List<String> tags,
+            String search,
+            int page,
+            int size,
+            ProjectSort sortBy,
+            String gameVersion,
+            ProjectClassification contentType,
+            Integer minDownloads,
+            Integer minFavorites,
+            ProjectViewCategory viewCategory,
+            String dateRange,
+            String authorId
+    ) {
+        return projectCatalogSearchService.searchProjectMarquee(
+                tags,
+                search,
+                page,
+                size,
+                sortBy,
+                gameVersion,
+                contentType,
+                minDownloads,
+                minFavorites,
+                viewCategory,
+                dateRange,
+                authorId
+        );
+    }
+
     public Page<Project> searchDeletedProjects(String query, Pageable pageable) {
         return projectCatalogSearchService.searchDeletedProjects(query, pageable);
     }

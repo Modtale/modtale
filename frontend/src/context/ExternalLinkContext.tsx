@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AlertTriangle, ArrowRight, ShieldAlert, X } from 'lucide-react';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { theme } from '@/styles/theme';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface ExternalLinkContextType {
     openExternalLink: (url: string) => void;
@@ -100,6 +101,7 @@ export const ExternalLinkProvider: React.FC<{ children: React.ReactNode }> = ({ 
             {children}
 
             {targetUrl && (
+                <ModalPortal>
                 <div className={`${theme.components.modalOverlay} z-[9999]`}>
                     <div className={`${theme.components.modalContent} relative w-full max-w-2xl animate-in zoom-in-95 duration-200`}>
                         <div className={theme.components.modalHeader}>
@@ -170,6 +172,7 @@ export const ExternalLinkProvider: React.FC<{ children: React.ReactNode }> = ({ 
                         </div>
                     </div>
                 </div>
+                </ModalPortal>
             )}
         </ExternalLinkContext.Provider>
     );

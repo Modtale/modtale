@@ -142,6 +142,7 @@ class VersionServiceTest {
                 List.of(dependency),
                 List.of(),
                 ProjectVersion.Channel.RELEASE,
+                false,
                 user
         );
 
@@ -184,6 +185,7 @@ class VersionServiceTest {
                 null,
                 null,
                 ProjectVersion.Channel.RELEASE,
+                false,
                 user
         );
 
@@ -193,6 +195,153 @@ class VersionServiceTest {
         verify(projectService).evictProjectCache(project);
         verify(scanService, never()).createQueuedScanResult(1, "Initial scan queued.");
         verify(scanService, never()).enqueueBackgroundScan("project-1", savedVersion.getId(), "/files/data/bundle.zip", "bundle.zip", false, 1);
+    }
+
+    @Test
+    void addVersionRejectsDuplicateGameTargetWithoutReplacementConsent() throws Exception {
+        Project project = new Project();
+        project.setId("project-1");
+        project.setStatus(ProjectStatus.PUBLISHED);
+        project.setClassification(ProjectClassification.DATA);
+
+        ProjectVersion existing = new ProjectVersion();
+        existing.setId("version-old");
+        existing.setVersionNumber("1.0.0");
+        existing.setGameVersions(List.of("1.21.0"));
+        existing.setFileUrl("/files/data/old.zip");
+        existing.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        project.setVersions(new ArrayList<>(List.of(existing)));
+
+        User user = new User();
+        user.setId("user-1");
+        MockMultipartFile file = new MockMultipartFile("file", "replacement.zip", "application/zip", new byte[]{9, 8, 7});
+
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.hasProjectPermission(project, user, "VERSION_CREATE")).thenReturn(true);
+        doNothing().when(validationService).validateVersionNumber("1.0.0");
+        when(validationService.getAllowedGameVersions()).thenReturn(List.of("1.21.0"));
+
+        assertThrows(InvalidVersionRequestException.class, () -> service.addVersion(
+                "project-1",
+                "1.0.0",
+                List.of("1.21.0"),
+                file,
+                "Replacement notes",
+                null,
+                null,
+                ProjectVersion.Channel.RELEASE,
+                false,
+                user
+        ));
+
+        verify(versionArtifactService, never()).prepareVersionArtifact(project, file);
+        verify(projectDeletionService, never()).deleteVersionFile(existing);
+    }
+
+    @Test
+    void addVersionReplacesDuplicateGameTargetWhenConsentedAndReturnsToPendingReview() throws Exception {
+        Project project = new Project();
+        project.setId("project-1");
+        project.setStatus(ProjectStatus.PUBLISHED);
+        project.setClassification(ProjectClassification.DATA);
+
+        ProjectVersion existing = new ProjectVersion();
+        existing.setId("version-old");
+        existing.setVersionNumber("1.0.0");
+        existing.setGameVersions(List.of("1.21.0"));
+        existing.setFileUrl("/files/data/old.zip");
+        existing.setDownloadCount(42);
+        existing.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        project.setVersions(new ArrayList<>(List.of(existing)));
+
+        User user = new User();
+        user.setId("user-1");
+        MockMultipartFile file = new MockMultipartFile("file", "replacement.zip", "application/zip", new byte[]{9, 8, 7});
+        ScanResult queuedScan = new ScanResult();
+
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.hasProjectPermission(project, user, "VERSION_CREATE")).thenReturn(true);
+        when(sanitizationService.sanitizePlainText("Replacement notes")).thenReturn("Replacement notes");
+        doNothing().when(validationService).validateVersionNumber("1.0.0");
+        when(validationService.getAllowedGameVersions()).thenReturn(List.of("1.21.0"));
+        when(versionArtifactService.prepareVersionArtifact(project, file))
+                .thenReturn(new VersionArtifactService.PreparedVersionArtifact(ProjectClassification.DATA, "/files/data/replacement.zip", "sha-replacement"));
+        when(scanService.createQueuedScanResult(1, "Initial scan queued.")).thenReturn(queuedScan);
+
+        service.addVersion(
+                "project-1",
+                "1.0.0",
+                List.of("1.21.0"),
+                file,
+                "Replacement notes",
+                null,
+                null,
+                ProjectVersion.Channel.RELEASE,
+                true,
+                user
+        );
+
+        assertEquals(1, project.getVersions().size());
+        ProjectVersion savedVersion = project.getVersions().getFirst();
+        assertEquals("1.0.0", savedVersion.getVersionNumber());
+        assertEquals(List.of("1.21.0"), savedVersion.getGameVersions());
+        assertEquals("/files/data/replacement.zip", savedVersion.getFileUrl());
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, savedVersion.getReviewStatus());
+        assertEquals(0, savedVersion.getDownloadCount());
+        assertEquals(queuedScan, savedVersion.getScanResult());
+        verify(projectDeletionService).deleteVersionFile(existing);
+        verify(projectRepository).save(project);
+        verify(projectService).evictProjectCache(project);
+        verify(scanService).enqueueBackgroundScan("project-1", savedVersion.getId(), "/files/data/replacement.zip", "replacement.zip", false, 1);
+    }
+
+    @Test
+    void addVersionReplacementKeepsUntouchedGameTargetsOnExistingVersion() throws Exception {
+        Project project = new Project();
+        project.setId("project-1");
+        project.setStatus(ProjectStatus.PUBLISHED);
+        project.setClassification(ProjectClassification.DATA);
+
+        ProjectVersion existing = new ProjectVersion();
+        existing.setId("version-old");
+        existing.setVersionNumber("1.0.0");
+        existing.setGameVersions(new ArrayList<>(List.of("1.20.0", "1.21.0")));
+        existing.setFileUrl("/files/data/old.zip");
+        existing.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        project.setVersions(new ArrayList<>(List.of(existing)));
+
+        User user = new User();
+        user.setId("user-1");
+        MockMultipartFile file = new MockMultipartFile("file", "replacement.zip", "application/zip", new byte[]{9, 8, 7});
+
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.hasProjectPermission(project, user, "VERSION_CREATE")).thenReturn(true);
+        when(sanitizationService.sanitizePlainText("Replacement notes")).thenReturn("Replacement notes");
+        doNothing().when(validationService).validateVersionNumber("1.0.0");
+        when(validationService.getAllowedGameVersions()).thenReturn(List.of("1.20.0", "1.21.0"));
+        when(versionArtifactService.prepareVersionArtifact(project, file))
+                .thenReturn(new VersionArtifactService.PreparedVersionArtifact(ProjectClassification.DATA, "/files/data/replacement.zip", "sha-replacement"));
+        when(scanService.createQueuedScanResult(1, "Initial scan queued.")).thenReturn(new ScanResult());
+
+        service.addVersion(
+                "project-1",
+                "1.0.0",
+                List.of("1.21.0"),
+                file,
+                "Replacement notes",
+                null,
+                null,
+                ProjectVersion.Channel.RELEASE,
+                true,
+                user
+        );
+
+        assertEquals(2, project.getVersions().size());
+        assertEquals(List.of("1.21.0"), project.getVersions().getFirst().getGameVersions());
+        assertEquals("version-old", project.getVersions().get(1).getId());
+        assertEquals(List.of("1.20.0"), project.getVersions().get(1).getGameVersions());
+        assertEquals(ProjectVersion.ReviewStatus.APPROVED, project.getVersions().get(1).getReviewStatus());
+        verify(projectDeletionService, never()).deleteVersionFile(existing);
     }
 
     @Test

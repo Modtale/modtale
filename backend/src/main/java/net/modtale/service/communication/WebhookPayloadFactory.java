@@ -106,8 +106,8 @@ public class WebhookPayloadFactory {
                 + "\n**Classification:** " + project.getClassification());
 
         Map<String, Object> body = new HashMap<>();
-        body.put("username", "Modtale Admin Bot");
-        body.put("avatar_url", frontendUrl + "/assets/favicon.png");
+        body.put("username", DiscordWebhookIdentity.ADMIN_BOT_USERNAME);
+        body.put("avatar_url", DiscordWebhookIdentity.adminBotAvatarUrl(frontendUrl));
         body.put("content", "**Verification Required**");
         body.put("embeds", List.of(embed));
         return Optional.of(new WebhookDispatchRequest(adminDiscordWebhookUrl, body));

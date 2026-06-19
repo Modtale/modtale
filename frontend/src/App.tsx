@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, Suspense, lazy, useRef } from 'react';
 import { Route, Routes, useNavigate, useLocation, Navigate, BrowserRouter } from 'react-router-dom';
 import { StaticRouter } from 'react-router-dom/server';
 import { HelmetProvider } from 'react-helmet-async';
@@ -8,6 +8,8 @@ import { Navbar } from '@/modules/core/components/Navbar';
 import { Footer } from '@/modules/core/components/Footer';
 import { SEOHead } from '@/modules/core/components/SEOHead';
 import { Home } from '@/modules/home/views/Home';
+import { Browse } from '@/modules/discovery/views/Browse';
+import { ProjectDetails } from '@/modules/project/views/ProjectDetails';
 
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBoundary } from '@/components/ui/error/ErrorBoundary';
@@ -22,14 +24,13 @@ import type { User } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
 import type { Classification } from '@/data/categories';
 import { normalizeUser } from '@/utils/users';
+import { clearPendingSignInMethod, completeSignInMethod } from '@/modules/auth/api/authClient';
 
 const StatusModal = lazy(() => import('@/components/ui/StatusModal').then((module) => ({ default: module.StatusModal })));
 const Onboarding = lazy(() => import('@/modules/user/components/Onboarding').then((module) => ({ default: module.Onboarding })));
 const TermsOfService = lazy(() => import('@/modules/core/views/TermsOfService').then((module) => ({ default: module.TermsOfService })));
 const PrivacyPolicy = lazy(() => import('@/modules/core/views/PrivacyPolicy').then((module) => ({ default: module.PrivacyPolicy })));
 const Status = lazy(() => import('@/modules/core/views/Status').then((module) => ({ default: module.Status })));
-const Browse = lazy(() => import('@/modules/discovery/views/Browse').then((module) => ({ default: module.Browse })));
-const ProjectDetails = lazy(() => import('@/modules/project/views/ProjectDetails').then((module) => ({ default: module.ProjectDetails })));
 const UserProfile = lazy(() => import('@/modules/user/views/UserProfile').then((module) => ({ default: module.UserProfile })));
 const Dashboard = lazy(() => import('@/modules/user/views/Dashboard').then((module) => ({ default: module.Dashboard })));
 const VerifyEmail = lazy(() => import('@/modules/auth/views/VerifyEmail').then((module) => ({ default: module.VerifyEmail })));
@@ -49,11 +50,39 @@ const hasLikelyAuthCookie = () => {
     return /(?:^|;\s*)(SESSION|JSESSIONID|XSRF-TOKEN)=/.test(cookies);
 };
 
+const projectRouteBase = (pathname: string) => {
+    const match = pathname.match(/^\/(project|mod|modpack|world)\/[^/]+/i);
+    return match ? match[0].toLowerCase() : '';
+};
+
+const isProjectModalSubroute = (pathname: string) => (
+    /^\/(project|mod|modpack|world)\/[^/]+\/(download|changelog|gallery)\/?$/i.test(pathname)
+);
+
 const ScrollToTop = () => {
     const { pathname } = useLocation();
+    const previousPathRef = useRef<string | null>(null);
+
     useEffect(() => {
+        const previousPath = previousPathRef.current;
+        const previousProjectBase = previousPath ? projectRouteBase(previousPath) : '';
+        const nextProjectBase = projectRouteBase(pathname);
+        const isSameProjectModalTransition = Boolean(
+            previousPath
+            && previousProjectBase
+            && previousProjectBase === nextProjectBase
+            && (isProjectModalSubroute(previousPath) || isProjectModalSubroute(pathname))
+        );
+
+        previousPathRef.current = pathname;
+
+        if (isSameProjectModalTransition) {
+            return;
+        }
+
         window.scrollTo(0, 0);
     }, [pathname]);
+
     return null;
 };
 
@@ -76,6 +105,7 @@ const AppContent: React.FC = () => {
         if (oauthError) {
             const decodedError = decodeURIComponent(oauthError).replace(/\+/g, ' ');
             setGlobalError(decodedError);
+            clearPendingSignInMethod();
             navigate(location.pathname, { replace: true });
         }
     }, [location, navigate]);
@@ -112,6 +142,7 @@ const AppContent: React.FC = () => {
             const res = await api.get(`/user/me?t=${Date.now()}`);
             if (res.data) {
                 setUser(normalizeUser(res.data));
+                completeSignInMethod();
                 if ((res.data as any).is_new_account) {
                     setShowOnboarding(true);
                 }

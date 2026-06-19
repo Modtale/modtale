@@ -9,10 +9,10 @@ import { VersionRelationKind } from '@/types';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { dependencyProjectKey, getDependencyType, isExternalDependency, isOptionalDependency, normalizeDependencyReference } from '../utils/dependencyEntries';
 import { useToast } from '@/components/ui/Toast';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 type DependencyMeta = { title: string; author: string; icon: string; source?: string; url?: string };
 type DropdownOption<T extends string> = { value: T; label: string; detail?: string };
-
 interface DependencySelectorProps {
     selectedDeps: ProjectDependency[] | string[];
     onChange: (deps: any[]) => void;
@@ -474,8 +474,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
             const fullProject = project.versions ? project : await projectClient.getProject(project.id);
             setSelectedProject({ ...fullProject, versions: fullProject.versions || [] });
         } catch {
-            setSelectedProject({ ...project, versions: project.versions || [] });
-        } finally {
+            setSelectedProject({ ...project, versions: project.versions || [] });        } finally {
             setLoadingProjectVersions(false);
         }
     };
@@ -613,6 +612,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
             )}
 
             {selectedProject && !disabled && !isIncompatibilityMode && (
+                <ModalPortal>
                 <div className={theme.components.modalOverlay}>
                     <div className="fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-md max-h-[85dvh] flex flex-col z-[100] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 shadow-xl rounded-3xl overflow-hidden">
                         <div className="p-5 flex justify-between items-start border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/95">
@@ -685,6 +685,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                         )}
                     </div>
                 </div>
+                </ModalPortal>
             )}
 
             {showExternalModal && !disabled && !isIncompatibilityMode && (

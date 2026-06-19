@@ -5,6 +5,7 @@ import { api, BACKEND_URL } from '@/utils/api';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import type { ProjectVersion } from '@/types';
 import { isEmbeddedDependency, isExternalDependency, isOptionalDependency } from '@/modules/project/utils/dependencyEntries';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface DependencyModalProps {
     dependencies: NonNullable<ProjectVersion['dependencies']>;
@@ -199,8 +200,10 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({
     if (isInline) return content;
 
     return (
+        <ModalPortal>
         <div className={theme.components.modalOverlay} onClick={onClose}>
             {content}
         </div>
+        </ModalPortal>
     );
 };

@@ -87,6 +87,45 @@ public class ProjectCatalogSearchService {
         return projectSearchResultDecorator.decorateCatalogResults(results);
     }
 
+    @Cacheable(
+            value = "projectMarqueeSearch",
+            key = "T(java.util.Arrays).asList(#tags, #search, #page, #size, #sortBy, #gameVersion, #contentType, #minDownloads, #minFavorites, #viewCategory, #dateRange, #authorId)",
+            condition = "#viewCategory == null || !#viewCategory.personalView",
+            sync = true
+    )
+    public Page<Project> searchProjectMarquee(
+            List<String> tags,
+            String search,
+            int page,
+            int size,
+            ProjectSort sortBy,
+            String gameVersion,
+            ProjectClassification contentType,
+            Integer minDownloads,
+            Integer minFavorites,
+            ProjectViewCategory viewCategory,
+            String dateRange,
+            String authorId
+    ) {
+        LocalDate dateCutoff = resolveDateCutoff(dateRange);
+
+        Page<Project> results = projectRepository.searchProjectMarquee(
+                search,
+                tags,
+                gameVersion,
+                contentType,
+                minDownloads,
+                minFavorites,
+                PageRequest.of(page, size),
+                sortBy,
+                viewCategory,
+                dateCutoff,
+                authorId
+        );
+
+        return projectSearchResultDecorator.decorateCatalogResults(results);
+    }
+
     public Page<Project> searchDeletedProjects(String query, org.springframework.data.domain.Pageable pageable) {
         return projectRepository.searchDeletedProjects(query, pageable);
     }

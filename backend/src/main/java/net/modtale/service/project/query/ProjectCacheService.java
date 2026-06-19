@@ -26,6 +26,11 @@ public class ProjectCacheService {
         if (project == null) return;
         Cache cache = cacheManager.getCache("projectDetails");
         Cache detailDtoCache = cacheManager.getCache("projectDetailDtos");
+        Cache pageDtoCache = cacheManager.getCache("projectPageDtos");
+        Cache versionDtoCache = cacheManager.getCache("projectVersionDtos");
+        Cache commentDtoCache = cacheManager.getCache("projectCommentDtos");
+        Cache galleryDtoCache = cacheManager.getCache("projectGalleryDtos");
+        Cache teamDtoCache = cacheManager.getCache("projectTeamDtos");
         Cache changelogCache = cacheManager.getCache("projectVersionChangelogs");
         Cache metaDtoCache = cacheManager.getCache("projectMetaDtos");
         Cache permissionCache = cacheManager.getCache("projectPermissionSnapshots");
@@ -34,6 +39,11 @@ public class ProjectCacheService {
         if (cache != null && project.getId() != null) cache.evict("public:" + project.getId());
         if (cache != null && project.getId() != null) cache.evict("public-page:" + project.getId());
         if (detailDtoCache != null && project.getId() != null) detailDtoCache.evict("public:" + project.getId());
+        if (pageDtoCache != null && project.getId() != null) pageDtoCache.evict("public:" + project.getId());
+        if (versionDtoCache != null && project.getId() != null) versionDtoCache.evict("public:" + project.getId());
+        if (commentDtoCache != null && project.getId() != null) commentDtoCache.evict("public:" + project.getId());
+        if (galleryDtoCache != null && project.getId() != null) galleryDtoCache.evict("public:" + project.getId());
+        if (teamDtoCache != null && project.getId() != null) teamDtoCache.evict("public:" + project.getId());
         if (changelogCache != null && project.getId() != null) changelogCache.evict("public:" + project.getId());
         if (metaDtoCache != null && project.getId() != null) metaDtoCache.evict("public:" + project.getId());
         if (permissionCache != null && project.getId() != null) permissionCache.evict(project.getId());
@@ -43,12 +53,22 @@ public class ProjectCacheService {
         if (cache != null && routeHandle != null) cache.evict("public:" + routeHandle);
         if (cache != null && routeHandle != null) cache.evict("public-page:" + routeHandle);
         if (detailDtoCache != null && routeHandle != null) detailDtoCache.evict("public:" + routeHandle);
+        if (pageDtoCache != null && routeHandle != null) pageDtoCache.evict("public:" + routeHandle);
+        if (versionDtoCache != null && routeHandle != null) versionDtoCache.evict("public:" + routeHandle);
+        if (commentDtoCache != null && routeHandle != null) commentDtoCache.evict("public:" + routeHandle);
+        if (galleryDtoCache != null && routeHandle != null) galleryDtoCache.evict("public:" + routeHandle);
+        if (teamDtoCache != null && routeHandle != null) teamDtoCache.evict("public:" + routeHandle);
         if (changelogCache != null && routeHandle != null) changelogCache.evict("public:" + routeHandle);
         if (metaDtoCache != null && routeHandle != null) metaDtoCache.evict("public:" + routeHandle);
         if (cache != null && project.getSlug() != null) cache.evict(project.getSlug());
         if (cache != null && project.getSlug() != null) cache.evict("public:" + project.getSlug());
         if (cache != null && project.getSlug() != null) cache.evict("public-page:" + project.getSlug());
         if (detailDtoCache != null && project.getSlug() != null) detailDtoCache.evict("public:" + project.getSlug());
+        if (pageDtoCache != null && project.getSlug() != null) pageDtoCache.evict("public:" + project.getSlug());
+        if (versionDtoCache != null && project.getSlug() != null) versionDtoCache.evict("public:" + project.getSlug());
+        if (commentDtoCache != null && project.getSlug() != null) commentDtoCache.evict("public:" + project.getSlug());
+        if (galleryDtoCache != null && project.getSlug() != null) galleryDtoCache.evict("public:" + project.getSlug());
+        if (teamDtoCache != null && project.getSlug() != null) teamDtoCache.evict("public:" + project.getSlug());
         if (changelogCache != null && project.getSlug() != null) changelogCache.evict("public:" + project.getSlug());
         if (metaDtoCache != null && project.getSlug() != null) metaDtoCache.evict("public:" + project.getSlug());
     }
@@ -64,6 +84,26 @@ public class ProjectCacheService {
         Cache detailDtoCache = cacheManager.getCache("projectDetailDtos");
         if (detailDtoCache != null) {
             detailDtoCache.evict("public:" + projectId);
+        }
+        Cache pageDtoCache = cacheManager.getCache("projectPageDtos");
+        if (pageDtoCache != null) {
+            pageDtoCache.evict("public:" + projectId);
+        }
+        Cache versionDtoCache = cacheManager.getCache("projectVersionDtos");
+        if (versionDtoCache != null) {
+            versionDtoCache.evict("public:" + projectId);
+        }
+        Cache commentDtoCache = cacheManager.getCache("projectCommentDtos");
+        if (commentDtoCache != null) {
+            commentDtoCache.evict("public:" + projectId);
+        }
+        Cache galleryDtoCache = cacheManager.getCache("projectGalleryDtos");
+        if (galleryDtoCache != null) {
+            galleryDtoCache.evict("public:" + projectId);
+        }
+        Cache teamDtoCache = cacheManager.getCache("projectTeamDtos");
+        if (teamDtoCache != null) {
+            teamDtoCache.evict("public:" + projectId);
         }
         Cache changelogCache = cacheManager.getCache("projectVersionChangelogs");
         if (changelogCache != null) {
@@ -82,6 +122,8 @@ public class ProjectCacheService {
     public void evictProjectSearchCache() {
         clearCache("projectSearch");
         clearCache("projectSummarySearch");
+        clearCache("projectMarqueeSearch");
+        clearCache("projectMarqueeSummarySearch");
         clearCache("sitemapData");
         clearCache("platformStats");
     }
