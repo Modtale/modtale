@@ -44,6 +44,9 @@ jobs:
             echo "FRONTEND_SERVICE=modtale-frontend" >> $GITHUB_ENV
             echo "DB_NAME=modtale" >> $GITHUB_ENV
             echo "SEEDING_ENABLED=false" >> $GITHUB_ENV
+            echo "SEEDING_MODE=mock" >> $GITHUB_ENV
+            echo "SEEDING_RESET=false" >> $GITHUB_ENV
+            echo "SEEDING_SOURCE_DB=modtale-mock-template" >> $GITHUB_ENV
             echo "BACKEND_DOMAIN=https://api.modtale.net" >> $GITHUB_ENV
             echo "FRONTEND_DOMAIN=https://modtale.net" >> $GITHUB_ENV
             echo "TAG=latest" >> $GITHUB_ENV
@@ -57,6 +60,9 @@ jobs:
             echo "FRONTEND_SERVICE=modtale-frontend-dev" >> $GITHUB_ENV
             echo "DB_NAME=modtale" >> $GITHUB_ENV
             echo "SEEDING_ENABLED=false" >> $GITHUB_ENV
+            echo "SEEDING_MODE=mock" >> $GITHUB_ENV
+            echo "SEEDING_RESET=false" >> $GITHUB_ENV
+            echo "SEEDING_SOURCE_DB=modtale-mock-template" >> $GITHUB_ENV
             echo "BACKEND_DOMAIN=https://dev.api.modtale.net" >> $GITHUB_ENV
             echo "FRONTEND_DOMAIN=https://dev.modtale.net" >> $GITHUB_ENV
             echo "TAG=dev" >> $GITHUB_ENV
@@ -71,6 +77,9 @@ jobs:
             echo "FRONTEND_SERVICE=modtale-frontend-$SLUG" >> $GITHUB_ENV
             echo "DB_NAME=modtale-$SLUG" >> $GITHUB_ENV
             echo "SEEDING_ENABLED=true" >> $GITHUB_ENV
+            echo "SEEDING_MODE=template" >> $GITHUB_ENV
+            echo "SEEDING_RESET=true" >> $GITHUB_ENV
+            echo "SEEDING_SOURCE_DB=modtale-mock-template" >> $GITHUB_ENV
             echo "TAG=$SLUG" >> $GITHUB_ENV
             echo "R2_BUCKET_NAME=modtale-dev" >> $GITHUB_ENV
             echo "R2_PUBLIC_DOMAIN=https://pub-dc8241faa0a343c080802bf00bc72bc5.r2.dev" >> $GITHUB_ENV
@@ -126,8 +135,10 @@ jobs:
             "--use-http2"
             "--memory" "1Gi"
             "--update-env-vars" "MONGODB_DATABASE_NAME=${{ env.DB_NAME }}"
-            "--update-env-vars" "SEEDING_ENABLED=${{ env.SEEDING_ENABLED }}"
-            "--update-env-vars" "SEEDING_SOURCE_DB=modtale"
+            "--update-env-vars" "APP_SEEDING_ENABLED=${{ env.SEEDING_ENABLED }}"
+            "--update-env-vars" "APP_SEEDING_MODE=${{ env.SEEDING_MODE }}"
+            "--update-env-vars" "APP_SEEDING_RESET=${{ env.SEEDING_RESET }}"
+            "--update-env-vars" "APP_SEEDING_SOURCE_DB=${{ env.SEEDING_SOURCE_DB }}"
             "--update-env-vars" "WARDEN_URL=${{ secrets.WARDEN_URL }}"
             "--update-env-vars" "WARDEN_ENABLED=true"
             "--update-env-vars" "FRONTEND_URL=placeholder"

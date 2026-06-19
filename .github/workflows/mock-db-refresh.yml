@@ -1,0 +1,77 @@
+name: Refresh Mock Database
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 8 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: refresh-mock-database
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Generate Sanitized Mock DB
+    if: github.repository == 'Modtale/modtale'
+    runs-on: ubuntu-latest
+
+    env:
+      MOCK_SOURCE_MONGODB_URI: ${{ secrets.MOCK_SOURCE_MONGODB_URI }}
+      MOCK_SOURCE_DATABASE_NAME: ${{ vars.MOCK_SOURCE_DATABASE_NAME }}
+      MOCK_TEMPLATE_MONGODB_URI: ${{ secrets.MOCK_TEMPLATE_MONGODB_URI }}
+      MOCK_TEMPLATE_DATABASE_NAME: ${{ vars.MOCK_TEMPLATE_DATABASE_NAME }}
+      MOCK_DB_OUTPUT_DIR: ${{ github.workspace }}/mock-db/generated/collections
+      MOCK_DB_COLLECTION_DIR: ${{ github.workspace }}/mock-db/generated/collections
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate secret configuration
+        run: |
+          : "${MOCK_SOURCE_MONGODB_URI:?Set secret MOCK_SOURCE_MONGODB_URI with a read-only source MongoDB user.}"
+          : "${MOCK_TEMPLATE_MONGODB_URI:?Set secret MOCK_TEMPLATE_MONGODB_URI for the preview template MongoDB target.}"
+          echo "MOCK_SOURCE_DATABASE_NAME=${MOCK_SOURCE_DATABASE_NAME:-modtale}" >> "$GITHUB_ENV"
+          echo "MOCK_TEMPLATE_DATABASE_NAME=${MOCK_TEMPLATE_DATABASE_NAME:-modtale-mock-template}" >> "$GITHUB_ENV"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install mock DB tooling
+        working-directory: mock-db
+        run: npm install
+
+      - name: Generate sanitized fixtures
+        working-directory: mock-db
+        run: npm run generate
+
+      - name: Validate sanitized fixtures
+        working-directory: mock-db
+        run: npm run validate
+
+      - name: Upload public mock DB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: modtale-mock-db-json
+          path: mock-db/generated/collections/*.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Load preview template database
+        working-directory: mock-db
+        run: npm run load-template
+
+      - name: Write summary
+        run: |
+          {
+            echo "## Mock DB Refresh"
+            echo ""
+            echo "- Generated sanitized JSON artifact: \`modtale-mock-db-json\`"
+            echo "- Refreshed template database: \`${MOCK_TEMPLATE_DATABASE_NAME:-modtale-mock-template}\`"
+            echo "- Source privileged collections were not read; reports/admin logs/API keys/status/analytics are synthetic."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -6,6 +6,13 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 @ConfigurationProperties(prefix = "app.seeding")
 public record AppSeedingProperties(
         @DefaultValue("false") boolean enabled,
+        @DefaultValue("mock") Mode mode,
+        @DefaultValue("false") boolean reset,
         @DefaultValue("modtale") String sourceDb
 ) {
+    public enum Mode {
+        MOCK,
+        TEMPLATE,
+        CLONE
+    }
 }
