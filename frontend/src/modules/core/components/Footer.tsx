@@ -46,7 +46,7 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
                     </div>
 
                     <div className="col-span-1">
-                        <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Discover</h4>
+                        <div className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Discover</div>
                         <div className="flex flex-col space-y-3">
                             <Link to={SiteRoutes.browse()} className={linkClass}>
                                 <Layout className="w-3.5 h-3.5 mr-2 opacity-70" /> Mods
@@ -70,7 +70,7 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
                     </div>
 
                     <div className="col-span-1">
-                        <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Resources</h4>
+                        <div className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Resources</div>
                         <div className="flex flex-col space-y-3">
                             <Link to={SiteRoutes.apiDocs()} className={linkClass}>
                                 <Code className="w-4 h-4 mr-2 opacity-70" /> API Docs
@@ -89,7 +89,7 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
                     </div>
 
                     <div className="col-span-1">
-                        <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Community</h4>
+                        <div className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Community</div>
                         <div className="flex flex-col space-y-3">
                             <a href="https://discord.gg/PcFaDVYqVe" target="_blank" rel="noopener noreferrer" className={linkClass}>
                                 <DiscordBrandIcon className="w-4 h-4 mr-2" /> Discord

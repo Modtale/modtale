@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "start": "node dist/server/entry.mjs",
+    "start": "node scripts/start-server.mjs",
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",

@@ -419,12 +419,12 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 z-10 pointer-events-none group-focus-within:text-modtale-accent transition-colors" />
                     <input type="text" className="block w-full pl-9 pr-9 h-full rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-sm shadow-sm focus:ring-2 focus:ring-modtale-accent outline-none text-slate-900 dark:text-white relative z-0 transition-all duration-300" placeholder="Search projects..." value={searchTerm} onChange={(e) => onSearchChange(e.target.value)} />
                     {searchTerm && (
-                        <button type="button" onClick={() => onSearchChange('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 z-20"><X className="w-4 h-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors" /></button>
+                        <button type="button" aria-label="Clear search" onClick={() => onSearchChange('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 z-20"><X className="w-4 h-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors" /></button>
                     )}
                 </div>
                 <div className={`flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl items-center shadow-sm shrink-0 transition-all duration-300 overflow-hidden ${isScrolled && isMobile ? 'max-w-0 opacity-0 border-transparent p-0 m-0 h-10' : 'max-w-[200px] opacity-100 p-1 h-10'}`}>
                     {(['grid', 'list', 'compact'] as const).map(style => (
-                        <button key={style} type="button" onClick={() => onViewStyleChange(style)} className={`p-1.5 rounded-lg transition-colors ${viewStyle === style ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
+                        <button key={style} type="button" aria-label={`${style} view`} onClick={() => onViewStyleChange(style)} className={`p-1.5 rounded-lg transition-colors ${viewStyle === style ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
                             {style === 'grid' && <LayoutGrid className="w-4 h-4" />}
                             {style === 'list' && <List className="w-4 h-4" />}
                             {style === 'compact' && <AlignJustify className="w-4 h-4" />}
@@ -443,7 +443,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                     <div className="flex flex-wrap lg:flex-nowrap items-center justify-start lg:justify-end gap-2 w-full lg:w-auto shrink-0 mt-1 lg:mt-0">
                         <div className="hidden lg:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center shadow-sm shrink-0">
                             {(['grid', 'list', 'compact'] as const).map(style => (
-                                <button key={style} type="button" onClick={() => onViewStyleChange(style)} className={`p-1.5 rounded-lg transition-colors ${viewStyle === style ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
+                                <button key={style} type="button" aria-label={`${style} view`} onClick={() => onViewStyleChange(style)} className={`p-1.5 rounded-lg transition-colors ${viewStyle === style ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
                                     {style === 'grid' && <LayoutGrid className="w-4 h-4" />}
                                     {style === 'list' && <List className="w-4 h-4" />}
                                     {style === 'compact' && <AlignJustify className="w-4 h-4" />}
@@ -461,7 +461,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                             placeholder="12"
                             containerClassName="relative flex-none h-10 w-16"
                             buttonLabel={itemsPerPage}
-                            buttonAriaLabel="Results per page"
+                            buttonAriaLabel={`${itemsPerPage} results per page`}
                             buttonTitle="Results per page"
                             showSelectedCheck={false}
                             buttonClassName="w-full h-full flex items-center justify-center gap-1 border rounded-xl px-2 text-xs font-black transition-all whitespace-nowrap bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm"
