@@ -143,15 +143,12 @@ public class DataSeeder implements CommandLineRunner {
 
             ensureClassificationCoverage(sourceProjectsCol, compiledProjects);
 
-            Set<String> selectedProjectIds = compiledProjects.stream()
-                    .map(doc -> doc.get("_id"))
-                    .filter(Objects::nonNull)
-                    .map(Object::toString)
-                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            Set<String> selectedProjectIds = projectIds(compiledProjects);
 
             List<Document> dependencyProjects = collectDependencyProjects(sourceProjectsCol, selectedProjectIds);
             if (!dependencyProjects.isEmpty()) {
                 compiledProjects.addAll(dependencyProjects);
+                selectedProjectIds = projectIds(compiledProjects);
                 logger.info("Included {} dependency projects for selected projects.", dependencyProjects.size());
             }
 
@@ -169,12 +166,15 @@ public class DataSeeder implements CommandLineRunner {
             cloneSpecificUsers(sourceDb, targetDb, authorIds);
 
             try {
-                compiledProjects.forEach(this::stripPrivateProjectFields);
+                Set<String> finalSelectedProjectIds = selectedProjectIds;
+                compiledProjects.forEach(project -> stripPrivateProjectFields(project, finalSelectedProjectIds));
                 targetDb.getCollection("projects").insertMany(compiledProjects);
                 logger.info("Cloned {} public projects to local database.", compiledProjects.size());
             } catch (MongoBulkWriteException e) {
                 logger.warn("Project insertion warning (duplicates might exist): {}", e.getMessage());
             }
+
+            seedSyntheticSupplementDocuments(targetDb);
 
             logger.info("Seeding completed successfully.");
 
@@ -519,10 +519,35 @@ public class DataSeeder implements CommandLineRunner {
         );
     }
 
-    private void stripPrivateProjectFields(Document project) {
+    private void seedSyntheticSupplementDocuments(MongoDatabase targetDb) {
+        for (String collectionName : MOCK_COLLECTIONS) {
+            MongoCollection<Document> collection = targetDb.getCollection(collectionName);
+            List<Document> documents = syntheticMockDocuments(collectionName);
+
+            for (Document document : documents) {
+                upsertMockDocument(collection, document);
+            }
+
+            logger.info("Upserted {} synthetic supplement documents into '{}'.", documents.size(), collectionName);
+        }
+    }
+
+    private Set<String> projectIds(List<Document> projects) {
+        return projects.stream()
+                .map(doc -> doc.get("_id"))
+                .filter(Objects::nonNull)
+                .map(Object::toString)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private void stripPrivateProjectFields(Document project, Set<String> selectedProjectIds) {
         project.remove("approvedBy");
+        project.remove("lastTrendingNotification");
         project.remove("pendingTransferTo");
         project.remove("teamInvites");
+
+        filterStringListField(project, "childProjectIds", selectedProjectIds);
+        sanitizeProjectComments(project);
 
         Object rawVersions = project.get("versions");
         if (!(rawVersions instanceof List<?> versions)) {
@@ -538,7 +563,124 @@ public class DataSeeder implements CommandLineRunner {
             versionDoc.remove("approvedIssueBaselines");
             versionDoc.remove("rejectionReason");
             versionDoc.remove("scheduledPublishDate");
+            filterVersionReferences(versionDoc, selectedProjectIds);
         }
+    }
+
+    private void filterVersionReferences(Document versionDoc, Set<String> selectedProjectIds) {
+        Object rawDependencies = versionDoc.get("dependencies");
+        if (rawDependencies instanceof List<?> dependencies) {
+            List<Document> filteredDependencies = new ArrayList<>();
+            for (Object dependencyObj : dependencies) {
+                if (!(dependencyObj instanceof Document dependencyDoc)) {
+                    continue;
+                }
+
+                Object dependencyId = dependencyDoc.get("modId");
+                if (dependencyId == null) {
+                    dependencyId = dependencyDoc.get("projectId");
+                }
+
+                if (dependencyId != null && selectedProjectIds.contains(dependencyId.toString())) {
+                    filteredDependencies.add(dependencyDoc);
+                }
+            }
+            versionDoc.put("dependencies", filteredDependencies);
+        }
+
+        filterStringListField(versionDoc, "incompatibleProjectIds", selectedProjectIds);
+    }
+
+    private void filterStringListField(Document document, String fieldName, Set<String> allowedValues) {
+        Object rawValue = document.get(fieldName);
+        if (!(rawValue instanceof List<?> values)) {
+            return;
+        }
+
+        List<String> filtered = values.stream()
+                .filter(Objects::nonNull)
+                .map(Object::toString)
+                .filter(allowedValues::contains)
+                .collect(Collectors.toList());
+        document.put(fieldName, filtered);
+    }
+
+    private void sanitizeProjectComments(Document project) {
+        Object rawComments = project.get("comments");
+        if (!(rawComments instanceof List<?> comments)) {
+            project.put("comments", List.of());
+            return;
+        }
+
+        List<Document> sanitizedComments = new ArrayList<>();
+        int index = 1;
+        for (Object commentObj : comments) {
+            if (!(commentObj instanceof Document commentDoc)) {
+                continue;
+            }
+
+            String content = boundedString(commentDoc.get("content"), "", 5000);
+            if (content.isBlank()) {
+                continue;
+            }
+
+            Object rawId = commentDoc.get("id") != null ? commentDoc.get("id") : commentDoc.get("_id");
+            Document sanitized = doc(
+                    "id", boundedString(rawId, "mock-comment-" + index, 120),
+                    "userId", boundedString(commentDoc.get("userId"), "mock-user-1", 120),
+                    "content", content,
+                    "date", boundedString(commentDoc.get("date"), "2026-01-01", 80),
+                    "updatedAt", boundedString(commentDoc.get("updatedAt"), null, 80),
+                    "upvotes", syntheticVoteIds(commentDoc.get("upvotes"), "comment-upvote"),
+                    "downvotes", syntheticVoteIds(commentDoc.get("downvotes"), "comment-downvote"),
+                    "developerReply", sanitizeCommentReply(commentDoc.get("developerReply"))
+            );
+            sanitizedComments.add(sanitized);
+            index++;
+        }
+
+        project.put("comments", sanitizedComments);
+    }
+
+    private Document sanitizeCommentReply(Object replyObj) {
+        if (!(replyObj instanceof Document replyDoc)) {
+            return null;
+        }
+
+        String content = boundedString(replyDoc.get("content"), "", 5000);
+        if (content.isBlank()) {
+            return null;
+        }
+
+        return doc(
+                "userId", boundedString(replyDoc.get("userId"), "mock-user-1", 120),
+                "content", content,
+                "date", boundedString(replyDoc.get("date"), "2026-01-01", 80),
+                "upvotes", syntheticVoteIds(replyDoc.get("upvotes"), "reply-upvote"),
+                "downvotes", syntheticVoteIds(replyDoc.get("downvotes"), "reply-downvote")
+        );
+    }
+
+    private List<String> syntheticVoteIds(Object rawVotes, String prefix) {
+        int voteCount = rawVotes instanceof Collection<?> votes ? votes.size() : 0;
+        List<String> syntheticIds = new ArrayList<>();
+        for (int i = 0; i < Math.min(voteCount, 50); i++) {
+            syntheticIds.add("mock-" + prefix + "-voter-" + (i + 1));
+        }
+        return syntheticIds;
+    }
+
+    private String boundedString(Object value, String fallback, int limit) {
+        if (value == null) {
+            return fallback;
+        }
+
+        String stringValue = value.toString().trim();
+        if (stringValue.isBlank()) {
+            return fallback;
+        }
+
+        return stringValue.length() > limit ? stringValue.substring(0, limit) : stringValue;
     }
 
     private ObjectId getSafeObjectId(Object id) {
@@ -628,7 +770,7 @@ public class DataSeeder implements CommandLineRunner {
         sourceCol.find(Filters.in("_id", objectIds)).into(usersToClone);
 
         if (usersToClone.isEmpty()) {
-            List<String> stringIds = userIds.stream().collect(Collectors.toList());
+            List<String> stringIds = new ArrayList<>(userIds);
             sourceCol.find(Filters.in("_id", stringIds)).into(usersToClone);
         }
 
@@ -636,27 +778,11 @@ public class DataSeeder implements CommandLineRunner {
         List<Document> safeToInsert = new ArrayList<>();
 
         for (Document user : usersToClone) {
-            String id = user.get("_id").toString();
-            String username = user.getString("username");
-
-            if (id.equals(SUPER_ADMIN_ID) || id.equals(ADMIN_ID) || "user".equals(username) || "super_admin".equals(username) || "admin".equals(username)) {
+            Document safeUser = sanitizeAuthorUser(user, defaultPasswordHash);
+            if (safeUser == null) {
                 continue;
             }
-
-            user.put("password", defaultPasswordHash);
-            user.put("email", "scrubbed_" + id + "@modtale.local");
-            user.put("emailVerified", true);
-            user.put("mfaEnabled", false);
-            user.put("mfaSecret", null);
-            user.put("verificationToken", null);
-            user.put("verificationTokenExpiry", null);
-            user.put("passwordResetToken", null);
-            user.put("passwordResetTokenExpiry", null);
-            user.put("githubAccessToken", null);
-            user.put("gitlabAccessToken", null);
-            user.put("gitlabRefreshToken", null);
-            user.put("gitlabTokenExpiresAt", null);
-            safeToInsert.add(user);
+            safeToInsert.add(safeUser);
         }
 
         if (!safeToInsert.isEmpty()) {
@@ -667,6 +793,77 @@ public class DataSeeder implements CommandLineRunner {
                 logger.warn("Partial user insertion error: {}", e.getMessage());
             }
         }
+    }
+
+    private Document sanitizeAuthorUser(Document user, String defaultPasswordHash) {
+        Object rawId = user.get("_id");
+        if (rawId == null) {
+            return null;
+        }
+
+        String id = rawId.toString();
+        String username = boundedString(user.get("username"), "", 80);
+        if (
+                id.equals(SUPER_ADMIN_ID)
+                        || id.equals(ADMIN_ID)
+                        || "user".equals(username)
+                        || "super_admin".equals(username)
+                        || "admin".equals(username)
+        ) {
+            return null;
+        }
+
+        String accountType = boundedString(user.get("accountType"), "USER", 32);
+        String tier = boundedString(user.get("tier"), "USER", 32);
+        Document safeUser = doc(
+                "_id", rawId,
+                "username", username,
+                "email", "scrubbed-" + emailToken(id) + "@example.test",
+                "emailVerified", true,
+                "password", defaultPasswordHash,
+                "roles", List.of("USER"),
+                "tier", tier,
+                "accountType", accountType,
+                "likedModIds", List.of(),
+                "followingIds", List.of(),
+                "followerIds", List.of(),
+                "connectedAccounts", List.of()
+        );
+
+        appendBoundedIfPresent(safeUser, "avatarUrl", user.get("avatarUrl"), 1000);
+        appendBoundedIfPresent(safeUser, "bannerUrl", user.get("bannerUrl"), 1000);
+        appendBoundedIfPresent(safeUser, "bio", user.get("bio"), 5000);
+        appendBoundedIfPresent(safeUser, "createdAt", user.get("createdAt"), 80);
+
+        Object badges = user.get("badges");
+        if (badges instanceof List<?> badgeList) {
+            safeUser.put(
+                    "badges",
+                    badgeList.stream()
+                            .filter(Objects::nonNull)
+                            .map(Object::toString)
+                            .limit(20)
+                            .collect(Collectors.toList())
+            );
+        }
+
+        return safeUser;
+    }
+
+    private void appendBoundedIfPresent(Document document, String fieldName, Object value, int limit) {
+        String stringValue = boundedString(value, null, limit);
+        if (stringValue != null && !stringValue.isBlank()) {
+            document.put(fieldName, stringValue);
+        }
+    }
+
+    private String emailToken(String value) {
+        String token = value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-");
+        token = token.replaceAll("^-+|-+$", "");
+        if (token.isBlank()) {
+            return "author";
+        }
+        return token.length() > 40 ? token.substring(0, 40) : token;
     }
 
     private List<Document> collectDependencyProjects(MongoCollection<Document> sourceProjectsCol, Set<String> initialProjectIds) {

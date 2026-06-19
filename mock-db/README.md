@@ -52,7 +52,17 @@ northstar_collective
 
 ## Backend Auto-Seeding
 
-For fully synthetic fallback data, the backend can generate a local mock database on startup:
+For local runs against a Mongo URI that can see the source database, the backend can seed directly on startup. This is the default seeding mode when `APP_SEEDING_ENABLED=true`: it reads public project data from `APP_SEEDING_SOURCE_DB` (`modtale` by default), adds generated synthetic sensitive/admin data, and writes everything into `MONGODB_DATABASE_NAME` if that target database has no projects yet.
+
+```bash
+APP_SEEDING_ENABLED=true
+APP_SEEDING_SOURCE_DB=modtale
+MONGODB_DATABASE_NAME=modtale-local
+```
+
+`MONGODB_DATABASE_NAME` must not be `modtale` when pulling from prod. The seeder refuses to run when the target database name equals the source database name.
+
+For fully synthetic fallback data, explicitly use mock mode:
 
 ```bash
 APP_SEEDING_ENABLED=true
