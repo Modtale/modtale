@@ -92,13 +92,15 @@ The repository includes a trusted-only refresh path in `mock-db/scripts/generate
 
 Sensitive/admin-only collections are never read from the source database. Reports, admin logs, API keys, banned emails, notifications, status incidents, project analytics, and platform analytics are generated synthetically.
 
-This script is intended to run from the `Refresh Mock Database` GitHub Actions workflow, not from pull requests. Use a read-only source database credential and a non-production GitHub environment/secret:
+This script is intended to run from the `Refresh Mock Database` GitHub Actions workflow, not from pull requests. Use a source database credential that can read the source database and write the separate template database. If `MOCK_TEMPLATE_MONGODB_URI` is not set, the workflow uses `MOCK_SOURCE_MONGODB_URI` for the template load too.
 
 ```text
-MOCK_SOURCE_MONGODB_URI
-MOCK_SOURCE_DATABASE_NAME
-MOCK_TEMPLATE_MONGODB_URI
-MOCK_TEMPLATE_DATABASE_NAME
+MOCK_SOURCE_MONGODB_URI          # required
+MOCK_SOURCE_DATABASE_NAME        # optional, defaults to modtale
+MOCK_TEMPLATE_MONGODB_URI        # optional, defaults to MOCK_SOURCE_MONGODB_URI
+MOCK_TEMPLATE_DATABASE_NAME      # optional, defaults to modtale-mock-template
 ```
 
-After generation, `mock-db/scripts/validate-fixtures.mjs` checks for forbidden fields and secret-like strings before the workflow uploads the artifact and imports it into the preview template DB.
+`MOCK_TEMPLATE_DATABASE_NAME` must not equal `MOCK_SOURCE_DATABASE_NAME`. The workflow refuses to run if both names are the same, because loading the template database drops and replaces mock collections.
+
+After generation, `mock-db/scripts/validate-fixtures.mjs` checks for forbidden fields and secret-like strings before the workflow uploads the artifact and imports the validated data into the preview template DB.
