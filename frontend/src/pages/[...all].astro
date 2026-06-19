@@ -178,7 +178,7 @@ if (classification) {
         } catch {
             initialData = { homeProjects: [], stats: { totalProjects: 0, totalDownloads: 0, totalUsers: 0 } };
         }
-    } else if (isBot && !isComplex) {
+    } else if (isStaticBrowseRequest) {
         try {
                 const sort = normalizeSort(searchParams.get('sort') || '');
                 const page = searchParams.get('page') || '0';

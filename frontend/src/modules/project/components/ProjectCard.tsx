@@ -255,9 +255,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                     </Link>
                 )}
                 <div className="flex-1 min-w-0 relative z-20 pointer-events-none">
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-all">
+                    <h2 className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-all">
                         {title}
-                    </h3>
+                    </h2>
                     <div className="flex items-center gap-1 text-xs font-medium text-slate-500 mt-1">
                         <span>by</span>
                         {authorPath ? (
@@ -309,7 +309,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                 <div className="flex-1 min-w-0 flex flex-col justify-center sm:justify-start relative z-20 pointer-events-none">
                     <div className="flex justify-between items-start gap-2 sm:gap-4">
                         <div className="min-w-0 flex-1">
-                            <h3 className="text-base sm:text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight">
+                            <h2 className="text-base sm:text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight">
                                 {disableNavigation ? (
                                     <span className="relative z-30">{title}</span>
                                 ) : (
@@ -317,7 +317,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                                         {title}
                                     </Link>
                                 )}
-                            </h3>
+                            </h2>
                             <div className="flex items-center gap-1 text-xs sm:text-sm font-bold text-slate-500 mt-0.5 sm:mt-1">
                                 <span>by</span>
                                 {authorPath ? (
@@ -342,6 +342,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                     <div className="mt-3 sm:mt-5 flex items-center gap-4 sm:gap-6 text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest">
                         <span className="flex items-center gap-1 sm:gap-1.5 pointer-events-none"><Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {downloads}</span>
                         <button
+                            aria-label={`${favorites} favorites`}
                             disabled={!isLoggedIn}
                             onClick={(e) => {
                                 e.preventDefault();
@@ -445,7 +446,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                 )}
 
                 <div className="mt-12">
-                    <h3 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight" title={title}>
+                    <h2 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight" title={title}>
                         {disableNavigation ? (
                             <span className="relative z-30">{title}</span>
                         ) : (
@@ -456,7 +457,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                                 {title}
                             </Link>
                         )}
-                    </h3>
+                    </h2>
 
                     <div className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 font-medium truncate mt-1">
                         <span>By</span>
@@ -489,6 +490,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                         <span className="flex items-center gap-1.5 pointer-events-none"><Download className="w-4 h-4" /> {downloads}</span>
 
                         <button
+                            aria-label={`${favorites} favorites`}
                             disabled={!isLoggedIn}
                             onClick={(e) => {
                                 e.preventDefault();

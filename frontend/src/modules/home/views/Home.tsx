@@ -177,6 +177,15 @@ export const Home: React.FC<{
     const initialMarqueeProjects = ssrData?.homeMarqueeProjects || [];
     const initialTrendingProjects = ssrData?.homeTrendingProjects || ssrData?.homeProjects || [];
     const initialNewestProjects = ssrData?.homeNewestProjects || [];
+    const hasHomeSSRData = Boolean(
+        ssrData
+        && (
+            'homeMarqueeProjects' in ssrData
+            || 'homeTrendingProjects' in ssrData
+            || 'homeNewestProjects' in ssrData
+            || 'homeProjects' in ssrData
+        )
+    );
     const initialProjectSeed = useMemo(
         () => dedupeProjects([...initialTrendingProjects, ...initialNewestProjects]),
         [initialNewestProjects, initialTrendingProjects]
@@ -185,8 +194,8 @@ export const Home: React.FC<{
         () => initialMarqueeProjects.length ? initialMarqueeProjects : initialProjectSeed.filter(isHeroMarqueeProject),
         [initialMarqueeProjects, initialProjectSeed]
     );
-    const shouldFetchFallbackProjects = initialProjectSeed.length === 0;
-    const shouldFetchFallbackMarquee = initialMarqueeSeed.length === 0;
+    const shouldFetchFallbackProjects = !hasHomeSSRData && initialProjectSeed.length === 0;
+    const shouldFetchFallbackMarquee = !hasHomeSSRData && initialMarqueeSeed.length === 0;
     const shouldRefreshTrendingProjects = !initialTrendingProjects.length && initialProjectSeed.length > 0;
     const hasInitialHeroMarqueeProjects = initialMarqueeSeed.some(isHeroMarqueeProject);
     const initialProjects = initialTrendingProjects.length ? initialTrendingProjects : initialProjectSeed;
@@ -222,9 +231,9 @@ export const Home: React.FC<{
         handleResize();
         window.addEventListener('resize', handleResize, { passive: true });
 
-        const shouldFetchFallbackNewest = !initialNewestProjects.length && initialProjectSeed.length === 0;
+        const shouldFetchFallbackNewest = !hasHomeSSRData && !initialNewestProjects.length && initialProjectSeed.length === 0;
         const shouldRefreshNewestProjects = !initialNewestProjects.length && initialProjectSeed.length > 0;
-        const shouldFetchFallbackStats = !ssrData?.stats?.totalProjects;
+        const shouldFetchFallbackStats = !ssrData?.stats;
         let isCancelled = false;
         const scheduledTasks: Array<() => void> = [];
 
@@ -398,6 +407,7 @@ export const Home: React.FC<{
     }, [
         DESKTOP_BREAKPOINT,
         hasInitialHeroMarqueeProjects,
+        hasHomeSSRData,
         initialMarqueeProjects.length,
         initialMarqueeSeed.length,
         initialNewestProjects.length,
@@ -592,7 +602,9 @@ export const Home: React.FC<{
                 <meta name="description" content={homeSeo.description} />
                 <meta name="keywords" content={homeSeo.keywords} />
                 <link rel="preload" as="image" href="/assets/logo.svg" />
-                <style>{`
+            </Helmet>
+
+            <style>{`
                     @keyframes marquee-up {
                         from { transform: translateY(20px); }
                         to { transform: translateY(calc(-50% + 20px)); }
@@ -988,7 +1000,6 @@ export const Home: React.FC<{
                         }
                     }
                 `}</style>
-            </Helmet>
 
             <main className="relative z-10 contain-content">
                 <section className={`home-hero home-hero-desktop ${isHeroProjectsLoading ? 'home-hero-loading-state' : ''} lg:min-h-[92vh] 2xl:min-h-[90vh] lg:pt-[7vh] 2xl:pt-36 lg:pb-[6vh] ${isDesktopStackedHeroLayout ? 'home-hero-desktop-stacked lg:min-h-[calc(100dvh-6rem)] lg:pt-6 lg:pb-6' : ''} relative w-full min-h-[100dvh] flex flex-col items-center justify-center pt-12 sm:pt-[7vh] pb-6 sm:pb-[5vh] overflow-hidden`}>

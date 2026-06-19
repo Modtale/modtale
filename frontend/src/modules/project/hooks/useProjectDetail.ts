@@ -57,12 +57,13 @@ export const useProjectDetail = (
 ) => {
     const { backgroundRefresh = false, hydrateChangelogs = false, full = false } = options;
     const routeKey = rawId?.trim() || '';
+    const initialProjectUnavailable = Boolean((initialData as any)?.__projectUnavailable);
 
-    const isInitialDataValid = initialData && SiteRoutes.matchesProjectRoute(initialData, routeKey);
+    const isInitialDataValid = !initialProjectUnavailable && initialData && SiteRoutes.matchesProjectRoute(initialData, routeKey);
 
     const [project, setProject] = useState<Project | null>(isInitialDataValid ? initialData : null);
-    const [loading, setLoading] = useState(!isInitialDataValid);
-    const [isNotFound, setIsNotFound] = useState(false);
+    const [loading, setLoading] = useState(!isInitialDataValid && !initialProjectUnavailable);
+    const [isNotFound, setIsNotFound] = useState(initialProjectUnavailable);
     const [authorProfile, setAuthorProfile] = useState<User | null>(null);
     const [orgMembers, setOrgMembers] = useState<User[]>([]);
     const [contributors, setContributors] = useState<User[]>([]);
@@ -80,9 +81,20 @@ export const useProjectDetail = (
     const fetchedCommentsKey = useRef('');
 
     useEffect(() => {
+        if (initialProjectUnavailable) {
+            setProject(null);
+            setLoading(false);
+            setIsNotFound(true);
+            setAuthorProfile(null);
+            setOrgMembers([]);
+            setContributors([]);
+            return;
+        }
+
         if (!isInitialDataValid) {
             setProject(null);
             setLoading(true);
+            setIsNotFound(false);
             setAuthorProfile(null);
             setOrgMembers([]);
             setContributors([]);
@@ -95,9 +107,15 @@ export const useProjectDetail = (
             fetchedProjectTeamKey.current = '';
             fetchedCommentsKey.current = '';
         }
-    }, [routeKey, isInitialDataValid]);
+    }, [routeKey, isInitialDataValid, initialProjectUnavailable]);
 
     useEffect(() => {
+        if (initialProjectUnavailable) {
+            setIsNotFound(true);
+            setLoading(false);
+            return;
+        }
+
         if (!routeKey) {
             setIsNotFound(true);
             setLoading(false);
