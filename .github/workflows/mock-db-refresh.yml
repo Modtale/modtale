@@ -39,9 +39,24 @@ jobs:
       - name: Validate secret configuration
         run: |
           : "${MOCK_SOURCE_MONGODB_URI:?Set secret MOCK_SOURCE_MONGODB_URI with a read-only source MongoDB user.}"
-          : "${MOCK_TEMPLATE_MONGODB_URI:?Set secret MOCK_TEMPLATE_MONGODB_URI for the preview template MongoDB target.}"
-          echo "MOCK_SOURCE_DATABASE_NAME=${MOCK_SOURCE_DATABASE_NAME:-modtale}" >> "$GITHUB_ENV"
-          echo "MOCK_TEMPLATE_DATABASE_NAME=${MOCK_TEMPLATE_DATABASE_NAME:-modtale-mock-template}" >> "$GITHUB_ENV"
+
+          source_db="${MOCK_SOURCE_DATABASE_NAME:-modtale}"
+          template_db="${MOCK_TEMPLATE_DATABASE_NAME:-modtale-mock-template}"
+
+          if [ "$source_db" = "$template_db" ]; then
+            echo "::error::MOCK_TEMPLATE_DATABASE_NAME must differ from MOCK_SOURCE_DATABASE_NAME. Refusing to load mock data into the source database."
+            exit 1
+          fi
+
+          echo "MOCK_SOURCE_DATABASE_NAME=$source_db" >> "$GITHUB_ENV"
+          echo "MOCK_TEMPLATE_DATABASE_NAME=$template_db" >> "$GITHUB_ENV"
+
+          if [ -z "${MOCK_TEMPLATE_MONGODB_URI:-}" ]; then
+            echo "MOCK_TEMPLATE_MONGODB_URI=$MOCK_SOURCE_MONGODB_URI" >> "$GITHUB_ENV"
+            echo "TEMPLATE_URI_SOURCE=MOCK_SOURCE_MONGODB_URI" >> "$GITHUB_ENV"
+          else
+            echo "TEMPLATE_URI_SOURCE=MOCK_TEMPLATE_MONGODB_URI" >> "$GITHUB_ENV"
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -99,5 +114,6 @@ jobs:
             echo ""
             echo "- Generated sanitized JSON artifact: \`modtale-mock-db-json\`"
             echo "- Refreshed template database: \`${MOCK_TEMPLATE_DATABASE_NAME:-modtale-mock-template}\`"
+            echo "- Template Mongo URI source: \`${TEMPLATE_URI_SOURCE:-MOCK_TEMPLATE_MONGODB_URI}\`"
             echo "- Source privileged collections were not read; reports/admin logs/API keys/status/analytics are synthetic."
           } >> "$GITHUB_STEP_SUMMARY"

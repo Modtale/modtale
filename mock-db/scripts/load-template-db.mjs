@@ -10,6 +10,7 @@ const fixtureDir = process.env.MOCK_DB_COLLECTION_DIR
 
 const targetUri = process.env.MOCK_TEMPLATE_MONGODB_URI;
 const targetDbName = process.env.MOCK_TEMPLATE_DATABASE_NAME || 'modtale-mock-template';
+const sourceDbName = process.env.MOCK_SOURCE_DATABASE_NAME || 'modtale';
 const collections = [
   'users',
   'projects',
@@ -26,6 +27,11 @@ const collections = [
 
 if (!targetUri) {
   console.error('MOCK_TEMPLATE_MONGODB_URI is required.');
+  process.exit(1);
+}
+
+if (targetDbName === sourceDbName) {
+  console.error('MOCK_TEMPLATE_DATABASE_NAME must differ from MOCK_SOURCE_DATABASE_NAME.');
   process.exit(1);
 }
 
