@@ -25,7 +25,7 @@ The mock DB refresh workflow runs automatically only when a trusted push to `mai
 
 ### Import the Mock DB Locally
 
-1. Download the latest `modtale-mock-db-json` artifact from the [`Refresh Mock Database` GitHub Actions workflow](https://github.com/Modtale/modtale/actions?query=workflow%3A%22Refresh%20Mock%20Database%22).
+1. Download the latest `modtale-mock-db-json` artifact from the [`Refresh Mock Database` GitHub Actions workflow](https://github.com/Modtale/modtale/actions/workflows/mock-db-refresh.yml).
 2. Extract the artifact into `mock-db/collections/`.
 3. Install MongoDB Database Tools so `mongoimport` is available.
 4. Import it:
