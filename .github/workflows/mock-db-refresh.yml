@@ -2,11 +2,17 @@ name: Refresh Mock Database
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '17 8 * * 1'
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'backend/src/main/java/net/modtale/model/**'
+      - 'backend/src/main/java/net/modtale/repository/**'
 
 permissions:
   contents: read
+  actions: write
 
 concurrency:
   group: refresh-mock-database
@@ -44,7 +50,7 @@ jobs:
 
       - name: Install mock DB tooling
         working-directory: mock-db
-        run: npm install
+        run: npm ci
 
       - name: Generate sanitized fixtures
         working-directory: mock-db
@@ -53,6 +59,26 @@ jobs:
       - name: Validate sanitized fixtures
         working-directory: mock-db
         run: npm run validate
+
+      - name: Delete previous public mock DB artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          artifact_ids="$(
+            gh api --paginate \
+              "/repos/${GITHUB_REPOSITORY}/actions/artifacts?name=modtale-mock-db-json&per_page=100" \
+              --jq '.artifacts[] | select(.expired == false) | .id'
+          )"
+
+          if [ -z "$artifact_ids" ]; then
+            echo "No previous modtale-mock-db-json artifacts found."
+            exit 0
+          fi
+
+          for artifact_id in $artifact_ids; do
+            echo "Deleting previous mock DB artifact $artifact_id"
+            gh api --method DELETE "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}"
+          done
 
       - name: Upload public mock DB artifact
         uses: actions/upload-artifact@v4

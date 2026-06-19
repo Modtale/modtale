@@ -21,9 +21,11 @@ Modtale provides a public mock MongoDB dataset for local testing and PR review. 
 
 The generated artifact may include real public project fields that are already available from the public API, such as author names, project descriptions, categories, public media URLs, public release metadata, and a safe public-comment subset. It must not include real draft, pending, private, or unlisted projects, emails, passwords, tokens, scan results, reports, admin enforcement actions, admin logs, private notifications, or detailed analytics. Those private/admin-only areas are generated synthetically.
 
+The mock DB refresh workflow runs automatically only when a trusted push to `main` or `develop` changes backend model or repository code. Each successful refresh deletes older `modtale-mock-db-json` artifacts before uploading the new one so GitHub Actions storage does not fill up with stale downloads.
+
 ### Import the Mock DB Locally
 
-1. Download the latest `modtale-mock-db-json` artifact from the `Refresh Mock Database` GitHub Actions workflow.
+1. Download the latest `modtale-mock-db-json` artifact from the [`Refresh Mock Database` GitHub Actions workflow](https://github.com/Modtale/modtale/actions?query=workflow%3A%22Refresh%20Mock%20Database%22).
 2. Extract the artifact into `mock-db/collections/`.
 3. Install MongoDB Database Tools so `mongoimport` is available.
 4. Import it:
