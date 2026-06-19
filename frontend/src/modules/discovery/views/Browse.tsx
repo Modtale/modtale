@@ -62,7 +62,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
     const { initialData } = useSSRData();
 
     const hasComplexParams = searchParams.has('q') || searchParams.has('tags') || searchParams.has('version') || searchParams.has('minDl') || searchParams.has('minFav') || searchParams.has('date') || searchParams.has('category') || (searchParams.get('page') && parseInt(searchParams.get('page')!, 10) > 0);
-    const hasUsableBrowseSSRData = Boolean(initialData?.browseData);
+    const hasUsableBrowseSSRData = Boolean(initialData?.browseData && initialData?.browseDataReady !== false);
     const useSSR = hasUsableBrowseSSRData && !hasComplexParams;
     const initialPreferences = useMemo(() => getInitialBrowsePreferences(), []);
     const [viewStyle, setViewStyle] = useState<BrowseViewStyle>(initialPreferences.viewStyle);

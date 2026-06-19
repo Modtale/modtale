@@ -162,6 +162,7 @@ if (classification) {
             const newestProjects = newest?.content || [];
 
             initialData = {
+                homeDataReady: true,
                 homeProjects: unique || [],
                 homeMarqueeProjects: marqueeProjects,
                 homeTrendingProjects: unique || [],
@@ -176,7 +177,7 @@ if (classification) {
 
             ssrSuccessfullyCompleted = true;
         } catch {
-            initialData = { homeProjects: [], stats: { totalProjects: 0, totalDownloads: 0, totalUsers: 0 } };
+            initialData = { homeDataReady: false, homeProjects: [], stats: { totalProjects: 0, totalDownloads: 0, totalUsers: 0 } };
         }
     } else if (isStaticBrowseRequest) {
         try {

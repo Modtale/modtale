@@ -178,13 +178,10 @@ export const Home: React.FC<{
     const initialTrendingProjects = ssrData?.homeTrendingProjects || ssrData?.homeProjects || [];
     const initialNewestProjects = ssrData?.homeNewestProjects || [];
     const hasHomeSSRData = Boolean(
-        ssrData
-        && (
-            'homeMarqueeProjects' in ssrData
-            || 'homeTrendingProjects' in ssrData
-            || 'homeNewestProjects' in ssrData
-            || 'homeProjects' in ssrData
-        )
+        ssrData?.homeDataReady
+        || initialMarqueeProjects.length
+        || initialTrendingProjects.length
+        || initialNewestProjects.length
     );
     const initialProjectSeed = useMemo(
         () => dedupeProjects([...initialTrendingProjects, ...initialNewestProjects]),
@@ -233,7 +230,7 @@ export const Home: React.FC<{
 
         const shouldFetchFallbackNewest = !hasHomeSSRData && !initialNewestProjects.length && initialProjectSeed.length === 0;
         const shouldRefreshNewestProjects = !initialNewestProjects.length && initialProjectSeed.length > 0;
-        const shouldFetchFallbackStats = !ssrData?.stats;
+        const shouldFetchFallbackStats = !hasHomeSSRData || !ssrData?.stats;
         let isCancelled = false;
         const scheduledTasks: Array<() => void> = [];
 
