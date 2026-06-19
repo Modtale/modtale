@@ -56,6 +56,26 @@ class GameVersionServiceTest {
             """;
 
     @Test
+    void indexedVersionsContainingPreAreClassifiedAsPreReleases() {
+        GameVersionCatalogOrderingService orderingService = new GameVersionCatalogOrderingService(
+                new AppGameVersionProperties("https://versions.example/release.xml", "https://versions.example/pre.xml", 1_000L)
+        );
+
+        GameVersionService.GameVersionCatalog catalog = orderingService.buildCatalog(
+                new GameVersionCatalogSourceService.GameVersionCatalogSource(
+                        List.of("0.5.1"),
+                        List.of(),
+                        List.of("0.5.0-pre.8", "0.5.0")
+                )
+        );
+
+        assertEquals(List.of("0.5.1", "0.5.0"), catalog.releaseVersions());
+        assertEquals(List.of("0.5.0-pre.8"), catalog.preReleaseVersions());
+        assertTrue(catalog.versions().stream()
+                .anyMatch(entry -> entry.version().equals("0.5.0-pre.8") && entry.preRelease()));
+    }
+
+    @Test
     void initialRefreshSurfacesDownloadFailures() {
         RestTemplate restTemplate = new RestTemplate();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();

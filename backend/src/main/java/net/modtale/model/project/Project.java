@@ -173,6 +173,7 @@ public class Project {
 
     private boolean hmWikiEnabled = false;
     private String hmWikiSlug;
+    private boolean galleryCarouselEnabled = false;
 
     @Indexed
     private ProjectStatus status = ProjectStatus.PUBLISHED;
@@ -189,6 +190,7 @@ public class Project {
     private String pendingTransferTo;
 
     private List<String> galleryImages = new ArrayList<>();
+    private Map<String, String> galleryImageCaptions = new HashMap<>();
     private List<Comment> comments = new ArrayList<>();
     private List<ProjectVersion> versions = new ArrayList<>();
 
@@ -270,6 +272,8 @@ public class Project {
     public void setHmWikiEnabled(boolean hmWikiEnabled) { this.hmWikiEnabled = hmWikiEnabled; }
     public String getHmWikiSlug() { return hmWikiSlug; }
     public void setHmWikiSlug(String hmWikiSlug) { this.hmWikiSlug = hmWikiSlug; }
+    public boolean isGalleryCarouselEnabled() { return galleryCarouselEnabled; }
+    public void setGalleryCarouselEnabled(boolean galleryCarouselEnabled) { this.galleryCarouselEnabled = galleryCarouselEnabled; }
     public ProjectStatus getStatus() { return status; }
     public void setStatus(ProjectStatus status) { this.status = status; }
     public String getExpiresAt() { return expiresAt; }
@@ -290,6 +294,8 @@ public class Project {
     public void setPendingTransferTo(String pendingTransferTo) { this.pendingTransferTo = pendingTransferTo; }
     public List<String> getGalleryImages() { return galleryImages; }
     public void setGalleryImages(List<String> galleryImages) { this.galleryImages = galleryImages; }
+    public Map<String, String> getGalleryImageCaptions() { return galleryImageCaptions; }
+    public void setGalleryImageCaptions(Map<String, String> galleryImageCaptions) { this.galleryImageCaptions = galleryImageCaptions; }
     public List<Comment> getComments() { return comments; }
     public void setComments(List<Comment> comments) { this.comments = comments; }
     public List<ProjectVersion> getVersions() { return versions; }

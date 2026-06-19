@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Eye, Download, TrendingUp, TrendingDown, PackagePlus, Server, UserPlus, Activity } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
 import { LineChart } from '@/components/ui/charts/LineChart';
+import { useChartVisibility } from '@/components/ui/charts/chartVisibility';
 import { extractApiErrorMessage } from '@/utils/api';
 import { sliceData, calculateWoW, calculateRollingAverage } from '@/utils/analytics';
 
@@ -35,7 +36,7 @@ export function PlatformAnalytics() {
     const [loading, setLoading] = useState(true);
     const [range, setRange] = useState('30d');
     const [data, setData] = useState<any>(null);
-    const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({});
+    const { isHidden, toggleHandler } = useChartVisibility();
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     useEffect(() => {
@@ -107,25 +108,25 @@ export function PlatformAnalytics() {
 
     const chartDatasets = {
         downloads: [
-            { id: 'downloads', label: 'Platform Downloads', color: '#3b82f6', data: sliceData(downloadsData), hidden: !!hiddenSeries['downloads'] },
-            { id: 'apiDownloads', label: 'API Downloads', color: '#f97316', data: sliceData(apiDownloadsData), hidden: !!hiddenSeries['apiDownloads'] },
-            { id: 'downloadsAvg7', label: 'Downloads 7d Avg', color: '#14b8a6', data: sliceData(downloadsAvg7), hidden: hiddenSeries['downloadsAvg7'] ?? true },
-            { id: 'downloadsAvg30', label: 'Downloads 30d Avg', color: '#a855f7', data: sliceData(downloadsAvg30), hidden: hiddenSeries['downloadsAvg30'] ?? true }
+            { id: 'downloads', label: 'Platform Downloads', color: '#3b82f6', data: sliceData(downloadsData), hidden: isHidden('downloads', 'downloads') },
+            { id: 'apiDownloads', label: 'API Downloads', color: '#f97316', data: sliceData(apiDownloadsData), hidden: isHidden('downloads', 'apiDownloads') },
+            { id: 'downloadsAvg7', label: 'Downloads 7d Avg', color: '#14b8a6', data: sliceData(downloadsAvg7), hidden: isHidden('downloads', 'downloadsAvg7', true) },
+            { id: 'downloadsAvg30', label: 'Downloads 30d Avg', color: '#a855f7', data: sliceData(downloadsAvg30), hidden: isHidden('downloads', 'downloadsAvg30', true) }
         ],
         views: [
-            { id: 'views', label: 'Platform Views', color: '#a855f7', data: sliceData(viewsData), hidden: !!hiddenSeries['views'] },
-            { id: 'viewsAvg7', label: 'Views 7d Avg', color: '#14b8a6', data: sliceData(viewsAvg7), hidden: hiddenSeries['viewsAvg7'] ?? true },
-            { id: 'viewsAvg30', label: 'Views 30d Avg', color: '#f97316', data: sliceData(viewsAvg30), hidden: hiddenSeries['viewsAvg30'] ?? true }
+            { id: 'views', label: 'Platform Views', color: '#a855f7', data: sliceData(viewsData), hidden: isHidden('views', 'views') },
+            { id: 'viewsAvg7', label: 'Views 7d Avg', color: '#14b8a6', data: sliceData(viewsAvg7), hidden: isHidden('views', 'viewsAvg7', true) },
+            { id: 'viewsAvg30', label: 'Views 30d Avg', color: '#f97316', data: sliceData(viewsAvg30), hidden: isHidden('views', 'viewsAvg30', true) }
         ],
         newProjects: [
-            { id: 'newProjects', label: 'New Projects', color: '#10b981', data: sliceData(newProjectsData), hidden: !!hiddenSeries['newProjects'] },
-            { id: 'newUsers', label: 'New Users', color: '#f59e0b', data: sliceData(newUsersData), hidden: !!hiddenSeries['newUsers'] },
-            { id: 'newOrgs', label: 'New Organizations', color: '#8b5cf6', data: sliceData(newOrgsData), hidden: !!hiddenSeries['newOrgs'] }
+            { id: 'newProjects', label: 'New Projects', color: '#10b981', data: sliceData(newProjectsData), hidden: isHidden('newCreations', 'newProjects') },
+            { id: 'newUsers', label: 'New Users', color: '#f59e0b', data: sliceData(newUsersData), hidden: isHidden('newCreations', 'newUsers') },
+            { id: 'newOrgs', label: 'New Organizations', color: '#8b5cf6', data: sliceData(newOrgsData), hidden: isHidden('newCreations', 'newOrgs') }
         ],
         growth: [
-            { id: 'downloadsGrowth', label: 'Downloads Momentum', color: '#3b82f6', data: sliceData(calculateWoW(downloadsData)), hidden: !!hiddenSeries['downloadsGrowth'] },
-            { id: 'viewsGrowth', label: 'Views Momentum', color: '#a855f7', data: sliceData(calculateWoW(viewsData)), hidden: !!hiddenSeries['viewsGrowth'] },
-            { id: 'usersGrowth', label: 'Users Momentum', color: '#f59e0b', data: sliceData(calculateWoW(newUsersData)), hidden: !!hiddenSeries['usersGrowth'] }
+            { id: 'downloadsGrowth', label: 'Downloads Momentum', color: '#3b82f6', data: sliceData(calculateWoW(downloadsData)), hidden: isHidden('momentum', 'downloadsGrowth') },
+            { id: 'viewsGrowth', label: 'Views Momentum', color: '#a855f7', data: sliceData(calculateWoW(viewsData)), hidden: isHidden('momentum', 'viewsGrowth') },
+            { id: 'usersGrowth', label: 'Users Momentum', color: '#f59e0b', data: sliceData(calculateWoW(newUsersData)), hidden: isHidden('momentum', 'usersGrowth') }
         ]
     };
 
@@ -202,7 +203,7 @@ export function PlatformAnalytics() {
                             </div>
                         </div>
                         <div className="flex-1 min-h-0 px-6 pb-6">
-                            <LineChart datasets={chartDatasets.downloads} onToggle={(sid) => setHiddenSeries(p => ({ ...p, [sid]: !p[sid] }))} />
+                            <LineChart datasets={chartDatasets.downloads} onToggle={toggleHandler('downloads')} />
                         </div>
                     </div>
 
@@ -215,7 +216,7 @@ export function PlatformAnalytics() {
                             </div>
                         </div>
                         <div className="flex-1 min-h-0 px-6 pb-6">
-                            <LineChart datasets={chartDatasets.views} onToggle={(sid) => setHiddenSeries(p => ({ ...p, [sid]: !p[sid] }))} />
+                            <LineChart datasets={chartDatasets.views} onToggle={toggleHandler('views')} />
                         </div>
                     </div>
 
@@ -228,7 +229,7 @@ export function PlatformAnalytics() {
                             </div>
                         </div>
                         <div className="flex-1 min-h-0 px-6 pb-6">
-                            <LineChart datasets={chartDatasets.newProjects} onToggle={(sid) => setHiddenSeries(p => ({ ...p, [sid]: !p[sid] }))} />
+                            <LineChart datasets={chartDatasets.newProjects} onToggle={toggleHandler('newCreations')} />
                         </div>
                     </div>
 
@@ -241,7 +242,7 @@ export function PlatformAnalytics() {
                             </div>
                         </div>
                         <div className="flex-1 min-h-0 px-6 pb-6">
-                            <LineChart datasets={chartDatasets.growth} onToggle={(sid) => setHiddenSeries(p => ({ ...p, [sid]: !p[sid] }))} yAxisFormatter={(val) => `${val > 0 ? '+' : ''}${Math.round(val)}%`} />
+                            <LineChart datasets={chartDatasets.growth} onToggle={toggleHandler('momentum')} yAxisFormatter={(val) => `${val > 0 ? '+' : ''}${Math.round(val)}%`} />
                         </div>
                     </div>
                 </div>

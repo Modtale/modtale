@@ -17,7 +17,9 @@ vi.mock('@/utils/api', () => ({
 }));
 
 vi.mock('@/modules/home/components/HeroMarquee', () => ({
-    MarqueeColumn: () => <div data-testid="marquee-column" />
+    MarqueeColumn: ({ projects }: { projects: Array<unknown> }) => (
+        <div data-testid="marquee-column" data-project-count={projects.length} />
+    )
 }));
 
 vi.mock('@/modules/home/components/FeaturePreviews', () => ({
@@ -649,7 +651,7 @@ describe('Home fallback requests', () => {
         expect(heroSection?.className).not.toContain('min-h-[100vh]');
     });
 
-    it('fetches trending home projects via sort', async () => {
+    it('fetches popular marquee projects via sort', async () => {
         mockedApi.get
             .mockResolvedValueOnce({ data: { content: [] } } as any)
             .mockResolvedValueOnce({ data: { content: [] } } as any)
@@ -672,7 +674,7 @@ describe('Home fallback requests', () => {
         });
 
         expect(mockedApi.get).toHaveBeenCalledWith('/projects', {
-            params: { size: 16, sort: 'trending' },
+            params: { size: 16, sort: 'popular', view: 'marquee' },
             timeout: 1800,
         });
         expect(mockedApi.get).toHaveBeenCalledWith('/projects', {
@@ -682,7 +684,61 @@ describe('Home fallback requests', () => {
         expect(mockedApi.get).toHaveBeenCalledWith('/analytics/platform/stats', { timeout: 1800 });
     });
 
-    it('uses newest SSR projects as the initial marquee seed instead of immediately refetching trending data', async () => {
+    it('loads additional popular marquee pages in the background after the initial seed', async () => {
+        await act(async () => {
+            root.render(
+                <SSRProvider
+                    data={{
+                        homeMarqueeProjects: [
+                            {
+                                id: 'project-1',
+                                title: 'Skyforge Utilities',
+                                authorId: 'user-1',
+                                author: 'Ada',
+                                imageUrl: '/images/skyforge-icon.png',
+                                bannerUrl: '/images/skyforge-banner.png',
+                                downloadCount: 1200
+                            }
+                        ],
+                        homeProjects: [],
+                        homeTrendingProjects: [
+                            {
+                                id: 'project-2',
+                                title: 'Skyforge Core',
+                                authorId: 'user-1',
+                                author: 'Ada',
+                                imageUrl: '/images/skyforge-core-icon.png',
+                                bannerUrl: '/images/skyforge-core-banner.png',
+                                downloadCount: 900
+                            }
+                        ],
+                        homeNewestProjects: [],
+                        stats: { totalProjects: 2842, totalDownloads: 92841653, totalUsers: 49713 }
+                    }}
+                    initialPath="/"
+                >
+                    <HelmetProvider>
+                        <MemoryRouter initialEntries={['/']}>
+                            <Home />
+                        </MemoryRouter>
+                    </HelmetProvider>
+                </SSRProvider>
+            );
+        });
+
+        expect(mockedApi.get).not.toHaveBeenCalled();
+
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(200);
+        });
+
+        expect(mockedApi.get).toHaveBeenCalledWith('/projects', {
+            params: { size: 16, sort: 'popular', view: 'marquee', page: 1 },
+            timeout: 1800,
+        });
+    });
+
+    it('uses newest SSR projects as the initial marquee seed instead of immediately refetching marquee data', async () => {
         await act(async () => {
             root.render(
                 <SSRProvider
@@ -714,7 +770,7 @@ describe('Home fallback requests', () => {
         });
 
         expect(mockedApi.get).not.toHaveBeenCalledWith('/projects', expect.objectContaining({
-            params: expect.objectContaining({ sort: 'trending' }),
+            params: expect.objectContaining({ sort: 'popular', view: 'marquee' }),
             timeout: 1800,
         }));
         expect(mockedApi.get).not.toHaveBeenCalled();

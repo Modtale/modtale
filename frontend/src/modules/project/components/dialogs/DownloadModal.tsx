@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Link } from 'react-router-dom';
 import { Download, X, ChevronDown, FileText, AlertCircle, ChevronRight } from 'lucide-react';
 import { DropdownSelect, type DropdownOption } from '@/components/ui/DropdownSelect';
 import { theme } from '@/styles/theme';
@@ -7,6 +6,7 @@ import { formatTimeAgo, compareSemVer } from '@/utils/modHelpers';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { getExternalDependencies } from '@/modules/project/utils/dependencyEntries';
 import type { ProjectDependency } from '@/types';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface DownloadModalProps {
     show: boolean;
@@ -271,9 +271,9 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
 
                 {latestVer ? (
                     <>
-                        <Link
-                            to="#"
-                            onClick={(e) => { e.preventDefault(); onDownload(latestVer.fileUrl, latestVer.versionNumber, selectedGameVer, latestVer.dependencies, latestVer.channel); }}
+                        <button
+                            type="button"
+                            onClick={() => onDownload(latestVer.fileUrl, latestVer.versionNumber, selectedGameVer, latestVer.dependencies, latestVer.channel)}
                             className={`w-full p-5 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 mb-6 group relative overflow-hidden ${themeClass}`}
                         >
                             <div className="font-black text-xl flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-6 h-6" /> Download Latest</div>
@@ -286,7 +286,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                                     Also supports: {otherCompatibleVersions(latestVer).join(', ')}
                                 </div>
                             )}
-                        </Link>
+                        </button>
                         {renderExternalDependencyNotice(latestVer)}
 
                         <div className="relative mb-6">
@@ -328,13 +328,14 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                                                 )}
                                             </div>
                                         </div>
-                                        <Link
-                                            to="#"
-                                            onClick={(e) => { e.preventDefault(); onDownload(ver.fileUrl, ver.versionNumber, selectedGameVer, ver.dependencies, ver.channel); }}
+                                        <button
+                                            type="button"
+                                            onClick={() => onDownload(ver.fileUrl, ver.versionNumber, selectedGameVer, ver.dependencies, ver.channel)}
                                             className={`p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-modtale-accent hover:text-white transition-colors`}
+                                            aria-label={`Download version ${ver.versionNumber}`}
                                         >
                                             <Download className="w-4 h-4" />
-                                        </Link>
+                                        </button>
                                     </div>
                                 ))}
                             </div>
@@ -364,8 +365,10 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
     if (isInline) return content;
 
     return (
+        <ModalPortal>
         <div className={theme.components.modalOverlay} onClick={onClose}>
             {content}
         </div>
+        </ModalPortal>
     );
 };

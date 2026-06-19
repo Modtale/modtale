@@ -2,6 +2,7 @@ package net.modtale.service.project.metadata;
 
 import java.util.ArrayList;
 import java.util.List;
+import net.modtale.exception.InvalidProjectRequestException;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.user.User;
@@ -16,7 +17,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -86,5 +89,33 @@ class MetadataServiceTest {
         verify(validationService).validateSlug("new-slug");
         verify(projectRepository).save(existing);
         verify(projectService).evictProjectCache(existing);
+    }
+
+    @Test
+    void updateMetadataRejectsMultipleGalleryCarouselMarkers() {
+        Project existing = new Project();
+        existing.setId("project-1");
+        existing.setClassification(ProjectClassification.DATA);
+
+        Project updated = new Project();
+        updated.setTitle("Raw Title");
+        updated.setDescription("Raw Description");
+        updated.setAbout("Intro\n\n{{gallery-carousel}}\n\nOutro\n\n{{ gallery-carousel }}");
+
+        User user = new User();
+        user.setId("user-1");
+
+        when(projectService.getRawProjectById("project-1")).thenReturn(existing);
+        when(accessControlService.hasProjectPermission(existing, user, "PROJECT_EDIT_METADATA")).thenReturn(true);
+        when(sanitizationService.sanitizePlainText("Raw Title")).thenReturn("Clean Title");
+        when(sanitizationService.sanitizePlainText("Raw Description")).thenReturn("Clean Description");
+
+        InvalidProjectRequestException error = assertThrows(
+                InvalidProjectRequestException.class,
+                () -> service.updateMetadata("project-1", updated, user)
+        );
+
+        assertEquals("Use {{gallery-carousel}} only once in the project description.", error.getMessage());
+        verify(projectRepository, never()).save(existing);
     }
 }

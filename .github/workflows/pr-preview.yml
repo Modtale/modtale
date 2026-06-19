@@ -1,0 +1,216 @@
+name: PR Preview
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - closed
+    branches:
+      - develop
+
+concurrency:
+  group: pr-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+  pull-requests: write
+
+env:
+  PROJECT_ID: ${{ vars.GCP_PREVIEW_PROJECT_ID }}
+  REGION: ${{ vars.GCP_PREVIEW_REGION }}
+  BUILD_SERVICE_ACCOUNT: ${{ vars.GCP_PREVIEW_BUILD_SERVICE_ACCOUNT }}
+  RUNTIME_SERVICE_ACCOUNT: ${{ vars.GCP_PREVIEW_RUNTIME_SERVICE_ACCOUNT }}
+  MONGODB_SECRET_NAME: ${{ vars.GCP_PREVIEW_MONGODB_SECRET_NAME }}
+
+jobs:
+  deploy:
+    name: Deploy PR Preview
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate preview isolation config
+        run: |
+          : "${PROJECT_ID:?Set repository variable GCP_PREVIEW_PROJECT_ID to a dedicated preview GCP project.}"
+          : "${BUILD_SERVICE_ACCOUNT:?Set repository variable GCP_PREVIEW_BUILD_SERVICE_ACCOUNT to a no-production-access Cloud Build service account.}"
+          : "${RUNTIME_SERVICE_ACCOUNT:?Set repository variable GCP_PREVIEW_RUNTIME_SERVICE_ACCOUNT to a no-production-access Cloud Run runtime service account.}"
+
+          REGION="${REGION:-us-central1}"
+          MONGODB_SECRET_NAME="${MONGODB_SECRET_NAME:-PREVIEW_MONGODB_URI}"
+
+          echo "REGION=$REGION" >> "$GITHUB_ENV"
+          echo "MONGODB_SECRET_NAME=$MONGODB_SECRET_NAME" >> "$GITHUB_ENV"
+
+      - name: Check out trusted base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+          persist-credentials: false
+
+      - name: Check out pull request code
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: source
+          persist-credentials: false
+
+      - name: Prepare preview names
+        run: |
+          pr_number="${{ github.event.pull_request.number }}"
+          head_sha="${{ github.event.pull_request.head.sha }}"
+          short_sha="${head_sha:0:7}"
+
+          echo "TAG=pr-${pr_number}-${short_sha}" >> "$GITHUB_ENV"
+          echo "BACKEND_SERVICE=modtale-pr-${pr_number}-backend" >> "$GITHUB_ENV"
+          echo "FRONTEND_SERVICE=modtale-pr-${pr_number}-frontend" >> "$GITHUB_ENV"
+          echo "DB_NAME=modtale-pr-${pr_number}" >> "$GITHUB_ENV"
+
+      - id: auth
+        name: Authenticate to preview GCP project
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_PREVIEW_CREDENTIALS }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build backend image
+        working-directory: source/backend
+        run: |
+          gcloud builds submit \
+            --project "$PROJECT_ID" \
+            --config "$GITHUB_WORKSPACE/base/backend/cloudbuild.yml" \
+            --service-account "$BUILD_SERVICE_ACCOUNT" \
+            --substitutions=_TAG="$TAG" .
+
+      - name: Deploy backend preview
+        run: |
+          backend_url="$(
+            gcloud run deploy "$BACKEND_SERVICE" \
+              --project "$PROJECT_ID" \
+              --image "gcr.io/$PROJECT_ID/modtale-backend:$TAG" \
+              --region "$REGION" \
+              --service-account "$RUNTIME_SERVICE_ACCOUNT" \
+              --allow-unauthenticated \
+              --use-http2 \
+              --memory "1Gi" \
+              --set-env-vars "MONGODB_DATABASE_NAME=$DB_NAME" \
+              --set-env-vars "APP_SEEDING_ENABLED=true" \
+              --set-env-vars "APP_SEEDING_MODE=template" \
+              --set-env-vars "APP_SEEDING_RESET=true" \
+              --set-env-vars "APP_SEEDING_SOURCE_DB=modtale-mock-template" \
+              --set-env-vars "WARDEN_ENABLED=false" \
+              --set-env-vars "OAUTH_ENABLED=false" \
+              --set-env-vars "FRONTEND_URL=placeholder" \
+              --set-env-vars "BACKEND_URL=placeholder" \
+              --set-env-vars "R2_BUCKET_NAME=modtale-preview-disabled" \
+              --set-env-vars "R2_ACCESS_KEY=preview-disabled" \
+              --set-env-vars "R2_SECRET_KEY=preview-disabled" \
+              --set-env-vars "R2_ENDPOINT=https://example.com" \
+              --set-env-vars "R2_PUBLIC_DOMAIN=https://example.test" \
+              --update-secrets "MONGODB_URI=$MONGODB_SECRET_NAME:latest" \
+              --format "value(status.url)"
+          )"
+
+          echo "BACKEND_URL=$backend_url" >> "$GITHUB_ENV"
+          echo "API_URL=$backend_url/api/v1" >> "$GITHUB_ENV"
+
+      - name: Build frontend image
+        working-directory: source/frontend
+        run: |
+          gcloud builds submit \
+            --project "$PROJECT_ID" \
+            --config "$GITHUB_WORKSPACE/base/frontend/cloudbuild.yml" \
+            --service-account "$BUILD_SERVICE_ACCOUNT" \
+            --substitutions=_PUBLIC_API_URL="$API_URL",_TAG="$TAG" .
+
+      - name: Deploy frontend preview
+        run: |
+          frontend_url="$(
+            gcloud run deploy "$FRONTEND_SERVICE" \
+              --project "$PROJECT_ID" \
+              --image "gcr.io/$PROJECT_ID/modtale-frontend:$TAG" \
+              --region "$REGION" \
+              --service-account "$RUNTIME_SERVICE_ACCOUNT" \
+              --allow-unauthenticated \
+              --set-env-vars "PUBLIC_API_URL=$API_URL" \
+              --format "value(status.url)"
+          )"
+
+          echo "FRONTEND_URL=$frontend_url" >> "$GITHUB_ENV"
+
+      - name: Update backend preview URLs
+        run: |
+          gcloud run services update "$BACKEND_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --update-env-vars "FRONTEND_URL=$FRONTEND_URL,BACKEND_URL=$BACKEND_URL"
+
+      - name: Publish preview comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          body_file="$(mktemp)"
+          cat > "$body_file" <<EOF
+          ## Modtale PR Preview
+
+          - Frontend: $FRONTEND_URL
+          - API: $API_URL
+          - Database: \`$DB_NAME\` seeded from the trusted sanitized template database
+          - Commit: \`${{ github.event.pull_request.head.sha }}\`
+
+          This preview runs untrusted PR code against preview-only infrastructure. It does not receive production/dev secrets, production domains, production buckets, OAuth credentials, Warden credentials, real scan results, admin enforcement data, or real analytics data.
+          EOF
+
+          gh pr comment "${{ github.event.pull_request.number }}" --edit-last --body-file "$body_file" \
+            || gh pr comment "${{ github.event.pull_request.number }}" --body-file "$body_file"
+
+  cleanup:
+    name: Clean Up PR Preview
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate preview isolation config
+        run: |
+          : "${PROJECT_ID:?Set repository variable GCP_PREVIEW_PROJECT_ID to a dedicated preview GCP project.}"
+          REGION="${REGION:-us-central1}"
+          echo "REGION=$REGION" >> "$GITHUB_ENV"
+          echo "BACKEND_SERVICE=modtale-pr-${{ github.event.pull_request.number }}-backend" >> "$GITHUB_ENV"
+          echo "FRONTEND_SERVICE=modtale-pr-${{ github.event.pull_request.number }}-frontend" >> "$GITHUB_ENV"
+
+      - id: auth
+        name: Authenticate to preview GCP project
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_PREVIEW_CREDENTIALS }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Delete preview Cloud Run services
+        run: |
+          gcloud run services delete "$BACKEND_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --quiet || true
+
+          gcloud run services delete "$FRONTEND_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --quiet || true
+
+      - name: Publish cleanup comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr comment "${{ github.event.pull_request.number }}" \
+            --body "PR preview services were removed. The preview database contains only mock data and can be pruned from the preview Mongo cluster separately."

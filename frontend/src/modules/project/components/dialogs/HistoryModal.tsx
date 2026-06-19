@@ -1,11 +1,11 @@
 import React, { memo, useCallback, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { List, X, Download, ChevronUp, ChevronDown, AlertCircle } from 'lucide-react';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import { theme } from '@/styles/theme';
 import { formatTimeAgo } from '@/utils/modHelpers';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { getExternalDependencies } from '@/modules/project/utils/dependencyEntries';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface HistoryModalProps {
     show: boolean;
@@ -32,7 +32,7 @@ const HistoryVersionItem = memo(({
     ver: any;
     isExpanded: boolean;
     onToggleExpand: (id: string) => void;
-    onDownload: (e: React.MouseEvent, ver: any) => void;
+    onDownload: (ver: any) => void;
     badgeClass: string;
     isModpack: boolean;
 }) => {
@@ -64,13 +64,13 @@ const HistoryVersionItem = memo(({
                         </div>
                     )}
                 </div>
-                <Link
-                    to="#"
-                    onClick={(e) => onDownload(e, ver)}
+                <button
+                    type="button"
+                    onClick={() => onDownload(ver)}
                     className={`px-4 py-2 bg-slate-100 dark:bg-white/5 hover:bg-modtale-accent hover:text-white text-slate-500 dark:text-slate-400 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2`}
                 >
                     <Download className="w-4 h-4" /> Download
-                </Link>
+                </button>
             </div>
 
             {ver.changelog ? (
@@ -128,8 +128,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
         setExpandedChangelog((prev) => (prev === id ? null : id));
     }, []);
 
-    const handleDownloadClick = useCallback((e: React.MouseEvent, ver: any) => {
-        e.preventDefault();
+    const handleDownloadClick = useCallback((ver: any) => {
         const gameVersion = Array.isArray(ver.gameVersions) && ver.gameVersions.length > 0 ? ver.gameVersions[0] : '';
         onDownload(ver.fileUrl, ver.versionNumber, gameVersion, ver.dependencies, ver.channel);
     }, [onDownload]);
@@ -180,8 +179,10 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
     if (isInline) return content;
 
     return (
+        <ModalPortal>
         <div className={theme.components.modalOverlay} onClick={onClose}>
             {content}
         </div>
+        </ModalPortal>
     );
 };

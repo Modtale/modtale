@@ -30,6 +30,7 @@ public class VersionMutationApplicationService {
                 normalizeDependencies(requestPayload.getDependencies()),
                 normalizeProjectIds(requestPayload.getIncompatibleProjectIds()),
                 requestPayload.getChannel(),
+                requestPayload.isReplaceExisting(),
                 currentUser
         );
     }

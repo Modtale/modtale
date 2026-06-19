@@ -159,7 +159,37 @@ public class OpenApiConfig {
                     null);
 
             enrichOperation(paths, "/api/v1/projects/{id}", "GET",
-                    "Returns a single project with metadata, permissions, and latest published state.",
+                    "Returns the lean project page shell needed for the first detail-page render. Versions, comments, gallery, and team data are exposed through focused subresources.",
+                    null,
+                    null,
+                    Map.of("error", "Project not found"));
+
+            enrichOperation(paths, "/api/v1/projects/{id}/details", "GET",
+                    "Returns the full project detail payload for editor and management workflows.",
+                    null,
+                    null,
+                    Map.of("error", "Project not found"));
+
+            enrichOperation(paths, "/api/v1/projects/{id}/versions", "GET",
+                    "Returns project versions without changelog bodies. Use the changelog endpoint when release notes are needed.",
+                    null,
+                    null,
+                    Map.of("error", "Project not found"));
+
+            enrichOperation(paths, "/api/v1/projects/{id}/comments", "GET",
+                    "Returns the project discussion thread for the current viewer.",
+                    null,
+                    null,
+                    Map.of("error", "Project not found"));
+
+            enrichOperation(paths, "/api/v1/projects/{id}/gallery", "GET",
+                    "Returns gallery image URLs for the project.",
+                    null,
+                    null,
+                    Map.of("error", "Project not found"));
+
+            enrichOperation(paths, "/api/v1/projects/{id}/team", "GET",
+                    "Returns public project contributor roles and members. Privileged viewers may also receive pending invites.",
                     null,
                     null,
                     Map.of("error", "Project not found"));

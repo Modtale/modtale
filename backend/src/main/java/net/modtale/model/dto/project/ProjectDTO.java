@@ -38,6 +38,7 @@ public class ProjectDTO {
     private boolean allowComments;
     private boolean hmWikiEnabled;
     private String hmWikiSlug;
+    private boolean galleryCarouselEnabled;
     private ProjectStatus status;
     private String expiresAt;
 
@@ -46,6 +47,7 @@ public class ProjectDTO {
     private List<Project.ProjectMember> teamInvites;
 
     private List<String> galleryImages;
+    private Map<String, String> galleryImageCaptions;
     private List<ProjectCommentDTO> comments;
     private List<ProjectVersionDTO> versions;
     private boolean canEdit;
@@ -109,6 +111,8 @@ public class ProjectDTO {
     public void setHmWikiEnabled(boolean hmWikiEnabled) { this.hmWikiEnabled = hmWikiEnabled; }
     public String getHmWikiSlug() { return hmWikiSlug; }
     public void setHmWikiSlug(String hmWikiSlug) { this.hmWikiSlug = hmWikiSlug; }
+    public boolean isGalleryCarouselEnabled() { return galleryCarouselEnabled; }
+    public void setGalleryCarouselEnabled(boolean galleryCarouselEnabled) { this.galleryCarouselEnabled = galleryCarouselEnabled; }
     public ProjectStatus getStatus() { return status; }
     public void setStatus(ProjectStatus status) { this.status = status; }
     public String getExpiresAt() { return expiresAt; }
@@ -123,6 +127,8 @@ public class ProjectDTO {
 
     public List<String> getGalleryImages() { return galleryImages; }
     public void setGalleryImages(List<String> galleryImages) { this.galleryImages = galleryImages; }
+    public Map<String, String> getGalleryImageCaptions() { return galleryImageCaptions; }
+    public void setGalleryImageCaptions(Map<String, String> galleryImageCaptions) { this.galleryImageCaptions = galleryImageCaptions; }
     public List<ProjectCommentDTO> getComments() { return comments; }
     public void setComments(List<ProjectCommentDTO> comments) { this.comments = comments; }
     public List<ProjectVersionDTO> getVersions() { return versions; }

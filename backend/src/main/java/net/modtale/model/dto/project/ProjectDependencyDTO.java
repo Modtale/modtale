@@ -1,6 +1,7 @@
 package net.modtale.model.dto.project;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -16,5 +17,11 @@ public record ProjectDependencyDTO(
         String externalFileUrl,
         String externalFileName,
         String cachedFileUrl,
-        boolean hytaleProjectConfirmed
+        boolean hytaleProjectConfirmed,
+        String icon,
+        String title,
+        ProjectClassification classification,
+        String slug,
+        boolean isOptional,
+        boolean isEmbedded
 ) {}

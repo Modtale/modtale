@@ -6,7 +6,7 @@ import node from '@astrojs/node';
 export default defineConfig({
     output: 'server',
     adapter: node({
-        mode: 'standalone',
+        mode: 'middleware',
     }),
     integrations: [
         react(),
@@ -19,6 +19,9 @@ export default defineConfig({
         host: true
     },
     vite: {
+        optimizeDeps: {
+            include: ['@sentry/react', 'react-easy-crop']
+        },
         ssr: {
             noExternal: ['react-router-dom', 'lucide-react', 'react-easy-crop', 'react-helmet-async']
         },

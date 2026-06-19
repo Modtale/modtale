@@ -4,6 +4,7 @@ import { adminClient } from '../api/adminClient';
 import { API_BASE_URL, extractApiErrorMessage } from '@/utils/api';
 import { isSuperAdminUser } from '../utils/access';
 import type { Project, ScanIssue } from '@/types';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }) {
     const [query, setQuery] = useState('');
@@ -205,7 +206,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
             } else if (confirmAction === 'DELETE_VER' && targetVersionId) {
                 await adminClient.deleteVersion(foundProject.id, targetVersionId);
                 setStatus({ type: 'success', title: 'Version Deleted', msg: 'Version removed successfully.' });
-                const newVersions = foundProject.versions.filter(v => v.id !== targetVersionId);
+                const newVersions = (foundProject.versions || []).filter(v => v.id !== targetVersionId);
                 setFoundProject({ ...foundProject, versions: newVersions });
             }
             setConfirmAction(null);
@@ -349,6 +350,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
                     )}
 
                     {showRawModal && (
+                        <ModalPortal>
                         <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
                             <div className="bg-slate-900 w-full max-w-5xl rounded-3xl shadow-2xl border border-white/10 flex flex-col overflow-hidden h-[85vh]">
                                 <div className="px-6 py-4 border-b border-white/10 flex justify-between items-center bg-black/40">
@@ -371,9 +373,11 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
                                 </div>
                             </div>
                         </div>
+                        </ModalPortal>
                     )}
 
                     {confirmAction && (
+                        <ModalPortal>
                         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
                             <div className="bg-white dark:bg-slate-900 w-full max-w-md p-6 rounded-3xl shadow-2xl border border-slate-200 dark:border-white/10">
                                 <div className={`flex items-center gap-3 mb-4 ${confirmAction === 'RESTORE' ? 'text-emerald-500' : 'text-red-500'}`}>
@@ -417,6 +421,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
                                 </div>
                             </div>
                         </div>
+                        </ModalPortal>
                     )}
                 </div>
             )}

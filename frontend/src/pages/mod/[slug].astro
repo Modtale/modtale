@@ -17,20 +17,26 @@ const userAgent = Astro.request.headers.get('user-agent') || '';
 const isBot = isBotUserAgent(userAgent);
 
 let modData = null;
+let projectUnavailable = false;
 let title = ROUTE_SEO['/mods'].title;
 let description = ROUTE_SEO['/mods'].description;
 let image = projectId ? `${BACKEND_URL}/api/v1/og/project/${projectId}.png` : 'https://modtale.net/assets/logo.svg';
 let jsonLd: any = undefined;
 let ssrSuccessfullyCompleted = false;
 
-if (isBot && projectId) {
+if (projectId) {
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(() => controller.abort(), 2500);
+
     try {
-        const res = await fetch(`${BACKEND_URL}/api/v1/projects/${projectId}`);
+        const res = await fetch(`${BACKEND_URL}/api/v1/projects/${projectId}`, {
+            signal: controller.signal,
+        });
         if (res.ok) {
             modData = await res.json();
 
             const canonicalUrl = SiteRoutes.project(modData);
-            if (cleanPath !== canonicalUrl.replace(/\/$/, "")) {
+            if (isBot && cleanPath !== canonicalUrl.replace(/\/$/, "")) {
                 return Astro.redirect(canonicalUrl, 301);
             }
 
@@ -57,8 +63,14 @@ if (isBot && projectId) {
 
             jsonLd = [appSchema, breadcrumbSchema];
             ssrSuccessfullyCompleted = true;
+        } else {
+            projectUnavailable = true;
         }
-    } catch (e) {}
+    } catch (e) {
+        projectUnavailable = true;
+    } finally {
+        clearTimeout(timeoutHandle);
+    }
 }
 
 if (ssrSuccessfullyCompleted) {
@@ -67,9 +79,10 @@ if (ssrSuccessfullyCompleted) {
     Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=0, must-revalidate');
 }
 
-const projectBootstrapUrl = !modData && projectId ? `${BACKEND_URL}/api/v1/projects/${projectId}` : undefined;
+const projectInitialData = modData || (projectUnavailable && projectId ? { __projectUnavailable: true, id: projectId } : null);
+const projectBootstrapUrl = !projectInitialData && projectId ? `${BACKEND_URL}/api/v1/projects/${projectId}` : undefined;
 ---
 
-<BaseLayout title={title} description={description} image={image} jsonLd={jsonLd} initialData={modData} projectBootstrapUrl={projectBootstrapUrl}>
-    <App client:load initialPath={path} ssrData={modData} />
+<BaseLayout title={title} description={description} image={image} jsonLd={jsonLd} initialData={projectInitialData} projectBootstrapUrl={projectBootstrapUrl}>
+    <App client:load initialPath={path} ssrData={projectInitialData} />
 </BaseLayout>

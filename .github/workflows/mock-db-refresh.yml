@@ -1,0 +1,119 @@
+name: Refresh Mock Database
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'backend/src/main/java/net/modtale/model/**'
+      - 'backend/src/main/java/net/modtale/repository/**'
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: refresh-mock-database
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Generate Sanitized Mock DB
+    if: github.repository == 'Modtale/modtale'
+    runs-on: ubuntu-latest
+
+    env:
+      MOCK_SOURCE_MONGODB_URI: ${{ secrets.MOCK_SOURCE_MONGODB_URI }}
+      MOCK_SOURCE_DATABASE_NAME: ${{ vars.MOCK_SOURCE_DATABASE_NAME }}
+      MOCK_TEMPLATE_MONGODB_URI: ${{ secrets.MOCK_TEMPLATE_MONGODB_URI }}
+      MOCK_TEMPLATE_DATABASE_NAME: ${{ vars.MOCK_TEMPLATE_DATABASE_NAME }}
+      MOCK_DB_OUTPUT_DIR: ${{ github.workspace }}/mock-db/generated/collections
+      MOCK_DB_COLLECTION_DIR: ${{ github.workspace }}/mock-db/generated/collections
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate secret configuration
+        run: |
+          : "${MOCK_SOURCE_MONGODB_URI:?Set secret MOCK_SOURCE_MONGODB_URI with a read-only source MongoDB user.}"
+
+          source_db="${MOCK_SOURCE_DATABASE_NAME:-modtale}"
+          template_db="${MOCK_TEMPLATE_DATABASE_NAME:-modtale-mock-template}"
+
+          if [ "$source_db" = "$template_db" ]; then
+            echo "::error::MOCK_TEMPLATE_DATABASE_NAME must differ from MOCK_SOURCE_DATABASE_NAME. Refusing to load mock data into the source database."
+            exit 1
+          fi
+
+          echo "MOCK_SOURCE_DATABASE_NAME=$source_db" >> "$GITHUB_ENV"
+          echo "MOCK_TEMPLATE_DATABASE_NAME=$template_db" >> "$GITHUB_ENV"
+
+          if [ -z "${MOCK_TEMPLATE_MONGODB_URI:-}" ]; then
+            echo "MOCK_TEMPLATE_MONGODB_URI=$MOCK_SOURCE_MONGODB_URI" >> "$GITHUB_ENV"
+            echo "TEMPLATE_URI_SOURCE=MOCK_SOURCE_MONGODB_URI" >> "$GITHUB_ENV"
+          else
+            echo "TEMPLATE_URI_SOURCE=MOCK_TEMPLATE_MONGODB_URI" >> "$GITHUB_ENV"
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install mock DB tooling
+        working-directory: mock-db
+        run: npm ci
+
+      - name: Generate sanitized fixtures
+        working-directory: mock-db
+        run: npm run generate
+
+      - name: Validate sanitized fixtures
+        working-directory: mock-db
+        run: npm run validate
+
+      - name: Delete previous public mock DB artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          artifact_ids="$(
+            gh api --paginate \
+              "/repos/${GITHUB_REPOSITORY}/actions/artifacts?name=modtale-mock-db-json&per_page=100" \
+              --jq '.artifacts[] | select(.expired == false) | .id'
+          )"
+
+          if [ -z "$artifact_ids" ]; then
+            echo "No previous modtale-mock-db-json artifacts found."
+            exit 0
+          fi
+
+          for artifact_id in $artifact_ids; do
+            echo "Deleting previous mock DB artifact $artifact_id"
+            gh api --method DELETE "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}"
+          done
+
+      - name: Upload public mock DB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: modtale-mock-db-json
+          path: mock-db/generated/collections/*.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Load preview template database
+        working-directory: mock-db
+        run: npm run load-template
+
+      - name: Write summary
+        run: |
+          {
+            echo "## Mock DB Refresh"
+            echo ""
+            echo "- Generated sanitized JSON artifact: \`modtale-mock-db-json\`"
+            echo "- Refreshed template database: \`${MOCK_TEMPLATE_DATABASE_NAME:-modtale-mock-template}\`"
+            echo "- Template Mongo URI source: \`${TEMPLATE_URI_SOURCE:-MOCK_TEMPLATE_MONGODB_URI}\`"
+            echo "- Source privileged collections were not read; reports/admin logs/API keys/status/analytics are synthetic."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
-import { NewReleasesSection, ProjectAnalyticsSection, TrendingProjectsSection } from '@/modules/home/components/FeaturePreviews';
+import { InlineDependencyUI, NewReleasesSection, ProjectAnalyticsSection, TrendingProjectsSection } from '@/modules/home/components/FeaturePreviews';
 
 vi.mock('@/components/ui/charts/LineChart', () => ({
     LineChart: () => <div data-testid="line-chart" />
@@ -131,5 +131,44 @@ describe('FeaturePreviews project sections', () => {
 
         expect(markup).toContain('data-testid="project-card"');
         expect(markup).toContain('Skyforge Utilities');
+    });
+
+    it('uses real project data for every dependency preview entry', () => {
+        const dependencyProjects = [
+            {
+                id: 'arcane-toolkit',
+                title: 'Arcane Toolkit',
+                author: 'Ada',
+                imageUrl: '/images/arcane.png',
+                classification: 'PLUGIN',
+                versions: [{ versionNumber: '2.4.0', releaseDate: '2026-04-10T00:00:00Z' }]
+            },
+            {
+                id: 'worldedit-plus',
+                title: 'WorldEdit Plus',
+                author: 'Grace',
+                imageUrl: '/images/worldedit.png',
+                classification: 'MODPACK',
+                versions: [{ versionNumber: '1.8.2', releaseDate: '2026-03-10T00:00:00Z' }]
+            },
+            {
+                id: 'biome-painter',
+                title: 'Biome Painter',
+                author: 'Lin',
+                imageUrl: '/images/biome.png',
+                classification: 'DATA',
+                versions: [{ versionNumber: '3.0.1', releaseDate: '2026-05-10T00:00:00Z' }]
+            }
+        ] as any;
+
+        const markup = renderToStaticMarkup(<InlineDependencyUI projects={dependencyProjects} />);
+
+        expect(markup).toContain('Arcane Toolkit');
+        expect(markup).toContain('WorldEdit Plus');
+        expect(markup).toContain('Biome Painter');
+        expect(markup).toContain('by Ada');
+        expect(markup).toContain('v2.4.0');
+        expect(markup).not.toContain('Hytale Core Library');
+        expect(markup).not.toContain('MathLib');
     });
 });

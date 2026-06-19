@@ -4,6 +4,7 @@ import { projectClient } from '../../api/projectClient';
 import { theme } from '@/styles/theme';
 import { extractApiErrorMessage } from '@/utils/api';
 import { useScrollLock } from '@/hooks/useScrollLock';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface ReportModalProps {
     isOpen: boolean;
@@ -92,6 +93,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targe
     const selectedLabel = REPORT_REASONS.find(r => r.id === reason)?.label;
 
     return (
+        <ModalPortal>
         <div className={theme.components.modalOverlay} onClick={onClose}>
             <div className={`${theme.components.modalContent} max-w-2xl w-full overflow-visible`} onClick={e => e.stopPropagation()}>
                 <div className={theme.components.modalHeader}>
@@ -179,5 +181,6 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targe
                 </div>
             </div>
         </div>
+        </ModalPortal>
     );
 };

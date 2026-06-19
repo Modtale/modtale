@@ -11,7 +11,7 @@ interface BarData {
 interface BarChartProps {
     data: BarData[];
     formatter?: (val: number) => string;
-    onToggle?: (id: string) => void;
+    onToggle?: (id: string, hidden: boolean) => void;
 }
 
 export const BarChart: React.FC<BarChartProps> = ({ data, formatter, onToggle }) => {
@@ -102,7 +102,7 @@ export const BarChart: React.FC<BarChartProps> = ({ data, formatter, onToggle })
                 {normalizedData.map(d => (
                     <button
                         key={d.id}
-                        onClick={() => onToggle && onToggle(d.id)}
+                        onClick={() => onToggle && onToggle(d.id, !d.hidden)}
                         className={`flex items-center gap-2 text-[11px] font-bold px-3 py-1.5 rounded-full transition-all border ${
                             d.hidden
                                 ? 'bg-transparent text-slate-400 border-slate-300 dark:border-white/10 border-dashed hover:border-slate-400 dark:hover:border-white/20'
@@ -139,12 +139,6 @@ export const BarChart: React.FC<BarChartProps> = ({ data, formatter, onToggle })
                     <div className="flex-1 relative h-full w-full overflow-visible">
                         <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="w-full h-full block overflow-visible" onMouseLeave={() => setHoverIndex(null)}>
                             <defs>
-                                {activeData.map(d => (
-                                    <linearGradient key={`grad-${d.id}`} id={`grad-${d.id}`} x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor={d.color} stopOpacity="1" />
-                                        <stop offset="100%" stopColor={d.color} stopOpacity="0.5" />
-                                    </linearGradient>
-                                ))}
                                 <clipPath id={`grid-clip-${chartId}`}>
                                     <rect x={paddingX} y={paddingTop} width={chartWidth} height={chartHeight} />
                                 </clipPath>
@@ -180,7 +174,7 @@ export const BarChart: React.FC<BarChartProps> = ({ data, formatter, onToggle })
                                                 y={y}
                                                 width={barWidth}
                                                 height={Math.max(0, barH + 10)}
-                                                fill={`url(#grad-${d.id})`}
+                                                fill={d.color}
                                                 className="transition-opacity duration-300 ease-out"
                                                 style={{ opacity: hoverIndex !== null && hoverIndex !== i ? 0.3 : 1 }}
                                                 rx={8}
