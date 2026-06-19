@@ -21,3 +21,7 @@ frontend/.env.local
 frontend/npm-debug.log*
 frontend/yarn-debug.log*
 frontend/yarn-error.log*
+
+mock-db/collections/
+mock-db/generated/
+mock-db/node_modules/
