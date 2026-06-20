@@ -26,7 +26,8 @@ const metaData = {
     repositoryUrl: '',
     iconFile: null,
     iconPreview: null,
-    license: 'MIT'
+    license: 'MIT',
+    customLicenseOpenSource: false
 } satisfies MetadataFormData;
 
 const projectData = {

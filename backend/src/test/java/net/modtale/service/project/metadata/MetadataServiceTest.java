@@ -17,7 +17,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -67,6 +69,7 @@ class MetadataServiceTest {
         updated.setTags(List.of("magic"));
         updated.setSlug("new-slug");
         updated.setLicense("MIT");
+        updated.setCustomLicenseOpenSource(true);
 
         User user = new User();
         user.setId("user-1");
@@ -86,9 +89,37 @@ class MetadataServiceTest {
         assertEquals(List.of("magic"), existing.getTags());
         assertEquals("new-slug", existing.getSlug());
         assertEquals("MIT", existing.getLicense());
+        assertFalse(existing.isCustomLicenseOpenSource());
         verify(validationService).validateSlug("new-slug");
         verify(projectRepository).save(existing);
         verify(projectService).evictProjectCache(existing);
+    }
+
+    @Test
+    void updateMetadataPersistsOpenSourceFlagForCustomLicenses() {
+        Project existing = new Project();
+        existing.setId("project-1");
+        existing.setClassification(ProjectClassification.DATA);
+
+        Project updated = new Project();
+        updated.setTitle("Raw Title");
+        updated.setDescription("Raw Description");
+        updated.setLicense("Sky Public License");
+        updated.setCustomLicenseOpenSource(true);
+
+        User user = new User();
+        user.setId("user-1");
+
+        when(projectService.getRawProjectById("project-1")).thenReturn(existing);
+        when(accessControlService.hasProjectPermission(existing, user, "PROJECT_EDIT_METADATA")).thenReturn(true);
+        when(sanitizationService.sanitizePlainText("Raw Title")).thenReturn("Clean Title");
+        when(sanitizationService.sanitizePlainText("Raw Description")).thenReturn("Clean Description");
+
+        service.updateMetadata("project-1", updated, user);
+
+        assertEquals("Sky Public License", existing.getLicense());
+        assertTrue(existing.isCustomLicenseOpenSource());
+        verify(projectRepository).save(existing);
     }
 
     @Test

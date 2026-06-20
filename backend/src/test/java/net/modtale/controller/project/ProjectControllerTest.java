@@ -554,6 +554,32 @@ class ProjectControllerTest {
     }
 
     @Test
+    void updateProjectPassesCustomLicenseOpenSourceFlag() {
+        User currentUser = user("user-1", "ada");
+        Project existing = project("project-1", "Existing", ProjectStatus.DRAFT);
+
+        UpdateProjectRequest request = new UpdateProjectRequest();
+        request.setTitle("Updated Title");
+        request.setLicense("Sky Public License");
+        request.setCustomLicenseOpenSource(true);
+
+        when(accountService.requireCurrentUser(null, "editing project metadata")).thenReturn(currentUser);
+        when(projectService.getRawProjectById("project-1")).thenReturn(existing);
+        doNothing().when(metadataService).updateMetadata(eq("project-1"), org.mockito.ArgumentMatchers.any(Project.class), eq(currentUser));
+
+        var response = controller.updateProject("project-1", request, null);
+
+        assertEquals(200, response.getStatusCode().value());
+
+        ArgumentCaptor<Project> captor = ArgumentCaptor.forClass(Project.class);
+        verify(metadataService).updateMetadata(eq("project-1"), captor.capture(), eq(currentUser));
+
+        Project updated = captor.getValue();
+        assertEquals("Sky Public License", updated.getLicense());
+        assertTrue(updated.isCustomLicenseOpenSource());
+    }
+
+    @Test
     void deleteProjectDelegatesToProjectRetentionService() {
         User currentUser = user("user-1", "ada");
         when(accountService.requireCurrentUser(null, "deleting a project")).thenReturn(currentUser);

@@ -103,6 +103,7 @@ public class ProjectMapper {
                 project.getUpdatedAt(),
                 project.getCreatedAt(),
                 project.getLicense(),
+                project.isCustomLicenseOpenSource(),
                 project.getLinks(),
                 project.isAllowModpacks(),
                 project.isAllowComments(),
@@ -171,6 +172,7 @@ public class ProjectMapper {
                 project.getUpdatedAt(),
                 project.getCreatedAt(),
                 project.getLicense(),
+                project.isCustomLicenseOpenSource(),
                 project.getLinks(),
                 project.getChildProjectIds(),
                 project.isAllowModpacks(),
@@ -223,6 +225,7 @@ public class ProjectMapper {
         dto.setUpdatedAt(project.getUpdatedAt());
         dto.setCreatedAt(project.getCreatedAt());
         dto.setLicense(project.getLicense());
+        dto.setCustomLicenseOpenSource(project.isCustomLicenseOpenSource());
         dto.setLastTrendingNotification(project.getLastTrendingNotification());
         dto.setLinks(project.getLinks());
         dto.setTypes(project.getTypes());

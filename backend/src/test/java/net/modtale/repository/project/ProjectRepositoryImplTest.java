@@ -283,7 +283,7 @@ class ProjectRepositoryImplTest {
     }
 
     @Test
-    void openSourceFilterMatchesOnlyStandardOpenLicenseIds() {
+    void openSourceFilterMatchesStandardOpenLicenseIdsAndMarkedCustomLicenses() {
         repository.searchProjects(
                 null,
                 null,
@@ -306,8 +306,9 @@ class ProjectRepositoryImplTest {
         assertTrue(queryJson.contains("MIT"));
         assertTrue(queryJson.contains("Apache-2.0"));
         assertTrue(queryJson.contains("Unlicense"));
-        assertFalse(queryJson.contains("ARR"));
-        assertFalse(queryJson.contains("CC-BY-NC-SA-4.0"));
+        assertTrue(queryJson.contains("customLicenseOpenSource"));
+        assertTrue(queryJson.contains("$nin"));
+        assertTrue(queryJson.contains("CC-BY-NC-SA-4.0"));
     }
 
     @Test
@@ -318,7 +319,7 @@ class ProjectRepositoryImplTest {
 
         assertTrue(queryJson.contains("license"));
         assertTrue(queryJson.contains("MIT"));
-        assertFalse(queryJson.contains("ARR"));
+        assertTrue(queryJson.contains("customLicenseOpenSource"));
     }
 
     private Query capturedFindQuery() {

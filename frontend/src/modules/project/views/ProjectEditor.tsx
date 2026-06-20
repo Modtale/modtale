@@ -57,7 +57,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
     const { project: projectData, setProject: setProjectData, loading, contributors } = useProjectDetail(id, null, currentUser, { hydrateChangelogs: true, full: true });
 
     const [metaData, setMetaData] = useState<MetadataFormData>({
-        title: '', summary: '', description: '', tags: [], links: {}, repositoryUrl: '', iconFile: null, iconPreview: null, slug: ''
+        title: '', summary: '', description: '', tags: [], links: {}, repositoryUrl: '', iconFile: null, iconPreview: null, slug: '', customLicenseOpenSource: false
     });
     const [versionData, setVersionData] = useState<VersionFormData>({
         projectIds: [], incompatibleProjectIds: [], versionNumber: '', gameVersions: [], changelog: '', file: null, dependencies: [], modIds: [], channel: 'RELEASE', replaceExisting: false
@@ -126,7 +126,8 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                 repositoryUrl: projectData.repositoryUrl || '',
                 iconFile: null,
                 iconPreview: projectData.imageUrl || null,
-                license: projectData.license
+                license: projectData.license,
+                customLicenseOpenSource: projectData.customLicenseOpenSource || false
             });
             if (projectData.bannerUrl) setBannerPreview(projectData.bannerUrl);
         }
@@ -402,7 +403,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         markDirty();
         const linksWithoutCustomLicense = { ...metaData.links };
         delete linksWithoutCustomLicense.LICENSE;
-        setMetaData({ ...metaData, license: licenseId, links: linksWithoutCustomLicense });
+        setMetaData({ ...metaData, license: licenseId, links: linksWithoutCustomLicense, customLicenseOpenSource: false });
     };
 
     const handleUploadVersion = async () => {
@@ -979,7 +980,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                     ))}
                                     <button
                                         disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
-                                        onClick={() => { markDirty(); if (!isCustomLicense) setMetaData({ ...metaData, license: '' }); }}
+                                        onClick={() => { markDirty(); if (!isCustomLicense) setMetaData({ ...metaData, license: '', customLicenseOpenSource: false }); }}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-between border-t ${theme.colors.border} mt-1 pt-2 ${isCustomLicense ? 'bg-modtale-accent text-white' : `${theme.colors.textSecondary} hover:bg-slate-200 dark:hover:bg-white/10`}`}
                                     >
                                         <span>Custom License</span>
@@ -1004,6 +1005,18 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                             {!metaData.links.LICENSE && (
                                                 <p className="text-[10px] text-red-500 font-bold px-1">URL is required for custom licenses.</p>
                                             )}
+                                            <button
+                                                type="button"
+                                                aria-pressed={metaData.customLicenseOpenSource}
+                                                disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
+                                                onClick={() => { markDirty(); setMetaData({ ...metaData, customLicenseOpenSource: !metaData.customLicenseOpenSource }); }}
+                                                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold transition-colors ${metaData.customLicenseOpenSource ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-700 dark:text-emerald-300' : `${theme.colors.bgSurfaceAlt} ${theme.colors.border} ${theme.colors.textSecondary} hover:bg-slate-200 dark:hover:bg-white/10`}`}
+                                            >
+                                                <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${metaData.customLicenseOpenSource ? 'bg-emerald-500 border-emerald-500 text-white' : theme.colors.border}`}>
+                                                    {metaData.customLicenseOpenSource && <Check className="w-3 h-3" />}
+                                                </span>
+                                                <span>Open Source</span>
+                                            </button>
                                         </div>
                                     )}
                                 </div>

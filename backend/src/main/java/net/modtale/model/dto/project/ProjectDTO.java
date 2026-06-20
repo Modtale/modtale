@@ -30,6 +30,7 @@ public class ProjectDTO {
     private String updatedAt;
     private String createdAt;
     private String license;
+    private boolean customLicenseOpenSource;
     private String lastTrendingNotification;
     private Map<String, String> links;
     private List<String> types;
@@ -96,6 +97,8 @@ public class ProjectDTO {
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
     public String getLicense() { return license; }
     public void setLicense(String license) { this.license = license; }
+    public boolean isCustomLicenseOpenSource() { return customLicenseOpenSource; }
+    public void setCustomLicenseOpenSource(boolean customLicenseOpenSource) { this.customLicenseOpenSource = customLicenseOpenSource; }
     public String getLastTrendingNotification() { return lastTrendingNotification; }
     public void setLastTrendingNotification(String lastTrendingNotification) { this.lastTrendingNotification = lastTrendingNotification; }
     public Map<String, String> getLinks() { return links; }

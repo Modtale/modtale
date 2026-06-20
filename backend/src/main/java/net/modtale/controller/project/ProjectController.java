@@ -503,6 +503,7 @@ public class ProjectController {
         updated.setLinks(requestPayload.getLinks());
         updated.setRepositoryUrl(requestPayload.getRepositoryUrl());
         updated.setLicense(requestPayload.getLicense());
+        updated.setCustomLicenseOpenSource(Boolean.TRUE.equals(requestPayload.getCustomLicenseOpenSource()));
         if (requestPayload.getAllowModpacks() != null) updated.setAllowModpacks(requestPayload.getAllowModpacks());
         else if (existing != null) updated.setAllowModpacks(existing.isAllowModpacks());
         if (requestPayload.getAllowComments() != null) updated.setAllowComments(requestPayload.getAllowComments());
