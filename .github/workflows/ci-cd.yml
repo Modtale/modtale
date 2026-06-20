@@ -54,6 +54,7 @@ jobs:
             echo "SEEDING_MODE=mock" >> $GITHUB_ENV
             echo "SEEDING_RESET=false" >> $GITHUB_ENV
             echo "SEEDING_SOURCE_DB=modtale-mock-template" >> $GITHUB_ENV
+            echo "SEEDING_SOURCE_R2_BUCKET_NAME=" >> $GITHUB_ENV
             echo "BACKEND_DOMAIN=https://api.modtale.net" >> $GITHUB_ENV
             echo "FRONTEND_DOMAIN=https://modtale.net" >> $GITHUB_ENV
             echo "TAG=latest" >> $GITHUB_ENV
@@ -70,6 +71,7 @@ jobs:
             echo "SEEDING_MODE=mock" >> $GITHUB_ENV
             echo "SEEDING_RESET=false" >> $GITHUB_ENV
             echo "SEEDING_SOURCE_DB=modtale-mock-template" >> $GITHUB_ENV
+            echo "SEEDING_SOURCE_R2_BUCKET_NAME=" >> $GITHUB_ENV
             echo "BACKEND_DOMAIN=https://dev.api.modtale.net" >> $GITHUB_ENV
             echo "FRONTEND_DOMAIN=https://dev.modtale.net" >> $GITHUB_ENV
             echo "TAG=dev" >> $GITHUB_ENV
@@ -78,7 +80,10 @@ jobs:
             echo "WARDEN_SECRET_NAME=WARDEN_API_KEY" >> $GITHUB_ENV
           
           else
-            SLUG=$(echo $BRANCH_NAME | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]' | cut -c 1-20 | sed 's/-$//')
+            SLUG=$(echo $BRANCH_NAME | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]' | sed 's/--*/-/g' | cut -c 1-20 | sed 's/^-//;s/-$//')
+            if [ -z "$SLUG" ]; then
+              SLUG="${GITHUB_SHA:0:7}"
+            fi
             echo "ENV_TYPE=preview" >> $GITHUB_ENV
             echo "BACKEND_SERVICE=modtale-backend-$SLUG" >> $GITHUB_ENV
             echo "FRONTEND_SERVICE=modtale-frontend-$SLUG" >> $GITHUB_ENV
@@ -87,8 +92,9 @@ jobs:
             echo "SEEDING_MODE=template" >> $GITHUB_ENV
             echo "SEEDING_RESET=true" >> $GITHUB_ENV
             echo "SEEDING_SOURCE_DB=modtale-mock-template" >> $GITHUB_ENV
+            echo "SEEDING_SOURCE_R2_BUCKET_NAME=modtale-binaries" >> $GITHUB_ENV
             echo "TAG=$SLUG" >> $GITHUB_ENV
-            echo "R2_BUCKET_NAME=modtale-dev" >> $GITHUB_ENV
+            echo "R2_BUCKET_NAME=modtale-branch-$SLUG" >> $GITHUB_ENV
             echo "R2_PUBLIC_DOMAIN=https://pub-dc8241faa0a343c080802bf00bc72bc5.r2.dev" >> $GITHUB_ENV
             echo "WARDEN_SECRET_NAME=WARDEN_API_KEY" >> $GITHUB_ENV
           fi
@@ -100,6 +106,43 @@ jobs:
 
       - name: 'Set up Cloud SDK'
         uses: 'google-github-actions/setup-gcloud@v2'
+
+      - name: Ensure Branch R2 Bucket
+        if: env.ENV_TYPE == 'preview'
+        run: |
+          set -euo pipefail
+
+          : "${R2_BUCKET_NAME:?R2_BUCKET_NAME must be configured for preview branch deployments.}"
+
+          r2_access_key="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret=R2_ACCESS_KEY)"
+          r2_secret_key="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret=R2_SECRET_KEY)"
+          r2_endpoint="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret=R2_ENDPOINT)"
+          r2_endpoint="$(printf '%s' "$r2_endpoint" | sed -E 's#(https?://[^/]+).*#\1#')"
+
+          echo "::add-mask::$r2_access_key"
+          echo "::add-mask::$r2_secret_key"
+
+          if ! command -v aws >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y awscli
+          fi
+
+          if AWS_ACCESS_KEY_ID="$r2_access_key" \
+             AWS_SECRET_ACCESS_KEY="$r2_secret_key" \
+             AWS_DEFAULT_REGION=auto \
+             aws s3api head-bucket \
+               --endpoint-url "$r2_endpoint" \
+               --bucket "$R2_BUCKET_NAME" >/dev/null 2>&1; then
+            echo "R2 bucket '$R2_BUCKET_NAME' already exists."
+          else
+            echo "Creating R2 bucket '$R2_BUCKET_NAME'."
+            AWS_ACCESS_KEY_ID="$r2_access_key" \
+            AWS_SECRET_ACCESS_KEY="$r2_secret_key" \
+            AWS_DEFAULT_REGION=auto \
+            aws s3api create-bucket \
+              --endpoint-url "$r2_endpoint" \
+              --bucket "$R2_BUCKET_NAME" >/dev/null
+          fi
 
       - name: Check Existing Services
         id: check_services
@@ -146,6 +189,7 @@ jobs:
             "--update-env-vars" "APP_SEEDING_MODE=${{ env.SEEDING_MODE }}"
             "--update-env-vars" "APP_SEEDING_RESET=${{ env.SEEDING_RESET }}"
             "--update-env-vars" "APP_SEEDING_SOURCE_DB=${{ env.SEEDING_SOURCE_DB }}"
+            "--update-env-vars" "APP_SEEDING_SOURCE_R2_BUCKET_NAME=${{ env.SEEDING_SOURCE_R2_BUCKET_NAME }}"
             "--update-env-vars" "WARDEN_URL=${{ secrets.WARDEN_URL }}"
             "--update-env-vars" "WARDEN_ENABLED=true"
             "--update-env-vars" "FRONTEND_URL=placeholder"
