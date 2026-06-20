@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
 const outputDir = process.env.MOCK_DB_OUTPUT_DIR
@@ -13,7 +13,7 @@ const sourceUri = process.env.MOCK_SOURCE_MONGODB_URI;
 const sourceDbName = process.env.MOCK_SOURCE_DATABASE_NAME || 'modtale';
 const projectLimit = Number.parseInt(process.env.MOCK_PROJECT_LIMIT || '80', 10);
 
-const passwordHash = '$2a$10$7EqJtq98hPqEX7fNZaFWoOHiDwGZfq23E4M//LDdYX2.J9FLcweT2';
+const passwordHash = '$2a$10$YQPnaULIFCpHYqXreH4IdeK0tSn2gCrMgOSE6bOcKCIR16cG9/Ujy';
 const classifications = ['PLUGIN', 'DATA', 'ART', 'SAVE', 'MODPACK'];
 
 if (!sourceUri) {
@@ -114,6 +114,76 @@ const publicProjectProjection = {
   'versions.incompatibleProjectIds': 1,
   'versions.channel': 1
 };
+
+const publicProjectFilter = {
+  status: { $in: ['PUBLISHED', 'ARCHIVED'] },
+  deletedAt: null
+};
+
+const projectIdClauses = (projectId) => {
+  const id = String(projectId || '');
+  const clauses = [{ _id: id }];
+  if (ObjectId.isValid(id)) {
+    clauses.unshift({ _id: new ObjectId(id) });
+  }
+  return clauses;
+};
+
+async function findPublicProjectById(db, projectId) {
+  const clauses = projectIdClauses(projectId);
+  return db.collection('projects').findOne(
+    {
+      ...publicProjectFilter,
+      $or: clauses
+    },
+    { projection: publicProjectProjection }
+  );
+}
+
+function extractDependencyProjectIds(project) {
+  const dependencyIds = new Set();
+  const versions = Array.isArray(project?.versions) ? project.versions : [];
+
+  for (const version of versions) {
+    const dependencies = Array.isArray(version?.dependencies) ? version.dependencies : [];
+    for (const dependency of dependencies) {
+      if (!dependency || typeof dependency !== 'object') continue;
+      if (dependency.source && String(dependency.source).toUpperCase() !== 'MODTALE') continue;
+
+      const dependencyId = dependency.projectId ?? dependency.modId;
+      if (dependencyId != null && String(dependencyId).trim()) {
+        dependencyIds.add(String(dependencyId));
+      }
+    }
+  }
+
+  return dependencyIds;
+}
+
+async function includeDependencyProjects(db, selected, seen) {
+  let added = 0;
+  const queue = [...selected];
+
+  while (queue.length > 0) {
+    const project = queue.shift();
+    for (const dependencyId of extractDependencyProjectIds(project)) {
+      if (seen.has(dependencyId)) continue;
+
+      const dependencyProject = await findPublicProjectById(db, dependencyId);
+      if (!dependencyProject) continue;
+
+      const id = String(dependencyProject._id);
+      if (seen.has(id)) continue;
+
+      selected.push(dependencyProject);
+      queue.push(dependencyProject);
+      seen.add(id);
+      added += 1;
+    }
+  }
+
+  return added;
+}
 
 function baseUsers(authorProfiles) {
   const users = [
@@ -987,10 +1057,7 @@ async function main() {
     const db = client.db(sourceDbName);
     const sourceProjects = await db.collection('projects')
       .find(
-        {
-          status: { $in: ['PUBLISHED', 'ARCHIVED'] },
-          deletedAt: null
-        },
+        publicProjectFilter,
         { projection: publicProjectProjection }
       )
       .sort({ downloadCount: -1, updatedAt: -1 })
@@ -1015,6 +1082,11 @@ async function main() {
         selected.push(project);
         seen.add(id);
       }
+    }
+
+    const dependencyCount = await includeDependencyProjects(db, selected, seen);
+    if (dependencyCount > 0) {
+      console.log(`Included ${dependencyCount} dependency project(s) in the mock project fixture.`);
     }
 
     const selectedProjectIds = new Set(selected.map((project) => String(project._id)));
