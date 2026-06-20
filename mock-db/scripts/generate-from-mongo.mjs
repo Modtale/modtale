@@ -13,7 +13,7 @@ const sourceUri = process.env.MOCK_SOURCE_MONGODB_URI;
 const sourceDbName = process.env.MOCK_SOURCE_DATABASE_NAME || 'modtale';
 const projectLimit = Number.parseInt(process.env.MOCK_PROJECT_LIMIT || '80', 10);
 
-const passwordHash = '$2a$10$7EqJtq98hPqEX7fNZaFWoOHiDwGZfq23E4M//LDdYX2.J9FLcweT2';
+const passwordHash = '$2a$10$YQPnaULIFCpHYqXreH4IdeK0tSn2gCrMgOSE6bOcKCIR16cG9/Ujy';
 const classifications = ['PLUGIN', 'DATA', 'ART', 'SAVE', 'MODPACK'];
 
 if (!sourceUri) {
