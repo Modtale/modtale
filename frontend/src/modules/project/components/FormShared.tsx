@@ -13,6 +13,7 @@ export type MetadataFormData = {
     iconFile: File | null;
     iconPreview: string | null;
     license?: string;
+    customLicenseOpenSource: boolean;
 };
 
 export type VersionFormData = {

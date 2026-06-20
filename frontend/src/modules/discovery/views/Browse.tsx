@@ -61,14 +61,14 @@ export const Browse: React.FC<BrowseViewProps> = ({
     const { isMobile } = useMobile();
     const { initialData } = useSSRData();
 
-    const hasComplexParams = searchParams.has('q') || searchParams.has('tags') || searchParams.has('version') || searchParams.has('minDl') || searchParams.has('minFav') || searchParams.has('date') || searchParams.has('category') || (searchParams.get('page') && parseInt(searchParams.get('page')!, 10) > 0);
+    const hasComplexParams = searchParams.has('q') || searchParams.has('tags') || searchParams.has('version') || searchParams.has('minDl') || searchParams.has('minFav') || searchParams.has('openSource') || searchParams.has('date') || searchParams.has('category') || (searchParams.get('page') && parseInt(searchParams.get('page')!, 10) > 0);
     const hasUsableBrowseSSRData = Boolean(initialData?.browseData && initialData?.browseDataReady !== false);
     const useSSR = hasUsableBrowseSSRData && !hasComplexParams;
     const initialPreferences = useMemo(() => getInitialBrowsePreferences(), []);
     const [viewStyle, setViewStyle] = useState<BrowseViewStyle>(initialPreferences.viewStyle);
 
     const {
-        page, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, selectedTags, urlSearchTerm,
+        page, sortBy, selectedVersion, minDownloads, minFavorites, openSourceOnly, filterDate, selectedTags, urlSearchTerm,
         viewCategory, searchTerm, setSearchTerm, selectedClassification, setSelectedClassification, totalPages, totalItems, loading, isPending, items,
         itemsPerPage, setItemsPerPage, updateParams
     } = useProjectSearch(initialClassification || 'All', !!useSSR, useSSR ? initialData.browseData.content : [], useSSR ? initialData.browseData.totalPages : 0, useSSR ? initialData.browseData.totalElements : 0, initialPreferences.itemsPerPage);
@@ -273,7 +273,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
                                 }}
                                 onClearTags={() => updateParams({ tags: null })}
                                 activeFilterCount={0}
-                                onResetFilters={() => updateParams({ version: null, minDl: null, minFav: null, date: null, tags: null })}
+                                onResetFilters={() => updateParams({ version: null, minDl: null, minFav: null, openSource: null, date: null, tags: null })}
                                 isFilterOpen={isFilterOpen}
                                 onToggleFilterMenu={() => setIsFilterOpen(prev => !prev)}
                                 searchTerm={searchTerm}
@@ -284,6 +284,8 @@ export const Browse: React.FC<BrowseViewProps> = ({
                                 setMinFavorites={(v) => updateParams({ minFav: v > 0 ? v.toString() : null })}
                                 minDownloads={minDownloads}
                                 setMinDownloads={(v) => updateParams({ minDl: v > 0 ? v.toString() : null })}
+                                openSourceOnly={openSourceOnly}
+                                setOpenSourceOnly={(v) => updateParams({ openSource: v ? 'true' : null })}
                                 filterDate={filterDate}
                                 setFilterDate={(v) => updateParams({ date: v })}
                                 setPage={handlePageChange}

@@ -10,6 +10,7 @@ export interface SearchParams {
     gameVersion?: string;
     minDownloads?: number;
     minFavorites?: number;
+    openSource?: boolean;
     dateRange?: string;
     category?: string;
 }

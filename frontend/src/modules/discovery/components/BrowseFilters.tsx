@@ -12,44 +12,18 @@ import {
     RotateCcw,
     Calendar as CalendarIcon,
     Download,
+    Scale,
     LayoutGrid,
     List,
     AlignJustify
 } from 'lucide-react';
 import { GLOBAL_TAGS } from '@/data/categories';
 import { projectClient } from '@/modules/project/api/projectClient';
-import { compareSemVer } from '@/utils/modHelpers';
+import { buildVersionGroups, compareSemVer, parseSelectedVersions, type VersionGroup } from '@/utils/modHelpers';
 import { DropdownSelect } from '@/components/ui/DropdownSelect';
 import { CalendarWidget } from '@/components/ui/CalendarWidget';
 import { SortDropdown } from './SortDropdown';
 import { BROWSE_ITEMS_PER_PAGE_OPTIONS, type BrowseViewStyle } from '../preferences';
-
-const parseSelectedVersions = (value: string) => {
-    if (!value || value === 'Any') return [];
-    return value.split(',').map(v => v.trim()).filter(v => v && v !== 'Any');
-};
-
-const getVersionRangeLabel = (version: string) => {
-    const [baseVersion] = version.split('-');
-    const parts = baseVersion.split('.');
-    if (parts.length < 2 || !parts[0] || !parts[1]) return null;
-    if (!/^\d+$/.test(parts[0]) || !/^\d+$/.test(parts[1])) return null;
-    return `${parts[0]}.${parts[1]}.x`;
-};
-
-const buildVersionGroups = (versions: string[]) => {
-    const groups = new Map<string, string[]>();
-    for (const version of versions) {
-        const label = getVersionRangeLabel(version);
-        const key = label || version;
-        groups.set(key, [...(groups.get(key) || []), version]);
-    }
-    return Array.from(groups, ([label, groupVersions]) => ({
-        label,
-        versions: groupVersions,
-        grouped: groupVersions.length > 1
-    }));
-};
 
 const VersionFilterDropdown = ({
     selectedVersions,
@@ -59,7 +33,7 @@ const VersionFilterDropdown = ({
 }: {
     selectedVersions: string[],
     versions: string[],
-    groups: { label: string, versions: string[], grouped: boolean }[],
+    groups: VersionGroup[],
     onChange: (val: string) => void
 }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -191,6 +165,8 @@ export interface BrowseFiltersProps {
     setMinFavorites: (v: number) => void;
     minDownloads: number;
     setMinDownloads: (v: number) => void;
+    openSourceOnly: boolean;
+    setOpenSourceOnly: (v: boolean) => void;
     filterDate: string | null;
     setFilterDate: (d: string | null) => void;
     setPage: (p: number) => void;
@@ -206,7 +182,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                                                                            categoryPills, pageTitle, totalItems, loading, sortBy, onSortChange,
                                                                            selectedTags, onToggleTag, onClearTags, onResetFilters,
                                                                            isFilterOpen, onToggleFilterMenu, searchTerm, onSearchChange,
-                                                                           selectedVersion, setSelectedVersion, minFavorites, setMinFavorites, minDownloads, setMinDownloads, filterDate, setFilterDate,
+                                                                           selectedVersion, setSelectedVersion, minFavorites, setMinFavorites, minDownloads, setMinDownloads, openSourceOnly, setOpenSourceOnly, filterDate, setFilterDate,
                                                                            isMobile, viewStyle, onViewStyleChange, itemsPerPage, onItemsPerPageChange, isScrolled
                                                                        }) => {
     const [isTagsOpen, setIsTagsOpen] = useState(false);
@@ -338,7 +314,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
         setSelectedDateObj(null);
         setShowCalendar(false);
     };
-    const displayFilterCount = [selectedVersions.length > 0, minFavorites > 0, minDownloads > 0, (filterDate !== null && !isDownloadSort)].filter(Boolean).length;
+    const displayFilterCount = [selectedVersions.length > 0, openSourceOnly, minFavorites > 0, minDownloads > 0, (filterDate !== null && !isDownloadSort)].filter(Boolean).length;
     const resultCountLabel = totalItems === 1 ? '1 result' : `${totalItems.toLocaleString()} results`;
 
     const filterMenuBody = (
@@ -363,6 +339,23 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                     )}
                 </div>
                 <VersionFilterDropdown selectedVersions={selectedVersions} versions={visibleGameVersions} groups={gameVersionGroups} onChange={setSelectedVersion} />
+            </div>
+            <div>
+                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">License</label>
+                <button
+                    type="button"
+                    aria-pressed={openSourceOnly}
+                    onClick={() => setOpenSourceOnly(!openSourceOnly)}
+                    className={`w-full flex items-center justify-between rounded-xl border px-3 py-2 text-xs font-bold transition-colors shadow-sm ${openSourceOnly ? 'bg-modtale-accent text-white border-transparent' : 'bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10'}`}
+                >
+                    <span className="flex items-center gap-2">
+                        <span className={`w-4 h-4 rounded-[4px] border flex items-center justify-center ${openSourceOnly ? 'border-white/70 bg-white/20 text-white' : 'border-slate-300 dark:border-white/20 text-transparent'}`}>
+                            <Check className="w-3 h-3" />
+                        </span>
+                        <span>Open Source</span>
+                    </span>
+                    <Scale className="w-3.5 h-3.5 opacity-75" />
+                </button>
             </div>
             <div>
                 <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">Minimum Favorites</label>

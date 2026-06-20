@@ -43,7 +43,8 @@ describe('Project settings tab', () => {
             repositoryUrl: '',
             iconFile: null,
             iconPreview: null,
-            license: 'MIT'
+            license: 'MIT',
+            customLicenseOpenSource: false
         };
         const setProjectData = vi.fn();
         const markDirty = vi.fn();

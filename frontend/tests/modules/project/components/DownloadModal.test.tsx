@@ -196,6 +196,192 @@ describe('DownloadModal Toggle Visibility', () => {
         expect(onDownload).toHaveBeenCalledWith('/files/skyforge.jar', '1.0.0', '0.5.4', [], 'RELEASE');
     });
 
+    it('defaults to the latest version family in the download modal', async () => {
+        const versionsByGame = {
+            '0.5.4': [
+                {
+                    id: 'v54',
+                    versionNumber: '1.1.0',
+                    channel: 'RELEASE',
+                    gameVersion: '0.5.4',
+                    gameVersions: ['0.5.4'],
+                    fileUrl: '/files/skyforge-054.jar',
+                    dependencies: [],
+                    releaseDate: '2026-03-01T00:00:00.000Z'
+                }
+            ],
+            '0.5.3': [
+                {
+                    id: 'v53',
+                    versionNumber: '1.0.0',
+                    channel: 'RELEASE',
+                    gameVersion: '0.5.3',
+                    gameVersions: ['0.5.3'],
+                    fileUrl: '/files/skyforge-053.jar',
+                    dependencies: [],
+                    releaseDate: '2026-02-01T00:00:00.000Z'
+                }
+            ],
+            '0.4.9': [
+                {
+                    id: 'v49',
+                    versionNumber: '0.9.0',
+                    channel: 'RELEASE',
+                    gameVersion: '0.4.9',
+                    gameVersions: ['0.4.9'],
+                    fileUrl: '/files/skyforge-049.jar',
+                    dependencies: [],
+                    releaseDate: '2026-01-01T00:00:00.000Z'
+                }
+            ]
+        };
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <DownloadModal
+                        show={true}
+                        onClose={vi.fn()}
+                        versionsByGame={versionsByGame}
+                        preReleaseGameVersions={[]}
+                        orderedGameVersions={['0.5.4', '0.5.3', '0.4.9']}
+                        onDownload={vi.fn()}
+                        showExperimental={false}
+                        onToggleExperimental={vi.fn()}
+                        onViewHistory={vi.fn()}
+                    />
+                </MemoryRouter>
+            );
+        });
+        await settle();
+
+        const listButton = Array.from(document.body.querySelectorAll('button'))
+            .find((button) => button.textContent?.includes('View all files for 0.5.x')) as HTMLButtonElement;
+
+        await act(async () => {
+            listButton.click();
+        });
+
+        expect(pageText()).toContain('v1.1.0');
+        expect(pageText()).toContain('v1.0.0');
+        expect(pageText()).not.toContain('v0.9.0');
+
+        const dropdownButton = Array.from(document.body.querySelectorAll('button'))
+            .find((button) => button.getAttribute('aria-label') === 'Game version filter') as HTMLButtonElement;
+
+        await act(async () => {
+            dropdownButton.click();
+        });
+
+        const expandGroupButton = Array.from(document.body.querySelectorAll('button'))
+            .find((button) => button.getAttribute('aria-label') === 'Expand 0.5.x versions') as HTMLButtonElement;
+
+        await act(async () => {
+            expandGroupButton.click();
+        });
+
+        const versionButton = Array.from(document.body.querySelectorAll('button'))
+            .find((button) => button.textContent?.trim() === '0.5.3') as HTMLButtonElement;
+
+        await act(async () => {
+            versionButton.click();
+        });
+
+        expect(pageText()).not.toContain('1/2');
+    });
+
+    it('selects a version family as an OR-compatible set in the download modal', async () => {
+        const versionsByGame = {
+            '0.6.0': [
+                {
+                    id: 'v60',
+                    versionNumber: '2.0.0',
+                    channel: 'RELEASE',
+                    gameVersion: '0.6.0',
+                    gameVersions: ['0.6.0'],
+                    fileUrl: '/files/skyforge-060.jar',
+                    dependencies: [],
+                    releaseDate: '2026-04-01T00:00:00.000Z'
+                }
+            ],
+            '0.5.4': [
+                {
+                    id: 'v54',
+                    versionNumber: '1.1.0',
+                    channel: 'RELEASE',
+                    gameVersion: '0.5.4',
+                    gameVersions: ['0.5.4'],
+                    fileUrl: '/files/skyforge-054.jar',
+                    dependencies: [],
+                    releaseDate: '2026-03-01T00:00:00.000Z'
+                }
+            ],
+            '0.5.3': [
+                {
+                    id: 'v53',
+                    versionNumber: '1.0.0',
+                    channel: 'RELEASE',
+                    gameVersion: '0.5.3',
+                    gameVersions: ['0.5.3'],
+                    fileUrl: '/files/skyforge-053.jar',
+                    dependencies: [],
+                    releaseDate: '2026-02-01T00:00:00.000Z'
+                }
+            ]
+        };
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <DownloadModal
+                        show={true}
+                        onClose={vi.fn()}
+                        versionsByGame={versionsByGame}
+                        preReleaseGameVersions={[]}
+                        orderedGameVersions={['0.6.0', '0.5.4', '0.5.3']}
+                        onDownload={vi.fn()}
+                        showExperimental={false}
+                        onToggleExperimental={vi.fn()}
+                        onViewHistory={vi.fn()}
+                    />
+                </MemoryRouter>
+            );
+        });
+        await settle();
+
+        const dropdownButton = Array.from(document.body.querySelectorAll('button'))
+            .find((button) => button.getAttribute('aria-label') === 'Game version filter') as HTMLButtonElement;
+
+        await act(async () => {
+            dropdownButton.click();
+        });
+
+        const anyButton = Array.from(document.body.querySelectorAll('button'))
+            .find((button) => button.textContent?.trim() === 'Any') as HTMLButtonElement;
+
+        await act(async () => {
+            anyButton.click();
+        });
+
+        const groupButton = Array.from(document.body.querySelectorAll('button'))
+            .find((button) => button.getAttribute('aria-label') === 'Select all 0.5.x versions') as HTMLButtonElement;
+
+        await act(async () => {
+            groupButton.click();
+        });
+
+        const listButton = Array.from(document.body.querySelectorAll('button'))
+            .find((button) => button.textContent?.includes('View all files for 0.5.x')) as HTMLButtonElement;
+
+        await act(async () => {
+            listButton.click();
+        });
+
+        expect(pageText()).toContain('v1.1.0');
+        expect(pageText()).toContain('v1.0.0');
+        expect(pageText()).not.toContain('v2.0.0');
+    });
+
     it('uses a button for changelog download actions', async () => {
         const onDownload = vi.fn();
 
