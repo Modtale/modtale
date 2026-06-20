@@ -691,7 +691,7 @@ public class DataSeeder implements CommandLineRunner {
                             );
                             uploaded++;
                             copied++;
-                        } else if (allowSyntheticFallback) {
+                        } else if (allowSyntheticFallback || object.syntheticFallback()) {
                             storageService.uploadDirect(object.key(), fixtureBytes(object), contentType(object.key()));
                             uploaded++;
                             generated++;
@@ -955,24 +955,129 @@ public class DataSeeder implements CommandLineRunner {
 
     private void addR2SeedObject(
             Map<String, R2SeedObject> objects,
-            String key,
+            String rawLocation,
             String projectName,
             String versionNumber,
             ProjectClassification classification
     ) {
-        if (key == null || key.isBlank()) {
+        R2SeedLocation location = r2SeedLocation(rawLocation);
+        if (location == null) {
             return;
         }
 
+        String key = location.key();
         objects.putIfAbsent(
                 key,
                 new R2SeedObject(
                         key,
                         firstNonBlank(projectName, filenameStem(key), "project"),
                         firstNonBlank(versionNumber, "latest"),
-                        classification == null ? ProjectClassification.PLUGIN : classification
+                        classification == null ? ProjectClassification.PLUGIN : classification,
+                        location.syntheticFallback()
                 )
         );
+    }
+
+    private R2SeedLocation r2SeedLocation(String rawLocation) {
+        String value = trimToNull(rawLocation);
+        if (value == null) {
+            return null;
+        }
+
+        if (value.startsWith("/api/files/proxy/")) {
+            return r2SeedLocationFromKey(value.substring("/api/files/proxy/".length()), false);
+        }
+
+        URI uri = parseUri(value);
+        if (uri != null && uri.getScheme() != null) {
+            String scheme = uri.getScheme().toLowerCase(Locale.ROOT);
+            if (!"http".equals(scheme) && !"https".equals(scheme)) {
+                return null;
+            }
+
+            String key = stripLeadingSlash(uri.getPath());
+            if (key.isBlank()) {
+                return null;
+            }
+
+            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+            if ("example.test".equals(host) && key.startsWith("mock-downloads/")) {
+                return r2SeedLocationFromKey(key, true);
+            }
+
+            if (isFirstPartyStorageHost(host)) {
+                return r2SeedLocationFromKey(key, false);
+            }
+
+            return null;
+        }
+
+        return r2SeedLocationFromKey(value, false);
+    }
+
+    private R2SeedLocation r2SeedLocationFromKey(String key, boolean syntheticFallback) {
+        String normalized = normalizeObjectKey(key);
+        if (normalized == null) {
+            return null;
+        }
+        return new R2SeedLocation(normalized, syntheticFallback);
+    }
+
+    private boolean isFirstPartyStorageHost(String host) {
+        if (host == null || host.isBlank()) {
+            return false;
+        }
+        if ("cdn.modtale.net".equals(host) || host.endsWith(".r2.dev")) {
+            return true;
+        }
+
+        String publicDomainHost = hostFromUrl(r2Properties.publicDomain());
+        return publicDomainHost != null && host.equals(publicDomainHost);
+    }
+
+    private String hostFromUrl(String rawUrl) {
+        String value = trimToNull(rawUrl);
+        if (value == null) {
+            return null;
+        }
+
+        URI uri = parseUri(value);
+        return uri == null || uri.getHost() == null ? null : uri.getHost().toLowerCase(Locale.ROOT);
+    }
+
+    private URI parseUri(String value) {
+        try {
+            return URI.create(value);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private String normalizeObjectKey(String key) {
+        String value = trimToNull(key);
+        if (value == null) {
+            return null;
+        }
+
+        int query = value.indexOf('?');
+        if (query >= 0) {
+            value = value.substring(0, query);
+        }
+        int fragment = value.indexOf('#');
+        if (fragment >= 0) {
+            value = value.substring(0, fragment);
+        }
+
+        value = stripLeadingSlash(value);
+        return value.isBlank() ? null : value;
+    }
+
+    private String stripLeadingSlash(String value) {
+        String stripped = value == null ? "" : value.trim();
+        while (stripped.startsWith("/")) {
+            stripped = stripped.substring(1);
+        }
+        return stripped;
     }
 
     private byte[] fixtureBytes(R2SeedObject object) {
@@ -1119,7 +1224,16 @@ public class DataSeeder implements CommandLineRunner {
         return value != null && !value.isBlank();
     }
 
-    private record R2SeedObject(String key, String projectName, String versionNumber, ProjectClassification classification) {
+    private record R2SeedLocation(String key, boolean syntheticFallback) {
+    }
+
+    private record R2SeedObject(
+            String key,
+            String projectName,
+            String versionNumber,
+            ProjectClassification classification,
+            boolean syntheticFallback
+    ) {
     }
 
     private record R2SourceConfig(String bucket, String accessKey, String secretKey, String endpoint) {
