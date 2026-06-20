@@ -9,6 +9,9 @@ on:
     paths:
       - 'backend/src/main/java/net/modtale/model/**'
       - 'backend/src/main/java/net/modtale/repository/**'
+      - 'mock-db/package-lock.json'
+      - 'mock-db/package.json'
+      - 'mock-db/scripts/**'
 
 permissions:
   contents: read
