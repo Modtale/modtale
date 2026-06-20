@@ -58,9 +58,18 @@ For local runs against a Mongo URI that can see the source database, the backend
 APP_SEEDING_ENABLED=true
 APP_SEEDING_SOURCE_DB=modtale
 MONGODB_DATABASE_NAME=modtale-local
+R2_BUCKET_NAME=modtale-local
+R2_ACCESS_KEY=...
+R2_SECRET_KEY=...
+R2_ENDPOINT=https://<accountid>.r2.cloudflarestorage.com
+APP_SEEDING_SOURCE_R2_BUCKET_NAME=modtale-prod
 ```
 
 `MONGODB_DATABASE_NAME` must not be `modtale` when pulling from prod. The seeder refuses to run when the target database name equals the source database name.
+
+When seeding is enabled, `DataSeeder` also copies missing R2 objects for seeded project version files and cached dependency files from the configured source bucket into `R2_BUCKET_NAME`. It does not delete storage objects, and it skips keys that already exist in the target bucket. After a clean pass, it writes a small marker under `.modtale/seeding/r2-artifacts/` in the target bucket; later boots with the same seeded artifact set check that marker and skip the per-object R2 validation. If the same R2 credentials can read the source and target buckets, only set `APP_SEEDING_SOURCE_R2_BUCKET_NAME`; otherwise also set `APP_SEEDING_SOURCE_R2_ACCESS_KEY`, `APP_SEEDING_SOURCE_R2_SECRET_KEY`, and `APP_SEEDING_SOURCE_R2_ENDPOINT`.
+
+`APP_SEEDING_ENABLED` is the only seeding on/off switch. Mongo and R2 are checked independently: Mongo import can skip because projects already exist while R2 still fills missing target objects. If no source R2 bucket is configured, real R2 copying is skipped and logged; synthetic mock mode can still create small installable placeholder objects for made-up mock projects.
 
 For fully synthetic fallback data, explicitly use mock mode:
 

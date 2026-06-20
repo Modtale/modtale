@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
@@ -99,6 +99,44 @@ const CodeFallback = ({ content }: { content: string }) => (
     </pre>
 );
 
+const fallbackCopyText = (content: string) => {
+    if (typeof document === 'undefined') {
+        return false;
+    }
+
+    const textarea = document.createElement('textarea');
+    textarea.value = content;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.top = '-9999px';
+    textarea.style.left = '-9999px';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    textarea.setSelectionRange(0, textarea.value.length);
+
+    const legacyDocument = document as unknown as { execCommand?: (command: string) => boolean };
+
+    try {
+        return legacyDocument.execCommand?.('copy') ?? false;
+    } finally {
+        document.body.removeChild(textarea);
+    }
+};
+
+const copyText = async (content: string) => {
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(content);
+            return true;
+        }
+    } catch {
+        // Fall through to the textarea fallback for non-secure or embedded browser contexts.
+    }
+
+    return fallbackCopyText(content);
+};
+
 const MermaidFallback = ({ content }: { content: string }) => (
     <div className="relative w-full my-4 rounded-xl overflow-hidden bg-slate-900 ring-1 ring-slate-300 dark:ring-white/10 shadow-lg z-10">
         <div className="px-4 py-1.5 bg-slate-800 border-b border-slate-950 text-xs font-sans text-slate-400 select-none">
@@ -147,8 +185,15 @@ const DeferredMermaidChart = ({ content }: { content: string }) => {
 
 const CodeBlock = ({ node: _node, inline, className, children, ...props }: any) => {
     const [copied, setCopied] = useState(false);
+    const resetTimerRef = useRef<number | null>(null);
     const match = /language-(\w+)/.exec(className || '');
     const isBlock = !inline && (match || String(children).includes('\n'));
+
+    useEffect(() => () => {
+        if (resetTimerRef.current !== null) {
+            window.clearTimeout(resetTimerRef.current);
+        }
+    }, []);
 
     if (isBlock) {
         const lang = match ? match[1] : 'text';
@@ -158,10 +203,20 @@ const CodeBlock = ({ node: _node, inline, className, children, ...props }: any) 
             return <DeferredMermaidChart content={content} />;
         }
 
-        const handleCopy = () => {
-            navigator.clipboard.writeText(content);
+        const handleCopy = async () => {
+            const copiedToClipboard = await copyText(content);
+            if (!copiedToClipboard) {
+                return;
+            }
+
             setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+            if (resetTimerRef.current !== null) {
+                window.clearTimeout(resetTimerRef.current);
+            }
+            resetTimerRef.current = window.setTimeout(() => {
+                setCopied(false);
+                resetTimerRef.current = null;
+            }, 2000);
         };
 
         return (
@@ -169,7 +224,8 @@ const CodeBlock = ({ node: _node, inline, className, children, ...props }: any) 
                 <div className="px-4 py-1.5 bg-slate-800 border-b border-slate-950 text-xs font-sans text-slate-400 select-none flex items-center justify-between">
                     <span>{lang}</span>
                     <button
-                        onClick={handleCopy}
+                        type="button"
+                        onClick={() => { void handleCopy(); }}
                         className="group/copy flex items-center justify-end px-2 py-1 -mr-2 rounded-md hover:bg-white/10 transition-colors text-slate-400 hover:text-white focus:outline-none"
                         title="Copy code"
                     >

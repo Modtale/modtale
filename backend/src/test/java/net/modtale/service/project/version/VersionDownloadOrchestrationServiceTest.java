@@ -5,6 +5,7 @@ import java.util.List;
 import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.exception.InvalidDownloadTokenException;
 import net.modtale.exception.ResourceNotFoundException;
+import net.modtale.exception.UnauthorizedException;
 import net.modtale.model.dto.response.project.BundleDownloadUrlResponse;
 import net.modtale.model.dto.response.project.DownloadUrlResponse;
 import net.modtale.model.project.Project;
@@ -69,14 +70,15 @@ class VersionDownloadOrchestrationServiceTest {
     @Test
     void createDownloadUrlAndBundleUrlGenerateShortLivedTokenRoutes() {
         User user = new User();
+        user.setId("user-1");
         Project project = project("project-1", "Sky Tools", ProjectClassification.PLUGIN);
         ProjectVersion version = version("version-1", "1.0.0", "files/mod.jar");
 
         when(projectService.getProjectById("project-1", user)).thenReturn(project);
         when(projectVersionAccessService.requireByVersionNumber(org.mockito.Mockito.eq(project), org.mockito.Mockito.eq("1.0.0"), org.mockito.Mockito.eq("1.21.0"), org.mockito.Mockito.any()))
                 .thenReturn(version);
-        when(downloadTokenService.generateToken("project-1", "1.0.0", "1.21.0")).thenReturn("download-token");
-        when(downloadTokenService.generateToken("project-1", "1.0.0", "1.21.0", List.of("dep-1"))).thenReturn("bundle-token");
+        when(downloadTokenService.generateToken("project-1", "1.0.0", "1.21.0", null, "user-1")).thenReturn("download-token");
+        when(downloadTokenService.generateToken("project-1", "1.0.0", "1.21.0", List.of("dep-1"), "user-1")).thenReturn("bundle-token");
         when(downloadTokenService.getTokenValiditySeconds()).thenReturn(300);
 
         DownloadUrlResponse download = service.createDownloadUrl("project-1", "1.0.0", "1.21.0", user);
@@ -195,6 +197,25 @@ class VersionDownloadOrchestrationServiceTest {
 
         assertThrows(InvalidDownloadTokenException.class, () -> service.downloadVersion("invalid", false, null, null, null, user));
         assertThrows(ResourceNotFoundException.class, () -> service.downloadVersion("unreadable", false, null, null, null, user));
+    }
+
+    @Test
+    void downloadRejectsUserBoundTokenWithoutMatchingSession() {
+        User user = new User();
+        user.setId("other-user");
+
+        when(downloadTokenService.validateAndConsume("token")).thenReturn(
+                new DownloadTokenService.DownloadToken(
+                        "project-1",
+                        "1.0.0",
+                        null,
+                        null,
+                        "user-1",
+                        Instant.now().plusSeconds(60)
+                )
+        );
+
+        assertThrows(UnauthorizedException.class, () -> service.downloadVersion("token", false, null, null, null, user));
     }
 
     private static DownloadTokenService.DownloadToken token(

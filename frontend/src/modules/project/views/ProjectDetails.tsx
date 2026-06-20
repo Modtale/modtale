@@ -49,7 +49,7 @@ const WikiMobileNavigation = lazy(() => import('../components/HMWiki').then((mod
 interface ProjectDetailViewProps {
     currentUser: User | null;
     isLiked: (id: string) => boolean;
-    onToggleFavorite: (id: string) => void;
+    onToggleFavorite: (id: string, options?: { onError?: () => void }) => boolean | undefined;
     onDownload: (id: string) => void;
     downloadedSessionIds: Set<string>;
     onRefresh: () => Promise<void>;
@@ -361,16 +361,29 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const handleProjectFavoriteToggle = useCallback(() => {
         if (!project) return;
-        const wasLiked = isLiked(project.id);
+        let nextLiked: boolean | undefined;
+        const rollbackFavoriteCount = () => {
+            if (typeof nextLiked !== 'boolean') return;
+            setProject(previous => {
+                if (!previous || previous.id !== project.id) return previous;
+                return {
+                    ...previous,
+                    favoriteCount: Math.max(0, (previous.favoriteCount || 0) + (nextLiked ? -1 : 1))
+                };
+            });
+        };
+
+        nextLiked = onToggleFavorite(project.id, { onError: rollbackFavoriteCount });
+        if (typeof nextLiked !== 'boolean') return;
+
         setProject(previous => {
             if (!previous || previous.id !== project.id) return previous;
             return {
                 ...previous,
-                favoriteCount: Math.max(0, (previous.favoriteCount || 0) + (wasLiked ? -1 : 1))
+                favoriteCount: Math.max(0, (previous.favoriteCount || 0) + (nextLiked ? 1 : -1))
             };
         });
-        onToggleFavorite(project.id);
-    }, [isLiked, onToggleFavorite, project, setProject]);
+    }, [onToggleFavorite, project, setProject]);
 
     const handleMobileWikiNavigate = useCallback((slug: string) => {
         if (!projectUrl) return;
@@ -606,6 +619,9 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                         onToggleExperimental={toggleExperimental}
                         onViewHistory={() => navigate(projectUrl + '/changelog')}
                         isModpack={project.classification === 'MODPACK'}
+                        projectId={project.id}
+                        projectHandle={SiteRoutes.projectHandle(project)}
+                        onLauncherFallback={() => navigate(SiteRoutes.launcher())}
                     />
                 )}
                 {isDepModalOpen && pendingDownload && (

@@ -185,6 +185,11 @@ public class StorageService {
             return true;
         } catch (NoSuchKeyException e) {
             return false;
+        } catch (S3Exception e) {
+            if (e.statusCode() == 404) {
+                return false;
+            }
+            throw StorageDownloadException.from(e, "Failed to check the requested file.");
         } catch (SdkException e) {
             throw StorageDownloadException.from(e, "Failed to check the requested file.");
         }

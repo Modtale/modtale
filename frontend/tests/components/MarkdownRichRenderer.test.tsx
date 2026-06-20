@@ -1,7 +1,11 @@
 import { act } from 'react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRoot, type Root } from 'react-dom/client';
 import { MarkdownRichRenderer } from '@/components/ui/MarkdownRichRenderer';
+
+vi.mock('@/components/ui/MarkdownSyntaxHighlighter', () => ({
+    HighlightedCode: ({ content }: { content: string }) => <pre data-testid="highlighted-code">{content}</pre>
+}));
 
 describe('MarkdownRichRenderer', () => {
     let container: HTMLDivElement;
@@ -70,5 +74,35 @@ describe('MarkdownRichRenderer', () => {
         const image = container.querySelector('img[alt="Gallery build"]') as HTMLImageElement | null;
         expect(image).not.toBeNull();
         expect(image?.getAttribute('src')).toBe('https://cdn.modtale.net/gallery/build.png');
+    });
+
+    it('copies markdown code block contents', async () => {
+        const originalClipboard = navigator.clipboard;
+        const writeText = vi.fn().mockResolvedValue(undefined);
+        Object.defineProperty(navigator, 'clipboard', {
+            configurable: true,
+            value: { writeText }
+        });
+
+        try {
+            await act(async () => {
+                root.render(<MarkdownRichRenderer content={'```json\n{"ok": true}\n```'} />);
+            });
+
+            const copyButton = container.querySelector('button[title="Copy code"]') as HTMLButtonElement | null;
+            expect(copyButton).not.toBeNull();
+
+            await act(async () => {
+                copyButton?.click();
+            });
+
+            expect(writeText).toHaveBeenCalledWith('{"ok": true}');
+            expect(copyButton?.textContent).toContain('Copied');
+        } finally {
+            Object.defineProperty(navigator, 'clipboard', {
+                configurable: true,
+                value: originalClipboard
+            });
+        }
     });
 });

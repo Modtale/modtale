@@ -55,6 +55,14 @@ describe('authClient', () => {
         expect(mockedApi.post).toHaveBeenCalledWith('/auth/mfa/validate-login', payload);
     });
 
+    it('issues launcher auth codes through the auth API', async () => {
+        const payload = { redirectUri: 'http://127.0.0.1:49152/callback', state: 'state-123' };
+
+        await authClient.issueLauncherAuthCode(payload);
+
+        expect(mockedApi.post).toHaveBeenCalledWith('/auth/launcher/issue', payload);
+    });
+
     it('normalizes signin payloads from both camelCase and snake_case responses', () => {
         expect(normalizeSignInResponse({
             status: 'mfa_required',

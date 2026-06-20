@@ -9,6 +9,7 @@ import net.modtale.model.user.User;
 import net.modtale.service.user.account.AccountService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
@@ -65,6 +66,54 @@ class OAuth2LoginServiceTest {
         AccountService accountService = mock(AccountService.class);
         AuthenticationService authenticationService = mock(AuthenticationService.class);
         ObjectProvider<HttpServletRequest> requestProvider = mock(ObjectProvider.class);
+
+        DefaultOAuth2User upstreamUser = oauthUser("oauth-1", "ada-gh");
+        DefaultOAuth2User signedInUser = oauthUser("user-1", "Ada");
+
+        TestOAuth2LoginService service = new TestOAuth2LoginService(accountService, authenticationService, requestProvider, upstreamUser);
+        when(authenticationService.processUserLogin("github", upstreamUser, "access-token")).thenReturn(signedInUser);
+
+        OAuth2User result = service.loadUser(oauthRequest("github"));
+
+        assertSame(signedInUser, result);
+        verify(authenticationService).processUserLogin("github", upstreamUser, "access-token");
+        verify(authenticationService, never()).linkAccount(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void loadUserRejectsGitlabAsSignInProvider() {
+        AccountService accountService = mock(AccountService.class);
+        AuthenticationService authenticationService = mock(AuthenticationService.class);
+        ObjectProvider<HttpServletRequest> requestProvider = mock(ObjectProvider.class);
+
+        DefaultOAuth2User upstreamUser = oauthUser("oauth-1", "ada-gitlab");
+        TestOAuth2LoginService service = new TestOAuth2LoginService(accountService, authenticationService, requestProvider, upstreamUser);
+
+        OAuth2AuthenticationException error = assertThrows(
+                OAuth2AuthenticationException.class,
+                () -> service.loadUser(oauthRequest("gitlab"))
+        );
+
+        assertEquals("login_failure", error.getError().getErrorCode());
+        verify(authenticationService, never()).processUserLogin(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void loadUserUsesLoginFlowForLauncherOAuthEvenWithExistingBrowserSession() {
+        AccountService accountService = mock(AccountService.class);
+        AuthenticationService authenticationService = mock(AuthenticationService.class);
+        ObjectProvider<HttpServletRequest> requestProvider = mock(ObjectProvider.class);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        Authentication authentication = mock(Authentication.class);
+        request.setUserPrincipal(authentication);
+        request.getSession().setAttribute(
+                LauncherAuthService.OAUTH_REDIRECT_URI_SESSION_ATTRIBUTE,
+                "http://127.0.0.1:49152/callback"
+        );
+
+        when(requestProvider.getIfAvailable()).thenReturn(request);
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getName()).thenReturn("ada");
 
         DefaultOAuth2User upstreamUser = oauthUser("oauth-1", "ada-gh");
         DefaultOAuth2User signedInUser = oauthUser("user-1", "Ada");

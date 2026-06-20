@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Download, X, AlertCircle, Check, Copy } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Download, X, AlertCircle, Check, Copy, MonitorDown } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { ModalPortal } from '@/components/ui/ModalPortal';
+import { SiteRoutes } from '@/utils/routes';
 
 interface PostDownloadModalProps {
     isOpen: boolean;
@@ -118,7 +120,7 @@ export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
                             <Download className={`w-6 h-6 ${channel === 'RELEASE' ? 'text-blue-500 dark:text-blue-400' : themeColors.text}`} />
                         </div>
                         <div>
-                            <h3 className={`text-xl font-black ${theme.colors.textPrimary} tracking-tight`}>Download Started</h3>
+                            <h3 className={`text-xl font-black ${theme.colors.textPrimary} tracking-normal`}>Download Started</h3>
                             <p className={`text-xs ${theme.colors.textSecondary} font-medium mt-1`}>Installation instructions for {title}</p>
                         </div>
                     </div>
@@ -147,6 +149,28 @@ export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
                     )}
 
                     <div className="p-6">
+                        <div className={`mb-6 flex flex-col gap-3 rounded-2xl border p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between ${theme.colors.bgBase} ${theme.colors.border}`}>
+                            <div className="flex min-w-0 items-start gap-3">
+                                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${themeColors.bgAlpha} ${themeColors.text}`}>
+                                    <MonitorDown className="h-5 w-5" aria-hidden="true" />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className={`text-sm font-black ${theme.colors.textPrimary}`}>Install automatically</p>
+                                    <p className={`mt-1 text-xs font-medium leading-relaxed ${theme.colors.textSecondary}`}>
+                                        You can install mods automatically using the Modtale Launcher.
+                                    </p>
+                                </div>
+                            </div>
+                            <Link
+                                to={SiteRoutes.launcher()}
+                                aria-label="Download Modtale Launcher"
+                                title="Download Modtale Launcher"
+                                className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-sm transition-colors ${themeColors.bg} hover:opacity-90`}
+                            >
+                                <Download className="h-5 w-5" aria-hidden="true" />
+                            </Link>
+                        </div>
+
                         <div className={`flex rounded-xl p-1.5 border ${theme.colors.border} mb-6 bg-slate-200/60 dark:bg-slate-800/70`}>
                             {(['windows', 'macos', 'linux'] as const).map(platform => (
                                 <button

@@ -5,6 +5,7 @@ const STATIC_ROUTES = [
     { path: '/mods', changefreq: 'daily', priority: '0.95' },
     { path: '/plugins', changefreq: 'daily', priority: '0.9' },
     { path: '/modpacks', changefreq: 'daily', priority: '0.8' },
+    { path: '/launcher', changefreq: 'weekly', priority: '0.85' },
     { path: '/art', changefreq: 'weekly', priority: '0.75' },
     { path: '/data', changefreq: 'weekly', priority: '0.75' },
     { path: '/worlds', changefreq: 'daily', priority: '0.75' },

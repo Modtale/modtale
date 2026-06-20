@@ -16,8 +16,8 @@ const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supp
 const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
 
 const Badge = ({ type }: { type: string }) => {
-    if (type === 'OG') return <span className="bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-md uppercase tracking-tighter cursor-help align-middle" title="Early Adopter">OG</span>;
-    if (type === 'VERIFIED') return <span className="bg-blue-500 text-white text-[10px] font-bold px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-md uppercase tracking-tight cursor-help align-middle" title="Verified Creator">Verified</span>;
+    if (type === 'OG') return <span className="bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-md uppercase tracking-normal cursor-help align-middle" title="Early Adopter">OG</span>;
+    if (type === 'VERIFIED') return <span className="bg-blue-500 text-white text-[10px] font-bold px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-md uppercase tracking-normal cursor-help align-middle" title="Verified Creator">Verified</span>;
     return null;
 }
 
@@ -370,7 +370,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                     <div className="flex flex-col md:flex-row md:items-center justify-start gap-1 md:gap-3">
                                         <div className="flex items-center gap-2 flex-wrap">
                                             {headerInput ? headerInput : (
-                                                <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight overflow-visible break-words pb-1 min-h-[1.2em]">{displayTitle}</h1>
+                                                <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-normal leading-tight overflow-visible break-words pb-1 min-h-[1.2em]">{displayTitle}</h1>
                                             )}
 
                                             {!isEditing && (

@@ -20,7 +20,7 @@ export default {
                 }
             },
             fontFamily: {
-                sans: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
+                sans: ['Inter Variable', 'Inter', 'SF Pro Text', 'Segoe UI', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
             }
         },
     },
