@@ -70,6 +70,7 @@ if (!modtaleApiBaseUrl.isBlank()) {
 }
 def installerVersionMatcher = packageVersion =~ /\d+(?:\.\d+){0,2}/
 def installerVersion = installerVersionMatcher.find() ? installerVersionMatcher.group() : '0.1.0'
+def jpackageAppVersion = jpackageCompatibleVersion(installerVersion)
 def appDescription = 'Native Modtale launcher for Hytale mods.'
 def appVendor = 'Modtale'
 def appHomepage = 'https://modtale.net'
@@ -186,7 +187,7 @@ def commonJpackageArgs = {
             '--name', appDisplayName,
             '--main-jar', appJar.get().asFile.name,
             '--main-class', application.mainClass.get(),
-            '--app-version', installerVersion,
+            '--app-version', jpackageAppVersion,
             '--vendor', appVendor,
             '--description', appDescription,
             '--add-modules', javaRuntimeModules.join(','),
@@ -840,6 +841,17 @@ def appImageArch() {
         return 'aarch64'
     }
     return arch.replaceAll(/[^a-z0-9_+-]/, '-')
+}
+
+def jpackageCompatibleVersion(String version) {
+    def parts = version.tokenize('.').collect { Integer.parseInt(it) }
+    if (parts.isEmpty()) {
+        return '1'
+    }
+    if (parts[0] < 1) {
+        parts[0] = 1
+    }
+    return parts.take(3).join('.')
 }
 
 def debArchitecture() {
