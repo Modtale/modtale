@@ -42,6 +42,7 @@ jobs:
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
       backend: ${{ steps.filter.outputs.backend }}
+      launcher: ${{ steps.filter.outputs.launcher }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -121,4 +122,32 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run backend tests
+        run: ./gradlew test
+
+  launcher:
+    name: Launcher Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.launcher == 'true' && github.repository == 'Modtale/modtale' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'Modtale/modtale')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: launcher
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Ensure Gradle wrapper is executable
+        run: chmod +x gradlew
+
+      - name: Run launcher tests
         run: ./gradlew test
