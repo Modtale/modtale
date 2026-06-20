@@ -47,6 +47,7 @@ jobs:
           
           if [ "$BRANCH_NAME" = "main" ]; then
             echo "ENV_TYPE=prod" >> $GITHUB_ENV
+            echo "BUILD_SERVICE_ACCOUNT=github-branch-preview-deployer@$PROJECT_ID.iam.gserviceaccount.com" >> $GITHUB_ENV
             echo "BACKEND_SERVICE=modtale-backend" >> $GITHUB_ENV
             echo "FRONTEND_SERVICE=modtale-frontend" >> $GITHUB_ENV
             echo "DB_NAME=modtale" >> $GITHUB_ENV
@@ -70,6 +71,7 @@ jobs:
           
           elif [ "$BRANCH_NAME" = "develop" ]; then
             echo "ENV_TYPE=dev" >> $GITHUB_ENV
+            echo "BUILD_SERVICE_ACCOUNT=github-branch-preview-deployer@$PROJECT_ID.iam.gserviceaccount.com" >> $GITHUB_ENV
             echo "BACKEND_SERVICE=modtale-backend-dev" >> $GITHUB_ENV
             echo "FRONTEND_SERVICE=modtale-frontend-dev" >> $GITHUB_ENV
             echo "DB_NAME=modtale" >> $GITHUB_ENV
@@ -97,6 +99,7 @@ jobs:
               SLUG="${GITHUB_SHA:0:7}"
             fi
             echo "ENV_TYPE=preview" >> $GITHUB_ENV
+            echo "BUILD_SERVICE_ACCOUNT=github-branch-preview-deployer@$PROJECT_ID.iam.gserviceaccount.com" >> $GITHUB_ENV
             echo "BACKEND_SERVICE=modtale-backend-$SLUG" >> $GITHUB_ENV
             echo "FRONTEND_SERVICE=modtale-frontend-$SLUG" >> $GITHUB_ENV
             echo "DB_NAME=modtale-$SLUG" >> $GITHUB_ENV
@@ -235,6 +238,7 @@ jobs:
           cd backend
           gcloud builds submit \
             --config=cloudbuild.yml \
+            --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
             --substitutions=_TAG=${{ env.TAG }} .
           
           ARGS=(
@@ -339,6 +343,7 @@ jobs:
           cd frontend
           gcloud builds submit \
             --config=cloudbuild.yml \
+            --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
             --substitutions=_PUBLIC_API_URL=$API_URL,_TAG=$TAG .
           
           gcloud run deploy $FRONTEND_SERVICE \
