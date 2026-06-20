@@ -90,7 +90,7 @@ jobs:
             echo "DB_NAME=modtale-$SLUG" >> $GITHUB_ENV
             echo "SEEDING_ENABLED=true" >> $GITHUB_ENV
             echo "SEEDING_MODE=template" >> $GITHUB_ENV
-            echo "SEEDING_RESET=true" >> $GITHUB_ENV
+            echo "SEEDING_RESET=false" >> $GITHUB_ENV
             echo "SEEDING_SOURCE_DB=modtale-mock-template" >> $GITHUB_ENV
             echo "SEEDING_SOURCE_R2_BUCKET_NAME=modtale-binaries" >> $GITHUB_ENV
             echo "TAG=$SLUG" >> $GITHUB_ENV

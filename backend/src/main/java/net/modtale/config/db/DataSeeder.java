@@ -62,6 +62,7 @@ public class DataSeeder implements CommandLineRunner {
     private final AppSeedingProperties seedingProperties;
 
     private static final int PUBLISHED_PROJECT_LIMIT = 100;
+    private static final int MONGO_SEED_PROGRESS_INTERVAL = 25;
     private static final int R2_SEED_PROGRESS_INTERVAL = 25;
     private static final String R2_SEED_MARKER_PREFIX = ".modtale/seeding/r2-artifacts/";
     private static final String SUPER_ADMIN_ID = "692620f7c2f3266e23ac0ded";
@@ -156,6 +157,11 @@ public class DataSeeder implements CommandLineRunner {
             MongoDatabase targetDb = mongoTemplate.getDb();
 
             long sourceProjectCount = sourceDb.getCollection("projects").countDocuments();
+            logger.info(
+                    "Mongo clone seed progress: source database '{}' has {} project documents.",
+                    seedingProperties.sourceDb(),
+                    sourceProjectCount
+            );
             if (sourceProjectCount == 0) {
                 logger.warn("SOURCE DB '{}' IS EMPTY! Cannot clone data.", seedingProperties.sourceDb());
                 return;
@@ -176,10 +182,19 @@ public class DataSeeder implements CommandLineRunner {
                     )),
                     Aggregates.sample(PUBLISHED_PROJECT_LIMIT)
             );
+            logger.info(
+                    "Mongo clone seed progress: sampling up to {} published/archived projects from '{}'.",
+                    PUBLISHED_PROJECT_LIMIT,
+                    seedingProperties.sourceDb()
+            );
             sourceProjectsCol.aggregate(publishedPipeline).into(compiledProjects);
-            logger.info("Fetched {} random public projects.", compiledProjects.size());
+            logger.info("Mongo clone seed progress: fetched {} random public projects.", compiledProjects.size());
 
             ensureClassificationCoverage(sourceProjectsCol, compiledProjects);
+            logger.info(
+                    "Mongo clone seed progress: project set after classification coverage contains {} projects.",
+                    compiledProjects.size()
+            );
 
             Set<String> selectedProjectIds = projectIds(compiledProjects);
 
@@ -187,7 +202,11 @@ public class DataSeeder implements CommandLineRunner {
             if (!dependencyProjects.isEmpty()) {
                 compiledProjects.addAll(dependencyProjects);
                 selectedProjectIds = projectIds(compiledProjects);
-                logger.info("Included {} dependency projects for selected projects.", dependencyProjects.size());
+                logger.info(
+                        "Mongo clone seed progress: included {} dependency projects; project set now contains {} projects.",
+                        dependencyProjects.size(),
+                        compiledProjects.size()
+                );
             }
 
             if (compiledProjects.isEmpty()) {
@@ -205,9 +224,11 @@ public class DataSeeder implements CommandLineRunner {
 
             try {
                 Set<String> finalSelectedProjectIds = selectedProjectIds;
+                logger.info("Mongo clone seed progress: sanitizing {} public projects before insert.", compiledProjects.size());
                 compiledProjects.forEach(project -> stripPrivateProjectFields(project, finalSelectedProjectIds));
+                logger.info("Mongo clone seed progress: inserting {} public projects into target database '{}'.", compiledProjects.size(), currentDbName);
                 targetDb.getCollection("projects").insertMany(compiledProjects);
-                logger.info("Cloned {} public projects to local database.", compiledProjects.size());
+                logger.info("Mongo clone seed progress: cloned {} public projects to target database '{}'.", compiledProjects.size(), currentDbName);
             } catch (MongoBulkWriteException e) {
                 logger.warn("Project insertion warning (duplicates might exist): {}", e.getMessage());
             }
@@ -239,20 +260,22 @@ public class DataSeeder implements CommandLineRunner {
 
         try {
             if (seedingProperties.reset()) {
-                for (String collectionName : MOCK_COLLECTIONS) {
-                    targetDb.getCollection(collectionName).deleteMany(new Document());
-                }
+                resetMockCollections(targetDb, "mock");
             }
 
+            int collectionIndex = 0;
             for (String collectionName : MOCK_COLLECTIONS) {
+                collectionIndex++;
+                logger.info(
+                        "Mongo mock seed progress: preparing collection {}/{} '{}' with synthetic documents.",
+                        collectionIndex,
+                        MOCK_COLLECTIONS.size(),
+                        collectionName
+                );
                 List<Document> documents = syntheticMockDocuments(collectionName);
                 MongoCollection<Document> collection = targetDb.getCollection(collectionName);
 
-                for (Document document : documents) {
-                    upsertMockDocument(collection, document);
-                }
-
-                logger.info("Imported {} mock documents into '{}'.", documents.size(), collectionName);
+                upsertDocumentsWithProgress(collection, collectionName, documents, "mock", collectionIndex, MOCK_COLLECTIONS.size());
                 if ("projects".equals(collectionName)) {
                     seedR2ObjectsForProjects(documents, true);
                 }
@@ -306,20 +329,30 @@ public class DataSeeder implements CommandLineRunner {
             }
 
             if (seedingProperties.reset()) {
-                for (String collectionName : MOCK_COLLECTIONS) {
-                    targetDb.getCollection(collectionName).deleteMany(new Document());
-                }
+                resetMockCollections(targetDb, "template");
             }
 
+            int collectionIndex = 0;
             for (String collectionName : MOCK_COLLECTIONS) {
-                List<Document> documents = fetchSubset(sourceDb, collectionName, templateLimit(collectionName));
+                collectionIndex++;
+                int limit = templateLimit(collectionName);
+                logger.info(
+                        "Mongo template seed progress: fetching collection {}/{} '{}' from '{}' (limit={}).",
+                        collectionIndex,
+                        MOCK_COLLECTIONS.size(),
+                        collectionName,
+                        sourceDbName,
+                        limit
+                );
+                List<Document> documents = fetchSubset(sourceDb, collectionName, limit);
+                logger.info(
+                        "Mongo template seed progress: fetched {} documents for collection '{}'.",
+                        documents.size(),
+                        collectionName
+                );
                 MongoCollection<Document> collection = targetDb.getCollection(collectionName);
 
-                for (Document document : documents) {
-                    upsertMockDocument(collection, document);
-                }
-
-                logger.info("Imported {} sanitized template documents into '{}'.", documents.size(), collectionName);
+                upsertDocumentsWithProgress(collection, collectionName, documents, "template", collectionIndex, MOCK_COLLECTIONS.size());
                 if ("projects".equals(collectionName)) {
                     seedR2ObjectsForProjects(documents, false);
                 }
@@ -579,23 +612,111 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedSyntheticSupplementDocuments(MongoDatabase targetDb) {
+        int collectionIndex = 0;
         for (String collectionName : MOCK_COLLECTIONS) {
+            collectionIndex++;
             MongoCollection<Document> collection = targetDb.getCollection(collectionName);
+            logger.info(
+                    "Mongo supplemental seed progress: preparing collection {}/{} '{}'.",
+                    collectionIndex,
+                    MOCK_COLLECTIONS.size(),
+                    collectionName
+            );
             List<Document> documents = syntheticMockDocuments(collectionName);
 
-            for (Document document : documents) {
-                upsertMockDocument(collection, document);
-            }
-
-            logger.info("Upserted {} synthetic supplement documents into '{}'.", documents.size(), collectionName);
+            upsertDocumentsWithProgress(collection, collectionName, documents, "supplemental", collectionIndex, MOCK_COLLECTIONS.size());
             if ("projects".equals(collectionName)) {
                 seedR2ObjectsForProjects(documents, true);
             }
         }
     }
 
+    private void resetMockCollections(MongoDatabase targetDb, String seedLabel) {
+        logger.info(
+                "Mongo {} seed reset progress: clearing {} collections before import.",
+                seedLabel,
+                MOCK_COLLECTIONS.size()
+        );
+        int collectionIndex = 0;
+        for (String collectionName : MOCK_COLLECTIONS) {
+            collectionIndex++;
+            long deleted = targetDb.getCollection(collectionName).deleteMany(new Document()).getDeletedCount();
+            logger.info(
+                    "Mongo {} seed reset progress: cleared collection {}/{} '{}' (deleted={}).",
+                    seedLabel,
+                    collectionIndex,
+                    MOCK_COLLECTIONS.size(),
+                    collectionName,
+                    deleted
+            );
+        }
+    }
+
+    private void upsertDocumentsWithProgress(
+            MongoCollection<Document> collection,
+            String collectionName,
+            List<Document> documents,
+            String seedLabel,
+            int collectionIndex,
+            int collectionTotal
+    ) {
+        int total = documents == null ? 0 : documents.size();
+        logger.info(
+                "Mongo {} seed progress: importing collection {}/{} '{}' (documents={}).",
+                seedLabel,
+                collectionIndex,
+                collectionTotal,
+                collectionName,
+                total
+        );
+        if (total == 0) {
+            logger.info(
+                    "Mongo {} seed progress: completed collection {}/{} '{}' (documents=0, elapsedMs=0).",
+                    seedLabel,
+                    collectionIndex,
+                    collectionTotal,
+                    collectionName
+            );
+            return;
+        }
+
+        int processed = 0;
+        long startedAt = System.nanoTime();
+        for (Document document : documents) {
+            upsertMockDocument(collection, document);
+            processed++;
+            if (processed == 1 || processed % MONGO_SEED_PROGRESS_INTERVAL == 0 || processed == total) {
+                logger.info(
+                        "Mongo {} seed progress: collection {}/{} '{}' processed={}/{}.",
+                        seedLabel,
+                        collectionIndex,
+                        collectionTotal,
+                        collectionName,
+                        processed,
+                        total
+                );
+            }
+        }
+
+        long elapsedMillis = (System.nanoTime() - startedAt) / 1_000_000L;
+        logger.info(
+                "Mongo {} seed progress: completed collection {}/{} '{}' (documents={}, elapsedMs={}).",
+                seedLabel,
+                collectionIndex,
+                collectionTotal,
+                collectionName,
+                total,
+                elapsedMillis
+        );
+    }
+
     private void seedR2ObjectsFromCurrentProjects(boolean allowSyntheticFallback) {
         try {
+            logger.info(
+                    "R2 artifact seed discovery: loading current project versions from database '{}' (syntheticFallback={}).",
+                    mongoTemplate.getDb().getName(),
+                    allowSyntheticFallback
+            );
             List<Document> projects = new ArrayList<>();
             mongoTemplate.getCollection("projects")
                     .find()
@@ -626,6 +747,17 @@ public class DataSeeder implements CommandLineRunner {
         for (Document project : projects) {
             collectProjectR2Objects(project, objects);
         }
+        long syntheticFallbackKeys = objects.values().stream()
+                .filter(R2SeedObject::syntheticFallback)
+                .count();
+        logger.info(
+                "R2 artifact seed discovery: projects={}, versions={}, objectKeys={}, syntheticFallbackKeys={}, sourceCopyCandidateKeys={}.",
+                projects.size(),
+                versionCount,
+                objects.size(),
+                syntheticFallbackKeys,
+                objects.size() - syntheticFallbackKeys
+        );
 
         if (objects.isEmpty()) {
             logger.info(
@@ -653,6 +785,13 @@ public class DataSeeder implements CommandLineRunner {
         }
 
         R2SourceConfig source = sourceConfig.orElse(null);
+        logger.info(
+                "R2 artifact seed progress: targetBucket='{}', sourceBucket='{}', objectKeys={}, syntheticFallbackKeys={}.",
+                r2Properties.bucket(),
+                source == null ? "" : source.bucket(),
+                objects.size(),
+                syntheticFallbackKeys
+        );
         S3Client sourceClient = source == null ? null : sourceR2Client(source);
         logger.info(
                 "Checking {} R2 artifact keys against target storage (sourceBucketConfigured={}, syntheticFallback={}).",
@@ -1464,7 +1603,10 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void cloneSpecificUsers(MongoDatabase source, MongoDatabase target, Set<String> userIds) {
-        if (userIds.isEmpty()) return;
+        if (userIds.isEmpty()) {
+            logger.info("Mongo clone seed progress: no referenced authors to clone.");
+            return;
+        }
 
         MongoCollection<Document> sourceCol = source.getCollection("users");
         MongoCollection<Document> targetCol = target.getCollection("users");
@@ -1474,16 +1616,34 @@ public class DataSeeder implements CommandLineRunner {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
-        if (objectIds.isEmpty()) return;
+        if (objectIds.isEmpty()) {
+            logger.info(
+                    "Mongo clone seed progress: no ObjectId-shaped author IDs found among {} referenced authors.",
+                    userIds.size()
+            );
+            return;
+        }
 
         List<Document> usersToClone = new ArrayList<>();
+        logger.info(
+                "Mongo clone seed progress: fetching {} referenced author documents from source users collection.",
+                objectIds.size()
+        );
         sourceCol.find(Filters.in("_id", objectIds)).into(usersToClone);
 
         if (usersToClone.isEmpty()) {
             List<String> stringIds = new ArrayList<>(userIds);
+            logger.info(
+                    "Mongo clone seed progress: no ObjectId author matches found; retrying {} string author IDs.",
+                    stringIds.size()
+            );
             sourceCol.find(Filters.in("_id", stringIds)).into(usersToClone);
         }
 
+        logger.info(
+                "Mongo clone seed progress: fetched {} referenced author documents; sanitizing before insert.",
+                usersToClone.size()
+        );
         String defaultPasswordHash = passwordEncoder.encode("password");
         List<Document> safeToInsert = new ArrayList<>();
 
@@ -1497,11 +1657,17 @@ public class DataSeeder implements CommandLineRunner {
 
         if (!safeToInsert.isEmpty()) {
             try {
+                logger.info(
+                        "Mongo clone seed progress: inserting {} sanitized referenced author documents.",
+                        safeToInsert.size()
+                );
                 targetCol.insertMany(safeToInsert);
-                logger.info("Cloned and sanitized {} users.", safeToInsert.size());
+                logger.info("Mongo clone seed progress: cloned and sanitized {} referenced author users.", safeToInsert.size());
             } catch (MongoBulkWriteException e) {
                 logger.warn("Partial user insertion error: {}", e.getMessage());
             }
+        } else {
+            logger.info("Mongo clone seed progress: no referenced author documents remained after sanitization.");
         }
     }
 
