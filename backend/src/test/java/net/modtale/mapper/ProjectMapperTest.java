@@ -97,6 +97,7 @@ class ProjectMapperTest {
         assertEquals(1, dto.getProjectRoles().size());
         assertEquals(1, dto.getTeamMembers().size());
         assertEquals(1, dto.getTeamInvites().size());
+        assertTrue(dto.isCustomLicenseOpenSource());
 
         ProjectCommentDTO comment = dto.getComments().getFirst();
         assertEquals("Lock in, this one ships.", comment.content());
@@ -169,6 +170,7 @@ class ProjectMapperTest {
         project.setUpdatedAt("2026-01-01");
         project.setCreatedAt("2025-12-01");
         project.setLicense("MIT");
+        project.setCustomLicenseOpenSource(true);
         project.setLastTrendingNotification("2026-01-02");
         project.setLinks(Map.of("docs", "https://example.com/docs"));
         project.setTypes(List.of("SERVER"));

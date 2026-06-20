@@ -9,6 +9,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
+import net.modtale.model.project.ProjectLicenseSupport;
 import net.modtale.model.project.ProjectSort;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectViewCategory;
@@ -24,23 +25,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
-    private static final List<String> OPEN_SOURCE_LICENSES = List.of(
-            "MIT",
-            "Apache-2.0",
-            "GPL-3.0",
-            "LGPL-3.0",
-            "AGPL-3.0",
-            "MPL-2.0",
-            "BSD-2-Clause",
-            "BSD-3-Clause",
-            "ISC",
-            "Zlib",
-            "Unlicense",
-            "CC0-1.0",
-            "CC-BY-4.0",
-            "CC-BY-SA-4.0"
-    );
-
     private final MongoTemplate mongoTemplate;
     private final ProjectSearchResultDecorator projectSearchResultDecorator;
 
@@ -142,7 +126,7 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
             criteriaList.add(Criteria.where("versions.gameVersions").in(gameVersions));
         if (minDownloads != null) criteriaList.add(Criteria.where("downloadCount").gte(minDownloads));
         if (minFavorites != null) criteriaList.add(Criteria.where("favoriteCount").gte(minFavorites));
-        if (Boolean.TRUE.equals(openSource)) criteriaList.add(Criteria.where("license").in(OPEN_SOURCE_LICENSES));
+        if (Boolean.TRUE.equals(openSource)) criteriaList.add(openSourceLicenseCriteria());
 
         boolean isTimeBasedDownloadSort = sortBy == ProjectSort.DOWNLOADS && dateCutoff != null;
         if (dateCutoff != null && !isTimeBasedDownloadSort) {
@@ -240,6 +224,16 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
         return Sort.by(Sort.Order.desc("updatedAt"));
     }
 
+    private Criteria openSourceLicenseCriteria() {
+        return new Criteria().orOperator(
+                Criteria.where("license").in(ProjectLicenseSupport.OPEN_SOURCE_LICENSES),
+                new Criteria().andOperator(
+                        Criteria.where("customLicenseOpenSource").is(true),
+                        Criteria.where("license").nin(ProjectLicenseSupport.SELECTABLE_LICENSES).ne(null)
+                )
+        );
+    }
+
     private List<String> parseGameVersions(String gameVersion) {
         if (gameVersion == null || gameVersion.trim().isEmpty()) {
             return List.of();
@@ -292,7 +286,7 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
         query.addCriteria(Criteria.where("id").in(projectIds));
         query.addCriteria(Criteria.where("status").in(ProjectStatus.PUBLISHED, ProjectStatus.ARCHIVED));
         if (Boolean.TRUE.equals(openSource)) {
-            query.addCriteria(Criteria.where("license").in(OPEN_SOURCE_LICENSES));
+            query.addCriteria(openSourceLicenseCriteria());
         }
 
         if (search != null && !search.trim().isEmpty()) {

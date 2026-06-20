@@ -141,7 +141,6 @@ const VersionMultiSelectDropdown: React.FC<VersionMultiSelectDropdownProps> = ({
                                             className="min-w-0 flex-1 text-left px-4 py-2.5 text-xs sm:text-sm font-bold flex items-center gap-2"
                                         >
                                             <span className="truncate">{group.label}</span>
-                                            {isPartiallySelected && <span className="shrink-0 text-[10px] opacity-80">{selectedCount}/{group.versions.length}</span>}
                                         </button>
                                         <button
                                             type="button"
@@ -274,14 +273,13 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
 
     const gameVersionGroups = useMemo(() => buildVersionGroups(gameVersions), [gameVersions]);
 
-    const preferredGameVersion = useMemo(() => gameVersions[0] || '', [gameVersions]);
+    const preferredGameVersions = useMemo(() => gameVersionGroups[0]?.versions || [], [gameVersionGroups]);
 
     useEffect(() => {
         const isOpening = show && !wasOpenRef.current;
-        const effectivePreferredGameVersion = preferredGameVersion || gameVersions[0] || '';
 
-        if (isOpening && effectivePreferredGameVersion) {
-            setSelectedGameVersions([effectivePreferredGameVersion]);
+        if (isOpening && preferredGameVersions.length > 0) {
+            setSelectedGameVersions(preferredGameVersions);
             setIsListExpanded(false);
         } else if (show) {
             setSelectedGameVersions((current) => {
@@ -290,14 +288,12 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                 if (validSelections.length === current.length) return current;
                 return validSelections.length > 0
                     ? validSelections
-                    : effectivePreferredGameVersion
-                        ? [effectivePreferredGameVersion]
-                        : [];
+                    : preferredGameVersions;
             });
         }
 
         wasOpenRef.current = show;
-    }, [show, gameVersions, preferredGameVersion]);
+    }, [show, gameVersions, preferredGameVersions]);
 
     const activeSelectedGameVersions = useMemo(() => {
         return selectedGameVersions.length > 0 ? selectedGameVersions : gameVersions;
@@ -336,9 +332,9 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
     }, [forceShowPreReleaseGameVersions, effectiveShowExperimental, onlyExperimentalArePreRelease, hasPreReleaseGameVersionEntries]);
 
     useEffect(() => {
-        if (!show || !preferredGameVersion) return;
+        if (!show || preferredGameVersions.length === 0) return;
         setIsListExpanded(false);
-    }, [effectiveShowPreReleaseGameVersions, effectiveShowExperimental, show, preferredGameVersion]);
+    }, [effectiveShowPreReleaseGameVersions, effectiveShowExperimental, show, preferredGameVersions]);
 
     useEffect(() => {
         if (forceShowPreReleaseGameVersions && !showPreReleaseGameVersions) {

@@ -87,6 +87,7 @@ const publicProjectProjection = {
   updatedAt: 1,
   createdAt: 1,
   license: 1,
+  customLicenseOpenSource: 1,
   links: 1,
   types: 1,
   childProjectIds: 1,
@@ -333,6 +334,7 @@ function sanitizeProject(project, index, selectedProjectIds, authorIdMap) {
     updatedAt: cleanDate(project.updatedAt),
     createdAt: cleanDate(project.createdAt),
     license: typeof project.license === 'string' ? project.license.slice(0, 32) : 'MIT',
+    customLicenseOpenSource: Boolean(project.customLicenseOpenSource),
     links: project.links && typeof project.links === 'object' && !Array.isArray(project.links) ? project.links : {},
     types: list(project.types, 4),
     childProjectIds: list(project.childProjectIds, 4)

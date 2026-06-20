@@ -161,6 +161,7 @@ public class Project {
     private String updatedAt;
     private String createdAt;
     private String license;
+    private boolean customLicenseOpenSource;
 
     private String lastTrendingNotification;
 
@@ -260,6 +261,8 @@ public class Project {
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
     public String getLicense() { return license; }
     public void setLicense(String license) { this.license = license; }
+    public boolean isCustomLicenseOpenSource() { return customLicenseOpenSource; }
+    public void setCustomLicenseOpenSource(boolean customLicenseOpenSource) { this.customLicenseOpenSource = customLicenseOpenSource; }
     public Map<String, String> getLinks() { return links; }
     public void setLinks(Map<String, String> links) { this.links = links; }
     public List<String> getTypes() { return types; }

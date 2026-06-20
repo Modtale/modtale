@@ -16,6 +16,7 @@ const mockProject = {
     imageUrl: null,
     bannerUrl: null,
     license: 'MIT',
+    customLicenseOpenSource: false,
     status: 'DRAFT',
     classification: 'PLUGIN',
     versions: [],
@@ -213,6 +214,22 @@ describe('ProjectEditorView route smoke test', () => {
 
         expect(container.querySelector('input[placeholder="License Name"]')).not.toBeNull();
         expect(container.querySelector('input[placeholder="License URL"]')).not.toBeNull();
+
+        const openSourceButton = Array.from(container.querySelectorAll('button')).find((button) => (
+            button.textContent?.trim() === 'Open Source'
+        ));
+
+        expect(openSourceButton, 'expected custom licenses to offer an open source toggle').toBeDefined();
+        expect(openSourceButton?.getAttribute('aria-pressed')).toBe('false');
+
+        await act(async () => {
+            openSourceButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        const toggledOpenSourceButton = Array.from(container.querySelectorAll('button')).find((button) => (
+            button.textContent?.trim() === 'Open Source'
+        ));
+        expect(toggledOpenSourceButton?.getAttribute('aria-pressed')).toBe('true');
     });
 
     it('expands the card preview without exposing project links', async () => {

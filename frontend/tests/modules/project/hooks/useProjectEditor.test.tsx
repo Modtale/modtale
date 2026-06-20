@@ -169,7 +169,8 @@ describe('useProjectEditor', () => {
             repositoryUrl: 'https://github.com/sky/tools',
             iconFile: null,
             iconPreview: '/old-icon.png',
-            license: 'MIT'
+            license: 'MIT',
+            customLicenseOpenSource: false
         } satisfies MetadataFormData,
         bannerFile = null as File | null,
         bannerPreview = '/old-banner.png'
@@ -266,11 +267,12 @@ describe('useProjectEditor', () => {
                 summary: 'Updated summary',
                 description: 'Updated description',
                 tags: ['magic', 'utility'],
-                links: { website: 'https://modtale.net' },
+                links: { website: 'https://modtale.net', LICENSE: 'https://example.com/license' },
                 repositoryUrl: 'https://github.com/sky/tools',
                 iconFile,
                 iconPreview: '/old-icon.png',
-                license: 'Apache-2.0'
+                license: 'Sky Public License',
+                customLicenseOpenSource: true
             },
             bannerFile
         });
@@ -291,9 +293,10 @@ describe('useProjectEditor', () => {
             description: 'Updated summary',
             about: 'Updated description',
             tags: ['magic', 'utility'],
-            links: { website: 'https://modtale.net' },
+            links: { website: 'https://modtale.net', LICENSE: 'https://example.com/license' },
             repositoryUrl: 'https://github.com/sky/tools',
-            license: 'Apache-2.0',
+            license: 'Sky Public License',
+            customLicenseOpenSource: true,
             allowModpacks: true,
             allowComments: true,
             hmWikiEnabled: false,
@@ -332,7 +335,8 @@ describe('useProjectEditor', () => {
                 repositoryUrl: '',
                 iconFile: null,
                 iconPreview: null,
-                license: 'MIT'
+                license: 'MIT',
+                customLicenseOpenSource: false
             }
         });
 
