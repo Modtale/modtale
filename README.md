@@ -99,8 +99,6 @@ The Spring Boot backend relies on environment variables. You can set these in yo
 
 > **Note on Warden:** The "Warden" malware and security scanner is proprietary to protect our threat-detection logic. You **must** set `WARDEN_ENABLED=false` to run the backend locally. This enables a "Mock Mode" where file uploads bypass the scanner and automatically return a mock "CLEAN" status.
 
-> **Note on seeding storage:** When `APP_SEEDING_ENABLED=true`, set `APP_SEEDING_SOURCE_R2_BUCKET_NAME` to copy seeded release files from a real source R2 bucket into `R2_BUCKET_NAME`. If the target R2 key can also read the source bucket, the regular `R2_ACCESS_KEY`, `R2_SECRET_KEY`, and `R2_ENDPOINT` values are reused. After a clean R2 pass, `DataSeeder` writes a small marker under `.modtale/seeding/r2-artifacts/` in the target bucket so later boots can skip artifact-by-artifact checks for the same seeded project set.
-
 **(Optional) OAuth Variables:**
 To test social logins (GitHub, Discord, Google), provide their respective Client IDs and Secrets (e.g., `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`).
 
