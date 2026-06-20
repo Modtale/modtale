@@ -60,7 +60,7 @@ jobs:
   frontend:
     name: Frontend Tests
     needs: detect-changes
-    if: needs.detect-changes.outputs.frontend == 'true'
+    if: needs.detect-changes.outputs.frontend == 'true' && github.repository == 'Modtale/modtale' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'Modtale/modtale')
     runs-on: ubuntu-latest
     defaults:
       run:

@@ -8,8 +8,6 @@ on:
       - reopened
       - ready_for_review
       - closed
-    branches:
-      - develop
 
 concurrency:
   group: pr-preview-${{ github.event.pull_request.number }}
@@ -31,8 +29,14 @@ env:
 jobs:
   deploy:
     name: Deploy PR Preview
-    if: github.event.action != 'closed'
+    if: github.repository == 'Modtale/modtale' && github.event.pull_request.head.repo.full_name == 'Modtale/modtale' && github.event.action != 'closed'
     runs-on: ubuntu-latest
+    outputs:
+      launcher_build: ${{ steps.filter.outputs.launcher_build }}
+      launcher_site_base_url: ${{ steps.launcher_metadata.outputs.site_base_url }}
+      launcher_api_base_url: ${{ steps.launcher_metadata.outputs.api_base_url }}
+      launcher_version: ${{ steps.launcher_metadata.outputs.version }}
+      launcher_artifact_prefix: ${{ steps.launcher_metadata.outputs.artifact_prefix }}
 
     steps:
       - name: Validate preview isolation config
@@ -52,6 +56,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: base
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Check out pull request code
@@ -60,7 +65,23 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
           path: source
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Detect changed components
+        id: filter
+        working-directory: source
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          git fetch --no-tags origin \
+            "+refs/heads/$PR_BASE_REF:refs/remotes/origin/$PR_BASE_REF" \
+            "+refs/heads/$PR_HEAD_REF:refs/remotes/origin/$PR_HEAD_REF"
+          bash "$GITHUB_WORKSPACE/base/.github/scripts/detect-component-changes.sh"
 
       - name: Prepare preview names
         run: |
@@ -154,6 +175,14 @@ jobs:
             --region "$REGION" \
             --update-env-vars "FRONTEND_URL=$FRONTEND_URL,BACKEND_URL=$BACKEND_URL"
 
+      - name: Export launcher build metadata
+        id: launcher_metadata
+        run: |
+          echo "site_base_url=$FRONTEND_URL" >> "$GITHUB_OUTPUT"
+          echo "api_base_url=$API_URL" >> "$GITHUB_OUTPUT"
+          echo "version=0.1.0-$TAG" >> "$GITHUB_OUTPUT"
+          echo "artifact_prefix=launcher-$TAG" >> "$GITHUB_OUTPUT"
+
       - name: Publish preview comment
         env:
           GH_TOKEN: ${{ github.token }}
@@ -173,9 +202,106 @@ jobs:
           gh pr comment "${{ github.event.pull_request.number }}" --edit-last --body-file "$body_file" \
             || gh pr comment "${{ github.event.pull_request.number }}" --body-file "$body_file"
 
+  package-launcher:
+    name: Package PR Launcher (${{ matrix.name }})
+    needs: deploy
+    if: github.repository == 'Modtale/modtale' && github.event.pull_request.head.repo.full_name == 'Modtale/modtale' && needs.deploy.outputs.launcher_build == 'true'
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux AppImage
+            os: ubuntu-latest
+            artifact: linux
+          - name: Windows Installer
+            os: windows-latest
+            artifact: windows
+          - name: macOS DMG
+            os: macos-latest
+            artifact: macos
+    defaults:
+      run:
+        working-directory: launcher
+        shell: bash
+    env:
+      LAUNCHER_SITE_BASE_URL: ${{ needs.deploy.outputs.launcher_site_base_url }}
+      LAUNCHER_API_BASE_URL: ${{ needs.deploy.outputs.launcher_api_base_url }}
+      LAUNCHER_VERSION: ${{ needs.deploy.outputs.launcher_version }}
+
+    steps:
+      - name: Check out pull request code
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+
+      - name: Validate launcher target URLs
+        run: |
+          : "${LAUNCHER_SITE_BASE_URL:?Launcher site URL was not produced by the deploy job.}"
+          : "${LAUNCHER_API_BASE_URL:?Launcher API URL was not produced by the deploy job.}"
+          : "${LAUNCHER_VERSION:?Launcher version was not produced by the deploy job.}"
+
+          echo "Launcher site URL: $LAUNCHER_SITE_BASE_URL"
+          echo "Launcher API URL: $LAUNCHER_API_BASE_URL"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Set up Linux AppImage tooling
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse2 || sudo apt-get install -y libfuse2t64 || true
+          curl -L \
+            -o "$RUNNER_TEMP/appimagetool" \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x "$RUNNER_TEMP/appimagetool"
+          echo "APPIMAGETOOL=$RUNNER_TEMP/appimagetool" >> "$GITHUB_ENV"
+          echo "APPIMAGE_EXTRACT_AND_RUN=1" >> "$GITHUB_ENV"
+
+      - name: Set up Windows installer tooling
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install wixtoolset -y --no-progress
+          $wix = Get-ChildItem "C:\Program Files (x86)" -Directory -Filter "WiX Toolset*" |
+            Sort-Object Name -Descending |
+            Select-Object -First 1
+          if ($null -eq $wix) {
+            throw "WiX Toolset was not installed."
+          }
+          "$($wix.FullName)\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Ensure Gradle wrapper is executable
+        run: chmod +x gradlew
+
+      - name: Build PR launcher package
+        run: |
+          ./gradlew clean packageAll \
+            -PlauncherVersion="$LAUNCHER_VERSION" \
+            -PmodtaleSiteBaseUrl="$LAUNCHER_SITE_BASE_URL" \
+            -PmodtaleApiBaseUrl="$LAUNCHER_API_BASE_URL"
+
+      - name: Upload PR launcher package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ needs.deploy.outputs.launcher_artifact_prefix }}-${{ matrix.artifact }}
+          path: launcher/build/distributions/*
+          if-no-files-found: error
+
   cleanup:
     name: Clean Up PR Preview
-    if: github.event.action == 'closed'
+    if: github.repository == 'Modtale/modtale' && github.event.pull_request.head.repo.full_name == 'Modtale/modtale' && github.event.action == 'closed'
     runs-on: ubuntu-latest
 
     steps:
