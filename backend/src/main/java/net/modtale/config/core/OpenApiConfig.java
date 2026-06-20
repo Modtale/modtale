@@ -148,7 +148,7 @@ public class OpenApiConfig {
                     Map.of("error", "Invalid credentials"));
 
             enrichOperation(paths, "/api/v1/projects", "GET",
-                    "Searches and filters publicly visible projects. Supports tags, classification, pagination, and optional sort parameters.",
+                    "Searches and filters publicly visible projects. Supports tags, classification, license openness, pagination, and optional sort parameters.",
                     Map.of(
                             "content", List.of(
                                     Map.of("id", "f0a0f750-9f2c-4a54-8d90-bf42c21fb2f2", "title", "Skyforge Utilities", "classification", "PLUGIN")

@@ -112,6 +112,7 @@ class ProjectControllerTest {
                 eq(ProjectViewCategory.FAVORITES),
                 eq("30d"),
                 eq("Ada"),
+                eq(true),
                 eq(currentUser)
         )).thenReturn(page);
 
@@ -127,6 +128,7 @@ class ProjectControllerTest {
                 5,
                 "Favorites",
                 "30d",
+                true,
                 "Ada",
                 "catalog",
                 null
@@ -161,7 +163,8 @@ class ProjectControllerTest {
                 isNull(),
                 eq(ProjectViewCategory.ALL),
                 isNull(),
-                eq("creator-name")
+                eq("creator-name"),
+                isNull()
         )).thenReturn(page);
 
         var response = controller.getProjects(
@@ -175,6 +178,7 @@ class ProjectControllerTest {
                 null,
                 null,
                 "Your Projects",
+                null,
                 null,
                 "creator-name",
                 "catalog",
@@ -196,7 +200,8 @@ class ProjectControllerTest {
                 isNull(),
                 eq(ProjectViewCategory.ALL),
                 isNull(),
-                eq("creator-name")
+                eq("creator-name"),
+                isNull()
         );
     }
 
@@ -221,7 +226,8 @@ class ProjectControllerTest {
                 isNull(),
                 eq(ProjectViewCategory.ALL),
                 eq("all"),
-                isNull()
+                isNull(),
+                eq(true)
         )).thenReturn(page);
 
         var response = controller.getProjects(
@@ -236,6 +242,7 @@ class ProjectControllerTest {
                 null,
                 "all",
                 "all",
+                true,
                 null,
                 "catalog",
                 authentication
@@ -256,7 +263,8 @@ class ProjectControllerTest {
                 isNull(),
                 eq(ProjectViewCategory.ALL),
                 eq("all"),
-                isNull()
+                isNull(),
+                eq(true)
         );
     }
 
@@ -276,6 +284,7 @@ class ProjectControllerTest {
                 isNull(),
                 eq(ProjectViewCategory.ALL),
                 isNull(),
+                isNull(),
                 isNull()
         )).thenReturn(page);
 
@@ -290,6 +299,7 @@ class ProjectControllerTest {
                 null,
                 null,
                 "all",
+                null,
                 null,
                 null,
                 "marquee",
@@ -312,6 +322,7 @@ class ProjectControllerTest {
                 isNull(),
                 eq(ProjectViewCategory.ALL),
                 isNull(),
+                isNull(),
                 isNull()
         );
         verify(projectResponseCacheService, never()).searchPublicProjectSummaries(
@@ -319,6 +330,7 @@ class ProjectControllerTest {
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.anyInt(),
                 org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),

@@ -37,6 +37,7 @@ public class SearchService {
             ProjectViewCategory viewCategory,
             String dateRange,
             String authorId,
+            Boolean openSource,
             User currentUser
     ) {
         return projectCatalogSearchService.searchProjects(
@@ -52,6 +53,7 @@ public class SearchService {
                 viewCategory,
                 dateRange,
                 authorId,
+                openSource,
                 currentUser
         );
     }
@@ -68,7 +70,8 @@ public class SearchService {
             Integer minFavorites,
             ProjectViewCategory viewCategory,
             String dateRange,
-            String authorId
+            String authorId,
+            Boolean openSource
     ) {
         return projectCatalogSearchService.searchProjectMarquee(
                 tags,
@@ -82,7 +85,8 @@ public class SearchService {
                 minFavorites,
                 viewCategory,
                 dateRange,
-                authorId
+                authorId,
+                openSource
         );
     }
 
