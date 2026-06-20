@@ -236,6 +236,23 @@ jobs:
         if: steps.filter.outputs.backend == 'true' || env.BACKEND_EXISTS == 'false'
         run: |
           cd backend
+
+          WARDEN_URL_VALUE=""
+          if [ "${{ env.ENV_TYPE }}" = "prod" ] || [ "${{ env.ENV_TYPE }}" = "dev" ]; then
+            WARDEN_URL_VALUE="$(
+              gcloud secrets versions access latest \
+                --project "$PROJECT_ID" \
+                --secret WARDEN_URL
+            )"
+
+            if [ -z "$WARDEN_URL_VALUE" ]; then
+              echo "::error::Secret WARDEN_URL is empty or unavailable."
+              exit 1
+            fi
+
+            echo "::add-mask::$WARDEN_URL_VALUE"
+          fi
+
           gcloud builds submit \
             --config=cloudbuild.yml \
             --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
@@ -266,7 +283,7 @@ jobs:
           ARGS+=("--update-secrets" "R2_ENDPOINT=${{ env.R2_ENDPOINT_SECRET_NAME }}:latest")
 
           if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
-            ARGS+=("--update-secrets" "WARDEN_URL=WARDEN_URL:latest")
+            ARGS+=("--update-env-vars" "WARDEN_URL=$WARDEN_URL_VALUE")
             ARGS+=("--update-secrets" "SMTP_HOST=SMTP_HOST:latest")
             ARGS+=("--update-secrets" "SMTP_USERNAME=SMTP_USERNAME:latest")
             ARGS+=("--update-secrets" "SMTP_PASSWORD=SMTP_PASSWORD:latest")
@@ -290,7 +307,7 @@ jobs:
             ARGS+=("--update-secrets" "ADMIN_DISCORD_WEBHOOK_URL=ADMIN_DISCORD_WEBHOOK_URL:latest")
             ARGS+=("--update-secrets" "STATUS_DISCORD_WEBHOOK_URL=STATUS_DISCORD_WEBHOOK_URL:latest")
           elif [ "${{ env.ENV_TYPE }}" = "dev" ]; then
-            ARGS+=("--update-secrets" "WARDEN_URL=WARDEN_URL:latest")
+            ARGS+=("--update-env-vars" "WARDEN_URL=$WARDEN_URL_VALUE")
             ARGS+=("--update-secrets" "SMTP_HOST=SMTP_HOST:latest")
             ARGS+=("--update-secrets" "SMTP_USERNAME=SMTP_USERNAME:latest")
             ARGS+=("--update-secrets" "SMTP_PASSWORD=SMTP_PASSWORD:latest")
