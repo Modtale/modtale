@@ -97,6 +97,39 @@ export const compareSemVer = (a: string, b: string) => {
     return 0;
 };
 
+export interface VersionGroup {
+    label: string;
+    versions: string[];
+    grouped: boolean;
+}
+
+export const parseSelectedVersions = (value: string) => {
+    if (!value || value === 'Any') return [];
+    return value.split(',').map(v => v.trim()).filter(v => v && v !== 'Any');
+};
+
+export const getVersionRangeLabel = (version: string) => {
+    const [baseVersion] = version.split('-');
+    const parts = baseVersion.split('.');
+    if (parts.length < 2 || !parts[0] || !parts[1]) return null;
+    if (!/^\d+$/.test(parts[0]) || !/^\d+$/.test(parts[1])) return null;
+    return `${parts[0]}.${parts[1]}.x`;
+};
+
+export const buildVersionGroups = (versions: string[]): VersionGroup[] => {
+    const groups = new Map<string, string[]>();
+    for (const version of versions) {
+        const label = getVersionRangeLabel(version);
+        const key = label || version;
+        groups.set(key, [...(groups.get(key) || []), version]);
+    }
+    return Array.from(groups, ([label, groupVersions]) => ({
+        label,
+        versions: groupVersions,
+        grouped: groupVersions.length > 1
+    }));
+};
+
 export const getClassificationIcon = (cls: string, className: string = "w-4 h-4") => {
     switch (cls) {
         case 'PLUGIN': return <Code className={className} />;
