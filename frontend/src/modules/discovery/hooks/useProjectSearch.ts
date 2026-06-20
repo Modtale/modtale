@@ -44,6 +44,7 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
     const selectedVersion = searchParams.get('version') || 'Any';
     const minDownloads = parseInt(searchParams.get('minDl') || '0');
     const minFavorites = parseInt(searchParams.get('minFav') || '0');
+    const openSourceOnly = searchParams.get('openSource') === 'true';
     const filterDate = searchParams.get('date');
     const viewCategory = normalizeViewCategory(searchParams.get('category'));
     const rawTags = searchParams.get('tags');
@@ -72,9 +73,10 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
         selectedVersion,
         minDownloads,
         minFavorites,
+        openSourceOnly,
         filterDate,
         viewCategory,
-    })}`, [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, viewCategory]);
+    })}`, [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, openSourceOnly, filterDate, viewCategory]);
     const queryKey = useMemo(() => JSON.stringify({
         page,
         itemsPerPage,
@@ -85,9 +87,10 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
         selectedVersion,
         minDownloads,
         minFavorites,
+        openSourceOnly,
         filterDate,
         viewCategory,
-    }), [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, viewCategory]);
+    }), [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, openSourceOnly, filterDate, viewCategory]);
 
     useEffect(() => {
         if (urlSearchTerm !== searchTerm) {
@@ -182,6 +185,7 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
                 gameVersion: selectedVersion !== 'Any' ? selectedVersion : undefined,
                 minDownloads: minDownloads > 0 ? minDownloads : undefined,
                 minFavorites: minFavorites > 0 ? minFavorites : undefined,
+                openSource: openSourceOnly ? true : undefined,
                 dateRange: filterDate || 'all',
                 category: viewCategory !== 'all' ? viewCategory : undefined,
             }, controller.signal);
@@ -224,7 +228,7 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
                 setIsPending(false);
             }
         }
-    }, [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, viewCategory, useSSRData, setSearchParams]);
+    }, [page, itemsPerPage, selectedClassification, selectedTags, urlSearchTerm, sortBy, selectedVersion, minDownloads, minFavorites, openSourceOnly, filterDate, viewCategory, useSSRData, setSearchParams]);
 
     useEffect(() => {
         fetchData();
@@ -240,7 +244,8 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
                 (key === 'category' && value === 'all') ||
                 (key === 'version' && value === 'Any') ||
                 (key === 'minDl' && value === '0') ||
-                (key === 'minFav' && value === '0')
+                (key === 'minFav' && value === '0') ||
+                (key === 'openSource' && value !== 'true')
             ) {
                 next.delete(key);
             } else {
@@ -264,7 +269,7 @@ export const useProjectSearch = (initialClassification: Classification | 'All', 
     }, [searchParams, setSearchParams]);
 
     return {
-        page, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, selectedTags, urlSearchTerm,
+        page, sortBy, selectedVersion, minDownloads, minFavorites, openSourceOnly, filterDate, selectedTags, urlSearchTerm,
         viewCategory,
         searchTerm, setSearchTerm, selectedClassification, setSelectedClassification, totalPages, totalItems, loading, isPending, items, setItems,
         itemsPerPage, setItemsPerPage, updateParams, searchParams, setSearchParams

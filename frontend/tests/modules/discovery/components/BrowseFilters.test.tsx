@@ -28,7 +28,9 @@ const renderFilters = (
     onResetFilters = vi.fn(),
     totalItems = 12,
     itemsPerPage = 12,
-    onItemsPerPageChange = vi.fn()
+    onItemsPerPageChange = vi.fn(),
+    openSourceOnly = false,
+    setOpenSourceOnly = vi.fn()
 ) => (
     <BrowseFilters
         pageTitle="All Projects"
@@ -51,6 +53,8 @@ const renderFilters = (
         setMinFavorites={vi.fn()}
         minDownloads={0}
         setMinDownloads={vi.fn()}
+        openSourceOnly={openSourceOnly}
+        setOpenSourceOnly={setOpenSourceOnly}
         filterDate={null}
         setFilterDate={vi.fn()}
         setPage={vi.fn()}
@@ -195,6 +199,26 @@ describe('BrowseFilters performance behavior', () => {
         });
 
         expect(setSelectedVersion).toHaveBeenCalledWith('0.5.4,0.5.3');
+    });
+
+    it('toggles the open source license filter', async () => {
+        const setOpenSourceOnly = vi.fn();
+
+        await act(async () => {
+            root.render(renderFilters(true, 'Any', vi.fn(), vi.fn(), 12, 12, vi.fn(), false, setOpenSourceOnly));
+        });
+
+        const openSourceButton = Array.from(container.querySelectorAll('button')).find(
+            (button) => button.textContent?.includes('Open Source')
+        );
+
+        expect(openSourceButton).toBeTruthy();
+
+        await act(async () => {
+            openSourceButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(setOpenSourceOnly).toHaveBeenCalledWith(true);
     });
 
     it('shows a singular result count when there is exactly one result', async () => {

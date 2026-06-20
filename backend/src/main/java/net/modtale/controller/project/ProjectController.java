@@ -132,6 +132,7 @@ public class ProjectController {
                     message = "Date ranges must be 7d, 30d, 90d, 1y, all, or an ISO-8601 date."
             )
             String dateRange,
+            @RequestParam(required = false) Boolean openSource,
             @RequestParam(required = false) String authorId,
             @RequestParam(required = false, defaultValue = "catalog")
             @Pattern(
@@ -151,6 +152,7 @@ public class ProjectController {
                 ? ProjectViewCategory.ALL
                 : ProjectViewCategory.fromQueryValue(category);
         ProjectClassification classificationEnum = classification != null ? resolveClassification(classification) : null;
+        Boolean openSourceFilter = Boolean.TRUE.equals(openSource) ? Boolean.TRUE : null;
         User currentUser = shouldResolveCatalogViewer(effectiveCategory)
                 ? accountService.getCurrentUser(authentication)
                 : null;
@@ -171,7 +173,8 @@ public class ProjectController {
                     minFavorites,
                     effectiveCategory,
                     dateRange,
-                    authorId
+                    authorId,
+                    openSourceFilter
             );
 
             return ResponseEntity.ok()
@@ -192,7 +195,8 @@ public class ProjectController {
                         minFavorites,
                         effectiveCategory,
                         dateRange,
-                        authorId
+                        authorId,
+                        openSourceFilter
                 )
                 : searchService.searchProjects(
                         tagList,
@@ -207,6 +211,7 @@ public class ProjectController {
                         effectiveCategory,
                         dateRange,
                         authorId,
+                        openSourceFilter,
                         currentUser
                 ).map(ProjectMapper::toSummaryDTO);
 
