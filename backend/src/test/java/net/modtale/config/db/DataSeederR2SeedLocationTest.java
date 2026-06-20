@@ -3,8 +3,12 @@ package net.modtale.config.db;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.lang.reflect.Method;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import net.modtale.config.properties.AppR2Properties;
 import net.modtale.config.properties.AppSeedingProperties;
+import org.bson.Document;
 import org.junit.jupiter.api.Test;
 
 class DataSeederR2SeedLocationTest {
@@ -47,6 +51,42 @@ class DataSeederR2SeedLocationTest {
     }
 
     @Test
+    void extractsKeysFromAbsoluteProxyUrls() throws Exception {
+        R2Location location = location("https://modtale.net/api/files/proxy/images/banner.jpg?download=1");
+
+        assertEquals("images/banner.jpg", location.key());
+        assertFalse(location.syntheticFallback());
+    }
+
+    @Test
+    void collectsVersionArtifactsAndDependencyArtifactsWithoutMediaUrls() throws Exception {
+        Document project = new Document("slug", "sample-project")
+                .append("title", "Sample Project")
+                .append("classification", "PLUGIN")
+                .append("imageUrl", "https://cdn.modtale.net/images/icon.jpg")
+                .append("bannerUrl", "https://cdn.modtale.net/images/banner.jpg")
+                .append("galleryImages", List.of(
+                        "https://cdn.modtale.net/gallery/one.webp",
+                        "https://www.youtube.com/watch?v=abcdefghijk"
+                ))
+                .append("versions", List.of(new Document("versionNumber", "1.2.3")
+                        .append("fileUrl", "files/plugin/sample.jar")
+                        .append("dependencies", List.of(new Document("projectTitle", "Dep")
+                                .append("cachedFileUrl", "external-dependencies/curseforge/1/2/dep.jar")
+                                .append("icon", "https://cdn.modtale.net/images/dep-icon.png")))));
+
+        Map<String, Object> objects = collectObjects(project);
+
+        assertTrue(objects.containsKey("files/plugin/sample.jar"));
+        assertTrue(objects.containsKey("external-dependencies/curseforge/1/2/dep.jar"));
+        assertFalse(objects.containsKey("images/icon.jpg"));
+        assertFalse(objects.containsKey("images/banner.jpg"));
+        assertFalse(objects.containsKey("gallery/one.webp"));
+        assertFalse(objects.containsKey("images/dep-icon.png"));
+        assertFalse(objects.containsKey("watch"));
+    }
+
+    @Test
     void marksTemplateMockDownloadsForSyntheticFallback() throws Exception {
         R2Location location = location("https://example.test/mock-downloads/review-me-0.1.0.jar");
 
@@ -73,6 +113,14 @@ class DataSeederR2SeedLocationTest {
         Method method = DataSeeder.class.getDeclaredMethod("r2SeedLocation", String.class);
         method.setAccessible(true);
         return method.invoke(seeder, rawLocation);
+    }
+
+    private Map<String, Object> collectObjects(Document project) throws Exception {
+        Method method = DataSeeder.class.getDeclaredMethod("collectProjectR2Objects", Document.class, Map.class);
+        method.setAccessible(true);
+        Map<String, Object> objects = new LinkedHashMap<>();
+        method.invoke(seeder, project, objects);
+        return objects;
     }
 
     private record R2Location(String key, boolean syntheticFallback) {

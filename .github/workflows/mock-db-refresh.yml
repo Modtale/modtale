@@ -26,6 +26,7 @@ jobs:
     name: Generate Sanitized Mock DB
     if: github.repository == 'Modtale/modtale'
     runs-on: ubuntu-latest
+    environment: mock-refresh
 
     env:
       MOCK_SOURCE_MONGODB_URI: ${{ secrets.MOCK_SOURCE_MONGODB_URI }}
@@ -34,6 +35,18 @@ jobs:
       MOCK_TEMPLATE_DATABASE_NAME: ${{ vars.MOCK_TEMPLATE_DATABASE_NAME }}
       MOCK_DB_OUTPUT_DIR: ${{ github.workspace }}/mock-db/generated/collections
       MOCK_DB_COLLECTION_DIR: ${{ github.workspace }}/mock-db/generated/collections
+      MOCK_R2_OBJECT_KEYS_FILE: ${{ github.workspace }}/mock-db/generated/r2-object-keys.txt
+      MOCK_SOURCE_R2_BUCKET_NAME: ${{ vars.MOCK_SOURCE_R2_BUCKET_NAME }}
+      MOCK_TEMPLATE_R2_BUCKET_NAME: ${{ vars.MOCK_TEMPLATE_R2_BUCKET_NAME }}
+      MOCK_SOURCE_R2_ACCESS_KEY: ${{ secrets.MOCK_SOURCE_R2_ACCESS_KEY }}
+      MOCK_SOURCE_R2_SECRET_KEY: ${{ secrets.MOCK_SOURCE_R2_SECRET_KEY }}
+      MOCK_SOURCE_R2_ENDPOINT: ${{ secrets.MOCK_SOURCE_R2_ENDPOINT }}
+      MOCK_TEMPLATE_R2_ACCESS_KEY: ${{ secrets.MOCK_TEMPLATE_R2_ACCESS_KEY }}
+      MOCK_TEMPLATE_R2_SECRET_KEY: ${{ secrets.MOCK_TEMPLATE_R2_SECRET_KEY }}
+      MOCK_TEMPLATE_R2_ENDPOINT: ${{ secrets.MOCK_TEMPLATE_R2_ENDPOINT }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_R2_PROVISIONER: ${{ secrets.CLOUDFLARE_R2_PROVISIONER }}
+      CLOUDFLARE_R2_JURISDICTION: ${{ vars.CLOUDFLARE_R2_JURISDICTION }}
 
     steps:
       - name: Check out repository
@@ -42,17 +55,34 @@ jobs:
       - name: Validate secret configuration
         run: |
           : "${MOCK_SOURCE_MONGODB_URI:?Set secret MOCK_SOURCE_MONGODB_URI with a read-only source MongoDB user.}"
+          : "${MOCK_SOURCE_R2_ACCESS_KEY:?Set secret MOCK_SOURCE_R2_ACCESS_KEY with read-only access to the production source R2 bucket.}"
+          : "${MOCK_SOURCE_R2_SECRET_KEY:?Set secret MOCK_SOURCE_R2_SECRET_KEY with read-only access to the production source R2 bucket.}"
+          : "${MOCK_SOURCE_R2_ENDPOINT:?Set secret MOCK_SOURCE_R2_ENDPOINT for the production source R2 account.}"
+          : "${MOCK_TEMPLATE_R2_ACCESS_KEY:?Set secret MOCK_TEMPLATE_R2_ACCESS_KEY with write access to the sanitized preview template R2 bucket.}"
+          : "${MOCK_TEMPLATE_R2_SECRET_KEY:?Set secret MOCK_TEMPLATE_R2_SECRET_KEY with write access to the sanitized preview template R2 bucket.}"
+          : "${MOCK_TEMPLATE_R2_ENDPOINT:?Set secret MOCK_TEMPLATE_R2_ENDPOINT for the sanitized preview template R2 bucket.}"
+          : "${CLOUDFLARE_ACCOUNT_ID:?Set secret CLOUDFLARE_ACCOUNT_ID.}"
+          : "${CLOUDFLARE_R2_PROVISIONER:?Set secret CLOUDFLARE_R2_PROVISIONER.}"
 
           source_db="${MOCK_SOURCE_DATABASE_NAME:-modtale}"
           template_db="${MOCK_TEMPLATE_DATABASE_NAME:-modtale-mock-template}"
+          source_r2_bucket="${MOCK_SOURCE_R2_BUCKET_NAME:-modtale-binaries}"
+          template_r2_bucket="${MOCK_TEMPLATE_R2_BUCKET_NAME:-modtale-preview-template}"
 
           if [ "$source_db" = "$template_db" ]; then
             echo "::error::MOCK_TEMPLATE_DATABASE_NAME must differ from MOCK_SOURCE_DATABASE_NAME. Refusing to load mock data into the source database."
             exit 1
           fi
 
+          if [ "$source_r2_bucket" = "$template_r2_bucket" ]; then
+            echo "::error::MOCK_TEMPLATE_R2_BUCKET_NAME must differ from MOCK_SOURCE_R2_BUCKET_NAME."
+            exit 1
+          fi
+
           echo "MOCK_SOURCE_DATABASE_NAME=$source_db" >> "$GITHUB_ENV"
           echo "MOCK_TEMPLATE_DATABASE_NAME=$template_db" >> "$GITHUB_ENV"
+          echo "MOCK_SOURCE_R2_BUCKET_NAME=$source_r2_bucket" >> "$GITHUB_ENV"
+          echo "MOCK_TEMPLATE_R2_BUCKET_NAME=$template_r2_bucket" >> "$GITHUB_ENV"
 
           if [ -z "${MOCK_TEMPLATE_MONGODB_URI:-}" ]; then
             echo "MOCK_TEMPLATE_MONGODB_URI=$MOCK_SOURCE_MONGODB_URI" >> "$GITHUB_ENV"
@@ -77,6 +107,10 @@ jobs:
       - name: Validate sanitized fixtures
         working-directory: mock-db
         run: npm run validate
+
+      - name: Collect sanitized R2 artifact keys
+        working-directory: mock-db
+        run: npm run collect-r2-keys
 
       - name: Delete previous public mock DB artifacts
         env:
@@ -110,6 +144,77 @@ jobs:
         working-directory: mock-db
         run: npm run load-template
 
+      - name: Sync preview template R2 bucket
+        run: |
+          set -euo pipefail
+
+          source_endpoint="$(printf '%s' "$MOCK_SOURCE_R2_ENDPOINT" | sed -E 's#(https?://[^/]+).*#\1#')"
+          template_endpoint="$(printf '%s' "$MOCK_TEMPLATE_R2_ENDPOINT" | sed -E 's#(https?://[^/]+).*#\1#')"
+
+          echo "::add-mask::$MOCK_SOURCE_R2_ACCESS_KEY"
+          echo "::add-mask::$MOCK_SOURCE_R2_SECRET_KEY"
+          echo "::add-mask::$MOCK_TEMPLATE_R2_ACCESS_KEY"
+          echo "::add-mask::$MOCK_TEMPLATE_R2_SECRET_KEY"
+
+          if ! command -v aws >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y awscli
+          fi
+
+          R2_BUCKET_NAME="$MOCK_TEMPLATE_R2_BUCKET_NAME" \
+            node .github/scripts/cloudflare-r2-preview.mjs ensure-bucket
+
+          AWS_ACCESS_KEY_ID="$MOCK_TEMPLATE_R2_ACCESS_KEY" \
+          AWS_SECRET_ACCESS_KEY="$MOCK_TEMPLATE_R2_SECRET_KEY" \
+          AWS_DEFAULT_REGION=auto \
+          aws s3api head-bucket \
+            --endpoint-url "$template_endpoint" \
+            --bucket "$MOCK_TEMPLATE_R2_BUCKET_NAME" >/dev/null
+
+          copied=0
+          missing=0
+          failed=0
+
+          while IFS= read -r key || [ -n "$key" ]; do
+            [ -n "$key" ] || continue
+
+            object_file="$(mktemp)"
+            if AWS_ACCESS_KEY_ID="$MOCK_SOURCE_R2_ACCESS_KEY" \
+               AWS_SECRET_ACCESS_KEY="$MOCK_SOURCE_R2_SECRET_KEY" \
+               AWS_DEFAULT_REGION=auto \
+               aws s3 cp \
+                 --endpoint-url "$source_endpoint" \
+                 --only-show-errors \
+                 "s3://$MOCK_SOURCE_R2_BUCKET_NAME/$key" \
+                 "$object_file"; then
+              if AWS_ACCESS_KEY_ID="$MOCK_TEMPLATE_R2_ACCESS_KEY" \
+                 AWS_SECRET_ACCESS_KEY="$MOCK_TEMPLATE_R2_SECRET_KEY" \
+                 AWS_DEFAULT_REGION=auto \
+                 aws s3 cp \
+                   --endpoint-url "$template_endpoint" \
+                   --only-show-errors \
+                   "$object_file" \
+                   "s3://$MOCK_TEMPLATE_R2_BUCKET_NAME/$key"; then
+                copied=$((copied + 1))
+              else
+                echo "::warning::Failed to upload sanitized R2 artifact '$key' to '$MOCK_TEMPLATE_R2_BUCKET_NAME'."
+                failed=$((failed + 1))
+              fi
+            else
+              echo "::warning::Source R2 artifact '$key' was not found in '$MOCK_SOURCE_R2_BUCKET_NAME'."
+              missing=$((missing + 1))
+            fi
+
+            rm -f "$object_file"
+          done < "$MOCK_R2_OBJECT_KEYS_FILE"
+
+          echo "Sanitized R2 template sync finished: copied=$copied missing=$missing failed=$failed"
+
+          if [ "$missing" -gt 0 ] || [ "$failed" -gt 0 ]; then
+            echo "::error::Sanitized R2 template sync was incomplete."
+            exit 1
+          fi
+
       - name: Write summary
         run: |
           {
@@ -117,6 +222,7 @@ jobs:
             echo ""
             echo "- Generated sanitized JSON artifact: \`modtale-mock-db-json\`"
             echo "- Refreshed template database: \`${MOCK_TEMPLATE_DATABASE_NAME:-modtale-mock-template}\`"
+            echo "- Synced sanitized R2 template bucket: \`${MOCK_TEMPLATE_R2_BUCKET_NAME:-modtale-preview-template}\`"
             echo "- Template Mongo URI source: \`${TEMPLATE_URI_SOURCE:-MOCK_TEMPLATE_MONGODB_URI}\`"
             echo "- Source privileged collections were not read; reports/admin logs/API keys/status/analytics are synthetic."
           } >> "$GITHUB_STEP_SUMMARY"

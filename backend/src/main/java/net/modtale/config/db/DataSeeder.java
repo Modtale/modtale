@@ -65,6 +65,8 @@ public class DataSeeder implements CommandLineRunner {
     private static final int MONGO_SEED_PROGRESS_INTERVAL = 25;
     private static final int R2_SEED_PROGRESS_INTERVAL = 25;
     private static final String R2_SEED_MARKER_PREFIX = ".modtale/seeding/r2-artifacts/";
+    private static final Set<String> VERSION_ARTIFACT_FIELDS = Set.of("fileUrl", "cachedFileUrl", "artifactUrl");
+    private static final Set<String> DEPENDENCY_ARTIFACT_FIELDS = Set.of("cachedFileUrl", "externalFileUrl", "fileUrl");
     private static final String SUPER_ADMIN_ID = "692620f7c2f3266e23ac0ded";
     private static final String ADMIN_ID = "692620f7c2f3266e23ac0dee";
     private static final List<String> MOCK_COLLECTIONS = List.of(
@@ -350,6 +352,9 @@ public class DataSeeder implements CommandLineRunner {
                         documents.size(),
                         collectionName
                 );
+                if ("projects".equals(collectionName)) {
+                    documents = completeDependencyProjects(sourceDb.getCollection("projects"), documents, "template");
+                }
                 MongoCollection<Document> collection = targetDb.getCollection(collectionName);
 
                 upsertDocumentsWithProgress(collection, collectionName, documents, "template", collectionIndex, MOCK_COLLECTIONS.size());
@@ -1064,7 +1069,7 @@ public class DataSeeder implements CommandLineRunner {
             }
 
             String versionNumber = firstNonBlank(stringValue(versionDoc.get("versionNumber")), "latest");
-            addR2SeedObject(objects, stringValue(versionDoc.get("fileUrl")), projectName, versionNumber, classification);
+            collectFieldR2Objects(versionDoc, VERSION_ARTIFACT_FIELDS, objects, projectName, versionNumber, classification);
             collectDependencyR2Objects(versionDoc, objects);
         }
     }
@@ -1082,13 +1087,28 @@ public class DataSeeder implements CommandLineRunner {
 
             String title = firstNonBlank(
                     stringValue(dependencyDoc.get("projectTitle")),
+                    stringValue(dependencyDoc.get("modTitle")),
                     stringValue(dependencyDoc.get("title")),
                     stringValue(dependencyDoc.get("projectId")),
+                    stringValue(dependencyDoc.get("modId")),
                     stringValue(dependencyDoc.get("externalId")),
                     "dependency"
             );
             String versionNumber = firstNonBlank(stringValue(dependencyDoc.get("versionNumber")), "latest");
-            addR2SeedObject(objects, stringValue(dependencyDoc.get("cachedFileUrl")), title, versionNumber, ProjectClassification.PLUGIN);
+            collectFieldR2Objects(dependencyDoc, DEPENDENCY_ARTIFACT_FIELDS, objects, title, versionNumber, ProjectClassification.PLUGIN);
+        }
+    }
+
+    private void collectFieldR2Objects(
+            Document document,
+            Set<String> fieldNames,
+            Map<String, R2SeedObject> objects,
+            String projectName,
+            String versionNumber,
+            ProjectClassification classification
+    ) {
+        for (String fieldName : fieldNames) {
+            addR2SeedObject(objects, stringValue(document.get(fieldName)), projectName, versionNumber, classification);
         }
     }
 
@@ -1137,6 +1157,10 @@ public class DataSeeder implements CommandLineRunner {
             String key = stripLeadingSlash(uri.getPath());
             if (key.isBlank()) {
                 return null;
+            }
+
+            if (key.startsWith("api/files/proxy/")) {
+                return r2SeedLocationFromKey(key.substring("api/files/proxy/".length()), false);
             }
 
             String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
@@ -1290,6 +1314,7 @@ public class DataSeeder implements CommandLineRunner {
             case "jpg", "jpeg" -> "image/jpeg";
             case "webp" -> "image/webp";
             case "gif" -> "image/gif";
+            case "svg" -> "image/svg+xml";
             default -> "application/octet-stream";
         };
     }
@@ -1740,6 +1765,38 @@ public class DataSeeder implements CommandLineRunner {
             return "author";
         }
         return token.length() > 40 ? token.substring(0, 40) : token;
+    }
+
+    private List<Document> completeDependencyProjects(
+            MongoCollection<Document> sourceProjectsCol,
+            List<Document> projects,
+            String seedLabel
+    ) {
+        if (projects == null || projects.isEmpty()) {
+            return projects == null ? List.of() : projects;
+        }
+
+        Set<String> selectedProjectIds = projectIds(projects);
+        List<Document> dependencyProjects = collectDependencyProjects(sourceProjectsCol, selectedProjectIds);
+        if (dependencyProjects.isEmpty()) {
+            logger.info(
+                    "Mongo {} seed progress: no additional dependency projects needed for {} selected projects.",
+                    seedLabel,
+                    projects.size()
+            );
+            return projects;
+        }
+
+        List<Document> completed = new ArrayList<>(projects.size() + dependencyProjects.size());
+        completed.addAll(projects);
+        completed.addAll(dependencyProjects);
+        logger.info(
+                "Mongo {} seed progress: included {} dependency projects; project set now contains {} projects.",
+                seedLabel,
+                dependencyProjects.size(),
+                completed.size()
+        );
+        return completed;
     }
 
     private List<Document> collectDependencyProjects(MongoCollection<Document> sourceProjectsCol, Set<String> initialProjectIds) {
