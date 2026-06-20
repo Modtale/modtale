@@ -74,6 +74,8 @@ public class User implements Serializable {
 
     private NotificationPreferences notificationPreferences = new NotificationPreferences();
 
+    private LauncherSettingsSnapshot launcherSettings;
+
     private String githubAccessToken;
 
     private String gitlabAccessToken;
@@ -283,6 +285,9 @@ public class User implements Serializable {
 
     public NotificationPreferences getNotificationPreferences() { return notificationPreferences; }
     public void setNotificationPreferences(NotificationPreferences notificationPreferences) { this.notificationPreferences = notificationPreferences; }
+
+    public LauncherSettingsSnapshot getLauncherSettings() { return launcherSettings; }
+    public void setLauncherSettings(LauncherSettingsSnapshot launcherSettings) { this.launcherSettings = launcherSettings; }
 
     public String getGithubAccessToken() { return githubAccessToken; }
     public void setGithubAccessToken(String githubAccessToken) { this.githubAccessToken = githubAccessToken; }

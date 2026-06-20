@@ -7,6 +7,7 @@ import java.util.Optional;
 import net.modtale.exception.InvalidAccountRequestException;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.model.project.Project;
+import net.modtale.model.user.LauncherSettingsSnapshot;
 import net.modtale.model.user.OAuthProvider;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
@@ -25,6 +26,11 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class AccountService {
+
+    private static final int MAX_LAUNCHER_SYNC_PROJECTS = 500;
+    private static final int MAX_LAUNCHER_SYNC_LIST_ITEMS = 64;
+    private static final int MAX_LAUNCHER_SYNC_STRING = 512;
+    private static final int MAX_LAUNCHER_SYNC_HASH = 128;
 
     private final UserRepository userRepository;
     private final MongoTemplate mongoTemplate;
@@ -157,6 +163,27 @@ public class AccountService {
         userRepository.save(user);
     }
 
+    public LauncherSettingsSnapshot getLauncherSettings(String userId) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found."));
+        return user.getLauncherSettings() == null ? new LauncherSettingsSnapshot() : user.getLauncherSettings();
+    }
+
+    public LauncherSettingsSnapshot updateLauncherSettings(String userId, LauncherSettingsSnapshot snapshot) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found."));
+        LauncherSettingsSnapshot normalized = normalizeLauncherSettings(snapshot);
+        user.setLauncherSettings(normalized);
+        userRepository.save(user);
+        return normalized;
+    }
+
+    public LauncherSettingsSnapshot updateLauncherSettingsPreferences(String userId, LauncherSettingsSnapshot snapshot) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found."));
+        LauncherSettingsSnapshot normalized = normalizeLauncherSettingsPreferences(snapshot, user.getLauncherSettings());
+        user.setLauncherSettings(normalized);
+        userRepository.save(user);
+        return normalized;
+    }
+
     public void toggleConnectionVisibility(String userId, String provider) {
         if ("google".equalsIgnoreCase(provider)) {
             throw new InvalidAccountRequestException("Google accounts cannot be made visible on public profiles.");
@@ -208,6 +235,145 @@ public class AccountService {
 
     public void recoverUser(String userId) {
         accountLifecycleService.recoverUser(userId);
+    }
+
+    private LauncherSettingsSnapshot normalizeLauncherSettings(LauncherSettingsSnapshot snapshot) {
+        LauncherSettingsSnapshot source = snapshot == null ? new LauncherSettingsSnapshot() : snapshot;
+        LauncherSettingsSnapshot normalized = new LauncherSettingsSnapshot();
+        normalized.setSchemaVersion(source.getSchemaVersion());
+        normalized.setSettingsHash(limit(source.getSettingsHash(), MAX_LAUNCHER_SYNC_HASH));
+        normalized.setUpdatedAt(LocalDateTime.now().toString());
+        normalized.setPreferences(normalizeLauncherPreferences(source.getPreferences()));
+        normalized.setInstalledProjects(normalizeInstalledProjects(source.getInstalledProjects()));
+        return normalized;
+    }
+
+    private LauncherSettingsSnapshot normalizeLauncherSettingsPreferences(
+            LauncherSettingsSnapshot snapshot,
+            LauncherSettingsSnapshot existing
+    ) {
+        LauncherSettingsSnapshot source = snapshot == null ? new LauncherSettingsSnapshot() : snapshot;
+        LauncherSettingsSnapshot stored = existing == null ? new LauncherSettingsSnapshot() : existing;
+        LauncherSettingsSnapshot normalized = new LauncherSettingsSnapshot();
+        normalized.setSchemaVersion(source.getSchemaVersion());
+        normalized.setSettingsHash(limit(source.getSettingsHash(), MAX_LAUNCHER_SYNC_HASH));
+        normalized.setUpdatedAt(LocalDateTime.now().toString());
+        normalized.setPreferences(normalizeLauncherPreferences(source.getPreferences()));
+        normalized.setInstalledProjects(normalizeInstalledProjects(stored.getInstalledProjects()));
+        return normalized;
+    }
+
+    private LauncherSettingsSnapshot.Preferences normalizeLauncherPreferences(LauncherSettingsSnapshot.Preferences source) {
+        LauncherSettingsSnapshot.Preferences preferences = new LauncherSettingsSnapshot.Preferences();
+        if (source == null) {
+            return preferences;
+        }
+        preferences.setHytaleModsPath(limit(source.getHytaleModsPath(), MAX_LAUNCHER_SYNC_STRING));
+        preferences.setHytaleGamePath(limit(source.getHytaleGamePath(), MAX_LAUNCHER_SYNC_STRING));
+        preferences.setHytaleUserDataPath(limit(source.getHytaleUserDataPath(), MAX_LAUNCHER_SYNC_STRING));
+        preferences.setHytaleJavaPath(limit(source.getHytaleJavaPath(), MAX_LAUNCHER_SYNC_STRING));
+        preferences.setHytaleBranch(limit(source.getHytaleBranch(), MAX_LAUNCHER_SYNC_STRING));
+        preferences.setHytaleBuild(source.getHytaleBuild());
+        preferences.setGameVersion(limit(source.getGameVersion(), MAX_LAUNCHER_SYNC_STRING));
+        preferences.setIncludeDependencies(source.isIncludeDependencies());
+        preferences.setIncludeOptionalDependencies(source.isIncludeOptionalDependencies());
+        preferences.setAutoCheckUpdates(source.isAutoCheckUpdates());
+        preferences.setLauncherAutoUpdates(source.isLauncherAutoUpdates());
+        return preferences;
+    }
+
+    private List<LauncherSettingsSnapshot.InstalledProject> normalizeInstalledProjects(
+            List<LauncherSettingsSnapshot.InstalledProject> source
+    ) {
+        if (source == null || source.isEmpty()) {
+            return List.of();
+        }
+        List<LauncherSettingsSnapshot.InstalledProject> normalized = new ArrayList<>();
+        for (LauncherSettingsSnapshot.InstalledProject project : source) {
+            if (project == null || isBlank(project.getProjectId()) || normalized.size() >= MAX_LAUNCHER_SYNC_PROJECTS) {
+                continue;
+            }
+            LauncherSettingsSnapshot.InstalledProject copy = new LauncherSettingsSnapshot.InstalledProject();
+            copy.setProjectId(limit(project.getProjectId(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setSlug(limit(project.getSlug(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setTitle(limit(project.getTitle(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setClassification(limit(project.getClassification(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setInstalledVersion(limit(project.getInstalledVersion(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setInstalledVersionId(limit(project.getInstalledVersionId(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setGameVersion(limit(project.getGameVersion(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setSource(defaultValue(limit(project.getSource(), MAX_LAUNCHER_SYNC_STRING), "MODTALE"));
+            copy.setInstallType(defaultValue(limit(project.getInstallType(), MAX_LAUNCHER_SYNC_STRING), "DIRECT"));
+            copy.setModpackUnlocked(project.isModpackUnlocked());
+            copy.setDependencyProjectIds(normalizeStringList(project.getDependencyProjectIds()));
+            copy.setExternalDependencies(normalizeStringList(project.getExternalDependencies()));
+            copy.setBundledProjects(normalizeInstalledProjectReferences(project.getBundledProjects()));
+            normalized.add(copy);
+        }
+        return normalized;
+    }
+
+    private List<LauncherSettingsSnapshot.InstalledProjectReference> normalizeInstalledProjectReferences(
+            List<LauncherSettingsSnapshot.InstalledProjectReference> source
+    ) {
+        if (source == null || source.isEmpty()) {
+            return List.of();
+        }
+        List<LauncherSettingsSnapshot.InstalledProjectReference> normalized = new ArrayList<>();
+        for (LauncherSettingsSnapshot.InstalledProjectReference reference : source) {
+            if (reference == null || normalized.size() >= MAX_LAUNCHER_SYNC_LIST_ITEMS) {
+                continue;
+            }
+            LauncherSettingsSnapshot.InstalledProjectReference copy =
+                    new LauncherSettingsSnapshot.InstalledProjectReference();
+            copy.setId(limit(reference.getId(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setProjectId(limit(reference.getProjectId(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setSlug(limit(reference.getSlug(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setTitle(limit(reference.getTitle(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setClassification(limit(reference.getClassification(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setVersionNumber(limit(reference.getVersionNumber(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setDependencyType(limit(reference.getDependencyType(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setSource(limit(reference.getSource(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setExternalId(limit(reference.getExternalId(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setExternalUrl(limit(reference.getExternalUrl(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setExternalFileUrl(limit(reference.getExternalFileUrl(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setExternalFileName(limit(reference.getExternalFileName(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setCachedFileUrl(limit(reference.getCachedFileUrl(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setIcon(limit(reference.getIcon(), MAX_LAUNCHER_SYNC_STRING));
+            copy.setOptional(reference.getOptional());
+            copy.setEmbedded(reference.getEmbedded());
+            normalized.add(copy);
+        }
+        return normalized;
+    }
+
+    private List<String> normalizeStringList(List<String> source) {
+        if (source == null || source.isEmpty()) {
+            return List.of();
+        }
+        List<String> normalized = new ArrayList<>();
+        for (String value : source) {
+            String next = limit(value, MAX_LAUNCHER_SYNC_STRING);
+            if (!next.isBlank() && !normalized.contains(next)) {
+                normalized.add(next);
+            }
+            if (normalized.size() >= MAX_LAUNCHER_SYNC_LIST_ITEMS) {
+                break;
+            }
+        }
+        return normalized;
+    }
+
+    private static String limit(String value, int maxLength) {
+        String trimmed = value == null ? "" : value.trim();
+        return trimmed.length() <= maxLength ? trimmed : trimmed.substring(0, maxLength);
+    }
+
+    private static String defaultValue(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     @Scheduled(cron = "0 0 0 * * ?")

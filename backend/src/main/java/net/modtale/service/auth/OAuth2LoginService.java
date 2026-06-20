@@ -1,6 +1,7 @@
 package net.modtale.service.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import net.modtale.exception.AuthenticationOperationException;
 import net.modtale.exception.ForbiddenOperationException;
 import net.modtale.exception.InvalidAuthenticationRequestException;
@@ -43,14 +44,21 @@ public class OAuth2LoginService extends DefaultOAuth2UserService {
         try {
             Authentication currentAuth = currentAuthentication();
 
-            if (currentAuth != null && currentAuth.isAuthenticated() &&
-                    !currentAuth.getName().equals("anonymousUser")) {
+            boolean linking = !hasPendingLauncherOAuth()
+                    && currentAuth != null && currentAuth.isAuthenticated()
+                    && !currentAuth.getName().equals("anonymousUser");
+
+            if (linking) {
 
                 User currentUser = accountService.getCurrentUser();
 
                 if (currentUser != null) {
                     return authenticationService.linkAccount(currentUser, provider, oauthUser, accessToken);
                 }
+            }
+
+            if ("gitlab".equalsIgnoreCase(provider)) {
+                throw new InvalidAuthenticationRequestException("GitLab can be linked from profile settings, but it cannot be used to sign in.");
             }
 
             return authenticationService.processUserLogin(provider, oauthUser, accessToken);
@@ -66,6 +74,13 @@ public class OAuth2LoginService extends DefaultOAuth2UserService {
     private Authentication currentAuthentication() {
         HttpServletRequest request = requestProvider.getIfAvailable();
         return request != null && request.getUserPrincipal() instanceof Authentication auth ? auth : null;
+    }
+
+    private boolean hasPendingLauncherOAuth() {
+        HttpServletRequest request = requestProvider.getIfAvailable();
+        HttpSession session = request == null ? null : request.getSession(false);
+        return session != null
+                && session.getAttribute(LauncherAuthService.OAUTH_REDIRECT_URI_SESSION_ATTRIBUTE) instanceof String;
     }
 
     protected OAuth2User fetchOAuthUser(OAuth2UserRequest userRequest) {

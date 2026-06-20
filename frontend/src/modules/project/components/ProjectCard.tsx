@@ -19,6 +19,7 @@ interface ProjectCardProps {
     onReady?: (projectId: string) => void;
     isVisible?: boolean;
     disableNavigation?: boolean;
+    versionLabel?: string;
 }
 
 export type ProjectCardViewStyle = 'grid' | 'list' | 'compact';
@@ -120,7 +121,7 @@ export const ProjectCardSkeletons: React.FC<ProjectCardSkeletonsProps> = ({ view
     );
 };
 
-export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, path, isFavorite, onToggleFavorite, isLoggedIn, priority = false, viewStyle = 'grid', onReady, isVisible = true, disableNavigation = false }) => {
+export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, path, isFavorite, onToggleFavorite, isLoggedIn, priority = false, viewStyle = 'grid', onReady, isVisible = true, disableNavigation = false, versionLabel }) => {
     const title = project.title || 'Untitled Project';
     const author = project.author || 'Unknown';
     const authorPath = project.authorId ? SiteRoutes.creator(project.authorId, author) : null;
@@ -275,7 +276,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                         )}
                     </div>
                 </div>
-                <div className="hidden sm:flex flex-col items-end gap-1.5 shrink-0 text-[10px] font-bold text-slate-400 uppercase tracking-tight relative z-20">
+                <div className="hidden sm:flex flex-col items-end gap-1.5 shrink-0 text-[10px] font-bold text-slate-400 uppercase tracking-normal relative z-20">
                     <div className="flex items-center gap-3">
                         <span className="flex items-center gap-1"><Download className="w-3 h-3" /> {downloads}</span>
                         <span className="flex items-center gap-1"><Heart className={`w-3 h-3 ${isFavorite ? 'text-red-500 fill-current' : ''}`} /> {favorites}</span>
@@ -332,6 +333,13 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                                     <span className="truncate block">{author}</span>
                                 )}
                             </div>
+                            {versionLabel && (
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                                        {versionLabel}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                         <div className="hidden sm:flex bg-slate-100 dark:bg-white/5 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider items-center gap-1.5 shrink-0 border border-slate-200 dark:border-white/5 pointer-events-none">
                             <span className="text-blue-600 dark:text-blue-400">{getClassificationIcon(classification)}</span>
@@ -531,15 +539,16 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
         p.project.downloadCount === n.project.downloadCount &&
         p.project.updatedAt === n.project.updatedAt &&
         p.project.favoriteCount === n.project.favoriteCount &&
-        p.project.projectIds === n.project.projectIds &&
         p.project.childProjectIds === n.project.childProjectIds &&
         p.path === n.path &&
         p.isFavorite === n.isFavorite &&
+        p.onToggleFavorite === n.onToggleFavorite &&
         p.isLoggedIn === n.isLoggedIn &&
         p.priority === n.priority &&
         p.viewStyle === n.viewStyle &&
         p.isVisible === n.isVisible &&
-        p.disableNavigation === n.disableNavigation
+        p.disableNavigation === n.disableNavigation &&
+        p.versionLabel === n.versionLabel
     );
 });
 

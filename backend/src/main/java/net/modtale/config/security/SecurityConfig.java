@@ -13,11 +13,13 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import net.modtale.controller.auth.AuthController;
 import net.modtale.config.auth.ApiKeyAuthFilter;
 import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.model.user.User;
 import net.modtale.service.auth.AuthenticationService;
+import net.modtale.service.auth.LauncherAuthService;
 import net.modtale.service.auth.LocalUserDetailsService;
 import net.modtale.service.auth.OAuth2LoginService;
 import net.modtale.service.auth.OidcLoginService;
@@ -69,6 +71,7 @@ public class SecurityConfig {
     private final PasswordEncoder passwordEncoder;
     private final AccountService accountService;
     private final AuthenticationService authenticationService;
+    private final LauncherAuthService launcherAuthService;
     private final AppFrontendProperties frontendProperties;
 
     public SecurityConfig(
@@ -81,6 +84,7 @@ public class SecurityConfig {
             PasswordEncoder passwordEncoder,
             AccountService accountService,
             AuthenticationService authenticationService,
+            LauncherAuthService launcherAuthService,
             AppFrontendProperties frontendProperties
     ) {
         this.apiKeyAuthFilter = apiKeyAuthFilter;
@@ -92,6 +96,7 @@ public class SecurityConfig {
         this.passwordEncoder = passwordEncoder;
         this.accountService = accountService;
         this.authenticationService = authenticationService;
+        this.launcherAuthService = launcherAuthService;
         this.frontendProperties = frontendProperties;
     }
 
@@ -282,7 +287,10 @@ public class SecurityConfig {
                                 "/api/v1/auth/verify",
                                 "/api/v1/auth/signin",
                                 "/api/v1/auth/logout",
+                                "/api/v1/auth/oauth/**",
+                                "/api/v1/auth/launcher/oauth/**",
                                 "/api/v1/auth/mfa/validate-login",
+                                "/api/v1/auth/launcher/exchange",
                                 "/api/v1/auth/forgot-password",
                                 "/api/v1/auth/reset-password"
                         ).permitAll()
@@ -299,13 +307,14 @@ public class SecurityConfig {
                                 "/api/v1/og/**",
                                 "/api/v1/download/**",
                                 "/api/v1/download-bundle/**",
+                                "/api/v1/lists/**",
                                 "/api/v1/meta/**",
                                 "/api/v1/status",
                                 "/api/v1/version/**",
                                 "/api/v1/analytics/platform/stats",
                                 "/api/v1/wiki/**"
                         ).permitAll()
-                        .requestMatchers(HttpMethod.HEAD, "/api/v1/projects/**", "/api/v1/tags", "/api/v1/files/**", "/api/v1/user/profile/**", "/api/v1/og/**").permitAll()
+                        .requestMatchers(HttpMethod.HEAD, "/api/v1/projects/**", "/api/v1/tags", "/api/v1/files/**", "/api/v1/user/profile/**", "/api/v1/og/**", "/api/v1/lists/**").permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/users/batch"
                         ).permitAll()
@@ -482,9 +491,44 @@ public class SecurityConfig {
 
             User user = accountService.getPublicProfile(login);
             boolean isLinking = Boolean.TRUE.equals(oauthUser.getAttribute("is_linking"));
+            LauncherOAuthRequest launcherOAuthRequest = consumeLauncherOAuthRequest(request);
+            if (launcherOAuthRequest != null && !isLinking) {
+                if (user == null) {
+                    response.sendRedirect(launcherCallbackUrl(
+                            launcherOAuthRequest.redirectUri(),
+                            "oauth_user_not_found",
+                            launcherOAuthRequest.state(),
+                            false
+                    ));
+                    return;
+                }
+                if (!user.isMfaEnabled()) {
+                    SecurityContextRepository repository = securityContextRepository();
+                    repository.saveContext(SecurityContextHolder.getContext(), request, response);
+                    try {
+                        LauncherAuthService.LauncherAuthGrant grant = launcherAuthService.issueCode(
+                                user,
+                                launcherOAuthRequest.redirectUri(),
+                                launcherOAuthRequest.state()
+                        );
+                        response.sendRedirect(launcherCallbackUrl(grant.redirectUri(), grant.code(), grant.state(), true));
+                    } catch (RuntimeException ex) {
+                        response.sendRedirect(launcherCallbackUrl(
+                                launcherOAuthRequest.redirectUri(),
+                                ex.getMessage(),
+                                launcherOAuthRequest.state(),
+                                false
+                        ));
+                    }
+                    return;
+                }
+            }
 
             if (user != null && user.isMfaEnabled() && !isLinking) {
                 String preAuthToken = authenticationService.generatePreAuthToken(user.getId());
+                String postLoginRedirect = launcherOAuthRequest == null
+                        ? consumePostOAuthRedirect(request, "/dashboard/profile")
+                        : launcherAuthFrontendPath(launcherOAuthRequest);
 
                 SecurityContextHolder.clearContext();
 
@@ -496,14 +540,16 @@ public class SecurityConfig {
                     session.invalidate();
                 }
 
-                String cleanUrl = getCleanFrontendUrl();
-                response.sendRedirect((cleanUrl != null ? cleanUrl : "") + "/mfa?token=" + preAuthToken);
+                String mfaPath = "/mfa?token=" + preAuthToken;
+                if (!"/dashboard/profile".equals(postLoginRedirect)) {
+                    mfaPath += "&redirect=" + URLEncoder.encode(postLoginRedirect, StandardCharsets.UTF_8);
+                }
+                response.sendRedirect(frontendUrl(mfaPath));
             } else {
                 SecurityContextRepository repository = securityContextRepository();
                 repository.saveContext(SecurityContextHolder.getContext(), request, response);
 
-                String cleanUrl = getCleanFrontendUrl();
-                response.sendRedirect((cleanUrl != null ? cleanUrl : "") + "/dashboard/profile");
+                response.sendRedirect(frontendUrl(consumePostOAuthRedirect(request, "/dashboard/profile")));
             }
         };
     }
@@ -511,10 +557,99 @@ public class SecurityConfig {
     @Bean
     public AuthenticationFailureHandler oauthFailureHandler() {
         return (request, response, exception) -> {
+            LauncherOAuthRequest launcherOAuthRequest = consumeLauncherOAuthRequest(request);
+            if (launcherOAuthRequest != null) {
+                response.sendRedirect(launcherCallbackUrl(
+                        launcherOAuthRequest.redirectUri(),
+                        exception.getMessage(),
+                        launcherOAuthRequest.state(),
+                        false
+                ));
+                return;
+            }
             String errorParam = URLEncoder.encode(exception.getMessage(), StandardCharsets.UTF_8);
-            String cleanUrl = getCleanFrontendUrl();
-            response.sendRedirect((cleanUrl != null ? cleanUrl : "") + "/?oauth_error=" + errorParam);
+            String redirectPath = consumePostOAuthRedirect(request, "/");
+            String separator = redirectPath.contains("?") ? "&" : "?";
+            response.sendRedirect(frontendUrl(redirectPath + separator + "oauth_error=" + errorParam));
         };
+    }
+
+    private String frontendUrl(String path) {
+        String cleanUrl = getCleanFrontendUrl();
+        return (cleanUrl != null ? cleanUrl : "") + safeInternalRedirect(path, "/");
+    }
+
+    private LauncherOAuthRequest consumeLauncherOAuthRequest(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session == null) {
+            return null;
+        }
+
+        Object redirectUri = session.getAttribute(LauncherAuthService.OAUTH_REDIRECT_URI_SESSION_ATTRIBUTE);
+        Object state = session.getAttribute(LauncherAuthService.OAUTH_STATE_SESSION_ATTRIBUTE);
+        session.removeAttribute(LauncherAuthService.OAUTH_REDIRECT_URI_SESSION_ATTRIBUTE);
+        session.removeAttribute(LauncherAuthService.OAUTH_STATE_SESSION_ATTRIBUTE);
+
+        if (redirectUri instanceof String redirect && !redirect.isBlank()) {
+            return new LauncherOAuthRequest(redirect, state instanceof String value ? value : "");
+        }
+        return null;
+    }
+
+    private String launcherAuthFrontendPath(LauncherOAuthRequest request) {
+        return "/launcher/auth?redirect_uri=" + URLEncoder.encode(request.redirectUri(), StandardCharsets.UTF_8)
+                + (request.state().isBlank()
+                ? ""
+                : "&state=" + URLEncoder.encode(request.state(), StandardCharsets.UTF_8));
+    }
+
+    private String launcherCallbackUrl(String redirectUri, String value, String state, boolean success) {
+        String key = success ? "code" : "error";
+        int fragmentStart = redirectUri.indexOf('#');
+        String base = fragmentStart >= 0 ? redirectUri.substring(0, fragmentStart) : redirectUri;
+        String fragment = fragmentStart >= 0 ? redirectUri.substring(fragmentStart) : "";
+
+        StringBuilder target = new StringBuilder(base);
+        if (base.contains("?")) {
+            if (!base.endsWith("?") && !base.endsWith("&")) {
+                target.append('&');
+            }
+        } else {
+            target.append('?');
+        }
+
+        target.append(key).append('=').append(URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8));
+        if (state != null && !state.isBlank()) {
+            target.append("&state=").append(URLEncoder.encode(state, StandardCharsets.UTF_8));
+        }
+        target.append(fragment);
+        return target.toString();
+    }
+
+    private String consumePostOAuthRedirect(HttpServletRequest request, String fallback) {
+        HttpSession session = request.getSession(false);
+        if (session == null) {
+            return fallback;
+        }
+
+        Object redirect = session.getAttribute(AuthController.POST_OAUTH_REDIRECT_ATTRIBUTE);
+        session.removeAttribute(AuthController.POST_OAUTH_REDIRECT_ATTRIBUTE);
+        if (redirect instanceof String redirectPath) {
+            return safeInternalRedirect(redirectPath, fallback);
+        }
+        return fallback;
+    }
+
+    private String safeInternalRedirect(String redirect, String fallback) {
+        if (redirect == null || redirect.isBlank()) {
+            return fallback;
+        }
+
+        String trimmed = redirect.trim();
+        if (!trimmed.startsWith("/") || trimmed.startsWith("//")) {
+            return fallback;
+        }
+        return trimmed;
     }
 
     private URI safeUri(String rawUri, String description) {
@@ -532,5 +667,8 @@ public class SecurityConfig {
     private String safeHostFromUrl(String rawUri) {
         URI uri = safeUri(rawUri, "request origin");
         return uri != null ? uri.getHost() : null;
+    }
+
+    private record LauncherOAuthRequest(String redirectUri, String state) {
     }
 }

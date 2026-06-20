@@ -1,6 +1,7 @@
 package net.modtale.service.auth;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import java.util.Map;
 import net.modtale.exception.AuthenticationOperationException;
 import net.modtale.exception.ForbiddenOperationException;
@@ -49,7 +50,8 @@ public class OidcLoginService extends OidcUserService {
             Authentication currentAuth = currentAuthentication();
             HttpServletRequest request = currentRequest();
 
-            if (currentAuth != null && currentAuth.isAuthenticated() && !currentAuth.getName().equals("anonymousUser")) {
+            if (!hasPendingLauncherOAuth()
+                    && currentAuth != null && currentAuth.isAuthenticated() && !currentAuth.getName().equals("anonymousUser")) {
                 String pendingOrgId = request != null
                         ? (String) request.getSession().getAttribute("pending_org_link_id")
                         : null;
@@ -87,6 +89,13 @@ public class OidcLoginService extends OidcUserService {
 
     private HttpServletRequest currentRequest() {
         return requestProvider.getIfAvailable();
+    }
+
+    private boolean hasPendingLauncherOAuth() {
+        HttpServletRequest request = currentRequest();
+        HttpSession session = request == null ? null : request.getSession(false);
+        return session != null
+                && session.getAttribute(LauncherAuthService.OAUTH_REDIRECT_URI_SESSION_ATTRIBUTE) instanceof String;
     }
 
     protected OidcUser fetchOidcUser(OidcUserRequest userRequest) {

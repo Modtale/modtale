@@ -356,7 +356,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                                         project={project}
                                         path={SiteRoutes.project(project)}
                                         isFavorite={likedModIds.includes(project.id)}
-                                        onToggleFavorite={() => { onToggleFavorite(project.id); }}
+                                        onToggleFavorite={onToggleFavorite}
                                         isLoggedIn={!!currentUser}
                                     />
                                 </div>

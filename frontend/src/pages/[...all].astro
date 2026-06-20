@@ -21,7 +21,6 @@ import {
 } from '../utils/schema';
 import { BACKEND_URL } from '@/utils/api.ts';
 
-const { all } = Astro.params;
 const url = Astro.url;
 const path = url.pathname;
 const cleanPath = normalizeSeoPath(path);
@@ -84,13 +83,14 @@ const isBot = isBotUserAgent(userAgent);
 const pathSegments = cleanPath.split('/').filter(Boolean);
 const isProjectRoute = pathSegments.length >= 2
     && ['project', 'mod', 'modpack', 'world'].includes(pathSegments[0]);
-const identifier = isProjectRoute ? pathSegments[1] : (all ? all.split('/').pop() : '');
-const projectId = identifier ? SiteRoutes.extractId(identifier) : '';
 const wikiSegmentIndex = isProjectRoute ? pathSegments.indexOf('wiki', 2) : -1;
 const wikiPagePath = wikiSegmentIndex >= 0 ? pathSegments.slice(wikiSegmentIndex + 1).join('/') : '';
 
-let image = (isProjectRoute && identifier)
-    ? `${BACKEND_URL}/api/v1/og/project/${projectId}.png`
+const projectRouteKey = isProjectRoute ? SiteRoutes.projectRouteKeyFromPath(cleanPath) : '';
+const projectLookupKey = projectRouteKey ? SiteRoutes.extractId(projectRouteKey) : '';
+
+let image = (isProjectRoute && projectLookupKey)
+    ? `${BACKEND_URL}/api/v1/og/project/${projectLookupKey}.png`
     : 'https://modtale.net/assets/logo.svg';
 
 let classification = null;
@@ -225,14 +225,18 @@ if (classification) {
     } else {
         jsonLd = baseSchemas;
     }
-} else if (isBot && identifier && isProjectRoute) {
+} else if (isBot && projectLookupKey && isProjectRoute) {
     try {
-        const modData = await fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects/${projectId}`, 2500);
+        const modData = await fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects/${projectLookupKey}`, 2500);
 
         if (modData) {
             const projectUrl = SiteRoutes.project(modData);
-            if (cleanPath !== normalizeSeoPath(projectUrl)) {
-                return Astro.redirect(projectUrl, 301);
+            const canonicalBasePath = normalizeSeoPath(projectUrl);
+            const currentBasePath = normalizeSeoPath(SiteRoutes.projectBasePathFromPath(cleanPath));
+
+            if (currentBasePath && currentBasePath !== canonicalBasePath) {
+                const canonicalPath = cleanPath.replace(currentBasePath, canonicalBasePath);
+                return Astro.redirect(canonicalPath, 301);
             }
 
             initialData = modData;
@@ -279,12 +283,12 @@ if (ssrSuccessfullyCompleted && (isHome || isStaticBrowseRequest)) {
     Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=0, must-revalidate');
 }
 
-const projectBootstrapUrl = !initialData && isProjectRoute && projectId ? `${BACKEND_URL}/api/v1/projects/${projectId}` : undefined;
-const wikiBootstrap = wikiSegmentIndex >= 0 && projectId
+const projectBootstrapUrl = !initialData && isProjectRoute && projectLookupKey ? `${BACKEND_URL}/api/v1/projects/${projectLookupKey}` : undefined;
+const wikiBootstrap = wikiSegmentIndex >= 0 && projectLookupKey
     ? {
-        projectId,
-        metadataUrl: `${BACKEND_URL}/api/v1/wiki/${encodeURIComponent(projectId)}`,
-        pageUrl: `${BACKEND_URL}/api/v1/wiki/${encodeURIComponent(projectId)}/${wikiPagePath || 'home-1'}`,
+        projectId: projectLookupKey,
+        metadataUrl: `${BACKEND_URL}/api/v1/wiki/${encodeURIComponent(projectLookupKey)}`,
+        pageUrl: `${BACKEND_URL}/api/v1/wiki/${encodeURIComponent(projectLookupKey)}/${wikiPagePath || 'home-1'}`,
         pageSlug: wikiPagePath || 'home-1',
     }
     : undefined;

@@ -151,7 +151,7 @@ export const StatusModal: React.FC<StatusModalProps> = ({
         <ModalPortal>
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={(e) => e.stopPropagation()}>
             {type === 'success' && <Confetti />}
-            <div className={`bg-white dark:bg-modtale-card border ${borderClass} rounded-xl w-full max-w-md shadow-2xl overflow-hidden relative z-[110]`}>
+            <div className={`bg-white dark:bg-modtale-card border ${borderClass} rounded-xl w-full max-w-md max-h-[calc(100vh-2rem)] shadow-2xl overflow-x-hidden overflow-y-auto relative z-[110]`}>
                 <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white">
                     <X className="w-5 h-5" />
                 </button>

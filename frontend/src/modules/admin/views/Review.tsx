@@ -314,7 +314,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                 <div className="flex-1 flex flex-col overflow-hidden relative bg-white dark:bg-transparent">
                     <div className="p-6 border-b border-slate-200 dark:border-white/5 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-md">
                         <div>
-                            <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{mod.title}</h1>
+                            <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-normal">{mod.title}</h1>
                             <div className="flex items-center gap-2 mt-1">
                                 <span className="text-xs font-mono text-slate-400">{mod.id}</span>
                                 <button onClick={() => navigator.clipboard.writeText(mod.id)} className="text-slate-400 hover:text-modtale-accent"><Copy className="w-3 h-3" /></button>
@@ -857,7 +857,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                 <div className="w-24 h-24 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-8 shadow-xl shadow-emerald-500/10">
                                     <Shield className="w-12 h-12 text-emerald-500" />
                                 </div>
-                                <h2 className="text-4xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">
+                                <h2 className="text-4xl font-black text-slate-900 dark:text-white mb-4 tracking-normal">
                                     {isNewProject ? "Approve Project?" : "Approve Update?"}
                                 </h2>
                                 <p className="text-slate-500 dark:text-slate-400 font-medium mb-10 text-lg leading-relaxed">

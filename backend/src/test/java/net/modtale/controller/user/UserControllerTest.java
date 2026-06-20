@@ -2,6 +2,7 @@ package net.modtale.controller.user;
 
 import net.modtale.model.dto.request.user.UpdateProfileRequest;
 import net.modtale.model.dto.response.common.ResourceUrlResponse;
+import net.modtale.model.user.LauncherSettingsSnapshot;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.media.MediaUploadService;
@@ -115,6 +116,28 @@ class UserControllerTest {
 
         assertEquals(200, response.getStatusCode().value());
         verify(socialService).followUser("user-1", "user-2");
+    }
+
+    @Test
+    void launcherSettingsEndpointsUseCurrentUser() {
+        User currentUser = user("user-1", "ada");
+        LauncherSettingsSnapshot snapshot = new LauncherSettingsSnapshot();
+        when(accountService.requireCurrentUser(null, "loading launcher settings")).thenReturn(currentUser);
+        when(accountService.requireCurrentUser(null, "syncing launcher settings")).thenReturn(currentUser);
+        when(accountService.getLauncherSettings("user-1")).thenReturn(snapshot);
+        when(accountService.updateLauncherSettings("user-1", snapshot)).thenReturn(snapshot);
+        when(accountService.updateLauncherSettingsPreferences("user-1", snapshot)).thenReturn(snapshot);
+
+        var getResponse = controller.getLauncherSettings(null);
+        var putResponse = controller.updateLauncherSettings(snapshot, null);
+        var prefsResponse = controller.updateLauncherSettingsPreferences(snapshot, null);
+
+        assertEquals(200, getResponse.getStatusCode().value());
+        assertSame(snapshot, getResponse.getBody());
+        assertEquals(200, putResponse.getStatusCode().value());
+        assertSame(snapshot, putResponse.getBody());
+        assertEquals(200, prefsResponse.getStatusCode().value());
+        assertSame(snapshot, prefsResponse.getBody());
     }
 
     private static User user(String id, String username) {

@@ -397,7 +397,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
                                     <img src={foundUser.avatarUrl} alt={foundUser.username} className="w-24 h-24 rounded-2xl object-cover" />
                                 </div>
                                 <div>
-                                    <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">{foundUser.username}</h3>
+                                    <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-normal">{foundUser.username}</h3>
                                     <div className="flex items-center gap-3 mt-3">
                                         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Active Roles</span>
                                         <div className="flex gap-2">

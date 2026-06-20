@@ -12,6 +12,12 @@ const settle = async () => {
     });
 };
 
+const launcherProtocolMock = vi.hoisted(() => ({
+    openLauncherInstallOrFallback: vi.fn()
+}));
+
+vi.mock('@/modules/launcher/utils/launcherProtocol', () => launcherProtocolMock);
+
 describe('DownloadModal Toggle Visibility', () => {
     let container: HTMLDivElement;
     let root: Root;
@@ -28,6 +34,7 @@ describe('DownloadModal Toggle Visibility', () => {
             root.unmount();
         });
         container.remove();
+        launcherProtocolMock.openLauncherInstallOrFallback.mockClear();
     });
 
     it('hides Alpha/Beta toggle if the project has no alpha/beta versions at all', async () => {
@@ -460,8 +467,8 @@ describe('DownloadModal Toggle Visibility', () => {
             );
         });
 
-        expect(container.textContent).toContain('This modpack uses external mods');
-        expect(container.textContent).toContain('External Shader');
+        expect(pageText()).toContain('This modpack uses external mods');
+        expect(pageText()).toContain('External Shader');
     });
 
     it('does not show the external mod warning for non-modpack projects', async () => {
@@ -503,7 +510,84 @@ describe('DownloadModal Toggle Visibility', () => {
             );
         });
 
-        expect(container.textContent).not.toContain('This modpack uses external mods');
-        expect(container.textContent).not.toContain('External Library');
+        expect(pageText()).not.toContain('This modpack uses external mods');
+        expect(pageText()).not.toContain('External Library');
+    });
+
+    it('keeps the launcher install action hidden without project context', async () => {
+        const versionsByGame = {
+            '0.5.4': [
+                { id: 'v1', versionNumber: '1.0.0', channel: 'RELEASE', gameVersion: '0.5.4', releaseDate: new Date().toISOString(), fileUrl: '/download.zip' }
+            ]
+        };
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <DownloadModal
+                        show={true}
+                        onClose={vi.fn()}
+                        versionsByGame={versionsByGame}
+                        preReleaseGameVersions={[]}
+                        orderedGameVersions={['0.5.4']}
+                        onDownload={vi.fn()}
+                        showExperimental={false}
+                        onToggleExperimental={vi.fn()}
+                        onViewHistory={vi.fn()}
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        expect(pageText()).not.toContain('Install with launcher');
+    });
+
+    it('hands the selected version to the launcher install flow', async () => {
+        const fallback = vi.fn();
+        const versionsByGame = {
+            '0.5.4': [
+                { id: 'v1', versionNumber: '1.0.0', channel: 'RELEASE', gameVersion: '0.5.4', releaseDate: new Date().toISOString(), fileUrl: '/download.zip' }
+            ]
+        };
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <DownloadModal
+                        show={true}
+                        onClose={vi.fn()}
+                        versionsByGame={versionsByGame}
+                        preReleaseGameVersions={[]}
+                        orderedGameVersions={['0.5.4']}
+                        onDownload={vi.fn()}
+                        showExperimental={false}
+                        onToggleExperimental={vi.fn()}
+                        onViewHistory={vi.fn()}
+                        projectId="project-123"
+                        projectHandle="cool-mod"
+                        onLauncherFallback={fallback}
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        const launcherButton = Array.from(document.body.querySelectorAll('button'))
+            .find((button) => button.textContent?.includes('Install with launcher')) as HTMLButtonElement | undefined;
+
+        expect(launcherButton).toBeTruthy();
+
+        await act(async () => {
+            launcherButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(launcherProtocolMock.openLauncherInstallOrFallback).toHaveBeenCalledWith(
+            {
+                projectId: 'project-123',
+                projectHandle: 'cool-mod',
+                versionNumber: '1.0.0',
+                gameVersion: '0.5.4'
+            },
+            fallback
+        );
     });
 });

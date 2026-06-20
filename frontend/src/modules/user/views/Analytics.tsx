@@ -30,7 +30,7 @@ const SummaryCard = ({ title, value, subValue, trend, icon: Icon, color, isPerce
         </div>
         <div className="relative z-10 mt-4">
             <h3 className="text-slate-500 dark:text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">{title}</h3>
-            <div className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">
+            <div className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-normal leading-none">
                 {value}{isPercent && <span className="text-2xl text-slate-400 ml-1">%</span>}
             </div>
             {subValue && <div className="text-xs text-slate-500 dark:text-slate-400 mt-2 font-medium">{subValue}</div>}

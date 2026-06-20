@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useState, useRef, useEffect } from 'react';
-import { Menu, X, Upload, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn, Code2, ChevronDown, LayoutGrid } from 'lucide-react';
+import { Menu, X, Upload, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn, ChevronDown, LayoutGrid, MonitorDown } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatedThemeToggler } from '@/components/ui/AnimatedThemeToggler';
 import { useMobile } from '@/context/MobileContext';
@@ -163,15 +163,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                                 </div>
 
                                 <Link
-                                        to={SiteRoutes.apiDocs()}
+                                        to={SiteRoutes.launcher()}
                                         className={`flex items-center px-3 py-2 rounded-lg text-sm font-bold transition-all duration-200 ${
-                                        currentPage.startsWith('api-docs')
+                                        currentPage.startsWith('launcher')
                                             ? 'text-modtale-accent bg-modtale-accent/10'
                                             : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
                                     }`}
                                 >
-                                    <Code2 className="w-4 h-4 mr-2" />
-                                    API
+                                    <MonitorDown className="w-4 h-4 mr-2" />
+                                    Launcher
                                 </Link>
                                 {user && (
                                     <>
@@ -316,7 +316,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                     <div className="h-px bg-slate-100 dark:bg-white/5 my-2"></div>
 
-                    <Link to={SiteRoutes.apiDocs()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><Code2 className="w-4 h-4 mr-3" /> API</Link>
+                    <Link to={SiteRoutes.launcher()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><MonitorDown className="w-4 h-4 mr-3" /> Launcher</Link>
                     {user && (
                         <>
                             <Link to={SiteRoutes.dashboard()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><LayoutDashboard className="w-4 h-4 mr-3" /> Dashboard</Link>

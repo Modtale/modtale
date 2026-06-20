@@ -84,6 +84,37 @@ class OidcLoginServiceTest {
     }
 
     @Test
+    void loadUserUsesLoginFlowForLauncherOAuthEvenWithExistingBrowserSession() {
+        AccountService accountService = mock(AccountService.class);
+        AuthenticationService authenticationService = mock(AuthenticationService.class);
+        ObjectProvider<HttpServletRequest> requestProvider = mock(ObjectProvider.class);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        Authentication authentication = mock(Authentication.class);
+        request.setUserPrincipal(authentication);
+        request.getSession().setAttribute(
+                LauncherAuthService.OAUTH_REDIRECT_URI_SESSION_ATTRIBUTE,
+                "http://127.0.0.1:49152/callback"
+        );
+
+        when(requestProvider.getIfAvailable()).thenReturn(request);
+        when(authentication.isAuthenticated()).thenReturn(true);
+        when(authentication.getName()).thenReturn("ada");
+
+        OidcUser upstreamUser = oidcUser();
+        DefaultOAuth2User appUser = oauthUser("user-1", "Ada");
+
+        TestOidcLoginService service = new TestOidcLoginService(accountService, authenticationService, requestProvider, upstreamUser);
+        when(authenticationService.processUserLogin("google", upstreamUser, "access-token")).thenReturn(appUser);
+
+        OidcUser result = service.loadUser(oidcRequest("google"));
+
+        assertInstanceOf(OidcLoginService.CustomOidcUser.class, result);
+        assertEquals("Ada", result.getAttribute("login"));
+        verify(authenticationService).processUserLogin("google", upstreamUser, "access-token");
+        verify(authenticationService, never()).linkAccount(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
     void loadUserMapsOidcAccountCollisionsToTheExpectedOAuthErrorCode() {
         AccountService accountService = mock(AccountService.class);
         AuthenticationService authenticationService = mock(AuthenticationService.class);

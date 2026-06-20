@@ -1,0 +1,928 @@
+plugins {
+    id 'application'
+}
+
+def configuredLauncherVersion = providers.gradleProperty('launcherVersion')
+        .orElse(providers.environmentVariable('LAUNCHER_VERSION'))
+        .orElse('0.1.0-SNAPSHOT')
+        .get()
+
+group = 'net.modtale'
+version = configuredLauncherVersion
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.2'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.2'
+    implementation 'com.vladsch.flexmark:flexmark:0.64.8'
+    implementation 'com.vladsch.flexmark:flexmark-ext-autolink:0.64.8'
+    implementation 'com.vladsch.flexmark:flexmark-ext-gfm-strikethrough:0.64.8'
+    implementation 'com.vladsch.flexmark:flexmark-ext-tables:0.64.8'
+    implementation 'com.vladsch.flexmark:flexmark-ext-gfm-tasklist:0.64.8'
+    implementation 'net.java.dev.jna:jna:5.14.0'
+    implementation "org.openjfx:javafx-base:21.0.5:${javafxPlatform()}"
+    implementation "org.openjfx:javafx-graphics:21.0.5:${javafxPlatform()}"
+    implementation "org.openjfx:javafx-controls:21.0.5:${javafxPlatform()}"
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+application {
+    mainClass = 'net.modtale.launcher.LauncherMain'
+}
+
+def appId = 'net.modtale.launcher'
+def appDisplayName = 'Modtale Launcher'
+def appSlug = 'modtale-launcher'
+def packageVersion = project.version.toString()
+def discordClientId = providers.gradleProperty('discordClientId')
+        .orElse(providers.environmentVariable('MODTALE_DISCORD_CLIENT_ID'))
+        .orElse(providers.environmentVariable('DISCORD_CLIENT_ID'))
+        .orElse('')
+        .get()
+def modtaleSiteBaseUrl = providers.gradleProperty('modtaleSiteBaseUrl')
+        .orElse(providers.gradleProperty('siteBaseUrl'))
+        .orElse('')
+        .get()
+def modtaleApiBaseUrl = providers.gradleProperty('modtaleApiBaseUrl')
+        .orElse(providers.gradleProperty('apiBaseUrl'))
+        .orElse('')
+        .get()
+def launcherJvmArgs = ["-Dmodtale.launcherVersion=${packageVersion}"]
+if (!discordClientId.isBlank()) {
+    launcherJvmArgs.add("-Dmodtale.discordClientId=${discordClientId.trim()}")
+}
+if (!modtaleSiteBaseUrl.isBlank()) {
+    launcherJvmArgs.add("-Dmodtale.siteBaseUrl=${modtaleSiteBaseUrl.trim()}")
+}
+if (!modtaleApiBaseUrl.isBlank()) {
+    launcherJvmArgs.add("-Dmodtale.apiBaseUrl=${modtaleApiBaseUrl.trim()}")
+}
+def installerVersionMatcher = packageVersion =~ /\d+(?:\.\d+){0,2}/
+def installerVersion = installerVersionMatcher.find() ? installerVersionMatcher.group() : '0.1.0'
+def appDescription = 'Native Modtale launcher for Hytale mods.'
+def appVendor = 'Modtale'
+def appHomepage = 'https://modtale.net'
+def appCopyright = 'Copyright (C) Modtale contributors'
+def appLicenseId = 'AGPL-3.0-or-later'
+def appLicense = layout.projectDirectory.file('../LICENSE')
+def appIconPng = layout.projectDirectory.file('src/main/resources/net/modtale/launcher/ui/nativefx/assets/favicon.png')
+def distributionDirectory = layout.buildDirectory.dir('distributions')
+def linuxAppImageDirectory = layout.buildDirectory.dir('jpackage/linux-app-image')
+def linuxAppDir = layout.buildDirectory.dir("appimage/${appSlug}.AppDir")
+def linuxPackageRootDirectory = layout.buildDirectory.dir('linux-package/root')
+def linuxPackageWorkDirectory = layout.buildDirectory.dir('linux-package/work')
+def linuxInstallDirectory = "/opt/${appSlug}"
+def linuxInstallPath = linuxInstallDirectory.replaceFirst('^/', '')
+def linuxPackageRelease = providers.gradleProperty('linuxPackageRelease')
+        .orElse(providers.environmentVariable('LINUX_PACKAGE_RELEASE'))
+        .orElse('1')
+        .get()
+def linuxDebMaintainer = providers.gradleProperty('linuxDebMaintainer')
+        .orElse('Modtale contributors <support@modtale.net>')
+        .get()
+def flatpakRuntimeVersion = providers.gradleProperty('flatpakRuntimeVersion').orElse('25.08').get()
+def flatpakRuntime = providers.gradleProperty('flatpakRuntime').orElse('org.freedesktop.Platform').get()
+def flatpakSdk = providers.gradleProperty('flatpakSdk').orElse('org.freedesktop.Sdk').get()
+def flatpakBranch = providers.gradleProperty('flatpakBranch').orElse('stable').get()
+def flatpakBuildDirectory = layout.buildDirectory.dir('flatpak/build')
+def flatpakRepoDirectory = layout.buildDirectory.dir('flatpak/repo')
+def currentOs = org.gradle.internal.os.OperatingSystem.current()
+def javaRuntimeModules = [
+        'java.base',
+        'java.datatransfer',
+        'java.desktop',
+        'java.logging',
+        'java.net.http',
+        'java.prefs',
+        'java.sql',
+        'java.xml',
+        'jdk.crypto.ec',
+        'jdk.httpserver',
+        'jdk.unsupported'
+]
+def jpackageJlinkOptions = [
+        '--strip-native-commands',
+        '--strip-debug',
+        '--no-man-pages',
+        '--no-header-files',
+        '--compress=zip-9'
+]
+
+application {
+    applicationDefaultJvmArgs = launcherJvmArgs
+}
+
+tasks.named('jar') {
+    manifest {
+        attributes(
+                'Implementation-Title': appDisplayName,
+                'Implementation-Version': packageVersion,
+                'Implementation-Vendor': appVendor
+        )
+    }
+}
+
+def appJar = tasks.named('jar').flatMap { it.archiveFile }
+def runtimeClasspathFiles = configurations.runtimeClasspath
+def windowsPackageType = providers.gradleProperty('windowsPackageType')
+        .orElse('exe')
+        .map { it.toLowerCase(Locale.ROOT) }
+        .get()
+def macPackageType = providers.gradleProperty('macPackageType')
+        .orElse('dmg')
+        .map { it.toLowerCase(Locale.ROOT) }
+        .get()
+def appImageTool = providers.gradleProperty('appImageTool')
+        .orElse(providers.environmentVariable('APPIMAGETOOL'))
+        .orElse('appimagetool')
+def linuxAppImageFile = distributionDirectory.map {
+    it.file("${appSlug}-${installerVersion}-${appImageArch()}.AppImage")
+}
+def linuxDebFile = distributionDirectory.map {
+    it.file("${appSlug}_${installerVersion}-${linuxPackageRelease}_${debArchitecture()}.deb")
+}
+def linuxRpmFile = distributionDirectory.map {
+    it.file("${appSlug}-${installerVersion}-${linuxPackageRelease}.${rpmArchitecture()}.rpm")
+}
+def linuxPacmanFile = distributionDirectory.map {
+    it.file("${appSlug}-${installerVersion}-${linuxPackageRelease}-${pacmanArchitecture()}.pkg.tar.zst")
+}
+def linuxFlatpakFile = distributionDirectory.map {
+    it.file("${appId}-${installerVersion}-${flatpakArchitecture()}.flatpak")
+}
+
+tasks.register('prepareJpackageInput', Sync) {
+    group = 'distribution'
+    description = 'Collects launcher jars for self-contained jpackage installers.'
+    dependsOn tasks.named('jar')
+    into layout.buildDirectory.dir('jpackage/input')
+    from(appJar)
+    from(runtimeClasspathFiles)
+}
+
+def java21Launcher = javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(21)
+}
+
+def jpackageExecutable = java21Launcher.map {
+    def extension = currentOs.isWindows() ? '.exe' : ''
+    file("${it.executablePath.asFile.parentFile}/jpackage${extension}")
+}
+
+def commonJpackageArgs = {
+    [
+            '--input', layout.buildDirectory.dir('jpackage/input').get().asFile.absolutePath,
+            '--name', appDisplayName,
+            '--main-jar', appJar.get().asFile.name,
+            '--main-class', application.mainClass.get(),
+            '--app-version', installerVersion,
+            '--vendor', appVendor,
+            '--description', appDescription,
+            '--add-modules', javaRuntimeModules.join(','),
+            '--jlink-options', jpackageJlinkOptions.join(' ')
+    ] + (['-Dfile.encoding=UTF-8'] + launcherJvmArgs).collectMany { ['--java-options', it] }
+}
+
+def installerJpackageArgs = {
+    [
+            '--about-url', appHomepage,
+            '--copyright', appCopyright,
+            '--license-file', appLicense.asFile.absolutePath
+    ]
+}
+
+def desktopFileContent = { String execName, String iconName ->
+    """[Desktop Entry]
+Type=Application
+Name=${appDisplayName}
+Comment=Install and update Hytale mods from Modtale
+Exec=${execName}
+Icon=${iconName}
+Terminal=false
+Categories=Game;
+StartupNotify=true
+StartupWMClass=net.modtale.launcher.ModtaleLauncher
+"""
+}
+
+def metainfoContent = {
+    """<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>${appId}</id>
+  <name>${appDisplayName}</name>
+  <summary>Install and update Hytale mods from Modtale</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>${appLicenseId}</project_license>
+  <developer id="net.modtale">
+    <name>Modtale contributors</name>
+  </developer>
+  <description>
+    <p>Install, update, and manage Hytale mods from Modtale with a self-contained native launcher.</p>
+  </description>
+  <launchable type="desktop-id">${appId}.desktop</launchable>
+  <url type="homepage">${appHomepage}</url>
+  <content_rating type="oars-1.1" />
+</component>
+"""
+}
+
+def configureJpackageTask = { TaskProvider<Exec> packageTask, String packageType, Closure<Boolean> hostPredicate, Closure<List<String>> platformArgs ->
+    packageTask.configure {
+        group = 'distribution'
+        dependsOn tasks.named('prepareJpackageInput')
+        onlyIf {
+            hostPredicate.call()
+        }
+        doFirst {
+            def executable = jpackageExecutable.get()
+            if (!executable.exists()) {
+                throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 21 to build native launcher installers.")
+            }
+
+            delete layout.buildDirectory.dir("jpackage/tmp/${name}")
+            mkdir distributionDirectory.get().asFile
+
+            commandLine([
+                    executable.absolutePath,
+                    '--type', packageType,
+                    '--dest', distributionDirectory.get().asFile.absolutePath,
+                    '--temp', layout.buildDirectory.dir("jpackage/tmp/${name}").get().asFile.absolutePath
+            ] + commonJpackageArgs.call() + installerJpackageArgs.call() + platformArgs.call())
+        }
+    }
+}
+
+configureJpackageTask(
+        tasks.register('packageWindows', Exec) {
+            description = 'Builds a self-contained Windows .exe installer with an embedded Java runtime.'
+        },
+        windowsPackageType,
+        { currentOs.isWindows() },
+        {
+            def args = [
+                    '--win-menu',
+                    '--win-menu-group', appDisplayName,
+                    '--win-shortcut',
+                    '--win-upgrade-uuid', '3d6c6852-fc6f-4a7e-a617-988263243f90'
+            ]
+            if (windowsPackageType == 'exe') {
+                args += [
+                        '--win-dir-chooser',
+                        '--win-per-user-install'
+                ]
+            }
+            args
+        }
+)
+
+configureJpackageTask(
+        tasks.register('packageMac', Exec) {
+            description = 'Builds a self-contained macOS .dmg containing a native .app bundle and embedded Java runtime.'
+        },
+        macPackageType,
+        { currentOs.isMacOsX() },
+        {
+            [
+                    '--mac-package-identifier', appId,
+                    '--mac-package-name', appDisplayName
+            ]
+        }
+)
+
+tasks.register('prepareLinuxAppImageRuntime', Exec) {
+    group = 'distribution'
+    description = 'Builds the self-contained Linux runtime image used by the AppImage package.'
+    dependsOn tasks.named('prepareJpackageInput')
+    onlyIf {
+        currentOs.isLinux()
+    }
+    doFirst {
+        def executable = jpackageExecutable.get()
+        if (!executable.exists()) {
+            throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 21 to build the Linux AppImage.")
+        }
+
+        delete linuxAppImageDirectory
+        commandLine([
+                executable.absolutePath,
+                '--type', 'app-image',
+                '--dest', linuxAppImageDirectory.get().asFile.absolutePath,
+                '--icon', appIconPng.asFile.absolutePath
+        ] + commonJpackageArgs.call())
+    }
+}
+
+tasks.register('prepareLinuxAppDir') {
+    group = 'distribution'
+    description = 'Assembles the AppDir consumed by appimagetool.'
+    dependsOn tasks.named('prepareLinuxAppImageRuntime')
+    onlyIf {
+        currentOs.isLinux()
+    }
+    inputs.dir linuxAppImageDirectory
+    outputs.dir linuxAppDir
+    doLast {
+        def appDir = linuxAppDir.get().asFile
+        def packagedApp = linuxAppImageDirectory.get().dir(appDisplayName).asFile
+        if (!packagedApp.exists()) {
+            throw new GradleException("Expected jpackage app image at ${packagedApp}, but it was not created.")
+        }
+
+        delete appDir
+        copy {
+            from(packagedApp)
+            into(appDir)
+        }
+
+        copy {
+            from(appIconPng)
+            into(appDir)
+            rename { "${appSlug}.png" }
+        }
+        copy {
+            from(appIconPng)
+            into(appDir)
+            rename { '.DirIcon' }
+        }
+        copy {
+            from(appIconPng)
+            into(new File(appDir, 'usr/share/icons/hicolor/256x256/apps'))
+            rename { "${appSlug}.png" }
+        }
+
+        def appRun = new File(appDir, 'AppRun')
+        appRun.text = '''#!/usr/bin/env sh
+set -eu
+APPDIR="${APPDIR:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}"
+if [ -n "${WAYLAND_DISPLAY:-}" ]; then
+    export GDK_BACKEND=x11
+fi
+exec "$APPDIR/bin/Modtale Launcher" "$@"
+'''
+        appRun.setExecutable(true, false)
+
+        def appImageDesktopFileContent = desktopFileContent(appSlug, appSlug)
+        def desktopFile = new File(appDir, "${appId}.desktop")
+        desktopFile.text = appImageDesktopFileContent
+
+        def desktopInstallFile = new File(appDir, "usr/share/applications/${appId}.desktop")
+        desktopInstallFile.parentFile.mkdirs()
+        desktopInstallFile.text = appImageDesktopFileContent
+
+        def metainfo = new File(appDir, "usr/share/metainfo/${appId}.appdata.xml")
+        metainfo.parentFile.mkdirs()
+        metainfo.text = metainfoContent()
+    }
+}
+
+tasks.register('packageLinux', Exec) {
+    group = 'distribution'
+    description = 'Builds a self-contained Linux AppImage with an embedded Java runtime.'
+    dependsOn tasks.named('prepareLinuxAppDir')
+    onlyIf {
+        currentOs.isLinux()
+    }
+    inputs.dir linuxAppDir
+    outputs.file linuxAppImageFile
+    doFirst {
+        def tool = resolveExecutable(appImageTool.get(), 'appimagetool', 'Install appimagetool, or set -PappImageTool=/path/to/appimagetool or APPIMAGETOOL.')
+        mkdir distributionDirectory.get().asFile
+        delete linuxAppImageFile.get().asFile
+        commandLine tool, linuxAppDir.get().asFile.absolutePath, linuxAppImageFile.get().asFile.absolutePath
+    }
+}
+
+tasks.register('prepareLinuxPackageRoot') {
+    group = 'distribution'
+    description = 'Stages the self-contained Linux launcher tree used by DEB, RPM, and Flatpak packages.'
+    dependsOn tasks.named('prepareLinuxAppImageRuntime')
+    onlyIf {
+        currentOs.isLinux()
+    }
+    inputs.dir linuxAppImageDirectory
+    outputs.dir linuxPackageRootDirectory
+    doLast {
+        def packagedApp = linuxAppImageDirectory.get().dir(appDisplayName).asFile
+        if (!packagedApp.exists()) {
+            throw new GradleException("Expected jpackage app image at ${packagedApp}, but it was not created.")
+        }
+
+        def rootDir = linuxPackageRootDirectory.get().asFile
+        delete rootDir
+        copy {
+            from(packagedApp)
+            into(new File(rootDir, linuxInstallPath))
+        }
+
+        def wrapper = new File(rootDir, "usr/bin/${appSlug}")
+        wrapper.parentFile.mkdirs()
+wrapper.text = """#!/usr/bin/env sh
+set -eu
+APPDIR="${linuxInstallDirectory}"
+exec "\$APPDIR/bin/${appDisplayName}" "\$@"
+"""
+        wrapper.setExecutable(true, false)
+
+        copy {
+            from(appIconPng)
+            into(new File(rootDir, "usr/share/icons/hicolor/256x256/apps"))
+            rename { "${appSlug}.png" }
+        }
+
+        def desktopFile = new File(rootDir, "usr/share/applications/${appId}.desktop")
+        desktopFile.parentFile.mkdirs()
+        desktopFile.text = desktopFileContent(appSlug, appSlug)
+
+        def metainfo = new File(rootDir, "usr/share/metainfo/${appId}.appdata.xml")
+        metainfo.parentFile.mkdirs()
+        metainfo.text = metainfoContent()
+
+        copy {
+            from(appLicense)
+            into(new File(rootDir, "usr/share/licenses/${appSlug}"))
+            rename { 'LICENSE' }
+        }
+    }
+}
+
+tasks.register('packageLinuxDeb') {
+    group = 'distribution'
+    description = 'Builds a self-contained Linux .deb package for the launcher.'
+    dependsOn tasks.named('prepareLinuxPackageRoot')
+    onlyIf {
+        currentOs.isLinux()
+    }
+    inputs.dir linuxPackageRootDirectory
+    outputs.file linuxDebFile
+    doLast {
+        def tar = resolveExecutable('tar', 'tar', 'Install tar to create Debian packages.')
+        def ar = resolveExecutable('ar', 'ar', 'Install binutils ar to create Debian packages.')
+        def rootDir = linuxPackageRootDirectory.get().asFile
+        def workDir = new File(linuxPackageWorkDirectory.get().asFile, 'deb')
+        def controlDir = new File(workDir, 'control')
+        def debianBinary = new File(workDir, 'debian-binary')
+        def controlTar = new File(workDir, 'control.tar.xz')
+        def dataTar = new File(workDir, 'data.tar.xz')
+        def output = linuxDebFile.get().asFile
+
+        delete workDir
+        controlDir.mkdirs()
+        mkdir distributionDirectory.get().asFile
+        delete output
+
+        long installedBytes = 0
+        rootDir.eachFileRecurse(groovy.io.FileType.FILES) { file ->
+            installedBytes += file.length()
+        }
+        long installedSizeKb = Math.max(1L, Math.ceil(installedBytes / 1024.0D) as long)
+
+        new File(controlDir, 'control').text = """Package: ${appSlug}
+Version: ${installerVersion}-${linuxPackageRelease}
+Section: games
+Priority: optional
+Architecture: ${debArchitecture()}
+Maintainer: ${linuxDebMaintainer}
+Installed-Size: ${installedSizeKb}
+Depends: libc6, libx11-6, libxext6, libxrender1, libxtst6, libxi6, libfreetype6, fontconfig, libgtk-3-0, zlib1g
+Homepage: ${appHomepage}
+Description: ${appDescription}
+ Install, update, and manage Hytale mods from Modtale with a self-contained native launcher.
+"""
+        debianBinary.text = '2.0\n'
+
+        runExternalCommand([
+                tar, '--sort=name', '--mtime=@0', '--owner=0', '--group=0', '--numeric-owner',
+                '-C', controlDir.absolutePath, '-cJf', controlTar.absolutePath, 'control'
+        ], null, ['XZ_OPT': '-9e'])
+        runExternalCommand([
+                tar, '--sort=name', '--mtime=@0', '--owner=0', '--group=0', '--numeric-owner',
+                '-C', rootDir.absolutePath, '-cJf', dataTar.absolutePath, '.'
+        ], null, ['XZ_OPT': '-9e'])
+        runExternalCommand([ar, 'rcs', output.absolutePath, debianBinary.name, controlTar.name, dataTar.name], workDir)
+    }
+}
+
+tasks.register('packageLinuxRpm') {
+    group = 'distribution'
+    description = 'Builds a self-contained Linux .rpm package for the launcher.'
+    dependsOn tasks.named('prepareLinuxPackageRoot')
+    onlyIf {
+        currentOs.isLinux()
+    }
+    inputs.dir linuxPackageRootDirectory
+    outputs.file linuxRpmFile
+    doLast {
+        def rpmbuild = resolveExecutable('rpmbuild', 'rpmbuild', 'Install rpm-build to create RPM packages.')
+        def tar = resolveExecutable('tar', 'tar', 'Install tar to create RPM packages.')
+        def rootDir = linuxPackageRootDirectory.get().asFile
+        def workDir = new File(linuxPackageWorkDirectory.get().asFile, 'rpm')
+        def sourceParent = new File(workDir, 'source')
+        def sourceRoot = new File(sourceParent, "${appSlug}-${installerVersion}-root")
+        def sourcesDir = new File(workDir, 'SOURCES')
+        def specsDir = new File(workDir, 'SPECS')
+        def specFile = new File(specsDir, "${appSlug}.spec")
+        def sourceTar = new File(sourcesDir, "${appSlug}-${installerVersion}-root.tar.gz")
+        def output = linuxRpmFile.get().asFile
+
+        delete workDir
+        sourceRoot.mkdirs()
+        sourcesDir.mkdirs()
+        specsDir.mkdirs()
+        mkdir new File(workDir, 'BUILD')
+        mkdir new File(workDir, 'BUILDROOT')
+        mkdir new File(workDir, 'RPMS')
+        mkdir new File(workDir, 'SRPMS')
+        mkdir distributionDirectory.get().asFile
+        delete output
+
+        copy {
+            from(rootDir)
+            into(sourceRoot)
+        }
+        runExternalCommand([tar, '-C', sourceParent.absolutePath, '-czf', sourceTar.absolutePath, sourceRoot.name])
+
+        specFile.text = """Name: ${appSlug}
+Version: ${installerVersion}
+Release: ${linuxPackageRelease}
+Summary: ${appDescription}
+License: ${appLicenseId}
+URL: ${appHomepage}
+BuildArch: ${rpmArchitecture()}
+Source0: %{name}-%{version}-root.tar.gz
+%global debug_package %{nil}
+%global __brp_check_rpaths %{nil}
+
+%description
+Install, update, and manage Hytale mods from Modtale with a self-contained native launcher.
+
+%prep
+%setup -q -n %{name}-%{version}-root
+
+%build
+
+%install
+mkdir -p %{buildroot}
+cp -a . %{buildroot}/
+
+%files
+%license /usr/share/licenses/${appSlug}/LICENSE
+${linuxInstallDirectory}
+/usr/bin/${appSlug}
+/usr/share/applications/${appId}.desktop
+/usr/share/icons/hicolor/256x256/apps/${appSlug}.png
+/usr/share/metainfo/${appId}.appdata.xml
+"""
+
+        runExternalCommand([
+                rpmbuild, '-bb',
+                '--define', "_topdir ${workDir.absolutePath}",
+                '--define', '_binary_payload w19.zstdio',
+                specFile.absolutePath
+        ], null, ['QA_RPATHS': '0x0002'])
+
+        def builtRpms = fileTree(new File(workDir, "RPMS/${rpmArchitecture()}")).matching {
+            include '*.rpm'
+        }.files
+        if (builtRpms.isEmpty()) {
+            throw new GradleException("rpmbuild completed but no RPM was produced in ${new File(workDir, "RPMS/${rpmArchitecture()}")}.")
+        }
+        copy {
+            from(builtRpms.first())
+            into(distributionDirectory)
+            rename { output.name }
+        }
+    }
+}
+
+tasks.register('packageLinuxPacman') {
+    group = 'distribution'
+    description = 'Builds a self-contained Arch Linux pacman package for the launcher.'
+    dependsOn tasks.named('prepareLinuxPackageRoot')
+    onlyIf {
+        currentOs.isLinux()
+    }
+    inputs.dir linuxPackageRootDirectory
+    outputs.file linuxPacmanFile
+    doLast {
+        def tar = resolveExecutable('tar', 'tar', 'Install tar to create pacman packages.')
+        resolveExecutable('zstd', 'zstd', 'Install zstd to create pacman packages.')
+        def rootDir = linuxPackageRootDirectory.get().asFile
+        def workDir = new File(linuxPackageWorkDirectory.get().asFile, 'pacman')
+        def packageRoot = new File(workDir, 'pkg')
+        def output = linuxPacmanFile.get().asFile
+
+        delete workDir
+        packageRoot.mkdirs()
+        mkdir distributionDirectory.get().asFile
+        delete output
+
+        copy {
+            from(rootDir)
+            into(packageRoot)
+        }
+
+        long installedBytes = 0
+        rootDir.eachFileRecurse(groovy.io.FileType.FILES) { file ->
+            installedBytes += file.length()
+        }
+
+        new File(packageRoot, '.PKGINFO').text = """pkgname = ${appSlug}
+pkgbase = ${appSlug}
+pkgver = ${installerVersion}-${linuxPackageRelease}
+pkgdesc = ${appDescription}
+url = ${appHomepage}
+builddate = 0
+packager = Modtale contributors
+size = ${installedBytes}
+arch = ${pacmanArchitecture()}
+license = ${appLicenseId}
+depend = glibc
+depend = libx11
+depend = libxext
+depend = libxrender
+depend = libxtst
+depend = libxi
+depend = freetype2
+depend = fontconfig
+depend = gtk3
+"""
+
+        runExternalCommand([
+                tar, '--sort=name', '--mtime=@0', '--owner=0', '--group=0', '--numeric-owner',
+                '--zstd', '-C', packageRoot.absolutePath, '-cf', output.absolutePath, '.'
+        ], null, ['ZSTD_CLEVEL': '19'])
+    }
+}
+
+tasks.register('packageLinuxFlatpak') {
+    group = 'distribution'
+    description = 'Builds a self-contained Linux Flatpak bundle for the launcher.'
+    dependsOn tasks.named('prepareLinuxAppImageRuntime')
+    onlyIf {
+        currentOs.isLinux()
+    }
+    inputs.dir linuxAppImageDirectory
+    outputs.file linuxFlatpakFile
+    doLast {
+        def flatpak = resolveExecutable('flatpak', 'flatpak', 'Install flatpak to create Flatpak bundles.')
+        def packagedApp = linuxAppImageDirectory.get().dir(appDisplayName).asFile
+        if (!packagedApp.exists()) {
+            throw new GradleException("Expected jpackage app image at ${packagedApp}, but it was not created.")
+        }
+
+        def buildDir = flatpakBuildDirectory.get().asFile
+        def repoDir = flatpakRepoDirectory.get().asFile
+        def filesDir = new File(buildDir, 'files')
+        def output = linuxFlatpakFile.get().asFile
+
+        delete buildDir
+        delete repoDir
+        mkdir distributionDirectory.get().asFile
+        delete output
+
+        runExternalCommand([
+                flatpak, 'build-init', "--arch=${flatpakArchitecture()}",
+                buildDir.absolutePath, appId, flatpakSdk, flatpakRuntime, flatpakRuntimeVersion
+        ])
+
+        copy {
+            from(packagedApp)
+            into(new File(filesDir, appSlug))
+        }
+
+        def wrapper = new File(filesDir, "bin/${appSlug}")
+        wrapper.parentFile.mkdirs()
+wrapper.text = """#!/usr/bin/env sh
+set -eu
+APPDIR="/app/${appSlug}"
+exec "\$APPDIR/bin/${appDisplayName}" "\$@"
+"""
+        wrapper.setExecutable(true, false)
+
+        copy {
+            from(appIconPng)
+            into(new File(filesDir, 'share/icons/hicolor/256x256/apps'))
+            rename { "${appId}.png" }
+        }
+
+        def desktopFile = new File(filesDir, "share/applications/${appId}.desktop")
+        desktopFile.parentFile.mkdirs()
+        desktopFile.text = desktopFileContent(appSlug, appId)
+
+        def metainfo = new File(filesDir, "share/metainfo/${appId}.appdata.xml")
+        metainfo.parentFile.mkdirs()
+        metainfo.text = metainfoContent()
+
+        copy {
+            from(appLicense)
+            into(new File(filesDir, "share/licenses/${appSlug}"))
+            rename { 'LICENSE' }
+        }
+
+        runExternalCommand([
+                flatpak, 'build-finish',
+                "--command=${appSlug}",
+                '--share=network',
+                '--share=ipc',
+                '--socket=x11',
+                '--socket=wayland',
+                '--device=dri',
+                '--filesystem=home',
+                '--talk-name=org.freedesktop.portal.Desktop',
+                buildDir.absolutePath
+        ])
+        runExternalCommand([
+                flatpak, 'build-export', "--arch=${flatpakArchitecture()}",
+                repoDir.absolutePath, buildDir.absolutePath, flatpakBranch
+        ])
+        runExternalCommand([
+                flatpak, 'build-bundle', "--arch=${flatpakArchitecture()}",
+                repoDir.absolutePath, output.absolutePath, appId, flatpakBranch
+        ])
+    }
+}
+
+tasks.register('packageLinuxInstallers') {
+    group = 'distribution'
+    description = 'Builds Linux Flatpak, RPM, DEB, and pacman launcher packages.'
+    dependsOn tasks.named('packageLinuxFlatpak'), tasks.named('packageLinuxRpm'), tasks.named('packageLinuxDeb'), tasks.named('packageLinuxPacman')
+}
+
+tasks.register('packageLinuxAll') {
+    group = 'distribution'
+    description = 'Builds all Linux launcher package formats, including AppImage, Flatpak, RPM, DEB, and pacman.'
+    dependsOn tasks.named('packageLinux'), tasks.named('packageLinuxInstallers')
+}
+
+tasks.register('packageAll') {
+    group = 'distribution'
+    description = 'Builds the self-contained native installer for the current OS. Run on Windows, macOS, and Linux hosts to produce all release artifacts.'
+    dependsOn tasks.named('packageMac'), tasks.named('packageWindows'), tasks.named('packageLinux')
+}
+
+tasks.register('jpackageAppImage', Exec) {
+    group = 'distribution'
+    description = 'Builds a self-contained unpacked app image for the current host OS.'
+    dependsOn tasks.named('prepareJpackageInput')
+    doFirst {
+        def executable = jpackageExecutable.get()
+        if (!executable.exists()) {
+            throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 21 to build native launcher app images.")
+        }
+
+        delete layout.buildDirectory.dir('jpackage/app-image')
+        commandLine([
+                executable.absolutePath,
+                '--type', 'app-image',
+                '--dest', layout.buildDirectory.dir('jpackage/app-image').get().asFile.absolutePath
+        ] + commonJpackageArgs.call())
+    }
+}
+
+tasks.named('assemble') {
+    dependsOn tasks.named('packageAll')
+}
+
+tasks.named('distZip') {
+    enabled = false
+}
+
+tasks.named('distTar') {
+    enabled = false
+}
+
+tasks.named('assembleDist') {
+    enabled = false
+}
+
+tasks.named('installDist') {
+    enabled = false
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-parameters']
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+def javafxPlatform() {
+    def os = org.gradle.internal.os.OperatingSystem.current()
+    def arch = System.getProperty('os.arch', '').toLowerCase(Locale.ROOT)
+    if (os.isWindows()) {
+        return 'win'
+    }
+    if (os.isMacOsX()) {
+        return arch.contains('aarch64') || arch.contains('arm64') ? 'mac-aarch64' : 'mac'
+    }
+    return arch.contains('aarch64') || arch.contains('arm64') ? 'linux-aarch64' : 'linux'
+}
+
+def appImageArch() {
+    def arch = System.getProperty('os.arch', '').toLowerCase(Locale.ROOT)
+    if (arch == 'amd64' || arch == 'x86_64') {
+        return 'x86_64'
+    }
+    if (arch.contains('aarch64') || arch.contains('arm64')) {
+        return 'aarch64'
+    }
+    return arch.replaceAll(/[^a-z0-9_+-]/, '-')
+}
+
+def debArchitecture() {
+    def arch = System.getProperty('os.arch', '').toLowerCase(Locale.ROOT)
+    if (arch == 'amd64' || arch == 'x86_64') {
+        return 'amd64'
+    }
+    if (arch.contains('aarch64') || arch.contains('arm64')) {
+        return 'arm64'
+    }
+    return arch.replaceAll(/[^a-z0-9_+-]/, '-')
+}
+
+def rpmArchitecture() {
+    def arch = System.getProperty('os.arch', '').toLowerCase(Locale.ROOT)
+    if (arch == 'amd64') {
+        return 'x86_64'
+    }
+    if (arch.contains('aarch64') || arch.contains('arm64')) {
+        return 'aarch64'
+    }
+    return arch.replaceAll(/[^a-z0-9_+-]/, '-')
+}
+
+def flatpakArchitecture() {
+    def arch = System.getProperty('os.arch', '').toLowerCase(Locale.ROOT)
+    if (arch == 'amd64' || arch == 'x86_64') {
+        return 'x86_64'
+    }
+    if (arch.contains('aarch64') || arch.contains('arm64')) {
+        return 'aarch64'
+    }
+    return arch.replaceAll(/[^a-z0-9_+-]/, '-')
+}
+
+def pacmanArchitecture() {
+    def arch = System.getProperty('os.arch', '').toLowerCase(Locale.ROOT)
+    if (arch == 'amd64' || arch == 'x86_64') {
+        return 'x86_64'
+    }
+    if (arch.contains('aarch64') || arch.contains('arm64')) {
+        return 'aarch64'
+    }
+    return arch.replaceAll(/[^a-z0-9_+-]/, '-')
+}
+
+def runExternalCommand(List<String> command, File workingDirectory = null, Map<String, String> environmentOverrides = [:]) {
+    def normalizedCommand = command.collect { it.toString() }
+    def processBuilder = new ProcessBuilder(normalizedCommand)
+    if (workingDirectory != null) {
+        processBuilder.directory(workingDirectory)
+    }
+    processBuilder.environment().putAll(environmentOverrides)
+    processBuilder.inheritIO()
+    def process = processBuilder.start()
+    def exitCode = process.waitFor()
+    if (exitCode != 0) {
+        throw new GradleException("Command failed with exit code ${exitCode}: ${normalizedCommand.join(' ')}")
+    }
+}
+
+def resolveExecutable(String candidate, String displayName, String installHint = "Install ${displayName}, or configure its path.") {
+    def candidateFile = new File(candidate)
+    if (candidateFile.isAbsolute() || candidate.contains(File.separator)) {
+        if (!candidateFile.isAbsolute()) {
+            candidateFile = file(candidate)
+        }
+        if (candidateFile.exists() && candidateFile.canExecute()) {
+            return candidateFile.absolutePath
+        }
+        throw new GradleException("${displayName} was not found or is not executable at ${candidateFile}. ${installHint}")
+    }
+
+    def path = System.getenv('PATH') ?: ''
+    for (String entry : path.split(File.pathSeparator)) {
+        if (entry == null || entry.isBlank()) {
+            continue
+        }
+        def executable = new File(entry, candidate)
+        if (executable.exists() && executable.canExecute()) {
+            return executable.absolutePath
+        }
+    }
+
+    throw new GradleException("${displayName} was not found on PATH. ${installHint}")
+}
