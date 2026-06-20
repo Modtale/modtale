@@ -49,6 +49,7 @@ class ProjectRepositoryImplTest {
                 ProjectSort.POPULAR,
                 ProjectViewCategory.ALL,
                 null,
+                null,
                 null
         );
 
@@ -76,6 +77,7 @@ class ProjectRepositoryImplTest {
                 null,
                 ProjectSort.RELEVANCE,
                 ProjectViewCategory.ALL,
+                null,
                 null,
                 null
         );
@@ -105,6 +107,7 @@ class ProjectRepositoryImplTest {
                 ProjectSort.TRENDING,
                 ProjectViewCategory.ALL,
                 null,
+                null,
                 null
         );
 
@@ -131,6 +134,7 @@ class ProjectRepositoryImplTest {
                 ProjectSort.NEWEST,
                 ProjectViewCategory.ALL,
                 null,
+                null,
                 null
         );
 
@@ -153,6 +157,7 @@ class ProjectRepositoryImplTest {
                 null,
                 ProjectSort.UPDATED,
                 ProjectViewCategory.ALL,
+                null,
                 null,
                 null
         );
@@ -177,6 +182,7 @@ class ProjectRepositoryImplTest {
                 ProjectSort.DOWNLOADS,
                 ProjectViewCategory.ALL,
                 null,
+                null,
                 null
         );
 
@@ -200,6 +206,7 @@ class ProjectRepositoryImplTest {
                 ProjectSort.FAVORITES,
                 ProjectViewCategory.ALL,
                 null,
+                null,
                 null
         );
 
@@ -222,6 +229,7 @@ class ProjectRepositoryImplTest {
                 null,
                 ProjectSort.RELEVANCE,
                 ProjectViewCategory.ALL,
+                null,
                 null,
                 null
         );
@@ -249,6 +257,7 @@ class ProjectRepositoryImplTest {
                 ProjectSort.DOWNLOADS,
                 ProjectViewCategory.ALL,
                 java.time.LocalDate.now().minusDays(7),
+                null,
                 null
         );
 
@@ -260,7 +269,7 @@ class ProjectRepositoryImplTest {
 
     @Test
     void favoritesQueryUsesCatalogSummaryProjection() {
-        repository.findFavorites(List.of("project-1"), null, PageRequest.of(0, 10));
+        repository.findFavorites(List.of("project-1"), null, PageRequest.of(0, 10), null);
 
         Query query = capturedFindQuery();
         Document fields = query.getFieldsObject();
@@ -271,6 +280,46 @@ class ProjectRepositoryImplTest {
         assertEquals(1, fields.get("childProjectIds"));
         assertFalse(fields.containsKey("versions"));
         verify(projectSearchResultDecorator).decorateCatalogResults(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void openSourceFilterMatchesStandardOpenLicenseIdsAndMarkedCustomLicenses() {
+        repository.searchProjects(
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                PageRequest.of(0, 20),
+                null,
+                ProjectSort.RELEVANCE,
+                ProjectViewCategory.ALL,
+                null,
+                null,
+                true
+        );
+
+        String queryJson = capturedFindQuery().getQueryObject().toString();
+
+        assertTrue(queryJson.contains("license"));
+        assertTrue(queryJson.contains("MIT"));
+        assertTrue(queryJson.contains("Apache-2.0"));
+        assertTrue(queryJson.contains("Unlicense"));
+        assertTrue(queryJson.contains("customLicenseOpenSource"));
+        assertTrue(queryJson.contains("$nin"));
+        assertTrue(queryJson.contains("CC-BY-NC-SA-4.0"));
+    }
+
+    @Test
+    void favoritesQueryCanApplyOpenSourceLicenseFilter() {
+        repository.findFavorites(List.of("project-1"), null, PageRequest.of(0, 10), true);
+
+        String queryJson = capturedFindQuery().getQueryObject().toString();
+
+        assertTrue(queryJson.contains("license"));
+        assertTrue(queryJson.contains("MIT"));
+        assertTrue(queryJson.contains("customLicenseOpenSource"));
     }
 
     private Query capturedFindQuery() {

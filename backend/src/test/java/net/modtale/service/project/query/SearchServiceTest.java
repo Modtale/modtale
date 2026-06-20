@@ -64,23 +64,23 @@ class SearchServiceTest {
     }
 
     @Test
-    void searchProjectsUsesFavoriteIdsForTheFavoritesView() {
+    void searchProjectsUsesFavoriteIdsForTheFavoritesViewWithOpenSourceFilter() {
         User currentUser = user("user-1", "viewer");
         currentUser.setLikedModIds(List.of("project-1", "project-2"));
         Page<Project> favorites = new PageImpl<>(List.of(project("project-1", "Sky Tools", ProjectStatus.PUBLISHED)));
 
-        when(projectRepository.findFavorites(eq(List.of("project-1", "project-2")), eq(""), any(Pageable.class)))
+        when(projectRepository.findFavorites(eq(List.of("project-1", "project-2")), eq(""), any(Pageable.class), eq(true)))
                 .thenReturn(favorites);
 
         Page<Project> result = searchService.searchProjects(
-                null, null, 0, 12, null, null, null, null, null, ProjectViewCategory.FAVORITES, null, null, currentUser
+                null, null, 0, 12, null, null, null, null, null, ProjectViewCategory.FAVORITES, null, null, true, currentUser
         );
 
         assertEquals(favorites, result);
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        verify(projectRepository).findFavorites(eq(List.of("project-1", "project-2")), eq(""), pageableCaptor.capture());
+        verify(projectRepository).findFavorites(eq(List.of("project-1", "project-2")), eq(""), pageableCaptor.capture(), eq(true));
         assertEquals(PageRequest.of(0, 12, Sort.by("title")), pageableCaptor.getValue());
-        verify(projectRepository, never()).searchProjects(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(projectRepository, never()).searchProjects(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -89,13 +89,13 @@ class SearchServiceTest {
         currentUser.setLikedModIds(List.of());
 
         Page<Project> result = searchService.searchProjects(
-                null, null, 0, 12, ProjectSort.RELEVANCE, null, null, null, null, ProjectViewCategory.FAVORITES, null, null, currentUser
+                null, null, 0, 12, ProjectSort.RELEVANCE, null, null, null, null, ProjectViewCategory.FAVORITES, null, null, null, currentUser
         );
 
         assertTrue(result.isEmpty());
         assertEquals(PageRequest.of(0, 12, Sort.by("title")), result.getPageable());
-        verify(projectRepository, never()).findFavorites(any(), any(), any());
-        verify(projectRepository, never()).searchProjects(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(projectRepository, never()).findFavorites(any(), any(), any(), any());
+        verify(projectRepository, never()).searchProjects(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -120,7 +120,8 @@ class SearchServiceTest {
                 eq(ProjectSort.DOWNLOADS),
                 eq(ProjectViewCategory.ALL),
                 any(LocalDate.class),
-                eq("author-1")
+                eq("author-1"),
+                eq(true)
         )).thenReturn(page);
         when(userRepository.findAllById(any(Iterable.class))).thenReturn(List.of(author));
 
@@ -137,6 +138,7 @@ class SearchServiceTest {
                 ProjectViewCategory.ALL,
                 "30d",
                 "author-1",
+                true,
                 currentUser
         );
 
@@ -154,7 +156,8 @@ class SearchServiceTest {
                 eq(ProjectSort.DOWNLOADS),
                 eq(ProjectViewCategory.ALL),
                 cutoffCaptor.capture(),
-                eq("author-1")
+                eq("author-1"),
+                eq(true)
         );
 
         assertEquals(PageRequest.of(1, 25), pageableCaptor.getValue());
@@ -182,6 +185,7 @@ class SearchServiceTest {
                 eq(ProjectSort.RELEVANCE),
                 eq(ProjectViewCategory.ALL),
                 isNull(),
+                isNull(),
                 isNull()
         )).thenReturn(page);
 
@@ -196,6 +200,7 @@ class SearchServiceTest {
                 null,
                 null,
                 ProjectViewCategory.ALL,
+                null,
                 null,
                 null,
                 null
@@ -221,6 +226,7 @@ class SearchServiceTest {
                         null,
                         ProjectViewCategory.ALL,
                         "not-a-date",
+                        null,
                         null,
                         null
                 )

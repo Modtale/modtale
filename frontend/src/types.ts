@@ -283,6 +283,7 @@ export interface Project {
     imageUrl: string;
     bannerUrl?: string;
     license?: string;
+    customLicenseOpenSource?: boolean;
     links?: Record<string, string>;
     classification: 'PLUGIN' | 'DATA' | 'ART' | 'SAVE' | 'MODPACK';
     tags?: string[];

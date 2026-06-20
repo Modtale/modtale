@@ -22,7 +22,8 @@ public interface ProjectRepositoryCustom {
             ProjectSort sortBy,
             ProjectViewCategory viewCategory,
             LocalDate dateCutoff,
-            String authorId
+            String authorId,
+            Boolean openSource
     );
 
     Page<Project> searchProjectMarquee(
@@ -36,10 +37,11 @@ public interface ProjectRepositoryCustom {
             ProjectSort sortBy,
             ProjectViewCategory viewCategory,
             LocalDate dateCutoff,
-            String authorId
+            String authorId,
+            Boolean openSource
     );
 
-    Page<Project> findFavorites(List<String> projectIds, String search, Pageable pageable);
+    Page<Project> findFavorites(List<String> projectIds, String search, Pageable pageable, Boolean openSource);
 
     Page<Project> searchDeletedProjects(String search, Pageable pageable);
 }
