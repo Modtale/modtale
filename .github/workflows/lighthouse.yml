@@ -5,15 +5,39 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
+  actions: read
+  pull-requests: read
 
 jobs:
+  dedupe:
+    name: Avoid Duplicate Lighthouse Runs
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.dedupe.outputs.should_run }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Decide whether this run owns the Lighthouse work
+        id: dedupe
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          PR_ACTION: ${{ github.event.action }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          WORKFLOW_FILE: lighthouse.yml
+        run: bash .github/scripts/should-run-tests-workflow.sh
+
   detect-changes:
     name: Detect Changes
+    needs: dedupe
+    if: needs.dedupe.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
