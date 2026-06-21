@@ -94,6 +94,25 @@ function appendGitHubEnv(values) {
   });
 }
 
+async function writeShellEnvFile(values) {
+  const envFile = optional("R2_RUNTIME_ENV_FILE");
+  if (!envFile) {
+    return;
+  }
+
+  const { appendFileSync } = await import("node:fs");
+  const lines = Object.entries(values).map(([key, value]) => {
+    const escaped = String(value).replace(/'/g, "'\\''");
+    return `${key}='${escaped}'`;
+  });
+  appendFileSync(envFile, `${lines.join("\n")}\n`, "utf8");
+}
+
+async function exportRuntimeValues(values) {
+  await appendGitHubEnv(values);
+  await writeShellEnvFile(values);
+}
+
 async function cloudflare(token, path, init = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -277,7 +296,7 @@ async function provision() {
     jurisdiction,
   );
 
-  await appendGitHubEnv({
+  await exportRuntimeValues({
     R2_RUNTIME_ACCESS_KEY: credentials.accessKey,
     R2_RUNTIME_SECRET_KEY: credentials.secretKey,
     R2_RUNTIME_TOKEN_ID: credentials.tokenId,
@@ -297,7 +316,7 @@ async function ensureOnly() {
   const jurisdiction = normalizeJurisdiction(optional("CLOUDFLARE_R2_JURISDICTION"));
 
   await ensureBucket(accountId, bucketToken, bucketName, jurisdiction);
-  await appendGitHubEnv({
+  await exportRuntimeValues({
     R2_RUNTIME_ENDPOINT: endpointFor(accountId, jurisdiction),
   });
 }
