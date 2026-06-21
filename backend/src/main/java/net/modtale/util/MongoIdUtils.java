@@ -1,12 +1,11 @@
 package net.modtale.util;
 
-import org.bson.types.ObjectId;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import org.bson.types.ObjectId;
 
 public final class MongoIdUtils {
 

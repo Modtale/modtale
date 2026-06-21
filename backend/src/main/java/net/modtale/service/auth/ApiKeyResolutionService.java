@@ -1,5 +1,8 @@
 package net.modtale.service.auth;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.concurrent.Executor;
 import net.modtale.exception.ApiKeyOperationForbiddenException;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.model.user.ApiKey;
@@ -10,10 +13,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.concurrent.Executor;
 
 @Service
 public class ApiKeyResolutionService {
@@ -38,6 +37,7 @@ public class ApiKeyResolutionService {
     }
 
     public ApiKey resolveKey(String plainKey) {
+        plainKey = normalizePlainKey(plainKey);
         if (plainKey == null || plainKey.length() < 10) {
             return null;
         }
@@ -81,5 +81,20 @@ public class ApiKeyResolutionService {
             key.setLastUsed(LocalDateTime.now());
             apiKeyRepository.save(key);
         });
+    }
+
+    private String normalizePlainKey(String plainKey) {
+        if (plainKey == null) {
+            return null;
+        }
+
+        String normalized = plainKey.trim();
+        if (normalized.regionMatches(true, 0, "Bearer ", 0, "Bearer ".length())) {
+            return normalized.substring("Bearer ".length()).trim();
+        }
+        if (normalized.regionMatches(true, 0, "ApiKey ", 0, "ApiKey ".length())) {
+            return normalized.substring("ApiKey ".length()).trim();
+        }
+        return normalized;
     }
 }

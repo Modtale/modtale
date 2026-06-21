@@ -4,7 +4,7 @@ import net.modtale.model.jam.Modjam;
 import net.modtale.model.jam.ModjamSubmission;
 import net.modtale.model.user.User;
 import net.modtale.service.ModjamService;
-import net.modtale.service.user.AccountService;
+import net.modtale.service.user.account.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

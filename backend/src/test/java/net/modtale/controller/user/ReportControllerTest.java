@@ -6,9 +6,9 @@ import net.modtale.model.dto.request.user.ResolveReportRequest;
 import net.modtale.model.dto.response.common.IdResponse;
 import net.modtale.model.user.Report;
 import net.modtale.model.user.User;
-import net.modtale.service.security.AccessControlService;
-import net.modtale.service.user.AccountService;
-import net.modtale.service.user.ReportService;
+import net.modtale.service.security.access.AccessControlService;
+import net.modtale.service.user.account.AccountService;
+import net.modtale.service.user.reporting.ReportService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.Authentication;
@@ -43,7 +43,7 @@ class ReportControllerTest {
 
         CreateReportRequest request = new CreateReportRequest();
         request.setTargetId("project-1");
-        request.setTargetType("PROJECT");
+        request.setTargetType(Report.TargetType.PROJECT);
         request.setReason("Spam");
         request.setDescription("Repeated reposts");
 
@@ -63,7 +63,7 @@ class ReportControllerTest {
         Authentication authentication = mock(Authentication.class);
         CreateReportRequest request = new CreateReportRequest();
         request.setTargetId("project-1");
-        request.setTargetType("PROJECT");
+        request.setTargetType(Report.TargetType.PROJECT);
         request.setReason("Spam");
 
         when(accessControlService.isApiKey(authentication)).thenReturn(true);
@@ -78,7 +78,7 @@ class ReportControllerTest {
     void resolveReportDelegatesUsingTheCurrentAdminUser() {
         User admin = user("admin-1", "mod");
         ResolveReportRequest request = new ResolveReportRequest();
-        request.setStatus("RESOLVED");
+        request.setStatus(Report.ReportStatus.RESOLVED);
         request.setNote("Handled");
 
         when(accountService.requireCurrentUser("resolving reports")).thenReturn(admin);

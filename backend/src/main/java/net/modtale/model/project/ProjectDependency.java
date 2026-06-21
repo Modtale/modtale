@@ -1,7 +1,10 @@
 package net.modtale.model.project;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.springframework.data.annotation.Transient;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class ProjectDependency {
 
     @JsonProperty("projectId")
@@ -11,6 +14,14 @@ public class ProjectDependency {
     private String modTitle;
 
     private String versionNumber;
+    @Transient
+    private String icon;
+    @Transient
+    private String title;
+    @Transient
+    private ProjectClassification classification;
+    @Transient
+    private String slug;
     private boolean isOptional;
     private boolean isEmbedded;
 
@@ -46,6 +57,18 @@ public class ProjectDependency {
 
     public String getVersionNumber() { return versionNumber; }
     public void setVersionNumber(String versionNumber) { this.versionNumber = versionNumber; }
+
+    public String getIcon() { return icon; }
+    public void setIcon(String icon) { this.icon = icon; }
+
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
+
+    public ProjectClassification getClassification() { return classification; }
+    public void setClassification(ProjectClassification classification) { this.classification = classification; }
+
+    public String getSlug() { return slug; }
+    public void setSlug(String slug) { this.slug = slug; }
 
     @JsonProperty("isOptional")
     public boolean isOptional() { return isOptional; }

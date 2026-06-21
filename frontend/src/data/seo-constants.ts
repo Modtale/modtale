@@ -111,6 +111,49 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
             },
         ],
     },
+    '/status': {
+        title: 'System Status | Modtale',
+        h1: 'Modtale System Status',
+        description: 'Live Modtale status for API, database, and storage availability, with service latency, uptime history, and Discord incident updates.',
+        keywords: 'modtale status, modtale uptime, modtale api status, modtale incidents',
+        intro: 'Track Modtale service availability across the API, database, and storage systems.',
+        contentBlocks: [
+            {
+                title: 'Live Service Health',
+                body: 'The Modtale status page reports the current health of the core services that power browsing, publishing, and downloads.',
+            },
+            {
+                title: 'Availability History',
+                body: 'Status history helps the team and community spot degraded periods, latency spikes, and service recovery.',
+            },
+            {
+                title: 'Discord Incident Updates',
+                body: 'Operational changes can be mirrored into Discord so the community can follow important incidents where they already gather.',
+            },
+        ],
+        relatedLinks: [
+            {
+                href: '/api-docs',
+                label: 'API Docs',
+                description: 'Review public API behavior and response shapes.',
+            },
+            {
+                href: '/mods',
+                label: 'Browse Mods',
+                description: 'Return to project discovery.',
+            },
+        ],
+        faq: [
+            {
+                question: 'What does Modtale monitor?',
+                answer: 'Modtale monitors API responsiveness, database connectivity, and storage connectivity for the core web experience.',
+            },
+            {
+                question: 'Where are incident updates posted?',
+                answer: 'The status page shows live health, and configured status changes can also be posted to the Modtale Discord server.',
+            },
+        ],
+    },
     '/mods': {
         title: 'Hytale Mods | Browse Hytale Mods and Modpacks | Modtale',
         h1: 'Hytale Mods',
@@ -435,20 +478,18 @@ export const generateDynamicSEO = (
     baseSEO: { title: string; description: string },
     page: number,
     sort: string,
-    view: string,
     query: string,
 ) => {
     let dynamicTitle = baseSEO.title;
     let dynamicDesc = baseSEO.description;
 
     let prefix = '';
-    if (sort === 'popular' || view === 'popular') prefix = 'Popular ';
-    else if (sort === 'trending' || view === 'trending') prefix = 'Trending ';
+    if (sort === 'popular') prefix = 'Popular ';
+    else if (sort === 'trending') prefix = 'Trending ';
     else if (sort === 'downloads') prefix = 'Most Downloaded ';
     else if (sort === 'favorites') prefix = 'Most Favorited ';
     else if (sort === 'newest') prefix = 'Newest ';
     else if (sort === 'updated') prefix = 'Recently Updated ';
-    else if (view === 'hidden_gems') prefix = 'Hidden Gems: ';
 
     if (prefix) {
         dynamicTitle = `${prefix}${dynamicTitle.replace(' | Modtale', '')} | Modtale`;

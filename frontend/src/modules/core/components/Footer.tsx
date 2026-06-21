@@ -1,5 +1,5 @@
 import React from 'react';
-import {Github, FileText, Shield, Layers, Box, Database, Palette, Save, Code, Layout} from 'lucide-react';
+import {Activity, Github, FileText, Shield, Layers, Box, Database, Palette, Save, Code, Layout} from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { BlueskyBrandIcon, DiscordBrandIcon, XBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { SiteRoutes } from '@/utils/routes';
@@ -46,7 +46,7 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
                     </div>
 
                     <div className="col-span-1">
-                        <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Discover</h4>
+                        <div className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Discover</div>
                         <div className="flex flex-col space-y-3">
                             <Link to={SiteRoutes.browse()} className={linkClass}>
                                 <Layout className="w-3.5 h-3.5 mr-2 opacity-70" /> Mods
@@ -70,10 +70,13 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
                     </div>
 
                     <div className="col-span-1">
-                        <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Resources</h4>
+                        <div className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Resources</div>
                         <div className="flex flex-col space-y-3">
                             <Link to={SiteRoutes.apiDocs()} className={linkClass}>
                                 <Code className="w-4 h-4 mr-2 opacity-70" /> API Docs
+                            </Link>
+                            <Link to={SiteRoutes.status()} className={linkClass}>
+                                <Activity className="w-4 h-4 mr-2 opacity-70" /> Status
                             </Link>
                             <div className="h-px bg-slate-100 dark:bg-white/5 my-1"></div>
                             <Link to={SiteRoutes.terms()} className={linkClass}>
@@ -86,7 +89,7 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
                     </div>
 
                     <div className="col-span-1">
-                        <h4 className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Community</h4>
+                        <div className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Community</div>
                         <div className="flex flex-col space-y-3">
                             <a href="https://discord.gg/PcFaDVYqVe" target="_blank" rel="noopener noreferrer" className={linkClass}>
                                 <DiscordBrandIcon className="w-4 h-4 mr-2" /> Discord

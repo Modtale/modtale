@@ -1,9 +1,10 @@
 package net.modtale.model.dto.user;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
-import java.util.List;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class UserDTO {
@@ -61,6 +62,10 @@ public class UserDTO {
     public void setPendingOrgInvites(List<User.OrganizationMember> pendingOrgInvites) { this.pendingOrgInvites = pendingOrgInvites; }
     public List<String> getLikedModIds() { return likedModIds; }
     public void setLikedModIds(List<String> likedModIds) { this.likedModIds = likedModIds; }
+    @JsonProperty("likedProjectIds")
+    public List<String> getLikedProjectIds() { return likedModIds; }
+    @JsonProperty("likedProjectIds")
+    public void setLikedProjectIds(List<String> likedProjectIds) { this.likedModIds = likedProjectIds; }
     public List<String> getFollowingIds() { return followingIds; }
     public void setFollowingIds(List<String> followingIds) { this.followingIds = followingIds; }
     public List<String> getFollowerIds() { return followerIds; }

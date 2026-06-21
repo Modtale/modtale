@@ -1,56 +1,99 @@
 package net.modtale.repository.project;
 
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
+import net.modtale.model.project.ProjectLicenseSupport;
+import net.modtale.model.project.ProjectSort;
 import net.modtale.model.project.ProjectStatus;
-import net.modtale.repository.user.UserRepository;
-import net.modtale.service.analytics.ScoringService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Lazy;
+import net.modtale.model.project.ProjectViewCategory;
+import net.modtale.service.project.query.ProjectSearchResultDecorator;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.aggregation.*;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.support.PageableExecutionUtils;
 import org.springframework.stereotype.Repository;
 
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.regex.Pattern;
-
 @Repository
 public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
-
-    private static final Logger logger = LoggerFactory.getLogger(ProjectRepositoryImpl.class);
-
     private final MongoTemplate mongoTemplate;
-    private final UserRepository userRepository;
-    private final ScoringService scoringService;
+    private final ProjectSearchResultDecorator projectSearchResultDecorator;
 
-    public ProjectRepositoryImpl(MongoTemplate mongoTemplate, UserRepository userRepository, @Lazy ScoringService scoringService) {
+    public ProjectRepositoryImpl(MongoTemplate mongoTemplate, ProjectSearchResultDecorator projectSearchResultDecorator) {
         this.mongoTemplate = mongoTemplate;
-        this.userRepository = userRepository;
-        this.scoringService = scoringService;
+        this.projectSearchResultDecorator = projectSearchResultDecorator;
     }
 
     @Override
     public Page<Project> searchProjects(
-            String search, List<String> tags, String gameVersion, String classification,
+            String search, List<String> tags, String gameVersion, ProjectClassification classification,
             Integer minDownloads, Integer minFavorites, Pageable pageable,
-            String currentUserId, String sortBy,
-            String viewCategory, LocalDate dateCutoff, String authorId
+            String currentUserId, ProjectSort sortBy,
+            ProjectViewCategory viewCategory, LocalDate dateCutoff, String authorId, Boolean openSource
+    ) {
+        return searchProjectsInternal(
+                search,
+                tags,
+                gameVersion,
+                classification,
+                minDownloads,
+                minFavorites,
+                pageable,
+                currentUserId,
+                sortBy,
+                viewCategory,
+                dateCutoff,
+                authorId,
+                openSource,
+                SearchProjection.CATALOG
+        );
+    }
+
+    @Override
+    public Page<Project> searchProjectMarquee(
+            String search, List<String> tags, String gameVersion, ProjectClassification classification,
+            Integer minDownloads, Integer minFavorites, Pageable pageable,
+            ProjectSort sortBy,
+            ProjectViewCategory viewCategory, LocalDate dateCutoff, String authorId, Boolean openSource
+    ) {
+        return searchProjectsInternal(
+                search,
+                tags,
+                gameVersion,
+                classification,
+                minDownloads,
+                minFavorites,
+                pageable,
+                null,
+                sortBy,
+                viewCategory,
+                dateCutoff,
+                authorId,
+                openSource,
+                SearchProjection.MARQUEE
+        );
+    }
+
+    private Page<Project> searchProjectsInternal(
+            String search, List<String> tags, String gameVersion, ProjectClassification classification,
+            Integer minDownloads, Integer minFavorites, Pageable pageable,
+            String currentUserId, ProjectSort sortBy,
+            ProjectViewCategory viewCategory, LocalDate dateCutoff, String authorId,
+            Boolean openSource,
+            SearchProjection projection
     ) {
         List<Criteria> criteriaList = new ArrayList<>();
 
-        if ("Your Projects".equals(viewCategory) && currentUserId != null) {
+        if (viewCategory == ProjectViewCategory.YOUR_PROJECTS && currentUserId != null) {
             criteriaList.add(new Criteria().orOperator(
                     Criteria.where("authorId").is(currentUserId),
                     Criteria.where("teamMembers.userId").is(currentUserId)
@@ -74,142 +117,177 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
 
         if (tags != null && !tags.isEmpty()) criteriaList.add(Criteria.where("tags").in(tags));
 
-        if (classification != null && !classification.isEmpty() && !"All".equals(classification)) {
-            try {
-                ProjectClassification classEnum = ProjectClassification.valueOf(classification.toUpperCase());
-                criteriaList.add(Criteria.where("classification").is(classEnum));
-            } catch (IllegalArgumentException ignored) {}
+        if (classification != null) {
+            criteriaList.add(Criteria.where("classification").is(classification));
         }
 
-        if (gameVersion != null && !gameVersion.isEmpty())
-            criteriaList.add(Criteria.where("versions.gameVersions").is(gameVersion));
+        List<String> gameVersions = parseGameVersions(gameVersion);
+        if (!gameVersions.isEmpty())
+            criteriaList.add(Criteria.where("versions.gameVersions").in(gameVersions));
         if (minDownloads != null) criteriaList.add(Criteria.where("downloadCount").gte(minDownloads));
         if (minFavorites != null) criteriaList.add(Criteria.where("favoriteCount").gte(minFavorites));
+        if (Boolean.TRUE.equals(openSource)) criteriaList.add(openSourceLicenseCriteria());
 
-        if ("trending".equals(sortBy) || "trending".equals(viewCategory)) {
-            criteriaList.add(Criteria.where("downloadCount").gte(10));
-        }
-
-        boolean isTimeBasedDownloadSort = "downloads".equals(sortBy) && dateCutoff != null;
+        boolean isTimeBasedDownloadSort = sortBy == ProjectSort.DOWNLOADS && dateCutoff != null;
         if (dateCutoff != null && !isTimeBasedDownloadSort) {
             criteriaList.add(Criteria.where("updatedAt").gte(dateCutoff.toString()));
         }
 
         Criteria baseCriteria = criteriaList.isEmpty() ? new Criteria() :
                 (criteriaList.size() == 1 ? criteriaList.get(0) : new Criteria().andOperator(criteriaList.toArray(new Criteria[0])));
+        Sort sort = resolveSort(sortBy, viewCategory, dateCutoff, pageable);
+        Query query = new Query(baseCriteria).with(sort);
+        if (projection == SearchProjection.MARQUEE) {
+            applyMarqueeProjection(query);
+        } else {
+            applyCatalogSummaryProjection(query);
+        }
+        query.skip((long) pageable.getPageNumber() * pageable.getPageSize());
+        query.limit(pageable.getPageSize());
 
-        List<AggregationOperation> pipeline = new ArrayList<>();
-        pipeline.add(Aggregation.match(baseCriteria));
+        List<Project> results = mongoTemplate.find(query, Project.class);
+        return PageableExecutionUtils.getPage(
+                results,
+                pageable,
+                () -> mongoTemplate.count(new Query(baseCriteria), Project.class)
+        );
+    }
 
-        pipeline.add(LookupOperation.newLookup()
-                .from("users")
-                .localField("authorId")
-                .foreignField("_id")
-                .as("authorInfo"));
+    private enum SearchProjection {
+        CATALOG,
+        MARQUEE
+    }
 
-        pipeline.add(Aggregation.addFields()
-                .addField("author")
-                .withValue(ConditionalOperators.ifNull(
-                        ArrayOperators.ArrayElemAt.arrayOf("authorInfo.username").elementAt(0)
-                ).then("$author"))
-                .build());
-
-        pipeline.add(Aggregation.project().andExclude("authorInfo"));
-
-        if ("hidden_gems".equals(viewCategory)) {
-            Query statsQuery = new Query(baseCriteria);
-            statsQuery.addCriteria(Criteria.where("downloads30d").gte(10));
-
-            long totalDocs = mongoTemplate.count(statsQuery, Project.class);
-            int p5Index = Math.max(0, (int) (totalDocs * 0.05));
-            int p20Index = Math.max(0, (int) (totalDocs * 0.20));
-
-            Query p5Query = new Query(baseCriteria)
-                    .addCriteria(Criteria.where("downloads30d").gte(10))
-                    .with(Sort.by(Sort.Direction.ASC, "downloads30d"))
-                    .skip(p5Index).limit(1);
-            Project p5Project = mongoTemplate.findOne(p5Query, Project.class);
-            int minDl = p5Project != null ? p5Project.getDownloads30d() : 0;
-
-            Query p20Query = new Query(baseCriteria)
-                    .addCriteria(Criteria.where("downloads30d").gte(10))
-                    .with(Sort.by(Sort.Direction.ASC, "downloads30d"))
-                    .skip(p20Index).limit(1);
-            Project p20Project = mongoTemplate.findOne(p20Query, Project.class);
-            int maxDl = p20Project != null ? p20Project.getDownloads30d() : Integer.MAX_VALUE;
-
-            if (maxDl <= minDl) maxDl = minDl + 500;
-
-            pipeline.add(Aggregation.match(new Criteria().andOperator(
-                    Criteria.where("downloads30d").gt(minDl),
-                    Criteria.where("downloads30d").lt(maxDl)
-            )));
-
-            pipeline.add(Aggregation.addFields()
-                    .addField("gemRatio")
-                    .withValue(ArithmeticOperators.Divide.valueOf("favoriteCount")
-                            .divideBy(ConditionalOperators.when(Criteria.where("downloads30d").gt(0))
-                                    .then("$downloads30d").otherwise(1)))
-                    .build());
+    private Sort resolveSort(ProjectSort sortBy, ProjectViewCategory viewCategory, LocalDate dateCutoff, Pageable pageable) {
+        if (sortBy == ProjectSort.TRENDING) {
+            return Sort.by(
+                    Sort.Order.asc("trendingRank"),
+                    Sort.Order.desc("trendScore"),
+                    Sort.Order.desc("downloads7d"),
+                    Sort.Order.desc("downloadCount"),
+                    Sort.Order.desc("updatedAt")
+            );
         }
 
-        if ("trending".equals(sortBy) || "trending".equals(viewCategory)) {
-            pipeline.add(Aggregation.sort(Sort.Direction.DESC, "trendScore"));
-        } else if ("popular".equals(sortBy) || "popular".equals(viewCategory)) {
-            pipeline.add(Aggregation.sort(Sort.Direction.DESC, "popularScore"));
-        } else if ("relevance".equals(sortBy)) {
-            pipeline.add(Aggregation.sort(Sort.Direction.DESC, "relevanceScore"));
-        } else if ("hidden_gems".equals(viewCategory)) {
-            pipeline.add(Aggregation.sort(Sort.Direction.DESC, "gemRatio"));
-        } else if ("downloads".equals(sortBy) && dateCutoff != null) {
+        if (sortBy == ProjectSort.POPULAR) {
+            return Sort.by(
+                    Sort.Order.asc("popularRank"),
+                    Sort.Order.desc("popularScore"),
+                    Sort.Order.desc("downloadCount"),
+                    Sort.Order.desc("favoriteCount"),
+                    Sort.Order.desc("updatedAt")
+            );
+        }
+
+        if (sortBy == ProjectSort.DOWNLOADS && dateCutoff != null) {
             long daysDiff = ChronoUnit.DAYS.between(dateCutoff, LocalDate.now());
             if (daysDiff <= 7) {
-                pipeline.add(Aggregation.sort(Sort.Direction.DESC, "downloads7d"));
-            } else if (daysDiff <= 31) {
-                pipeline.add(Aggregation.sort(Sort.Direction.DESC, "downloads30d"));
-            } else if (daysDiff <= 92) {
-                pipeline.add(Aggregation.sort(Sort.Direction.DESC, "downloads90d"));
-            } else {
-                pipeline.add(Aggregation.sort(Sort.Direction.DESC, "downloadCount"));
+                return Sort.by(Sort.Order.desc("downloads7d"), Sort.Order.desc("downloadCount"));
             }
-        } else if (pageable.getSort().isSorted()) {
-            pipeline.add(Aggregation.sort(pageable.getSort()));
-        } else {
-            pipeline.add(Aggregation.sort(Sort.Direction.DESC, "updatedAt"));
+            if (daysDiff <= 31) {
+                return Sort.by(Sort.Order.desc("downloads30d"), Sort.Order.desc("downloadCount"));
+            }
+            if (daysDiff <= 92) {
+                return Sort.by(Sort.Order.desc("downloads90d"), Sort.Order.desc("downloadCount"));
+            }
         }
 
-        pipeline.add(Aggregation.skip((long) pageable.getPageNumber() * pageable.getPageSize()));
-        pipeline.add(Aggregation.limit(pageable.getPageSize()));
-
-        @SuppressWarnings("deprecation")
-        Aggregation mainAgg = Aggregation.newAggregation(Project.class, pipeline);
-        List<Project> results = mongoTemplate.aggregate(mainAgg, Project.class, Project.class).getMappedResults();
-
-        scoringService.ensureScores(results);
-
-        long total;
-        if ("hidden_gems".equals(viewCategory)) {
-            List<AggregationOperation> countPipeline = new ArrayList<>(pipeline);
-            countPipeline.removeIf(op -> op instanceof SortOperation || op instanceof SkipOperation || op instanceof LimitOperation || op instanceof ProjectionOperation || op instanceof AddFieldsOperation || op instanceof LookupOperation);
-            countPipeline.add(Aggregation.count().as("total"));
-
-            @SuppressWarnings("deprecation")
-            Aggregation countAgg = Aggregation.newAggregation(Project.class, countPipeline);
-            @SuppressWarnings("rawtypes")
-            AggregationResults<HashMap> countRes = mongoTemplate.aggregate(countAgg, Project.class, HashMap.class);
-            total = countRes.getUniqueMappedResult() != null ? ((Number) countRes.getUniqueMappedResult().get("total")).longValue() : 0;
-        } else {
-            total = mongoTemplate.count(new Query(baseCriteria), Project.class);
+        if (sortBy == ProjectSort.RELEVANCE) {
+            return Sort.by(
+                    Sort.Order.asc("relevanceRank"),
+                    Sort.Order.desc("relevanceScore"),
+                    Sort.Order.desc("downloads30d"),
+                    Sort.Order.desc("updatedAt")
+            );
         }
 
-        return new PageImpl<>(results, pageable, total);
+        if (sortBy == ProjectSort.DOWNLOADS) {
+            return Sort.by(Sort.Order.desc("downloadCount"), Sort.Order.desc("updatedAt"));
+        }
+
+        if (sortBy == ProjectSort.FAVORITES) {
+            return Sort.by(Sort.Order.desc("favoriteCount"), Sort.Order.desc("updatedAt"));
+        }
+
+        if (sortBy == ProjectSort.NEWEST) {
+            return Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("updatedAt"));
+        }
+
+        if (sortBy == ProjectSort.UPDATED) {
+            return Sort.by(Sort.Order.desc("updatedAt"));
+        }
+
+        if (pageable.getSort().isSorted()) {
+            return pageable.getSort();
+        }
+
+        return Sort.by(Sort.Order.desc("updatedAt"));
+    }
+
+    private Criteria openSourceLicenseCriteria() {
+        return new Criteria().orOperator(
+                Criteria.where("license").in(ProjectLicenseSupport.OPEN_SOURCE_LICENSES),
+                new Criteria().andOperator(
+                        Criteria.where("customLicenseOpenSource").is(true),
+                        Criteria.where("license").nin(ProjectLicenseSupport.SELECTABLE_LICENSES).ne(null)
+                )
+        );
+    }
+
+    private List<String> parseGameVersions(String gameVersion) {
+        if (gameVersion == null || gameVersion.trim().isEmpty()) {
+            return List.of();
+        }
+
+        return Arrays.stream(gameVersion.split(","))
+                .map(String::trim)
+                .filter(version -> !version.isEmpty())
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    private void applyCatalogSummaryProjection(Query query) {
+        query.fields()
+                .include("_id")
+                .include("slug")
+                .include("title")
+                .include("description")
+                .include("authorId")
+                .include("author")
+                .include("imageUrl")
+                .include("bannerUrl")
+                .include("classification")
+                .include("downloadCount")
+                .include("favoriteCount")
+                .include("updatedAt")
+                .include("childProjectIds");
+    }
+
+    private void applyMarqueeProjection(Query query) {
+        query.fields()
+                .include("_id")
+                .include("slug")
+                .include("title")
+                .include("authorId")
+                .include("author")
+                .include("imageUrl")
+                .include("bannerUrl")
+                .include("classification")
+                .include("downloadCount");
     }
 
     @Override
-    public Page<Project> findFavorites(List<String> projectIds, String search, Pageable pageable) {
+    public Page<Project> findFavorites(List<String> projectIds, String search, Pageable pageable, Boolean openSource) {
+        if (projectIds == null || projectIds.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
         Query query = new Query();
         query.addCriteria(Criteria.where("id").in(projectIds));
         query.addCriteria(Criteria.where("status").in(ProjectStatus.PUBLISHED, ProjectStatus.ARCHIVED));
+        if (Boolean.TRUE.equals(openSource)) {
+            query.addCriteria(openSourceLicenseCriteria());
+        }
 
         if (search != null && !search.trim().isEmpty()) {
             String regex = Pattern.quote(search);
@@ -219,17 +297,15 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
             ));
         }
 
+        Query countQuery = Query.of(query).limit(0).skip(0);
+        applyCatalogSummaryProjection(query);
         query.with(pageable);
         List<Project> list = mongoTemplate.find(query, Project.class);
-
-        for (Project p : list) {
-            if (p.getAuthorId() != null && p.getAuthor() == null) {
-                userRepository.findById(p.getAuthorId()).ifPresent(u -> p.setAuthor(u.getUsername()));
-            }
-        }
-
-        long count = mongoTemplate.count(Query.of(query).limit(0).skip(0), Project.class);
-        return PageableExecutionUtils.getPage(list, pageable, () -> count);
+        return projectSearchResultDecorator.decorateCatalogResults(PageableExecutionUtils.getPage(
+                list,
+                pageable,
+                () -> mongoTemplate.count(countQuery, Project.class)
+        ));
     }
 
     @Override
@@ -247,16 +323,13 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
             ));
         }
 
-        long total = mongoTemplate.count(query, Project.class);
+        Query countQuery = Query.of(query).limit(0).skip(0);
         query.with(pageable);
         List<Project> results = mongoTemplate.find(query, Project.class);
-
-        for (Project p : results) {
-            if (p.getAuthorId() != null && p.getAuthor() == null) {
-                userRepository.findById(p.getAuthorId()).ifPresent(u -> p.setAuthor(u.getUsername()));
-            }
-        }
-
-        return new PageImpl<>(results, pageable, total);
+        return projectSearchResultDecorator.decorateCatalogResults(PageableExecutionUtils.getPage(
+                results,
+                pageable,
+                () -> mongoTemplate.count(countQuery, Project.class)
+        ));
     }
 }

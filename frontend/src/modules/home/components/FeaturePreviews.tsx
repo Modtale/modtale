@@ -4,290 +4,213 @@ import { Download, List, X, ChevronDown, ChevronRight, Check, Box, Link as LinkI
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { api, BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
-import { ProjectCard } from '@/modules/project/components/ProjectCard';
-import type { Project, User } from '@/types';
+import { ProjectCard, ProjectCardSkeleton } from '@/modules/project/components/ProjectCard';
+import type { Project, ProjectDependency, User } from '@/types';
 import { theme } from '@/styles/theme';
 import { GLASS_CARD, GLASS_HEADER } from '../styles';
 import { getClassificationIcon, toTitleCase, formatTimeAgo } from '@/utils/modHelpers';
 import { LineChart } from '@/components/ui/charts/LineChart';
+import { useChartVisibility } from '@/components/ui/charts/chartVisibility';
 import { FeaturedModCard } from './HeroMarquee';
 import { getCommentRoleBadge } from '@/modules/project/utils/commentRoles';
+import { DependencyModal } from '@/modules/project/components/dialogs/DependencyModal';
+import { DownloadModal } from '@/modules/project/components/dialogs/DownloadModal';
+import { HistoryModal } from '@/modules/project/components/dialogs/HistoryModal';
 
-export const InlineDependencyUI = ({ randomProject }: { randomProject?: Project }) => {
-    const [isMounted, setIsMounted] = useState(false);
-    useEffect(() => setIsMounted(true), []);
+const DEPENDENCY_PREVIEW_LIMIT = 3;
+const DEPENDENCY_PREVIEW_VERSION_TIMEOUT_MS = 1800;
 
-    const randomIconUrl = randomProject?.imageUrl
-        ? (randomProject.imageUrl.startsWith('/api') ? `${BACKEND_URL}${randomProject.imageUrl}` : randomProject.imageUrl)
-        : null;
+const getDependencyPreviewProjects = (projects?: Project[], fallbackProject?: Project) => {
+    const sourceProjects = projects?.length ? projects : fallbackProject ? [fallbackProject] : [];
+    return Array.from(
+        new Map(
+            sourceProjects
+                .filter((project): project is Project => Boolean(project?.id && project?.title))
+                .map(project => [project.id, project])
+        ).values()
+    ).slice(0, DEPENDENCY_PREVIEW_LIMIT);
+};
 
-    const randomVersion = randomProject?.versions?.[0]?.versionNumber || '1.0.0';
+const getPreviewVersionNumberFromVersions = (versions?: Project['versions']) => {
+    if (!versions?.length) return 'latest';
+    const [latestVersion] = [...versions].sort((a, b) => {
+        const aTime = new Date(a.releaseDate || 0).getTime();
+        const bTime = new Date(b.releaseDate || 0).getTime();
+        return bTime - aTime;
+    });
+    return latestVersion?.versionNumber || versions[0]?.versionNumber || 'latest';
+};
+
+const getPreviewVersionNumber = (project: Project, versionCache: Record<string, string>) => {
+    if (project.versions?.length) return getPreviewVersionNumberFromVersions(project.versions);
+    return versionCache[project.id] || 'latest';
+};
+
+export const InlineDependencyUI = ({ randomProject, projects }: { randomProject?: Project; projects?: Project[] }) => {
+    const previewProjects = useMemo(() => getDependencyPreviewProjects(projects, randomProject), [projects, randomProject]);
+    const [versionCache, setVersionCache] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        const missingVersionProjects = previewProjects.filter(project => !project.versions?.length && !versionCache[project.id]);
+        if (!missingVersionProjects.length) return;
+
+        let isCancelled = false;
+
+        Promise.all(missingVersionProjects.map(async (project) => {
+            try {
+                const res = await api.get<{ versions?: Project['versions'] }>(`/projects/${project.id}/versions`, {
+                    timeout: DEPENDENCY_PREVIEW_VERSION_TIMEOUT_MS
+                });
+                return [project.id, getPreviewVersionNumberFromVersions(res.data?.versions)] as const;
+            } catch {
+                return [project.id, 'latest'] as const;
+            }
+        })).then((entries) => {
+            if (isCancelled) return;
+
+            setVersionCache((current) => {
+                let didChange = false;
+                const next = { ...current };
+                for (const [projectId, versionNumber] of entries) {
+                    if (next[projectId] !== versionNumber) {
+                        next[projectId] = versionNumber;
+                        didChange = true;
+                    }
+                }
+                return didChange ? next : current;
+            });
+        });
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [previewProjects, versionCache]);
+
+    const previewDependencies = useMemo<ProjectDependency[]>(() => (
+        previewProjects.map((project, index) => ({
+            projectId: project.id,
+            projectTitle: project.title,
+            title: project.title,
+            icon: project.imageUrl || '',
+            classification: project.classification,
+            slug: project.slug,
+            isOptional: previewProjects.length > 1 && index === previewProjects.length - 1,
+            isEmbedded: false,
+            versionNumber: getPreviewVersionNumber(project, versionCache)
+        }))
+    ), [previewProjects, versionCache]);
+
+    const initialMetaCache = useMemo(() => {
+        return previewProjects.reduce<Record<string, { title: string; author: string; icon: string }>>((cache, project) => {
+            cache[project.id] = {
+                title: project.title,
+                author: project.author || 'Unknown',
+                icon: project.imageUrl || ''
+            };
+            return cache;
+        }, {});
+    }, [previewProjects]);
+
+    const initialSelected = useMemo(
+        () => previewDependencies.slice(0, 1).map(dep => dep.projectId),
+        [previewDependencies]
+    );
+    const dependencyKey = previewDependencies.map(dep => `${dep.projectId}:${dep.versionNumber}`).join('|');
 
     return (
-        <div className={`${theme.components.modalContent} w-full flex flex-col min-h-[420px] transform transition-transform duration-500`}>
-            <div className={theme.components.modalHeader}>
-                <h3 className={`font-black ${theme.colors.textPrimary} flex items-center gap-2.5 text-lg`}>
-                    <LinkIcon className={`w-5 h-5 ${theme.colors.accent}`} aria-hidden="true" /> Dependencies
-                </h3>
-            </div>
-            <div className={`${theme.components.modalBody} overflow-hidden relative flex-1 flex flex-col`}>
-                <div className="flex items-center justify-between p-4 rounded-2xl border border-blue-400/40 bg-blue-50/60 dark:bg-blue-500/10 shadow-sm transition-all hover:bg-blue-50 dark:hover:bg-blue-500/20">
-                    <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                        <div className="w-6 h-6 rounded-full bg-modtale-accent text-white flex items-center justify-center shrink-0 shadow-md">
-                            <Check className="w-3.5 h-3.5" aria-hidden="true" />
-                        </div>
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-                            <img src="/assets/favicon.svg" alt="Hytale Core Library Icon" className="w-full h-full object-cover p-2" loading="lazy" />
-                        </div>
-                        <div className="min-w-0">
-                            <div className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">Hytale Core Library</div>
-                            <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">v1.2.0</div>
-                        </div>
-                    </div>
-                    <span className="text-[9px] sm:text-[10px] font-bold uppercase bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-md border border-blue-200 dark:border-blue-500/30 shrink-0 ml-2">Required</span>
-                </div>
-
-                <div className={`flex items-center justify-between p-4 rounded-2xl ${theme.colors.dangerBorder} ${theme.colors.dangerBg} border shadow-sm transition-all hover:border-red-500 cursor-pointer`}>
-                    <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                        <div className="w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 bg-white/50 dark:bg-slate-800/50 flex items-center justify-center shrink-0 shadow-sm" />
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-                            <Box className="w-5 h-5 sm:w-6 h-6 text-slate-400" />
-                        </div>
-                        <div className="min-w-0">
-                            <div className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">MathLib</div>
-                            <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">v2.1.0</div>
-                        </div>
-                    </div>
-                    <span className="text-[9px] sm:text-[10px] font-black uppercase bg-red-500 text-white px-2 py-1 rounded-md shadow-sm shrink-0 ml-2">Required</span>
-                </div>
-
-                {randomProject ? (
-                    <div className={`flex items-center justify-between p-4 rounded-2xl ${theme.colors.border} ${theme.colors.bgBase} border shadow-sm`}>
-                        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                            <div className="w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 bg-white/50 dark:bg-slate-800/50 shrink-0" />
-                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl overflow-hidden shadow-sm border border-slate-200 dark:border-white/10 shrink-0">
-                                {randomIconUrl ? (
-                                    <OptimizedImage
-                                        key={`dep-icon-${isMounted}`}
-                                        src={randomIconUrl}
-                                        alt={`${randomProject.title} Icon`}
-                                        baseWidth={48}
-                                        className="w-full h-full object-cover"
-                                    />
-                                ) : <Box className="w-5 h-5 sm:w-6 h-6 text-slate-400" />}
-                            </div>
-                            <div className="min-w-0">
-                                <div className="font-bold text-sm sm:text-base text-slate-900 dark:text-white truncate">{randomProject.title}</div>
-                                <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5">v{randomVersion}</div>
-                            </div>
-                        </div>
-                        <span className={`text-[9px] sm:text-[10px] font-bold uppercase ${theme.colors.bgSurfaceAlt} ${theme.colors.textSecondary} px-2 py-1 rounded-md border ${theme.colors.border} shrink-0 ml-2`}>Optional</span>
-                    </div>
-                ) : (
-                    <div className="h-20 w-full animate-pulse bg-slate-100/50 dark:bg-slate-800/50 rounded-2xl border border-slate-200/50 dark:border-white/5" />
-                )}
-
-                <div className={`mt-auto flex items-start gap-3 text-sm ${theme.colors.dangerText} ${theme.colors.dangerBg} p-4 rounded-2xl border ${theme.colors.dangerBorder} shadow-sm`}>
-                    <AlertCircle className="w-5 h-5 shrink-0" aria-hidden="true" />
-                    <p className="font-medium text-xs sm:text-sm">Some <span className="font-black">Required</span> dependencies are currently unselected. The project may not function correctly without them.</p>
-                </div>
-            </div>
-        </div>
+        <DependencyModal
+            key={dependencyKey}
+            dependencies={previewDependencies}
+            onClose={() => {}}
+            onDownloadBundle={() => {}}
+            onDownloadProjectOnly={() => {}}
+            isInline={true}
+            initialMetaCache={initialMetaCache}
+            initialSelected={initialSelected}
+        />
     );
 };
 
 export const InlineDownloadUI = () => {
-    const [showExperimental, setShowExperimental] = useState(false);
-    const [showPreReleaseGameVersions, setShowPreReleaseGameVersions] = useState(false);
     const [view, setView] = useState<'download' | 'changelog'>('download');
-    const [selectedVersion, setSelectedVersion] = useState('0.5.4');
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const orderedGameVersions = ['0.6.0-pre.2', '0.6.0-pre.1.1', '0.6.0-pre.1', '0.5.4', '0.5.3', '0.5.2', '0.5.1', '0.5.0', '0.5.0-pre.9.2', '0.5.0-pre.9.1'];
-    const preReleaseGameVersions = ['0.6.0-pre.2', '0.6.0-pre.1.1', '0.6.0-pre.1', '0.5.0-pre.9.2', '0.5.0-pre.9.1'];
-    const preReleaseGameVersionSet = useMemo(() => new Set(preReleaseGameVersions), []);
-    const gameVersions = useMemo(() => {
-        if (showPreReleaseGameVersions) return orderedGameVersions;
-        return orderedGameVersions.filter(version => !preReleaseGameVersionSet.has(version));
-    }, [orderedGameVersions, preReleaseGameVersionSet, showPreReleaseGameVersions]);
-    const preferredGameVersion = useMemo(() => gameVersions[0] || '', [gameVersions]);
+    const [showExperimental, setShowExperimental] = useState(false);
 
-    const allVersions = [
-        { id: 'v9', versionNumber: '3.1.0-pre.2', channel: 'BETA', gameVersion: '0.6.0-pre.2', date: '30 minutes ago', changelog: 'Latest Hytale prerelease preview. Stabilized menus, polished world loading, and one more pass on particles.' },
-        { id: 'v8', versionNumber: '3.1.0-pre.1.1', channel: 'ALPHA', gameVersion: '0.6.0-pre.1.1', date: '1 hour ago', changelog: 'Hotfix preview for the next Hytale build. Focused on crash recovery and startup stability.' },
-        { id: 'v7', versionNumber: '3.1.0-pre.1', channel: 'ALPHA', gameVersion: '0.6.0-pre.1', date: '2 hours ago', changelog: 'Early Hytale prerelease with the new rendering pipeline. Expect rough edges.' },
-        { id: 'v6', versionNumber: '3.0.4', channel: 'RELEASE', gameVersion: '0.5.4', date: '12 hours ago', changelog: 'Hytale release branch update. Minor localization fixes and a few stability improvements.' },
-        { id: 'v5', versionNumber: '3.0.3', channel: 'RELEASE', gameVersion: '0.5.3', date: '1 day ago', changelog: 'Compatibility update for Hytale 0.5.3. Added new dynamic lighting and UI polish.' },
-        { id: 'v4', versionNumber: '3.0.2-beta', channel: 'BETA', gameVersion: '0.5.2', date: '1 week ago', changelog: 'Testing new durability mechanics against Hytale 0.5.2. Expect bugs.' },
-        { id: 'v3', versionNumber: '3.0.1', channel: 'RELEASE', gameVersion: '0.5.1', date: '2 weeks ago', changelog: 'Added new elemental wand effects and fixed visual bugs with particle effects.' },
-        { id: 'v2', versionNumber: '3.0.0', channel: 'RELEASE', gameVersion: '0.5.0', date: '1 month ago', changelog: 'Initial release of the expanded magic system for Hytale 0.5.0.' },
-        { id: 'v1', versionNumber: '2.9.9', channel: 'RELEASE', gameVersion: '0.5.0-pre.9.2', date: '2 months ago', changelog: 'Final update for the old magic system before the Hytale prerelease branch changed over.' }
-    ];
+    const orderedGameVersions = useMemo(() => ['0.6.0-pre.2', '0.6.0-pre.1.1', '0.6.0-pre.1', '0.5.4', '0.5.3', '0.5.2', '0.5.1', '0.5.0', '0.5.0-pre.9.2', '0.5.0-pre.9.1'], []);
+    const preReleaseGameVersions = useMemo(() => ['0.6.0-pre.2', '0.6.0-pre.1.1', '0.6.0-pre.1', '0.5.0-pre.9.2', '0.5.0-pre.9.1'], []);
 
-    useEffect(() => {
-        if (!preferredGameVersion) return;
-        setSelectedVersion(preferredGameVersion);
-        setIsDropdownOpen(false);
-    }, [preferredGameVersion, showPreReleaseGameVersions, showExperimental]);
+    const mockVersions = useMemo(() => {
+        const now = new Date();
+        const raw = [
+            { id: 'v18', versionNumber: '3.2.0-beta.1', channel: 'BETA', gameVersion: '0.5.4', releaseDate: new Date(now.getTime() - 2 * 60 * 1000).toISOString(), changelog: 'Experimental beta testing the upcoming 3.2.0 update features.', fileUrl: '#', dependencies: [] },
+            { id: 'v17', versionNumber: '3.2.0-alpha.1', channel: 'ALPHA', gameVersion: '0.5.4', releaseDate: new Date(now.getTime() - 5 * 60 * 1000).toISOString(), changelog: 'Early access alpha testing for the new major update.', fileUrl: '#', dependencies: [] },
+            { id: 'v16', versionNumber: '3.1.1', channel: 'RELEASE', gameVersion: '0.5.4', releaseDate: new Date(now.getTime() - 10 * 60 * 1000).toISOString(), changelog: 'Stable release for Hytale 0.5.4. Re-balanced magic, polished textures, and updated default server configuration.', fileUrl: '#', dependencies: [] },
+            { id: 'v15', versionNumber: '3.1.0', channel: 'RELEASE', gameVersion: '0.5.4', releaseDate: new Date(now.getTime() - 25 * 60 * 1000).toISOString(), changelog: 'Initial support for Hytale 0.5.4. Complete compatibility pass and UI refinements.', fileUrl: '#', dependencies: [] },
+            { id: 'v9', versionNumber: '3.1.0-pre.2', channel: 'BETA', gameVersion: '0.6.0-pre.2', releaseDate: new Date(now.getTime() - 40 * 60 * 1000).toISOString(), changelog: 'Latest Hytale prerelease preview. Stabilized menus, polished world loading, and one more pass on particles.', fileUrl: '#', dependencies: [] },
+            { id: 'v8', versionNumber: '3.1.0-pre.1.1', channel: 'ALPHA', gameVersion: '0.6.0-pre.1.1', releaseDate: new Date(now.getTime() - 90 * 60 * 1000).toISOString(), changelog: 'Hotfix preview for the next Hytale build. Focused on crash recovery and startup stability.', fileUrl: '#', dependencies: [] },
+            { id: 'v7', versionNumber: '3.1.0-pre.1', channel: 'ALPHA', gameVersion: '0.6.0-pre.1', releaseDate: new Date(now.getTime() - 3 * 60 * 60 * 1000).toISOString(), changelog: 'Early Hytale prerelease with the new rendering pipeline. Expect rough edges.', fileUrl: '#', dependencies: [] },
+            { id: 'v14', versionNumber: '3.0.5', channel: 'RELEASE', gameVersion: '0.5.4', releaseDate: new Date(now.getTime() - 6 * 60 * 60 * 1000).toISOString(), changelog: 'Hotfix release resolving UI scaling issues on ultra-wide monitors.', fileUrl: '#', dependencies: [] },
+            { id: 'v13', versionNumber: '3.0.4-beta.2', channel: 'BETA', gameVersion: '0.5.4', releaseDate: new Date(now.getTime() - 10 * 60 * 1000).toISOString(), changelog: 'Testing multi-threaded particle calculations for high-density environments.', fileUrl: '#', dependencies: [] },
+            { id: 'v6', versionNumber: '3.0.4', channel: 'RELEASE', gameVersion: '0.5.4', releaseDate: new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString(), changelog: 'Hytale release branch update. Minor localization fixes and a few stability improvements.', fileUrl: '#', dependencies: [] },
+            { id: 'v5', versionNumber: '3.0.3', channel: 'RELEASE', gameVersion: '0.5.3', releaseDate: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(), changelog: 'Compatibility update for Hytale 0.5.3. Added new dynamic lighting and UI polish.', fileUrl: '#', dependencies: [] },
+            { id: 'v12', versionNumber: '3.0.3-beta.1', channel: 'BETA', gameVersion: '0.5.3', releaseDate: new Date(now.getTime() - 28 * 60 * 60 * 1000).toISOString(), changelog: 'Early beta test of dynamic weather-influenced lighting values.', fileUrl: '#', dependencies: [] },
+            { id: 'v11', versionNumber: '3.0.2', channel: 'RELEASE', gameVersion: '0.5.2', releaseDate: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString(), changelog: 'Release build featuring stability improvements and durability fixes.', fileUrl: '#', dependencies: [] },
+            { id: 'v4', versionNumber: '3.0.2-beta', channel: 'BETA', gameVersion: '0.5.2', releaseDate: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(), changelog: 'Testing new durability mechanics against Hytale 0.5.2. Expect bugs.', fileUrl: '#', dependencies: [] },
+            { id: 'v3', versionNumber: '3.0.1', channel: 'RELEASE', gameVersion: '0.5.1', releaseDate: new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString(), changelog: 'Added new elemental wand effects and fixed visual bugs with particle effects.', fileUrl: '#', dependencies: [] },
+            { id: 'v10', versionNumber: '3.0.0-pre.1', channel: 'ALPHA', gameVersion: '0.5.0', releaseDate: new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000).toISOString(), changelog: 'Alpha testing for the overhauled skill tree system.', fileUrl: '#', dependencies: [] },
+            { id: 'v2', versionNumber: '3.0.0', channel: 'RELEASE', gameVersion: '0.5.0', releaseDate: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(), changelog: 'Initial release of the expanded magic system for Hytale 0.5.0.', fileUrl: '#', dependencies: [] },
+            { id: 'v1', versionNumber: '2.9.9', channel: 'RELEASE', gameVersion: '0.5.0-pre.9.2', releaseDate: new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString(), changelog: 'Final update for the old magic system before the Hytale prerelease branch changed over.', fileUrl: '#', dependencies: [] }
+        ];
+        return raw.map(v => ({ ...v, gameVersions: [v.gameVersion] }));
+    }, []);
 
-    const currentVersions = allVersions.filter(v => v.gameVersion === selectedVersion);
-    const visibleVersions = currentVersions.filter(v => showExperimental || v.channel === 'RELEASE');
-    const latestVer = visibleVersions[0];
-    const hasPreReleaseGameVersionEntries = preReleaseGameVersions.some(version => allVersions.some(v => v.gameVersion === version));
-    const hasReleaseGameVersionEntries = orderedGameVersions.some(version => !preReleaseGameVersionSet.has(version) && allVersions.some(v => v.gameVersion === version));
-    const forceShowPreReleaseGameVersions = hasPreReleaseGameVersionEntries && !hasReleaseGameVersionEntries;
-
-    useEffect(() => {
-        if (forceShowPreReleaseGameVersions && !showPreReleaseGameVersions) {
-            setShowPreReleaseGameVersions(true);
+    const versionsByGame = useMemo(() => {
+        const grouped: Record<string, any[]> = {};
+        for (const v of mockVersions) {
+            if (!grouped[v.gameVersion]) grouped[v.gameVersion] = [];
+            grouped[v.gameVersion].push(v);
         }
-    }, [forceShowPreReleaseGameVersions, showPreReleaseGameVersions]);
+        return grouped;
+    }, [mockVersions]);
 
-    const getVersionBadgeColor = (channel: string) => {
-        switch(channel) {
-            case 'BETA': return 'bg-purple-100/80 text-purple-800 border-purple-200/50 dark:bg-purple-500/20 dark:text-purple-200 dark:border-purple-500/30';
-            case 'ALPHA': return 'bg-red-100/80 text-red-800 border-red-200/50 dark:bg-red-500/20 dark:text-red-200 dark:border-red-500/30';
-            default: return 'bg-white/60 border-white/40 text-slate-800 dark:bg-white/10 dark:border-white/20 dark:text-white';
+    const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
+    const downloadRef = React.useCallback((node: HTMLDivElement | null) => {
+        if (node && !measuredHeight) {
+            const rect = node.getBoundingClientRect();
+            if (rect.height > 0) {
+                setMeasuredHeight(rect.height);
+            }
         }
-    };
-
-    const themeClass = latestVer?.channel === 'ALPHA'
-        ? 'bg-red-600/90 hover:bg-red-500 shadow-[0_8px_24px_rgba(220,38,38,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] border-red-500/50 text-white'
-        : latestVer?.channel === 'BETA'
-            ? 'bg-purple-600/90 hover:bg-purple-500 shadow-[0_8px_24px_rgba(147,51,234,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] border-purple-500/50 text-white'
-            : 'bg-modtale-accent/90 hover:bg-modtale-accent shadow-[0_8px_24px_rgba(59,130,246,0.3),inset_0_1px_0_rgba(255,255,255,0.2)] border-modtale-accent/50 text-white';
+    }, [measuredHeight]);
 
     if (view === 'changelog') {
         return (
-            <div className={`${theme.components.modalContent} w-full overflow-hidden flex flex-col h-[380px] transform transition-transform duration-500`}>
-                <div className={`${theme.components.modalHeader} p-4 sm:p-5`}>
-                    <div>
-                        <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2"><List className="w-4 h-4 sm:w-5 sm:h-5 text-modtale-accent" aria-hidden="true" /> Changelog</h3>
-                        <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={() => setShowExperimental(!showExperimental)}>
-                            <div className={`w-7 sm:w-8 h-3.5 sm:h-4 rounded-full relative transition-colors shadow-[inset_0_1px_4px_rgba(0,0,0,0.2)] ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-300/80 dark:bg-slate-700/80'}`}>
-                                <div className={`absolute top-[1px] sm:top-0.5 left-[1px] sm:left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm border border-black/5 ${showExperimental ? 'translate-x-3 sm:translate-x-4' : ''}`} />
-                            </div>
-                            <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">Show Beta/Alpha</span>
-                        </div>
-                    </div>
-                    <button onClick={() => setView('download')} aria-label="Close Changelog" className={`p-2 rounded-full ${theme.colors.bgSurfaceHover} ${theme.colors.textMuted} transition-colors`}><X className="w-4 h-4 sm:w-5 sm:h-5" /></button>
-                </div>
-
-                <div className={`${theme.components.modalBody} p-4 sm:p-5 overflow-y-auto flex-1 space-y-4 relative`}>
-                    {visibleVersions.length > 0 ? (
-                        visibleVersions.map(ver => (
-                            <div key={ver.id} className={`rounded-xl p-3 sm:p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-sm hover:border-slate-300 dark:hover:border-white/20 transition-colors`}>
-                                <div className="flex items-start sm:items-center justify-between gap-2 sm:gap-4 mb-3 border-b border-slate-200 dark:border-white/10 pb-3 flex-col sm:flex-row">
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-sm sm:text-base font-black text-slate-900 dark:text-white">v{ver.versionNumber}</span>
-                                            {ver.channel !== 'RELEASE' && <span className={`text-[8px] sm:text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border backdrop-blur-md shadow-sm ${getVersionBadgeColor(ver.channel)}`}>{ver.channel}</span>}
-                                        </div>
-                                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-[9px] sm:text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                                            <span>{ver.date}</span>
-                                            <span className="hidden sm:block w-1 h-1 rounded-full bg-slate-400/50 dark:bg-slate-600/50"></span>
-                                            <span className="truncate max-w-[120px] sm:max-w-none">{ver.gameVersion}</span>
-                                        </div>
-                                    </div>
-                                    <button aria-label={`Download version ${ver.versionNumber}`} className="p-2 sm:p-2.5 bg-slate-100 dark:bg-white/10 hover:bg-modtale-accent hover:text-white text-slate-700 dark:text-slate-300 rounded-lg transition-all shrink-0 shadow-sm border border-slate-200 dark:border-white/5 w-full sm:w-auto flex justify-center">
-                                        <Download className="w-4 h-4" />
-                                    </button>
-                                </div>
-                                <div className="text-[11px] sm:text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
-                                    {ver.changelog}
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="flex flex-col items-center justify-center text-slate-500 h-full gap-2">
-                            <AlertCircle className="w-8 h-8 opacity-50" aria-hidden="true" />
-                            <p className="font-medium text-xs sm:text-sm">No compatible versions.</p>
-                        </div>
-                    )}
-                </div>
-            </div>
+            <HistoryModal
+                show={true}
+                onClose={() => setView('download')}
+                history={mockVersions}
+                showExperimental={showExperimental}
+                onToggleExperimental={() => setShowExperimental(!showExperimental)}
+                onDownload={() => {}}
+                isInline={true}
+                inlineHeight={measuredHeight || undefined}
+            />
         );
     }
 
     return (
-            <div className={`${theme.components.modalContent} w-full overflow-hidden relative flex flex-col h-[380px] transform transition-transform duration-500`}>
-            <div className={`${theme.components.modalHeader} p-4 sm:p-5`}>
-                <div>
-                    <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                        <Download className="w-4 h-4 sm:w-5 sm:h-5 text-modtale-accent" aria-hidden="true" /> Download
-                    </h3>
-                    {hasPreReleaseGameVersionEntries && hasReleaseGameVersionEntries && (
-                        <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={() => setShowPreReleaseGameVersions(!showPreReleaseGameVersions)}>
-                            <div className={`w-7 sm:w-8 h-3.5 sm:h-4 rounded-full relative transition-colors shadow-[inset_0_1px_4px_rgba(0,0,0,0.2)] ${showPreReleaseGameVersions ? 'bg-modtale-accent' : 'bg-slate-300/80 dark:bg-slate-700/80'}`}>
-                                <div className={`absolute top-[1px] sm:top-0.5 left-[1px] sm:left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm border border-black/5 ${showPreReleaseGameVersions ? 'translate-x-3 sm:translate-x-4' : ''}`} />
-                            </div>
-                            <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">Show Pre-Release Game Versions</span>
-                        </div>
-                    )}
-                    <div className="mt-1 flex items-center gap-2 group cursor-pointer" onClick={() => setShowExperimental(!showExperimental)}>
-                        <div className={`w-7 sm:w-8 h-3.5 sm:h-4 rounded-full relative transition-colors shadow-[inset_0_1px_4px_rgba(0,0,0,0.2)] ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-300/80 dark:bg-slate-700/80'}`}>
-                            <div className={`absolute top-[1px] sm:top-0.5 left-[1px] sm:left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm border border-black/5 ${showExperimental ? 'translate-x-3 sm:translate-x-4' : ''}`} />
-                        </div>
-                        <span className="text-[9px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">Show Beta/Alpha</span>
-                    </div>
-                </div>
-            </div>
-
-            <div className="p-4 sm:p-5 overflow-visible relative flex-1 flex flex-col justify-center">
-                <div className="mb-5 relative z-20 shrink-0">
-                    <label className="block text-[9px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase mb-2 tracking-wider">Game Version</label>
-                    <div className="relative">
-                        <div
-                            className={`w-full flex items-center justify-between p-3 rounded-xl font-bold text-slate-900 dark:text-white text-xs sm:text-sm cursor-pointer bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 shadow-sm hover:border-modtale-accent/40 dark:hover:border-modtale-accent/50 transition-all ${isDropdownOpen ? 'ring-2 ring-modtale-accent border-transparent' : ''}`}
-                            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                        >
-                            <span className="truncate pr-2">{selectedVersion}</span>
-                            <ChevronDown className={`w-4 h-4 text-slate-500 shrink-0 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
-                        </div>
-                        {isDropdownOpen && (
-                            <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl overflow-hidden z-50 py-1">
-                                {gameVersions.map(v => (
-                                    <div
-                                        key={v}
-                                        className={`px-4 py-2.5 text-xs sm:text-sm font-bold cursor-pointer transition-colors truncate ${selectedVersion === v ? 'text-modtale-accent bg-blue-50/50 dark:bg-blue-500/10' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                                        onClick={() => {
-                                            setSelectedVersion(v);
-                                            setIsDropdownOpen(false);
-                                        }}
-                                    >
-                                        {v}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {latestVer ? (
-                    <button className={`w-full backdrop-blur-xl p-3 sm:p-4 rounded-2xl flex flex-col items-center justify-center gap-1 sm:gap-1.5 transition-all active:scale-95 mb-2 relative z-0 group overflow-hidden shrink-0 border ${themeClass}`}>
-                        <div className="font-black text-base sm:text-lg flex items-center gap-2 transition-transform z-10"><Download className="w-4 h-4 sm:w-5 sm:h-5" aria-hidden="true" /> Download Latest</div>
-                        <div className={`text-[9px] sm:text-[10px] font-bold font-mono px-2 sm:px-3 py-1 rounded-full border flex items-center gap-1.5 z-10 backdrop-blur-md shadow-sm ${getVersionBadgeColor(latestVer.channel)}`}>
-                            v{latestVer.versionNumber} {latestVer.channel !== 'RELEASE' && <span className="uppercase opacity-80">{latestVer.channel}</span>}
-                        </div>
-                    </button>
-                ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-slate-500">
-                        <AlertCircle className="w-6 h-6 sm:w-8 sm:h-8 opacity-50 mb-2" aria-hidden="true" />
-                        <p className="font-medium text-xs sm:text-sm text-center">No compatible versions.</p>
-                        {!showExperimental && currentVersions.length > 0 && (
-                            <button onClick={() => setShowExperimental(true)} className="mt-2 text-[10px] sm:text-[11px] font-bold text-modtale-accent hover:underline">
-                                Show experimental
-                            </button>
-                        )}
-                    </div>
-                )}
-            </div>
-
-            <div className={`${theme.components.modalFooter} p-3 sm:p-4 shrink-0 z-10`}>
-                <button onClick={() => setView('changelog')} className="text-[10px] sm:text-[11px] text-slate-500 hover:text-modtale-accent font-bold uppercase tracking-wider flex items-center justify-start gap-1 w-full transition-colors">
-                    View Full Changelog <ChevronDown className="w-3 h-3 -rotate-90" aria-hidden="true" />
-                </button>
-            </div>
-        </div>
+        <DownloadModal
+            show={true}
+            onClose={() => {}}
+            versionsByGame={versionsByGame}
+            preReleaseGameVersions={preReleaseGameVersions}
+            orderedGameVersions={orderedGameVersions}
+            onDownload={() => {}}
+            showExperimental={showExperimental}
+            onToggleExperimental={() => setShowExperimental(!showExperimental)}
+            onViewHistory={() => setView('changelog')}
+            isInline={true}
+            containerRef={downloadRef}
+        />
     );
 };
 
@@ -379,19 +302,25 @@ const PreviewSummaryCard = ({ title, value, subValue, trend, icon: Icon, color, 
             )}
         </div>
         <div className="relative z-10 mt-3">
-            <h3 className="text-slate-550 dark:text-slate-400 text-[9px] font-black uppercase tracking-widest mb-0.5">{title}</h3>
+            <h3 className="text-slate-500 dark:text-slate-400 text-[9px] font-black uppercase tracking-widest mb-0.5">{title}</h3>
             <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">
-                {value}{isPercent && <span className="text-lg text-slate-450 ml-0.5">%</span>}
+                {value}{isPercent && <span className="text-lg text-slate-400 ml-0.5">%</span>}
             </div>
                                             {subValue && <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 font-medium">{subValue}</div>}
         </div>
     </div>
 );
 
+const FeatureBodyText = ({ children }: { children: React.ReactNode }) => (
+    <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl [text-wrap:balance]">
+        {children}
+    </p>
+);
 
 
-const InlineAnalyticsUI = () => {
-    const [hiddenDatasets, setHiddenDatasets] = useState<Set<string>>(new Set());
+
+const InlineAnalyticsUI = ({ showConversionRate = true }: { showConversionRate?: boolean }) => {
+    const { isHidden, toggleHandler } = useChartVisibility();
     const mockChartData = [
         { date: 'Jun 4', value: 1200 },
         { date: 'Jun 5', value: 1350 },
@@ -411,35 +340,26 @@ const InlineAnalyticsUI = () => {
         { date: 'Jun 10', value: 2000 }
     ];
 
-    const handleToggle = (id: string) => {
-        setHiddenDatasets(prev => {
-            const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
-            return next;
-        });
-    };
-
     const mockChartDatasets = [
         {
             id: 'downloads',
             label: 'Downloads',
             color: '#3b82f6',
             data: mockChartData,
-            hidden: hiddenDatasets.has('downloads')
+            hidden: isHidden('inlineAnalytics', 'downloads')
         },
         {
             id: 'views',
             label: 'Views',
             color: '#8b5cf6',
             data: mockViewsData,
-            hidden: hiddenDatasets.has('views')
+            hidden: isHidden('inlineAnalytics', 'views')
         }
     ];
 
     return (
         <div className={`${GLASS_CARD} w-full flex flex-col min-h-[460px] p-5 sm:p-6 transform transition-transform duration-500`}>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className={`grid grid-cols-2 ${showConversionRate ? 'md:grid-cols-3' : ''} gap-4`}>
                 <PreviewSummaryCard
                     title="Downloads"
                     value="148,294"
@@ -458,21 +378,23 @@ const InlineAnalyticsUI = () => {
                     trend="8.1"
                     className="p-0.5"
                 />
-                <div className="hidden md:block">
-                    <PreviewSummaryCard
-                        title="Conversion Rate"
-                        value="43.2"
-                        subValue="Downloads per View"
-                        icon={PieChart}
-                        color="text-emerald-500"
-                        isPercent={true}
-                        className="p-0.5"
-                    />
-                </div>
+                {showConversionRate && (
+                    <div className="hidden md:block">
+                        <PreviewSummaryCard
+                            title="Conversion Rate"
+                            value="43.2"
+                            subValue="Downloads per View"
+                            icon={PieChart}
+                            color="text-emerald-500"
+                            isPercent={true}
+                            className="p-0.5"
+                        />
+                    </div>
+                )}
             </div>
             <div className="bg-white/40 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm flex flex-col backdrop-blur-md p-4 sm:p-5 mt-4">
                 <div className="h-[380px] w-full">
-                    <LineChart datasets={mockChartDatasets} onToggle={handleToggle} />
+                    <LineChart datasets={mockChartDatasets} onToggle={toggleHandler('inlineAnalytics')} />
                 </div>
             </div>
         </div>
@@ -507,7 +429,7 @@ const InlineCommentThreadUI = ({ project, currentUser }: { project?: Project; cu
                     avatar: resolvedAvatar,
                 });
             })
-            .catch(() => { /* silently fail */ });
+            .catch(() => {});
     }, [project?.authorId]);
 
     const commenterName = randomCommenter?.name ?? project?.author ?? '…';
@@ -719,60 +641,39 @@ const CompactFeaturedModCard = ({ project }: { project: Project }) => {
 };
 
 const ScrollContainer = ({ children }: { children: React.ReactNode }) => {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [showLeftFade, setShowLeftFade] = useState(false);
-    const [showRightFade, setShowRightFade] = useState(false);
-
-    const handleScroll = () => {
-        const el = containerRef.current;
-        if (!el) return;
-        
-        const { scrollLeft, scrollWidth, clientWidth } = el;
-        setShowLeftFade(scrollLeft > 1);
-        setShowRightFade(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 1);
-    };
-
-    useEffect(() => {
-        const el = containerRef.current;
-        if (!el) return;
-        
-        handleScroll();
-        
-        const resizeObserver = new ResizeObserver(() => handleScroll());
-        resizeObserver.observe(el);
-        
-        return () => resizeObserver.disconnect();
-    }, []);
-
     return (
         <div className="relative w-full overflow-hidden">
-            <div className={`absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#0b1220]/92 via-[#0b1220]/76 to-transparent pointer-events-none z-30 transition-opacity duration-300 ${showLeftFade ? 'opacity-100' : 'opacity-0'}`} />
-            
-            <div className={`absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#0b1220]/92 via-[#0b1220]/76 to-transparent pointer-events-none z-30 transition-opacity duration-300 ${showRightFade ? 'opacity-100' : 'opacity-0'}`} />
-            
-            <div 
-                ref={containerRef}
-                onScroll={handleScroll}
-                className="flex gap-4 overflow-x-auto pb-4 pt-2 scrollbar-none snap-x snap-mandatory w-full"
-            >
+            <div className="flex gap-4 overflow-x-auto pb-4 pt-2 scrollbar-none snap-x snap-mandatory w-full">
                 {children}
             </div>
         </div>
     );
 };
 
+const ProjectScrollSkeletons = ({ count = 3 }: { count?: number }) => (
+    <ScrollContainer>
+        {[...Array(count)].map((_, index) => (
+            <div key={index} className="w-[280px] sm:w-[320px] shrink-0 snap-start" aria-hidden="true">
+                <ProjectCardSkeleton />
+            </div>
+        ))}
+    </ScrollContainer>
+);
+
 export const TrendingProjectsSection = ({
     projects,
+    loading = false,
     likedProjectIds = [],
     onToggleFavorite = () => {},
     isLoggedIn = false
 }: {
     projects: Project[];
+    loading?: boolean;
     likedProjectIds?: string[];
     onToggleFavorite?: (projectId: string) => void;
     isLoggedIn?: boolean;
 }) => {
-    if (projects.length === 0) return null;
+    if (!loading && projects.length === 0) return null;
     return (
         <section className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end pb-0 gap-4 relative">
@@ -782,43 +683,49 @@ export const TrendingProjectsSection = ({
                     </h2>
                 </div>
                 <Link
-                    to={`${SiteRoutes.browse()}?view=trending`}
-                    className="text-xs font-bold text-slate-550 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition-colors flex items-center gap-0.5 shrink-0 pb-1.5"
+                    to={`${SiteRoutes.browse()}?sort=trending`}
+                    className="text-xs font-bold text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition-colors flex items-center gap-0.5 shrink-0 pb-1.5"
                 >
                     Browse All
                     <ArrowUpRight className="w-3.5 h-3.5" />
                 </Link>
             </div>
             
-            <ScrollContainer>
-                {projects.map((project) => (
-                    <div key={project.id} className="w-[280px] sm:w-[320px] shrink-0 snap-start">
-                        <ProjectCard
-                            project={project}
-                            isFavorite={likedProjectIds.includes(project.id)}
-                            onToggleFavorite={onToggleFavorite}
-                            isLoggedIn={isLoggedIn}
-                            viewStyle="grid"
-                        />
-                    </div>
-                ))}
-            </ScrollContainer>
+            {loading && projects.length === 0 ? (
+                <ProjectScrollSkeletons />
+            ) : (
+                <ScrollContainer>
+                    {projects.map((project) => (
+                        <div key={project.id} className="w-[280px] sm:w-[320px] shrink-0 snap-start">
+                            <ProjectCard
+                                project={project}
+                                isFavorite={likedProjectIds.includes(project.id)}
+                                onToggleFavorite={onToggleFavorite}
+                                isLoggedIn={isLoggedIn}
+                                viewStyle="grid"
+                            />
+                        </div>
+                    ))}
+                </ScrollContainer>
+            )}
         </section>
     );
 };
 
 export const NewReleasesSection = ({
     projects,
+    loading = false,
     likedProjectIds = [],
     onToggleFavorite = () => {},
     isLoggedIn = false
 }: {
     projects: Project[];
+    loading?: boolean;
     likedProjectIds?: string[];
     onToggleFavorite?: (projectId: string) => void;
     isLoggedIn?: boolean;
 }) => {
-    if (projects.length === 0) return null;
+    if (!loading && projects.length === 0) return null;
     return (
         <section className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end pb-0 gap-4 relative">
@@ -829,26 +736,30 @@ export const NewReleasesSection = ({
                 </div>
                 <Link
                     to={`${SiteRoutes.browse()}?sort=newest`}
-                    className="text-xs font-bold text-slate-550 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 transition-colors flex items-center gap-0.5 shrink-0 pb-1.5"
+                    className="text-xs font-bold text-slate-500 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 transition-colors flex items-center gap-0.5 shrink-0 pb-1.5"
                 >
                     Browse All
                     <ArrowUpRight className="w-3.5 h-3.5" />
                 </Link>
             </div>
             
-            <ScrollContainer>
-                {projects.map((project) => (
-                    <div key={project.id} className="w-[280px] sm:w-[320px] shrink-0 snap-start">
-                        <ProjectCard
-                            project={project}
-                            isFavorite={likedProjectIds.includes(project.id)}
-                            onToggleFavorite={onToggleFavorite}
-                            isLoggedIn={isLoggedIn}
-                            viewStyle="grid"
-                        />
-                    </div>
-                ))}
-            </ScrollContainer>
+            {loading && projects.length === 0 ? (
+                <ProjectScrollSkeletons />
+            ) : (
+                <ScrollContainer>
+                    {projects.map((project) => (
+                        <div key={project.id} className="w-[280px] sm:w-[320px] shrink-0 snap-start">
+                            <ProjectCard
+                                project={project}
+                                isFavorite={likedProjectIds.includes(project.id)}
+                                onToggleFavorite={onToggleFavorite}
+                                isLoggedIn={isLoggedIn}
+                                viewStyle="grid"
+                            />
+                        </div>
+                    ))}
+                </ScrollContainer>
+            )}
         </section>
     );
 };
@@ -863,9 +774,9 @@ export const DirectDownloadsSection = () => {
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500 dark:from-purple-400 dark:to-pink-400">
                     Versioned builds & changelogs.
                 </p>
-                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                <FeatureBodyText>
                     Finding the right file shouldn't be a puzzle. Modtale makes it easy to find projects for your game version and review changelogs before you hit download.
-                </p>
+                </FeatureBodyText>
             </div>
             <div className="flex-1 w-full max-w-xl relative overflow-visible">
                 <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/5 via-transparent to-pink-500/5 dark:from-purple-500/10 dark:via-transparent dark:to-pink-500/10 rounded-3xl blur-2xl pointer-events-none" />
@@ -875,7 +786,7 @@ export const DirectDownloadsSection = () => {
     );
 };
 
-export const SmartDependenciesSection = ({ randomProject }: { randomProject?: Project }) => {
+export const SmartDependenciesSection = ({ randomProject, previewProjects }: { randomProject?: Project; previewProjects?: Project[] }) => {
     return (
         <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
             <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
@@ -885,19 +796,19 @@ export const SmartDependenciesSection = ({ randomProject }: { randomProject?: Pr
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500 dark:from-emerald-400 dark:to-teal-400">
                     Automated library resolution.
                 </p>
-                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                <FeatureBodyText>
                     Forget hunting down core libraries or confusing projectpacks. Modtale allows you to seamlessly download all required projects in one swift action.
-                </p>
+                </FeatureBodyText>
             </div>
             <div className="flex-1 w-full max-w-xl relative overflow-visible">
                 <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/5 via-transparent to-teal-500/5 dark:from-emerald-500/10 dark:via-transparent dark:to-teal-500/10 rounded-3xl blur-2xl pointer-events-none" />
-                <InlineDependencyUI randomProject={randomProject} />
+                <InlineDependencyUI randomProject={randomProject} projects={previewProjects} />
             </div>
         </div>
     );
 };
 
-export const ProjectAnalyticsSection = () => {
+export const ProjectAnalyticsSection = ({ showConversionRate = true }: { showConversionRate?: boolean }) => {
     return (
         <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
             <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
@@ -907,13 +818,13 @@ export const ProjectAnalyticsSection = () => {
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-indigo-500 dark:from-blue-400 dark:to-indigo-400">
                     Track growth, downloads, and views over time.
                 </p>
-                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                <FeatureBodyText>
                     Keep tabs on how your Hytale uploads perform in real-time. Review clean graphs, growth percentages, and historical metrics in your developer hub.
-                </p>
+                </FeatureBodyText>
             </div>
             <div className="flex-1 w-full max-w-xl relative overflow-visible">
                 <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/5 via-transparent to-indigo-500/5 dark:from-blue-500/10 dark:via-transparent dark:to-indigo-500/10 rounded-3xl blur-2xl pointer-events-none" />
-                <InlineAnalyticsUI />
+                <InlineAnalyticsUI showConversionRate={showConversionRate} />
             </div>
         </div>
     );
@@ -929,9 +840,9 @@ export const CommunityThreadsSection = ({ project, currentUser }: { project?: Pr
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-violet-500 to-purple-500 dark:from-violet-400 dark:to-purple-400">
                     Engage and share feedback.
                 </p>
-                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                <FeatureBodyText>
                     Provide direct feedback, report immediate bugs, or collaborate with the creator team through nested, upvotable community comment sections.
-                </p>
+                </FeatureBodyText>
             </div>
             <div className="flex-1 w-full max-w-2xl relative overflow-visible">
                 <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/5 via-transparent to-purple-500/5 dark:from-indigo-500/10 dark:via-transparent dark:to-purple-500/10 rounded-3xl blur-2xl pointer-events-none" />
@@ -951,9 +862,9 @@ export const RealTimeAlertsSection = () => {
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-500 dark:from-amber-400 dark:to-orange-400">
                     Real-time updates on activity.
                 </p>
-                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                <FeatureBodyText>
                     Never miss a crucial patch or follow-up reply. Real-time platform notifications let you track your favorite projects and active discussions instantly.
-                </p>
+                </FeatureBodyText>
             </div>
             <div className="flex-1 w-full max-w-xl relative overflow-visible">
                 <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/5 via-transparent to-orange-500/5 dark:from-amber-500/10 dark:via-transparent dark:to-orange-500/10 rounded-3xl blur-2xl pointer-events-none" />
@@ -973,9 +884,9 @@ export const AccountPreferencesSection = () => {
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-slate-500 to-slate-400 dark:from-slate-400 dark:to-slate-500">
                     Tailored settings for alerts.
                 </p>
-                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                <FeatureBodyText>
                     Adjust toggles to choose exactly which events trigger notifications.
-                </p>
+                </FeatureBodyText>
             </div>
             <div className="flex-1 w-full max-w-xl relative overflow-visible">
                 <div className="absolute inset-0 bg-gradient-to-tr from-slate-500/5 via-transparent to-slate-400/5 dark:from-slate-500/10 dark:via-transparent dark:to-slate-400/10 rounded-3xl blur-2xl pointer-events-none" />

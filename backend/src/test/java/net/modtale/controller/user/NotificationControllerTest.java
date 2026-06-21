@@ -1,18 +1,17 @@
 package net.modtale.controller.user;
 
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
 import net.modtale.exception.UnauthorizedException;
 import net.modtale.model.dto.user.NotificationDTO;
 import net.modtale.model.user.Notification;
 import net.modtale.model.user.NotificationType;
 import net.modtale.model.user.User;
 import net.modtale.service.communication.NotificationService;
-import net.modtale.service.user.AccountService;
+import net.modtale.service.user.account.AccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.net.URI;
-import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;

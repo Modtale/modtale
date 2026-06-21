@@ -1,5 +1,7 @@
 package net.modtale.controller.admin;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import net.modtale.model.admin.AdminLog;
 import net.modtale.repository.admin.AdminLogRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,9 +11,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-
-import java.time.LocalDateTime;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.eq;

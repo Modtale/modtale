@@ -5,7 +5,7 @@ import { Package, Users, ChevronLeft, ChevronRight, CornerDownLeft, Building2 } 
 import { SiteRoutes } from '@/utils/routes';
 import { useSSRData } from '@/context/SSRContext';
 import { ProfileLayout } from '../components/ProfileLayout';
-import { ProjectCard } from '@/modules/project/components/ProjectCard';
+import { ProjectCard, ProjectCardSkeleton } from '@/modules/project/components/ProjectCard';
 import { Spinner } from '@/components/ui/Spinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import NotFound from '@/components/ui/error/NotFound';
@@ -28,11 +28,12 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     const navigate = useNavigate();
     const location = useLocation();
     const projectsTitleRef = useRef<HTMLHeadingElement>(null);
-    const userId = SiteRoutes.extractId(id);
-
+    const profileHandle = id?.trim() || '';
+    const userId = profileHandle;
+    const matchesHandle = (value?: string | null) => !!value && value.trim().toLowerCase() === userId.toLowerCase();
 
     const [profileUser, setProfileUser] = useState<User | null>(() => {
-        if (initialData && initialData.id === userId) {
+        if (initialData && (initialData.id === userId || matchesHandle(initialData.username))) {
             return initialData;
         }
         return null;
@@ -80,7 +81,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     useEffect(() => {
         const fetchUserData = async () => {
             if (!userId) return;
-            if (profileUser && profileUser.id === userId) {
+            if (profileUser && (profileUser.id === userId || matchesHandle(profileUser.username))) {
                 setLoadingUser(false);
                 return;
             }
@@ -342,11 +343,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                     {loadingProjects && page === 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-[1800px]:grid-cols-4 gap-4 md:gap-6 mt-4">
                             {[...Array(itemsPerPage)].map((_, i) => (
-                                <div
-                                    key={i}
-                                    className="h-[154px] bg-white/40 dark:bg-white/5 backdrop-blur-md rounded-2xl animate-pulse border border-slate-200 dark:border-white/10 relative overflow-hidden"
-                                >
-                                    <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+                                <div key={i}>
+                                    <ProjectCardSkeleton />
                                 </div>
                             ))}
                         </div>

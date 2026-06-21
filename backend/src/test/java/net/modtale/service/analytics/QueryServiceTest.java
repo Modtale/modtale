@@ -1,5 +1,8 @@
 package net.modtale.service.analytics;
 
+import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.List;
 import net.modtale.model.analytics.CreatorAnalytics;
 import net.modtale.model.analytics.ProjectMonthlyStats;
 import net.modtale.model.project.Project;
@@ -10,10 +13,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.test.util.ReflectionTestUtils;
-
-import java.time.LocalDate;
-import java.util.HashMap;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;

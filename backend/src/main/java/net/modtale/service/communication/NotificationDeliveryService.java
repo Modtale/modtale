@@ -1,5 +1,9 @@
 package net.modtale.service.communication;
 
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import net.modtale.model.user.Notification;
 import net.modtale.model.user.NotificationType;
 import net.modtale.model.user.User;
@@ -7,11 +11,6 @@ import net.modtale.repository.user.NotificationRepository;
 import net.modtale.repository.user.UserRepository;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
 
 @Service
 public class NotificationDeliveryService {

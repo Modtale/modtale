@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import Cropper from 'react-easy-crop';
 import { X, Check } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface ImageCropperModalProps {
     imageSrc: string;
@@ -178,7 +179,8 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <ModalPortal>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="bg-white dark:bg-slate-900 w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 flex flex-col h-[80vh] md:h-[600px] animate-in zoom-in-95 duration-200">
 
                 <div className="p-4 border-b border-slate-200 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-white/5">
@@ -238,5 +240,6 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                 </div>
             </div>
         </div>
+        </ModalPortal>
     );
 };

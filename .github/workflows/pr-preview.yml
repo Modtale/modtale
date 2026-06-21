@@ -1,0 +1,639 @@
+name: PR Preview
+
+on:
+  pull_request_target:
+    types:
+      - closed
+  issue_comment:
+    types:
+      - created
+
+concurrency:
+  group: pr-preview-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  command:
+    name: Validate Preview Command
+    if: github.repository == 'Modtale/modtale' && github.event_name == 'issue_comment' && github.event.action == 'created' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/deploy-preview')
+    runs-on: ubuntu-latest
+    outputs:
+      run_preview: ${{ steps.resolve.outputs.run_preview }}
+      pr_number: ${{ steps.resolve.outputs.pr_number }}
+      base_ref: ${{ steps.resolve.outputs.base_ref }}
+      base_sha: ${{ steps.resolve.outputs.base_sha }}
+      head_repo: ${{ steps.resolve.outputs.head_repo }}
+      head_sha: ${{ steps.resolve.outputs.head_sha }}
+    steps:
+      - id: resolve
+        name: Validate maintainer command
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          REPOSITORY: ${{ github.repository }}
+          COMMAND_BODY: ${{ github.event.comment.body }}
+          AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association }}
+        run: |
+          node <<'NODE'
+          const allowedAssociations = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+          const token = process.env.GH_TOKEN;
+          const repository = process.env.REPOSITORY;
+          const prNumber = process.env.PR_NUMBER;
+          const command = String(process.env.COMMAND_BODY || '').trim().split(/\s+/)[0];
+          const authorAssociation = process.env.AUTHOR_ASSOCIATION;
+          const { appendFileSync } = await import('node:fs');
+
+          if (command !== '/deploy-preview') {
+            console.log(`Ignoring unsupported preview command: ${command}`);
+            process.exit(0);
+          }
+
+          if (!allowedAssociations.has(authorAssociation)) {
+            console.error(`::error::Only a repository owner, member, or collaborator can run /deploy-preview. Comment author association was ${authorAssociation || '<empty>'}.`);
+            process.exit(1);
+          }
+
+          async function request(path) {
+            const response = await fetch(`https://api.github.com${path}`, {
+              headers: {
+                authorization: `Bearer ${token}`,
+                accept: 'application/vnd.github+json',
+                'x-github-api-version': '2022-11-28'
+              }
+            });
+
+            if (!response.ok) {
+              throw new Error(`GitHub API request failed: ${response.status} ${response.statusText}`);
+            }
+
+            return response.json();
+          }
+
+          const pr = await request(`/repos/${repository}/pulls/${prNumber}`);
+
+          if (pr.head?.repo?.full_name === repository) {
+            console.log('This PR comes from a Modtale/modtale branch, so PR preview infrastructure is skipped.');
+            appendFileSync(process.env.GITHUB_OUTPUT, 'run_preview=false\n');
+            process.exit(0);
+          }
+
+          if (pr.state !== 'open') {
+            console.error(`::error::PR #${prNumber} is ${pr.state}; refusing to deploy a preview.`);
+            process.exit(1);
+          }
+
+          const outputs = {
+            run_preview: 'true',
+            pr_number: String(pr.number),
+            base_ref: pr.base.ref,
+            base_sha: pr.base.sha,
+            head_repo: pr.head.repo.full_name,
+            head_sha: pr.head.sha
+          };
+
+          for (const [key, value] of Object.entries(outputs)) {
+            appendFileSync(process.env.GITHUB_OUTPUT, `${key}=${value}\n`);
+          }
+
+          console.log(`/deploy-preview accepted for PR #${pr.number} at ${pr.head.sha}.`);
+          NODE
+
+  deploy:
+    name: Deploy PR Preview
+    needs: command
+    if: github.repository == 'Modtale/modtale' && needs.command.outputs.run_preview == 'true'
+    runs-on: ubuntu-latest
+    environment: pr-preview
+    env:
+      PROJECT_ID: ${{ vars.GCP_PREVIEW_PROJECT_ID }}
+      REGION: ${{ vars.GCP_PREVIEW_REGION }}
+      BUILD_SERVICE_ACCOUNT: ${{ vars.GCP_PREVIEW_BUILD_SERVICE_ACCOUNT }}
+      RUNTIME_SERVICE_ACCOUNT: ${{ vars.GCP_PREVIEW_RUNTIME_SERVICE_ACCOUNT }}
+      MONGODB_SECRET_NAME: ${{ vars.GCP_PREVIEW_MONGODB_SECRET_NAME }}
+      SEEDING_SOURCE_R2_BUCKET_NAME: ${{ vars.GCP_PREVIEW_SOURCE_R2_BUCKET_NAME }}
+      SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME: ${{ vars.GCP_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME }}
+      SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME: ${{ vars.GCP_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME }}
+      SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME: ${{ vars.GCP_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME }}
+      R2_PUBLIC_DOMAIN: ${{ vars.GCP_PREVIEW_R2_PUBLIC_DOMAIN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_R2_PROVISIONER: ${{ secrets.CLOUDFLARE_R2_PROVISIONER }}
+      CLOUDFLARE_API_TOKEN_PROVISIONER: ${{ secrets.CLOUDFLARE_API_TOKEN_PROVISIONER }}
+      CLOUDFLARE_R2_JURISDICTION: ${{ vars.CLOUDFLARE_R2_JURISDICTION }}
+      PR_NUMBER: ${{ needs.command.outputs.pr_number }}
+      PR_BASE_REF: ${{ needs.command.outputs.base_ref }}
+      PR_BASE_SHA: ${{ needs.command.outputs.base_sha }}
+      PR_HEAD_REPO: ${{ needs.command.outputs.head_repo }}
+      PR_HEAD_SHA: ${{ needs.command.outputs.head_sha }}
+
+    steps:
+      - name: Validate preview isolation config
+        run: |
+          : "${PROJECT_ID:?Set repository variable GCP_PREVIEW_PROJECT_ID to a dedicated preview GCP project.}"
+          : "${BUILD_SERVICE_ACCOUNT:?Set repository variable GCP_PREVIEW_BUILD_SERVICE_ACCOUNT to a no-production-access Cloud Build service account.}"
+          : "${RUNTIME_SERVICE_ACCOUNT:?Set repository variable GCP_PREVIEW_RUNTIME_SERVICE_ACCOUNT to a no-production-access Cloud Run runtime service account.}"
+          : "${SEEDING_SOURCE_R2_BUCKET_NAME:?Set repository variable GCP_PREVIEW_SOURCE_R2_BUCKET_NAME to a sanitized preview R2 source bucket.}"
+          : "${CLOUDFLARE_ACCOUNT_ID:?Set secret CLOUDFLARE_ACCOUNT_ID.}"
+          : "${CLOUDFLARE_R2_PROVISIONER:?Set secret CLOUDFLARE_R2_PROVISIONER.}"
+          : "${CLOUDFLARE_API_TOKEN_PROVISIONER:?Set secret CLOUDFLARE_API_TOKEN_PROVISIONER.}"
+
+          REGION="${REGION:-us-central1}"
+          MONGODB_SECRET_NAME="${MONGODB_SECRET_NAME:-PREVIEW_MONGODB_URI}"
+          SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME="${SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME:-PREVIEW_SOURCE_R2_ACCESS_KEY}"
+          SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME="${SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME:-PREVIEW_SOURCE_R2_SECRET_KEY}"
+          SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME="${SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME:-PREVIEW_SOURCE_R2_ENDPOINT}"
+          R2_PUBLIC_DOMAIN="${R2_PUBLIC_DOMAIN:-}"
+
+          if [ "$PROJECT_ID" = "gen-lang-client-0244308719" ]; then
+            echo "::error::PR previews must use a dedicated preview GCP project, not the production project."
+            exit 1
+          fi
+
+          if [ "$MONGODB_SECRET_NAME" = "MONGODB_URI" ]; then
+            echo "::error::PR previews must use a preview MongoDB secret, not the production MONGODB_URI secret."
+            exit 1
+          fi
+
+          if [ "$SEEDING_SOURCE_R2_BUCKET_NAME" = "modtale-binaries" ]; then
+            echo "::error::PR previews must seed from a sanitized preview R2 source bucket, not the production modtale-binaries bucket."
+            exit 1
+          fi
+
+          for secret_name in \
+            "$SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME" \
+            "$SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME" \
+            "$SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME"; do
+            case "$secret_name" in
+              R2_ACCESS_KEY|R2_SECRET_KEY|R2_ENDPOINT)
+                echo "::error::PR previews must use preview-scoped R2 secrets, not production R2 secret '$secret_name'."
+                exit 1
+                ;;
+            esac
+          done
+
+          if [ "$R2_PUBLIC_DOMAIN" = "https://cdn.modtale.net" ]; then
+            echo "::error::PR previews must not use the production CDN domain."
+            exit 1
+          fi
+
+          echo "REGION=$REGION" >> "$GITHUB_ENV"
+          echo "MONGODB_SECRET_NAME=$MONGODB_SECRET_NAME" >> "$GITHUB_ENV"
+          echo "SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME=$SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME" >> "$GITHUB_ENV"
+          echo "SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME=$SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME" >> "$GITHUB_ENV"
+          echo "SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME=$SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME" >> "$GITHUB_ENV"
+          echo "R2_PUBLIC_DOMAIN=$R2_PUBLIC_DOMAIN" >> "$GITHUB_ENV"
+
+      - name: Check out trusted base
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.PR_BASE_SHA }}
+          path: base
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check out pull request code
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PR_HEAD_REPO }}
+          ref: ${{ env.PR_HEAD_SHA }}
+          path: source
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Detect changed components
+        id: filter
+        working-directory: source
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          PR_BASE_SHA: ${{ env.PR_BASE_SHA }}
+          PR_HEAD_SHA: ${{ env.PR_HEAD_SHA }}
+          PR_BASE_REF: ${{ env.PR_BASE_REF }}
+        run: |
+          git remote add base-repo "https://github.com/${{ github.repository }}.git" 2>/dev/null \
+            || git remote set-url base-repo "https://github.com/${{ github.repository }}.git"
+          git fetch --no-tags base-repo \
+            "+refs/heads/$PR_BASE_REF:refs/remotes/base-repo/$PR_BASE_REF"
+          bash "$GITHUB_WORKSPACE/base/.github/scripts/detect-component-changes.sh"
+
+      - name: Prepare preview names
+        run: |
+          pr_number="$PR_NUMBER"
+          head_sha="$PR_HEAD_SHA"
+          short_sha="${head_sha:0:7}"
+
+          echo "TAG=pr-${pr_number}-${short_sha}" >> "$GITHUB_ENV"
+          echo "BACKEND_SERVICE=modtale-pr-${pr_number}-backend" >> "$GITHUB_ENV"
+          echo "FRONTEND_SERVICE=modtale-pr-${pr_number}-frontend" >> "$GITHUB_ENV"
+          echo "DB_NAME=modtale-pr-${pr_number}" >> "$GITHUB_ENV"
+          echo "R2_BUCKET_NAME=modtale-pr-${pr_number}" >> "$GITHUB_ENV"
+          echo "R2_ACCESS_KEY_SECRET_NAME=pr-preview-${pr_number}-r2-access-key" >> "$GITHUB_ENV"
+          echo "R2_SECRET_KEY_SECRET_NAME=pr-preview-${pr_number}-r2-secret-key" >> "$GITHUB_ENV"
+          echo "R2_ENDPOINT_SECRET_NAME=pr-preview-${pr_number}-r2-endpoint" >> "$GITHUB_ENV"
+          echo "R2_TOKEN_ID_SECRET_NAME=pr-preview-${pr_number}-r2-token-id" >> "$GITHUB_ENV"
+          echo "R2_TOKEN_NAME=modtale-pr-${pr_number}-runtime" >> "$GITHUB_ENV"
+
+      - id: auth
+        name: Authenticate to preview GCP project
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_PREVIEW_CREDENTIALS }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Provision PR Preview R2 Bucket and Runtime Token
+        run: |
+          set -euo pipefail
+
+          : "${R2_BUCKET_NAME:?R2_BUCKET_NAME must be configured for PR preview deployments.}"
+          : "${SEEDING_SOURCE_R2_BUCKET_NAME:?SEEDING_SOURCE_R2_BUCKET_NAME must point to the sanitized preview R2 source bucket.}"
+
+          case "$R2_BUCKET_NAME" in
+            modtale-pr-[0-9]*)
+              ;;
+            *)
+              echo "::error::Refusing to create non-preview R2 bucket '$R2_BUCKET_NAME'."
+              exit 1
+              ;;
+          esac
+
+          source_r2_access_key="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME")"
+          source_r2_secret_key="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME")"
+          source_r2_endpoint="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME")"
+          source_r2_endpoint="$(printf '%s' "$source_r2_endpoint" | sed -E 's#(https?://[^/]+).*#\1#')"
+
+          echo "::add-mask::$source_r2_access_key"
+          echo "::add-mask::$source_r2_secret_key"
+
+          if ! command -v aws >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y awscli
+          fi
+
+          AWS_ACCESS_KEY_ID="$source_r2_access_key" \
+          AWS_SECRET_ACCESS_KEY="$source_r2_secret_key" \
+          AWS_DEFAULT_REGION=auto \
+          aws s3api head-bucket \
+            --endpoint-url "$source_r2_endpoint" \
+            --bucket "$SEEDING_SOURCE_R2_BUCKET_NAME" >/dev/null
+
+          existing_token_id="$(
+            gcloud secrets versions access latest \
+              --project "$PROJECT_ID" \
+              --secret="$R2_TOKEN_ID_SECRET_NAME" 2>/dev/null || true
+          )"
+          echo "::add-mask::$existing_token_id"
+          export EXISTING_R2_RUNTIME_TOKEN_ID="$existing_token_id"
+
+          node "$GITHUB_WORKSPACE/base/.github/scripts/cloudflare-r2-preview.mjs" provision
+
+      - name: Store PR Preview R2 runtime secrets
+        run: |
+          set -euo pipefail
+
+          upsert_secret() {
+            local name="$1"
+            local value="$2"
+
+            if gcloud secrets describe "$name" --project "$PROJECT_ID" >/dev/null 2>&1; then
+              printf '%s' "$value" | gcloud secrets versions add "$name" \
+                --project "$PROJECT_ID" \
+                --data-file=-
+            else
+              printf '%s' "$value" | gcloud secrets create "$name" \
+                --project "$PROJECT_ID" \
+                --replication-policy=automatic \
+                --data-file=-
+            fi
+
+            gcloud secrets add-iam-policy-binding "$name" \
+              --project "$PROJECT_ID" \
+              --member="serviceAccount:$RUNTIME_SERVICE_ACCOUNT" \
+              --role="roles/secretmanager.secretAccessor" \
+              --quiet >/dev/null
+          }
+
+          upsert_secret "$R2_ACCESS_KEY_SECRET_NAME" "$R2_RUNTIME_ACCESS_KEY"
+          upsert_secret "$R2_SECRET_KEY_SECRET_NAME" "$R2_RUNTIME_SECRET_KEY"
+          upsert_secret "$R2_ENDPOINT_SECRET_NAME" "$R2_RUNTIME_ENDPOINT"
+          upsert_secret "$R2_TOKEN_ID_SECRET_NAME" "$R2_RUNTIME_TOKEN_ID"
+
+      - name: Build backend image
+        working-directory: source/backend
+        run: |
+          gcloud builds submit \
+            --project "$PROJECT_ID" \
+            --config "$GITHUB_WORKSPACE/base/backend/cloudbuild.yml" \
+            --service-account "projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
+            --substitutions=_TAG="$TAG" .
+
+      - name: Deploy backend preview
+        run: |
+          backend_url="$(
+            gcloud run deploy "$BACKEND_SERVICE" \
+              --project "$PROJECT_ID" \
+              --image "gcr.io/$PROJECT_ID/modtale-backend:$TAG" \
+              --region "$REGION" \
+              --service-account "$RUNTIME_SERVICE_ACCOUNT" \
+              --allow-unauthenticated \
+              --use-http2 \
+              --memory "1Gi" \
+              --set-env-vars "MONGODB_DATABASE_NAME=$DB_NAME" \
+              --set-env-vars "APP_SEEDING_ENABLED=true" \
+              --set-env-vars "APP_SEEDING_MODE=template" \
+              --set-env-vars "APP_SEEDING_RESET=false" \
+              --set-env-vars "APP_SEEDING_SOURCE_DB=modtale-mock-template" \
+              --set-env-vars "APP_SEEDING_SOURCE_R2_BUCKET_NAME=$SEEDING_SOURCE_R2_BUCKET_NAME" \
+              --set-env-vars "WARDEN_ENABLED=false" \
+              --set-env-vars "OAUTH_ENABLED=false" \
+              --set-env-vars "FRONTEND_URL=placeholder" \
+              --set-env-vars "BACKEND_URL=placeholder" \
+              --set-env-vars "R2_BUCKET_NAME=$R2_BUCKET_NAME" \
+              --set-env-vars "R2_PUBLIC_DOMAIN=$R2_PUBLIC_DOMAIN" \
+              --update-secrets "MONGODB_URI=$MONGODB_SECRET_NAME:latest" \
+              --update-secrets "R2_ACCESS_KEY=$R2_ACCESS_KEY_SECRET_NAME:latest" \
+              --update-secrets "R2_SECRET_KEY=$R2_SECRET_KEY_SECRET_NAME:latest" \
+              --update-secrets "R2_ENDPOINT=$R2_ENDPOINT_SECRET_NAME:latest" \
+              --update-secrets "APP_SEEDING_SOURCE_R2_ACCESS_KEY=$SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME:latest" \
+              --update-secrets "APP_SEEDING_SOURCE_R2_SECRET_KEY=$SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME:latest" \
+              --update-secrets "APP_SEEDING_SOURCE_R2_ENDPOINT=$SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME:latest" \
+              --format "value(status.url)"
+          )"
+
+          echo "BACKEND_URL=$backend_url" >> "$GITHUB_ENV"
+          echo "API_URL=$backend_url/api/v1" >> "$GITHUB_ENV"
+
+      - name: Build frontend image
+        working-directory: source/frontend
+        run: |
+          gcloud builds submit \
+            --project "$PROJECT_ID" \
+            --config "$GITHUB_WORKSPACE/base/frontend/cloudbuild.yml" \
+            --service-account "projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
+            --substitutions=_PUBLIC_API_URL="$API_URL",_TAG="$TAG" .
+
+      - name: Deploy frontend preview
+        run: |
+          frontend_url="$(
+            gcloud run deploy "$FRONTEND_SERVICE" \
+              --project "$PROJECT_ID" \
+              --image "gcr.io/$PROJECT_ID/modtale-frontend:$TAG" \
+              --region "$REGION" \
+              --service-account "$RUNTIME_SERVICE_ACCOUNT" \
+              --allow-unauthenticated \
+              --set-env-vars "PUBLIC_API_URL=$API_URL" \
+              --format "value(status.url)"
+          )"
+
+          echo "FRONTEND_URL=$frontend_url" >> "$GITHUB_ENV"
+
+      - name: Update backend preview URLs
+        run: |
+          gcloud run services update "$BACKEND_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --update-env-vars "FRONTEND_URL=$FRONTEND_URL,BACKEND_URL=$BACKEND_URL"
+
+      - name: Publish preview comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          body_file="$(mktemp)"
+          cat > "$body_file" <<EOF
+          ## Modtale PR Preview
+
+          - Frontend: $FRONTEND_URL
+          - API: $API_URL
+          - Database: \`$DB_NAME\` seeded from the trusted sanitized template database
+          - R2 Bucket: \`$R2_BUCKET_NAME\` seeded from the trusted sanitized preview source bucket \`$SEEDING_SOURCE_R2_BUCKET_NAME\`
+          - Commit: \`$PR_HEAD_SHA\`
+
+          This preview runs untrusted PR code against preview-only infrastructure. It does not receive production/dev secrets, production domains, production buckets, OAuth credentials, Warden credentials, real scan results, admin enforcement data, or real analytics data.
+          EOF
+
+          gh pr comment "$PR_NUMBER" --edit-last --body-file "$body_file" \
+            || gh pr comment "$PR_NUMBER" --body-file "$body_file"
+
+  cleanup:
+    name: Clean Up PR Preview
+    if: github.repository == 'Modtale/modtale' && github.event.pull_request.head.repo.full_name != github.repository && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    environment: pr-preview
+    env:
+      PROJECT_ID: ${{ vars.GCP_PREVIEW_PROJECT_ID }}
+      REGION: ${{ vars.GCP_PREVIEW_REGION }}
+      MONGODB_SECRET_NAME: ${{ vars.GCP_PREVIEW_MONGODB_SECRET_NAME }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_R2_PROVISIONER: ${{ secrets.CLOUDFLARE_R2_PROVISIONER }}
+      CLOUDFLARE_API_TOKEN_PROVISIONER: ${{ secrets.CLOUDFLARE_API_TOKEN_PROVISIONER }}
+      CLOUDFLARE_R2_JURISDICTION: ${{ vars.CLOUDFLARE_R2_JURISDICTION }}
+
+    steps:
+      - name: Check out trusted cleanup scripts
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate preview isolation config
+        run: |
+          : "${PROJECT_ID:?Set repository variable GCP_PREVIEW_PROJECT_ID to a dedicated preview GCP project.}"
+          : "${CLOUDFLARE_ACCOUNT_ID:?Set secret CLOUDFLARE_ACCOUNT_ID.}"
+          : "${CLOUDFLARE_R2_PROVISIONER:?Set secret CLOUDFLARE_R2_PROVISIONER.}"
+          : "${CLOUDFLARE_API_TOKEN_PROVISIONER:?Set secret CLOUDFLARE_API_TOKEN_PROVISIONER.}"
+          REGION="${REGION:-us-central1}"
+          MONGODB_SECRET_NAME="${MONGODB_SECRET_NAME:-PREVIEW_MONGODB_URI}"
+
+          if [ "$PROJECT_ID" = "gen-lang-client-0244308719" ]; then
+            echo "::error::PR preview cleanup must use the dedicated preview GCP project, not the production project."
+            exit 1
+          fi
+
+          if [ "$MONGODB_SECRET_NAME" = "MONGODB_URI" ]; then
+            echo "::error::PR preview cleanup must use the preview MongoDB secret, not the production MONGODB_URI secret."
+            exit 1
+          fi
+
+          echo "REGION=$REGION" >> "$GITHUB_ENV"
+          echo "MONGODB_SECRET_NAME=$MONGODB_SECRET_NAME" >> "$GITHUB_ENV"
+          echo "BACKEND_SERVICE=modtale-pr-${{ github.event.pull_request.number }}-backend" >> "$GITHUB_ENV"
+          echo "FRONTEND_SERVICE=modtale-pr-${{ github.event.pull_request.number }}-frontend" >> "$GITHUB_ENV"
+          echo "DB_NAME=modtale-pr-${{ github.event.pull_request.number }}" >> "$GITHUB_ENV"
+          echo "R2_BUCKET_NAME=modtale-pr-${{ github.event.pull_request.number }}" >> "$GITHUB_ENV"
+          echo "R2_ACCESS_KEY_SECRET_NAME=pr-preview-${{ github.event.pull_request.number }}-r2-access-key" >> "$GITHUB_ENV"
+          echo "R2_SECRET_KEY_SECRET_NAME=pr-preview-${{ github.event.pull_request.number }}-r2-secret-key" >> "$GITHUB_ENV"
+          echo "R2_ENDPOINT_SECRET_NAME=pr-preview-${{ github.event.pull_request.number }}-r2-endpoint" >> "$GITHUB_ENV"
+          echo "R2_TOKEN_ID_SECRET_NAME=pr-preview-${{ github.event.pull_request.number }}-r2-token-id" >> "$GITHUB_ENV"
+          head_sha="${{ github.event.pull_request.head.sha }}"
+          echo "IMAGE_TAG=pr-${{ github.event.pull_request.number }}-${head_sha:0:7}" >> "$GITHUB_ENV"
+
+      - id: auth
+        name: Authenticate to preview GCP project
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_PREVIEW_CREDENTIALS }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Delete preview Cloud Run services
+        run: |
+          gcloud run services delete "$BACKEND_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --quiet || true
+
+          gcloud run services delete "$FRONTEND_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --quiet || true
+
+      - name: Remove PR preview image tags
+        run: |
+          gcloud container images untag "gcr.io/$PROJECT_ID/modtale-backend:$IMAGE_TAG" --quiet || true
+          gcloud container images untag "gcr.io/$PROJECT_ID/modtale-frontend:$IMAGE_TAG" --quiet || true
+
+      - name: Empty PR Preview R2 Bucket
+        run: |
+          set -euo pipefail
+
+          case "$R2_BUCKET_NAME" in
+            modtale-pr-[0-9]*)
+              ;;
+            *)
+              echo "::error::Refusing to delete non-preview R2 bucket '$R2_BUCKET_NAME'."
+              exit 1
+              ;;
+          esac
+
+          r2_access_key="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$R2_ACCESS_KEY_SECRET_NAME" 2>/dev/null || true)"
+          r2_secret_key="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$R2_SECRET_KEY_SECRET_NAME" 2>/dev/null || true)"
+          r2_endpoint="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$R2_ENDPOINT_SECRET_NAME" 2>/dev/null || true)"
+          r2_endpoint="$(printf '%s' "$r2_endpoint" | sed -E 's#(https?://[^/]+).*#\1#')"
+
+          echo "::add-mask::$r2_access_key"
+          echo "::add-mask::$r2_secret_key"
+
+          if [ -z "$r2_access_key" ] || [ -z "$r2_secret_key" ] || [ -z "$r2_endpoint" ]; then
+            echo "Per-PR R2 runtime secrets are missing; skipping object empty step."
+            exit 0
+          fi
+
+          if ! command -v aws >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y awscli
+          fi
+
+          if AWS_ACCESS_KEY_ID="$r2_access_key" \
+             AWS_SECRET_ACCESS_KEY="$r2_secret_key" \
+             AWS_DEFAULT_REGION=auto \
+             aws s3api head-bucket \
+               --endpoint-url "$r2_endpoint" \
+               --bucket "$R2_BUCKET_NAME" >/dev/null 2>&1; then
+            AWS_ACCESS_KEY_ID="$r2_access_key" \
+            AWS_SECRET_ACCESS_KEY="$r2_secret_key" \
+            AWS_DEFAULT_REGION=auto \
+            aws s3 rm \
+              --endpoint-url "$r2_endpoint" \
+              "s3://$R2_BUCKET_NAME" \
+              --recursive
+          else
+            echo "R2 bucket '$R2_BUCKET_NAME' does not exist; nothing to delete."
+          fi
+
+      - name: Delete PR Preview R2 bucket and token
+        run: |
+          set -euo pipefail
+
+          case "$R2_BUCKET_NAME" in
+            modtale-pr-[0-9]*)
+              ;;
+            *)
+              echo "::error::Refusing to delete non-preview R2 bucket '$R2_BUCKET_NAME'."
+              exit 1
+              ;;
+          esac
+
+          runtime_token_id="$(
+            gcloud secrets versions access latest \
+              --project "$PROJECT_ID" \
+              --secret="$R2_TOKEN_ID_SECRET_NAME" 2>/dev/null || true
+          )"
+          if [ -z "$runtime_token_id" ]; then
+            runtime_token_id="$(
+              gcloud secrets versions access latest \
+                --project "$PROJECT_ID" \
+                --secret="$R2_ACCESS_KEY_SECRET_NAME" 2>/dev/null || true
+            )"
+          fi
+          echo "::add-mask::$runtime_token_id"
+          export R2_RUNTIME_TOKEN_ID="$runtime_token_id"
+
+          node "$GITHUB_WORKSPACE/.github/scripts/cloudflare-r2-preview.mjs" cleanup
+
+      - name: Delete PR Preview R2 runtime secrets
+        run: |
+          set -euo pipefail
+
+          for secret_name in \
+            "$R2_ACCESS_KEY_SECRET_NAME" \
+            "$R2_SECRET_KEY_SECRET_NAME" \
+            "$R2_ENDPOINT_SECRET_NAME" \
+            "$R2_TOKEN_ID_SECRET_NAME"; do
+            gcloud secrets delete "$secret_name" \
+              --project "$PROJECT_ID" \
+              --quiet || true
+          done
+
+      - name: Drop PR Preview Mongo Database
+        run: |
+          set -euo pipefail
+
+          case "$DB_NAME" in
+            modtale-pr-[0-9]*)
+              ;;
+            *)
+              echo "::error::Refusing to drop non-PR Mongo database '$DB_NAME'."
+              exit 1
+              ;;
+          esac
+
+          mongodb_uri="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$MONGODB_SECRET_NAME")"
+          echo "::add-mask::$mongodb_uri"
+
+          npm install --silent --prefix "$RUNNER_TEMP/mongo-cleanup" mongodb@6
+
+          MONGODB_URI="$mongodb_uri" \
+          NODE_PATH="$RUNNER_TEMP/mongo-cleanup/node_modules" \
+          node <<'NODE'
+          const { MongoClient } = require('mongodb');
+
+          const uri = process.env.MONGODB_URI;
+          const dbName = process.env.DB_NAME;
+
+          if (!/^modtale-pr-[0-9]+$/.test(dbName)) {
+            throw new Error(`Refusing to drop unsafe database name: ${dbName}`);
+          }
+
+          const client = new MongoClient(uri, { appName: 'modtale-pr-preview-cleanup' });
+          try {
+            await client.connect();
+            const result = await client.db(dbName).dropDatabase();
+            console.log(`Dropped Mongo database ${dbName}: ${result}`);
+          } finally {
+            await client.close();
+          }
+          NODE
+
+      - name: Publish cleanup comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr comment "${{ github.event.pull_request.number }}" \
+            --body "PR preview services, R2 bucket, image tags, and Mongo database were removed."

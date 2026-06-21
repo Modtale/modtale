@@ -1,9 +1,8 @@
 package net.modtale.service.communication;
 
-import org.junit.jupiter.api.Test;
-
 import java.util.Map;
 import java.util.concurrent.Executor;
+import org.junit.jupiter.api.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;

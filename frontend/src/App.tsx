@@ -8,6 +8,8 @@ import { Navbar } from '@/modules/core/components/Navbar';
 import { Footer } from '@/modules/core/components/Footer';
 import { SEOHead } from '@/modules/core/components/SEOHead';
 import { Home } from '@/modules/home/views/Home';
+import { Browse } from '@/modules/discovery/views/Browse';
+import { ProjectDetails } from '@/modules/project/views/ProjectDetails';
 
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBoundary } from '@/components/ui/error/ErrorBoundary';
@@ -21,16 +23,16 @@ import { MobileProvider } from '@/context/MobileContext';
 import type { User } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
 import type { Classification } from '@/data/categories';
+import { normalizeUser } from '@/utils/users';
+import { clearPendingSignInMethod, completeSignInMethod } from '@/modules/auth/api/authClient';
 
 const StatusModal = lazy(() => import('@/components/ui/StatusModal').then((module) => ({ default: module.StatusModal })));
 const Onboarding = lazy(() => import('@/modules/user/components/Onboarding').then((module) => ({ default: module.Onboarding })));
 const TermsOfService = lazy(() => import('@/modules/core/views/TermsOfService').then((module) => ({ default: module.TermsOfService })));
 const PrivacyPolicy = lazy(() => import('@/modules/core/views/PrivacyPolicy').then((module) => ({ default: module.PrivacyPolicy })));
 const Status = lazy(() => import('@/modules/core/views/Status').then((module) => ({ default: module.Status })));
-const Browse = lazy(() => import('@/modules/discovery/views/Browse').then((module) => ({ default: module.Browse })));
 const JamsList = lazy(() => import('@/modules/jam/views/JamsList').then((module) => ({ default: module.JamsList })));
 const JamDetail = lazy(() => import('@/modules/jam/views/JamDetail').then((module) => ({ default: module.JamDetail })));
-const ProjectDetails = lazy(() => import('@/modules/project/views/ProjectDetails').then((module) => ({ default: module.ProjectDetails })));
 const UserProfile = lazy(() => import('@/modules/user/views/UserProfile').then((module) => ({ default: module.UserProfile })));
 const Dashboard = lazy(() => import('@/modules/user/views/Dashboard').then((module) => ({ default: module.Dashboard })));
 const VerifyEmail = lazy(() => import('@/modules/auth/views/VerifyEmail').then((module) => ({ default: module.VerifyEmail })));
@@ -50,26 +52,48 @@ const hasLikelyAuthCookie = () => {
     return /(?:^|;\s*)(SESSION|JSESSIONID|XSRF-TOKEN)=/.test(cookies);
 };
 
+const projectRouteBase = (pathname: string) => {
+    const match = pathname.match(/^\/(project|mod|modpack|world)\/[^/]+/i);
+    return match ? match[0].toLowerCase() : '';
+};
+
+const isProjectModalSubroute = (pathname: string) => (
+    /^\/(project|mod|modpack|world)\/[^/]+\/(download|changelog|gallery)\/?$/i.test(pathname)
+);
+
 const ScrollToTop = () => {
     const { pathname } = useLocation();
-    const previousPathname = useRef<string | null>(null);
+    const previousPathRef = useRef<string | null>(null);
+
     useEffect(() => {
-        const prev = previousPathname.current;
-        previousPathname.current = pathname;
-        if (!prev) return;
-
+        const previousPath = previousPathRef.current;
         const jamTabPattern = /^\/jam\/[^/]+\/(overview|rules|entries)$/;
-        const prevJamTabMatch = prev.match(jamTabPattern);
+        const previousJamTabMatch = previousPath?.match(jamTabPattern);
         const nextJamTabMatch = pathname.match(jamTabPattern);
+        const isSameJamTabTransition = Boolean(
+            previousPath
+            && previousJamTabMatch
+            && nextJamTabMatch
+            && previousPath.replace(/\/(overview|rules|entries)$/, '') === pathname.replace(/\/(overview|rules|entries)$/, '')
+        );
+        const previousProjectBase = previousPath ? projectRouteBase(previousPath) : '';
+        const nextProjectBase = projectRouteBase(pathname);
+        const isSameProjectModalTransition = Boolean(
+            previousPath
+            && previousProjectBase
+            && previousProjectBase === nextProjectBase
+            && (isProjectModalSubroute(previousPath) || isProjectModalSubroute(pathname))
+        );
 
-        if (prevJamTabMatch && nextJamTabMatch) {
-            const prevJamBase = prev.replace(/\/(overview|rules|entries)$/, '');
-            const nextJamBase = pathname.replace(/\/(overview|rules|entries)$/, '');
-            if (prevJamBase === nextJamBase) return;
+        previousPathRef.current = pathname;
+
+        if (isSameJamTabTransition || isSameProjectModalTransition) {
+            return;
         }
 
         window.scrollTo(0, 0);
     }, [pathname]);
+
     return null;
 };
 
@@ -92,6 +116,7 @@ const AppContent: React.FC = () => {
         if (oauthError) {
             const decodedError = decodeURIComponent(oauthError).replace(/\+/g, ' ');
             setGlobalError(decodedError);
+            clearPendingSignInMethod();
             navigate(location.pathname, { replace: true });
         }
     }, [location, navigate]);
@@ -127,7 +152,8 @@ const AppContent: React.FC = () => {
         try {
             const res = await api.get(`/user/me?t=${Date.now()}`);
             if (res.data) {
-                setUser(res.data);
+                setUser(normalizeUser(res.data));
+                completeSignInMethod();
                 if ((res.data as any).is_new_account) {
                     setShowOnboarding(true);
                 }
@@ -159,10 +185,17 @@ const AppContent: React.FC = () => {
 
     const handleToggleFavorite = async (id: string) => {
         if (!user) return;
-        const isLiked = user.likedProjectIds?.includes(id);
-        const newProjectLikes = isLiked ? (user.likedProjectIds || []).filter(lid => lid !== id) : [...(user.likedProjectIds || []), id];
+        const previousUser = user;
+        const likedProjectIds = user.likedProjectIds || [];
+        const isLiked = likedProjectIds.includes(id);
+        const newProjectLikes = isLiked ? likedProjectIds.filter(lid => lid !== id) : [...likedProjectIds, id];
         setUser({ ...user, likedProjectIds: newProjectLikes });
-        try { await api.post(`/projects/${id}/favorite`); } catch (e) { fetchUser(); }
+        try {
+            await api.post(`/projects/${id}/favorite`);
+        } catch (e) {
+            setUser(previousUser);
+            fetchUser();
+        }
     };
 
     const handleDownload = (id: string) => { if (!downloadedSessionIds.has(id)) setDownloadedSessionIds(prev => new Set(prev).add(id)); };
@@ -270,11 +303,12 @@ const AppContent: React.FC = () => {
 
                                     {['/project/:id', '/mod/:id', '/modpack/:id', '/world/:id'].map(path => (
                                         <React.Fragment key={path}>
-                                            <Route path={path} element={renderProjectDetail()} />
-                                            <Route path={`${path}/download`} element={renderProjectDetail()} />
-                                            <Route path={`${path}/changelog`} element={renderProjectDetail()} />
-                                            <Route path={`${path}/gallery`} element={renderProjectDetail()} />
-                                            <Route path={`${path}/wiki/*`} element={renderProjectDetail()} />
+                                            <Route path={path} element={renderProjectDetail()}>
+                                                <Route path="download" element={null} />
+                                                <Route path="changelog" element={null} />
+                                                <Route path="gallery" element={null} />
+                                                <Route path="wiki/*" element={null} />
+                                            </Route>
                                             <Route path={`${path}/edit`} element={
                                                 loadingAuth ? <RouteLoading /> :
                                                     user ? <ProjectEditorView currentUser={user} onShowStatus={onShowStatus} /> :

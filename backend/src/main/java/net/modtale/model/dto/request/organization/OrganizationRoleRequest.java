@@ -2,9 +2,8 @@ package net.modtale.model.dto.request.organization;
 
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import net.modtale.model.user.ApiKey;
-
 import java.util.Set;
+import net.modtale.model.user.ApiKey;
 
 public class OrganizationRoleRequest {
 

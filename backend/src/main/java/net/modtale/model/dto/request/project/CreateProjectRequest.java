@@ -1,20 +1,18 @@
 package net.modtale.model.dto.request.project;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import net.modtale.model.project.ProjectClassification;
 
 public class CreateProjectRequest {
     @NotBlank(message = "A project title is required before we can create a draft.")
     @Size(max = 100, message = "Project titles must be 100 characters or fewer.")
     private String title;
 
-    @NotBlank(message = "A project classification is required before we can create a draft.")
-    @Pattern(
-            regexp = "(?i)PLUGIN|DATA|ART|SAVE|MODPACK",
-            message = "Project classifications must be PLUGIN, DATA, ART, SAVE, or MODPACK."
-    )
-    private String classification;
+    @NotNull(message = "A project classification is required before we can create a draft.")
+    private ProjectClassification classification;
 
     @Size(max = 250, message = "The short summary cannot exceed 250 characters.")
     private String description;
@@ -34,11 +32,11 @@ public class CreateProjectRequest {
         this.title = title;
     }
 
-    public String getClassification() {
+    public ProjectClassification getClassification() {
         return classification;
     }
 
-    public void setClassification(String classification) {
+    public void setClassification(ProjectClassification classification) {
         this.classification = classification;
     }
 

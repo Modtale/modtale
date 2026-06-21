@@ -1,5 +1,11 @@
 package net.modtale.service.auth;
 
+import java.security.SecureRandom;
+import java.util.Base64;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Executor;
 import net.modtale.config.properties.AppLimitProperties;
 import net.modtale.exception.InvalidApiKeyRequestException;
 import net.modtale.exception.ResourceNotFoundException;
@@ -8,19 +14,12 @@ import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.ApiKeyRepository;
 import net.modtale.repository.user.UserRepository;
-import net.modtale.service.security.AccessControlService;
-import net.modtale.service.user.OrganizationApiKeyContextService;
+import net.modtale.service.security.access.AccessControlService;
+import net.modtale.service.user.organization.OrganizationApiKeyContextService;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
-import java.security.SecureRandom;
-import java.util.Base64;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Executor;
 
 @Service
 public class ApiKeyIssuanceService {

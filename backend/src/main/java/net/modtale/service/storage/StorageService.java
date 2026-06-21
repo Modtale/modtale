@@ -1,5 +1,11 @@
 package net.modtale.service.storage;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 import net.coobird.thumbnailator.Thumbnails;
 import net.modtale.config.properties.AppR2Properties;
 import net.modtale.exception.InvalidProjectRequestException;
@@ -14,13 +20,6 @@ import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
 
 @Service
 public class StorageService {
@@ -141,6 +140,8 @@ public class StorageService {
             fileName = fileName.replace("/api/files/proxy/", "");
         } else if (publicDomain != null && fileName.startsWith(publicDomain)) {
             fileName = fileName.replace(publicDomain + "/", "");
+        } else if (fileName.startsWith("http://") || fileName.startsWith("https://")) {
+            return;
         }
 
         if (fileName.contains(DEFAULT_IMAGE) || fileName.contains("placeholder.png")) {
@@ -171,6 +172,26 @@ public class StorageService {
             throw new StorageDownloadException("The requested file is not available in storage.", e);
         } catch (IOException | SdkException e) {
             throw StorageDownloadException.from(e, "Failed to download the requested file.");
+        }
+    }
+
+    public boolean exists(String fileName) {
+        try {
+            HeadObjectRequest headReq = HeadObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(fileName)
+                    .build();
+            s3Client.headObject(headReq);
+            return true;
+        } catch (NoSuchKeyException e) {
+            return false;
+        } catch (S3Exception e) {
+            if (e.statusCode() == 404) {
+                return false;
+            }
+            throw StorageDownloadException.from(e, "Failed to check the requested file.");
+        } catch (SdkException e) {
+            throw StorageDownloadException.from(e, "Failed to check the requested file.");
         }
     }
 

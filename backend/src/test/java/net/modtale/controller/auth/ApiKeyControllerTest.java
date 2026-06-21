@@ -1,14 +1,13 @@
 package net.modtale.controller.auth;
 
+import java.util.Map;
+import java.util.Set;
 import net.modtale.model.dto.request.auth.CreateApiKeyRequest;
 import net.modtale.model.user.User;
 import net.modtale.service.auth.ApiKeyService;
-import net.modtale.service.user.AccountService;
+import net.modtale.service.user.account.AccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.util.Map;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;

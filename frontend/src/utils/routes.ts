@@ -32,9 +32,7 @@ export class SiteRoutes {
 
     static project(project: { id: string; title: string; slug?: string; classification?: string } | null) {
         if (!project) return '/';
-        const handle = (project.slug && project.slug.trim().length > 0)
-            ? this.createHandle(project.slug, project.id)
-            : this.createSlug(project.title, project.id);
+        const handle = this.projectHandle(project);
         return `/${this.getProjectPrefix(project.classification)}/${handle}`;
     }
 
@@ -46,8 +44,9 @@ export class SiteRoutes {
 
     static creator(userId: string, username?: string) {
         if (!userId) return '/';
-        if (!username) return `/creator/${userId}`;
-        return `/creator/${this.createHandle(username, userId)}`;
+        const handle = username?.trim();
+        if (!handle) return `/creator/${userId}`;
+        return `/creator/${handle}`;
     }
 
     static dashboard() { return '/dashboard'; }
@@ -69,6 +68,31 @@ export class SiteRoutes {
         if (classification === 'MODPACK') return 'modpack';
         if (classification === 'SAVE') return 'world';
         return 'mod';
+    }
+
+    static projectHandle(project: { id: string; title: string; slug?: string } | null) {
+        if (!project) return '';
+        const customSlug = project.slug?.trim();
+        if (customSlug) return customSlug;
+        return this.createSlug(project.title, project.id);
+    }
+
+    static matchesProjectRoute(project: { id: string; title: string; slug?: string } | null, routeKey?: string) {
+        if (!project || !routeKey) return false;
+        const normalizedRouteKey = routeKey.trim();
+        if (!normalizedRouteKey) return false;
+
+        const customSlug = project.slug?.trim();
+        if (customSlug && normalizedRouteKey.toLowerCase() === customSlug.toLowerCase()) {
+            return true;
+        }
+
+        const handle = this.projectHandle(project);
+        if (handle && normalizedRouteKey.toLowerCase() === handle.toLowerCase()) {
+            return true;
+        }
+
+        return this.extractId(normalizedRouteKey) === project.id;
     }
 
     static createSlug(title: string, id: string) {

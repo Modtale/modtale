@@ -1,11 +1,11 @@
-name: Modtale CI/CD 
+name: Modtale CI/CD
 
 on:
   push:
     branches:
       - main
       - develop
-      - '*'
+      - '**'
 
 env:
   PROJECT_ID: gen-lang-client-0244308719
@@ -13,56 +13,153 @@ env:
 
 jobs:
   deploy:
+    if: github.repository == 'Modtale/modtale' && github.event.deleted != true
     runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'production' || github.ref_name == 'develop' && 'develop' || 'branch-preview' }}
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_R2_PROVISIONER: ${{ secrets.CLOUDFLARE_R2_PROVISIONER }}
+      CLOUDFLARE_API_TOKEN_PROVISIONER: ${{ secrets.CLOUDFLARE_API_TOKEN_PROVISIONER }}
+      CLOUDFLARE_R2_JURISDICTION: ${{ vars.CLOUDFLARE_R2_JURISDICTION }}
     permissions:
       contents: 'read'
       id-token: 'write'
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed components
+        id: filter
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: bash .github/scripts/detect-component-changes.sh
 
       - name: Configure Environment
         id: config
         run: |
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
           echo "Detected branch: $BRANCH_NAME"
-          
+          BRANCH_SLUG=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]' | sed 's/--*/-/g' | cut -c 1-20 | sed 's/^-//;s/-$//')
+          if [ -z "$BRANCH_SLUG" ]; then
+            BRANCH_SLUG="${GITHUB_SHA:0:7}"
+          fi
+          echo "GIT_BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+          echo "BRANCH_SLUG=$BRANCH_SLUG" >> $GITHUB_ENV
+
           if [ "$BRANCH_NAME" = "main" ]; then
             echo "ENV_TYPE=prod" >> $GITHUB_ENV
+            echo "BUILD_SERVICE_ACCOUNT=${{ vars.GCP_BUILD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
+            echo "RUNTIME_SERVICE_ACCOUNT=${{ vars.GCP_PROD_RUNTIME_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
             echo "BACKEND_SERVICE=modtale-backend" >> $GITHUB_ENV
             echo "FRONTEND_SERVICE=modtale-frontend" >> $GITHUB_ENV
             echo "DB_NAME=modtale" >> $GITHUB_ENV
             echo "SEEDING_ENABLED=false" >> $GITHUB_ENV
-            echo "FIXED_BACKEND_URL=https://api.modtale.net/api/v1" >> $GITHUB_ENV
+            echo "SEEDING_MODE=mock" >> $GITHUB_ENV
+            echo "SEEDING_RESET=false" >> $GITHUB_ENV
+            echo "SEEDING_SOURCE_DB=modtale-mock-template" >> $GITHUB_ENV
+            echo "SEEDING_SOURCE_R2_BUCKET_NAME=" >> $GITHUB_ENV
+            echo "MONGODB_SECRET_NAME=MONGODB_URI" >> $GITHUB_ENV
+            echo "BACKEND_DOMAIN=https://api.modtale.net" >> $GITHUB_ENV
             echo "FRONTEND_DOMAIN=https://modtale.net" >> $GITHUB_ENV
             echo "TAG=latest" >> $GITHUB_ENV
             echo "R2_BUCKET_NAME=modtale-binaries" >> $GITHUB_ENV
+            echo "R2_ACCESS_KEY_SECRET_NAME=R2_ACCESS_KEY" >> $GITHUB_ENV
+            echo "R2_SECRET_KEY_SECRET_NAME=R2_SECRET_KEY" >> $GITHUB_ENV
+            echo "R2_ENDPOINT_SECRET_NAME=R2_ENDPOINT" >> $GITHUB_ENV
             echo "R2_PUBLIC_DOMAIN=https://cdn.modtale.net" >> $GITHUB_ENV
+            echo "WARDEN_ENABLED=true" >> $GITHUB_ENV
+            echo "OAUTH_ENABLED=true" >> $GITHUB_ENV
             echo "WARDEN_SECRET_NAME=WARDEN_API_KEY" >> $GITHUB_ENV
-          
+
           elif [ "$BRANCH_NAME" = "develop" ]; then
             echo "ENV_TYPE=dev" >> $GITHUB_ENV
+            echo "BUILD_SERVICE_ACCOUNT=${{ vars.GCP_BUILD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
+            echo "RUNTIME_SERVICE_ACCOUNT=${{ vars.GCP_DEV_RUNTIME_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
             echo "BACKEND_SERVICE=modtale-backend-dev" >> $GITHUB_ENV
             echo "FRONTEND_SERVICE=modtale-frontend-dev" >> $GITHUB_ENV
             echo "DB_NAME=modtale" >> $GITHUB_ENV
             echo "SEEDING_ENABLED=false" >> $GITHUB_ENV
+            echo "SEEDING_MODE=mock" >> $GITHUB_ENV
+            echo "SEEDING_RESET=false" >> $GITHUB_ENV
+            echo "SEEDING_SOURCE_DB=modtale-mock-template" >> $GITHUB_ENV
+            echo "SEEDING_SOURCE_R2_BUCKET_NAME=" >> $GITHUB_ENV
+            echo "MONGODB_SECRET_NAME=MONGODB_URI" >> $GITHUB_ENV
+            echo "BACKEND_DOMAIN=https://dev.api.modtale.net" >> $GITHUB_ENV
             echo "FRONTEND_DOMAIN=https://dev.modtale.net" >> $GITHUB_ENV
             echo "TAG=dev" >> $GITHUB_ENV
             echo "R2_BUCKET_NAME=modtale-binaries" >> $GITHUB_ENV
+            echo "R2_ACCESS_KEY_SECRET_NAME=R2_ACCESS_KEY" >> $GITHUB_ENV
+            echo "R2_SECRET_KEY_SECRET_NAME=R2_SECRET_KEY" >> $GITHUB_ENV
+            echo "R2_ENDPOINT_SECRET_NAME=R2_ENDPOINT" >> $GITHUB_ENV
             echo "R2_PUBLIC_DOMAIN=https://cdn.modtale.net" >> $GITHUB_ENV
+            echo "WARDEN_ENABLED=true" >> $GITHUB_ENV
+            echo "OAUTH_ENABLED=true" >> $GITHUB_ENV
             echo "WARDEN_SECRET_NAME=WARDEN_API_KEY" >> $GITHUB_ENV
-          
+
           else
-            SLUG=$(echo $BRANCH_NAME | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]' | cut -c 1-20 | sed 's/-$//')
+            SLUG="$BRANCH_SLUG"
+            BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME="${{ vars.GCP_BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME }}"
+            if [ -z "$BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME" ]; then
+              BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME="${{ vars.GCP_PREVIEW_SOURCE_R2_BUCKET_NAME }}"
+            fi
+            if [ -z "$BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME" ]; then
+              BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME="modtale-binaries"
+            fi
+
+            BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME="${{ vars.GCP_BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME }}"
+            if [ -z "$BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME" ]; then
+              BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME="${{ vars.GCP_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME }}"
+            fi
+            if [ -z "$BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME" ]; then
+              BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME="R2_SOURCE_READ_ACCESS_KEY"
+            fi
+
+            BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME="${{ vars.GCP_BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME }}"
+            if [ -z "$BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME" ]; then
+              BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME="${{ vars.GCP_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME }}"
+            fi
+            if [ -z "$BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME" ]; then
+              BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME="R2_SOURCE_READ_SECRET_KEY"
+            fi
+
+            BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME="${{ vars.GCP_BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME }}"
+            if [ -z "$BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME" ]; then
+              BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME="${{ vars.GCP_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME }}"
+            fi
+            if [ -z "$BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME" ]; then
+              BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME="R2_SOURCE_READ_ENDPOINT"
+            fi
+
             echo "ENV_TYPE=preview" >> $GITHUB_ENV
+            echo "BUILD_SERVICE_ACCOUNT=${{ vars.GCP_BUILD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
             echo "BACKEND_SERVICE=modtale-backend-$SLUG" >> $GITHUB_ENV
             echo "FRONTEND_SERVICE=modtale-frontend-$SLUG" >> $GITHUB_ENV
             echo "DB_NAME=modtale-$SLUG" >> $GITHUB_ENV
             echo "SEEDING_ENABLED=true" >> $GITHUB_ENV
+            echo "SEEDING_MODE=template" >> $GITHUB_ENV
+            echo "SEEDING_RESET=false" >> $GITHUB_ENV
+            echo "SEEDING_SOURCE_DB=modtale-mock-template" >> $GITHUB_ENV
+            echo "SEEDING_SOURCE_R2_BUCKET_NAME=$BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME" >> $GITHUB_ENV
+            echo "MONGODB_SECRET_NAME=BRANCH_PREVIEW_MONGODB_URI" >> $GITHUB_ENV
             echo "TAG=$SLUG" >> $GITHUB_ENV
-            echo "R2_BUCKET_NAME=modtale-dev" >> $GITHUB_ENV
-            echo "R2_PUBLIC_DOMAIN=https://pub-dc8241faa0a343c080802bf00bc72bc5.r2.dev" >> $GITHUB_ENV
-            echo "WARDEN_SECRET_NAME=WARDEN_API_KEY" >> $GITHUB_ENV
+            echo "R2_BUCKET_NAME=modtale-branch-$SLUG" >> $GITHUB_ENV
+            echo "R2_ACCESS_KEY_SECRET_NAME=branch-preview-$SLUG-r2-access-key" >> $GITHUB_ENV
+            echo "R2_SECRET_KEY_SECRET_NAME=branch-preview-$SLUG-r2-secret-key" >> $GITHUB_ENV
+            echo "R2_ENDPOINT_SECRET_NAME=branch-preview-$SLUG-r2-endpoint" >> $GITHUB_ENV
+            echo "R2_TOKEN_ID_SECRET_NAME=branch-preview-$SLUG-r2-token-id" >> $GITHUB_ENV
+            echo "R2_TOKEN_NAME=modtale-branch-$SLUG-runtime" >> $GITHUB_ENV
+            echo "RUNTIME_SERVICE_ACCOUNT=${{ vars.GCP_BRANCH_PREVIEW_RUNTIME_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
+            echo "SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME=$BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME" >> $GITHUB_ENV
+            echo "SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME=$BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME" >> $GITHUB_ENV
+            echo "SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME=$BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME" >> $GITHUB_ENV
+            echo "R2_PUBLIC_DOMAIN=" >> $GITHUB_ENV
+            echo "WARDEN_ENABLED=false" >> $GITHUB_ENV
+            echo "OAUTH_ENABLED=false" >> $GITHUB_ENV
           fi
 
       - id: 'auth'
@@ -73,39 +170,295 @@ jobs:
       - name: 'Set up Cloud SDK'
         uses: 'google-github-actions/setup-gcloud@v2'
 
+      - name: Ensure Branch R2 Bucket
+        if: env.ENV_TYPE == 'preview'
+        run: |
+          set -euo pipefail
+
+          : "${R2_BUCKET_NAME:?R2_BUCKET_NAME must be configured for preview branch deployments.}"
+          : "${CLOUDFLARE_ACCOUNT_ID:?Set secret CLOUDFLARE_ACCOUNT_ID.}"
+          : "${CLOUDFLARE_R2_PROVISIONER:?Set secret CLOUDFLARE_R2_PROVISIONER.}"
+          : "${RUNTIME_SERVICE_ACCOUNT:?Set environment variable GCP_BRANCH_PREVIEW_RUNTIME_SERVICE_ACCOUNT in the branch-preview GitHub environment.}"
+
+          if [ "${MONGODB_SECRET_NAME:-}" = "MONGODB_URI" ]; then
+            echo "::error::Branch previews must use BRANCH_PREVIEW_MONGODB_URI, not production MONGODB_URI."
+            exit 1
+          fi
+          if [ "$SEEDING_SOURCE_R2_BUCKET_NAME" = "$R2_BUCKET_NAME" ]; then
+            echo "::error::Branch previews must seed from a source R2 bucket that differs from their per-branch target bucket."
+            exit 1
+          fi
+          if [ "$SEEDING_SOURCE_R2_BUCKET_NAME" = "modtale-binaries" ]; then
+            echo "::warning::Branch preview is seeding from modtale-binaries. Set GCP_BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME and matching source secret-name vars to use a sanitized preview source bucket."
+          fi
+
+          source_r2_access_key="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME")"
+          source_r2_secret_key="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME")"
+          source_r2_endpoint="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME")"
+          source_r2_endpoint="$(printf '%s' "$source_r2_endpoint" | sed -E 's#(https?://[^/]+).*#\1#')"
+
+          echo "::add-mask::$source_r2_access_key"
+          echo "::add-mask::$source_r2_secret_key"
+
+          if ! command -v aws >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y awscli
+          fi
+
+          AWS_ACCESS_KEY_ID="$source_r2_access_key" \
+          AWS_SECRET_ACCESS_KEY="$source_r2_secret_key" \
+          AWS_DEFAULT_REGION=auto \
+          aws s3api head-bucket \
+            --endpoint-url "$source_r2_endpoint" \
+            --bucket "$SEEDING_SOURCE_R2_BUCKET_NAME" >/dev/null
+
+          existing_token_id="$(
+            gcloud secrets versions access latest \
+              --project "$PROJECT_ID" \
+              --secret="$R2_TOKEN_ID_SECRET_NAME" 2>/dev/null || true
+          )"
+          echo "::add-mask::$existing_token_id"
+
+          latest_secret_version() {
+            local name="$1"
+            gcloud secrets versions list "$name" \
+              --project "$PROJECT_ID" \
+              --filter="state=ENABLED" \
+              --sort-by="~createTime" \
+              --limit=1 \
+              --format="value(name)"
+          }
+
+          ensure_secret_accessor() {
+            local name="$1"
+
+            gcloud secrets add-iam-policy-binding "$name" \
+              --project "$PROJECT_ID" \
+              --member="serviceAccount:$RUNTIME_SERVICE_ACCOUNT" \
+              --role="roles/secretmanager.secretAccessor" \
+              --quiet >/dev/null
+          }
+
+          write_secret() {
+            local name="$1"
+            local value="$2"
+
+            if gcloud secrets describe "$name" --project "$PROJECT_ID" >/dev/null 2>&1; then
+              printf '%s' "$value" | gcloud secrets versions add "$name" \
+                --project "$PROJECT_ID" \
+                --data-file=- >/dev/null
+            else
+              printf '%s' "$value" | gcloud secrets create "$name" \
+                --project "$PROJECT_ID" \
+                --replication-policy=automatic \
+                --data-file=- >/dev/null
+            fi
+
+            ensure_secret_accessor "$name"
+            latest_secret_version "$name"
+          }
+
+          existing_r2_access_key="$(
+            gcloud secrets versions access latest \
+              --project "$PROJECT_ID" \
+              --secret="$R2_ACCESS_KEY_SECRET_NAME" 2>/dev/null || true
+          )"
+          existing_r2_secret_key="$(
+            gcloud secrets versions access latest \
+              --project "$PROJECT_ID" \
+              --secret="$R2_SECRET_KEY_SECRET_NAME" 2>/dev/null || true
+          )"
+          existing_r2_endpoint="$(
+            gcloud secrets versions access latest \
+              --project "$PROJECT_ID" \
+              --secret="$R2_ENDPOINT_SECRET_NAME" 2>/dev/null || true
+          )"
+          existing_r2_endpoint="$(printf '%s' "$existing_r2_endpoint" | sed -E 's#(https?://[^/]+).*#\1#')"
+
+          echo "::add-mask::$existing_r2_access_key"
+          echo "::add-mask::$existing_r2_secret_key"
+
+          runtime_credentials_valid=false
+          if [ -n "$existing_r2_access_key" ] && \
+             [ -n "$existing_r2_secret_key" ] && \
+             [ -n "$existing_r2_endpoint" ]; then
+            check_file="$(mktemp)"
+            check_key=".modtale-preview/credential-check-${GITHUB_RUN_ID:-manual}-${GITHUB_RUN_ATTEMPT:-0}"
+            printf 'ok' > "$check_file"
+
+            if AWS_ACCESS_KEY_ID="$existing_r2_access_key" \
+               AWS_SECRET_ACCESS_KEY="$existing_r2_secret_key" \
+               AWS_DEFAULT_REGION=auto \
+               aws s3api put-object \
+                 --endpoint-url "$existing_r2_endpoint" \
+                 --bucket "$R2_BUCKET_NAME" \
+                 --key "$check_key" \
+                 --body "$check_file" >/dev/null && \
+               AWS_ACCESS_KEY_ID="$existing_r2_access_key" \
+               AWS_SECRET_ACCESS_KEY="$existing_r2_secret_key" \
+               AWS_DEFAULT_REGION=auto \
+               aws s3api head-object \
+                 --endpoint-url "$existing_r2_endpoint" \
+                 --bucket "$R2_BUCKET_NAME" \
+                 --key "$check_key" >/dev/null; then
+              runtime_credentials_valid=true
+            fi
+
+            AWS_ACCESS_KEY_ID="$existing_r2_access_key" \
+            AWS_SECRET_ACCESS_KEY="$existing_r2_secret_key" \
+            AWS_DEFAULT_REGION=auto \
+            aws s3api delete-object \
+              --endpoint-url "$existing_r2_endpoint" \
+              --bucket "$R2_BUCKET_NAME" \
+              --key "$check_key" >/dev/null 2>&1 || true
+            rm -f "$check_file"
+          fi
+
+          if [ "$runtime_credentials_valid" = "true" ]; then
+            echo "Reusing existing branch preview R2 runtime credentials."
+            ensure_secret_accessor "$R2_ACCESS_KEY_SECRET_NAME"
+            ensure_secret_accessor "$R2_SECRET_KEY_SECRET_NAME"
+            ensure_secret_accessor "$R2_ENDPOINT_SECRET_NAME"
+            if gcloud secrets describe "$R2_TOKEN_ID_SECRET_NAME" --project "$PROJECT_ID" >/dev/null 2>&1; then
+              ensure_secret_accessor "$R2_TOKEN_ID_SECRET_NAME"
+              R2_TOKEN_ID_SECRET_VERSION="$(latest_secret_version "$R2_TOKEN_ID_SECRET_NAME")"
+            else
+              R2_TOKEN_ID_SECRET_VERSION=""
+            fi
+
+            R2_ACCESS_KEY_SECRET_VERSION="$(latest_secret_version "$R2_ACCESS_KEY_SECRET_NAME")"
+            R2_SECRET_KEY_SECRET_VERSION="$(latest_secret_version "$R2_SECRET_KEY_SECRET_NAME")"
+            R2_ENDPOINT_SECRET_VERSION="$(latest_secret_version "$R2_ENDPOINT_SECRET_NAME")"
+            R2_RUNTIME_CREDENTIALS_REPLACED=false
+          else
+            echo "Existing branch preview R2 runtime credentials are missing or invalid; provisioning a replacement."
+            : "${CLOUDFLARE_API_TOKEN_PROVISIONER:?Set secret CLOUDFLARE_API_TOKEN_PROVISIONER.}"
+            export EXISTING_R2_RUNTIME_TOKEN_ID="$existing_token_id"
+            node .github/scripts/cloudflare-r2-preview.mjs provision
+
+            R2_ACCESS_KEY_SECRET_VERSION="$(write_secret "$R2_ACCESS_KEY_SECRET_NAME" "$R2_RUNTIME_ACCESS_KEY")"
+            R2_SECRET_KEY_SECRET_VERSION="$(write_secret "$R2_SECRET_KEY_SECRET_NAME" "$R2_RUNTIME_SECRET_KEY")"
+            R2_ENDPOINT_SECRET_VERSION="$(write_secret "$R2_ENDPOINT_SECRET_NAME" "$R2_RUNTIME_ENDPOINT")"
+            R2_TOKEN_ID_SECRET_VERSION="$(write_secret "$R2_TOKEN_ID_SECRET_NAME" "$R2_RUNTIME_TOKEN_ID")"
+            R2_RUNTIME_CREDENTIALS_REPLACED=true
+          fi
+
+          echo "R2_ACCESS_KEY_SECRET_VERSION=$R2_ACCESS_KEY_SECRET_VERSION" >> "$GITHUB_ENV"
+          echo "R2_SECRET_KEY_SECRET_VERSION=$R2_SECRET_KEY_SECRET_VERSION" >> "$GITHUB_ENV"
+          echo "R2_ENDPOINT_SECRET_VERSION=$R2_ENDPOINT_SECRET_VERSION" >> "$GITHUB_ENV"
+          echo "R2_TOKEN_ID_SECRET_VERSION=$R2_TOKEN_ID_SECRET_VERSION" >> "$GITHUB_ENV"
+          echo "R2_RUNTIME_CREDENTIALS_REPLACED=$R2_RUNTIME_CREDENTIALS_REPLACED" >> "$GITHUB_ENV"
+
+      - name: Check Existing Services
+        id: check_services
+        run: |
+          # Check backend service
+          if gcloud run services describe ${{ env.BACKEND_SERVICE }} --region ${{ env.REGION }} >/dev/null 2>&1; then
+            echo "BACKEND_EXISTS=true" >> $GITHUB_ENV
+            B_URL=$(gcloud run services describe ${{ env.BACKEND_SERVICE }} --region ${{ env.REGION }} --format="value(status.url)")
+            echo "EXISTING_BACKEND_URL=$B_URL" >> $GITHUB_ENV
+            echo "Backend service already exists: $B_URL"
+          else
+            echo "BACKEND_EXISTS=false" >> $GITHUB_ENV
+            echo "Backend service does not exist."
+          fi
+
+          # Check frontend service
+          if gcloud run services describe ${{ env.FRONTEND_SERVICE }} --region ${{ env.REGION }} >/dev/null 2>&1; then
+            echo "FRONTEND_EXISTS=true" >> $GITHUB_ENV
+            F_URL=$(gcloud run services describe ${{ env.FRONTEND_SERVICE }} --region ${{ env.REGION }} --format="value(status.url)")
+            echo "EXISTING_FRONTEND_URL=$F_URL" >> $GITHUB_ENV
+            echo "Frontend service already exists: $F_URL"
+          else
+            echo "FRONTEND_EXISTS=false" >> $GITHUB_ENV
+            echo "Frontend service does not exist."
+          fi
+
       - name: Build and Deploy Backend
+        id: deploy_backend
+        if: steps.filter.outputs.backend == 'true' || env.BACKEND_EXISTS == 'false' || env.R2_RUNTIME_CREDENTIALS_REPLACED == 'true'
         run: |
           cd backend
-          gcloud builds submit --tag gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }} .
-          
+
+          : "${BUILD_SERVICE_ACCOUNT:?Set GitHub environment variable GCP_BUILD_SERVICE_ACCOUNT.}"
+          : "${RUNTIME_SERVICE_ACCOUNT:?Set the GitHub environment runtime service account variable for this environment.}"
+
+          WARDEN_URL_VALUE=""
+          if [ "${{ env.ENV_TYPE }}" = "prod" ] || [ "${{ env.ENV_TYPE }}" = "dev" ]; then
+            WARDEN_URL_VALUE="$(
+              gcloud secrets versions access latest \
+                --project "$PROJECT_ID" \
+                --secret WARDEN_URL
+            )"
+
+            if [ -z "$WARDEN_URL_VALUE" ]; then
+              echo "::error::Secret WARDEN_URL is empty or unavailable."
+              exit 1
+            fi
+
+            echo "::add-mask::$WARDEN_URL_VALUE"
+          fi
+
+          gcloud builds submit \
+            --config=cloudbuild.yml \
+            --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
+            --substitutions=_TAG=${{ env.TAG }} .
+
           ARGS=(
             "--image" "gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }}"
             "--region" "$REGION"
+            "--service-account" "$RUNTIME_SERVICE_ACCOUNT"
             "--allow-unauthenticated"
             "--use-http2"
             "--memory" "1Gi"
             "--update-env-vars" "MONGODB_DATABASE_NAME=${{ env.DB_NAME }}"
-            "--update-env-vars" "SEEDING_ENABLED=${{ env.SEEDING_ENABLED }}"
-            "--update-env-vars" "SEEDING_SOURCE_DB=modtale"
-            "--update-env-vars" "WARDEN_URL=${{ secrets.WARDEN_URL }}"
-            "--update-env-vars" "WARDEN_ENABLED=true"
+            "--update-env-vars" "APP_SEEDING_ENABLED=${{ env.SEEDING_ENABLED }}"
+            "--update-env-vars" "APP_SEEDING_MODE=${{ env.SEEDING_MODE }}"
+            "--update-env-vars" "APP_SEEDING_RESET=${{ env.SEEDING_RESET }}"
+            "--update-env-vars" "APP_SEEDING_SOURCE_DB=${{ env.SEEDING_SOURCE_DB }}"
+            "--update-env-vars" "APP_SEEDING_SOURCE_R2_BUCKET_NAME=${{ env.SEEDING_SOURCE_R2_BUCKET_NAME }}"
+            "--update-env-vars" "WARDEN_ENABLED=${{ env.WARDEN_ENABLED }}"
+            "--update-env-vars" "OAUTH_ENABLED=${{ env.OAUTH_ENABLED }}"
             "--update-env-vars" "FRONTEND_URL=placeholder"
             "--update-env-vars" "R2_BUCKET_NAME=${{ env.R2_BUCKET_NAME }}"
             "--update-env-vars" "R2_PUBLIC_DOMAIN=${{ env.R2_PUBLIC_DOMAIN }}"
           )
 
+          R2_ACCESS_KEY_SECRET_VERSION="${R2_ACCESS_KEY_SECRET_VERSION:-latest}"
+          R2_SECRET_KEY_SECRET_VERSION="${R2_SECRET_KEY_SECRET_VERSION:-latest}"
+          R2_ENDPOINT_SECRET_VERSION="${R2_ENDPOINT_SECRET_VERSION:-latest}"
+
+          ARGS+=("--update-secrets" "MONGODB_URI=${{ env.MONGODB_SECRET_NAME }}:latest")
+          ARGS+=("--update-secrets" "R2_ACCESS_KEY=${{ env.R2_ACCESS_KEY_SECRET_NAME }}:$R2_ACCESS_KEY_SECRET_VERSION")
+          ARGS+=("--update-secrets" "R2_SECRET_KEY=${{ env.R2_SECRET_KEY_SECRET_NAME }}:$R2_SECRET_KEY_SECRET_VERSION")
+          ARGS+=("--update-secrets" "R2_ENDPOINT=${{ env.R2_ENDPOINT_SECRET_NAME }}:$R2_ENDPOINT_SECRET_VERSION")
+
           if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
+            ARGS+=("--update-env-vars" "WARDEN_URL=$WARDEN_URL_VALUE")
+            ARGS+=("--update-secrets" "SMTP_HOST=SMTP_HOST:latest")
+            ARGS+=("--update-secrets" "SMTP_USERNAME=SMTP_USERNAME:latest")
+            ARGS+=("--update-secrets" "SMTP_PASSWORD=SMTP_PASSWORD:latest")
+            ARGS+=("--update-secrets" "PRE_AUTH_SECRET=PRE_AUTH_SECRET:latest")
+            ARGS+=("--update-secrets" "GITHUB_CLIENT_ID=GITHUB_CLIENT_ID:latest")
+            ARGS+=("--update-secrets" "GITHUB_CLIENT_SECRET=GITHUB_CLIENT_SECRET:latest")
+            ARGS+=("--update-secrets" "GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest")
+            ARGS+=("--update-secrets" "GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest")
+            ARGS+=("--update-secrets" "GITLAB_CLIENT_ID=GITLAB_CLIENT_ID:latest")
+            ARGS+=("--update-secrets" "GITLAB_CLIENT_SECRET=GITLAB_CLIENT_SECRET:latest")
+            ARGS+=("--update-secrets" "DISCORD_CLIENT_ID=DISCORD_CLIENT_ID:latest")
+            ARGS+=("--update-secrets" "DISCORD_CLIENT_SECRET=DISCORD_CLIENT_SECRET:latest")
+            ARGS+=("--update-secrets" "TWITTER_CLIENT_ID=TWITTER_CLIENT_ID:latest")
+            ARGS+=("--update-secrets" "TWITTER_CLIENT_SECRET=TWITTER_CLIENT_SECRET:latest")
+            ARGS+=("--update-secrets" "BLUESKY_CLIENT_ID=BLUESKY_CLIENT_ID:latest")
             ARGS+=("--update-secrets" "WARDEN_API_KEY=${{ env.WARDEN_SECRET_NAME }}:latest")
             ARGS+=("--update-secrets" "WEBHOOK_URL=WEBHOOK_URL:latest")
             ARGS+=("--update-secrets" "HYTALEMODDING_KEY=HYTALEMODDING_KEY:latest")
             ARGS+=("--update-secrets" "WIKI_API_KEY=WIKI_API_KEY:latest")
             ARGS+=("--update-secrets" "DISCORD_WEBHOOK_URL=DISCORD_WEBHOOK_URL:latest")
             ARGS+=("--update-secrets" "ADMIN_DISCORD_WEBHOOK_URL=ADMIN_DISCORD_WEBHOOK_URL:latest")
-          else
-            ARGS+=("--update-secrets" "MONGODB_URI=MONGODB_URI:latest")
-            ARGS+=("--update-secrets" "R2_ACCESS_KEY=R2_ACCESS_KEY:latest")
-            ARGS+=("--update-secrets" "R2_SECRET_KEY=R2_SECRET_KEY:latest")
-            ARGS+=("--update-secrets" "R2_ENDPOINT=R2_ENDPOINT:latest")
+            ARGS+=("--update-secrets" "STATUS_DISCORD_WEBHOOK_URL=STATUS_DISCORD_WEBHOOK_URL:latest")
+          elif [ "${{ env.ENV_TYPE }}" = "dev" ]; then
+            ARGS+=("--update-env-vars" "WARDEN_URL=$WARDEN_URL_VALUE")
             ARGS+=("--update-secrets" "SMTP_HOST=SMTP_HOST:latest")
             ARGS+=("--update-secrets" "SMTP_USERNAME=SMTP_USERNAME:latest")
             ARGS+=("--update-secrets" "SMTP_PASSWORD=SMTP_PASSWORD:latest")
@@ -123,42 +476,397 @@ jobs:
             ARGS+=("--update-secrets" "BLUESKY_CLIENT_ID=BLUESKY_CLIENT_ID:latest")
             ARGS+=("--update-secrets" "WARDEN_API_KEY=${{ env.WARDEN_SECRET_NAME }}:latest")
             ARGS+=("--update-secrets" "WIKI_API_KEY=WIKI_API_KEY:latest")
+          else
+            : "${RUNTIME_SERVICE_ACCOUNT:?Set environment variable GCP_BRANCH_PREVIEW_RUNTIME_SERVICE_ACCOUNT in the branch-preview GitHub environment.}"
+            ARGS+=("--no-cpu-throttling")
+            ARGS+=("--startup-probe" "httpGet.path=/actuator/health/readiness,httpGet.port=8080,periodSeconds=10,timeoutSeconds=10,failureThreshold=60")
+            ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_FORMAT_CONSOLE=logstash")
+            ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_JSON_RENAME_LEVEL=severity")
+            ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_JSON_ADD_SERVICE_NAME=${{ env.BACKEND_SERVICE }}")
+            ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_JSON_ADD_COMPONENT=backend")
+            ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_JSON_ADD_ENVIRONMENT=branch-preview")
+            ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_JSON_ADD_BRANCH=${{ env.BRANCH_SLUG }}")
+            ARGS+=("--labels" "app=modtale,environment=branch-preview,component=backend,branch=${{ env.BRANCH_SLUG }}")
+            ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_ACCESS_KEY=${{ env.SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME }}:latest")
+            ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_SECRET_KEY=${{ env.SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME }}:latest")
+            ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_ENDPOINT=${{ env.SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME }}:latest")
+            ARGS+=("--remove-env-vars" "SMTP_HOST,SMTP_PORT,SMTP_USERNAME,SMTP_PASSWORD,PRE_AUTH_SECRET,GITHUB_CLIENT_ID,GITHUB_CLIENT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GITLAB_CLIENT_ID,GITLAB_CLIENT_SECRET,DISCORD_CLIENT_ID,DISCORD_CLIENT_SECRET,TWITTER_CLIENT_ID,TWITTER_CLIENT_SECRET,BLUESKY_CLIENT_ID,BLUESKY_CLIENT_SECRET,WARDEN_URL,WARDEN_API_KEY,WIKI_API_KEY,WEBHOOK_URL,HYTALEMODDING_KEY,DISCORD_WEBHOOK_URL,ADMIN_DISCORD_WEBHOOK_URL,STATUS_DISCORD_WEBHOOK_URL")
           fi
 
           gcloud run deploy ${{ env.BACKEND_SERVICE }} "${ARGS[@]}" --format="value(status.url)" > backend_url.txt
 
+          if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
+            BACKEND_REVISION=$(gcloud run services describe "$BACKEND_SERVICE" --region "$REGION" --format="value(status.latestReadyRevisionName)")
+            echo "revision=$BACKEND_REVISION" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Determine API URL
         run: |
-          if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
-            echo "API_URL=${{ env.FIXED_BACKEND_URL }}" >> $GITHUB_ENV
+          if [ -n "${BACKEND_DOMAIN:-}" ]; then
+            echo "API_URL=$BACKEND_DOMAIN/api/v1" >> $GITHUB_ENV
           else
-            echo "API_URL=$(cat backend/backend_url.txt)/api/v1" >> $GITHUB_ENV
+            if [ -f backend/backend_url.txt ]; then
+              echo "API_URL=$(cat backend/backend_url.txt)/api/v1" >> $GITHUB_ENV
+            else
+              echo "API_URL=$EXISTING_BACKEND_URL/api/v1" >> $GITHUB_ENV
+            fi
           fi
 
       - name: Build and Deploy Frontend
+        id: deploy_frontend
+        if: steps.filter.outputs.frontend == 'true' || env.FRONTEND_EXISTS == 'false'
         run: |
           cd frontend
+
+          : "${BUILD_SERVICE_ACCOUNT:?Set GitHub environment variable GCP_BUILD_SERVICE_ACCOUNT.}"
+          : "${RUNTIME_SERVICE_ACCOUNT:?Set the GitHub environment runtime service account variable for this environment.}"
+
           gcloud builds submit \
             --config=cloudbuild.yml \
-            --substitutions=_PUBLIC_API_URL=${{ env.API_URL }},_TAG=${{ env.TAG }} .
-          
-          gcloud run deploy ${{ env.FRONTEND_SERVICE }} \
-            --image gcr.io/$PROJECT_ID/modtale-frontend:${{ env.TAG }} \
-            --region $REGION \
-            --allow-unauthenticated \
-            --set-env-vars PUBLIC_API_URL=${{ env.API_URL }} \
-            --format="value(status.url)" > frontend_url.txt
+            --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
+            --substitutions=_PUBLIC_API_URL=$API_URL,_TAG=$TAG .
+
+          FRONTEND_ARGS=(
+            "--image" "gcr.io/$PROJECT_ID/modtale-frontend:$TAG"
+            "--region" "$REGION"
+            "--service-account" "$RUNTIME_SERVICE_ACCOUNT"
+            "--allow-unauthenticated"
+            "--set-env-vars" "PUBLIC_API_URL=$API_URL"
+          )
+
+          if [ "${{ env.ENV_TYPE }}" = "preview" ]; then
+            FRONTEND_ARGS+=("--set-env-vars" "LOG_SERVICE_NAME=${{ env.FRONTEND_SERVICE }}")
+            FRONTEND_ARGS+=("--set-env-vars" "LOG_COMPONENT=frontend")
+            FRONTEND_ARGS+=("--set-env-vars" "LOG_ENVIRONMENT=branch-preview")
+            FRONTEND_ARGS+=("--set-env-vars" "LOG_BRANCH=${{ env.BRANCH_SLUG }}")
+            FRONTEND_ARGS+=("--labels" "app=modtale,environment=branch-preview,component=frontend,branch=${{ env.BRANCH_SLUG }}")
+          fi
+
+          gcloud run deploy "$FRONTEND_SERVICE" "${FRONTEND_ARGS[@]}" --format="value(status.url)" > frontend_url.txt
+
+          if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
+            FRONTEND_REVISION=$(gcloud run services describe "$FRONTEND_SERVICE" --region "$REGION" --format="value(status.latestReadyRevisionName)")
+            echo "revision=$FRONTEND_REVISION" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Notify Status Bot of Frontend Production Deploy
+        if: env.ENV_TYPE == 'prod' && steps.deploy_frontend.outputs.revision != ''
+        env:
+          STATUS_DISCORD_WEBHOOK_URL: ${{ secrets.STATUS_DISCORD_WEBHOOK_URL }}
+          COMPONENT_NAME: Frontend
+          SERVICE_NAME: ${{ env.FRONTEND_SERVICE }}
+          SERVICE_URL: ${{ env.FRONTEND_DOMAIN }}
+          DEPLOYED_REVISION: ${{ steps.deploy_frontend.outputs.revision }}
+        run: bash .github/scripts/notify-status-deploy.sh
 
       - name: Determine Frontend URL
         run: |
           if [ "${{ env.ENV_TYPE }}" = "preview" ]; then
-            echo "FINAL_FRONTEND_URL=$(cat frontend/frontend_url.txt)" >> $GITHUB_ENV
+            if [ -f frontend/frontend_url.txt ]; then
+              echo "FINAL_FRONTEND_URL=$(cat frontend/frontend_url.txt)" >> $GITHUB_ENV
+            else
+              echo "FINAL_FRONTEND_URL=${{ env.EXISTING_FRONTEND_URL }}" >> $GITHUB_ENV
+            fi
           else
             echo "FINAL_FRONTEND_URL=${{ env.FRONTEND_DOMAIN }}" >> $GITHUB_ENV
           fi
 
       - name: Update Backend CORS and Self-Awareness
+        id: update_backend_self_awareness
+        if: (steps.filter.outputs.backend == 'true' || env.BACKEND_EXISTS == 'false' || steps.filter.outputs.frontend == 'true' || env.FRONTEND_EXISTS == 'false')
         run: |
+          BEFORE_REVISION=$(gcloud run services describe "${{ env.BACKEND_SERVICE }}" --region "$REGION" --format="value(status.latestReadyRevisionName)" 2>/dev/null || true)
+
+          if [ -f backend/backend_url.txt ]; then
+            B_URL=$(cat backend/backend_url.txt)
+          else
+            B_URL=${EXISTING_BACKEND_URL:-}
+          fi
+
+          if [ -n "${BACKEND_DOMAIN:-}" ]; then
+            PUBLIC_BACKEND_URL=$BACKEND_DOMAIN
+          else
+            PUBLIC_BACKEND_URL=$B_URL
+          fi
+
           gcloud run services update ${{ env.BACKEND_SERVICE }} \
             --region $REGION \
-            --update-env-vars FRONTEND_URL=${{ env.FINAL_FRONTEND_URL }},BACKEND_URL=$(cat backend/backend_url.txt)
+            --update-env-vars "FRONTEND_URL=$FINAL_FRONTEND_URL,BACKEND_URL=$PUBLIC_BACKEND_URL"
+
+          if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
+            BACKEND_REVISION=$(gcloud run services describe "$BACKEND_SERVICE" --region "$REGION" --format="value(status.latestReadyRevisionName)")
+            if [ "$BACKEND_REVISION" != "$BEFORE_REVISION" ]; then
+              echo "revision=$BACKEND_REVISION" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Notify Status Bot of Backend Production Deploy
+        if: env.ENV_TYPE == 'prod' && (steps.update_backend_self_awareness.outputs.revision != '' || steps.deploy_backend.outputs.revision != '')
+        env:
+          STATUS_DISCORD_WEBHOOK_URL: ${{ secrets.STATUS_DISCORD_WEBHOOK_URL }}
+          COMPONENT_NAME: Backend
+          SERVICE_NAME: ${{ env.BACKEND_SERVICE }}
+          SERVICE_URL: ${{ env.BACKEND_DOMAIN }}
+          DEPLOYED_REVISION: ${{ steps.update_backend_self_awareness.outputs.revision || steps.deploy_backend.outputs.revision }}
+        run: bash .github/scripts/notify-status-deploy.sh
+
+      - name: Generate Deployment Summary
+        if: always()
+        run: |
+          PUBLIC_API_URL="${API_URL:-}"
+
+          # Define status emojis and labels
+          if [ "${{ steps.filter.outputs.backend }}" = "true" ] || [ "${{ env.BACKEND_EXISTS }}" = "false" ] || [ "${{ env.R2_RUNTIME_CREDENTIALS_REPLACED }}" = "true" ]; then
+            if [ "${{ env.R2_RUNTIME_CREDENTIALS_REPLACED }}" = "true" ] && [ "${{ steps.filter.outputs.backend }}" != "true" ] && [ "${{ env.BACKEND_EXISTS }}" != "false" ]; then
+              BACKEND_STATUS="Deployed (R2 Credentials Replaced)"
+            elif [ "${{ steps.filter.outcome }}" = "success" ]; then
+              BACKEND_STATUS="Deployed (Fresh Build)"
+            else
+              BACKEND_STATUS="Deployment Failed"
+            fi
+            if [ -f backend/backend_url.txt ]; then
+              B_URL=$(cat backend/backend_url.txt)
+            else
+              B_URL="${{ env.EXISTING_BACKEND_URL }}"
+            fi
+          else
+            BACKEND_STATUS="✨ Cached (No Changes / Reused)"
+            B_URL="${{ env.EXISTING_BACKEND_URL }}"
+          fi
+
+          if [ "${{ steps.filter.outputs.frontend }}" = "true" ] || [ "${{ env.FRONTEND_EXISTS }}" = "false" ]; then
+            if [ "${{ steps.filter.outcome }}" = "success" ]; then
+              FRONTEND_STATUS="Deployed (Fresh Build)"
+            else
+              FRONTEND_STATUS="Deployment Failed"
+            fi
+            if [ -f frontend/frontend_url.txt ]; then
+              F_URL=$(cat frontend/frontend_url.txt)
+            else
+              F_URL="${{ env.EXISTING_FRONTEND_URL }}"
+            fi
+          else
+            FRONTEND_STATUS="✨ Cached (No Changes / Reused)"
+            F_URL="${{ env.EXISTING_FRONTEND_URL }}"
+          fi
+
+          # Output to GitHub Step Summary
+          echo "## Modtale Deployment Dashboard" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Environment Context" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered By:** \`${{ github.actor }}\` via \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** \`${{ env.ENV_TYPE }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Status | Target Service | Service URL |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
+
+          if [ -n "$PUBLIC_API_URL" ]; then
+            echo "| **Backend API** | $BACKEND_STATUS | \`${{ env.BACKEND_SERVICE }}\` | [API Endpoint]($PUBLIC_API_URL) |" >> $GITHUB_STEP_SUMMARY
+          elif [ -n "$B_URL" ]; then
+            echo "| **Backend API** | $BACKEND_STATUS | \`${{ env.BACKEND_SERVICE }}\` | [API Endpoint]($B_URL/api/v1) |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| **Backend API** | $BACKEND_STATUS | \`${{ env.BACKEND_SERVICE }}\` | *N/A* |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ -n "$F_URL" ]; then
+            echo "| **Frontend App** | $FRONTEND_STATUS | \`${{ env.FRONTEND_SERVICE }}\` | [App URL]($F_URL) |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| **Frontend App** | $FRONTEND_STATUS | \`${{ env.FRONTEND_SERVICE }}\` | *N/A* |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*View deployment details in [Google Cloud Console](https://console.cloud.google.com/run?project=${{ env.PROJECT_ID }}).* " >> $GITHUB_STEP_SUMMARY
+
+  cleanup-branch-preview:
+    name: Clean Up Deleted Branch Preview
+    if: github.repository == 'Modtale/modtale' && github.event.deleted == true && startsWith(github.ref, 'refs/heads/') && github.ref_name != 'main' && github.ref_name != 'develop'
+    runs-on: ubuntu-latest
+    environment: branch-preview
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_R2_PROVISIONER: ${{ secrets.CLOUDFLARE_R2_PROVISIONER }}
+      CLOUDFLARE_API_TOKEN_PROVISIONER: ${{ secrets.CLOUDFLARE_API_TOKEN_PROVISIONER }}
+      CLOUDFLARE_R2_JURISDICTION: ${{ vars.CLOUDFLARE_R2_JURISDICTION }}
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Prepare cleanup names
+        run: |
+          set -euo pipefail
+
+          branch_name="${GITHUB_REF#refs/heads/}"
+          slug="$(printf '%s' "$branch_name" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]' | sed 's/--*/-/g' | cut -c 1-20 | sed 's/^-//;s/-$//')"
+          if [ -z "$slug" ]; then
+            deleted_sha="${{ github.event.before }}"
+            slug="${deleted_sha:0:7}"
+          fi
+
+          if [ -z "$slug" ] || [ "$slug" = "main" ] || [ "$slug" = "develop" ]; then
+            echo "::error::Refusing to clean up protected or empty branch slug '$slug'."
+            exit 1
+          fi
+
+          echo "BRANCH_SLUG=$slug" >> "$GITHUB_ENV"
+          echo "BACKEND_SERVICE=modtale-backend-$slug" >> "$GITHUB_ENV"
+          echo "FRONTEND_SERVICE=modtale-frontend-$slug" >> "$GITHUB_ENV"
+          echo "DB_NAME=modtale-$slug" >> "$GITHUB_ENV"
+          echo "MONGODB_SECRET_NAME=BRANCH_PREVIEW_MONGODB_URI" >> "$GITHUB_ENV"
+          echo "R2_BUCKET_NAME=modtale-branch-$slug" >> "$GITHUB_ENV"
+          echo "R2_ACCESS_KEY_SECRET_NAME=branch-preview-$slug-r2-access-key" >> "$GITHUB_ENV"
+          echo "R2_SECRET_KEY_SECRET_NAME=branch-preview-$slug-r2-secret-key" >> "$GITHUB_ENV"
+          echo "R2_ENDPOINT_SECRET_NAME=branch-preview-$slug-r2-endpoint" >> "$GITHUB_ENV"
+          echo "R2_TOKEN_ID_SECRET_NAME=branch-preview-$slug-r2-token-id" >> "$GITHUB_ENV"
+          echo "IMAGE_TAG=$slug" >> "$GITHUB_ENV"
+
+      - name: Check out cleanup scripts
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Delete branch Cloud Run services
+        run: |
+          gcloud run services delete "$BACKEND_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --quiet || true
+
+          gcloud run services delete "$FRONTEND_SERVICE" \
+            --project "$PROJECT_ID" \
+            --region "$REGION" \
+            --quiet || true
+
+      - name: Remove branch image tags
+        run: |
+          gcloud container images untag "gcr.io/$PROJECT_ID/modtale-backend:$IMAGE_TAG" --quiet || true
+          gcloud container images untag "gcr.io/$PROJECT_ID/modtale-frontend:$IMAGE_TAG" --quiet || true
+
+      - name: Delete branch R2 bucket
+        run: |
+          set -euo pipefail
+
+          case "$R2_BUCKET_NAME" in
+            modtale-branch-*)
+              ;;
+            *)
+              echo "::error::Refusing to delete non-branch R2 bucket '$R2_BUCKET_NAME'."
+              exit 1
+              ;;
+          esac
+
+          r2_access_key="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$R2_ACCESS_KEY_SECRET_NAME" 2>/dev/null || true)"
+          r2_secret_key="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$R2_SECRET_KEY_SECRET_NAME" 2>/dev/null || true)"
+          r2_endpoint="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$R2_ENDPOINT_SECRET_NAME" 2>/dev/null || true)"
+          r2_endpoint="$(printf '%s' "$r2_endpoint" | sed -E 's#(https?://[^/]+).*#\1#')"
+
+          echo "::add-mask::$r2_access_key"
+          echo "::add-mask::$r2_secret_key"
+
+          if [ -z "$r2_access_key" ] || [ -z "$r2_secret_key" ] || [ -z "$r2_endpoint" ]; then
+            echo "Per-branch R2 runtime secrets are missing; skipping object empty step."
+          elif ! command -v aws >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y awscli
+          fi
+
+          if [ -n "$r2_access_key" ] && \
+             [ -n "$r2_secret_key" ] && \
+             [ -n "$r2_endpoint" ] && \
+             AWS_ACCESS_KEY_ID="$r2_access_key" \
+             AWS_SECRET_ACCESS_KEY="$r2_secret_key" \
+             AWS_DEFAULT_REGION=auto \
+             aws s3api head-bucket \
+               --endpoint-url "$r2_endpoint" \
+               --bucket "$R2_BUCKET_NAME" >/dev/null 2>&1; then
+            AWS_ACCESS_KEY_ID="$r2_access_key" \
+            AWS_SECRET_ACCESS_KEY="$r2_secret_key" \
+            AWS_DEFAULT_REGION=auto \
+            aws s3 rm \
+              --endpoint-url "$r2_endpoint" \
+              "s3://$R2_BUCKET_NAME" \
+              --recursive
+          else
+            echo "R2 bucket '$R2_BUCKET_NAME' does not exist; nothing to delete."
+          fi
+
+          runtime_token_id="$(
+            gcloud secrets versions access latest \
+              --project "$PROJECT_ID" \
+              --secret="$R2_TOKEN_ID_SECRET_NAME" 2>/dev/null || true
+          )"
+          if [ -z "$runtime_token_id" ]; then
+            runtime_token_id="$(
+              gcloud secrets versions access latest \
+                --project "$PROJECT_ID" \
+                --secret="$R2_ACCESS_KEY_SECRET_NAME" 2>/dev/null || true
+            )"
+          fi
+          echo "::add-mask::$runtime_token_id"
+          export R2_RUNTIME_TOKEN_ID="$runtime_token_id"
+
+          : "${CLOUDFLARE_ACCOUNT_ID:?Set secret CLOUDFLARE_ACCOUNT_ID.}"
+          : "${CLOUDFLARE_R2_PROVISIONER:?Set secret CLOUDFLARE_R2_PROVISIONER.}"
+          : "${CLOUDFLARE_API_TOKEN_PROVISIONER:?Set secret CLOUDFLARE_API_TOKEN_PROVISIONER.}"
+          node .github/scripts/cloudflare-r2-preview.mjs cleanup
+
+          for secret_name in \
+            "$R2_ACCESS_KEY_SECRET_NAME" \
+            "$R2_SECRET_KEY_SECRET_NAME" \
+            "$R2_ENDPOINT_SECRET_NAME" \
+            "$R2_TOKEN_ID_SECRET_NAME"; do
+            gcloud secrets delete "$secret_name" \
+              --project "$PROJECT_ID" \
+              --quiet || true
+          done
+
+      - name: Drop branch Mongo database
+        run: |
+          set -euo pipefail
+
+          case "$DB_NAME" in
+            modtale-*)
+              ;;
+            *)
+              echo "::error::Refusing to drop non-preview Mongo database '$DB_NAME'."
+              exit 1
+              ;;
+          esac
+
+          mongodb_uri="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$MONGODB_SECRET_NAME")"
+          echo "::add-mask::$mongodb_uri"
+
+          npm install --silent --prefix "$RUNNER_TEMP/mongo-cleanup" mongodb@6
+
+          MONGODB_URI="$mongodb_uri" \
+          NODE_PATH="$RUNNER_TEMP/mongo-cleanup/node_modules" \
+          node <<'NODE'
+          const { MongoClient } = require('mongodb');
+
+          const uri = process.env.MONGODB_URI;
+          const dbName = process.env.DB_NAME;
+
+          if (!/^modtale-[a-z0-9-]+$/.test(dbName)) {
+            throw new Error(`Refusing to drop unsafe database name: ${dbName}`);
+          }
+
+          const client = new MongoClient(uri, { appName: 'modtale-branch-preview-cleanup' });
+          try {
+            await client.connect();
+            const result = await client.db(dbName).dropDatabase();
+            console.log(`Dropped Mongo database ${dbName}: ${result}`);
+          } finally {
+            await client.close();
+          }
+          NODE

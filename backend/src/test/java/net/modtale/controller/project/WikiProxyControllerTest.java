@@ -1,13 +1,13 @@
 package net.modtale.controller.project;
 
-import tools.jackson.databind.ObjectMapper;
 import net.modtale.exception.UpstreamServiceException;
-import net.modtale.service.user.AccountService;
-import net.modtale.service.project.WikiService;
+import net.modtale.service.project.media.WikiService;
+import net.modtale.service.user.account.AccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
+import tools.jackson.databind.ObjectMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;

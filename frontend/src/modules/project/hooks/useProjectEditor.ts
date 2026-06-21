@@ -3,6 +3,7 @@ import { projectClient } from '@/modules/project/api/projectClient';
 import { api, extractApiErrorMessage } from '@/utils/api';
 import type { Project, User } from '@/types';
 import type { MetadataFormData } from '../components/FormShared';
+import { countGalleryCarouselMarkers, GALLERY_CAROUSEL_MARKER } from '../utils/galleryCarouselMarker';
 
 export const useProjectEditor = (
     projectData: Project | null,
@@ -78,6 +79,11 @@ export const useProjectEditor = (
 
     const handleSave = async () => {
         if (!projectData?.id) return;
+        if (countGalleryCarouselMarkers(metaData.description) > 1) {
+            onShowStatus('error', 'Gallery Carousel Marker', `Use ${GALLERY_CAROUSEL_MARKER} only once in the project description.`);
+            return;
+        }
+
         setIsSaving(true);
         setSlugError(null);
         try {
@@ -90,6 +96,7 @@ export const useProjectEditor = (
                 links: metaData.links,
                 repositoryUrl: metaData.repositoryUrl,
                 license: metaData.license,
+                customLicenseOpenSource: metaData.customLicenseOpenSource,
                 allowModpacks: projectData.allowModpacks,
                 allowComments: projectData.allowComments,
                 hmWikiEnabled: projectData.hmWikiEnabled,
@@ -116,7 +123,7 @@ export const useProjectEditor = (
 
             let refreshed: Project | null = null;
             try {
-                refreshed = await projectClient.getProject(projectData.id);
+                refreshed = await projectClient.getProjectFull(projectData.id);
             } catch {
             }
 
@@ -133,7 +140,8 @@ export const useProjectEditor = (
                     tags: metaData.tags,
                     links: metaData.links,
                     repositoryUrl: metaData.repositoryUrl,
-                    license: metaData.license
+                    license: metaData.license,
+                    customLicenseOpenSource: metaData.customLicenseOpenSource
                 };
             });
             setIsDirty(false);
@@ -187,6 +195,33 @@ export const useProjectEditor = (
         }
     };
 
+    const handleGalleryVideoAdd = async (videoUrl: string) => {
+        if (!projectData?.id) return;
+        try {
+            const res = await api.post(`/projects/${projectData.id}/gallery/youtube`, {
+                videoUrl
+            });
+            setProjectData(res.data);
+            onShowStatus('success', 'Added', 'Video added to gallery.');
+        } catch (e: any) {
+            onShowStatus('error', 'Video Add Failed', extractApiErrorMessage(e, 'Failed to add video.'));
+        }
+    };
+
+    const handleGalleryCaptionChange = async (imageUrl: string, caption: string) => {
+        if (!projectData?.id) return;
+        try {
+            const res = await api.put(`/projects/${projectData.id}/gallery/caption`, {
+                imageUrl,
+                caption
+            });
+            setProjectData(res.data);
+            onShowStatus('success', 'Saved', 'Gallery caption updated.');
+        } catch (e: any) {
+            onShowStatus('error', 'Caption Save Failed', extractApiErrorMessage(e, 'Failed to update gallery caption.'));
+        }
+    };
+
     const handleGalleryDelete = async (url: string) => {
         if (!projectData?.id) return;
         try {
@@ -205,6 +240,6 @@ export const useProjectEditor = (
         repos, loadingRepos, manualRepo, setManualRepo, repoValid, isDirty, setIsDirty,
         slugError, setSlugError, userSearchResults, setUserSearchResults, provider,
         setProvider, markDirty, checkRepoUrl, fetchRepos, handleRoleUpdate, handleCancelInvite,
-        handleSave, handleSubmit, isSaving, handleGalleryUpload, handleGalleryDelete
+        handleSave, handleSubmit, isSaving, handleGalleryUpload, handleGalleryVideoAdd, handleGalleryCaptionChange, handleGalleryDelete
     };
 };

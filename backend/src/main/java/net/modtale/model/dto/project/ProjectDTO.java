@@ -1,12 +1,11 @@
 package net.modtale.model.dto.project;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.util.List;
+import java.util.Map;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectStatus;
-
-import java.util.List;
-import java.util.Map;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ProjectDTO {
@@ -31,6 +30,7 @@ public class ProjectDTO {
     private String updatedAt;
     private String createdAt;
     private String license;
+    private boolean customLicenseOpenSource;
     private String lastTrendingNotification;
     private Map<String, String> links;
     private List<String> types;
@@ -41,6 +41,7 @@ public class ProjectDTO {
     private boolean allowComments;
     private boolean hmWikiEnabled;
     private String hmWikiSlug;
+    private boolean galleryCarouselEnabled;
     private ProjectStatus status;
     private String expiresAt;
 
@@ -49,6 +50,7 @@ public class ProjectDTO {
     private List<Project.ProjectMember> teamInvites;
 
     private List<String> galleryImages;
+    private Map<String, String> galleryImageCaptions;
     private List<ProjectCommentDTO> comments;
     private List<ProjectVersionDTO> versions;
     private boolean canEdit;
@@ -96,6 +98,8 @@ public class ProjectDTO {
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
     public String getLicense() { return license; }
     public void setLicense(String license) { this.license = license; }
+    public boolean isCustomLicenseOpenSource() { return customLicenseOpenSource; }
+    public void setCustomLicenseOpenSource(boolean customLicenseOpenSource) { this.customLicenseOpenSource = customLicenseOpenSource; }
     public String getLastTrendingNotification() { return lastTrendingNotification; }
     public void setLastTrendingNotification(String lastTrendingNotification) { this.lastTrendingNotification = lastTrendingNotification; }
     public Map<String, String> getLinks() { return links; }
@@ -116,6 +120,8 @@ public class ProjectDTO {
     public void setHmWikiEnabled(boolean hmWikiEnabled) { this.hmWikiEnabled = hmWikiEnabled; }
     public String getHmWikiSlug() { return hmWikiSlug; }
     public void setHmWikiSlug(String hmWikiSlug) { this.hmWikiSlug = hmWikiSlug; }
+    public boolean isGalleryCarouselEnabled() { return galleryCarouselEnabled; }
+    public void setGalleryCarouselEnabled(boolean galleryCarouselEnabled) { this.galleryCarouselEnabled = galleryCarouselEnabled; }
     public ProjectStatus getStatus() { return status; }
     public void setStatus(ProjectStatus status) { this.status = status; }
     public String getExpiresAt() { return expiresAt; }
@@ -130,6 +136,8 @@ public class ProjectDTO {
 
     public List<String> getGalleryImages() { return galleryImages; }
     public void setGalleryImages(List<String> galleryImages) { this.galleryImages = galleryImages; }
+    public Map<String, String> getGalleryImageCaptions() { return galleryImageCaptions; }
+    public void setGalleryImageCaptions(Map<String, String> galleryImageCaptions) { this.galleryImageCaptions = galleryImageCaptions; }
     public List<ProjectCommentDTO> getComments() { return comments; }
     public void setComments(List<ProjectCommentDTO> comments) { this.comments = comments; }
     public List<ProjectVersionDTO> getVersions() { return versions; }
