@@ -3,14 +3,13 @@ name: PR Preview
 on:
   pull_request_target:
     types:
-      - opened
-      - synchronize
-      - reopened
-      - ready_for_review
       - closed
+  issue_comment:
+    types:
+      - created
 
 concurrency:
-  group: pr-preview-${{ github.event.pull_request.number }}
+  group: pr-preview-${{ github.event.pull_request.number || github.event.issue.number }}
   cancel-in-progress: true
 
 permissions:
@@ -20,9 +19,95 @@ permissions:
   pull-requests: write
 
 jobs:
+  command:
+    name: Validate Preview Command
+    if: github.repository == 'Modtale/modtale' && github.event_name == 'issue_comment' && github.event.action == 'created' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/deploy-preview')
+    runs-on: ubuntu-latest
+    outputs:
+      run_preview: ${{ steps.resolve.outputs.run_preview }}
+      pr_number: ${{ steps.resolve.outputs.pr_number }}
+      base_ref: ${{ steps.resolve.outputs.base_ref }}
+      base_sha: ${{ steps.resolve.outputs.base_sha }}
+      head_repo: ${{ steps.resolve.outputs.head_repo }}
+      head_sha: ${{ steps.resolve.outputs.head_sha }}
+    steps:
+      - id: resolve
+        name: Validate maintainer command
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          REPOSITORY: ${{ github.repository }}
+          COMMAND_BODY: ${{ github.event.comment.body }}
+          AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association }}
+        run: |
+          node <<'NODE'
+          const allowedAssociations = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+          const token = process.env.GH_TOKEN;
+          const repository = process.env.REPOSITORY;
+          const prNumber = process.env.PR_NUMBER;
+          const command = String(process.env.COMMAND_BODY || '').trim().split(/\s+/)[0];
+          const authorAssociation = process.env.AUTHOR_ASSOCIATION;
+          const { appendFileSync } = await import('node:fs');
+
+          if (command !== '/deploy-preview') {
+            console.log(`Ignoring unsupported preview command: ${command}`);
+            process.exit(0);
+          }
+
+          if (!allowedAssociations.has(authorAssociation)) {
+            console.error(`::error::Only a repository owner, member, or collaborator can run /deploy-preview. Comment author association was ${authorAssociation || '<empty>'}.`);
+            process.exit(1);
+          }
+
+          async function request(path) {
+            const response = await fetch(`https://api.github.com${path}`, {
+              headers: {
+                authorization: `Bearer ${token}`,
+                accept: 'application/vnd.github+json',
+                'x-github-api-version': '2022-11-28'
+              }
+            });
+
+            if (!response.ok) {
+              throw new Error(`GitHub API request failed: ${response.status} ${response.statusText}`);
+            }
+
+            return response.json();
+          }
+
+          const pr = await request(`/repos/${repository}/pulls/${prNumber}`);
+
+          if (pr.head?.repo?.full_name === repository) {
+            console.log('This PR comes from a Modtale/modtale branch, so PR preview infrastructure is skipped.');
+            appendFileSync(process.env.GITHUB_OUTPUT, 'run_preview=false\n');
+            process.exit(0);
+          }
+
+          if (pr.state !== 'open') {
+            console.error(`::error::PR #${prNumber} is ${pr.state}; refusing to deploy a preview.`);
+            process.exit(1);
+          }
+
+          const outputs = {
+            run_preview: 'true',
+            pr_number: String(pr.number),
+            base_ref: pr.base.ref,
+            base_sha: pr.base.sha,
+            head_repo: pr.head.repo.full_name,
+            head_sha: pr.head.sha
+          };
+
+          for (const [key, value] of Object.entries(outputs)) {
+            appendFileSync(process.env.GITHUB_OUTPUT, `${key}=${value}\n`);
+          }
+
+          console.log(`/deploy-preview accepted for PR #${pr.number} at ${pr.head.sha}.`);
+          NODE
+
   deploy:
     name: Deploy PR Preview
-    if: github.repository == 'Modtale/modtale' && github.event.action != 'closed'
+    needs: command
+    if: github.repository == 'Modtale/modtale' && needs.command.outputs.run_preview == 'true'
     runs-on: ubuntu-latest
     environment: pr-preview
     env:
@@ -40,12 +125,11 @@ jobs:
       CLOUDFLARE_R2_PROVISIONER: ${{ secrets.CLOUDFLARE_R2_PROVISIONER }}
       CLOUDFLARE_API_TOKEN_PROVISIONER: ${{ secrets.CLOUDFLARE_API_TOKEN_PROVISIONER }}
       CLOUDFLARE_R2_JURISDICTION: ${{ vars.CLOUDFLARE_R2_JURISDICTION }}
-    outputs:
-      launcher_build: ${{ steps.filter.outputs.launcher_build }}
-      launcher_site_base_url: ${{ steps.launcher_metadata.outputs.site_base_url }}
-      launcher_api_base_url: ${{ steps.launcher_metadata.outputs.api_base_url }}
-      launcher_version: ${{ steps.launcher_metadata.outputs.version }}
-      launcher_artifact_prefix: ${{ steps.launcher_metadata.outputs.artifact_prefix }}
+      PR_NUMBER: ${{ needs.command.outputs.pr_number }}
+      PR_BASE_REF: ${{ needs.command.outputs.base_ref }}
+      PR_BASE_SHA: ${{ needs.command.outputs.base_sha }}
+      PR_HEAD_REPO: ${{ needs.command.outputs.head_repo }}
+      PR_HEAD_SHA: ${{ needs.command.outputs.head_sha }}
 
     steps:
       - name: Validate preview isolation config
@@ -107,7 +191,7 @@ jobs:
       - name: Check out trusted base
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ env.PR_BASE_SHA }}
           path: base
           fetch-depth: 0
           persist-credentials: false
@@ -115,8 +199,8 @@ jobs:
       - name: Check out pull request code
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
+          repository: ${{ env.PR_HEAD_REPO }}
+          ref: ${{ env.PR_HEAD_SHA }}
           path: source
           fetch-depth: 0
           persist-credentials: false
@@ -126,9 +210,9 @@ jobs:
         working-directory: source
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_BASE_SHA: ${{ env.PR_BASE_SHA }}
+          PR_HEAD_SHA: ${{ env.PR_HEAD_SHA }}
+          PR_BASE_REF: ${{ env.PR_BASE_REF }}
         run: |
           git remote add base-repo "https://github.com/${{ github.repository }}.git" 2>/dev/null \
             || git remote set-url base-repo "https://github.com/${{ github.repository }}.git"
@@ -138,8 +222,8 @@ jobs:
 
       - name: Prepare preview names
         run: |
-          pr_number="${{ github.event.pull_request.number }}"
-          head_sha="${{ github.event.pull_request.head.sha }}"
+          pr_number="$PR_NUMBER"
+          head_sha="$PR_HEAD_SHA"
           short_sha="${head_sha:0:7}"
 
           echo "TAG=pr-${pr_number}-${short_sha}" >> "$GITHUB_ENV"
@@ -245,7 +329,7 @@ jobs:
           gcloud builds submit \
             --project "$PROJECT_ID" \
             --config "$GITHUB_WORKSPACE/base/backend/cloudbuild.yml" \
-            --service-account "$BUILD_SERVICE_ACCOUNT" \
+            --service-account "projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
             --substitutions=_TAG="$TAG" .
 
       - name: Deploy backend preview
@@ -290,7 +374,7 @@ jobs:
           gcloud builds submit \
             --project "$PROJECT_ID" \
             --config "$GITHUB_WORKSPACE/base/frontend/cloudbuild.yml" \
-            --service-account "$BUILD_SERVICE_ACCOUNT" \
+            --service-account "projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
             --substitutions=_PUBLIC_API_URL="$API_URL",_TAG="$TAG" .
 
       - name: Deploy frontend preview
@@ -315,14 +399,6 @@ jobs:
             --region "$REGION" \
             --update-env-vars "FRONTEND_URL=$FRONTEND_URL,BACKEND_URL=$BACKEND_URL"
 
-      - name: Export launcher build metadata
-        id: launcher_metadata
-        run: |
-          echo "site_base_url=$FRONTEND_URL" >> "$GITHUB_OUTPUT"
-          echo "api_base_url=$API_URL" >> "$GITHUB_OUTPUT"
-          echo "version=0.1.0-$TAG" >> "$GITHUB_OUTPUT"
-          echo "artifact_prefix=launcher-$TAG" >> "$GITHUB_OUTPUT"
-
       - name: Publish preview comment
         env:
           GH_TOKEN: ${{ github.token }}
@@ -335,114 +411,17 @@ jobs:
           - API: $API_URL
           - Database: \`$DB_NAME\` seeded from the trusted sanitized template database
           - R2 Bucket: \`$R2_BUCKET_NAME\` seeded from the trusted sanitized preview source bucket \`$SEEDING_SOURCE_R2_BUCKET_NAME\`
-          - Commit: \`${{ github.event.pull_request.head.sha }}\`
+          - Commit: \`$PR_HEAD_SHA\`
 
           This preview runs untrusted PR code against preview-only infrastructure. It does not receive production/dev secrets, production domains, production buckets, OAuth credentials, Warden credentials, real scan results, admin enforcement data, or real analytics data.
           EOF
 
-          gh pr comment "${{ github.event.pull_request.number }}" --edit-last --body-file "$body_file" \
-            || gh pr comment "${{ github.event.pull_request.number }}" --body-file "$body_file"
-
-  package-launcher:
-    name: Package PR Launcher (${{ matrix.name }})
-    needs: deploy
-    if: github.repository == 'Modtale/modtale' && needs.deploy.outputs.launcher_build == 'true'
-    runs-on: ${{ matrix.os }}
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Linux AppImage
-            os: ubuntu-latest
-            artifact: linux
-          - name: Windows Installer
-            os: windows-latest
-            artifact: windows
-          - name: macOS DMG
-            os: macos-latest
-            artifact: macos
-    defaults:
-      run:
-        working-directory: launcher
-        shell: bash
-    env:
-      LAUNCHER_SITE_BASE_URL: ${{ needs.deploy.outputs.launcher_site_base_url }}
-      LAUNCHER_API_BASE_URL: ${{ needs.deploy.outputs.launcher_api_base_url }}
-      LAUNCHER_VERSION: ${{ needs.deploy.outputs.launcher_version }}
-
-    steps:
-      - name: Check out pull request code
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
-
-      - name: Validate launcher target URLs
-        run: |
-          : "${LAUNCHER_SITE_BASE_URL:?Launcher site URL was not produced by the deploy job.}"
-          : "${LAUNCHER_API_BASE_URL:?Launcher API URL was not produced by the deploy job.}"
-          : "${LAUNCHER_VERSION:?Launcher version was not produced by the deploy job.}"
-
-          echo "Launcher site URL: $LAUNCHER_SITE_BASE_URL"
-          echo "Launcher API URL: $LAUNCHER_API_BASE_URL"
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v3
-
-      - name: Set up Linux AppImage tooling
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libfuse2 || sudo apt-get install -y libfuse2t64 || true
-          curl -L \
-            -o "$RUNNER_TEMP/appimagetool" \
-            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x "$RUNNER_TEMP/appimagetool"
-          echo "APPIMAGETOOL=$RUNNER_TEMP/appimagetool" >> "$GITHUB_ENV"
-          echo "APPIMAGE_EXTRACT_AND_RUN=1" >> "$GITHUB_ENV"
-
-      - name: Set up Windows installer tooling
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          choco install wixtoolset -y --no-progress
-          $wix = Get-ChildItem "C:\Program Files (x86)" -Directory -Filter "WiX Toolset*" |
-            Sort-Object Name -Descending |
-            Select-Object -First 1
-          if ($null -eq $wix) {
-            throw "WiX Toolset was not installed."
-          }
-          "$($wix.FullName)\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
-
-      - name: Ensure Gradle wrapper is executable
-        run: chmod +x gradlew
-
-      - name: Build PR launcher package
-        run: |
-          ./gradlew clean packageAll \
-            -PlauncherVersion="$LAUNCHER_VERSION" \
-            -PmodtaleSiteBaseUrl="$LAUNCHER_SITE_BASE_URL" \
-            -PmodtaleApiBaseUrl="$LAUNCHER_API_BASE_URL"
-
-      - name: Upload PR launcher package
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ needs.deploy.outputs.launcher_artifact_prefix }}-${{ matrix.artifact }}
-          path: launcher/build/distributions/*
-          if-no-files-found: error
+          gh pr comment "$PR_NUMBER" --edit-last --body-file "$body_file" \
+            || gh pr comment "$PR_NUMBER" --body-file "$body_file"
 
   cleanup:
     name: Clean Up PR Preview
-    if: github.repository == 'Modtale/modtale' && github.event.action == 'closed'
+    if: github.repository == 'Modtale/modtale' && github.event.pull_request.head.repo.full_name != github.repository && github.event.action == 'closed'
     runs-on: ubuntu-latest
     environment: pr-preview
     env:
