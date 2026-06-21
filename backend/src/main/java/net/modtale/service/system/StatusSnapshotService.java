@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import net.modtale.config.properties.AppR2Properties;
 import net.modtale.model.dto.response.system.ServiceStatusView;
 import net.modtale.model.dto.response.system.StatusHistoryPointView;
 import net.modtale.model.dto.response.system.SystemStatusView;
@@ -20,6 +21,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 
 @Service
 public class StatusSnapshotService {
@@ -28,6 +30,7 @@ public class StatusSnapshotService {
 
     private final MongoTemplate mongoTemplate;
     private final S3Client s3Client;
+    private final String bucketName;
     private final StatusHistoryRepository historyRepository;
     private final StatusDiscordNotifierService statusDiscordNotifierService;
     private final StatusIncidentService statusIncidentService;
@@ -38,12 +41,14 @@ public class StatusSnapshotService {
     public StatusSnapshotService(
             MongoTemplate mongoTemplate,
             S3Client s3Client,
+            AppR2Properties r2Properties,
             StatusHistoryRepository historyRepository,
             StatusDiscordNotifierService statusDiscordNotifierService,
             StatusIncidentService statusIncidentService
     ) {
         this.mongoTemplate = mongoTemplate;
         this.s3Client = s3Client;
+        this.bucketName = r2Properties.bucket();
         this.historyRepository = historyRepository;
         this.statusDiscordNotifierService = statusDiscordNotifierService;
         this.statusIncidentService = statusIncidentService;
@@ -167,7 +172,7 @@ public class StatusSnapshotService {
         long storageStart = System.currentTimeMillis();
         SystemStatus storageStatus = SystemStatus.OPERATIONAL;
         try {
-            s3Client.listBuckets();
+            s3Client.headBucket(HeadBucketRequest.builder().bucket(bucketName).build());
         } catch (SdkException e) {
             logger.error("Health Check: Storage failed", e);
             allOperational = false;
