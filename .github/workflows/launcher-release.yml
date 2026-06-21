@@ -55,7 +55,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Linux AppImage
+          - name: Linux Packages
             os: ubuntu-latest
             artifact: launcher-linux
           - name: Windows Installer
@@ -82,11 +82,20 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Set up Linux AppImage tooling
+      - name: Set up Linux packaging tooling
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
+          sudo apt-get install -y \
+            binutils \
+            flatpak \
+            rpm \
+            tar \
+            xz-utils \
+            zstd
           sudo apt-get install -y libfuse2 || sudo apt-get install -y libfuse2t64 || true
+          sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          sudo flatpak install -y flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
           curl -L \
             -o "$RUNNER_TEMP/appimagetool" \
             https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
@@ -111,7 +120,13 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build native launcher package
-        run: ./gradlew clean packageAll -PlauncherVersion="${{ needs.metadata.outputs.version }}"
+        run: |
+          package_task="packageAll"
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            package_task="packageLinuxAll"
+          fi
+
+          ./gradlew clean "$package_task" -PlauncherVersion="${{ needs.metadata.outputs.version }}"
 
       - name: Upload launcher package
         uses: actions/upload-artifact@v4
