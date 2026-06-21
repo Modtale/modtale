@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { MongoClient } from 'mongodb';
+import { connectMongo } from './mongo-connection.mjs';
 
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
 const fixtureDir = process.env.MOCK_DB_COLLECTION_DIR
@@ -63,21 +63,30 @@ function readCollection(collectionName) {
   return docs.map(reviveExtendedJson);
 }
 
-const client = new MongoClient(targetUri, { appName: 'modtale-mock-template-load' });
+async function main() {
+  const client = await connectMongo(targetUri, {
+    appName: 'modtale-mock-template-load',
+    label: 'template'
+  });
 
-try {
-  await client.connect();
-  const db = client.db(targetDbName);
+  try {
+    const db = client.db(targetDbName);
 
-  for (const collectionName of collections) {
-    const docs = readCollection(collectionName);
-    const collection = db.collection(collectionName);
-    await collection.deleteMany({});
-    if (docs.length > 0) {
-      await collection.insertMany(docs, { ordered: false });
+    for (const collectionName of collections) {
+      const docs = readCollection(collectionName);
+      const collection = db.collection(collectionName);
+      await collection.deleteMany({});
+      if (docs.length > 0) {
+        await collection.insertMany(docs, { ordered: false });
+      }
+      console.log(`Loaded ${docs.length} document(s) into ${targetDbName}.${collectionName}`);
     }
-    console.log(`Loaded ${docs.length} document(s) into ${targetDbName}.${collectionName}`);
+  } finally {
+    await client.close();
   }
-} finally {
-  await client.close();
 }
+
+main().catch((error) => {
+  console.error(error?.message || error);
+  process.exit(1);
+});
