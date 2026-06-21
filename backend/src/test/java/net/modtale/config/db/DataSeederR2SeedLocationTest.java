@@ -138,6 +138,21 @@ class DataSeederR2SeedLocationTest {
         verify(storageService).uploadDirect(startsWith(".modtale/seeding/r2-artifacts/"), any(byte[].class), eq("application/json"));
     }
 
+    @Test
+    void fetchesAllTemplateProjects() throws Exception {
+        Method method = DataSeeder.class.getDeclaredMethod("templateLimit", String.class);
+        method.setAccessible(true);
+
+        assertEquals(0, method.invoke(seeder, "projects"));
+    }
+
+    @Test
+    void detectsIncompleteTemplateImportsByProjectsAndVersions() throws Exception {
+        assertTrue(templateImportIncomplete(10, 90, 10, 90));
+        assertTrue(templateImportIncomplete(90, 90, 10, 180));
+        assertFalse(templateImportIncomplete(90, 90, 180, 180));
+    }
+
     private R2Location location(String rawLocation) throws Exception {
         Object raw = rawLocation(rawLocation);
         assertNotNull(raw);
@@ -160,6 +175,23 @@ class DataSeederR2SeedLocationTest {
         Map<String, Object> objects = new LinkedHashMap<>();
         method.invoke(seeder, project, objects);
         return objects;
+    }
+
+    private boolean templateImportIncomplete(
+            long targetProjectCount,
+            long sourceProjectCount,
+            long targetVersionCount,
+            long sourceVersionCount
+    ) throws Exception {
+        Method method = DataSeeder.class.getDeclaredMethod(
+                "templateImportIncomplete",
+                long.class,
+                long.class,
+                long.class,
+                long.class
+        );
+        method.setAccessible(true);
+        return (Boolean) method.invoke(seeder, targetProjectCount, sourceProjectCount, targetVersionCount, sourceVersionCount);
     }
 
     private record R2Location(String key, boolean syntheticFallback) {
