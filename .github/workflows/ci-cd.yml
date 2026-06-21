@@ -640,7 +640,48 @@ jobs:
             -PmodtaleSiteBaseUrl="$LAUNCHER_SITE_BASE_URL" \
             -PmodtaleApiBaseUrl="$LAUNCHER_API_BASE_URL"
 
+      - name: Upload Linux AppImage package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ needs.deploy.outputs.launcher_artifact_prefix }}-linux-appimage
+          path: launcher/build/distributions/*.AppImage
+          if-no-files-found: error
+
+      - name: Upload Linux Debian package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ needs.deploy.outputs.launcher_artifact_prefix }}-linux-deb
+          path: launcher/build/distributions/*.deb
+          if-no-files-found: error
+
+      - name: Upload Linux RPM package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ needs.deploy.outputs.launcher_artifact_prefix }}-linux-rpm
+          path: launcher/build/distributions/*.rpm
+          if-no-files-found: error
+
+      - name: Upload Linux Flatpak package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ needs.deploy.outputs.launcher_artifact_prefix }}-linux-flatpak
+          path: launcher/build/distributions/*.flatpak
+          if-no-files-found: error
+
+      - name: Upload Linux pacman package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ needs.deploy.outputs.launcher_artifact_prefix }}-linux-pacman
+          path: launcher/build/distributions/*.pkg.tar.zst
+          if-no-files-found: error
+
       - name: Upload staging launcher package
+        if: runner.os != 'Linux'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ needs.deploy.outputs.launcher_artifact_prefix }}-${{ matrix.artifact }}
