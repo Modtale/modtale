@@ -4,6 +4,8 @@ import { createHash } from "node:crypto";
 
 const API_BASE = "https://api.cloudflare.com/client/v4";
 const R2_BUCKET_ITEM_WRITE = "Workers R2 Storage Bucket Item Write";
+const TOKEN_OWNER_ACCOUNT = "account";
+const TOKEN_OWNER_USER = "user";
 
 const mode = process.argv[2];
 
@@ -44,6 +46,30 @@ function endpointFor(accountId, jurisdiction) {
     return `https://${accountId}.fedramp.r2.cloudflarestorage.com`;
   }
   return `https://${accountId}.r2.cloudflarestorage.com`;
+}
+
+function tokenOwner() {
+  const owner = optional("CLOUDFLARE_API_TOKEN_OWNER", TOKEN_OWNER_ACCOUNT);
+  if (![TOKEN_OWNER_ACCOUNT, TOKEN_OWNER_USER].includes(owner)) {
+    throw new Error(
+      `Unsupported CLOUDFLARE_API_TOKEN_OWNER '${owner}'. Use '${TOKEN_OWNER_ACCOUNT}' or '${TOKEN_OWNER_USER}'.`,
+    );
+  }
+  return owner;
+}
+
+function tokenCollectionPath(accountId) {
+  return tokenOwner() === TOKEN_OWNER_USER
+    ? "/user/tokens"
+    : `/accounts/${accountId}/tokens`;
+}
+
+function tokenItemPath(accountId, tokenId) {
+  return `${tokenCollectionPath(accountId)}/${encodeURIComponent(tokenId)}`;
+}
+
+function tokenPermissionGroupsPath(accountId) {
+  return `${tokenCollectionPath(accountId)}/permission_groups`;
 }
 
 function bucketResource(accountId, jurisdiction, bucketName) {
@@ -150,8 +176,11 @@ async function ensureBucket(accountId, token, bucketName, jurisdiction) {
   console.log(`Created R2 bucket '${bucketName}'.`);
 }
 
-async function permissionGroupId(token, permissionName) {
-  const payload = await cloudflare(token, "/user/tokens/permission_groups");
+async function permissionGroupId(accountId, token, permissionName) {
+  const payload = await cloudflare(
+    token,
+    `${tokenPermissionGroupsPath(accountId)}?name=${encodeURIComponent(permissionName)}`,
+  );
   const match = payload.result?.find((group) => group.name === permissionName);
   if (!match?.id) {
     throw new Error(`Cloudflare permission group '${permissionName}' was not found.`);
@@ -159,12 +188,12 @@ async function permissionGroupId(token, permissionName) {
   return match.id;
 }
 
-async function revokeToken(token, tokenId, reason) {
+async function revokeToken(accountId, token, tokenId, reason) {
   if (!tokenId) {
     return;
   }
   try {
-    await cloudflare(token, `/user/tokens/${encodeURIComponent(tokenId)}`, {
+    await cloudflare(token, tokenItemPath(accountId, tokenId), {
       method: "DELETE",
     });
     console.log(`Revoked Cloudflare token '${tokenId}'${reason ? ` (${reason})` : ""}.`);
@@ -178,7 +207,7 @@ async function revokeToken(token, tokenId, reason) {
 }
 
 async function createRuntimeToken(accountId, token, bucketName, jurisdiction) {
-  const groupId = await permissionGroupId(token, R2_BUCKET_ITEM_WRITE);
+  const groupId = await permissionGroupId(accountId, token, R2_BUCKET_ITEM_WRITE);
   const tokenName = optional("R2_TOKEN_NAME", `modtale preview ${bucketName}`);
   const expiresOn = optional("R2_TOKEN_EXPIRES_ON");
 
@@ -199,7 +228,7 @@ async function createRuntimeToken(accountId, token, bucketName, jurisdiction) {
     body.expires_on = expiresOn;
   }
 
-  const payload = await cloudflare(token, "/user/tokens", {
+  const payload = await cloudflare(token, tokenCollectionPath(accountId), {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -235,6 +264,7 @@ async function provision() {
 
   await ensureBucket(accountId, bucketToken, bucketName, jurisdiction);
   await revokeToken(
+    accountId,
     tokenProvisioner,
     optional("EXISTING_R2_RUNTIME_TOKEN_ID"),
     "replacing runtime token",
@@ -301,7 +331,12 @@ async function cleanup() {
   }
 
   if (tokenProvisioner) {
-    await revokeToken(tokenProvisioner, optional("R2_RUNTIME_TOKEN_ID"), "preview cleanup");
+    await revokeToken(
+      accountId,
+      tokenProvisioner,
+      optional("R2_RUNTIME_TOKEN_ID"),
+      "preview cleanup",
+    );
   }
 }
 
