@@ -284,12 +284,6 @@ async function provision() {
   const jurisdiction = normalizeJurisdiction(optional("CLOUDFLARE_R2_JURISDICTION"));
 
   await ensureBucket(accountId, bucketToken, bucketName, jurisdiction);
-  await revokeToken(
-    accountId,
-    tokenProvisioner,
-    optional("EXISTING_R2_RUNTIME_TOKEN_ID"),
-    "replacing runtime token",
-  );
 
   const credentials = await createRuntimeToken(
     accountId,
