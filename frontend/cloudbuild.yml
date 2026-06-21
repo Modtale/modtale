@@ -17,3 +17,7 @@ steps:
 substitutions:
   _PUBLIC_API_URL: http://localhost:8080/api/v1
   _TAG: latest
+
+options:
+  defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET
+  

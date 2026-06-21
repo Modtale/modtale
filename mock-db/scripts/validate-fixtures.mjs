@@ -29,6 +29,7 @@ const forbiddenStringPatterns = [
   /AKIA[0-9A-Z]{16}/,
   /(?:password|passwd|pwd)\s*[:=]\s*[^,\s]+/i,
 ];
+const expectedPasswordHash = '$2a$10$YQPnaULIFCpHYqXreH4IdeK0tSn2gCrMgOSE6bOcKCIR16cG9/Ujy';
 
 const errors = [];
 
@@ -134,6 +135,9 @@ for (const user of collections.users) {
   const username = user.username || user._id;
   if (!String(user.email || '').endsWith('@example.test')) {
     errors.push(`User ${username} must use an @example.test email address.`);
+  }
+  if (user.password !== expectedPasswordHash) {
+    errors.push(`User ${username} must use the shared mock password hash.`);
   }
   if (user.connectedAccounts?.some((account) => String(account.profileUrl || '').includes('github.com'))) {
     errors.push(`User ${username} must not link to real social profiles.`);
