@@ -128,7 +128,48 @@ jobs:
 
           ./gradlew clean "$package_task" -PlauncherVersion="${{ needs.metadata.outputs.version }}"
 
+      - name: Upload Linux AppImage package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-linux-appimage
+          path: launcher/build/distributions/*.AppImage
+          if-no-files-found: error
+
+      - name: Upload Linux Debian package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-linux-deb
+          path: launcher/build/distributions/*.deb
+          if-no-files-found: error
+
+      - name: Upload Linux RPM package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-linux-rpm
+          path: launcher/build/distributions/*.rpm
+          if-no-files-found: error
+
+      - name: Upload Linux Flatpak package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-linux-flatpak
+          path: launcher/build/distributions/*.flatpak
+          if-no-files-found: error
+
+      - name: Upload Linux pacman package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-linux-pacman
+          path: launcher/build/distributions/*.pkg.tar.zst
+          if-no-files-found: error
+
       - name: Upload launcher package
+        if: runner.os != 'Linux'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
