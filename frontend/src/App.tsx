@@ -65,12 +65,6 @@ const setProjectLikedState = (user: User, projectId: string, liked: boolean): Us
     };
 };
 
-const hasLikelyAuthCookie = () => {
-    if (typeof document === 'undefined') return false;
-    const cookies = document.cookie || '';
-    return /(?:^|;\s*)(SESSION|JSESSIONID|XSRF-TOKEN)=/.test(cookies);
-};
-
 const ScrollToTop = () => {
     const { pathname } = useLocation();
     const previousPathnameRef = useRef<string | undefined>(undefined);
@@ -144,11 +138,6 @@ const AppContent: React.FC = () => {
     }, [user]);
 
     const fetchUser = useCallback(async () => {
-        if (!hasLikelyAuthCookie()) {
-            setLoadingAuth(false);
-            return;
-        }
-
         try {
             const res = await api.get(`/user/me?t=${Date.now()}`);
             if (res.data) {
