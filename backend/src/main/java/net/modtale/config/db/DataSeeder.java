@@ -67,6 +67,11 @@ public class DataSeeder implements CommandLineRunner {
     private static final int MONGO_SEED_PROGRESS_INTERVAL = 25;
     private static final int R2_SEED_PROGRESS_INTERVAL = 25;
     private static final String R2_SEED_MARKER_PREFIX = ".modtale/seeding/r2-artifacts/";
+    private static final String R2_SEED_MANIFEST_KEY = R2_SEED_MARKER_PREFIX + "manifest.json";
+    private static final String MONGO_SEED_MANIFEST_COLLECTION = "_modtale_seed_manifests";
+    private static final String MONGO_SEED_DOCUMENT_COLLECTION = "_modtale_seed_documents";
+    private static final String MOCK_SEED_MANIFEST_ID = "mock";
+    private static final String TEMPLATE_SEED_MANIFEST_ID = "template";
     private static final Set<String> VERSION_ARTIFACT_FIELDS = Set.of("fileUrl", "cachedFileUrl", "artifactUrl");
     private static final Set<String> DEPENDENCY_ARTIFACT_FIELDS = Set.of("cachedFileUrl", "externalFileUrl", "fileUrl");
     private static final String SUPER_ADMIN_ID = "692620f7c2f3266e23ac0ded";
@@ -251,7 +256,14 @@ public class DataSeeder implements CommandLineRunner {
         MongoDatabase targetDb = mongoTemplate.getDb();
 
         if (!seedingProperties.reset() && mongoTemplate.getCollection("projects").countDocuments() > 0) {
-            logger.info("Database '{}' already contains projects. Skipping mock database import.", currentDbName);
+            if (reconcileMongoSeedManifest(targetDb, MOCK_SEED_MANIFEST_ID, "mock", true)) {
+                return;
+            }
+            logger.warn(
+                    "Database '{}' already contains projects but has no mock seed manifest. Adopting the current branch dataset as the expected mock seed state.",
+                    currentDbName
+            );
+            writeMongoSeedManifest(targetDb, MOCK_SEED_MANIFEST_ID, "mock", "current-target", currentSeedDocuments(targetDb));
             seedR2ObjectsFromCurrentProjects(true);
             return;
         }
@@ -267,6 +279,7 @@ public class DataSeeder implements CommandLineRunner {
                 resetMockCollections(targetDb, "mock");
             }
 
+            Map<String, List<Document>> seededDocuments = new LinkedHashMap<>();
             int collectionIndex = 0;
             for (String collectionName : MOCK_COLLECTIONS) {
                 collectionIndex++;
@@ -277,6 +290,7 @@ public class DataSeeder implements CommandLineRunner {
                         collectionName
                 );
                 List<Document> documents = syntheticMockDocuments(collectionName);
+                seededDocuments.put(collectionName, documents);
                 MongoCollection<Document> collection = targetDb.getCollection(collectionName);
 
                 upsertDocumentsWithProgress(collection, collectionName, documents, "mock", collectionIndex, MOCK_COLLECTIONS.size());
@@ -285,6 +299,7 @@ public class DataSeeder implements CommandLineRunner {
                 }
             }
 
+            writeMongoSeedManifest(targetDb, MOCK_SEED_MANIFEST_ID, "mock", "synthetic", seededDocuments);
             logger.info("Mock database import completed successfully.");
         } catch (MongoException e) {
             logger.error("Failed to import generated mock database documents", e);
@@ -330,32 +345,22 @@ public class DataSeeder implements CommandLineRunner {
 
             long targetProjectCount = targetProjects.countDocuments();
             if (!seedingProperties.reset() && targetProjectCount > 0) {
-                long sourceVersionCount = countProjectVersions(sourceProjects);
-                long targetVersionCount = countProjectVersions(targetProjects);
-                if (!templateImportIncomplete(targetProjectCount, sourceProjectCount, targetVersionCount, sourceVersionCount)) {
-                    logger.info(
-                            "Database '{}' already contains a complete template import (projects={}, versions={}). Skipping template import.",
-                            currentDbName,
-                            targetProjectCount,
-                            targetVersionCount
-                    );
-                    seedR2ObjectsFromCurrentProjects(false);
+                if (reconcileMongoSeedManifest(targetDb, TEMPLATE_SEED_MANIFEST_ID, "template", false)) {
                     return;
                 }
-
                 logger.warn(
-                        "Database '{}' contains an incomplete template import (projects={}/{}, versions={}/{}). Refreshing template collections.",
+                        "Database '{}' already contains projects but has no template seed manifest. Adopting the current branch dataset as the expected template seed state instead of refreshing from '{}'.",
                         currentDbName,
-                        targetProjectCount,
-                        sourceProjectCount,
-                        targetVersionCount,
-                        sourceVersionCount
+                        sourceDbName
                 );
-                resetMockCollections(targetDb, "template");
+                writeMongoSeedManifest(targetDb, TEMPLATE_SEED_MANIFEST_ID, "template", "current-target", currentSeedDocuments(targetDb));
+                seedR2ObjectsFromCurrentProjects(false);
+                return;
             } else if (seedingProperties.reset()) {
                 resetMockCollections(targetDb, "template");
             }
 
+            Map<String, List<Document>> seededDocuments = new LinkedHashMap<>();
             int collectionIndex = 0;
             for (String collectionName : MOCK_COLLECTIONS) {
                 collectionIndex++;
@@ -377,6 +382,7 @@ public class DataSeeder implements CommandLineRunner {
                 if ("projects".equals(collectionName)) {
                     documents = completeDependencyProjects(sourceDb.getCollection("projects"), documents, "template");
                 }
+                seededDocuments.put(collectionName, documents);
                 MongoCollection<Document> collection = targetDb.getCollection(collectionName);
 
                 upsertDocumentsWithProgress(collection, collectionName, documents, "template", collectionIndex, MOCK_COLLECTIONS.size());
@@ -385,6 +391,7 @@ public class DataSeeder implements CommandLineRunner {
                 }
             }
 
+            writeMongoSeedManifest(targetDb, TEMPLATE_SEED_MANIFEST_ID, "template", sourceDbName, seededDocuments);
             logger.info("Sanitized template import completed successfully.");
         } catch (MongoException e) {
             logger.error("Failed to import sanitized template database '{}'", sourceDbName, e);
@@ -403,15 +410,6 @@ public class DataSeeder implements CommandLineRunner {
 
     private String templateLimitLabel(int limit) {
         return limit <= 0 ? "all" : Integer.toString(limit);
-    }
-
-    private boolean templateImportIncomplete(
-            long targetProjectCount,
-            long sourceProjectCount,
-            long targetVersionCount,
-            long sourceVersionCount
-    ) {
-        return targetProjectCount < sourceProjectCount || targetVersionCount < sourceVersionCount;
     }
 
     private List<Document> syntheticMockDocuments(String collectionName) {
@@ -692,6 +690,206 @@ public class DataSeeder implements CommandLineRunner {
         }
     }
 
+    private Map<String, List<Document>> currentSeedDocuments(MongoDatabase targetDb) {
+        Map<String, List<Document>> documentsByCollection = new LinkedHashMap<>();
+        for (String collectionName : MOCK_COLLECTIONS) {
+            List<Document> documents = new ArrayList<>();
+            targetDb.getCollection(collectionName).find().into(documents);
+            documentsByCollection.put(collectionName, documents);
+        }
+        return documentsByCollection;
+    }
+
+    private boolean reconcileMongoSeedManifest(
+            MongoDatabase targetDb,
+            String manifestId,
+            String seedLabel,
+            boolean allowSyntheticFallback
+    ) {
+        Document manifest = targetDb.getCollection(MONGO_SEED_MANIFEST_COLLECTION)
+                .find(Filters.eq("_id", manifestId))
+                .first();
+        if (manifest == null) {
+            return false;
+        }
+
+        List<Document> snapshots = new ArrayList<>();
+        targetDb.getCollection(MONGO_SEED_DOCUMENT_COLLECTION)
+                .find(Filters.eq("manifestId", manifestId))
+                .into(snapshots);
+        if (snapshots.isEmpty()) {
+            logger.warn(
+                    "Mongo {} seed manifest '{}' exists but has no document snapshots. Leaving current database untouched.",
+                    seedLabel,
+                    manifestId
+            );
+            return true;
+        }
+
+        int expected = 0;
+        int alreadyPresent = 0;
+        int restored = 0;
+        int skipped = 0;
+        List<Document> expectedProjects = new ArrayList<>();
+        long startedAt = System.nanoTime();
+
+        for (Document snapshot : snapshots) {
+            String collectionName = snapshot.getString("collectionName");
+            if (!MOCK_COLLECTIONS.contains(collectionName)) {
+                skipped++;
+                continue;
+            }
+
+            Object documentId = snapshot.get("documentId");
+            Document document = snapshot.get("document", Document.class);
+            if (documentId == null || document == null) {
+                skipped++;
+                continue;
+            }
+
+            expected++;
+            MongoCollection<Document> collection = targetDb.getCollection(collectionName);
+            if (collection.find(Filters.eq("_id", documentId)).projection(new Document("_id", 1)).first() == null) {
+                upsertMockDocument(collection, new Document(document));
+                restored++;
+            } else {
+                alreadyPresent++;
+            }
+
+            if ("projects".equals(collectionName)) {
+                expectedProjects.add(new Document(document));
+            }
+        }
+
+        long elapsedMillis = (System.nanoTime() - startedAt) / 1_000_000L;
+        logger.info(
+                "Mongo {} seed manifest reconcile finished: manifest='{}', expected={}, alreadyPresent={}, restoredMissing={}, skippedSnapshots={}, elapsedMs={}.",
+                seedLabel,
+                manifestId,
+                expected,
+                alreadyPresent,
+                restored,
+                skipped,
+                elapsedMillis
+        );
+
+        if (!expectedProjects.isEmpty()) {
+            seedR2ObjectsForProjects(expectedProjects, allowSyntheticFallback);
+        }
+        return true;
+    }
+
+    private void writeMongoSeedManifest(
+            MongoDatabase targetDb,
+            String manifestId,
+            String seedLabel,
+            String sourceDbName,
+            Map<String, List<Document>> documentsByCollection
+    ) {
+        if (documentsByCollection == null || documentsByCollection.isEmpty()) {
+            logger.info("Mongo {} seed manifest '{}' was not written because no documents were supplied.", seedLabel, manifestId);
+            return;
+        }
+
+        MongoCollection<Document> manifestCollection = targetDb.getCollection(MONGO_SEED_MANIFEST_COLLECTION);
+        MongoCollection<Document> snapshotCollection = targetDb.getCollection(MONGO_SEED_DOCUMENT_COLLECTION);
+        Document existingManifest = manifestCollection.find(Filters.eq("_id", manifestId)).first();
+        Date now = new Date();
+        Object createdAt = existingManifest == null ? now : existingManifest.get("createdAt", now);
+
+        snapshotCollection.deleteMany(Filters.eq("manifestId", manifestId));
+
+        int documentCount = 0;
+        List<Document> collectionEntries = new ArrayList<>();
+        List<Document> projectDocuments = new ArrayList<>();
+        List<Document> snapshotDocuments = new ArrayList<>();
+
+        for (String collectionName : MOCK_COLLECTIONS) {
+            List<Document> documents = documentsByCollection.getOrDefault(collectionName, List.of());
+            List<Object> documentIds = new ArrayList<>();
+            for (Document document : documents) {
+                if (document == null) {
+                    continue;
+                }
+
+                Object id = document.get("_id");
+                if (id == null) {
+                    continue;
+                }
+
+                documentIds.add(id);
+                documentCount++;
+                if ("projects".equals(collectionName)) {
+                    projectDocuments.add(new Document(document));
+                }
+                snapshotDocuments.add(seedDocumentSnapshot(manifestId, collectionName, document));
+            }
+
+            collectionEntries.add(new Document("name", collectionName)
+                    .append("documentCount", documentIds.size())
+                    .append("documentIds", documentIds));
+        }
+
+        if (!snapshotDocuments.isEmpty()) {
+            snapshotCollection.insertMany(snapshotDocuments, new com.mongodb.client.model.InsertManyOptions().ordered(false));
+        }
+
+        Map<String, R2SeedObject> r2Objects = new LinkedHashMap<>();
+        for (Document project : projectDocuments) {
+            collectProjectR2Objects(project, r2Objects);
+        }
+
+        Document manifest = new Document("_id", manifestId)
+                .append("type", "modtale-mongo-seed-manifest")
+                .append("seedLabel", seedLabel)
+                .append("sourceDb", sourceDbName)
+                .append("createdAt", createdAt)
+                .append("updatedAt", now)
+                .append("documentCount", documentCount)
+                .append("versionCount", countVersionDocuments(projectDocuments))
+                .append("collections", collectionEntries)
+                .append("r2", new Document("objectCount", r2Objects.size())
+                        .append("fingerprint", r2SeedFingerprint(r2Objects.values()))
+                        .append("objects", r2Objects.values().stream()
+                                .map(R2SeedObject::key)
+                                .sorted()
+                                .toList()));
+
+        manifestCollection.replaceOne(
+                Filters.eq("_id", manifestId),
+                manifest,
+                new ReplaceOptions().upsert(true)
+        );
+        logger.info(
+                "Wrote Mongo {} seed manifest '{}' (documents={}, projectDocuments={}, r2Objects={}).",
+                seedLabel,
+                manifestId,
+                documentCount,
+                projectDocuments.size(),
+                r2Objects.size()
+        );
+    }
+
+    private Document seedDocumentSnapshot(String manifestId, String collectionName, Document document) {
+        Object id = document.get("_id");
+        return new Document("_id", seedDocumentSnapshotId(manifestId, collectionName, id))
+                .append("manifestId", manifestId)
+                .append("collectionName", collectionName)
+                .append("documentId", id)
+                .append("document", new Document(document));
+    }
+
+    private String seedDocumentSnapshotId(String manifestId, String collectionName, Object id) {
+        return manifestId + ":" + collectionName + ":" + documentIdKey(id);
+    }
+
+    private String documentIdKey(Object id) {
+        if (id instanceof ObjectId objectId) {
+            return "objectid:" + objectId.toHexString();
+        }
+        return "value:" + String.valueOf(id);
+    }
+
     private void upsertDocumentsWithProgress(
             MongoCollection<Document> collection,
             String collectionName,
@@ -917,7 +1115,7 @@ public class DataSeeder implements CommandLineRunner {
         );
 
         if (missingSource == 0 && failed == 0) {
-            writeR2SeedMarker(markerKey, objects.size(), versionCount, uploaded, copied, generated, skipped, elapsedMillis);
+            writeR2SeedMarker(markerKey, objects.values(), versionCount, uploaded, copied, generated, skipped, elapsedMillis);
         } else {
             logger.info(
                     "R2 artifact seed marker was not written because missingSource={} and failed={}. The next startup will re-check R2 artifacts.",
@@ -988,7 +1186,7 @@ public class DataSeeder implements CommandLineRunner {
 
     private void writeR2SeedMarker(
             String markerKey,
-            int objectCount,
+            Collection<R2SeedObject> objects,
             int versionCount,
             int uploaded,
             int copied,
@@ -996,13 +1194,21 @@ public class DataSeeder implements CommandLineRunner {
             int alreadyPresent,
             long elapsedMillis
     ) {
+        String manifestJson = r2SeedMarkerJson(markerKey, objects, versionCount, uploaded, copied, generated, alreadyPresent, elapsedMillis);
+        int objectCount = objects.size();
         try {
             storageService.uploadDirect(
                     markerKey,
-                    r2SeedMarkerJson(markerKey, objectCount, versionCount, uploaded, copied, generated, alreadyPresent, elapsedMillis)
-                            .getBytes(StandardCharsets.UTF_8),
+                    manifestJson.getBytes(StandardCharsets.UTF_8),
                     "application/json"
             );
+            if (!R2_SEED_MANIFEST_KEY.equals(markerKey)) {
+                storageService.uploadDirect(
+                        R2_SEED_MANIFEST_KEY,
+                        manifestJson.getBytes(StandardCharsets.UTF_8),
+                        "application/json"
+                );
+            }
             logger.info("Wrote R2 artifact seed marker for current artifact set (objects={}, marker={}).", objectCount, markerKey);
         } catch (RuntimeException e) {
             logger.warn("Could not write R2 artifact seed marker '{}': {}", markerKey, e.getMessage());
@@ -1032,7 +1238,7 @@ public class DataSeeder implements CommandLineRunner {
 
     private String r2SeedMarkerJson(
             String markerKey,
-            int objectCount,
+            Collection<R2SeedObject> objects,
             int versionCount,
             int uploaded,
             int copied,
@@ -1042,18 +1248,70 @@ public class DataSeeder implements CommandLineRunner {
     ) {
         String fingerprint = markerKey
                 .substring(R2_SEED_MARKER_PREFIX.length(), markerKey.length() - ".json".length());
+        List<R2SeedObject> sortedObjects = objects.stream()
+                .sorted(Comparator.comparing(R2SeedObject::key))
+                .toList();
         return "{\n"
                 + "  \"type\": \"modtale-r2-artifact-seed\",\n"
                 + "  \"fingerprint\": \"" + fingerprint + "\",\n"
-                + "  \"objectCount\": " + objectCount + ",\n"
+                + "  \"objectCount\": " + sortedObjects.size() + ",\n"
                 + "  \"versionCount\": " + versionCount + ",\n"
                 + "  \"uploaded\": " + uploaded + ",\n"
                 + "  \"copiedFromSource\": " + copied + ",\n"
                 + "  \"generatedSynthetic\": " + generated + ",\n"
                 + "  \"alreadyPresent\": " + alreadyPresent + ",\n"
                 + "  \"elapsedMs\": " + elapsedMillis + ",\n"
-                + "  \"createdAt\": \"" + Instant.now() + "\"\n"
+                + "  \"createdAt\": \"" + Instant.now() + "\",\n"
+                + "  \"objects\": [\n"
+                + r2SeedObjectsJson(sortedObjects)
+                + "  ]\n"
                 + "}\n";
+    }
+
+    private String r2SeedObjectsJson(List<R2SeedObject> objects) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < objects.size(); i++) {
+            R2SeedObject object = objects.get(i);
+            builder.append("    {")
+                    .append("\"key\": \"").append(jsonEscape(object.key())).append("\", ")
+                    .append("\"projectName\": \"").append(jsonEscape(object.projectName())).append("\", ")
+                    .append("\"versionNumber\": \"").append(jsonEscape(object.versionNumber())).append("\", ")
+                    .append("\"classification\": \"").append(object.classification()).append("\", ")
+                    .append("\"syntheticFallback\": ").append(object.syntheticFallback())
+                    .append("}");
+            if (i + 1 < objects.size()) {
+                builder.append(',');
+            }
+            builder.append('\n');
+        }
+        return builder.toString();
+    }
+
+    private String jsonEscape(String value) {
+        if (value == null) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '"' -> builder.append("\\\"");
+                case '\\' -> builder.append("\\\\");
+                case '\b' -> builder.append("\\b");
+                case '\f' -> builder.append("\\f");
+                case '\n' -> builder.append("\\n");
+                case '\r' -> builder.append("\\r");
+                case '\t' -> builder.append("\\t");
+                default -> {
+                    if (c < 0x20) {
+                        builder.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        builder.append(c);
+                    }
+                }
+            }
+        }
+        return builder.toString();
     }
 
     private int countVersionDocuments(List<Document> projects) {
@@ -1706,17 +1964,6 @@ public class DataSeeder implements CommandLineRunner {
             db.getCollection(collectionName).find().into(buffer);
         }
         return buffer;
-    }
-
-    private long countProjectVersions(MongoCollection<Document> projectsCollection) {
-        long count = 0;
-        for (Document project : projectsCollection.find().projection(new Document("versions", 1))) {
-            Object rawVersions = project.get("versions");
-            if (rawVersions instanceof List<?> versions) {
-                count += versions.size();
-            }
-        }
-        return count;
     }
 
     private void cloneSpecificUsers(MongoDatabase source, MongoDatabase target, Set<String> userIds) {

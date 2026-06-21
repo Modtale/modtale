@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -135,7 +136,8 @@ class DataSeederR2SeedLocationTest {
         method.invoke(staleMarkerSeeder, List.of(project), true);
 
         verify(storageService).uploadDirect(eq("files/plugin/sample.jar"), any(byte[].class), eq("application/java-archive"));
-        verify(storageService).uploadDirect(startsWith(".modtale/seeding/r2-artifacts/"), any(byte[].class), eq("application/json"));
+        verify(storageService, times(2)).uploadDirect(startsWith(".modtale/seeding/r2-artifacts/"), any(byte[].class), eq("application/json"));
+        verify(storageService).uploadDirect(eq(".modtale/seeding/r2-artifacts/manifest.json"), any(byte[].class), eq("application/json"));
     }
 
     @Test
@@ -144,13 +146,6 @@ class DataSeederR2SeedLocationTest {
         method.setAccessible(true);
 
         assertEquals(0, method.invoke(seeder, "projects"));
-    }
-
-    @Test
-    void detectsIncompleteTemplateImportsByProjectsAndVersions() throws Exception {
-        assertTrue(templateImportIncomplete(10, 90, 10, 90));
-        assertTrue(templateImportIncomplete(90, 90, 10, 180));
-        assertFalse(templateImportIncomplete(90, 90, 180, 180));
     }
 
     private R2Location location(String rawLocation) throws Exception {
@@ -177,21 +172,42 @@ class DataSeederR2SeedLocationTest {
         return objects;
     }
 
-    private boolean templateImportIncomplete(
-            long targetProjectCount,
-            long sourceProjectCount,
-            long targetVersionCount,
-            long sourceVersionCount
-    ) throws Exception {
+    @Test
+    void r2SeedMarkerJsonListsExpectedObjectKeys() throws Exception {
+        Document project = new Document("slug", "sample-project")
+                .append("title", "Sample Project")
+                .append("classification", "PLUGIN")
+                .append("versions", List.of(new Document("versionNumber", "1.2.3")
+                        .append("fileUrl", "files/plugin/sample.jar")));
+        Map<String, Object> objects = collectObjects(project);
+
         Method method = DataSeeder.class.getDeclaredMethod(
-                "templateImportIncomplete",
-                long.class,
-                long.class,
-                long.class,
+                "r2SeedMarkerJson",
+                String.class,
+                java.util.Collection.class,
+                int.class,
+                int.class,
+                int.class,
+                int.class,
+                int.class,
                 long.class
         );
         method.setAccessible(true);
-        return (Boolean) method.invoke(seeder, targetProjectCount, sourceProjectCount, targetVersionCount, sourceVersionCount);
+        String json = (String) method.invoke(
+                seeder,
+                ".modtale/seeding/r2-artifacts/fingerprint.json",
+                objects.values(),
+                1,
+                1,
+                1,
+                0,
+                0,
+                42L
+        );
+
+        assertTrue(json.contains("\"objects\""));
+        assertTrue(json.contains("\"key\": \"files/plugin/sample.jar\""));
+        assertTrue(json.contains("\"objectCount\": 1"));
     }
 
     private record R2Location(String key, boolean syntheticFallback) {
