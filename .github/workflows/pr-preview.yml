@@ -3,17 +3,13 @@ name: PR Preview
 on:
   pull_request_target:
     types:
-      - opened
-      - synchronize
-      - reopened
-      - ready_for_review
       - closed
-  pull_request_review:
+  issue_comment:
     types:
-      - submitted
+      - created
 
 concurrency:
-  group: pr-preview-${{ github.event.pull_request.number }}
+  group: pr-preview-${{ github.event.pull_request.number || github.event.issue.number }}
   cancel-in-progress: true
 
 permissions:
@@ -23,24 +19,45 @@ permissions:
   pull-requests: write
 
 jobs:
-  approval:
-    name: Require Maintainer Approval
-    if: github.repository == 'Modtale/modtale' && github.event.pull_request.head.repo.full_name != github.repository && github.event.action != 'closed' && (github.event_name != 'pull_request_review' || github.event.review.state == 'approved')
+  command:
+    name: Validate Preview Command
+    if: github.repository == 'Modtale/modtale' && github.event_name == 'issue_comment' && github.event.action == 'created' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/deploy-preview')
     runs-on: ubuntu-latest
+    outputs:
+      run_preview: ${{ steps.resolve.outputs.run_preview }}
+      pr_number: ${{ steps.resolve.outputs.pr_number }}
+      base_ref: ${{ steps.resolve.outputs.base_ref }}
+      base_sha: ${{ steps.resolve.outputs.base_sha }}
+      head_repo: ${{ steps.resolve.outputs.head_repo }}
+      head_sha: ${{ steps.resolve.outputs.head_sha }}
     steps:
-      - name: Check latest-head maintainer approval
+      - id: resolve
+        name: Validate maintainer command
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.issue.number }}
           REPOSITORY: ${{ github.repository }}
+          COMMAND_BODY: ${{ github.event.comment.body }}
+          AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association }}
         run: |
           node <<'NODE'
           const allowedAssociations = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
           const token = process.env.GH_TOKEN;
           const repository = process.env.REPOSITORY;
           const prNumber = process.env.PR_NUMBER;
-          const headSha = process.env.HEAD_SHA;
+          const command = String(process.env.COMMAND_BODY || '').trim().split(/\s+/)[0];
+          const authorAssociation = process.env.AUTHOR_ASSOCIATION;
+          const { appendFileSync } = await import('node:fs');
+
+          if (command !== '/deploy-preview') {
+            console.log(`Ignoring unsupported preview command: ${command}`);
+            process.exit(0);
+          }
+
+          if (!allowedAssociations.has(authorAssociation)) {
+            console.error(`::error::Only a repository owner, member, or collaborator can run /deploy-preview. Comment author association was ${authorAssociation || '<empty>'}.`);
+            process.exit(1);
+          }
 
           async function request(path) {
             const response = await fetch(`https://api.github.com${path}`, {
@@ -58,42 +75,39 @@ jobs:
             return response.json();
           }
 
-          const reviews = [];
-          for (let page = 1; ; page += 1) {
-            const pageReviews = await request(`/repos/${repository}/pulls/${prNumber}/reviews?per_page=100&page=${page}`);
-            reviews.push(...pageReviews);
-            if (pageReviews.length < 100) break;
+          const pr = await request(`/repos/${repository}/pulls/${prNumber}`);
+
+          if (pr.head?.repo?.full_name === repository) {
+            console.log('This PR comes from a Modtale/modtale branch, so PR preview infrastructure is skipped.');
+            appendFileSync(process.env.GITHUB_OUTPUT, 'run_preview=false\n');
+            process.exit(0);
           }
 
-          const latestByReviewer = new Map();
-
-          for (const review of reviews) {
-            if (review.commit_id !== headSha) continue;
-            if (!allowedAssociations.has(review.author_association)) continue;
-            if (!review.user?.login) continue;
-
-            const existing = latestByReviewer.get(review.user.login);
-            const submittedAt = Date.parse(review.submitted_at || 0);
-            const existingSubmittedAt = Date.parse(existing?.submitted_at || 0);
-            if (!existing || submittedAt >= existingSubmittedAt) {
-              latestByReviewer.set(review.user.login, review);
-            }
-          }
-
-          const approval = [...latestByReviewer.values()].find((review) => review.state === 'APPROVED');
-          if (!approval) {
-            console.error(`::error::A maintainer must approve PR #${prNumber} at head commit ${headSha} before the PR preview can deploy.`);
-            console.error('Approve the PR review for the current commit, then GitHub will rerun this workflow from the pull_request_review event.');
+          if (pr.state !== 'open') {
+            console.error(`::error::PR #${prNumber} is ${pr.state}; refusing to deploy a preview.`);
             process.exit(1);
           }
 
-          console.log(`PR #${prNumber} preview approved by ${approval.user.login} for ${headSha}.`);
+          const outputs = {
+            run_preview: 'true',
+            pr_number: String(pr.number),
+            base_ref: pr.base.ref,
+            base_sha: pr.base.sha,
+            head_repo: pr.head.repo.full_name,
+            head_sha: pr.head.sha
+          };
+
+          for (const [key, value] of Object.entries(outputs)) {
+            appendFileSync(process.env.GITHUB_OUTPUT, `${key}=${value}\n`);
+          }
+
+          console.log(`/deploy-preview accepted for PR #${pr.number} at ${pr.head.sha}.`);
           NODE
 
   deploy:
     name: Deploy PR Preview
-    needs: approval
-    if: github.repository == 'Modtale/modtale' && github.event.pull_request.head.repo.full_name != github.repository && github.event.action != 'closed' && (github.event_name != 'pull_request_review' || github.event.review.state == 'approved') && needs.approval.result == 'success'
+    needs: command
+    if: github.repository == 'Modtale/modtale' && needs.command.outputs.run_preview == 'true'
     runs-on: ubuntu-latest
     environment: pr-preview
     env:
@@ -111,6 +125,11 @@ jobs:
       CLOUDFLARE_R2_PROVISIONER: ${{ secrets.CLOUDFLARE_R2_PROVISIONER }}
       CLOUDFLARE_API_TOKEN_PROVISIONER: ${{ secrets.CLOUDFLARE_API_TOKEN_PROVISIONER }}
       CLOUDFLARE_R2_JURISDICTION: ${{ vars.CLOUDFLARE_R2_JURISDICTION }}
+      PR_NUMBER: ${{ needs.command.outputs.pr_number }}
+      PR_BASE_REF: ${{ needs.command.outputs.base_ref }}
+      PR_BASE_SHA: ${{ needs.command.outputs.base_sha }}
+      PR_HEAD_REPO: ${{ needs.command.outputs.head_repo }}
+      PR_HEAD_SHA: ${{ needs.command.outputs.head_sha }}
 
     steps:
       - name: Validate preview isolation config
@@ -172,7 +191,7 @@ jobs:
       - name: Check out trusted base
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ env.PR_BASE_SHA }}
           path: base
           fetch-depth: 0
           persist-credentials: false
@@ -180,8 +199,8 @@ jobs:
       - name: Check out pull request code
         uses: actions/checkout@v4
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
+          repository: ${{ env.PR_HEAD_REPO }}
+          ref: ${{ env.PR_HEAD_SHA }}
           path: source
           fetch-depth: 0
           persist-credentials: false
@@ -191,9 +210,9 @@ jobs:
         working-directory: source
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_BASE_SHA: ${{ env.PR_BASE_SHA }}
+          PR_HEAD_SHA: ${{ env.PR_HEAD_SHA }}
+          PR_BASE_REF: ${{ env.PR_BASE_REF }}
         run: |
           git remote add base-repo "https://github.com/${{ github.repository }}.git" 2>/dev/null \
             || git remote set-url base-repo "https://github.com/${{ github.repository }}.git"
@@ -203,8 +222,8 @@ jobs:
 
       - name: Prepare preview names
         run: |
-          pr_number="${{ github.event.pull_request.number }}"
-          head_sha="${{ github.event.pull_request.head.sha }}"
+          pr_number="$PR_NUMBER"
+          head_sha="$PR_HEAD_SHA"
           short_sha="${head_sha:0:7}"
 
           echo "TAG=pr-${pr_number}-${short_sha}" >> "$GITHUB_ENV"
@@ -392,13 +411,13 @@ jobs:
           - API: $API_URL
           - Database: \`$DB_NAME\` seeded from the trusted sanitized template database
           - R2 Bucket: \`$R2_BUCKET_NAME\` seeded from the trusted sanitized preview source bucket \`$SEEDING_SOURCE_R2_BUCKET_NAME\`
-          - Commit: \`${{ github.event.pull_request.head.sha }}\`
+          - Commit: \`$PR_HEAD_SHA\`
 
           This preview runs untrusted PR code against preview-only infrastructure. It does not receive production/dev secrets, production domains, production buckets, OAuth credentials, Warden credentials, real scan results, admin enforcement data, or real analytics data.
           EOF
 
-          gh pr comment "${{ github.event.pull_request.number }}" --edit-last --body-file "$body_file" \
-            || gh pr comment "${{ github.event.pull_request.number }}" --body-file "$body_file"
+          gh pr comment "$PR_NUMBER" --edit-last --body-file "$body_file" \
+            || gh pr comment "$PR_NUMBER" --body-file "$body_file"
 
   cleanup:
     name: Clean Up PR Preview
