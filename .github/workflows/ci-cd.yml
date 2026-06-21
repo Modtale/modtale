@@ -47,7 +47,8 @@ jobs:
           
           if [ "$BRANCH_NAME" = "main" ]; then
             echo "ENV_TYPE=prod" >> $GITHUB_ENV
-            echo "BUILD_SERVICE_ACCOUNT=github-branch-preview-deployer@$PROJECT_ID.iam.gserviceaccount.com" >> $GITHUB_ENV
+            echo "BUILD_SERVICE_ACCOUNT=${{ vars.GCP_BUILD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
+            echo "RUNTIME_SERVICE_ACCOUNT=${{ vars.GCP_PROD_RUNTIME_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
             echo "BACKEND_SERVICE=modtale-backend" >> $GITHUB_ENV
             echo "FRONTEND_SERVICE=modtale-frontend" >> $GITHUB_ENV
             echo "DB_NAME=modtale" >> $GITHUB_ENV
@@ -71,7 +72,8 @@ jobs:
           
           elif [ "$BRANCH_NAME" = "develop" ]; then
             echo "ENV_TYPE=dev" >> $GITHUB_ENV
-            echo "BUILD_SERVICE_ACCOUNT=github-branch-preview-deployer@$PROJECT_ID.iam.gserviceaccount.com" >> $GITHUB_ENV
+            echo "BUILD_SERVICE_ACCOUNT=${{ vars.GCP_BUILD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
+            echo "RUNTIME_SERVICE_ACCOUNT=${{ vars.GCP_DEV_RUNTIME_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
             echo "BACKEND_SERVICE=modtale-backend-dev" >> $GITHUB_ENV
             echo "FRONTEND_SERVICE=modtale-frontend-dev" >> $GITHUB_ENV
             echo "DB_NAME=modtale" >> $GITHUB_ENV
@@ -99,7 +101,7 @@ jobs:
               SLUG="${GITHUB_SHA:0:7}"
             fi
             echo "ENV_TYPE=preview" >> $GITHUB_ENV
-            echo "BUILD_SERVICE_ACCOUNT=github-branch-preview-deployer@$PROJECT_ID.iam.gserviceaccount.com" >> $GITHUB_ENV
+            echo "BUILD_SERVICE_ACCOUNT=${{ vars.GCP_BUILD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
             echo "BACKEND_SERVICE=modtale-backend-$SLUG" >> $GITHUB_ENV
             echo "FRONTEND_SERVICE=modtale-frontend-$SLUG" >> $GITHUB_ENV
             echo "DB_NAME=modtale-$SLUG" >> $GITHUB_ENV
@@ -237,6 +239,9 @@ jobs:
         run: |
           cd backend
 
+          : "${BUILD_SERVICE_ACCOUNT:?Set GitHub environment variable GCP_BUILD_SERVICE_ACCOUNT.}"
+          : "${RUNTIME_SERVICE_ACCOUNT:?Set the GitHub environment runtime service account variable for this environment.}"
+
           WARDEN_URL_VALUE=""
           if [ "${{ env.ENV_TYPE }}" = "prod" ] || [ "${{ env.ENV_TYPE }}" = "dev" ]; then
             WARDEN_URL_VALUE="$(
@@ -261,6 +266,7 @@ jobs:
           ARGS=(
             "--image" "gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }}"
             "--region" "$REGION"
+            "--service-account" "$RUNTIME_SERVICE_ACCOUNT"
             "--allow-unauthenticated"
             "--use-http2"
             "--memory" "1Gi"
@@ -327,7 +333,6 @@ jobs:
             ARGS+=("--update-secrets" "WIKI_API_KEY=WIKI_API_KEY:latest")
           else
             : "${RUNTIME_SERVICE_ACCOUNT:?Set environment variable GCP_BRANCH_PREVIEW_RUNTIME_SERVICE_ACCOUNT in the branch-preview GitHub environment.}"
-            ARGS+=("--service-account" "$RUNTIME_SERVICE_ACCOUNT")
             ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_ACCESS_KEY=${{ env.SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME }}:latest")
             ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_SECRET_KEY=${{ env.SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME }}:latest")
             ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_ENDPOINT=${{ env.SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME }}:latest")
@@ -358,6 +363,10 @@ jobs:
         if: steps.filter.outputs.frontend == 'true' || env.FRONTEND_EXISTS == 'false'
         run: |
           cd frontend
+
+          : "${BUILD_SERVICE_ACCOUNT:?Set GitHub environment variable GCP_BUILD_SERVICE_ACCOUNT.}"
+          : "${RUNTIME_SERVICE_ACCOUNT:?Set the GitHub environment runtime service account variable for this environment.}"
+
           gcloud builds submit \
             --config=cloudbuild.yml \
             --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
@@ -366,6 +375,7 @@ jobs:
           gcloud run deploy $FRONTEND_SERVICE \
             --image gcr.io/$PROJECT_ID/modtale-frontend:$TAG \
             --region $REGION \
+            --service-account "$RUNTIME_SERVICE_ACCOUNT" \
             --allow-unauthenticated \
             --set-env-vars "PUBLIC_API_URL=$API_URL" \
             --format="value(status.url)" > frontend_url.txt
