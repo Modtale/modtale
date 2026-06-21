@@ -310,17 +310,13 @@ public class DataSeeder implements CommandLineRunner {
             return;
         }
 
-        MongoDatabase sourceDb = mongoTemplate.getMongoDatabaseFactory().getMongoDatabase(sourceDbName);
-        MongoDatabase targetDb = mongoTemplate.getDb();
-
-        if (!seedingProperties.reset() && mongoTemplate.getCollection("projects").countDocuments() > 0) {
-            logger.info("Database '{}' already contains projects. Skipping template import.", currentDbName);
-            seedR2ObjectsFromCurrentProjects(false);
-            return;
-        }
-
         try {
-            long sourceProjectCount = sourceDb.getCollection("projects").countDocuments();
+            MongoDatabase sourceDb = mongoTemplate.getMongoDatabaseFactory().getMongoDatabase(sourceDbName);
+            MongoDatabase targetDb = mongoTemplate.getDb();
+            MongoCollection<Document> sourceProjects = sourceDb.getCollection("projects");
+            MongoCollection<Document> targetProjects = targetDb.getCollection("projects");
+
+            long sourceProjectCount = sourceProjects.countDocuments();
             if (sourceProjectCount == 0) {
                 logger.warn(
                         "Template database '{}' has no projects. Falling back to generated synthetic mock documents.",
@@ -330,7 +326,31 @@ public class DataSeeder implements CommandLineRunner {
                 return;
             }
 
-            if (seedingProperties.reset()) {
+            long targetProjectCount = targetProjects.countDocuments();
+            if (!seedingProperties.reset() && targetProjectCount > 0) {
+                long sourceVersionCount = countProjectVersions(sourceProjects);
+                long targetVersionCount = countProjectVersions(targetProjects);
+                if (!templateImportIncomplete(targetProjectCount, sourceProjectCount, targetVersionCount, sourceVersionCount)) {
+                    logger.info(
+                            "Database '{}' already contains a complete template import (projects={}, versions={}). Skipping template import.",
+                            currentDbName,
+                            targetProjectCount,
+                            targetVersionCount
+                    );
+                    seedR2ObjectsFromCurrentProjects(false);
+                    return;
+                }
+
+                logger.warn(
+                        "Database '{}' contains an incomplete template import (projects={}/{}, versions={}/{}). Refreshing template collections.",
+                        currentDbName,
+                        targetProjectCount,
+                        sourceProjectCount,
+                        targetVersionCount,
+                        sourceVersionCount
+                );
+                resetMockCollections(targetDb, "template");
+            } else if (seedingProperties.reset()) {
                 resetMockCollections(targetDb, "template");
             }
 
@@ -344,7 +364,7 @@ public class DataSeeder implements CommandLineRunner {
                         MOCK_COLLECTIONS.size(),
                         collectionName,
                         sourceDbName,
-                        limit
+                        templateLimitLabel(limit)
                 );
                 List<Document> documents = fetchSubset(sourceDb, collectionName, limit);
                 logger.info(
@@ -371,12 +391,25 @@ public class DataSeeder implements CommandLineRunner {
 
     private int templateLimit(String collectionName) {
         return switch (collectionName) {
-            case "projects" -> 150;
+            case "projects" -> 0;
             case "project_monthly_stats" -> 500;
             case "platform_monthly_stats", "status_history" -> 120;
             case "admin_logs", "reports", "notifications", "api_keys", "banned_emails", "status_incidents" -> 100;
             default -> 200;
         };
+    }
+
+    private String templateLimitLabel(int limit) {
+        return limit <= 0 ? "all" : Integer.toString(limit);
+    }
+
+    private boolean templateImportIncomplete(
+            long targetProjectCount,
+            long sourceProjectCount,
+            long targetVersionCount,
+            long sourceVersionCount
+    ) {
+        return targetProjectCount < sourceProjectCount || targetVersionCount < sourceVersionCount;
     }
 
     private List<Document> syntheticMockDocuments(String collectionName) {
@@ -1661,8 +1694,23 @@ public class DataSeeder implements CommandLineRunner {
 
     private List<Document> fetchSubset(MongoDatabase db, String collectionName, int limit) {
         List<Document> buffer = new ArrayList<>();
-        db.getCollection(collectionName).find().limit(limit).into(buffer);
+        if (limit > 0) {
+            db.getCollection(collectionName).find().limit(limit).into(buffer);
+        } else {
+            db.getCollection(collectionName).find().into(buffer);
+        }
         return buffer;
+    }
+
+    private long countProjectVersions(MongoCollection<Document> projectsCollection) {
+        long count = 0;
+        for (Document project : projectsCollection.find().projection(new Document("versions", 1))) {
+            Object rawVersions = project.get("versions");
+            if (rawVersions instanceof List<?> versions) {
+                count += versions.size();
+            }
+        }
+        return count;
     }
 
     private void cloneSpecificUsers(MongoDatabase source, MongoDatabase target, Set<String> userIds) {
