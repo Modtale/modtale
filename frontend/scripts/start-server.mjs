@@ -8,6 +8,41 @@ import { handler } from '../dist/server/entry.mjs';
 const clientRoot = path.resolve(fileURLToPath(new URL('../dist/client/', import.meta.url)));
 const port = Number(process.env.PORT) || 5173;
 const host = process.env.HOST || '0.0.0.0';
+const logContext = {
+    service: process.env.LOG_SERVICE_NAME || process.env.K_SERVICE || 'modtale-frontend',
+    component: process.env.LOG_COMPONENT || 'frontend',
+    environment: process.env.LOG_ENVIRONMENT || process.env.NODE_ENV || 'local',
+    branch: process.env.LOG_BRANCH,
+    revision: process.env.K_REVISION,
+};
+
+const withoutEmptyValues = (entry) => Object.fromEntries(
+    Object.entries(entry).filter(([, value]) => value !== undefined && value !== null && value !== '')
+);
+
+const serializeError = (error) => {
+    if (!(error instanceof Error)) return { message: String(error) };
+    return withoutEmptyValues({
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+    });
+};
+
+const writeLog = (severity, message, fields = {}) => {
+    const entry = withoutEmptyValues({
+        severity,
+        message,
+        ...logContext,
+        ...fields,
+    });
+    const line = JSON.stringify(entry);
+    if (severity === 'ERROR' || severity === 'CRITICAL') {
+        console.error(line);
+    } else {
+        console.log(line);
+    }
+};
 
 const mimeTypes = new Map([
     ['.css', 'text/css; charset=utf-8'],
@@ -228,7 +263,7 @@ const sendBufferedResponse = (req, res, original, chunks, callback) => {
     } catch (error) {
         original.writeHead.call(res, 500, { 'Content-Type': 'text/plain; charset=utf-8' });
         original.end.call(res, 'Internal Server Error', callback);
-        console.error(error);
+        writeLog('ERROR', 'Failed to buffer frontend response.', { error: serializeError(error) });
     }
 };
 
@@ -290,11 +325,11 @@ const server = http.createServer(async (req, res) => {
             res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
         }
         res.end('Internal Server Error');
-        console.error(error);
+        writeLog('ERROR', 'Unhandled frontend request failure.', { error: serializeError(error) });
     }
 });
 
 server.listen(port, host, () => {
     const displayHost = host === '0.0.0.0' ? 'localhost' : host;
-    console.log(`Local: http://${displayHost}:${port}/`);
+    writeLog('INFO', 'Frontend server listening.', { host: displayHost, port });
 });
