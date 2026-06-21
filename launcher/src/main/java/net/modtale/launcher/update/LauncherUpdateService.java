@@ -22,10 +22,14 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import net.modtale.launcher.api.ModtaleApiException;
+import net.modtale.launcher.logging.LogSanitizer;
 import net.modtale.launcher.settings.LauncherConfig;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class LauncherUpdateService {
 
+    private static final Logger LOG = LogManager.getLogger(LauncherUpdateService.class);
     private static final String GITHUB_API_BASE_URL = "https://api.github.com";
 
     private final HttpClient httpClient;
@@ -88,7 +92,11 @@ public class LauncherUpdateService {
         Path target = installerTarget(update.assetName());
         try {
             Files.createDirectories(target.getParent());
+            LOG.info("GET " + LogSanitizer.uri(downloadUri));
+            long started = System.currentTimeMillis();
             HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            LOG.info("GET " + LogSanitizer.uri(downloadUri) + " -> HTTP "
+                    + response.statusCode() + " in " + Math.max(0, System.currentTimeMillis() - started) + "ms");
             ensureSuccess(response.statusCode(), downloadUri.toString());
             try (InputStream body = response.body()) {
                 Files.copy(body, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
@@ -98,9 +106,11 @@ public class LauncherUpdateService {
             }
             return target;
         } catch (IOException ex) {
-            throw new ModtaleApiException("Could not download launcher update from " + downloadUri, ex);
+            LOG.warn("Could not download launcher update from " + LogSanitizer.uri(downloadUri), ex);
+            throw new ModtaleApiException("Could not download launcher update from " + LogSanitizer.uri(downloadUri), ex);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
+            LOG.warn("Launcher update download was interrupted.", ex);
             throw new ModtaleApiException("Launcher update download was interrupted.", ex);
         }
     }
@@ -115,6 +125,7 @@ public class LauncherUpdateService {
         try {
             Desktop.getDesktop().open(installer.toFile());
         } catch (IOException ex) {
+            LOG.warn("Could not open launcher installer " + installer, ex);
             throw new ModtaleApiException("Could not open launcher installer " + installer, ex);
         }
     }
@@ -130,6 +141,7 @@ public class LauncherUpdateService {
         try {
             Desktop.getDesktop().browse(URI.create(releaseUrl));
         } catch (IOException ex) {
+            LOG.warn("Could not open launcher release page " + LogSanitizer.url(releaseUrl), ex);
             throw new ModtaleApiException("Could not open launcher release page " + releaseUrl, ex);
         }
     }
@@ -150,7 +162,11 @@ public class LauncherUpdateService {
                 .GET()
                 .build();
         try {
+            LOG.info("GET " + LogSanitizer.uri(uri));
+            long started = System.currentTimeMillis();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            LOG.info("GET " + LogSanitizer.uri(uri) + " -> HTTP "
+                    + response.statusCode() + " in " + Math.max(0, System.currentTimeMillis() - started) + "ms");
             ensureSuccess(response.statusCode(), uri.toString());
             List<GitHubRelease> releases = mapper.readValue(response.body(), new TypeReference<>() {
             });
@@ -162,9 +178,11 @@ public class LauncherUpdateService {
                             LauncherVersion.normalizeTagVersion(right.tagName())
                     ));
         } catch (IOException ex) {
-            throw new ModtaleApiException("Could not read launcher release metadata from " + uri, ex);
+            LOG.warn("Could not read launcher release metadata from " + LogSanitizer.uri(uri), ex);
+            throw new ModtaleApiException("Could not read launcher release metadata from " + LogSanitizer.uri(uri), ex);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
+            LOG.warn("Launcher update check was interrupted.", ex);
             throw new ModtaleApiException("Launcher update check was interrupted.", ex);
         }
     }
@@ -290,7 +308,9 @@ public class LauncherUpdateService {
 
     private static void ensureSuccess(int status, String target) {
         if (status < 200 || status >= 300) {
-            throw new ModtaleApiException("GitHub returned HTTP " + status + " for " + target, status, null);
+            String safeTarget = LogSanitizer.url(target);
+            LOG.warn("GitHub returned HTTP " + status + " for " + safeTarget);
+            throw new ModtaleApiException("GitHub returned HTTP " + status + " for " + safeTarget, status, null);
         }
     }
 

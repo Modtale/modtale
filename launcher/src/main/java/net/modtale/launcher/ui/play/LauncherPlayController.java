@@ -81,8 +81,12 @@ import net.modtale.launcher.ui.common.LauncherView;
 import net.modtale.launcher.ui.feedback.LauncherFeedback;
 import net.modtale.launcher.ui.settings.LauncherSettingsController;
 import net.modtale.launcher.ui.settings.LauncherSettingsForm;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public final class LauncherPlayController {
+
+    private static final Logger LOG = LogManager.getLogger(LauncherPlayController.class);
 
     private static final int BLOG_POST_PAGE_SIZE = 4;
     private static final int FRIEND_LIMIT = 6;
@@ -1767,6 +1771,7 @@ public final class LauncherPlayController {
                     feedback.log("[Hytale] " + line);
                 }
             } catch (IOException ex) {
+                LOG.warn("Could not read Hytale output.", ex);
                 feedback.log("Could not read Hytale output: " + ex.getMessage());
             }
             try {
@@ -1788,6 +1793,7 @@ public final class LauncherPlayController {
                 });
             } catch (InterruptedException ex) {
                 Thread.currentThread().interrupt();
+                LOG.warn("Interrupted while waiting for Hytale process.", ex);
             }
         }, executor);
     }

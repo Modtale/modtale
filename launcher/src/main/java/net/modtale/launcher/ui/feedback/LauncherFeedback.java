@@ -16,9 +16,12 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import net.modtale.launcher.ui.common.LauncherIcons;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public final class LauncherFeedback {
 
+    private static final Logger LOG = LogManager.getLogger(LauncherFeedback.class);
     private static final DateTimeFormatter LOG_TIME = DateTimeFormatter.ofPattern("HH:mm");
     private static final String TOAST_SUCCESS = "toast-success";
     private static final String TOAST_ERROR = "toast-error";
@@ -64,6 +67,7 @@ public final class LauncherFeedback {
                     statusText.setText(idleStatus.get());
                     if (error != null) {
                         Throwable cause = error.getCause() == null ? error : error.getCause();
+                        LOG.error("Async action failed: {}", status, cause);
                         log("Error: " + cause.getMessage());
                         showToast("Action failed", cause.getMessage());
                         onError.accept(cause);
@@ -74,6 +78,7 @@ public final class LauncherFeedback {
     }
 
     public void log(String message) {
+        LOG.info(message);
         Platform.runLater(() -> {
             HBox line = new HBox(10);
             line.getStyleClass().add("log-line");
@@ -93,6 +98,9 @@ public final class LauncherFeedback {
         toastTitle.setText(title == null ? "Modtale" : title);
         toastMessage.setText(message == null ? "" : message);
         ToastTone tone = toneFor(title);
+        if (tone == ToastTone.ERROR) {
+            LOG.warn("Error toast: {} - {}", toastTitle.getText(), toastMessage.getText());
+        }
         if (toast.getChildren().isEmpty()) {
             toastIcon = new StackPane();
             toastIcon.getStyleClass().add("toast-icon");

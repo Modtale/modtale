@@ -20,8 +20,12 @@ import net.modtale.launcher.ui.browse.ProjectBrowseController;
 import net.modtale.launcher.ui.common.CachedImageLoader;
 import net.modtale.launcher.ui.feedback.LauncherFeedback;
 import net.modtale.launcher.ui.library.LauncherLibraryController;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public final class LauncherProjectActions {
+
+    private static final Logger LOG = LogManager.getLogger(LauncherProjectActions.class);
 
     private final ModtaleApiClient apiClient;
     private final LauncherAccountController accountController;
@@ -181,7 +185,8 @@ public final class LauncherProjectActions {
     private GameVersionCatalog loadGameVersions(ProjectDetail project) {
         try {
             return apiClient.getGameVersionCatalog();
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException ex) {
+            LOG.warn("Could not load game version catalog; falling back to project versions.", ex);
             return catalogFromProject(project);
         }
     }

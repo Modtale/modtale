@@ -12,12 +12,17 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
+import net.modtale.launcher.logging.LogSanitizer;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 final class ModtaleApiTransport {
 
+    private static final Logger LOG = LogManager.getLogger(ModtaleApiTransport.class);
     private static final String CSRF_HEADER_NAME = "X-XSRF-TOKEN";
 
     private final HttpClient httpClient;
@@ -58,7 +63,8 @@ final class ModtaleApiTransport {
                     .build();
             return sendJson(request, type, Duration.ZERO);
         } catch (IOException ex) {
-            throw new ModtaleApiException("Could not write API request body for " + uri, ex);
+            LOG.warn("Could not write POST body for " + LogSanitizer.uri(uri), ex);
+            throw new ModtaleApiException("Could not write API request body for " + LogSanitizer.uri(uri), ex);
         }
     }
 
@@ -70,7 +76,8 @@ final class ModtaleApiTransport {
                     .build();
             return sendJson(request, type, Duration.ZERO);
         } catch (IOException ex) {
-            throw new ModtaleApiException("Could not write API request body for " + uri, ex);
+            LOG.warn("Could not write POST body for " + LogSanitizer.uri(uri), ex);
+            throw new ModtaleApiException("Could not write API request body for " + LogSanitizer.uri(uri), ex);
         }
     }
 
@@ -82,7 +89,8 @@ final class ModtaleApiTransport {
                     .build();
             return sendJson(request, type);
         } catch (IOException ex) {
-            throw new ModtaleApiException("Could not write API request body for " + uri, ex);
+            LOG.warn("Could not write PUT body for " + LogSanitizer.uri(uri), ex);
+            throw new ModtaleApiException("Could not write API request body for " + LogSanitizer.uri(uri), ex);
         }
     }
 
@@ -111,22 +119,29 @@ final class ModtaleApiTransport {
         }
 
         try {
+            LOG.info(request.method() + " " + LogSanitizer.uri(request.uri()));
+            Instant started = Instant.now();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            logResponse(request, response.statusCode(), response.body(), started);
             ensureSuccess(response.statusCode(), request.uri().toString(), response.body());
             if (ApiCachePolicy.isEnabled(cacheTtl)) {
                 responseCache.put(request.uri(), response.body());
             }
             return readResponseBody(response.body(), type);
         } catch (IOException ex) {
+            LOG.warn("I/O failure reading " + request.method() + " " + LogSanitizer.uri(request.uri()), ex);
             Optional<T> stale = readStaleFallback(request, type, cacheTtl);
             if (stale.isPresent()) {
+                LOG.warn("Using stale cached response for " + LogSanitizer.uri(request.uri()));
                 return stale.get();
             }
-            throw new ModtaleApiException("Could not read API response from " + request.uri(), ex);
+            throw new ModtaleApiException("Could not read API response from " + LogSanitizer.uri(request.uri()), ex);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
+            LOG.warn("Interrupted while reading " + request.method() + " " + LogSanitizer.uri(request.uri()), ex);
             Optional<T> stale = readStaleFallback(request, type, cacheTtl);
             if (stale.isPresent()) {
+                LOG.warn("Using stale cached response for " + LogSanitizer.uri(request.uri()));
                 return stale.get();
             }
             throw new ModtaleApiException("API request was interrupted.", ex);
@@ -146,22 +161,29 @@ final class ModtaleApiTransport {
         }
 
         try {
+            LOG.info(request.method() + " " + LogSanitizer.uri(request.uri()));
+            Instant started = Instant.now();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            logResponse(request, response.statusCode(), response.body(), started);
             ensureSuccess(response.statusCode(), request.uri().toString(), response.body());
             if (ApiCachePolicy.isEnabled(cacheTtl)) {
                 responseCache.put(request.uri(), response.body());
             }
             return mapper.readValue(response.body(), type);
         } catch (IOException ex) {
+            LOG.warn("I/O failure reading " + request.method() + " " + LogSanitizer.uri(request.uri()), ex);
             Optional<T> stale = readStaleFallback(request, type, cacheTtl);
             if (stale.isPresent()) {
+                LOG.warn("Using stale cached response for " + LogSanitizer.uri(request.uri()));
                 return stale.get();
             }
-            throw new ModtaleApiException("Could not read API response from " + request.uri(), ex);
+            throw new ModtaleApiException("Could not read API response from " + LogSanitizer.uri(request.uri()), ex);
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
+            LOG.warn("Interrupted while reading " + request.method() + " " + LogSanitizer.uri(request.uri()), ex);
             Optional<T> stale = readStaleFallback(request, type, cacheTtl);
             if (stale.isPresent()) {
+                LOG.warn("Using stale cached response for " + LogSanitizer.uri(request.uri()));
                 return stale.get();
             }
             throw new ModtaleApiException("API request was interrupted.", ex);
@@ -209,6 +231,18 @@ final class ModtaleApiTransport {
         }
     }
 
+    private void logResponse(HttpRequest request, int status, String body, Instant started) {
+        long elapsedMs = Duration.between(started, Instant.now()).toMillis();
+        String target = LogSanitizer.uri(request.uri());
+        if (status >= 200 && status < 300) {
+            LOG.info(request.method() + " " + target + " -> HTTP " + status + " in " + elapsedMs + "ms");
+            return;
+        }
+
+        LOG.warn(request.method() + " " + target + " -> HTTP " + status + " in " + elapsedMs
+                + "ms body=" + LogSanitizer.bodyPreview(body));
+    }
+
     static HttpRequest.Builder requestBuilder(URI uri) {
         return HttpRequest.newBuilder(uri)
                 .timeout(Duration.ofSeconds(60))
@@ -226,7 +260,9 @@ final class ModtaleApiTransport {
 
     static void ensureSuccess(int status, String target) {
         if (status < 200 || status >= 300) {
-            throw new ModtaleApiException("Modtale API returned HTTP " + status + " for " + target, status, null);
+            String safeTarget = LogSanitizer.url(target);
+            LOG.warn("HTTP " + status + " for " + safeTarget);
+            throw new ModtaleApiException("Modtale API returned HTTP " + status + " for " + safeTarget, status, null);
         }
     }
 
@@ -236,7 +272,9 @@ final class ModtaleApiTransport {
         }
         String serverMessage = serverErrorMessage(body);
         if (serverMessage == null || serverMessage.isBlank()) {
-            throw new ModtaleApiException("Modtale API returned HTTP " + status + " for " + target, status, null);
+            String safeTarget = LogSanitizer.url(target);
+            LOG.warn("HTTP " + status + " for " + safeTarget);
+            throw new ModtaleApiException("Modtale API returned HTTP " + status + " for " + safeTarget, status, null);
         }
         throw new ModtaleApiException(serverMessage, status, null);
     }

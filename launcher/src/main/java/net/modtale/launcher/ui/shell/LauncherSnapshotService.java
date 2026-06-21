@@ -11,8 +11,12 @@ import javafx.scene.image.PixelReader;
 import javafx.scene.image.WritableImage;
 import javafx.util.Duration;
 import javax.imageio.ImageIO;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public final class LauncherSnapshotService {
+
+    private static final Logger LOG = LogManager.getLogger(LauncherSnapshotService.class);
 
     private LauncherSnapshotService() {
     }
@@ -27,7 +31,7 @@ public final class LauncherSnapshotService {
                 WritableImage image = root.snapshot(new SnapshotParameters(), null);
                 ImageIO.write(toBufferedImage(image), "png", Path.of(outputPath).toFile());
             } catch (IOException ex) {
-                ex.printStackTrace();
+                LOG.warn("Could not write launcher snapshot to {}", outputPath, ex);
             } finally {
                 Platform.exit();
             }

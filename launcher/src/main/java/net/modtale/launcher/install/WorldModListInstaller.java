@@ -10,8 +10,12 @@ import net.modtale.launcher.api.ModtaleApiException;
 import net.modtale.launcher.model.worldlist.WorldModList;
 import net.modtale.launcher.model.worldlist.WorldModListInstallResult;
 import net.modtale.launcher.settings.LauncherSettings;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public final class WorldModListInstaller {
+
+    private static final Logger LOG = LogManager.getLogger(WorldModListInstaller.class);
 
     private final ModtaleApiClient apiClient;
     private final ArchiveInstaller archiveInstaller;
@@ -33,14 +37,27 @@ public final class WorldModListInstaller {
             throw new ModtaleApiException("Launcher settings are unavailable.");
         }
 
+        LOG.info("Starting shared list install listId=" + list.id()
+                + " title=\"" + list.title() + "\""
+                + " modsDirectory=" + settings.hytaleModsDirectory()
+                + " itemCount=" + list.mods().size());
         DownloadedFile download = apiClient.download("/lists/" + encodePathSegment(list.id()) + "/download");
         try {
+            LOG.info("Extracting shared list archive listId=" + list.id()
+                    + " filename=" + download.filename()
+                    + " temp=" + download.path());
             List<Path> installedFiles = archiveInstaller.extractInstallableEntries(download.path(), settings.hytaleModsDirectory());
             if (installedFiles.isEmpty()) {
+                LOG.warn("Shared list archive had no installable files listId=" + list.id());
                 throw new ModtaleApiException("This shared list did not include any installable files.");
             }
+            LOG.info("Completed shared list install listId=" + list.id()
+                    + " fileCount=" + installedFiles.size()
+                    + " files=" + installedFiles);
             return new WorldModListInstallResult(list, installedFiles);
         } catch (IOException ex) {
+            LOG.warn("Could not install shared list listId=" + list.id()
+                    + " into " + settings.hytaleModsDirectory(), ex);
             throw new ModtaleApiException("Could not install " + list.title() + " into " + settings.hytaleModsDirectory(), ex);
         } finally {
             deleteTemp(download.path());
@@ -56,6 +73,7 @@ public final class WorldModListInstaller {
         try {
             Files.deleteIfExists(path);
         } catch (IOException ignored) {
+            LOG.warn("Could not delete temporary shared list archive " + path);
             // Temporary download cleanup is best-effort.
         }
     }

@@ -25,8 +25,12 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public final class StatusModal {
+
+    private static final Logger LOG = LogManager.getLogger(StatusModal.class);
 
     public enum Type {
         SUCCESS("success", LauncherIcons.Glyph.CHECK),
@@ -96,6 +100,9 @@ public final class StatusModal {
         StackPane hostPane = host.get();
         if (hostPane == null) {
             return false;
+        }
+        if (type == Type.ERROR) {
+            LOG.warn("Error modal: {} - {}", title, message);
         }
         overlay = overlayShell();
         blurBackdrop(hostPane);

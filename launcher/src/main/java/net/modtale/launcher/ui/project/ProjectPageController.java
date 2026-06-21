@@ -91,8 +91,12 @@ import net.modtale.launcher.ui.common.CachedImageLoader;
 import net.modtale.launcher.ui.common.LauncherIcons;
 import net.modtale.launcher.ui.common.LauncherLayout;
 import net.modtale.launcher.ui.common.LauncherView;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public final class ProjectPageController {
+
+    private static final Logger LOG = LogManager.getLogger(ProjectPageController.class);
 
     private static final double CONTENT_MAX_WIDTH = 1568;
     private static final double HEADER_ICON_SIZE = 224;
@@ -373,6 +377,7 @@ public final class ProjectPageController {
             try {
                 projects = apiClient.getCreatorProjects(profile.id(), 0, 12);
             } catch (RuntimeException ex) {
+                LOG.warn("Could not load creator projects for {}", profile.id(), ex);
                 projects = new ProjectPage(List.of(), 0, 0, 0, true);
             }
             List<CreatorProfile> relations = List.of();
@@ -380,7 +385,8 @@ public final class ProjectPageController {
                 relations = profile.organization()
                         ? apiClient.getOrganizationMembers(profile.id())
                         : apiClient.getUserOrganizations(profile.id());
-            } catch (RuntimeException ignored) {
+            } catch (RuntimeException ex) {
+                LOG.warn("Could not load creator relations for {}", profile.id(), ex);
                 relations = List.of();
             }
             return new CreatorProfilePayload(profile, projects, relations);
@@ -390,8 +396,9 @@ public final class ProjectPageController {
             }
             creatorLoading = false;
             if (error != null) {
+                Throwable cause = error.getCause() == null ? error : error.getCause();
+                LOG.warn("Could not load creator profile {}", handle, cause);
                 if (toast != null) {
-                    Throwable cause = error.getCause() == null ? error : error.getCause();
                     toast.accept("Creator unavailable", value(cause.getMessage(), "Could not load this creator profile."));
                 }
                 content.getChildren().setAll(externalState(
@@ -2535,8 +2542,9 @@ public final class ProjectPageController {
                         return;
                     }
                     if (error != null) {
+                        Throwable cause = error.getCause() == null ? error : error.getCause();
+                        LOG.warn("Could not load changelogs for {}", key, cause);
                         if (toast != null) {
-                            Throwable cause = error.getCause() == null ? error : error.getCause();
                             toast.accept("Changelog unavailable", value(cause.getMessage(), "Could not load changelogs."));
                         }
                     } else {
@@ -2724,6 +2732,7 @@ public final class ProjectPageController {
         try {
             uri = URI.create(rawUrl);
         } catch (IllegalArgumentException ex) {
+            LOG.warn("Invalid browser URL {}", rawUrl, ex);
             showBrowserError("Invalid page URL.");
             return;
         }
@@ -2734,6 +2743,7 @@ public final class ProjectPageController {
         try {
             Desktop.getDesktop().browse(uri);
         } catch (IOException | SecurityException | UnsupportedOperationException ex) {
+            LOG.warn("Could not open browser URL {}", uri, ex);
             showBrowserError(value(ex.getMessage(), "Could not open your browser."));
         }
     }

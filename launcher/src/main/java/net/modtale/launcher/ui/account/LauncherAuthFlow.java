@@ -21,11 +21,15 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import net.modtale.launcher.api.ModtaleApiClient;
+import net.modtale.launcher.logging.LogSanitizer;
 import net.modtale.launcher.model.user.CurrentUser;
 import net.modtale.launcher.settings.LauncherConfig;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public final class LauncherAuthFlow {
 
+    private static final Logger LOG = LogManager.getLogger(LauncherAuthFlow.class);
     private static final Duration AUTH_TIMEOUT = Duration.ofMinutes(5);
     private static final String APP_NAME = "Modtale Launcher";
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -63,13 +67,17 @@ public final class LauncherAuthFlow {
             apiClient.exchangeLauncherCode(code);
             return apiClient.currentUser();
         } catch (TimeoutException ex) {
+            LOG.warn("Launcher sign-in timed out.", ex);
             throw new RuntimeException("Launcher sign-in timed out. Please try again.", ex);
         } catch (CancellationException ex) {
+            LOG.warn("Launcher sign-in was cancelled.", ex);
             throw ex;
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
+            LOG.warn("Launcher sign-in was interrupted.", ex);
             throw new RuntimeException("Launcher sign-in was interrupted.", ex);
         } catch (Exception ex) {
+            LOG.warn("Launcher sign-in failed.", ex);
             if (ex instanceof RuntimeException runtimeException) {
                 throw runtimeException;
             }
@@ -110,14 +118,17 @@ public final class LauncherAuthFlow {
         String code = params.get("code");
         String error = params.get("error");
         if (error != null && !error.isBlank()) {
+            LOG.warn("Launcher sign-in callback returned an error: " + error);
             codeFuture.completeExceptionally(new RuntimeException("Launcher sign-in failed: " + error));
             responseTitle = "Launcher sign-in failed";
             responseMessage = "Return to Modtale Launcher and try again.";
         } else if (!expectedState.equals(returnedState)) {
+            LOG.warn("Launcher sign-in callback returned an unexpected state.");
             codeFuture.completeExceptionally(new RuntimeException("Launcher sign-in returned an unexpected state."));
             responseTitle = "Launcher sign-in failed";
             responseMessage = "Return to Modtale Launcher and try again.";
         } else if (code == null || code.isBlank()) {
+            LOG.warn("Launcher sign-in callback did not include an authorization code.");
             codeFuture.completeExceptionally(new RuntimeException("Launcher sign-in did not return an authorization code."));
             responseTitle = "Launcher sign-in failed";
             responseMessage = "Return to Modtale Launcher and try again.";
@@ -138,8 +149,10 @@ public final class LauncherAuthFlow {
             throw new RuntimeException("Desktop browser integration is not available. Could not open Modtale sign-in.");
         }
         try {
+            LOG.info("Opening sign-in URL " + LogSanitizer.uri(uri));
             Desktop.getDesktop().browse(uri);
         } catch (IOException ex) {
+            LOG.warn("Could not open sign-in URL " + LogSanitizer.uri(uri), ex);
             throw new RuntimeException("Could not open Modtale sign-in in your browser.", ex);
         }
     }

@@ -25,8 +25,12 @@ import net.modtale.launcher.settings.LauncherSettings;
 import net.modtale.launcher.settings.SettingsStore;
 import net.modtale.launcher.ui.feedback.LauncherFeedback;
 import net.modtale.launcher.ui.settings.LauncherSettingsController;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public final class LauncherSettingsSyncService {
+
+    private static final Logger LOG = LogManager.getLogger(LauncherSettingsSyncService.class);
 
     private final ModtaleApiClient apiClient;
     private final SettingsStore settingsStore;
@@ -164,6 +168,7 @@ public final class LauncherSettingsSyncService {
                 installed++;
                 warnings.addAll(result.warnings());
             } catch (RuntimeException ex) {
+                LOG.warn("Could not restore installed project {}", projectSnapshot.getProjectId(), ex);
                 warnings.add(projectSnapshot.getProjectId() + ": " + ex.getMessage());
             }
         }
@@ -266,7 +271,8 @@ public final class LauncherSettingsSyncService {
                 }
                 try {
                     Files.deleteIfExists(Path.of(file));
-                } catch (IOException ignored) {
+                } catch (IOException ex) {
+                    LOG.warn("Could not delete stale installed file while restoring snapshot: {}", file, ex);
                     // A stale file should not block restoring the account snapshot.
                 }
             }
