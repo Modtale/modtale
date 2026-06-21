@@ -3,6 +3,7 @@
 import { createHash } from "node:crypto";
 
 const API_BASE = "https://api.cloudflare.com/client/v4";
+const R2_BUCKET_ITEM_READ = "Workers R2 Storage Bucket Item Read";
 const R2_BUCKET_ITEM_WRITE = "Workers R2 Storage Bucket Item Write";
 
 const mode = process.argv[2];
@@ -178,7 +179,8 @@ async function revokeToken(token, tokenId, reason) {
 }
 
 async function createRuntimeToken(accountId, token, bucketName, jurisdiction) {
-  const groupId = await permissionGroupId(token, R2_BUCKET_ITEM_WRITE);
+  const readGroupId = await permissionGroupId(token, R2_BUCKET_ITEM_READ);
+  const writeGroupId = await permissionGroupId(token, R2_BUCKET_ITEM_WRITE);
   const tokenName = optional("R2_TOKEN_NAME", `modtale preview ${bucketName}`);
   const expiresOn = optional("R2_TOKEN_EXPIRES_ON");
 
@@ -190,7 +192,7 @@ async function createRuntimeToken(accountId, token, bucketName, jurisdiction) {
         resources: {
           [bucketResource(accountId, jurisdiction, bucketName)]: "*",
         },
-        permission_groups: [{ id: groupId }],
+        permission_groups: [{ id: readGroupId }, { id: writeGroupId }],
       },
     ],
   };
