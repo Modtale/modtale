@@ -1,6 +1,13 @@
 package net.modtale.config.db;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Method;
 import java.util.LinkedHashMap;
@@ -8,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import net.modtale.config.properties.AppR2Properties;
 import net.modtale.config.properties.AppSeedingProperties;
+import net.modtale.service.storage.StorageService;
 import org.bson.Document;
 import org.junit.jupiter.api.Test;
 
@@ -97,6 +105,37 @@ class DataSeederR2SeedLocationTest {
     @Test
     void skipsExternalHttpUrls() throws Exception {
         assertNull(rawLocation("https://example.com/files/not-r2.jar"));
+    }
+
+    @Test
+    void reseedsMissingArtifactsWhenMarkerIsStale() throws Exception {
+        StorageService storageService = mock(StorageService.class);
+        when(storageService.exists(anyString())).thenAnswer(invocation -> {
+            String key = invocation.getArgument(0, String.class);
+            return key.startsWith(".modtale/seeding/r2-artifacts/");
+        });
+
+        DataSeeder staleMarkerSeeder = new DataSeeder(
+                null,
+                null,
+                null,
+                null,
+                storageService,
+                new AppR2Properties("target-bucket", "", "", "", "https://pub-test.r2.dev"),
+                new AppSeedingProperties(false, AppSeedingProperties.Mode.MOCK, false, "modtale-mock-template", "", "", "", "")
+        );
+        Document project = new Document("slug", "sample-project")
+                .append("title", "Sample Project")
+                .append("classification", "PLUGIN")
+                .append("versions", List.of(new Document("versionNumber", "1.2.3")
+                        .append("fileUrl", "files/plugin/sample.jar")));
+
+        Method method = DataSeeder.class.getDeclaredMethod("seedR2ObjectsForProjects", List.class, boolean.class);
+        method.setAccessible(true);
+        method.invoke(staleMarkerSeeder, List.of(project), true);
+
+        verify(storageService).uploadDirect(eq("files/plugin/sample.jar"), any(byte[].class), eq("application/java-archive"));
+        verify(storageService).uploadDirect(startsWith(".modtale/seeding/r2-artifacts/"), any(byte[].class), eq("application/json"));
     }
 
     private R2Location location(String rawLocation) throws Exception {
