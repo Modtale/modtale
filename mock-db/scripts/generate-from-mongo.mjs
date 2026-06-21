@@ -2,7 +2,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
-import { MongoClient, ObjectId } from 'mongodb';
+import { ObjectId } from 'mongodb';
+import { connectMongo } from './mongo-connection.mjs';
 
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
 const outputDir = process.env.MOCK_DB_OUTPUT_DIR
@@ -1050,8 +1051,10 @@ async function writeJson(name, docs) {
 }
 
 async function main() {
-  const client = new MongoClient(sourceUri, { appName: 'modtale-mock-db-refresh' });
-  await client.connect();
+  const client = await connectMongo(sourceUri, {
+    appName: 'modtale-mock-db-refresh',
+    label: 'source'
+  });
 
   try {
     const db = client.db(sourceDbName);
@@ -1140,6 +1143,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error(error?.message || error);
   process.exit(1);
 });
