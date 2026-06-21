@@ -1,5 +1,9 @@
 package net.modtale.service.social;
 
+import java.net.URI;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import net.modtale.exception.ForbiddenOperationException;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.model.project.Comment;
@@ -7,14 +11,10 @@ import net.modtale.model.project.Project;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
+import net.modtale.service.analytics.ScoringService;
 import net.modtale.service.communication.NotificationService;
-import net.modtale.service.project.ProjectService;
-import net.modtale.service.security.SanitizationService;
-
-import java.net.URI;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import net.modtale.service.project.query.ProjectService;
+import net.modtale.service.security.validation.SanitizationService;
 
 final class ProjectSocialService {
 
@@ -23,24 +23,28 @@ final class ProjectSocialService {
     private final ProjectService projectService;
     private final NotificationService notificationService;
     private final SanitizationService sanitizer;
+    private final ScoringService scoringService;
 
     ProjectSocialService(
             ProjectRepository projectRepository,
             UserRepository userRepository,
             ProjectService projectService,
             NotificationService notificationService,
-            SanitizationService sanitizer
+            SanitizationService sanitizer,
+            ScoringService scoringService
     ) {
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.projectService = projectService;
         this.notificationService = notificationService;
         this.sanitizer = sanitizer;
+        this.scoringService = scoringService;
     }
 
     void toggleFavorite(String projectId, String userId) {
         Project project = getProject(projectId);
         User user = getUser(userId);
+        int originalFavoriteCount = project.getFavoriteCount();
 
         List<String> likes = user.getLikedModIds();
         if (likes == null) {
@@ -55,6 +59,9 @@ final class ProjectSocialService {
         } else {
             likes.add(canonicalProjectId);
             project.setFavoriteCount(project.getFavoriteCount() + 1);
+        }
+        if (project.getFavoriteCount() != originalFavoriteCount) {
+            scoringService.markProjectRankingDirty(project);
         }
 
         userRepository.save(user);

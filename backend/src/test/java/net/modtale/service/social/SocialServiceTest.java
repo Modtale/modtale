@@ -1,17 +1,17 @@
 package net.modtale.service.social;
 
+import java.util.Optional;
 import net.modtale.exception.ForbiddenOperationException;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
+import net.modtale.service.analytics.ScoringService;
 import net.modtale.service.communication.NotificationService;
-import net.modtale.service.project.ProjectService;
-import net.modtale.service.security.SanitizationService;
+import net.modtale.service.project.query.ProjectService;
+import net.modtale.service.security.validation.SanitizationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.MongoTemplate;
-
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -32,7 +32,8 @@ class SocialServiceTest {
                 mock(ProjectService.class),
                 mock(NotificationService.class),
                 mock(SanitizationService.class),
-                mock(MongoTemplate.class)
+                mock(MongoTemplate.class),
+                mock(ScoringService.class)
         );
     }
 

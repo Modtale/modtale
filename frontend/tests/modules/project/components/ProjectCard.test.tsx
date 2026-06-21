@@ -19,6 +19,8 @@ vi.mock('@/utils/prefetch', () => ({
 describe('ProjectCard banner fade', () => {
     let container: HTMLDivElement;
     let root: Root;
+    let originalRequestIdleCallback: typeof window.requestIdleCallback;
+    let originalCancelIdleCallback: typeof window.cancelIdleCallback;
 
     const baseProject: Project = {
         id: 'project-1',
@@ -40,6 +42,8 @@ describe('ProjectCard banner fade', () => {
         container = document.createElement('div');
         document.body.appendChild(container);
         root = createRoot(container);
+        originalRequestIdleCallback = window.requestIdleCallback;
+        originalCancelIdleCallback = window.cancelIdleCallback;
 
         window.requestIdleCallback = ((cb: () => void) => {
             cb();
@@ -53,8 +57,8 @@ describe('ProjectCard banner fade', () => {
             root.unmount();
         });
         container.remove();
-        delete window.requestIdleCallback;
-        delete window.cancelIdleCallback;
+        window.requestIdleCallback = originalRequestIdleCallback;
+        window.cancelIdleCallback = originalCancelIdleCallback;
     });
 
     it('keeps the fade when no banner is set', async () => {
@@ -92,5 +96,37 @@ describe('ProjectCard banner fade', () => {
         expect(bannerImage).not.toBeNull();
         expect(bannerImage?.className).not.toContain('opacity-80');
         expect(container.querySelector('div[class*="bg-gradient-to-t"]')).toBeNull();
+    });
+
+    it('optimistically updates the displayed favorite count when favorite state changes', async () => {
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <ProjectCard
+                        project={baseProject}
+                        isFavorite={false}
+                        onToggleFavorite={vi.fn()}
+                        isLoggedIn={true}
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        expect(container.textContent).toContain('7');
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <ProjectCard
+                        project={baseProject}
+                        isFavorite={true}
+                        onToggleFavorite={vi.fn()}
+                        isLoggedIn={true}
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        expect(container.textContent).toContain('8');
     });
 });

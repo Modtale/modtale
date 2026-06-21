@@ -1,5 +1,10 @@
 package net.modtale.service.storage;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 import net.modtale.exception.StorageDownloadException;
 import net.modtale.exception.StorageUploadException;
 import net.modtale.model.project.Project;
@@ -8,12 +13,6 @@ import net.modtale.model.project.ProjectVersion;
 import net.modtale.repository.project.ProjectRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
 final class ModpackArchiveService {
 

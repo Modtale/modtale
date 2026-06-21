@@ -9,6 +9,13 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import net.modtale.config.core.PublicApiEndpointMatcher;
 import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
@@ -18,13 +25,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-
-import java.io.IOException;
-import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
@@ -104,7 +104,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             capacity = isWrite ? 40 : 3000;
             tierName = "Frontend-Public";
         } else {
-            if (isBlockedAgent(userAgent)) {
+            if (!PublicApiEndpointMatcher.isPublicOperation(path, req.getMethod()) && isBlockedAgent(userAgent)) {
                 sendError(res, 403, "Forbidden", "Automated access requires an API Key.");
                 return;
             }

@@ -1,13 +1,12 @@
 package net.modtale.controller.project;
 
-import tools.jackson.databind.JsonNode;
 import jakarta.servlet.http.HttpServletRequest;
 import net.modtale.exception.ErrorMessageUtils;
 import net.modtale.exception.InvalidProjectRequestException;
 import net.modtale.exception.UpstreamServiceException;
 import net.modtale.model.user.User;
-import net.modtale.service.project.WikiService;
-import net.modtale.service.user.AccountService;
+import net.modtale.service.project.media.WikiService;
+import net.modtale.service.user.account.AccountService;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -17,6 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;
 
 @RestController
 @RequestMapping("/api/v1/wiki")

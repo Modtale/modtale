@@ -1,23 +1,29 @@
 package net.modtale.mapper;
 
-import net.modtale.model.dto.admin.AdminProjectDTO;
-import net.modtale.model.dto.admin.AdminProjectVersionSummaryDTO;
-import net.modtale.model.dto.project.ProjectDTO;
-import net.modtale.model.dto.project.ProjectCommentDTO;
-import net.modtale.model.dto.project.ProjectCommentReplyDTO;
-import net.modtale.model.dto.project.ProjectDependencyDTO;
-import net.modtale.model.dto.project.ProjectMetaDTO;
-import net.modtale.model.dto.project.ProjectSummaryDTO;
-import net.modtale.model.dto.project.ProjectVersionDTO;
-import net.modtale.model.dto.project.ProjectVersionSummaryDTO;
-import net.modtale.model.project.Comment;
-import net.modtale.model.project.ProjectDependency;
-import net.modtale.model.project.Project;
-import net.modtale.model.project.ProjectVersion;
-
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+import net.modtale.model.dto.admin.AdminProjectDTO;
+import net.modtale.model.dto.admin.AdminProjectVersionSummaryDTO;
+import net.modtale.model.dto.project.ProjectCommentsDTO;
+import net.modtale.model.dto.project.ProjectCommentDTO;
+import net.modtale.model.dto.project.ProjectCommentReplyDTO;
+import net.modtale.model.dto.project.ProjectDTO;
+import net.modtale.model.dto.project.ProjectDependencyDTO;
+import net.modtale.model.dto.project.ProjectGalleryDTO;
+import net.modtale.model.dto.project.ProjectMarqueeDTO;
+import net.modtale.model.dto.project.ProjectMetaDTO;
+import net.modtale.model.dto.project.ProjectPageDTO;
+import net.modtale.model.dto.project.ProjectSummaryDTO;
+import net.modtale.model.dto.project.ProjectTeamDTO;
+import net.modtale.model.dto.project.ProjectVersionDTO;
+import net.modtale.model.dto.project.ProjectVersionsDTO;
+import net.modtale.model.dto.project.ProjectVersionSummaryDTO;
+import net.modtale.model.project.Comment;
+import net.modtale.model.project.Project;
+import net.modtale.model.project.ProjectDependency;
+import net.modtale.model.project.ProjectVersion;
 
 public class ProjectMapper {
 
@@ -48,6 +54,21 @@ public class ProjectMapper {
         );
     }
 
+    public static ProjectMarqueeDTO toMarqueeDTO(Project project) {
+        if (project == null) return null;
+        return new ProjectMarqueeDTO(
+                project.getId(),
+                project.getSlug(),
+                project.getTitle(),
+                project.getAuthorId(),
+                project.getAuthor(),
+                project.getImageUrl(),
+                project.getBannerUrl(),
+                project.getClassification(),
+                project.getDownloadCount()
+        );
+    }
+
     public static ProjectMetaDTO toMetaDTO(Project project) {
         if (project == null) return null;
         return new ProjectMetaDTO(
@@ -59,6 +80,75 @@ public class ProjectMapper {
                 project.getDownloadCount(),
                 project.getRepositoryUrl() != null ? project.getRepositoryUrl() : "",
                 project.getSlug() != null ? project.getSlug() : project.getId()
+        );
+    }
+
+    public static ProjectPageDTO toPageDTO(Project project) {
+        if (project == null) return null;
+        return new ProjectPageDTO(
+                project.getId(),
+                project.getSlug(),
+                project.getTitle(),
+                project.getAbout(),
+                project.getDescription(),
+                project.getAuthorId(),
+                project.getAuthor(),
+                project.getImageUrl(),
+                project.getBannerUrl(),
+                project.getClassification(),
+                project.getTags(),
+                project.getDownloadCount(),
+                project.getFavoriteCount(),
+                project.getRepositoryUrl(),
+                project.getUpdatedAt(),
+                project.getCreatedAt(),
+                project.getLicense(),
+                project.isCustomLicenseOpenSource(),
+                project.getLinks(),
+                project.isAllowModpacks(),
+                project.isAllowComments(),
+                project.isHmWikiEnabled(),
+                project.getHmWikiSlug(),
+                project.isGalleryCarouselEnabled(),
+                project.getStatus(),
+                project.getExpiresAt(),
+                project.isCanEdit(),
+                project.isOwner()
+        );
+    }
+
+    public static ProjectVersionsDTO toVersionsDTO(Project project) {
+        if (project == null) return null;
+        return new ProjectVersionsDTO(project.getVersions() != null
+                ? project.getVersions().stream()
+                        .map(version -> toVersionDTO(version, false))
+                        .collect(Collectors.toList())
+                : new ArrayList<>());
+    }
+
+    public static ProjectCommentsDTO toCommentsDTO(Project project, String currentUserId) {
+        if (project == null) return null;
+        return new ProjectCommentsDTO(project.getComments() != null
+                ? project.getComments().stream()
+                        .map(comment -> toCommentDTO(comment, currentUserId))
+                        .collect(Collectors.toList())
+                : new ArrayList<>());
+    }
+
+    public static ProjectGalleryDTO toGalleryDTO(Project project) {
+        if (project == null) return null;
+        return new ProjectGalleryDTO(
+                project.getGalleryImages() != null ? project.getGalleryImages() : new ArrayList<>(),
+                project.getGalleryImageCaptions() != null ? project.getGalleryImageCaptions() : Map.of()
+        );
+    }
+
+    public static ProjectTeamDTO toTeamDTO(Project project) {
+        if (project == null) return null;
+        return new ProjectTeamDTO(
+                project.getProjectRoles() != null ? project.getProjectRoles() : new ArrayList<>(),
+                project.getTeamMembers() != null ? project.getTeamMembers() : new ArrayList<>(),
+                project.getTeamInvites() != null ? project.getTeamInvites() : new ArrayList<>()
         );
     }
 
@@ -82,17 +172,20 @@ public class ProjectMapper {
                 project.getUpdatedAt(),
                 project.getCreatedAt(),
                 project.getLicense(),
+                project.isCustomLicenseOpenSource(),
                 project.getLinks(),
                 project.getChildProjectIds(),
                 project.isAllowModpacks(),
                 project.isAllowComments(),
                 project.isHmWikiEnabled(),
                 project.getHmWikiSlug(),
+                project.isGalleryCarouselEnabled(),
                 project.getStatus(),
                 project.getExpiresAt(),
                 project.getDeletedAt(),
                 project.getApprovedBy(),
                 project.getGalleryImages(),
+                project.getGalleryImageCaptions(),
                 project.getProjectRoles(),
                 project.getTeamMembers(),
                 project.getTeamInvites(),
@@ -105,6 +198,10 @@ public class ProjectMapper {
     }
 
     public static ProjectDTO toDTO(Project project, boolean isSummary, String currentUserId) {
+        return toDTO(project, isSummary, currentUserId, true);
+    }
+
+    public static ProjectDTO toDTO(Project project, boolean isSummary, String currentUserId, boolean includeVersionChangelogs) {
         if (project == null) return null;
         ProjectDTO dto = new ProjectDTO();
 
@@ -128,6 +225,7 @@ public class ProjectMapper {
         dto.setUpdatedAt(project.getUpdatedAt());
         dto.setCreatedAt(project.getCreatedAt());
         dto.setLicense(project.getLicense());
+        dto.setCustomLicenseOpenSource(project.isCustomLicenseOpenSource());
         dto.setLastTrendingNotification(project.getLastTrendingNotification());
         dto.setLinks(project.getLinks());
         dto.setTypes(project.getTypes());
@@ -140,6 +238,7 @@ public class ProjectMapper {
         dto.setDonationPlatformCutBps(project.getDonationPlatformCutBps());
         dto.setHmWikiEnabled(project.isHmWikiEnabled());
         dto.setHmWikiSlug(project.getHmWikiSlug());
+        dto.setGalleryCarouselEnabled(project.isGalleryCarouselEnabled());
         dto.setStatus(project.getStatus());
         dto.setExpiresAt(project.getExpiresAt());
         dto.setCanEdit(project.isCanEdit());
@@ -154,6 +253,7 @@ public class ProjectMapper {
             dto.setTeamMembers(project.getTeamMembers());
             dto.setTeamInvites(project.getTeamInvites());
             dto.setGalleryImages(project.getGalleryImages());
+            dto.setGalleryImageCaptions(project.getGalleryImageCaptions());
             dto.setComments(project.getComments() != null
                     ? project.getComments().stream()
                             .map(comment -> toCommentDTO(comment, currentUserId))
@@ -162,7 +262,7 @@ public class ProjectMapper {
 
             if (project.getVersions() != null) {
                 dto.setVersions(project.getVersions().stream()
-                        .map(ProjectMapper::toVersionDTO)
+                        .map(version -> toVersionDTO(version, includeVersionChangelogs))
                         .collect(Collectors.toList()));
             } else {
                 dto.setVersions(new ArrayList<>());
@@ -207,6 +307,10 @@ public class ProjectMapper {
     }
 
     public static ProjectVersionDTO toVersionDTO(ProjectVersion version) {
+        return toVersionDTO(version, true);
+    }
+
+    public static ProjectVersionDTO toVersionDTO(ProjectVersion version, boolean includeChangelog) {
         if (version == null) return null;
         ProjectVersionDTO dto = new ProjectVersionDTO();
         dto.setId(version.getId());
@@ -215,8 +319,11 @@ public class ProjectMapper {
         dto.setFileUrl(version.getFileUrl());
         dto.setDownloadCount(version.getDownloadCount());
         dto.setReleaseDate(version.getReleaseDate());
-        dto.setChangelog(version.getChangelog());
-        dto.setDependencies(version.getDependencies());
+        if (includeChangelog) {
+            dto.setChangelog(version.getChangelog());
+        }
+        dto.setDependencies(toDependencyDTOs(version.getDependencies()));
+        dto.setIncompatibleProjectIds(version.getIncompatibleProjectIds());
         dto.setChannel(version.getChannel());
         return dto;
     }
@@ -270,8 +377,19 @@ public class ProjectMapper {
                 dependency.getModId(),
                 dependency.getModTitle(),
                 dependency.getVersionNumber(),
+                dependency.getIcon(),
+                dependency.getTitle() != null ? dependency.getTitle() : dependency.getModTitle(),
+                dependency.getClassification(),
+                dependency.getSlug(),
                 dependency.isOptional(),
                 dependency.isEmbedded()
         );
+    }
+
+    public static List<ProjectDependencyDTO> toDependencyDTOs(List<ProjectDependency> dependencies) {
+        if (dependencies == null) return new ArrayList<>();
+        return dependencies.stream()
+                .map(ProjectMapper::toDependencyDTO)
+                .collect(Collectors.toList());
     }
 }

@@ -1,7 +1,7 @@
 package net.modtale.service.analytics;
 
 import net.modtale.repository.project.ProjectRepository;
-import net.modtale.service.project.ProjectService;
+import net.modtale.service.project.query.ProjectService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -31,7 +31,6 @@ public class TrackingService {
         this.trackingBufferService = bufferService;
         this.trackingFlushService = new TrackingFlushService(
                 mongoTemplate,
-                projectRepository,
                 projectService,
                 bufferService
         );

@@ -7,7 +7,7 @@ import net.modtale.model.project.Project;
 import net.modtale.model.user.User;
 import net.modtale.repository.finance.DonationIntentRepository;
 import net.modtale.repository.finance.FinanceLedgerEntryRepository;
-import net.modtale.service.project.ProjectService;
+import net.modtale.service.project.query.ProjectService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

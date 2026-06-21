@@ -2,7 +2,7 @@ package net.modtale.controller.finance;
 
 import net.modtale.model.user.User;
 import net.modtale.service.finance.DonationCheckoutService;
-import net.modtale.service.user.AccountService;
+import net.modtale.service.user.account.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

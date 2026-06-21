@@ -6,20 +6,16 @@ import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
-import io.swagger.v3.oas.models.media.Content;
-import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.ArraySchema;
 import io.swagger.v3.oas.models.media.ComposedSchema;
+import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MapSchema;
+import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
 import io.swagger.v3.oas.models.tags.Tag;
-import org.springdoc.core.customizers.OpenApiCustomizer;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -27,6 +23,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import org.springdoc.core.customizers.OpenApiCustomizer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class OpenApiConfig {
@@ -132,7 +131,7 @@ public class OpenApiConfig {
 
                 pathItem.readOperationsMap().forEach((httpMethod, operation) -> {
                     String method = httpMethod.name();
-                    boolean isPublic = isPublicOperation(path, method);
+                    boolean isPublic = PublicApiEndpointMatcher.isPublicOperation(path, method);
                     operation.addExtension("x-modtale-access", isPublic ? "public" : "auth");
                     operation.addExtension("x-modtale-rate-limit-tiers", rateLimitTiers(path));
 
@@ -149,7 +148,7 @@ public class OpenApiConfig {
                     Map.of("error", "Invalid credentials"));
 
             enrichOperation(paths, "/api/v1/projects", "GET",
-                    "Searches and filters publicly visible projects. Supports tags, classification, pagination, and optional sort parameters.",
+                    "Searches and filters publicly visible projects. Supports tags, classification, license openness, pagination, and optional sort parameters.",
                     Map.of(
                             "content", List.of(
                                     Map.of("id", "f0a0f750-9f2c-4a54-8d90-bf42c21fb2f2", "title", "Skyforge Utilities", "classification", "PLUGIN")
@@ -160,7 +159,37 @@ public class OpenApiConfig {
                     null);
 
             enrichOperation(paths, "/api/v1/projects/{id}", "GET",
-                    "Returns a single project with metadata, permissions, and latest published state.",
+                    "Returns the lean project page shell needed for the first detail-page render. Versions, comments, gallery, and team data are exposed through focused subresources.",
+                    null,
+                    null,
+                    Map.of("error", "Project not found"));
+
+            enrichOperation(paths, "/api/v1/projects/{id}/details", "GET",
+                    "Returns the full project detail payload for editor and management workflows.",
+                    null,
+                    null,
+                    Map.of("error", "Project not found"));
+
+            enrichOperation(paths, "/api/v1/projects/{id}/versions", "GET",
+                    "Returns project versions without changelog bodies. Use the changelog endpoint when release notes are needed.",
+                    null,
+                    null,
+                    Map.of("error", "Project not found"));
+
+            enrichOperation(paths, "/api/v1/projects/{id}/comments", "GET",
+                    "Returns the project discussion thread for the current viewer.",
+                    null,
+                    null,
+                    Map.of("error", "Project not found"));
+
+            enrichOperation(paths, "/api/v1/projects/{id}/gallery", "GET",
+                    "Returns gallery image URLs for the project.",
+                    null,
+                    null,
+                    Map.of("error", "Project not found"));
+
+            enrichOperation(paths, "/api/v1/projects/{id}/team", "GET",
+                    "Returns public project contributor roles and members. Privileged viewers may also receive pending invites.",
                     null,
                     null,
                     Map.of("error", "Project not found"));
@@ -344,6 +373,7 @@ public class OpenApiConfig {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private Object buildExample(Schema schema,
                                 Map<String, Schema> schemaRegistry,
                                 Set<String> visitedRefs,
@@ -610,49 +640,6 @@ public class OpenApiConfig {
         }
 
         return "Other";
-    }
-
-    private boolean isPublicOperation(String path, String method) {
-        String normalized = method.toUpperCase(Locale.ROOT);
-
-        if (normalized.equals("POST") && path.equals("/api/v1/users/batch")) {
-            return true;
-        }
-
-        if (path.equals("/api/v1/auth/register")
-                || path.equals("/api/v1/auth/verify")
-                || path.equals("/api/v1/auth/signin")
-                || path.equals("/api/v1/auth/mfa/validate-login")
-                || path.equals("/api/v1/auth/forgot-password")
-                || path.equals("/api/v1/auth/reset-password")) {
-            return true;
-        }
-
-        if (normalized.equals("GET") || normalized.equals("HEAD")) {
-            if (path.equals("/api/v1/tags")
-                    || path.equals("/api/v1/status")
-                    || path.equals("/api/v1/analytics/platform/stats")
-                    || path.startsWith("/api/v1/projects/")
-                    || path.equals("/api/v1/projects")
-                    || path.startsWith("/api/v1/files/")
-                    || path.startsWith("/api/v1/user/profile/")
-                    || path.startsWith("/api/v1/users/")
-                    || path.startsWith("/api/v1/creators/")
-                    || path.startsWith("/api/v1/og/")
-                    || path.startsWith("/api/v1/download/")
-                    || path.startsWith("/api/v1/download-bundle/")
-                    || path.startsWith("/api/v1/meta/")
-                    || path.startsWith("/api/v1/version/")
-                    || path.startsWith("/api/v1/wiki/")) {
-                return true;
-            }
-
-            if (path.matches("^/api/v1/orgs/[^/]+/members$")) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private List<Map<String, Object>> rateLimitTiers(String path) {

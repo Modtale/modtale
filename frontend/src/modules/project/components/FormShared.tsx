@@ -12,10 +12,12 @@ export type MetadataFormData = {
     iconFile: File | null;
     iconPreview: string | null;
     license?: string;
+    customLicenseOpenSource: boolean;
 };
 
 export type VersionFormData = {
     projectIds: string[];
+    incompatibleProjectIds: string[];
     channel?: 'RELEASE' | 'BETA' | 'ALPHA';
     versionNumber: string;
     gameVersions: string[];
@@ -23,6 +25,7 @@ export type VersionFormData = {
     file: File | null;
     dependencies: string[];
     modIds: any[];
+    replaceExisting?: boolean;
 };
 
 export const Label = ({ children, required, className }: { children: React.ReactNode, required?: boolean, className?: string }) => (

@@ -1,5 +1,12 @@
 package net.modtale.service.auth;
 
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import net.modtale.exception.ApiKeyOperationForbiddenException;
 import net.modtale.exception.ProjectNotFoundException;
 import net.modtale.model.project.Project;
@@ -7,17 +14,9 @@ import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.ApiKeyRepository;
-import net.modtale.service.user.OrganizationApiKeyContextService;
+import net.modtale.service.user.organization.OrganizationApiKeyContextService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.HashMap;
-import java.util.EnumSet;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
 
 final class ApiKeyRequestedContextAuthorizationService {
 

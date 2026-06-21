@@ -7,7 +7,7 @@ import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.config.properties.AppWebhookProperties;
 import net.modtale.model.project.Project;
 import net.modtale.repository.user.UserRepository;
-import net.modtale.service.project.ProjectService;
+import net.modtale.service.project.query.ProjectService;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

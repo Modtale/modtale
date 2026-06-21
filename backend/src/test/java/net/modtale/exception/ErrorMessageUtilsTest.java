@@ -12,32 +12,32 @@ class ErrorMessageUtilsTest {
     void describeUsesTheMostSpecificNonGenericCause() {
         RuntimeException error = new RuntimeException(
                 "Internal Server Error",
-                new IllegalArgumentException("Email already exists")
+                new IllegalArgumentException("ItsNeil17 already exists")
         );
 
-        assertEquals("Registration failed: Email already exists", ErrorMessageUtils.describe(error, "Registration failed"));
+        assertEquals("Registration failed: ItsNeil17 already exists", ErrorMessageUtils.describe(error, "Registration failed"));
     }
 
     @Test
     void describeAvoidsRepeatingTheFallbackPrefix() {
-        IllegalArgumentException error = new IllegalArgumentException("Registration failed: Email already exists");
+        IllegalArgumentException error = new IllegalArgumentException("Registration failed: ItsNeil17 already exists");
 
-        assertEquals("Registration failed: Email already exists", ErrorMessageUtils.describe(error, "Registration failed."));
+        assertEquals("Registration failed: ItsNeil17 already exists", ErrorMessageUtils.describe(error, "Registration failed."));
     }
 
     @Test
     void describeFallsBackWhenNoUsefulMessageExists() {
         RuntimeException error = new RuntimeException(RuntimeException.class.getName());
 
-        assertEquals("Something went wrong", ErrorMessageUtils.describe(error, "Something went wrong"));
+        assertEquals("Let's lock in", ErrorMessageUtils.describe(error, "Let's lock in"));
     }
 
     @Test
     void problemDetailMirrorsTheMessageInBothFields() {
-        ProblemDetail detail = ErrorMessageUtils.problemDetail(HttpStatus.BAD_REQUEST, "Bad request");
+        ProblemDetail detail = ErrorMessageUtils.problemDetail(HttpStatus.BAD_REQUEST, "lock in");
 
-        assertEquals("Bad request", detail.getDetail());
-        assertEquals("Bad request", detail.getProperties().get("error"));
-        assertEquals("Bad request", detail.getProperties().get("message"));
+        assertEquals("lock in", detail.getDetail());
+        assertEquals("lock in", detail.getProperties().get("error"));
+        assertEquals("lock in", detail.getProperties().get("message"));
     }
 }

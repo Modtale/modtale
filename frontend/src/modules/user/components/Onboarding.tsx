@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Camera, Check, Sparkles } from 'lucide-react';
 import { api, extractApiErrorMessage } from '@/utils/api';
 import { StatusModal } from '@/components/ui/StatusModal';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface OnboardingProps {
     isOpen: boolean;
@@ -52,6 +53,7 @@ export function Onboarding({
     };
 
     return (
+        <ModalPortal>
         <div className="fixed inset-0 z-[200] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
             {statusModal && (
                 <StatusModal
@@ -130,5 +132,6 @@ export function Onboarding({
                 </div>
             </div>
         </div>
+        </ModalPortal>
     );
 }

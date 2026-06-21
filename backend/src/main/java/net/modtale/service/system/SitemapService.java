@@ -1,0 +1,105 @@
+package net.modtale.service.system;
+
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import net.modtale.config.properties.AppFrontendProperties;
+import net.modtale.model.project.Project;
+import net.modtale.repository.project.ProjectRepository;
+import net.modtale.repository.user.UserRepository;
+import net.modtale.service.project.query.ProjectService;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Service;
+
+@Service
+public class SitemapService {
+
+    private final ProjectRepository projectRepository;
+    private final UserRepository userRepository;
+    private final ProjectService projectService;
+    private final String baseUrl;
+
+    public SitemapService(
+            ProjectRepository projectRepository,
+            UserRepository userRepository,
+            ProjectService projectService,
+            AppFrontendProperties frontendProperties
+    ) {
+        this.projectRepository = projectRepository;
+        this.userRepository = userRepository;
+        this.projectService = projectService;
+        this.baseUrl = frontendProperties.url();
+    }
+
+    @Cacheable(value = "sitemapData", key = "'sitemap.xml'", sync = true)
+    public String generateSitemap() {
+        LocalDate today = LocalDate.now();
+        StringBuilder xml = new StringBuilder();
+        xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        xml.append("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n");
+
+        addUrl(xml, baseUrl + "/", "1.0", today);
+        addUrl(xml, baseUrl + "/plugins", "0.9", today);
+        addUrl(xml, baseUrl + "/modpacks", "0.9", today);
+        addUrl(xml, baseUrl + "/worlds", "0.9", today);
+        addUrl(xml, baseUrl + "/data", "0.9", today);
+        addUrl(xml, baseUrl + "/art", "0.9", today);
+        addUrl(xml, baseUrl + "/api-docs", "0.8", today);
+
+        Set<String> activeAuthors = new HashSet<>();
+        List<Project> projects = projectRepository.findAllForSitemap();
+
+        for (Project project : projects) {
+            if (project.getUpdatedAt() != null) {
+                addUrl(xml, baseUrl + projectService.getProjectLink(project), "0.8", parseDate(project.getUpdatedAt(), today));
+                String authorHandle = resolveAuthorHandle(project);
+                if (authorHandle != null && !authorHandle.isBlank()) {
+                    activeAuthors.add(authorHandle);
+                }
+            }
+        }
+
+        for (String author : activeAuthors) {
+            if (author != null && !author.isBlank()) {
+                addUrl(xml, baseUrl + "/creator/" + author, "0.7", today);
+            }
+        }
+
+        xml.append("</urlset>");
+        return xml.toString();
+    }
+
+    private void addUrl(StringBuilder xml, String loc, String priority, LocalDate lastMod) {
+        xml.append("\t<url>\n");
+        xml.append("\t\t<loc>").append(loc).append("</loc>\n");
+        xml.append("\t\t<lastmod>").append(lastMod.format(DateTimeFormatter.ISO_DATE)).append("</lastmod>\n");
+        xml.append("\t\t<priority>").append(priority).append("</priority>\n");
+        xml.append("\t</url>\n");
+    }
+
+    private LocalDate parseDate(String dateStr, LocalDate fallback) {
+        try {
+            if (dateStr == null) return fallback;
+            return LocalDate.parse(dateStr);
+        } catch (DateTimeParseException e) {
+            return fallback;
+        }
+    }
+
+    private String resolveAuthorHandle(Project project) {
+        if (project == null) return null;
+        if (project.getAuthor() != null && !project.getAuthor().isBlank()) {
+            return project.getAuthor().trim();
+        }
+        if (project.getAuthorId() == null || project.getAuthorId().isBlank()) {
+            return null;
+        }
+
+        return userRepository.findById(project.getAuthorId())
+                .map(user -> user.getUsername() != null && !user.getUsername().isBlank() ? user.getUsername().trim() : project.getAuthorId())
+                .orElse(project.getAuthorId());
+    }
+}

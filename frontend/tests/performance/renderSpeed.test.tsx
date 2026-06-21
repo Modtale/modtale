@@ -23,11 +23,16 @@ vi.mock('@/modules/discovery/api/discoveryClient', () => ({
 vi.mock('@/modules/project/api/projectClient', () => ({
     projectClient: {
         getProject: vi.fn(),
+        getProjectVersions: vi.fn(),
+        getProjectGallery: vi.fn(),
+        getProjectTeam: vi.fn(),
+        getComments: vi.fn(),
         trackView: vi.fn(),
         getUserProfile: vi.fn(),
         getOrgMembers: vi.fn(),
         getUsersBatch: vi.fn(),
         getDependencyMeta: vi.fn(),
+        getDependencyMetaBatch: vi.fn(),
         getMetaGameVersionCatalog: vi.fn(),
         followUser: vi.fn(),
         unfollowUser: vi.fn()
@@ -129,11 +134,23 @@ describe('critical page render budgets', () => {
     beforeEach(() => {
         vi.stubGlobal('IntersectionObserver', MockObserver);
         vi.stubGlobal('ResizeObserver', MockObserver);
+        mockedProjectClient.getProjectVersions.mockResolvedValue([]);
+        mockedProjectClient.getProjectGallery.mockResolvedValue({
+            galleryImages: [],
+            galleryImageCaptions: {}
+        });
+        mockedProjectClient.getProjectTeam.mockResolvedValue({
+            projectRoles: [],
+            teamMembers: [],
+            teamInvites: []
+        });
+        mockedProjectClient.getComments.mockResolvedValue([]);
         mockedProjectClient.trackView.mockResolvedValue(undefined);
         mockedProjectClient.getUserProfile.mockResolvedValue({ id: 'user-1', username: 'Ada', avatarUrl: '', likedProjectIds: [] } as any);
         mockedProjectClient.getOrgMembers.mockResolvedValue([]);
         mockedProjectClient.getUsersBatch.mockResolvedValue([]);
         mockedProjectClient.getDependencyMeta.mockResolvedValue({ icon: '', title: 'Dependency' } as any);
+        mockedProjectClient.getDependencyMetaBatch.mockResolvedValue({});
         mockedProjectClient.getMetaGameVersionCatalog.mockResolvedValue({ orderedVersions: ['2026.03.11'] } as any);
         mockedDiscoveryClient.searchProjects.mockResolvedValue(page);
         mockedDiscoveryClient.getGameVersions.mockResolvedValue(['2026.03.11']);
@@ -172,7 +189,7 @@ describe('critical page render budgets', () => {
                     )}
                 />
             </Routes>,
-            '/mod/skyforge-1~project-1',
+            '/mod/skyforge-1',
             project
         ));
 

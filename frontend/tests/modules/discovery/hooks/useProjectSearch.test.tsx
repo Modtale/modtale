@@ -111,7 +111,7 @@ describe('useProjectSearch', () => {
         expect(latestSnapshot.loading).toBe(false);
 
         await act(async () => {
-            latestSnapshot.updateParams({ view: 'favorites' });
+            latestSnapshot.updateParams({ sort: 'popular' });
         });
         await settle();
 
@@ -122,14 +122,13 @@ describe('useProjectSearch', () => {
             classification: undefined,
             tags: '',
             search: '',
-            sort: 'relevance',
+            sort: 'popular',
             gameVersion: undefined,
             minDownloads: undefined,
             minFavorites: undefined,
             dateRange: 'all',
-            category: 'Favorites'
         }, expect.any(AbortSignal));
-        expect(latestSnapshot.locationSearch).toBe('?view=favorites');
+        expect(latestSnapshot.locationSearch).toBe('?sort=popular');
         expect(latestSnapshot.items).toEqual([{ id: 'project-2' }]);
     });
 
@@ -142,7 +141,7 @@ describe('useProjectSearch', () => {
 
         await act(async () => {
             root.render(
-                <MemoryRouter initialEntries={['/mods?q=sky&view=favorites&version=1.20.1&minDl=10&minFav=3&date=30d&tags=magic,tech&sort=popular&page=2']}>
+                <MemoryRouter initialEntries={['/mods?q=sky&version=1.20.1&minDl=10&minFav=3&openSource=true&date=30d&tags=magic,tech&sort=popular&page=2']}>
                     <Probe
                         initialClassification="All"
                         useSSRData={false}
@@ -164,19 +163,20 @@ describe('useProjectSearch', () => {
             classification: undefined,
             tags: 'magic,tech',
             search: 'sky',
-            sort: 'relevance',
+            sort: 'popular',
             gameVersion: '1.20.1',
             minDownloads: 10,
             minFavorites: 3,
+            openSource: true,
             dateRange: '30d',
-            category: 'Favorites'
         }, expect.any(AbortSignal));
         expect(latestSnapshot.items).toEqual([{ id: 'project-9' }]);
         expect(latestSnapshot.totalPages).toBe(4);
         expect(latestSnapshot.totalItems).toBe(48);
+        expect(latestSnapshot.openSourceOnly).toBe(true);
     });
 
-    it('normalizes legacy browse sort params to a backend-safe sort while preserving the selected view', async () => {
+    it('passes browse sort params through to the discovery request', async () => {
         mockedDiscoveryClient.searchProjects.mockResolvedValue({
             content: [{ id: 'project-7' }],
             totalPages: 1,
@@ -185,7 +185,7 @@ describe('useProjectSearch', () => {
 
         await act(async () => {
             root.render(
-                <MemoryRouter initialEntries={['/mods?view=trending&sort=trending']}>
+                <MemoryRouter initialEntries={['/mods?sort=trending']}>
                     <Probe
                         initialClassification="All"
                         useSSRData={false}
@@ -207,15 +207,13 @@ describe('useProjectSearch', () => {
             classification: undefined,
             tags: '',
             search: '',
-            sort: 'relevance',
+            sort: 'trending',
             gameVersion: undefined,
             minDownloads: undefined,
             minFavorites: undefined,
             dateRange: 'all',
-            category: 'trending'
         }, expect.any(AbortSignal));
-        expect(latestSnapshot.sortBy).toBe('relevance');
-        expect(latestSnapshot.activeViewId).toBe('trending');
+        expect(latestSnapshot.sortBy).toBe('trending');
     });
 
     it('rewrites out-of-range pages back to the last available page', async () => {
@@ -278,6 +276,39 @@ describe('useProjectSearch', () => {
         expect(latestSnapshot.loading).toBe(false);
     });
 
+    it('does not enter a pending state when browse params are already reset', async () => {
+        await act(async () => {
+            root.render(
+                <MemoryRouter initialEntries={['/mods']}>
+                    <Probe
+                        initialClassification="All"
+                        useSSRData={true}
+                        initialItems={[{ id: 'project-1' }]}
+                        initialTotalPages={1}
+                        initialTotalItems={1}
+                        onRender={snapshot => {
+                            latestSnapshot = snapshot;
+                        }}
+                    />
+                </MemoryRouter>
+            );
+        });
+        await settle();
+
+        await act(async () => {
+            latestSnapshot.updateParams({ version: null, minDl: null, minFav: null, openSource: null, date: null, tags: null });
+        });
+        await settle();
+
+        expect(mockedDiscoveryClient.searchProjects).not.toHaveBeenCalled();
+        expect(latestSnapshot.locationSearch).toBe('');
+        expect(latestSnapshot.loading).toBe(false);
+        expect(latestSnapshot.isPending).toBe(false);
+        expect(latestSnapshot.items).toEqual([{ id: 'project-1' }]);
+        expect(latestSnapshot.totalPages).toBe(1);
+        expect(latestSnapshot.totalItems).toBe(1);
+    });
+
     it('enters a pending state immediately when browse params change, before the fetch resolves', async () => {
         let resolveSearch: ((value: any) => void) | undefined;
         mockedDiscoveryClient.searchProjects.mockImplementation(() => new Promise((resolve) => {
@@ -306,7 +337,7 @@ describe('useProjectSearch', () => {
         expect(latestSnapshot.items).toEqual([{ id: 'project-1' }]);
 
         await act(async () => {
-            latestSnapshot.updateParams({ view: 'trending' });
+            latestSnapshot.updateParams({ sort: 'trending' });
         });
 
         expect(latestSnapshot.isPending).toBe(true);

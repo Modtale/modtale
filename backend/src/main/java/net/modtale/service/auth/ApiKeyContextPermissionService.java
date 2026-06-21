@@ -1,15 +1,14 @@
 package net.modtale.service.auth;
 
+import java.util.EnumSet;
+import java.util.Set;
 import net.modtale.exception.ApiKeyOperationForbiddenException;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
-import net.modtale.service.security.AccessControlService;
+import net.modtale.service.security.access.AccessControlService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.EnumSet;
-import java.util.Set;
 
 final class ApiKeyContextPermissionService {
 

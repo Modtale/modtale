@@ -56,6 +56,6 @@ describe('image utils', () => {
     it('builds a fallback absolute url in SSR mode for relative paths', () => {
         vi.stubGlobal('window', undefined);
         expect(getCloudflareUrl('images/hero.png', 70, 80))
-            .toBe('/cdn-cgi/image/width=128,quality=80,format=auto,onerror=redirect/https://modtale.net/images/hero.png');
+            .toBe('https://modtale.net/cdn-cgi/image/width=128,quality=80,format=auto,onerror=redirect/https://modtale.net/images/hero.png');
     });
 });

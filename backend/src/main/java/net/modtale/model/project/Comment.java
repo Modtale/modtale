@@ -1,8 +1,8 @@
 package net.modtale.model.project;
 
-import java.util.UUID;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 public class Comment {
     private String id;

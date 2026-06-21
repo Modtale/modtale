@@ -1,11 +1,10 @@
 package net.modtale.mapper;
 
+import java.util.ArrayList;
+import java.util.stream.Collectors;
 import net.modtale.model.dto.user.UserDTO;
 import net.modtale.model.dto.user.UserSummaryDTO;
 import net.modtale.model.user.User;
-
-import java.util.ArrayList;
-import java.util.stream.Collectors;
 
 public class UserMapper {
 
