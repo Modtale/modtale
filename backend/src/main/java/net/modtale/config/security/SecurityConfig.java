@@ -286,7 +286,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/forgot-password",
                                 "/api/v1/auth/reset-password"
                         ).permitAll()
-                        .requestMatchers("/sitemap.xml", "/actuator/health").permitAll()
+                        .requestMatchers("/sitemap.xml", "/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/client-metadata.json").permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/projects/**",
