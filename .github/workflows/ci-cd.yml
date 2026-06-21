@@ -20,6 +20,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_R2_PROVISIONER: ${{ secrets.CLOUDFLARE_R2_PROVISIONER }}
       CLOUDFLARE_API_TOKEN_PROVISIONER: ${{ secrets.CLOUDFLARE_API_TOKEN_PROVISIONER }}
+      CLOUDFLARE_API_TOKEN_OWNER: ${{ vars.CLOUDFLARE_API_TOKEN_OWNER }}
       CLOUDFLARE_R2_JURISDICTION: ${{ vars.CLOUDFLARE_R2_JURISDICTION }}
     permissions:
       contents: 'read'
@@ -180,6 +181,13 @@ jobs:
           : "${CLOUDFLARE_R2_PROVISIONER:?Set secret CLOUDFLARE_R2_PROVISIONER.}"
           : "${RUNTIME_SERVICE_ACCOUNT:?Set environment variable GCP_BRANCH_PREVIEW_RUNTIME_SERVICE_ACCOUNT in the branch-preview GitHub environment.}"
 
+          mask_secret() {
+            local value="${1:-}"
+            if [ -n "$value" ]; then
+              echo "::add-mask::$value"
+            fi
+          }
+
           if [ "${MONGODB_SECRET_NAME:-}" = "MONGODB_URI" ]; then
             echo "::error::Branch previews must use BRANCH_PREVIEW_MONGODB_URI, not production MONGODB_URI."
             exit 1
@@ -197,8 +205,8 @@ jobs:
           source_r2_endpoint="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME")"
           source_r2_endpoint="$(printf '%s' "$source_r2_endpoint" | sed -E 's#(https?://[^/]+).*#\1#')"
 
-          echo "::add-mask::$source_r2_access_key"
-          echo "::add-mask::$source_r2_secret_key"
+          mask_secret "$source_r2_access_key"
+          mask_secret "$source_r2_secret_key"
 
           if ! command -v aws >/dev/null 2>&1; then
             sudo apt-get update
@@ -217,7 +225,7 @@ jobs:
               --project "$PROJECT_ID" \
               --secret="$R2_TOKEN_ID_SECRET_NAME" 2>/dev/null || true
           )"
-          echo "::add-mask::$existing_token_id"
+          mask_secret "$existing_token_id"
 
           latest_secret_version() {
             local name="$1"
@@ -275,8 +283,8 @@ jobs:
           )"
           existing_r2_endpoint="$(printf '%s' "$existing_r2_endpoint" | sed -E 's#(https?://[^/]+).*#\1#')"
 
-          echo "::add-mask::$existing_r2_access_key"
-          echo "::add-mask::$existing_r2_secret_key"
+          mask_secret "$existing_r2_access_key"
+          mask_secret "$existing_r2_secret_key"
 
           runtime_credentials_valid=false
           if [ -n "$existing_r2_access_key" ] && \
@@ -334,7 +342,13 @@ jobs:
             echo "Existing branch preview R2 runtime credentials are missing or invalid; provisioning a replacement."
             : "${CLOUDFLARE_API_TOKEN_PROVISIONER:?Set secret CLOUDFLARE_API_TOKEN_PROVISIONER.}"
             export EXISTING_R2_RUNTIME_TOKEN_ID="$existing_token_id"
+            runtime_env_file="$(mktemp)"
+            trap 'rm -f "$runtime_env_file"' EXIT
+            export R2_RUNTIME_ENV_FILE="$runtime_env_file"
             node .github/scripts/cloudflare-r2-preview.mjs provision
+            set -a
+            . "$runtime_env_file"
+            set +a
 
             R2_ACCESS_KEY_SECRET_VERSION="$(write_secret "$R2_ACCESS_KEY_SECRET_NAME" "$R2_RUNTIME_ACCESS_KEY")"
             R2_SECRET_KEY_SECRET_VERSION="$(write_secret "$R2_SECRET_KEY_SECRET_NAME" "$R2_RUNTIME_SECRET_KEY")"
@@ -688,6 +702,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_R2_PROVISIONER: ${{ secrets.CLOUDFLARE_R2_PROVISIONER }}
       CLOUDFLARE_API_TOKEN_PROVISIONER: ${{ secrets.CLOUDFLARE_API_TOKEN_PROVISIONER }}
+      CLOUDFLARE_API_TOKEN_OWNER: ${{ vars.CLOUDFLARE_API_TOKEN_OWNER }}
       CLOUDFLARE_R2_JURISDICTION: ${{ vars.CLOUDFLARE_R2_JURISDICTION }}
     permissions:
       contents: read
@@ -757,6 +772,13 @@ jobs:
         run: |
           set -euo pipefail
 
+          mask_secret() {
+            local value="${1:-}"
+            if [ -n "$value" ]; then
+              echo "::add-mask::$value"
+            fi
+          }
+
           case "$R2_BUCKET_NAME" in
             modtale-branch-*)
               ;;
@@ -771,8 +793,8 @@ jobs:
           r2_endpoint="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$R2_ENDPOINT_SECRET_NAME" 2>/dev/null || true)"
           r2_endpoint="$(printf '%s' "$r2_endpoint" | sed -E 's#(https?://[^/]+).*#\1#')"
 
-          echo "::add-mask::$r2_access_key"
-          echo "::add-mask::$r2_secret_key"
+          mask_secret "$r2_access_key"
+          mask_secret "$r2_secret_key"
 
           if [ -z "$r2_access_key" ] || [ -z "$r2_secret_key" ] || [ -z "$r2_endpoint" ]; then
             echo "Per-branch R2 runtime secrets are missing; skipping object empty step."
@@ -813,7 +835,7 @@ jobs:
                 --secret="$R2_ACCESS_KEY_SECRET_NAME" 2>/dev/null || true
             )"
           fi
-          echo "::add-mask::$runtime_token_id"
+          mask_secret "$runtime_token_id"
           export R2_RUNTIME_TOKEN_ID="$runtime_token_id"
 
           : "${CLOUDFLARE_ACCOUNT_ID:?Set secret CLOUDFLARE_ACCOUNT_ID.}"
