@@ -7,8 +7,17 @@ import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.ReplaceOptions;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+import net.modtale.config.properties.AppR2Properties;
 import net.modtale.config.properties.AppSeedingProperties;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectStatus;
@@ -16,6 +25,7 @@ import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.auth.ReservedAccountGuardService;
+import net.modtale.service.storage.StorageService;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -25,6 +35,16 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.ResponseBytes;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 import java.util.*;
 
@@ -37,9 +57,16 @@ public class DataSeeder implements CommandLineRunner {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final ReservedAccountGuardService reservedAccountGuardService;
+    private final StorageService storageService;
+    private final AppR2Properties r2Properties;
     private final AppSeedingProperties seedingProperties;
 
     private static final int PUBLISHED_PROJECT_LIMIT = 100;
+    private static final int MONGO_SEED_PROGRESS_INTERVAL = 25;
+    private static final int R2_SEED_PROGRESS_INTERVAL = 25;
+    private static final String R2_SEED_MARKER_PREFIX = ".modtale/seeding/r2-artifacts/";
+    private static final Set<String> VERSION_ARTIFACT_FIELDS = Set.of("fileUrl", "cachedFileUrl", "artifactUrl");
+    private static final Set<String> DEPENDENCY_ARTIFACT_FIELDS = Set.of("cachedFileUrl", "externalFileUrl", "fileUrl");
     private static final String SUPER_ADMIN_ID = "692620f7c2f3266e23ac0ded";
     private static final String ADMIN_ID = "692620f7c2f3266e23ac0dee";
     private static final List<String> MOCK_COLLECTIONS = List.of(
@@ -61,12 +88,16 @@ public class DataSeeder implements CommandLineRunner {
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             ReservedAccountGuardService reservedAccountGuardService,
+            StorageService storageService,
+            AppR2Properties r2Properties,
             AppSeedingProperties seedingProperties
     ) {
         this.mongoTemplate = mongoTemplate;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.reservedAccountGuardService = reservedAccountGuardService;
+        this.storageService = storageService;
+        this.r2Properties = r2Properties;
         this.seedingProperties = seedingProperties;
     }
 
@@ -84,6 +115,15 @@ public class DataSeeder implements CommandLineRunner {
         }
 
         String currentDbName = mongoTemplate.getDb().getName();
+        logger.info(
+                "DataSeeder enabled: mode={}, reset={}, targetDb={}, sourceDb={}, targetR2BucketConfigured={}, sourceR2BucketConfigured={}.",
+                seedingProperties.mode(),
+                seedingProperties.reset(),
+                currentDbName,
+                seedingProperties.sourceDb(),
+                hasText(r2Properties.bucket()),
+                hasText(seedingProperties.sourceR2Bucket())
+        );
 
         if (seedingProperties.mode() == AppSeedingProperties.Mode.MOCK) {
             seedMockDatabase(currentDbName);
@@ -105,7 +145,8 @@ public class DataSeeder implements CommandLineRunner {
         }
 
         if (mongoTemplate.getCollection("projects").countDocuments() > 0) {
-            logger.info("Database '{}' already contains projects. Skipping content clone.", currentDbName);
+            logger.info("Database '{}' already contains projects. Skipping content clone and checking R2 artifacts.", currentDbName);
+            seedR2ObjectsFromCurrentProjects(false);
             return;
         }
 
@@ -118,6 +159,11 @@ public class DataSeeder implements CommandLineRunner {
             MongoDatabase targetDb = mongoTemplate.getDb();
 
             long sourceProjectCount = sourceDb.getCollection("projects").countDocuments();
+            logger.info(
+                    "Mongo clone seed progress: source database '{}' has {} project documents.",
+                    seedingProperties.sourceDb(),
+                    sourceProjectCount
+            );
             if (sourceProjectCount == 0) {
                 logger.warn("SOURCE DB '{}' IS EMPTY! Cannot clone data.", seedingProperties.sourceDb());
                 return;
@@ -138,10 +184,19 @@ public class DataSeeder implements CommandLineRunner {
                     )),
                     Aggregates.sample(PUBLISHED_PROJECT_LIMIT)
             );
+            logger.info(
+                    "Mongo clone seed progress: sampling up to {} published/archived projects from '{}'.",
+                    PUBLISHED_PROJECT_LIMIT,
+                    seedingProperties.sourceDb()
+            );
             sourceProjectsCol.aggregate(publishedPipeline).into(compiledProjects);
-            logger.info("Fetched {} random public projects.", compiledProjects.size());
+            logger.info("Mongo clone seed progress: fetched {} random public projects.", compiledProjects.size());
 
             ensureClassificationCoverage(sourceProjectsCol, compiledProjects);
+            logger.info(
+                    "Mongo clone seed progress: project set after classification coverage contains {} projects.",
+                    compiledProjects.size()
+            );
 
             Set<String> selectedProjectIds = projectIds(compiledProjects);
 
@@ -149,7 +204,11 @@ public class DataSeeder implements CommandLineRunner {
             if (!dependencyProjects.isEmpty()) {
                 compiledProjects.addAll(dependencyProjects);
                 selectedProjectIds = projectIds(compiledProjects);
-                logger.info("Included {} dependency projects for selected projects.", dependencyProjects.size());
+                logger.info(
+                        "Mongo clone seed progress: included {} dependency projects; project set now contains {} projects.",
+                        dependencyProjects.size(),
+                        compiledProjects.size()
+                );
             }
 
             if (compiledProjects.isEmpty()) {
@@ -167,13 +226,16 @@ public class DataSeeder implements CommandLineRunner {
 
             try {
                 Set<String> finalSelectedProjectIds = selectedProjectIds;
+                logger.info("Mongo clone seed progress: sanitizing {} public projects before insert.", compiledProjects.size());
                 compiledProjects.forEach(project -> stripPrivateProjectFields(project, finalSelectedProjectIds));
+                logger.info("Mongo clone seed progress: inserting {} public projects into target database '{}'.", compiledProjects.size(), currentDbName);
                 targetDb.getCollection("projects").insertMany(compiledProjects);
-                logger.info("Cloned {} public projects to local database.", compiledProjects.size());
+                logger.info("Mongo clone seed progress: cloned {} public projects to target database '{}'.", compiledProjects.size(), currentDbName);
             } catch (MongoBulkWriteException e) {
                 logger.warn("Project insertion warning (duplicates might exist): {}", e.getMessage());
             }
 
+            seedR2ObjectsForProjects(compiledProjects, false);
             seedSyntheticSupplementDocuments(targetDb);
 
             logger.info("Seeding completed successfully.");
@@ -188,6 +250,7 @@ public class DataSeeder implements CommandLineRunner {
 
         if (!seedingProperties.reset() && mongoTemplate.getCollection("projects").countDocuments() > 0) {
             logger.info("Database '{}' already contains projects. Skipping mock database import.", currentDbName);
+            seedR2ObjectsFromCurrentProjects(true);
             return;
         }
 
@@ -199,20 +262,25 @@ public class DataSeeder implements CommandLineRunner {
 
         try {
             if (seedingProperties.reset()) {
-                for (String collectionName : MOCK_COLLECTIONS) {
-                    targetDb.getCollection(collectionName).deleteMany(new Document());
-                }
+                resetMockCollections(targetDb, "mock");
             }
 
+            int collectionIndex = 0;
             for (String collectionName : MOCK_COLLECTIONS) {
+                collectionIndex++;
+                logger.info(
+                        "Mongo mock seed progress: preparing collection {}/{} '{}' with synthetic documents.",
+                        collectionIndex,
+                        MOCK_COLLECTIONS.size(),
+                        collectionName
+                );
                 List<Document> documents = syntheticMockDocuments(collectionName);
                 MongoCollection<Document> collection = targetDb.getCollection(collectionName);
 
-                for (Document document : documents) {
-                    upsertMockDocument(collection, document);
+                upsertDocumentsWithProgress(collection, collectionName, documents, "mock", collectionIndex, MOCK_COLLECTIONS.size());
+                if ("projects".equals(collectionName)) {
+                    seedR2ObjectsForProjects(documents, true);
                 }
-
-                logger.info("Imported {} mock documents into '{}'.", documents.size(), collectionName);
             }
 
             logger.info("Mock database import completed successfully.");
@@ -247,6 +315,7 @@ public class DataSeeder implements CommandLineRunner {
 
         if (!seedingProperties.reset() && mongoTemplate.getCollection("projects").countDocuments() > 0) {
             logger.info("Database '{}' already contains projects. Skipping template import.", currentDbName);
+            seedR2ObjectsFromCurrentProjects(false);
             return;
         }
 
@@ -262,20 +331,36 @@ public class DataSeeder implements CommandLineRunner {
             }
 
             if (seedingProperties.reset()) {
-                for (String collectionName : MOCK_COLLECTIONS) {
-                    targetDb.getCollection(collectionName).deleteMany(new Document());
-                }
+                resetMockCollections(targetDb, "template");
             }
 
+            int collectionIndex = 0;
             for (String collectionName : MOCK_COLLECTIONS) {
-                List<Document> documents = fetchSubset(sourceDb, collectionName, templateLimit(collectionName));
+                collectionIndex++;
+                int limit = templateLimit(collectionName);
+                logger.info(
+                        "Mongo template seed progress: fetching collection {}/{} '{}' from '{}' (limit={}).",
+                        collectionIndex,
+                        MOCK_COLLECTIONS.size(),
+                        collectionName,
+                        sourceDbName,
+                        limit
+                );
+                List<Document> documents = fetchSubset(sourceDb, collectionName, limit);
+                logger.info(
+                        "Mongo template seed progress: fetched {} documents for collection '{}'.",
+                        documents.size(),
+                        collectionName
+                );
+                if ("projects".equals(collectionName)) {
+                    documents = completeDependencyProjects(sourceDb.getCollection("projects"), documents, "template");
+                }
                 MongoCollection<Document> collection = targetDb.getCollection(collectionName);
 
-                for (Document document : documents) {
-                    upsertMockDocument(collection, document);
+                upsertDocumentsWithProgress(collection, collectionName, documents, "template", collectionIndex, MOCK_COLLECTIONS.size());
+                if ("projects".equals(collectionName)) {
+                    seedR2ObjectsForProjects(documents, false);
                 }
-
-                logger.info("Imported {} sanitized template documents into '{}'.", documents.size(), collectionName);
             }
 
             logger.info("Sanitized template import completed successfully.");
@@ -484,11 +569,23 @@ public class DataSeeder implements CommandLineRunner {
                 "galleryImageCaptions", new Document(),
                 "comments", List.of(),
                 "versions", List.of(doc("_id", slug + "-1-0-0", "versionNumber", "1.0.0",
-                        "gameVersions", List.of("2026.03.11"), "fileUrl", "https://example.test/mock-downloads/" + slug + "-1.0.0.zip",
+                        "gameVersions", List.of("2026.03.11"), "fileUrl", seedFileKey(slug, classification, "1.0.0"),
                         "hash", "sha256:mock-" + slug, "downloadCount", downloads, "releaseDate", "2026-06-18",
                         "changelog", "Synthetic changelog.", "dependencies", List.of(), "incompatibleProjectIds", List.of(),
                         "channel", "RELEASE", "reviewStatus", "PENDING".equals(status) ? "PENDING" : "APPROVED"))
         );
+    }
+
+    private String seedFileKey(String slug, String classification, String versionNumber) {
+        String safeSlug = sanitizeStorageName(slug == null || slug.isBlank() ? "mock-project" : slug);
+        String safeVersion = sanitizeStorageName(versionNumber == null || versionNumber.isBlank() ? "latest" : versionNumber);
+        return switch (parseClassification(classification)) {
+            case MODPACK -> "modpacks/" + safeSlug + "-" + safeVersion + ".zip";
+            case DATA -> "files/data/" + safeSlug + "-" + safeVersion + ".zip";
+            case ART -> "files/art/" + safeSlug + "-" + safeVersion + ".hmasset";
+            case SAVE -> "files/save/" + safeSlug + "-" + safeVersion + ".zip";
+            case PLUGIN -> "files/plugin/" + safeSlug + "-" + safeVersion + ".jar";
+        };
     }
 
     private Document doc(Object... values) {
@@ -520,16 +617,831 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedSyntheticSupplementDocuments(MongoDatabase targetDb) {
+        int collectionIndex = 0;
         for (String collectionName : MOCK_COLLECTIONS) {
+            collectionIndex++;
             MongoCollection<Document> collection = targetDb.getCollection(collectionName);
+            logger.info(
+                    "Mongo supplemental seed progress: preparing collection {}/{} '{}'.",
+                    collectionIndex,
+                    MOCK_COLLECTIONS.size(),
+                    collectionName
+            );
             List<Document> documents = syntheticMockDocuments(collectionName);
 
-            for (Document document : documents) {
-                upsertMockDocument(collection, document);
+            upsertDocumentsWithProgress(collection, collectionName, documents, "supplemental", collectionIndex, MOCK_COLLECTIONS.size());
+            if ("projects".equals(collectionName)) {
+                seedR2ObjectsForProjects(documents, true);
+            }
+        }
+    }
+
+    private void resetMockCollections(MongoDatabase targetDb, String seedLabel) {
+        logger.info(
+                "Mongo {} seed reset progress: clearing {} collections before import.",
+                seedLabel,
+                MOCK_COLLECTIONS.size()
+        );
+        int collectionIndex = 0;
+        for (String collectionName : MOCK_COLLECTIONS) {
+            collectionIndex++;
+            long deleted = targetDb.getCollection(collectionName).deleteMany(new Document()).getDeletedCount();
+            logger.info(
+                    "Mongo {} seed reset progress: cleared collection {}/{} '{}' (deleted={}).",
+                    seedLabel,
+                    collectionIndex,
+                    MOCK_COLLECTIONS.size(),
+                    collectionName,
+                    deleted
+            );
+        }
+    }
+
+    private void upsertDocumentsWithProgress(
+            MongoCollection<Document> collection,
+            String collectionName,
+            List<Document> documents,
+            String seedLabel,
+            int collectionIndex,
+            int collectionTotal
+    ) {
+        int total = documents == null ? 0 : documents.size();
+        logger.info(
+                "Mongo {} seed progress: importing collection {}/{} '{}' (documents={}).",
+                seedLabel,
+                collectionIndex,
+                collectionTotal,
+                collectionName,
+                total
+        );
+        if (total == 0) {
+            logger.info(
+                    "Mongo {} seed progress: completed collection {}/{} '{}' (documents=0, elapsedMs=0).",
+                    seedLabel,
+                    collectionIndex,
+                    collectionTotal,
+                    collectionName
+            );
+            return;
+        }
+
+        int processed = 0;
+        long startedAt = System.nanoTime();
+        for (Document document : documents) {
+            upsertMockDocument(collection, document);
+            processed++;
+            if (processed == 1 || processed % MONGO_SEED_PROGRESS_INTERVAL == 0 || processed == total) {
+                logger.info(
+                        "Mongo {} seed progress: collection {}/{} '{}' processed={}/{}.",
+                        seedLabel,
+                        collectionIndex,
+                        collectionTotal,
+                        collectionName,
+                        processed,
+                        total
+                );
+            }
+        }
+
+        long elapsedMillis = (System.nanoTime() - startedAt) / 1_000_000L;
+        logger.info(
+                "Mongo {} seed progress: completed collection {}/{} '{}' (documents={}, elapsedMs={}).",
+                seedLabel,
+                collectionIndex,
+                collectionTotal,
+                collectionName,
+                total,
+                elapsedMillis
+        );
+    }
+
+    private void seedR2ObjectsFromCurrentProjects(boolean allowSyntheticFallback) {
+        try {
+            logger.info(
+                    "R2 artifact seed discovery: loading current project versions from database '{}' (syntheticFallback={}).",
+                    mongoTemplate.getDb().getName(),
+                    allowSyntheticFallback
+            );
+            List<Document> projects = new ArrayList<>();
+            mongoTemplate.getCollection("projects")
+                    .find()
+                    .projection(new Document("title", 1)
+                            .append("slug", 1)
+                            .append("classification", 1)
+                            .append("versions", 1))
+                    .into(projects);
+            logger.info(
+                    "Checking existing database projects for R2 artifact seeding (projects={}, syntheticFallback={}).",
+                    projects.size(),
+                    allowSyntheticFallback
+            );
+            seedR2ObjectsForProjects(projects, allowSyntheticFallback);
+        } catch (MongoException e) {
+            logger.warn("Could not read existing projects for R2 artifact seeding: {}", e.getMessage());
+        }
+    }
+
+    private void seedR2ObjectsForProjects(List<Document> projects, boolean allowSyntheticFallback) {
+        if (projects == null || projects.isEmpty()) {
+            logger.info("No projects available for R2 artifact seeding.");
+            return;
+        }
+
+        int versionCount = countVersionDocuments(projects);
+        Map<String, R2SeedObject> objects = new LinkedHashMap<>();
+        for (Document project : projects) {
+            collectProjectR2Objects(project, objects);
+        }
+        long syntheticFallbackKeys = objects.values().stream()
+                .filter(R2SeedObject::syntheticFallback)
+                .count();
+        logger.info(
+                "R2 artifact seed discovery: projects={}, versions={}, objectKeys={}, syntheticFallbackKeys={}, sourceCopyCandidateKeys={}.",
+                projects.size(),
+                versionCount,
+                objects.size(),
+                syntheticFallbackKeys,
+                objects.size() - syntheticFallbackKeys
+        );
+
+        if (objects.isEmpty()) {
+            logger.info(
+                    "No R2 artifact keys found across {} projects and {} versions. Skipping R2 artifact seeding.",
+                    projects.size(),
+                    versionCount
+            );
+            return;
+        }
+
+        if (!hasText(r2Properties.bucket())) {
+            logger.info("Target R2 bucket is not configured. Skipping R2 artifact seeding for {} object keys.", objects.size());
+            return;
+        }
+
+        String markerKey = r2SeedMarkerKey(objects.values());
+        if (hasR2SeedMarker(markerKey, objects.size()) && r2SeedObjectsPresent(objects.values())) {
+            return;
+        }
+
+        Optional<R2SourceConfig> sourceConfig = r2SourceConfig();
+        if (sourceConfig.isEmpty() && !allowSyntheticFallback) {
+            logger.info("Source R2 is not configured. Skipping R2 artifact seeding for {} object keys.", objects.size());
+            return;
+        }
+
+        R2SourceConfig source = sourceConfig.orElse(null);
+        logger.info(
+                "R2 artifact seed progress: targetBucket='{}', sourceBucket='{}', objectKeys={}, syntheticFallbackKeys={}.",
+                r2Properties.bucket(),
+                source == null ? "" : source.bucket(),
+                objects.size(),
+                syntheticFallbackKeys
+        );
+        S3Client sourceClient = source == null ? null : sourceR2Client(source);
+        logger.info(
+                "Checking {} R2 artifact keys against target storage (sourceBucketConfigured={}, syntheticFallback={}).",
+                objects.size(),
+                source != null,
+                allowSyntheticFallback
+        );
+        int uploaded = 0;
+        int skipped = 0;
+        int copied = 0;
+        int generated = 0;
+        int missingSource = 0;
+        int failed = 0;
+        int processed = 0;
+        long startedAt = System.nanoTime();
+
+        try {
+            for (R2SeedObject object : objects.values()) {
+                processed++;
+                if (processed == 1 || (processed - 1) % R2_SEED_PROGRESS_INTERVAL == 0) {
+                    logger.info("R2 artifact seed progress: starting {}/{} ({})", processed, objects.size(), object.key());
+                }
+
+                try {
+                    if (storageService.exists(object.key())) {
+                        skipped++;
+                    } else {
+                        R2ObjectBytes bytes = sourceClient == null
+                                ? null
+                                : readSourceR2Object(sourceClient, source, object.key());
+                        if (bytes != null) {
+                            storageService.uploadDirect(
+                                    object.key(),
+                                    bytes.bytes(),
+                                    firstNonBlank(bytes.contentType(), contentType(object.key()))
+                            );
+                            uploaded++;
+                            copied++;
+                        } else if (allowSyntheticFallback || object.syntheticFallback()) {
+                            storageService.uploadDirect(object.key(), fixtureBytes(object), contentType(object.key()));
+                            uploaded++;
+                            generated++;
+                        } else {
+                            missingSource++;
+                            logger.warn("Source R2 object '{}' was not found. Target object was not seeded.", object.key());
+                        }
+                    }
+                } catch (RuntimeException e) {
+                    failed++;
+                    logger.warn("Could not seed R2 artifact object '{}': {}", object.key(), e.getMessage());
+                }
+
+                if (processed % R2_SEED_PROGRESS_INTERVAL == 0 || processed == objects.size()) {
+                    logger.info(
+                            "R2 artifact seed progress: processed={}/{} uploaded={} copiedFromSource={} generatedSynthetic={} alreadyPresent={} missingSource={} failed={}.",
+                            processed,
+                            objects.size(),
+                            uploaded,
+                            copied,
+                            generated,
+                            skipped,
+                            missingSource,
+                            failed
+                    );
+                }
+            }
+        } finally {
+            if (sourceClient != null) {
+                sourceClient.close();
+            }
+        }
+
+        long elapsedMillis = (System.nanoTime() - startedAt) / 1_000_000L;
+        logger.info(
+                "R2 artifact seed finished: uploaded={}, copiedFromSource={}, generatedSynthetic={}, alreadyPresent={}, missingSource={}, failed={}, elapsedMs={}.",
+                uploaded,
+                copied,
+                generated,
+                skipped,
+                missingSource,
+                failed,
+                elapsedMillis
+        );
+
+        if (missingSource == 0 && failed == 0) {
+            writeR2SeedMarker(markerKey, objects.size(), versionCount, uploaded, copied, generated, skipped, elapsedMillis);
+        } else {
+            logger.info(
+                    "R2 artifact seed marker was not written because missingSource={} and failed={}. The next startup will re-check R2 artifacts.",
+                    missingSource,
+                    failed
+            );
+        }
+    }
+
+    private boolean hasR2SeedMarker(String markerKey, int objectCount) {
+        try {
+            if (storageService.exists(markerKey)) {
+                logger.info(
+                        "R2 artifact seed marker exists for current artifact set (objects={}, marker={}). Verifying target objects before skipping copy.",
+                        objectCount,
+                        markerKey
+                );
+                return true;
+            }
+            logger.info("R2 artifact seed marker not found for current artifact set (marker={}). Validating target objects.", markerKey);
+        } catch (RuntimeException e) {
+            logger.warn(
+                    "Could not check R2 artifact seed marker '{}': {}. Falling back to object validation.",
+                    markerKey,
+                    e.getMessage()
+            );
+        }
+        return false;
+    }
+
+    private boolean r2SeedObjectsPresent(Collection<R2SeedObject> objects) {
+        int checked = 0;
+        int missing = 0;
+        List<String> missingSample = new ArrayList<>();
+
+        for (R2SeedObject object : objects) {
+            checked++;
+            try {
+                if (!storageService.exists(object.key())) {
+                    missing++;
+                    if (missingSample.size() < 10) {
+                        missingSample.add(object.key());
+                    }
+                }
+            } catch (RuntimeException e) {
+                logger.warn(
+                        "Could not verify R2 artifact object '{}' despite seed marker: {}. Falling back to object seeding.",
+                        object.key(),
+                        e.getMessage()
+                );
+                return false;
+            }
+        }
+
+        if (missing == 0) {
+            logger.info("R2 artifact seed marker verified: all {} target object keys are present.", checked);
+            return true;
+        }
+
+        logger.warn(
+                "R2 artifact seed marker is stale: {} of {} target object keys are missing. Missing sample: {}. Reseeding missing objects.",
+                missing,
+                checked,
+                missingSample
+        );
+        return false;
+    }
+
+    private void writeR2SeedMarker(
+            String markerKey,
+            int objectCount,
+            int versionCount,
+            int uploaded,
+            int copied,
+            int generated,
+            int alreadyPresent,
+            long elapsedMillis
+    ) {
+        try {
+            storageService.uploadDirect(
+                    markerKey,
+                    r2SeedMarkerJson(markerKey, objectCount, versionCount, uploaded, copied, generated, alreadyPresent, elapsedMillis)
+                            .getBytes(StandardCharsets.UTF_8),
+                    "application/json"
+            );
+            logger.info("Wrote R2 artifact seed marker for current artifact set (objects={}, marker={}).", objectCount, markerKey);
+        } catch (RuntimeException e) {
+            logger.warn("Could not write R2 artifact seed marker '{}': {}", markerKey, e.getMessage());
+        }
+    }
+
+    private String r2SeedMarkerKey(Collection<R2SeedObject> objects) {
+        return R2_SEED_MARKER_PREFIX + r2SeedFingerprint(objects) + ".json";
+    }
+
+    private String r2SeedFingerprint(Collection<R2SeedObject> objects) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            objects.stream()
+                    .map(R2SeedObject::key)
+                    .filter(Objects::nonNull)
+                    .sorted()
+                    .forEach(key -> {
+                        digest.update(key.getBytes(StandardCharsets.UTF_8));
+                        digest.update((byte) '\n');
+                    });
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is not available for R2 seed fingerprinting.", e);
+        }
+    }
+
+    private String r2SeedMarkerJson(
+            String markerKey,
+            int objectCount,
+            int versionCount,
+            int uploaded,
+            int copied,
+            int generated,
+            int alreadyPresent,
+            long elapsedMillis
+    ) {
+        String fingerprint = markerKey
+                .substring(R2_SEED_MARKER_PREFIX.length(), markerKey.length() - ".json".length());
+        return "{\n"
+                + "  \"type\": \"modtale-r2-artifact-seed\",\n"
+                + "  \"fingerprint\": \"" + fingerprint + "\",\n"
+                + "  \"objectCount\": " + objectCount + ",\n"
+                + "  \"versionCount\": " + versionCount + ",\n"
+                + "  \"uploaded\": " + uploaded + ",\n"
+                + "  \"copiedFromSource\": " + copied + ",\n"
+                + "  \"generatedSynthetic\": " + generated + ",\n"
+                + "  \"alreadyPresent\": " + alreadyPresent + ",\n"
+                + "  \"elapsedMs\": " + elapsedMillis + ",\n"
+                + "  \"createdAt\": \"" + Instant.now() + "\"\n"
+                + "}\n";
+    }
+
+    private int countVersionDocuments(List<Document> projects) {
+        int count = 0;
+        for (Document project : projects) {
+            Object rawVersions = project.get("versions");
+            if (rawVersions instanceof List<?> versions) {
+                count += versions.size();
+            }
+        }
+        return count;
+    }
+
+    private Optional<R2SourceConfig> r2SourceConfig() {
+        String bucket = trimToNull(seedingProperties.sourceR2Bucket());
+        if (bucket == null) {
+            return Optional.empty();
+        }
+
+        String accessKey = trimToNull(seedingProperties.sourceR2AccessKey());
+        String secretKey = trimToNull(seedingProperties.sourceR2SecretKey());
+        String endpoint = trimToNull(seedingProperties.sourceR2Endpoint());
+        if (accessKey == null || secretKey == null || endpoint == null) {
+            logger.warn(
+                    "Source R2 bucket '{}' is configured, but source endpoint/access/secret is incomplete. Skipping source R2 copy.",
+                    bucket
+            );
+            return Optional.empty();
+        }
+
+        return Optional.of(new R2SourceConfig(bucket, accessKey, secretKey, endpoint));
+    }
+
+    private S3Client sourceR2Client(R2SourceConfig source) {
+        URI endpoint = cleanEndpoint(source.endpoint());
+        return S3Client.builder()
+                .endpointOverride(endpoint)
+                .region(Region.US_EAST_1)
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(source.accessKey(), source.secretKey())
+                ))
+                .serviceConfiguration(S3Configuration.builder()
+                        .pathStyleAccessEnabled(true)
+                        .build())
+                .build();
+    }
+
+    private URI cleanEndpoint(String endpoint) {
+        URI uri = URI.create(endpoint);
+        return URI.create(uri.getScheme() + "://" + uri.getAuthority());
+    }
+
+    private R2ObjectBytes readSourceR2Object(S3Client sourceClient, R2SourceConfig source, String key) {
+        try {
+            ResponseBytes<GetObjectResponse> response = sourceClient.getObjectAsBytes(GetObjectRequest.builder()
+                    .bucket(source.bucket())
+                    .key(key)
+                    .build());
+            return new R2ObjectBytes(response.asByteArray(), response.response().contentType());
+        } catch (NoSuchKeyException e) {
+            return null;
+        } catch (S3Exception e) {
+            if (e.statusCode() == 404) {
+                return null;
+            }
+            throw e;
+        }
+    }
+
+    private void collectProjectR2Objects(Document project, Map<String, R2SeedObject> objects) {
+        ProjectClassification classification = parseClassification(project.get("classification"));
+        String projectName = firstNonBlank(
+                stringValue(project.get("slug")),
+                stringValue(project.get("title")),
+                "project"
+        );
+
+        Object rawVersions = project.get("versions");
+        if (!(rawVersions instanceof List<?> versions)) {
+            return;
+        }
+
+        for (Object versionObj : versions) {
+            if (!(versionObj instanceof Document versionDoc)) {
+                continue;
             }
 
-            logger.info("Upserted {} synthetic supplement documents into '{}'.", documents.size(), collectionName);
+            String versionNumber = firstNonBlank(stringValue(versionDoc.get("versionNumber")), "latest");
+            collectFieldR2Objects(versionDoc, VERSION_ARTIFACT_FIELDS, objects, projectName, versionNumber, classification);
+            collectDependencyR2Objects(versionDoc, objects);
         }
+    }
+
+    private void collectDependencyR2Objects(Document versionDoc, Map<String, R2SeedObject> objects) {
+        Object rawDependencies = versionDoc.get("dependencies");
+        if (!(rawDependencies instanceof List<?> dependencies)) {
+            return;
+        }
+
+        for (Object dependencyObj : dependencies) {
+            if (!(dependencyObj instanceof Document dependencyDoc)) {
+                continue;
+            }
+
+            String title = firstNonBlank(
+                    stringValue(dependencyDoc.get("projectTitle")),
+                    stringValue(dependencyDoc.get("modTitle")),
+                    stringValue(dependencyDoc.get("title")),
+                    stringValue(dependencyDoc.get("projectId")),
+                    stringValue(dependencyDoc.get("modId")),
+                    stringValue(dependencyDoc.get("externalId")),
+                    "dependency"
+            );
+            String versionNumber = firstNonBlank(stringValue(dependencyDoc.get("versionNumber")), "latest");
+            collectFieldR2Objects(dependencyDoc, DEPENDENCY_ARTIFACT_FIELDS, objects, title, versionNumber, ProjectClassification.PLUGIN);
+        }
+    }
+
+    private void collectFieldR2Objects(
+            Document document,
+            Set<String> fieldNames,
+            Map<String, R2SeedObject> objects,
+            String projectName,
+            String versionNumber,
+            ProjectClassification classification
+    ) {
+        for (String fieldName : fieldNames) {
+            addR2SeedObject(objects, stringValue(document.get(fieldName)), projectName, versionNumber, classification);
+        }
+    }
+
+    private void addR2SeedObject(
+            Map<String, R2SeedObject> objects,
+            String rawLocation,
+            String projectName,
+            String versionNumber,
+            ProjectClassification classification
+    ) {
+        R2SeedLocation location = r2SeedLocation(rawLocation);
+        if (location == null) {
+            return;
+        }
+
+        String key = location.key();
+        objects.putIfAbsent(
+                key,
+                new R2SeedObject(
+                        key,
+                        firstNonBlank(projectName, filenameStem(key), "project"),
+                        firstNonBlank(versionNumber, "latest"),
+                        classification == null ? ProjectClassification.PLUGIN : classification,
+                        location.syntheticFallback()
+                )
+        );
+    }
+
+    private R2SeedLocation r2SeedLocation(String rawLocation) {
+        String value = trimToNull(rawLocation);
+        if (value == null) {
+            return null;
+        }
+
+        if (value.startsWith("/api/files/proxy/")) {
+            return r2SeedLocationFromKey(value.substring("/api/files/proxy/".length()), false);
+        }
+
+        URI uri = parseUri(value);
+        if (uri != null && uri.getScheme() != null) {
+            String scheme = uri.getScheme().toLowerCase(Locale.ROOT);
+            if (!"http".equals(scheme) && !"https".equals(scheme)) {
+                return null;
+            }
+
+            String key = stripLeadingSlash(uri.getPath());
+            if (key.isBlank()) {
+                return null;
+            }
+
+            if (key.startsWith("api/files/proxy/")) {
+                return r2SeedLocationFromKey(key.substring("api/files/proxy/".length()), false);
+            }
+
+            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+            if ("example.test".equals(host) && key.startsWith("mock-downloads/")) {
+                return r2SeedLocationFromKey(key, true);
+            }
+
+            if (isFirstPartyStorageHost(host)) {
+                return r2SeedLocationFromKey(key, false);
+            }
+
+            return null;
+        }
+
+        return r2SeedLocationFromKey(value, false);
+    }
+
+    private R2SeedLocation r2SeedLocationFromKey(String key, boolean syntheticFallback) {
+        String normalized = normalizeObjectKey(key);
+        if (normalized == null) {
+            return null;
+        }
+        return new R2SeedLocation(normalized, syntheticFallback);
+    }
+
+    private boolean isFirstPartyStorageHost(String host) {
+        if (host == null || host.isBlank()) {
+            return false;
+        }
+        if ("cdn.modtale.net".equals(host) || host.endsWith(".r2.dev")) {
+            return true;
+        }
+
+        String publicDomainHost = hostFromUrl(r2Properties.publicDomain());
+        return publicDomainHost != null && host.equals(publicDomainHost);
+    }
+
+    private String hostFromUrl(String rawUrl) {
+        String value = trimToNull(rawUrl);
+        if (value == null) {
+            return null;
+        }
+
+        URI uri = parseUri(value);
+        return uri == null || uri.getHost() == null ? null : uri.getHost().toLowerCase(Locale.ROOT);
+    }
+
+    private URI parseUri(String value) {
+        try {
+            return URI.create(value);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private String normalizeObjectKey(String key) {
+        String value = trimToNull(key);
+        if (value == null) {
+            return null;
+        }
+
+        int query = value.indexOf('?');
+        if (query >= 0) {
+            value = value.substring(0, query);
+        }
+        int fragment = value.indexOf('#');
+        if (fragment >= 0) {
+            value = value.substring(0, fragment);
+        }
+
+        value = stripLeadingSlash(value);
+        return value.isBlank() ? null : value;
+    }
+
+    private String stripLeadingSlash(String value) {
+        String stripped = value == null ? "" : value.trim();
+        while (stripped.startsWith("/")) {
+            stripped = stripped.substring(1);
+        }
+        return stripped;
+    }
+
+    private byte[] fixtureBytes(R2SeedObject object) {
+        String extension = extension(object.key());
+        if (object.classification() == ProjectClassification.MODPACK || "zip".equals(extension)) {
+            return zipFixtureBytes(object);
+        }
+        if ("jar".equals(extension)) {
+            return jarFixtureBytes(object);
+        }
+
+        return ("Modtale fixture artifact\n"
+                + "Project: " + object.projectName() + "\n"
+                + "Version: " + object.versionNumber() + "\n"
+                + "Key: " + object.key() + "\n").getBytes(StandardCharsets.UTF_8);
+    }
+
+    private byte[] zipFixtureBytes(R2SeedObject object) {
+        try {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            try (ZipOutputStream zip = new ZipOutputStream(bytes)) {
+                writeZipEntry(zip, "README.txt", ("Modtale fixture archive for "
+                        + object.projectName()
+                        + " "
+                        + object.versionNumber()
+                        + "\n").getBytes(StandardCharsets.UTF_8));
+
+                if (object.classification() == ProjectClassification.MODPACK) {
+                    writeZipEntry(
+                            zip,
+                            sanitizeStorageName(object.projectName()) + "-" + sanitizeStorageName(object.versionNumber()) + ".jar",
+                            jarFixtureBytes(object)
+                    );
+                }
+            }
+            return bytes.toByteArray();
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not build fixture ZIP.", e);
+        }
+    }
+
+    private byte[] jarFixtureBytes(R2SeedObject object) {
+        try {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            try (ZipOutputStream jar = new ZipOutputStream(bytes)) {
+                writeZipEntry(jar, "META-INF/MANIFEST.MF", "Manifest-Version: 1.0\nCreated-By: Modtale DataSeeder\n\n"
+                        .getBytes(StandardCharsets.UTF_8));
+                writeZipEntry(jar, "modtale-fixture.txt", ("Fixture mod artifact for "
+                        + object.projectName()
+                        + " "
+                        + object.versionNumber()
+                        + "\n").getBytes(StandardCharsets.UTF_8));
+            }
+            return bytes.toByteArray();
+        } catch (IOException e) {
+            throw new IllegalStateException("Could not build fixture JAR.", e);
+        }
+    }
+
+    private void writeZipEntry(ZipOutputStream zip, String name, byte[] bytes) throws IOException {
+        zip.putNextEntry(new ZipEntry(name));
+        zip.write(bytes == null ? new byte[0] : bytes);
+        zip.closeEntry();
+    }
+
+    private String contentType(String key) {
+        return switch (extension(key)) {
+            case "jar" -> "application/java-archive";
+            case "zip" -> "application/zip";
+            case "png" -> "image/png";
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "webp" -> "image/webp";
+            case "gif" -> "image/gif";
+            case "svg" -> "image/svg+xml";
+            default -> "application/octet-stream";
+        };
+    }
+
+    private ProjectClassification parseClassification(Object value) {
+        if (value == null) {
+            return ProjectClassification.PLUGIN;
+        }
+
+        try {
+            return ProjectClassification.valueOf(value.toString().trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return ProjectClassification.PLUGIN;
+        }
+    }
+
+    private String extension(String key) {
+        String filename = filenameStem(key);
+        int dot = filename.lastIndexOf('.');
+        if (dot < 0 || dot == filename.length() - 1) {
+            return "";
+        }
+        return filename.substring(dot + 1).toLowerCase(Locale.ROOT);
+    }
+
+    private String filenameStem(String key) {
+        if (key == null || key.isBlank()) {
+            return "";
+        }
+        String trimmed = key.trim();
+        int query = trimmed.indexOf('?');
+        if (query >= 0) {
+            trimmed = trimmed.substring(0, query);
+        }
+        int slash = trimmed.lastIndexOf('/');
+        return slash >= 0 ? trimmed.substring(slash + 1) : trimmed;
+    }
+
+    private String sanitizeStorageName(String value) {
+        String sanitized = firstNonBlank(value, "fixture")
+                .replaceAll("[^A-Za-z0-9._-]+", "-")
+                .replaceAll("-+", "-")
+                .replaceAll("(^-|-$)", "");
+        return sanitized.isBlank() ? "fixture" : sanitized;
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return "";
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? null : value.toString();
+    }
+
+    private String trimToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private record R2SeedLocation(String key, boolean syntheticFallback) {
+    }
+
+    private record R2SeedObject(
+            String key,
+            String projectName,
+            String versionNumber,
+            ProjectClassification classification,
+            boolean syntheticFallback
+    ) {
+    }
+
+    private record R2SourceConfig(String bucket, String accessKey, String secretKey, String endpoint) {
+    }
+
+    private record R2ObjectBytes(byte[] bytes, String contentType) {
     }
 
     private Set<String> projectIds(List<Document> projects) {
@@ -754,7 +1666,10 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void cloneSpecificUsers(MongoDatabase source, MongoDatabase target, Set<String> userIds) {
-        if (userIds.isEmpty()) return;
+        if (userIds.isEmpty()) {
+            logger.info("Mongo clone seed progress: no referenced authors to clone.");
+            return;
+        }
 
         MongoCollection<Document> sourceCol = source.getCollection("users");
         MongoCollection<Document> targetCol = target.getCollection("users");
@@ -764,16 +1679,34 @@ public class DataSeeder implements CommandLineRunner {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
-        if (objectIds.isEmpty()) return;
+        if (objectIds.isEmpty()) {
+            logger.info(
+                    "Mongo clone seed progress: no ObjectId-shaped author IDs found among {} referenced authors.",
+                    userIds.size()
+            );
+            return;
+        }
 
         List<Document> usersToClone = new ArrayList<>();
+        logger.info(
+                "Mongo clone seed progress: fetching {} referenced author documents from source users collection.",
+                objectIds.size()
+        );
         sourceCol.find(Filters.in("_id", objectIds)).into(usersToClone);
 
         if (usersToClone.isEmpty()) {
             List<String> stringIds = new ArrayList<>(userIds);
+            logger.info(
+                    "Mongo clone seed progress: no ObjectId author matches found; retrying {} string author IDs.",
+                    stringIds.size()
+            );
             sourceCol.find(Filters.in("_id", stringIds)).into(usersToClone);
         }
 
+        logger.info(
+                "Mongo clone seed progress: fetched {} referenced author documents; sanitizing before insert.",
+                usersToClone.size()
+        );
         String defaultPasswordHash = passwordEncoder.encode("password");
         List<Document> safeToInsert = new ArrayList<>();
 
@@ -787,11 +1720,17 @@ public class DataSeeder implements CommandLineRunner {
 
         if (!safeToInsert.isEmpty()) {
             try {
+                logger.info(
+                        "Mongo clone seed progress: inserting {} sanitized referenced author documents.",
+                        safeToInsert.size()
+                );
                 targetCol.insertMany(safeToInsert);
-                logger.info("Cloned and sanitized {} users.", safeToInsert.size());
+                logger.info("Mongo clone seed progress: cloned and sanitized {} referenced author users.", safeToInsert.size());
             } catch (MongoBulkWriteException e) {
                 logger.warn("Partial user insertion error: {}", e.getMessage());
             }
+        } else {
+            logger.info("Mongo clone seed progress: no referenced author documents remained after sanitization.");
         }
     }
 
@@ -864,6 +1803,38 @@ public class DataSeeder implements CommandLineRunner {
             return "author";
         }
         return token.length() > 40 ? token.substring(0, 40) : token;
+    }
+
+    private List<Document> completeDependencyProjects(
+            MongoCollection<Document> sourceProjectsCol,
+            List<Document> projects,
+            String seedLabel
+    ) {
+        if (projects == null || projects.isEmpty()) {
+            return projects == null ? List.of() : projects;
+        }
+
+        Set<String> selectedProjectIds = projectIds(projects);
+        List<Document> dependencyProjects = collectDependencyProjects(sourceProjectsCol, selectedProjectIds);
+        if (dependencyProjects.isEmpty()) {
+            logger.info(
+                    "Mongo {} seed progress: no additional dependency projects needed for {} selected projects.",
+                    seedLabel,
+                    projects.size()
+            );
+            return projects;
+        }
+
+        List<Document> completed = new ArrayList<>(projects.size() + dependencyProjects.size());
+        completed.addAll(projects);
+        completed.addAll(dependencyProjects);
+        logger.info(
+                "Mongo {} seed progress: included {} dependency projects; project set now contains {} projects.",
+                seedLabel,
+                dependencyProjects.size(),
+                completed.size()
+        );
+        return completed;
     }
 
     private List<Document> collectDependencyProjects(MongoCollection<Document> sourceProjectsCol, Set<String> initialProjectIds) {
@@ -940,9 +1911,16 @@ public class DataSeeder implements CommandLineRunner {
                 if (!(dependencyObj instanceof Document dependencyDoc)) {
                     continue;
                 }
-                Object rawModId = dependencyDoc.get("modId");
-                if (rawModId != null) {
-                    dependencyIds.add(rawModId.toString());
+                Object rawSource = dependencyDoc.get("source");
+                if (rawSource != null && !"MODTALE".equalsIgnoreCase(rawSource.toString())) {
+                    continue;
+                }
+                Object rawProjectId = dependencyDoc.get("projectId");
+                if (rawProjectId == null) {
+                    rawProjectId = dependencyDoc.get("modId");
+                }
+                if (rawProjectId != null) {
+                    dependencyIds.add(rawProjectId.toString());
                 }
             }
         }
