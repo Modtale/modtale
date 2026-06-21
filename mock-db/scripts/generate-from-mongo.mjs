@@ -385,7 +385,7 @@ function sanitizeProject(project, index, selectedProjectIds, authorIdMap) {
     authorId: authorIdMap.get(sourceAuthorId) || sourceAuthorId,
     author: typeof project.author === 'string' && project.author.trim() ? project.author.trim().slice(0, 80) : 'creator',
     imageUrl: typeof project.imageUrl === 'string' ? project.imageUrl : placeholder(title, color),
-    bannerUrl: typeof project.bannerUrl === 'string' ? project.bannerUrl : placeholder(title, color, '1600x420'),
+    bannerUrl: typeof project.bannerUrl === 'string' && project.bannerUrl.trim() ? project.bannerUrl : null,
     classification,
     categories: list(project.categories, 4),
     tags: list(project.tags, 8),
