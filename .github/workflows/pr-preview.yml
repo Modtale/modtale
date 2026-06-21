@@ -22,7 +22,7 @@ permissions:
 jobs:
   deploy:
     name: Deploy PR Preview
-    if: github.repository == 'Modtale/modtale' && github.event.action != 'closed'
+    if: github.repository == 'Modtale/modtale' && github.event.pull_request.head.repo.full_name != github.repository && github.event.action != 'closed'
     runs-on: ubuntu-latest
     environment: pr-preview
     env:
@@ -331,7 +331,7 @@ jobs:
 
   cleanup:
     name: Clean Up PR Preview
-    if: github.repository == 'Modtale/modtale' && github.event.action == 'closed'
+    if: github.repository == 'Modtale/modtale' && github.event.pull_request.head.repo.full_name != github.repository && github.event.action == 'closed'
     runs-on: ubuntu-latest
     environment: pr-preview
     env:
