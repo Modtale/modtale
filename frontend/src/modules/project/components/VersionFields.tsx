@@ -6,12 +6,37 @@ import type { VersionFormData } from './FormShared';
 import { DependencySelector } from './DependencySelector';
 import { projectClient } from '../api/projectClient';
 import { theme } from '@/styles/theme';
-import type { ManifestDependencySuggestion, ProjectDependency } from '@/types';
+import { VersionRelationKind, type GameVersionCatalog, type ManifestDependencySuggestion, type ProjectDependency } from '@/types';
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
 
 const STRICT_VERSION_REGEX = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
+
+const uniqueVersions = (versions: string[]) => Array.from(new Set(versions.filter(Boolean)));
+
+const getCatalogVersions = (catalog: GameVersionCatalog | null | undefined) => {
+    const allVersions = catalog?.allVersions || [];
+    if (allVersions.length > 0) return allVersions;
+
+    const orderedVersions = catalog?.orderedVersions || [];
+    if (orderedVersions.length > 0) return orderedVersions;
+
+    const entryVersions = catalog?.versions?.map(entry => entry.version).filter(Boolean) || [];
+    if (entryVersions.length > 0) return uniqueVersions(entryVersions);
+
+    return uniqueVersions([...(catalog?.releaseVersions || []), ...(catalog?.preReleaseVersions || [])]);
+};
+
+const getDefaultGameVersion = (catalog: GameVersionCatalog | null | undefined, availableVersions: string[]) => {
+    const releaseVersions = catalog?.releaseVersions || [];
+    if (releaseVersions.length > 0) return releaseVersions[0];
+
+    const releaseEntry = catalog?.versions?.find(entry => !entry.preRelease && entry.version);
+    if (releaseEntry?.version) return releaseEntry.version;
+
+    return availableVersions[0] || '';
+};
 
 interface VersionFieldsProps {
     data: VersionFormData;
@@ -28,6 +53,7 @@ interface VersionFieldsProps {
 export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, isModpack, projectType, existingVersions = [], previousDependencies, disabled, hideFilePicker = false, currentProjectId }) => {
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [availableGameVersions, setAvailableGameVersions] = useState<string[]>([]);
+    const [defaultGameVersion, setDefaultGameVersion] = useState('');
     const [loadingVersions, setLoadingVersions] = useState(false);
     const [manifestSuggestions, setManifestSuggestions] = useState<ManifestDependencySuggestion[]>([]);
     const [loadingManifestSuggestions, setLoadingManifestSuggestions] = useState(false);
@@ -39,22 +65,38 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
         const fetchVersions = async () => {
             setLoadingVersions(true);
             try {
-                const versions = await projectClient.getMetaGameVersions();
-                setAvailableGameVersions(versions);
-            } catch (error) {} finally { setLoadingVersions(false); }
+                const catalog = await projectClient.getMetaGameVersionCatalog();
+                const versions = getCatalogVersions(catalog);
+
+                if (versions.length > 0) {
+                    setAvailableGameVersions(versions);
+                    setDefaultGameVersion(getDefaultGameVersion(catalog, versions));
+                    return;
+                }
+
+                const fallbackVersions = await projectClient.getMetaGameVersions();
+                setAvailableGameVersions(fallbackVersions);
+                setDefaultGameVersion(fallbackVersions[0] || '');
+            } catch {
+                try {
+                    const fallbackVersions = await projectClient.getMetaGameVersions();
+                    setAvailableGameVersions(fallbackVersions);
+                    setDefaultGameVersion(fallbackVersions[0] || '');
+                } catch {}
+            } finally { setLoadingVersions(false); }
         };
         fetchVersions();
     }, []);
 
     useEffect(() => {
         if (!disabled && (!data.gameVersions || data.gameVersions.length === 0) && availableGameVersions.length > 0) {
-            onChange({ ...data, gameVersions: [availableGameVersions[0]] });
+            onChange({ ...data, gameVersions: [defaultGameVersion || availableGameVersions[0]] });
         }
-    }, [disabled, data.gameVersions, onChange, availableGameVersions]);
+    }, [disabled, data.gameVersions, onChange, availableGameVersions, defaultGameVersion]);
 
     const versionNum = data.versionNumber.trim();
     const isFormatValid = STRICT_VERSION_REGEX.test(versionNum);
-    const isDuplicate = existingVersions.includes(versionNum);
+    const isDuplicate = existingVersions.some(existingVersion => existingVersion.toLowerCase() === versionNum.toLowerCase());
     const isValid = versionNum.length > 0 && isFormatValid && !isDuplicate;
     const allowsAutoSwitch = projectType === 'PLUGIN' || projectType === 'DATA' || projectType === 'ART';
 
@@ -339,6 +381,21 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                         label="Add Projects"
                         previousDependencies={previousDependencies}
                         isModpack={true}
+                        disabled={disabled}
+                    />
+                </div>
+            )}
+
+            {projectType !== 'SAVE' && (
+                <div className="mt-4">
+                    <Label>Incompatible Mods</Label>
+                    <p className={`text-xs ${theme.colors.textSecondary} mb-2`}>Mark mods that should not be used alongside this version.</p>
+                    <DependencySelector
+                        selectedDeps={data.incompatibleProjectIds || []}
+                        onChange={(deps) => onChange({ ...data, incompatibleProjectIds: deps })}
+                        label="Add Incompatible Mod"
+                        mode={VersionRelationKind.INCOMPATIBILITY}
+                        currentProjectId={currentProjectId}
                         disabled={disabled}
                     />
                 </div>

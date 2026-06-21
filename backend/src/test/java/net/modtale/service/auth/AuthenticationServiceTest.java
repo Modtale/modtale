@@ -1,5 +1,11 @@
 package net.modtale.service.auth;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import net.modtale.config.properties.AppSecurityProperties;
 import net.modtale.exception.UnauthorizedException;
 import net.modtale.model.user.OAuthProvider;
@@ -8,20 +14,13 @@ import net.modtale.repository.admin.BannedEmailRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.analytics.TrackingService;
 import net.modtale.service.communication.EmailService;
-import net.modtale.service.user.ConnectedAccountMutationService;
+import net.modtale.service.user.connection.ConnectedAccountMutationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;

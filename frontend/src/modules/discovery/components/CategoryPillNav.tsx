@@ -87,11 +87,12 @@ export const CategoryPillNav: React.FC<{ selectedClassification: Classification 
                             <Link
                                 key={type.id}
                                 to={toPath}
+                                aria-label={type.label.replace(' Assets', '').replace('Server ', '')}
                                 onClick={() => onClassificationChange(type.id as Classification | 'All')}
                                 ref={(el) => { tabsRef.current[index] = el; }}
                                 className={`px-3 lg:px-4 h-full rounded-xl text-xs md:text-sm font-bold flex items-center justify-center gap-2 transition-colors duration-200 whitespace-nowrap snap-center ${isSelected ? 'text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'}`}
                             >
-                                <Icon className="w-3.5 h-3.5 lg:w-4 lg:h-4 pointer-events-none" />
+                                <Icon className="w-3.5 h-3.5 lg:w-4 lg:h-4 pointer-events-none" aria-hidden="true" />
                                 <span className="inline pointer-events-none">{type.label.replace(' Assets', '').replace('Server ', '')}</span>
                             </Link>
                         );

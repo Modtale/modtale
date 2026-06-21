@@ -1,12 +1,20 @@
 package net.modtale.service.analytics;
 
+import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import net.modtale.model.analytics.PlatformMonthlyStats;
 import net.modtale.model.analytics.ProjectMonthlyStats;
 import net.modtale.model.project.Project;
-import net.modtale.repository.project.ProjectRepository;
-import net.modtale.service.project.ProjectService;
+import net.modtale.service.project.query.ProjectService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.data.mongodb.core.BulkOperations;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -14,48 +22,54 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
 @Service
 public class TrackingFlushService {
 
     private static final Logger logger = LoggerFactory.getLogger(TrackingFlushService.class);
 
     private final MongoTemplate mongoTemplate;
-    private final ProjectRepository projectRepository;
     private final ProjectService projectService;
     private final TrackingBufferService trackingBufferService;
+    private final CacheManager cacheManager;
+
+    @Autowired
+    public TrackingFlushService(
+            MongoTemplate mongoTemplate,
+            ProjectService projectService,
+            TrackingBufferService trackingBufferService,
+            CacheManager cacheManager
+    ) {
+        this.mongoTemplate = mongoTemplate;
+        this.projectService = projectService;
+        this.trackingBufferService = trackingBufferService;
+        this.cacheManager = cacheManager;
+    }
 
     public TrackingFlushService(
             MongoTemplate mongoTemplate,
-            ProjectRepository projectRepository,
             ProjectService projectService,
             TrackingBufferService trackingBufferService
     ) {
-        this.mongoTemplate = mongoTemplate;
-        this.projectRepository = projectRepository;
-        this.projectService = projectService;
-        this.trackingBufferService = trackingBufferService;
+        this(mongoTemplate, projectService, trackingBufferService, null);
     }
 
     public void flushAnalyticsBuffer() {
-        flushBaseProjectMetrics();
-        flushMonthlyStats();
-        flushPlatformEntityStats();
+        boolean flushedBaseMetrics = flushBaseProjectMetrics();
+        boolean flushedMonthlyStats = flushMonthlyStats();
+        boolean flushedPlatformEntityStats = flushPlatformEntityStats();
+        if (flushedBaseMetrics || flushedMonthlyStats || flushedPlatformEntityStats) {
+            evictAnalyticsCaches();
+        }
     }
 
     public void deleteProjectAnalytics(String projectId) {
         mongoTemplate.remove(Query.query(Criteria.where("projectId").is(projectId)), ProjectMonthlyStats.class);
     }
 
-    private void flushBaseProjectMetrics() {
+    private boolean flushBaseProjectMetrics() {
         TrackingBufferService.MetricsBatch batch = trackingBufferService.drainMetricIncrements();
         if (batch.isEmpty()) {
-            return;
+            return false;
         }
 
         BulkOperations bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, Project.class);
@@ -64,7 +78,9 @@ public class TrackingFlushService {
         for (Map.Entry<String, Integer> entry : batch.downloads().entrySet()) {
             bulkOps.updateOne(
                     new Query(Criteria.where("_id").is(entry.getKey())),
-                    new Update().inc("downloadCount", entry.getValue())
+                    new Update()
+                            .inc("downloadCount", entry.getValue())
+                            .set("rankingDirty", true)
             );
         }
 
@@ -79,19 +95,43 @@ public class TrackingFlushService {
 
         try {
             bulkOps.execute();
-            for (String id : allIdsToEvict) {
-                projectService.evictProjectCache(projectRepository.findById(id).orElse(null));
-            }
+            evictUpdatedProjectCaches(allIdsToEvict);
+            return true;
         } catch (Exception e) {
             logger.error("Failed to bulk flush metrics", e);
             trackingBufferService.restoreMetricIncrements(batch);
+            return false;
         }
     }
 
-    private void flushMonthlyStats() {
+    private void evictUpdatedProjectCaches(Set<String> projectIds) {
+        if (projectIds == null || projectIds.isEmpty()) {
+            return;
+        }
+
+        Query query = Query.query(Criteria.where("_id").in(projectIds));
+        query.fields()
+                .include("_id")
+                .include("slug")
+                .include("title")
+                .include("classification");
+
+        List<Project> projects = mongoTemplate.find(query, Project.class);
+        Set<String> foundIds = new HashSet<>();
+        projects.stream()
+                .map(Project::getId)
+                .filter(id -> id != null && !id.isBlank())
+                .forEach(foundIds::add);
+
+        Set<String> missingIds = new HashSet<>(projectIds);
+        missingIds.removeAll(foundIds);
+        projectService.evictProjectDetailsCaches(projects, missingIds);
+    }
+
+    private boolean flushMonthlyStats() {
         TrackingBufferService.MonthlyAnalyticsBatch batch = trackingBufferService.drainMonthlyAnalytics();
         if (batch.isEmpty()) {
-            return;
+            return false;
         }
 
         LocalDate now = LocalDate.now();
@@ -184,12 +224,13 @@ public class TrackingFlushService {
                     PlatformMonthlyStats.class
             );
         }
+        return true;
     }
 
-    private void flushPlatformEntityStats() {
+    private boolean flushPlatformEntityStats() {
         TrackingBufferService.PlatformEntityBatch batch = trackingBufferService.drainPlatformEntities();
         if (!batch.hasUpdates()) {
-            return;
+            return false;
         }
 
         LocalDate now = LocalDate.now();
@@ -207,6 +248,24 @@ public class TrackingFlushService {
         }
 
         mongoTemplate.upsert(query, update, PlatformMonthlyStats.class);
+        return true;
+    }
+
+    private void evictAnalyticsCaches() {
+        if (cacheManager == null) {
+            return;
+        }
+        clearCache("platformStats");
+        clearCache("platformAnalytics");
+        clearCache("creatorAnalytics");
+        clearCache("projectAnalytics");
+    }
+
+    private void clearCache(String cacheName) {
+        Cache cache = cacheManager.getCache(cacheName);
+        if (cache != null) {
+            cache.clear();
+        }
     }
 
     private static class ProjectAgg {

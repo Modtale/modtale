@@ -6,8 +6,8 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
-import net.modtale.service.security.AccessControlService;
-import net.modtale.service.user.AccountService;
+import net.modtale.service.security.access.AccessControlService;
+import net.modtale.service.user.account.AccountService;
 import org.springframework.stereotype.Service;
 
 @Service

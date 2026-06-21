@@ -1,6 +1,8 @@
 package net.modtale.config.auth;
 
 import jakarta.servlet.FilterChain;
+import java.util.EnumSet;
+import java.util.Map;
 import net.modtale.exception.UnauthorizedException;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
@@ -13,9 +15,6 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.servlet.HandlerExceptionResolver;
-
-import java.util.EnumSet;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -123,25 +122,49 @@ class ApiKeyAuthFilterTest {
     }
 
     @Test
-    void fallsBackToLegacyPersonalScopeWhenContextPermissionsAreMissing() throws Exception {
+    void missingContextPermissionsOnlyGrantApiRole() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/projects");
-        request.addHeader("X-MODTALE-KEY", "legacy-key");
+        request.addHeader("X-MODTALE-KEY", "unscoped-key");
         MockHttpServletResponse response = new MockHttpServletResponse();
         FilterChain chain = mock(FilterChain.class);
 
         ApiKey apiKey = new ApiKey();
         User user = new User();
-        user.setId("user-legacy");
+        user.setId("user-unscoped");
 
-        when(apiKeyService.resolveKey("legacy-key")).thenReturn(apiKey);
+        when(apiKeyService.resolveKey("unscoped-key")).thenReturn(apiKey);
         when(apiKeyService.getUserFromKey(apiKey)).thenReturn(user);
 
         filter.doFilterInternal(request, response, chain);
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         assertNotNull(auth);
-        assertTrue(auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("SCOPE_PERSONAL_PROJECT_READ")));
-        assertTrue(auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("SCOPE_PERSONAL_NOTIFICATION_DELETE")));
+        assertTrue(auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_API")));
+        assertEquals(1, auth.getAuthorities().size());
+        verify(chain).doFilter(request, response);
+    }
+
+    @Test
+    void explicitEmptyContextPermissionsOnlyGrantApiRole() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/projects");
+        request.addHeader("X-MODTALE-KEY", "empty-key");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        ApiKey apiKey = new ApiKey();
+        apiKey.setContextPermissions(Map.of());
+        User user = new User();
+        user.setId("user-empty");
+
+        when(apiKeyService.resolveKey("empty-key")).thenReturn(apiKey);
+        when(apiKeyService.getUserFromKey(apiKey)).thenReturn(user);
+
+        filter.doFilterInternal(request, response, chain);
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        assertNotNull(auth);
+        assertTrue(auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_API")));
+        assertEquals(1, auth.getAuthorities().size());
         verify(chain).doFilter(request, response);
     }
 }

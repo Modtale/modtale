@@ -1,17 +1,16 @@
 package net.modtale.service.analytics;
 
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import net.modtale.model.analytics.PlatformAnalyticsSummary;
 import net.modtale.model.analytics.PlatformMonthlyStats;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDate;
-import java.time.YearMonth;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 @Service
 public class PlatformAnalyticsQueryService {

@@ -1,10 +1,9 @@
 package net.modtale.model.dto.request.auth;
 
 import jakarta.validation.constraints.NotBlank;
-import net.modtale.model.user.ApiKey;
-
 import java.util.Map;
 import java.util.Set;
+import net.modtale.model.user.ApiKey;
 
 public class CreateApiKeyRequest {
     @NotBlank(message = "An API key name is required before we can create the key.")

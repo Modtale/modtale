@@ -2,17 +2,18 @@ package net.modtale.controller.user;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.List;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.exception.UnauthorizedException;
 import net.modtale.exception.UpstreamServiceException;
 import net.modtale.mapper.UserResponseMapper;
 import net.modtale.model.dto.user.GitRepositoryDTO;
 import net.modtale.model.user.User;
-import net.modtale.service.user.GithubService;
-import net.modtale.service.user.GitlabService;
-import net.modtale.service.user.OrganizationService;
-import net.modtale.service.user.AccountService;
-import net.modtale.service.user.ConnectionSessionService;
+import net.modtale.service.user.account.AccountService;
+import net.modtale.service.user.connection.ConnectionSessionService;
+import net.modtale.service.user.connection.GithubService;
+import net.modtale.service.user.connection.GitlabService;
+import net.modtale.service.user.organization.OrganizationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -21,7 +22,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.HttpClientErrorException;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1")

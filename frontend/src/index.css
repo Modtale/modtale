@@ -190,4 +190,120 @@
         background: #e2e8f0;
         border-color: rgba(15, 23, 42, 0.95);
     }
+
+    .modtale-project-banner-parallax {
+        transform: translate3d(0, 0, 0);
+    }
+
+    .modtale-project-banner-fade {
+        height: var(--fade-base);
+    }
+
+    @supports (animation-timeline: scroll(root block)) {
+        .modtale-project-banner-parallax {
+            animation: modtale-project-banner-parallax linear both;
+            animation-duration: 1s;
+            animation-timeline: scroll(root block);
+            animation-range: 0 1500px;
+        }
+
+        .modtale-project-banner-fade {
+            animation: modtale-project-banner-fade linear both;
+            animation-duration: 1s;
+            animation-timeline: scroll(root block);
+            animation-range: 0 1500px;
+        }
+    }
+}
+
+@keyframes modtale-project-banner-parallax {
+    0% {
+        transform: translate3d(0, 0, 0);
+    }
+    10% {
+        transform: translate3d(0, 111px, 0);
+    }
+    20% {
+        transform: translate3d(0, 197px, 0);
+    }
+    30% {
+        transform: translate3d(0, 264px, 0);
+    }
+    40% {
+        transform: translate3d(0, 316px, 0);
+    }
+    50% {
+        transform: translate3d(0, 357px, 0);
+    }
+    60% {
+        transform: translate3d(0, 388px, 0);
+    }
+    70% {
+        transform: translate3d(0, 413px, 0);
+    }
+    80% {
+        transform: translate3d(0, 432px, 0);
+    }
+    90% {
+        transform: translate3d(0, 447px, 0);
+    }
+    100% {
+        transform: translate3d(0, 459px, 0);
+    }
+}
+
+@keyframes modtale-project-banner-fade {
+    0% {
+        height: var(--fade-base);
+    }
+    10% {
+        height: calc(var(--fade-base) + 111px);
+    }
+    20% {
+        height: calc(var(--fade-base) + 197px);
+    }
+    30% {
+        height: calc(var(--fade-base) + 264px);
+    }
+    40% {
+        height: calc(var(--fade-base) + 316px);
+    }
+    50% {
+        height: calc(var(--fade-base) + 357px);
+    }
+    60% {
+        height: calc(var(--fade-base) + 388px);
+    }
+    70% {
+        height: calc(var(--fade-base) + 413px);
+    }
+    80% {
+        height: calc(var(--fade-base) + 432px);
+    }
+    90% {
+        height: calc(var(--fade-base) + 447px);
+    }
+    100% {
+        height: calc(var(--fade-base) + 459px);
+    }
+}
+
+@keyframes gallery-carousel-media {
+    from {
+        opacity: 0;
+        transform: scale(1.01);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes gallery-carousel-progress {
+    from {
+        transform: scaleX(0);
+    }
+    to {
+        transform: scaleX(1);
+    }
 }

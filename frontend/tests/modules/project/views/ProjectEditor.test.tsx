@@ -1,4 +1,4 @@
-import React, { act } from 'react';
+import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -16,6 +16,7 @@ const mockProject = {
     imageUrl: null,
     bannerUrl: null,
     license: 'MIT',
+    customLicenseOpenSource: false,
     status: 'DRAFT',
     classification: 'PLUGIN',
     versions: [],
@@ -35,7 +36,9 @@ const mockHandleSubmit = vi.fn();
 const mockHandleRoleUpdate = vi.fn();
 const mockHandleCancelInvite = vi.fn();
 const mockHandleGalleryUpload = vi.fn();
+const mockHandleGalleryVideoAdd = vi.fn();
 const mockHandleGalleryDelete = vi.fn();
+const mockHandleGalleryCaptionChange = vi.fn();
 
 vi.mock('@/modules/project/hooks/useProjectDetail', () => ({
     useProjectDetail: () => ({
@@ -70,13 +73,16 @@ vi.mock('@/modules/project/hooks/useProjectEditor', () => ({
         handleSubmit: mockHandleSubmit,
         isSaving: false,
         handleGalleryUpload: mockHandleGalleryUpload,
-        handleGalleryDelete: mockHandleGalleryDelete
+        handleGalleryVideoAdd: mockHandleGalleryVideoAdd,
+        handleGalleryDelete: mockHandleGalleryDelete,
+        handleGalleryCaptionChange: mockHandleGalleryCaptionChange
     })
 }));
 
 vi.mock('@/modules/project/api/projectClient', () => ({
     projectClient: {
-        getMetaGameVersions: vi.fn()
+        getMetaGameVersions: vi.fn(),
+        getMetaGameVersionCatalog: vi.fn()
     }
 }));
 
@@ -108,6 +114,12 @@ describe('ProjectEditorView route smoke test', () => {
         document.body.appendChild(container);
         root = createRoot(container);
         mockedProjectClient.getMetaGameVersions.mockResolvedValue(['1.21.0']);
+        mockedProjectClient.getMetaGameVersionCatalog.mockResolvedValue({
+            releaseVersions: ['1.21.0'],
+            preReleaseVersions: [],
+            allVersions: ['1.21.0'],
+            versions: [{ version: '1.21.0', preRelease: false, sourceUrl: 'test' }]
+        });
     });
 
     afterEach(async () => {
@@ -153,6 +165,124 @@ describe('ProjectEditorView route smoke test', () => {
 
         await waitForText(container, 'Version Number');
         expect(container.textContent).toContain('Game Versions');
-        expect(mockedProjectClient.getMetaGameVersions).toHaveBeenCalledTimes(1);
+        expect(mockedProjectClient.getMetaGameVersionCatalog).toHaveBeenCalledTimes(1);
+        expect(mockedProjectClient.getMetaGameVersions).not.toHaveBeenCalled();
+    });
+
+    it('opens custom license inputs when the custom license option is selected', async () => {
+        await act(async () => {
+            root.render(
+                <ToastProvider>
+                    <MemoryRouter initialEntries={['/projects/project-1/edit']}>
+                        <Routes>
+                            <Route
+                                path="/projects/:id/edit"
+                                element={
+                                    <ProjectEditorView
+                                        currentUser={{ id: 'user-1', username: 'tester' } as any}
+                                        onShowStatus={vi.fn()}
+                                    />
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </ToastProvider>
+            );
+        });
+
+        await waitForText(container, 'Test Project');
+
+        const licenseSectionButton = Array.from(container.querySelectorAll('button')).find((button) => (
+            button.textContent?.trim() === 'License'
+        ));
+
+        expect(licenseSectionButton, 'expected the editor sidebar to render the License section').toBeDefined();
+
+        await act(async () => {
+            licenseSectionButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitForText(container, 'Custom License');
+
+        const customLicenseButton = Array.from(container.querySelectorAll('button')).find((button) => (
+            button.textContent?.includes('Custom License')
+        ));
+
+        await act(async () => {
+            customLicenseButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(container.querySelector('input[placeholder="License Name"]')).not.toBeNull();
+        expect(container.querySelector('input[placeholder="License URL"]')).not.toBeNull();
+
+        const openSourceButton = Array.from(container.querySelectorAll('button')).find((button) => (
+            button.textContent?.trim() === 'Open Source'
+        ));
+
+        expect(openSourceButton, 'expected custom licenses to offer an open source toggle').toBeDefined();
+        expect(openSourceButton?.getAttribute('aria-pressed')).toBe('false');
+
+        await act(async () => {
+            openSourceButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        const toggledOpenSourceButton = Array.from(container.querySelectorAll('button')).find((button) => (
+            button.textContent?.trim() === 'Open Source'
+        ));
+        expect(toggledOpenSourceButton?.getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('expands the card preview without exposing project links', async () => {
+        await act(async () => {
+            root.render(
+                <ToastProvider>
+                    <MemoryRouter initialEntries={['/projects/project-1/edit']}>
+                        <Routes>
+                            <Route
+                                path="/projects/:id/edit"
+                                element={
+                                    <ProjectEditorView
+                                        currentUser={{ id: 'user-1', username: 'tester' } as any}
+                                        onShowStatus={vi.fn()}
+                                    />
+                                }
+                            />
+                        </Routes>
+                    </MemoryRouter>
+                </ToastProvider>
+            );
+        });
+
+        await waitForText(container, 'Test Project');
+
+        const previewTrigger = container.querySelector('[aria-label="Expand project card preview"]') as HTMLElement | null;
+        expect(previewTrigger, 'expected the editor sidebar to render the card preview trigger').not.toBeNull();
+        expect(previewTrigger?.querySelector('a[href]')).toBeNull();
+
+        await act(async () => {
+            previewTrigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        await waitForText(document.body, 'Project Card Preview');
+
+        const previewDialog = document.body.querySelector('[role="dialog"][aria-label="Project card preview"]') as HTMLElement | null;
+        expect(previewDialog).not.toBeNull();
+        expect(previewDialog?.querySelector('a[href]')).toBeNull();
+        expect(previewDialog?.textContent).toContain('Test Project');
+
+        const previewFrame = previewDialog?.querySelector('[data-testid="project-card-preview-frame"]') as HTMLElement | null;
+        expect(previewFrame).not.toBeNull();
+
+        await act(async () => {
+            previewFrame?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(document.body.querySelector('[role="dialog"][aria-label="Project card preview"]')).not.toBeNull();
+
+        await act(async () => {
+            previewDialog?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(document.body.querySelector('[role="dialog"][aria-label="Project card preview"]')).toBeNull();
     });
 });

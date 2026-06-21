@@ -1,5 +1,9 @@
 package net.modtale.service.communication;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import net.modtale.config.properties.AppAdminDiscordWebhookProperties;
 import net.modtale.config.properties.AppBackendProperties;
 import net.modtale.config.properties.AppDiscordWebhookProperties;
@@ -11,13 +15,8 @@ import net.modtale.model.project.ScanResult;
 import net.modtale.model.project.ScanStatus;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
-import net.modtale.service.project.ProjectService;
+import net.modtale.service.project.query.ProjectService;
 import org.springframework.stereotype.Service;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 @Service
 public class WebhookPayloadFactory {
@@ -107,8 +106,8 @@ public class WebhookPayloadFactory {
                 + "\n**Classification:** " + project.getClassification());
 
         Map<String, Object> body = new HashMap<>();
-        body.put("username", "Modtale Admin Bot");
-        body.put("avatar_url", frontendUrl + "/assets/favicon.png");
+        body.put("username", DiscordWebhookIdentity.ADMIN_BOT_USERNAME);
+        body.put("avatar_url", DiscordWebhookIdentity.adminBotAvatarUrl(frontendUrl));
         body.put("content", "**Verification Required**");
         body.put("embeds", List.of(embed));
         return Optional.of(new WebhookDispatchRequest(adminDiscordWebhookUrl, body));

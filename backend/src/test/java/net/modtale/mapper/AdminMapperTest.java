@@ -1,5 +1,6 @@
 package net.modtale.mapper;
 
+import java.time.LocalDateTime;
 import net.modtale.model.admin.AdminLog;
 import net.modtale.model.admin.BannedEmail;
 import net.modtale.model.dto.admin.AdminLogDTO;
@@ -7,8 +8,6 @@ import net.modtale.model.dto.admin.BannedEmailDTO;
 import net.modtale.model.dto.admin.ReportDTO;
 import net.modtale.model.user.Report;
 import org.junit.jupiter.api.Test;
-
-import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;

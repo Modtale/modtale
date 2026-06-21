@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { Save, UploadCloud, Eye, Image as ImageIcon, Users, BookOpen, Settings, FileText, ExternalLink, Send, Check, X, Tag, Scale, Link as LinkIcon, Edit2, Edit3, XCircle, Undo2, AlertTriangle, Info } from 'lucide-react';
@@ -35,6 +35,11 @@ import { VersionFields } from '../components/VersionFields';
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
 const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
+const CARD_PREVIEW_BASE_WIDTH = 340;
+const CARD_PREVIEW_FALLBACK_HEIGHT = 390;
+const CARD_PREVIEW_MAX_SCALE = 2.15;
+const CARD_PREVIEW_VIEWPORT_PADDING = 48;
+const CARD_PREVIEW_VERTICAL_RESERVE = 128;
 
 interface ProjectEditorViewProps {
     currentUser: User | null;
@@ -49,13 +54,13 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
     const [activeTab, setActiveTab] = useState<string>('details');
     const [editorMode, setEditorMode] = useState<'write' | 'preview'>('write');
 
-    const { project: projectData, setProject: setProjectData, loading, contributors } = useProjectDetail(id, null, currentUser);
+    const { project: projectData, setProject: setProjectData, loading, contributors } = useProjectDetail(id, null, currentUser, { hydrateChangelogs: true, full: true });
 
     const [metaData, setMetaData] = useState<MetadataFormData>({
-        title: '', summary: '', description: '', tags: [], links: {}, repositoryUrl: '', iconFile: null, iconPreview: null, slug: ''
+        title: '', summary: '', description: '', tags: [], links: {}, repositoryUrl: '', iconFile: null, iconPreview: null, slug: '', customLicenseOpenSource: false
     });
     const [versionData, setVersionData] = useState<VersionFormData>({
-        projectIds: [], versionNumber: '', gameVersions: [], changelog: '', file: null, dependencies: [], modIds: [], channel: 'RELEASE'
+        projectIds: [], incompatibleProjectIds: [], versionNumber: '', gameVersions: [], changelog: '', file: null, dependencies: [], modIds: [], channel: 'RELEASE', replaceExisting: false
     });
 
     const [bannerFile, setBannerFile] = useState<File | null>(null);
@@ -65,7 +70,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         repos, loadingRepos, manualRepo, setManualRepo, repoValid, isDirty, setIsDirty,
         slugError, setSlugError, userSearchResults, setUserSearchResults, provider,
         setProvider, markDirty, checkRepoUrl, fetchRepos, handleRoleUpdate, handleCancelInvite,
-        handleSave, handleSubmit, isSaving, handleGalleryUpload, handleGalleryDelete
+        handleSave, handleSubmit, isSaving, handleGalleryUpload, handleGalleryVideoAdd, handleGalleryCaptionChange, handleGalleryDelete
     } = useProjectEditor(
         projectData,
         currentUser,
@@ -83,6 +88,12 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
 
     const [idCopied, setIdCopied] = useState(false);
     const [showCardPreview, setShowCardPreview] = useState(false);
+    const cardPreviewRef = useRef<HTMLDivElement | null>(null);
+    const [cardPreviewSize, setCardPreviewSize] = useState({
+        width: CARD_PREVIEW_BASE_WIDTH,
+        height: CARD_PREVIEW_FALLBACK_HEIGHT
+    });
+    const [cardPreviewScale, setCardPreviewScale] = useState(1);
     const [showPublishConfirm, setShowPublishConfirm] = useState(false);
     const [showSlugPrompt, setShowSlugPrompt] = useState(false);
     const [editingVersion, setEditingVersion] = useState<ProjectVersion | null>(null);
@@ -115,7 +126,8 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                 repositoryUrl: projectData.repositoryUrl || '',
                 iconFile: null,
                 iconPreview: projectData.imageUrl || null,
-                license: projectData.license
+                license: projectData.license,
+                customLicenseOpenSource: projectData.customLicenseOpenSource || false
             });
             if (projectData.bannerUrl) setBannerPreview(projectData.bannerUrl);
         }
@@ -148,6 +160,53 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
 
         return () => window.clearTimeout(delayDebounceFn);
     }, [inviteUsername, inviteUserId, setUserSearchResults]);
+
+    useEffect(() => {
+        if (!showCardPreview) return;
+
+        const originalOverflow = document.body.style.overflow;
+
+        const updateCardPreviewScale = () => {
+            const card = cardPreviewRef.current;
+            const width = card?.offsetWidth || CARD_PREVIEW_BASE_WIDTH;
+            const height = card?.offsetHeight || CARD_PREVIEW_FALLBACK_HEIGHT;
+            const availableWidth = Math.max(240, window.innerWidth - CARD_PREVIEW_VIEWPORT_PADDING);
+            const availableHeight = Math.max(240, window.innerHeight - CARD_PREVIEW_VERTICAL_RESERVE);
+            const nextScale = Math.min(CARD_PREVIEW_MAX_SCALE, availableWidth / width, availableHeight / height);
+            const boundedScale = Number.isFinite(nextScale) && nextScale > 0 ? Math.max(0.5, nextScale) : 1;
+
+            setCardPreviewSize((current) => (
+                current.width === width && current.height === height ? current : { width, height }
+            ));
+            setCardPreviewScale((current) => (
+                Math.abs(current - boundedScale) < 0.01 ? current : boundedScale
+            ));
+        };
+        const handleCardPreviewKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setShowCardPreview(false);
+            }
+        };
+
+        document.body.style.overflow = 'hidden';
+        const animationFrame = window.requestAnimationFrame(updateCardPreviewScale);
+        window.addEventListener('resize', updateCardPreviewScale);
+        window.addEventListener('keydown', handleCardPreviewKeyDown);
+
+        let resizeObserver: ResizeObserver | null = null;
+        if ('ResizeObserver' in window && cardPreviewRef.current) {
+            resizeObserver = new ResizeObserver(updateCardPreviewScale);
+            resizeObserver.observe(cardPreviewRef.current);
+        }
+
+        return () => {
+            document.body.style.overflow = originalOverflow;
+            window.cancelAnimationFrame(animationFrame);
+            window.removeEventListener('resize', updateCardPreviewScale);
+            window.removeEventListener('keydown', handleCardPreviewKeyDown);
+            resizeObserver?.disconnect();
+        };
+    }, [showCardPreview]);
 
     if (loading || !projectData) return <div className="min-h-screen flex items-center justify-center"><Spinner /></div>;
 
@@ -198,7 +257,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         setIsInviting(true);
         try {
             await projectClient.inviteUser(projectData.id, inviteUserId, inviteRoleId);
-            const refreshed = await projectClient.getProject(projectData.id);
+            const refreshed = await projectClient.getProjectFull(projectData.id);
             setProjectData(refreshed);
             setInviteUsername('');
             setInviteUserId('');
@@ -218,7 +277,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
 
         try {
             await projectClient.removeContributor(projectData.id, memberToRemove);
-            const refreshed = await projectClient.getProject(projectData.id);
+            const refreshed = await projectClient.getProjectFull(projectData.id);
             setProjectData(refreshed);
             onShowStatus('success', memberToRemove === currentUser?.id ? 'Left Project' : 'Removed', memberToRemove === currentUser?.id ? 'You have left the project.' : 'Contributor removed successfully.');
         } catch (err: unknown) {
@@ -305,7 +364,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
     const previewSummary = metaData.summary.trim() || projectData.description || '';
     const previewProject: Project = { ...projectData, title: previewTitle, description: previewSummary };
 
-    const isCustomLicense = metaData.license && !LICENSES.some(l => l.id === metaData.license);
+    const isCustomLicense = typeof metaData.license === 'string' && !LICENSES.some(l => l.id === metaData.license);
     const hasTitle = metaData.title && metaData.title.trim().length > 0;
     const hasTags = metaData.tags.length > 0;
     const hasSummary = metaData.summary && metaData.summary.length >= 10 && metaData.summary.length <= 250;
@@ -340,6 +399,13 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
     const isPublishable = publishRequirements.every(r => r.met);
     const metCount = publishRequirements.filter(r => r.met).length;
 
+    const handleSelectStandardLicense = (licenseId: string) => {
+        markDirty();
+        const linksWithoutCustomLicense = { ...metaData.links };
+        delete linksWithoutCustomLicense.LICENSE;
+        setMetaData({ ...metaData, license: licenseId, links: linksWithoutCustomLicense, customLicenseOpenSource: false });
+    };
+
     const handleUploadVersion = async () => {
         if (!projectData?.id) return;
         if (!isModpack && !versionData.file) {
@@ -362,24 +428,28 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             versionData.gameVersions.forEach(version => formData.append('gameVersions', version));
             if (versionData.file) formData.append('file', versionData.file);
             (versionData.projectIds || []).forEach(dep => formData.append('modIds', dep));
+            (versionData.incompatibleProjectIds || []).forEach(projectId => formData.append('incompatibleProjectIds', projectId));
             if (versionData.changelog) formData.append('changelog', versionData.changelog);
             formData.append('channel', versionData.channel || 'RELEASE');
+            formData.append('replaceExisting', versionData.replaceExisting ? 'true' : 'false');
 
             await api.post(`/projects/${projectData.id}/versions`, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 
-            const refreshed = await projectClient.getProject(projectData.id);
+            const refreshed = await projectClient.getProjectFull(projectData.id);
             setProjectData(refreshed);
             setVersionData({
                 projectIds: versionData.projectIds || [],
+                incompatibleProjectIds: versionData.incompatibleProjectIds || [],
                 versionNumber: '',
                 gameVersions: versionData.gameVersions,
                 changelog: '',
                 file: null,
                 dependencies: [],
                 modIds: [],
-                channel: versionData.channel || 'RELEASE'
+                channel: versionData.channel || 'RELEASE',
+                replaceExisting: false
             });
             onShowStatus('success', 'Uploaded', 'Version uploaded successfully.');
         } catch (e: any) {
@@ -393,13 +463,15 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         setEditingVersion(version);
         setEditVersionData({
             projectIds: (version.dependencies || []).map(serializeProjectDependency),
+            incompatibleProjectIds: version.incompatibleProjectIds || [],
             versionNumber: version.versionNumber || '',
             gameVersions: version.gameVersions || (version.gameVersion ? [version.gameVersion] : []),
             changelog: version.changelog || '',
             file: null,
             dependencies: [],
             modIds: [],
-            channel: version.channel || 'RELEASE'
+            channel: version.channel || 'RELEASE',
+            replaceExisting: false
         });
     };
 
@@ -413,11 +485,12 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         try {
             await projectClient.updateVersion(projectData.id, editingVersion.id, {
                 modIds: editVersionData.projectIds || [],
+                incompatibleProjectIds: editVersionData.incompatibleProjectIds || [],
                 gameVersions: editVersionData.gameVersions,
                 changelog: editVersionData.changelog || '',
                 channel: editVersionData.channel || 'RELEASE'
             });
-            const refreshed = await projectClient.getProject(projectData.id);
+            const refreshed = await projectClient.getProjectFull(projectData.id);
             setProjectData(refreshed);
             setEditingVersion(null);
             setEditVersionData(null);
@@ -434,7 +507,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         setIsSavingVersion(true);
         try {
             await projectClient.deleteVersion(projectData.id, versionId);
-            const refreshed = await projectClient.getProject(projectData.id);
+            const refreshed = await projectClient.getProjectFull(projectData.id);
             setProjectData(refreshed);
             onShowStatus('success', 'Version Deleted', 'Version deleted successfully.');
         } catch (e: any) {
@@ -530,6 +603,9 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             setStatusModal(null);
         }
     };
+
+    const scaledCardPreviewWidth = cardPreviewSize.width * cardPreviewScale;
+    const scaledCardPreviewHeight = cardPreviewSize.height * cardPreviewScale;
 
     return (
         <div className="relative">
@@ -691,25 +767,44 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                 </div>,
                 document.body)}
             {showCardPreview && createPortal(
-                <div className={theme.components.modalOverlay} onClick={() => setShowCardPreview(false)}>
-                    <div
-                        className={`${theme.components.modalContent} w-full max-w-4xl`}
-                        onClick={(event) => event.stopPropagation()}
+                <div
+                    className="fixed inset-0 z-[220] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 sm:p-8 animate-in fade-in duration-200"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Project card preview"
+                    onClick={() => setShowCardPreview(false)}
+                >
+                    <button
+                        type="button"
+                        onClick={() => setShowCardPreview(false)}
+                        className="absolute right-4 top-4 sm:right-6 sm:top-6 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white shadow-2xl backdrop-blur transition-colors hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/70"
+                        aria-label="Close card preview"
                     >
-                        <div className={theme.components.modalHeader}>
-                            <div>
-                                <h3 className={`text-xl font-black ${theme.colors.textPrimary}`}>Project Card Preview</h3>
-                                <p className={`text-xs ${theme.colors.textMuted}`}>A larger look at how this card will appear in discovery.</p>
-                            </div>
-                            <button onClick={() => setShowCardPreview(false)} className={`p-2 ${theme.colors.bgSurfaceHover} rounded-xl transition-colors`} aria-label="Close card preview">
-                                <X className="w-5 h-5" />
-                            </button>
+                        <X className="h-5 w-5" />
+                    </button>
+                    <div className="flex h-full w-full flex-col items-center justify-center gap-5">
+                        <div className="text-center text-white">
+                            <h3 className="text-lg sm:text-xl font-black">Project Card Preview</h3>
                         </div>
-                        <div className={`${theme.components.modalBody} !p-4 sm:!p-6`}>
-                            <div className="mx-auto w-full max-w-2xl">
-                                <div className="pointer-events-none select-none">
-                                    <ProjectCard project={previewProject} isFavorite={false} onToggleFavorite={() => {}} isLoggedIn={false} />
-                                </div>
+                        <div
+                            data-testid="project-card-preview-frame"
+                            className="max-w-full"
+                            onClick={(event) => event.stopPropagation()}
+                            style={{
+                                width: scaledCardPreviewWidth,
+                                height: scaledCardPreviewHeight
+                            }}
+                        >
+                            <div
+                                ref={cardPreviewRef}
+                                className="pointer-events-none select-none origin-top-left"
+                                style={{
+                                    width: CARD_PREVIEW_BASE_WIDTH,
+                                    transform: `scale(${cardPreviewScale})`,
+                                    transition: 'transform 160ms ease'
+                                }}
+                            >
+                                <ProjectCard project={previewProject} isFavorite={false} onToggleFavorite={() => {}} isLoggedIn={false} disableNavigation />
                             </div>
                         </div>
                     </div>
@@ -844,7 +939,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                 sidebarContent={
                     <>
                         {activeTab === 'wiki' && wikiData && !wikiLoading && !wikiError && (
-                            <WikiSidebar tree={wikiData.mod.pages || []} projectUrl="#" currentSlug={wikiPreviewSlug} indexSlug={wikiData.mod.index?.slug} onNavigate={setWikiPreviewSlug} />
+                            <WikiSidebar tree={wikiData.mod.pages || []} projectUrl="#" currentSlug={wikiPreviewSlug} indexSlug={wikiData.mod.index?.slug} onNavigate={setWikiPreviewSlug} pageCache={wikiData.pageCache} />
                         )}
                         <SidebarSection title="Card Preview" icon={Eye}>
                             <div
@@ -861,7 +956,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                 aria-label="Expand project card preview"
                             >
                                 <div className="pointer-events-none select-none">
-                                    <ProjectCard project={previewProject} isFavorite={false} onToggleFavorite={() => {}} isLoggedIn={false} />
+                                    <ProjectCard project={previewProject} isFavorite={false} onToggleFavorite={() => {}} isLoggedIn={false} disableNavigation />
                                 </div>
                                 <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent px-4 py-3 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
                                     <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Click to expand</span>
@@ -876,7 +971,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                         <button
                                             key={lic.id}
                                             disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
-                                            onClick={() => { markDirty(); setMetaData({ ...metaData, license: lic.id }); }}
+                                            onClick={() => handleSelectStandardLicense(lic.id)}
                                             className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-between ${metaData.license === lic.id ? 'bg-modtale-accent text-white' : `${theme.colors.textSecondary} hover:bg-slate-200 dark:hover:bg-white/10`}`}
                                         >
                                             <span>{lic.name}</span>
@@ -885,7 +980,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                     ))}
                                     <button
                                         disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
-                                        onClick={() => { markDirty(); if (!metaData.license || LICENSES.some(l => l.id === metaData.license)) setMetaData({ ...metaData, license: '' }); }}
+                                        onClick={() => { markDirty(); if (!isCustomLicense) setMetaData({ ...metaData, license: '', customLicenseOpenSource: false }); }}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold flex items-center justify-between border-t ${theme.colors.border} mt-1 pt-2 ${isCustomLicense ? 'bg-modtale-accent text-white' : `${theme.colors.textSecondary} hover:bg-slate-200 dark:hover:bg-white/10`}`}
                                     >
                                         <span>Custom License</span>
@@ -910,6 +1005,18 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                             {!metaData.links.LICENSE && (
                                                 <p className="text-[10px] text-red-500 font-bold px-1">URL is required for custom licenses.</p>
                                             )}
+                                            <button
+                                                type="button"
+                                                aria-pressed={metaData.customLicenseOpenSource}
+                                                disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)}
+                                                onClick={() => { markDirty(); setMetaData({ ...metaData, customLicenseOpenSource: !metaData.customLicenseOpenSource }); }}
+                                                className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold transition-colors ${metaData.customLicenseOpenSource ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-700 dark:text-emerald-300' : `${theme.colors.bgSurfaceAlt} ${theme.colors.border} ${theme.colors.textSecondary} hover:bg-slate-200 dark:hover:bg-white/10`}`}
+                                            >
+                                                <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${metaData.customLicenseOpenSource ? 'bg-emerald-500 border-emerald-500 text-white' : theme.colors.border}`}>
+                                                    {metaData.customLicenseOpenSource && <Check className="w-3 h-3" />}
+                                                </span>
+                                                <span>Open Source</span>
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -951,7 +1058,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                 mainContent={
                     <>
                         {activeTab === 'details' && (
-                            <EditDetails metaData={metaData} setMetaData={setMetaData} readOnly={readOnly} hasProjectPermission={hasProjectPermission} editorMode={editorMode} setEditorMode={setEditorMode} markDirty={markDirty} />
+                            <EditDetails metaData={metaData} projectData={projectData} setMetaData={setMetaData} readOnly={readOnly} hasProjectPermission={hasProjectPermission} editorMode={editorMode} setEditorMode={setEditorMode} markDirty={markDirty} />
                         )}
                         {activeTab === 'files' && (
                             <Files
@@ -973,6 +1080,8 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                 readOnly={readOnly}
                                 hasProjectPermission={hasProjectPermission}
                                 handleGalleryDelete={handleGalleryDelete}
+                                handleGalleryCaptionChange={handleGalleryCaptionChange}
+                                handleGalleryVideoAdd={handleGalleryVideoAdd}
                     handleGallerySelect={(f) => {
                         if (isFileOverUploadLimit(f)) {
                             onShowStatus('error', 'Upload Failed', MAX_UPLOAD_ERROR_MESSAGE);

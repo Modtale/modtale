@@ -1,17 +1,18 @@
 package net.modtale.config.core;
 
+import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.Paths;
-import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.media.Content;
+import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.ObjectSchema;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.responses.ApiResponse;
-import io.swagger.v3.oas.models.media.Content;
-import io.swagger.v3.oas.models.media.MediaType;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -53,6 +54,22 @@ class OpenApiConfigTest {
         assertTrue(operation.getExtensions().containsKey("x-modtale-access"));
         assertTrue(operation.getExtensions().containsKey("x-modtale-rate-limit-tiers"));
         assertTrue(operation.getTags().contains("Projects, Versions & Downloads"));
+    }
+
+    @Test
+    void apiDocsCustomizerMarksDownloadUrlRoutesPublic() {
+        OpenAPI openApi = new OpenAPI().paths(new Paths()
+                .addPathItem("/api/v1/projects/{id}/versions/{version}/download-url", new PathItem().get(new Operation().operationId("getDownloadUrl")))
+                .addPathItem("/api/v1/user/me", new PathItem().get(new Operation().operationId("getCurrentUser"))));
+
+        openApiConfig.apiDocsOpenApiCustomizer().customise(openApi);
+
+        Operation downloadUrl = openApi.getPaths()
+                .get("/api/v1/projects/{id}/versions/{version}/download-url")
+                .getGet();
+        Operation currentUser = openApi.getPaths().get("/api/v1/user/me").getGet();
+        assertEquals("public", downloadUrl.getExtensions().get("x-modtale-access"));
+        assertEquals("auth", currentUser.getExtensions().get("x-modtale-access"));
     }
 
     @Test

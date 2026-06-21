@@ -1,20 +1,21 @@
 package net.modtale.controller.project;
 
+import java.io.IOException;
 import net.modtale.exception.ForbiddenOperationException;
 import net.modtale.exception.InvalidProjectRequestException;
-import net.modtale.exception.ProjectOperationForbiddenException;
 import net.modtale.exception.ProjectMediaOperationException;
+import net.modtale.exception.ProjectOperationForbiddenException;
 import net.modtale.exception.UnauthorizedException;
+import net.modtale.model.dto.request.project.AddGalleryVideoRequest;
 import net.modtale.model.dto.request.project.RemoveGalleryImageRequest;
+import net.modtale.model.project.Project;
 import net.modtale.model.user.User;
-import net.modtale.service.project.ProjectMediaService;
-import net.modtale.service.user.AccountService;
+import net.modtale.service.project.media.ProjectMediaService;
+import net.modtale.service.user.account.AccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.Authentication;
-
-import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -117,6 +118,23 @@ class MediaControllerTest {
 
         assertEquals(200, response.getStatusCode().value());
         verify(projectMediaService).removeGalleryImage("project-1", "https://cdn.example/gallery.png", user);
+    }
+
+    @Test
+    void addGalleryVideoDelegatesWhenTheRequestIsValid() {
+        User user = user("user-1");
+        Project project = new Project();
+        project.setId("project-1");
+        AddGalleryVideoRequest request = new AddGalleryVideoRequest();
+        request.setVideoUrl("https://youtu.be/dQw4w9WgXcQ");
+        when(accountService.requireCurrentUser(null, "adding a gallery video")).thenReturn(user);
+        when(projectMediaService.addGalleryVideo("project-1", "https://youtu.be/dQw4w9WgXcQ", user)).thenReturn(project);
+
+        var response = controller.addGalleryVideo("project-1", request, null);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("project-1", response.getBody().getId());
+        verify(projectMediaService).addGalleryVideo("project-1", "https://youtu.be/dQw4w9WgXcQ", user);
     }
 
     private static MockMultipartFile file(String filename) {

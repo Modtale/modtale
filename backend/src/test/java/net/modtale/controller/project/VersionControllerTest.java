@@ -1,5 +1,7 @@
 package net.modtale.controller.project;
 
+import java.time.Instant;
+import java.util.List;
 import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.model.dto.request.project.CreateVersionRequest;
 import net.modtale.model.project.Project;
@@ -8,18 +10,18 @@ import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
 import net.modtale.service.analytics.AnalyticsEligibilityService;
-import net.modtale.service.project.ProjectVersionAccessService;
 import net.modtale.service.analytics.TrackingService;
-import net.modtale.service.project.ProjectService;
-import net.modtale.service.project.VersionApplicationService;
-import net.modtale.service.project.VersionDownloadOrchestrationService;
-import net.modtale.service.project.VersionMutationApplicationService;
-import net.modtale.service.project.VersionService;
-import net.modtale.service.security.AccessControlService;
+import net.modtale.service.project.access.ProjectVersionAccessService;
+import net.modtale.service.project.query.ProjectService;
+import net.modtale.service.project.version.VersionApplicationService;
+import net.modtale.service.project.version.VersionDownloadOrchestrationService;
+import net.modtale.service.project.version.VersionMutationApplicationService;
+import net.modtale.service.project.version.VersionService;
+import net.modtale.service.security.access.AccessControlService;
 import net.modtale.service.storage.DownloadService;
 import net.modtale.service.storage.DownloadTokenService;
 import net.modtale.service.storage.StorageService;
-import net.modtale.service.user.AccountService;
+import net.modtale.service.user.account.AccountService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,9 +31,6 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-
-import java.time.Instant;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -111,7 +110,8 @@ class VersionControllerTest {
         requestPayload.setFile(file);
         requestPayload.setModIds(List.of("dep-a, dep-b, , dep-c"));
         requestPayload.setChangelog("Release notes");
-        requestPayload.setChannel("beta");
+        requestPayload.setChannel(ProjectVersion.Channel.BETA);
+        requestPayload.setReplaceExisting(true);
 
         when(accountService.requireCurrentUser(authentication, "uploading a project version")).thenReturn(currentUser);
 
@@ -119,14 +119,16 @@ class VersionControllerTest {
 
         assertEquals(200, response.getStatusCode().value());
         verify(versionService).addVersion(
-                "project-1",
-                "1.0.0",
-                List.of("1.0.0"),
-                file,
-                "Release notes",
-                List.of("dep-a", "dep-b", "dep-c"),
-                ProjectVersion.Channel.BETA,
-                currentUser
+                eq("project-1"),
+                eq("1.0.0"),
+                eq(List.of("1.0.0")),
+                eq(file),
+                eq("Release notes"),
+                eq(List.of("dep-a", "dep-b", "dep-c")),
+                isNull(),
+                eq(ProjectVersion.Channel.BETA),
+                eq(true),
+                eq(currentUser)
         );
     }
 

@@ -1,8 +1,8 @@
 package net.modtale.controller.user;
 
-import net.modtale.exception.ApiKeyOperationForbiddenException;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Pattern;
+import java.util.List;
+import net.modtale.exception.ApiKeyOperationForbiddenException;
 import net.modtale.mapper.AdminMapper;
 import net.modtale.model.dto.admin.ReportDTO;
 import net.modtale.model.dto.request.user.CreateReportRequest;
@@ -10,17 +10,14 @@ import net.modtale.model.dto.request.user.ResolveReportRequest;
 import net.modtale.model.dto.response.common.IdResponse;
 import net.modtale.model.user.Report;
 import net.modtale.model.user.User;
-import net.modtale.service.user.ReportService;
-import net.modtale.service.user.AccountService;
-import net.modtale.service.security.AccessControlService;
+import net.modtale.service.security.access.AccessControlService;
+import net.modtale.service.user.account.AccountService;
+import net.modtale.service.user.reporting.ReportService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.Locale;
 
 @RestController
 @Validated
@@ -52,10 +49,9 @@ public class ReportController {
         }
 
         User user = accountService.requireCurrentUser(authentication, "submitting a report");
-        Report.TargetType targetType = Report.TargetType.valueOf(requestPayload.getTargetType().toUpperCase(Locale.ROOT));
         Report report = reportService.createReport(
                 requestPayload.getTargetId(),
-                targetType,
+                requestPayload.getTargetType(),
                 requestPayload.getReason(),
                 requestPayload.getDescription(),
                 user
@@ -66,15 +62,9 @@ public class ReportController {
     @GetMapping("/admin/reports/queue")
     @PreAuthorize("@apiSecurity.isAdmin(authentication)")
     public ResponseEntity<List<ReportDTO>> getReportQueue(
-            @RequestParam(defaultValue = "OPEN")
-            @Pattern(
-                    regexp = "(?i)OPEN|RESOLVED|DISMISSED",
-                    message = "Report statuses must be OPEN, RESOLVED, or DISMISSED."
-            )
-            String status
+            @RequestParam(defaultValue = "OPEN") Report.ReportStatus status
     ) {
-        Report.ReportStatus reportStatus = Report.ReportStatus.valueOf(status.toUpperCase(Locale.ROOT));
-        return ResponseEntity.ok(reportService.getReportsByStatus(reportStatus).stream()
+        return ResponseEntity.ok(reportService.getReportsByStatus(status).stream()
                 .map(AdminMapper::toReportDTO)
                 .toList());
     }
@@ -83,8 +73,7 @@ public class ReportController {
     @PreAuthorize("@apiSecurity.isAdmin(authentication)")
     public ResponseEntity<Void> resolveReport(@PathVariable String id, @Valid @RequestBody ResolveReportRequest requestPayload) {
         User admin = accountService.requireCurrentUser("resolving reports");
-        Report.ReportStatus status = Report.ReportStatus.valueOf(requestPayload.getStatus().toUpperCase(Locale.ROOT));
-        reportService.resolveReport(id, status, requestPayload.getNote(), admin);
+        reportService.resolveReport(id, requestPayload.getStatus(), requestPayload.getNote(), admin);
         return ResponseEntity.ok().build();
     }
 }

@@ -4,6 +4,7 @@ import { projectClient } from '../../api/projectClient';
 import { theme } from '@/styles/theme';
 import { extractApiErrorMessage } from '@/utils/api';
 import { useScrollLock } from '@/hooks/useScrollLock';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface ReportModalProps {
     isOpen: boolean;
@@ -13,14 +14,21 @@ interface ReportModalProps {
     targetTitle?: string;
 }
 
+type ReportReasonOption = {
+    id: string;
+    label: string;
+    targetTypes?: Array<NonNullable<ReportModalProps['targetType']>>;
+};
+
 const REPORT_REASONS = [
     { id: 'MALWARE', label: 'Malware / Virus' },
     { id: 'SPAM', label: 'Spam / Misleading' },
     { id: 'INAPPROPRIATE', label: 'Inappropriate Content' },
+    { id: 'INACCURATE_LICENSE', label: 'Inaccurate License', targetTypes: ['PROJECT'] },
     { id: 'IP_INFRINGEMENT', label: 'Intellectual Property Violation' },
     { id: 'HARASSMENT', label: 'Harassment / Hate Speech' },
     { id: 'OTHER', label: 'Other' }
-];
+] satisfies ReportReasonOption[];
 
 export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targetId, targetType = 'PROJECT', targetTitle }) => {
     const [reason, setReason] = useState(REPORT_REASONS[0].id);
@@ -69,6 +77,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targe
 
     const effectiveTargetId = targetId || '';
     const effectiveTitle = targetTitle || (targetType === 'COMMENT' ? 'Comment' : (targetType === 'USER' ? 'User Profile' : 'Content'));
+    const availableReportReasons = REPORT_REASONS.filter(r => !r.targetTypes || r.targetTypes.includes(targetType));
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -89,9 +98,10 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targe
         }
     };
 
-    const selectedLabel = REPORT_REASONS.find(r => r.id === reason)?.label;
+    const selectedLabel = availableReportReasons.find(r => r.id === reason)?.label;
 
     return (
+        <ModalPortal>
         <div className={theme.components.modalOverlay} onClick={onClose}>
             <div className={`${theme.components.modalContent} max-w-2xl w-full overflow-visible`} onClick={e => e.stopPropagation()}>
                 <div className={theme.components.modalHeader}>
@@ -143,7 +153,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targe
 
                                 {dropdownOpen && (
                                     <div className={`absolute top-full left-0 right-0 mt-2 ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200`}>
-                                        {REPORT_REASONS.map(r => (
+                                        {availableReportReasons.map(r => (
                                             <button
                                                 key={r.id}
                                                 type="button"
@@ -179,5 +189,6 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targe
                 </div>
             </div>
         </div>
+        </ModalPortal>
     );
 };

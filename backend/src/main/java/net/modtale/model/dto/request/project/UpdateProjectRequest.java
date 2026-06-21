@@ -3,7 +3,6 @@ package net.modtale.model.dto.request.project;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-
 import java.util.List;
 import java.util.Map;
 
@@ -31,9 +30,11 @@ public class UpdateProjectRequest {
     )
     private String repositoryUrl;
     private String license;
+    private Boolean customLicenseOpenSource;
     private Boolean allowModpacks;
     private Boolean allowComments;
     private Boolean hmWikiEnabled;
+    private Boolean galleryCarouselEnabled;
 
     @Pattern(
             regexp = "^$|^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])?$",
@@ -57,12 +58,16 @@ public class UpdateProjectRequest {
     public void setRepositoryUrl(String repositoryUrl) { this.repositoryUrl = repositoryUrl; }
     public String getLicense() { return license; }
     public void setLicense(String license) { this.license = license; }
+    public Boolean getCustomLicenseOpenSource() { return customLicenseOpenSource; }
+    public void setCustomLicenseOpenSource(Boolean customLicenseOpenSource) { this.customLicenseOpenSource = customLicenseOpenSource; }
     public Boolean getAllowModpacks() { return allowModpacks; }
     public void setAllowModpacks(Boolean allowModpacks) { this.allowModpacks = allowModpacks; }
     public Boolean getAllowComments() { return allowComments; }
     public void setAllowComments(Boolean allowComments) { this.allowComments = allowComments; }
     public Boolean getHmWikiEnabled() { return hmWikiEnabled; }
     public void setHmWikiEnabled(Boolean hmWikiEnabled) { this.hmWikiEnabled = hmWikiEnabled; }
+    public Boolean getGalleryCarouselEnabled() { return galleryCarouselEnabled; }
+    public void setGalleryCarouselEnabled(Boolean galleryCarouselEnabled) { this.galleryCarouselEnabled = galleryCarouselEnabled; }
     public String getHmWikiSlug() { return hmWikiSlug; }
     public void setHmWikiSlug(String hmWikiSlug) { this.hmWikiSlug = hmWikiSlug; }
 }

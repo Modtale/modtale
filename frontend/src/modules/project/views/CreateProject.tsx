@@ -163,7 +163,7 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
         }
     };
 
-    const containerClasses = "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28";
+    const containerClasses = "max-w-[112rem] px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28";
 
     const ProjectTypeCard = ({ type, style, className = "" }: { type: any, style?: React.CSSProperties, className?: string }) => {
         const Icon = type.icon;

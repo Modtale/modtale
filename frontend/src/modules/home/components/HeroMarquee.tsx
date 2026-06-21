@@ -1,18 +1,22 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { Download } from 'lucide-react';
-import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
 import type { Project } from '@/types';
 
-export const FeaturedModCard = ({ project, priority = false }: { project: Project, priority?: boolean }) => {
+const resolveAssetUrl = (asset?: string | null) => {
+    if (!asset) return '/assets/favicon.svg';
+    return asset.startsWith('/api') ? `${BACKEND_URL}${asset}` : asset;
+};
+
+export const FeaturedModCard = memo(({ project, priority = false }: { project: Project, priority?: boolean }) => {
     const iconUrl = project.imageUrl
-        ? (project.imageUrl.startsWith('/api') ? `${BACKEND_URL}${project.imageUrl}` : project.imageUrl)
+        ? resolveAssetUrl(project.imageUrl)
         : '/assets/favicon.svg';
 
     const bannerUrl = project.bannerUrl
-        ? (project.bannerUrl.startsWith('/api') ? `${BACKEND_URL}${project.bannerUrl}` : project.bannerUrl)
+        ? resolveAssetUrl(project.bannerUrl)
         : null;
 
     const projectUrl = SiteRoutes.project(project);
@@ -27,11 +31,12 @@ export const FeaturedModCard = ({ project, priority = false }: { project: Projec
 
             <div className={`w-full aspect-[3/1] relative border-b border-slate-100 dark:border-white/5 rounded-t-2xl overflow-hidden shrink-0 ${bannerUrl ? 'bg-transparent' : 'bg-slate-200 dark:bg-slate-800'}`}>
                 {bannerUrl ? (
-                    <OptimizedImage
+                    <img
                         src={bannerUrl}
                         alt={`${project.title} Banner`}
-                        baseWidth={320}
-                        priority={priority}
+                        loading={priority ? 'eager' : 'lazy'}
+                        fetchPriority={priority ? 'high' : 'auto'}
+                        decoding="async"
                         className="w-full h-full opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 bg-transparent object-cover"
                     />
                 ) : (
@@ -41,11 +46,12 @@ export const FeaturedModCard = ({ project, priority = false }: { project: Projec
 
             <div className="px-4 sm:px-6 pb-4 sm:pb-6 relative flex flex-col flex-1 bg-transparent">
                 <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl absolute -top-6 sm:-top-8 group-hover:-translate-y-1 transition-transform duration-500 z-20 overflow-hidden border-4 border-white dark:border-slate-800 shadow-xl bg-transparent backdrop-blur-md">
-                    <OptimizedImage
+                    <img
                         src={iconUrl}
                         alt={`${project.title} Icon`}
-                        baseWidth={64}
-                        priority={priority}
+                        loading={priority ? 'eager' : 'lazy'}
+                        fetchPriority={priority ? 'high' : 'auto'}
+                        decoding="async"
                         className="w-full h-full bg-transparent object-cover"
                     />
                 </div>
@@ -74,7 +80,8 @@ export const FeaturedModCard = ({ project, priority = false }: { project: Projec
             </div>
         </article>
     );
-};
+});
+FeaturedModCard.displayName = 'FeaturedModCard';
 
 export const MarqueeColumn = ({ projects, duration }: { projects: Project[], duration: string }) => (
     <div className="flex flex-col w-[260px] 2xl:w-[320px] shrink-0">

@@ -1,19 +1,18 @@
 package net.modtale.controller.auth;
 
 import jakarta.validation.Valid;
+import java.util.List;
 import net.modtale.mapper.AuthMapper;
 import net.modtale.model.dto.auth.ApiKeyDTO;
-import net.modtale.model.dto.response.auth.ApiKeySecretResponse;
 import net.modtale.model.dto.request.auth.CreateApiKeyRequest;
+import net.modtale.model.dto.response.auth.ApiKeySecretResponse;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
-import net.modtale.service.user.AccountService;
 import net.modtale.service.auth.ApiKeyService;
+import net.modtale.service.user.account.AccountService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/user/api-keys")

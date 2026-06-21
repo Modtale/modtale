@@ -25,6 +25,8 @@ interface DropdownSelectProps {
     maxMenuHeightClassName?: string;
     emptyLabel?: React.ReactNode;
     buttonLabel?: React.ReactNode;
+    buttonAriaLabel?: string;
+    buttonTitle?: string;
 }
 
 export const DropdownSelect: React.FC<DropdownSelectProps> = ({
@@ -42,7 +44,9 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
     menuAlign = 'left',
     maxMenuHeightClassName = 'max-h-60',
     emptyLabel = 'No options found',
-    buttonLabel
+    buttonLabel,
+    buttonAriaLabel,
+    buttonTitle
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -74,6 +78,8 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
                 type="button"
                 disabled={disabled}
                 onClick={handleToggle}
+                aria-label={buttonAriaLabel}
+                title={buttonTitle}
                 className={buttonClassName}
             >
                 <span className="min-w-0 truncate text-left">

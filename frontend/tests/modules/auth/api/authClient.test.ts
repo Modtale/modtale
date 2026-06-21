@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '@/utils/api';
-import { authClient, normalizeSignInResponse } from '@/modules/auth/api/authClient';
+import {
+    authClient,
+    completeSignInMethod,
+    getLastSignInMethod,
+    LAST_SIGN_IN_METHOD_STORAGE_KEY,
+    normalizeSignInResponse,
+    PENDING_SIGN_IN_METHOD_STORAGE_KEY,
+    stageSignInMethod
+} from '@/modules/auth/api/authClient';
 
 vi.mock('@/utils/api', () => ({
     api: {
@@ -16,6 +24,8 @@ const mockedApi = vi.mocked(api);
 describe('authClient', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        window.localStorage.clear();
+        window.sessionStorage.clear();
         mockedApi.post.mockResolvedValue({ data: { ok: true } } as any);
     });
 
@@ -65,5 +75,21 @@ describe('authClient', () => {
             mfaRequired: true,
             preAuthToken: 'snake-token'
         });
+    });
+
+    it('stores the completed sign-in method for the next modal session', () => {
+        stageSignInMethod('github');
+
+        expect(window.sessionStorage.getItem(PENDING_SIGN_IN_METHOD_STORAGE_KEY)).toBe('github');
+        expect(completeSignInMethod()).toBe('github');
+        expect(getLastSignInMethod()).toBe('github');
+        expect(window.localStorage.getItem(LAST_SIGN_IN_METHOD_STORAGE_KEY)).toBe('github');
+        expect(window.sessionStorage.getItem(PENDING_SIGN_IN_METHOD_STORAGE_KEY)).toBeNull();
+    });
+
+    it('ignores unknown stored sign-in method values', () => {
+        window.localStorage.setItem(LAST_SIGN_IN_METHOD_STORAGE_KEY, 'fax-machine');
+
+        expect(getLastSignInMethod()).toBeNull();
     });
 });

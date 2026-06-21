@@ -1,8 +1,8 @@
 package net.modtale.controller.admin;
 
 import net.modtale.model.user.User;
-import net.modtale.service.admin.UserManagementService;
-import net.modtale.service.user.AccountService;
+import net.modtale.service.admin.user.UserManagementService;
+import net.modtale.service.user.account.AccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

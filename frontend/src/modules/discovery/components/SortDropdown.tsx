@@ -11,15 +11,17 @@ interface SortDropdownProps {
 
 export const SortDropdown: React.FC<SortDropdownProps> = ({ value, onChange, onOpen, isMobile }) => {
     const options = [
-        { id: 'relevance', label: 'Relevance', mobileOnly: false },
-        { id: 'downloads', label: 'Downloads', mobileOnly: false },
-        { id: 'favorites', label: 'Favorites', mobileOnly: false },
-        { id: 'newest', label: 'Newest', mobileOnly: true },
-        { id: 'updated', label: 'Updated', mobileOnly: true }
+        { id: 'relevance', label: 'Relevance', desktop: false },
+        { id: 'popular', label: 'Popular', desktop: false },
+        { id: 'trending', label: 'Trending', desktop: false },
+        { id: 'downloads', label: 'Downloads', desktop: true },
+        { id: 'favorites', label: 'Favorites', desktop: true },
+        { id: 'newest', label: 'Newest', desktop: false },
+        { id: 'updated', label: 'Updated', desktop: false }
     ];
 
     const visibleOptions = useMemo(
-        () => options.filter((option) => isMobile || !option.mobileOnly),
+        () => options.filter((option) => isMobile || option.desktop),
         [isMobile]
     );
 

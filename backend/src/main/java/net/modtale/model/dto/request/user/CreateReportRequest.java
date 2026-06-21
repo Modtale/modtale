@@ -1,20 +1,17 @@
 package net.modtale.model.dto.request.user;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import net.modtale.model.user.Report;
 
 public class CreateReportRequest {
 
     @NotBlank(message = "A report target is required.")
     private String targetId;
 
-    @NotBlank(message = "A report target type is required.")
-    @Pattern(
-            regexp = "(?i)PROJECT|COMMENT|USER",
-            message = "Report target types must be PROJECT, COMMENT, or USER."
-    )
-    private String targetType;
+    @NotNull(message = "A report target type is required.")
+    private Report.TargetType targetType;
 
     @NotBlank(message = "A report reason is required.")
     @Size(max = 200, message = "Report reasons must be 200 characters or fewer.")
@@ -31,11 +28,11 @@ public class CreateReportRequest {
         this.targetId = targetId;
     }
 
-    public String getTargetType() {
+    public Report.TargetType getTargetType() {
         return targetType;
     }
 
-    public void setTargetType(String targetType) {
+    public void setTargetType(Report.TargetType targetType) {
         this.targetType = targetType;
     }
 

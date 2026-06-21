@@ -7,7 +7,7 @@ import { useMobile } from '@/context/MobileContext';
 import { useSSRData } from '@/context/SSRContext';
 import { generateItemListSchema, generateBreadcrumbSchema, getBreadcrumbsForClassification } from '@/utils/schema';
 import { getCategorySEO, generateDynamicSEO } from '@/data/seo-constants';
-import { BROWSE_VIEWS, PROJECT_TYPES } from '@/data/categories';
+import { BROWSE_SORTS, PROJECT_TYPES } from '@/data/categories';
 import type { Classification } from '@/data/categories';
 import { EmptyState } from '@/components/ui/EmptyState';
 
@@ -15,7 +15,14 @@ import { useProjectSearch } from '../hooks/useProjectSearch';
 import { BrowseFilters } from '../components/BrowseFilters';
 import { CategoryPillNav } from '../components/CategoryPillNav';
 import { ProjectGrid } from '../components/ProjectGrid';
-import { BrowseSkeletons } from '../components/BrowseSkeletons';
+import { ProjectCardSkeletons } from '@/modules/project/components/ProjectCard';
+import {
+    BROWSE_ITEMS_PER_PAGE_STORAGE_KEY,
+    BROWSE_VIEW_STYLE_STORAGE_KEY,
+    type BrowseViewStyle,
+    isBrowseItemsPerPage,
+    isBrowseViewStyle
+} from '../preferences';
 
 interface BrowseViewProps {
     likedProjectIds: string[];
@@ -23,6 +30,28 @@ interface BrowseViewProps {
     isLoggedIn: boolean;
     initialClassification?: Classification;
 }
+
+const DEFAULT_ITEMS_PER_PAGE = 12;
+const COMPACT_ITEMS_PER_PAGE = 48;
+
+const getInitialBrowsePreferences = (): { viewStyle: BrowseViewStyle; itemsPerPage: number } => {
+    if (typeof window === 'undefined') {
+        return { viewStyle: 'grid', itemsPerPage: DEFAULT_ITEMS_PER_PAGE };
+    }
+
+    const savedViewStyle = window.localStorage.getItem(BROWSE_VIEW_STYLE_STORAGE_KEY);
+    const viewStyle = isBrowseViewStyle(savedViewStyle) ? savedViewStyle : 'grid';
+
+    const savedItemsPerPage = parseInt(window.localStorage.getItem(BROWSE_ITEMS_PER_PAGE_STORAGE_KEY) || '', 10);
+    if (Number.isFinite(savedItemsPerPage) && isBrowseItemsPerPage(savedItemsPerPage)) {
+        return { viewStyle, itemsPerPage: savedItemsPerPage };
+    }
+
+    return {
+        viewStyle,
+        itemsPerPage: viewStyle === 'compact' ? COMPACT_ITEMS_PER_PAGE : DEFAULT_ITEMS_PER_PAGE
+    };
+};
 
 export const Browse: React.FC<BrowseViewProps> = ({
                                                       likedProjectIds, onToggleFavorite, isLoggedIn, initialClassification
@@ -32,20 +61,18 @@ export const Browse: React.FC<BrowseViewProps> = ({
     const { isMobile } = useMobile();
     const { initialData } = useSSRData();
 
-    const [isMounted, setIsMounted] = useState(false);
-
-    const hasComplexParams = searchParams.has('q') || searchParams.has('tags') || searchParams.has('version') || searchParams.has('minDl') || searchParams.has('minFav') || searchParams.has('date') || (searchParams.get('page') && parseInt(searchParams.get('page')!, 10) > 0);
-    const hasUsableBrowseSSRData = Boolean(initialData?.browseData) && initialData?.browseDataReady !== false;
+    const hasComplexParams = searchParams.has('q') || searchParams.has('tags') || searchParams.has('version') || searchParams.has('minDl') || searchParams.has('minFav') || searchParams.has('openSource') || searchParams.has('date') || searchParams.has('category') || (searchParams.get('page') && parseInt(searchParams.get('page')!, 10) > 0);
+    const hasUsableBrowseSSRData = Boolean(initialData?.browseData && initialData?.browseDataReady !== false);
     const useSSR = hasUsableBrowseSSRData && !hasComplexParams;
-    const canRenderHydratedContent = useSSR || isMounted;
+    const initialPreferences = useMemo(() => getInitialBrowsePreferences(), []);
+    const [viewStyle, setViewStyle] = useState<BrowseViewStyle>(initialPreferences.viewStyle);
 
     const {
-        page, sortBy, activeViewId, selectedVersion, minDownloads, minFavorites, filterDate, selectedTags, urlSearchTerm,
-        searchTerm, setSearchTerm, selectedClassification, setSelectedClassification, totalPages, totalItems, loading, isPending, items,
+        page, sortBy, selectedVersion, minDownloads, minFavorites, openSourceOnly, filterDate, selectedTags, urlSearchTerm,
+        viewCategory, searchTerm, setSearchTerm, selectedClassification, setSelectedClassification, totalPages, totalItems, loading, isPending, items,
         itemsPerPage, setItemsPerPage, updateParams
-    } = useProjectSearch(initialClassification || 'All', !!useSSR, useSSR ? initialData.browseData.content : [], useSSR ? initialData.browseData.totalPages : 0, useSSR ? initialData.browseData.totalElements : 0);
+    } = useProjectSearch(initialClassification || 'All', !!useSSR, useSSR ? initialData.browseData.content : [], useSSR ? initialData.browseData.totalPages : 0, useSSR ? initialData.browseData.totalElements : 0, initialPreferences.itemsPerPage);
 
-    const [viewStyle, setViewStyle] = useState<'grid' | 'list' | 'compact'>('grid');
     const [isFilterOpen, setIsFilterOpen] = useState(false);
 
     const [isScrolled, setIsScrolled] = useState(false);
@@ -59,18 +86,6 @@ export const Browse: React.FC<BrowseViewProps> = ({
         const currentBrowseUrl = `${window.location.pathname}${query ? `?${query}` : ''}`;
         window.sessionStorage.setItem('modtale.lastBrowseUrl', currentBrowseUrl);
     }, [location.pathname, searchParams]);
-
-    useEffect(() => {
-        setIsMounted(true);
-        const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('modtale_view_style') : null;
-        if (saved === 'grid' || saved === 'list' || saved === 'compact') {
-            setViewStyle(saved as 'grid' | 'list' | 'compact');
-        }
-    }, []);
-
-    useEffect(() => {
-        setItemsPerPage(viewStyle === 'compact' ? 48 : 12);
-    }, [viewStyle, setItemsPerPage]);
 
     const itemListSchema = useMemo(() => generateItemListSchema(items), [items]);
     const breadcrumbSchema = useMemo(() => {
@@ -116,9 +131,9 @@ export const Browse: React.FC<BrowseViewProps> = ({
         }
     }, [totalPages, setSearchParams, handleScrollTop]);
 
-    const handleViewStyleChange = useCallback((style: 'grid' | 'list' | 'compact') => {
+    const handleViewStyleChange = useCallback((style: BrowseViewStyle) => {
         setViewStyle(style);
-        if (typeof window !== 'undefined') localStorage.setItem('modtale_view_style', style);
+        if (typeof window !== 'undefined') localStorage.setItem(BROWSE_VIEW_STYLE_STORAGE_KEY, style);
         setSearchParams(prev => {
             const next = new URLSearchParams(prev);
             next.delete('page');
@@ -126,9 +141,37 @@ export const Browse: React.FC<BrowseViewProps> = ({
         });
     }, [setSearchParams]);
 
+    const handleItemsPerPageChange = useCallback((nextSize: number) => {
+        if (nextSize === itemsPerPage || !isBrowseItemsPerPage(nextSize)) {
+            return;
+        }
+
+        setItemsPerPage(nextSize);
+        if (typeof window !== 'undefined') localStorage.setItem(BROWSE_ITEMS_PER_PAGE_STORAGE_KEY, String(nextSize));
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            next.delete('page');
+            return next;
+        });
+    }, [itemsPerPage, setItemsPerPage, setSearchParams]);
+
     const handleSortChange = useCallback((nextSort: string) => {
-        updateParams({ sort: nextSort });
+        updateParams({ sort: nextSort, category: null });
     }, [updateParams]);
+
+    const getBrowseLink = useCallback((updates: Record<string, string | null>) => {
+        const s = new URLSearchParams(searchParams);
+        Object.entries(updates).forEach(([key, value]) => {
+            if (value === null || value === 'all' || (key === 'sort' && value === 'relevance')) {
+                s.delete(key);
+            } else {
+                s.set(key, value);
+            }
+        });
+        s.delete('page');
+        const query = s.toString();
+        return query ? `?${query}` : '?';
+    }, [searchParams]);
 
     const getPageNumbers = () => {
         const total = totalPages;
@@ -153,15 +196,15 @@ export const Browse: React.FC<BrowseViewProps> = ({
     };
 
     const getPageTitle = useCallback(() => {
+        if (viewCategory === 'favorites') return 'My Favorites';
         if (selectedTags.length > 0) return `Tagged: ${selectedTags[0]}${selectedTags.length > 1 ? ` (+${selectedTags.length - 1})` : ''}`;
-        if (activeViewId === 'all') return selectedClassification === 'All' ? 'All Projects' : getCategorySEO(selectedClassification).h1 || `All ${PROJECT_TYPES.find(t=>t.id===selectedClassification)?.label}`;
-        const view = BROWSE_VIEWS.find(v => v.id === activeViewId);
-        if (view) return view.label;
-        return 'Projects';
-    }, [selectedTags, activeViewId, selectedClassification]);
+        const sort = BROWSE_SORTS.find(v => v.id === sortBy);
+        if (sort && sort.id !== 'relevance') return sort.label;
+        return selectedClassification === 'All' ? 'All Projects' : getCategorySEO(selectedClassification).h1 || `All ${PROJECT_TYPES.find(t=>t.id===selectedClassification)?.label}`;
+    }, [viewCategory, selectedTags, sortBy, selectedClassification]);
 
     const seoContent = getCategorySEO(selectedClassification);
-    const dynamicSEO = generateDynamicSEO({ title: seoContent.title, description: seoContent.description }, page, sortBy, activeViewId, urlSearchTerm);
+    const dynamicSEO = generateDynamicSEO({ title: seoContent.title, description: seoContent.description }, page, sortBy, urlSearchTerm);
 
     const getPageUrl = (targetPage: number) => {
         const s = new URLSearchParams(searchParams);
@@ -181,7 +224,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
                 {breadcrumbSchema && <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>}
             </Helmet>
 
-            <main className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 pt-2 pb-8 transition-[max-width] duration-300">
+            <main className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 pt-2 pb-8 transition-[max-width] duration-300">
                 <h1 className="sr-only">{seoContent.h1}</h1>
 
                 <div className="flex flex-col md:flex-row gap-8">
@@ -196,20 +239,20 @@ export const Browse: React.FC<BrowseViewProps> = ({
                         <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-sm animate-in fade-in slide-in-from-left-4 duration-700">
                             <span className="block text-xs font-black uppercase text-slate-500 dark:text-slate-400 mb-3 tracking-widest px-2 drop-shadow-sm">Browse</span>
                             <div className="space-y-1.5">
-                                {BROWSE_VIEWS.map(v => {
-                                    const s = new URLSearchParams(searchParams);
-                                    if (v.id === 'all') s.delete('view'); else s.set('view', v.id);
-                                    if (v.defaultSort === 'relevance') s.delete('sort');
-                                    else s.set('sort', v.defaultSort);
-                                    s.delete('page');
-                                    const query = s.toString() ? `?${s.toString()}` : '?';
+                                {BROWSE_SORTS.filter(v => !['downloads', 'favorites'].includes(v.id)).map(v => {
+                                    const query = getBrowseLink({ sort: v.id, category: null });
 
                                     return (
-                                        <Link key={v.id} to={query} className={`block w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeViewId === v.id ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}`}>
+                                        <Link key={v.id} to={query} className={`block w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all ${viewCategory === 'all' && sortBy === v.id ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}`}>
                                             <span className="pointer-events-none">{v.label}</span>
                                         </Link>
                                     );
                                 })}
+                                {isLoggedIn && (
+                                    <Link to={getBrowseLink({ category: 'favorites', sort: 'relevance' })} className={`block w-full text-left px-4 py-3 rounded-xl text-sm font-bold transition-all ${viewCategory === 'favorites' ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'}`}>
+                                        <span className="pointer-events-none">My Favorites</span>
+                                    </Link>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -230,7 +273,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
                                 }}
                                 onClearTags={() => updateParams({ tags: null })}
                                 activeFilterCount={0}
-                                onResetFilters={() => updateParams({ version: null, minDl: null, minFav: null, date: null, tags: null })}
+                                onResetFilters={() => updateParams({ version: null, minDl: null, minFav: null, openSource: null, date: null, tags: null })}
                                 isFilterOpen={isFilterOpen}
                                 onToggleFilterMenu={() => setIsFilterOpen(prev => !prev)}
                                 searchTerm={searchTerm}
@@ -241,27 +284,31 @@ export const Browse: React.FC<BrowseViewProps> = ({
                                 setMinFavorites={(v) => updateParams({ minFav: v > 0 ? v.toString() : null })}
                                 minDownloads={minDownloads}
                                 setMinDownloads={(v) => updateParams({ minDl: v > 0 ? v.toString() : null })}
+                                openSourceOnly={openSourceOnly}
+                                setOpenSourceOnly={(v) => updateParams({ openSource: v ? 'true' : null })}
                                 filterDate={filterDate}
                                 setFilterDate={(v) => updateParams({ date: v })}
                                 setPage={handlePageChange}
                                 isMobile={isMobile}
                                 viewStyle={viewStyle}
                                 onViewStyleChange={handleViewStyleChange}
+                                itemsPerPage={itemsPerPage}
+                                onItemsPerPageChange={handleItemsPerPageChange}
                                 isScrolled={isScrolled}
                             />
                         </div>
 
-                        {!canRenderHydratedContent || isPending ? (
-                            <BrowseSkeletons viewStyle={viewStyle} count={itemsPerPage} />
-                        ) : items.length > 0 ? (
+                        {items.length > 0 ? (
                             <ProjectGrid items={items} loading={loading} viewStyle={viewStyle} itemsPerPage={itemsPerPage} likedProjectIds={likedProjectIds} onToggleFavorite={onToggleFavorite} isLoggedIn={isLoggedIn} />
+                        ) : isPending || loading ? (
+                            <ProjectCardSkeletons viewStyle={viewStyle} count={Math.min(itemsPerPage, 12)} />
                         ) : (
                             <div className="mt-8 animate-in fade-in zoom-in-95 duration-500">
                                 <EmptyState icon={PackageSearch} title="No matches found" message="Try adjusting your search terms or filters to find what you're looking for." />
                             </div>
                         )}
 
-                        {totalPages > 1 && canRenderHydratedContent && (
+                        {totalPages > 1 && (
                             <nav aria-label="Pagination" className="mt-12 flex flex-col md:flex-row justify-center items-center gap-8 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
                                 <div className="rounded-2xl border border-modtale-accent/20 bg-white/80 dark:bg-[#0f172a]/80 backdrop-blur-xl px-2 py-2 flex items-center gap-1">
                                     {page === 0 ? (

@@ -1,5 +1,10 @@
 import type { Permission } from '@/modules/permissions/permissions';
 
+export enum VersionRelationKind {
+    DEPENDENCY = 'DEPENDENCY',
+    INCOMPATIBILITY = 'INCOMPATIBILITY'
+}
+
 export interface ConnectedAccount {
     provider: string;
     providerId: string;
@@ -56,6 +61,10 @@ export interface ProjectDependency {
     projectId: string;
     projectTitle: string;
     versionNumber: string;
+    icon?: string;
+    title?: string;
+    classification?: string;
+    slug?: string;
     isOptional?: boolean;
     isEmbedded?: boolean;
 }
@@ -175,10 +184,17 @@ export interface ProjectVersion {
     releaseDate: string;
     changelog?: string;
     dependencies?: ProjectDependency[];
+    incompatibleProjectIds?: string[];
     channel?: 'RELEASE' | 'BETA' | 'ALPHA';
     scanResult?: ScanResult;
     reviewStatus?: 'PENDING' | 'SCHEDULED' | 'APPROVED' | 'REJECTED';
     rejectionReason?: string;
+}
+
+export interface ProjectVersionChangelog {
+    id: string;
+    versionNumber: string;
+    changelog?: string | null;
 }
 
 export interface Reply {
@@ -219,6 +235,12 @@ export interface ProjectMember {
     avatarUrl?: string;
 }
 
+export interface GalleryImage {
+    url?: string;
+    imageUrl?: string;
+    caption?: string;
+}
+
 export interface Project {
     id: string;
     slug?: string;
@@ -230,6 +252,7 @@ export interface Project {
     imageUrl: string;
     bannerUrl?: string;
     license?: string;
+    customLicenseOpenSource?: boolean;
     links?: Record<string, string>;
     classification: 'PLUGIN' | 'DATA' | 'ART' | 'SAVE' | 'MODPACK';
     tags?: string[];
@@ -241,9 +264,10 @@ export interface Project {
     childProjectIds?: string[];
     modjamIds?: string[];
     sizeBytes?: number;
-    comments: Comment[];
-    versions: ProjectVersion[];
-    galleryImages: string[];
+    comments?: Comment[];
+    versions?: ProjectVersion[];
+    galleryImages?: Array<string | GalleryImage>;
+    galleryImageCaptions?: Record<string, string>;
     repositoryUrl?: string;
 
     projectRoles?: ProjectRole[];
@@ -255,6 +279,7 @@ export interface Project {
     allowComments?: boolean;
     hmWikiEnabled?: boolean;
     hmWikiSlug?: string;
+    galleryCarouselEnabled?: boolean;
     status?: 'DRAFT' | 'PRIVATE' | 'PENDING' | 'PUBLISHED' | 'UNLISTED' | 'DELETED' | 'ARCHIVED';
     expiresAt?: string;
     canEdit?: boolean;

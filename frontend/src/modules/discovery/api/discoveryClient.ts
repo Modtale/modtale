@@ -1,5 +1,4 @@
 import { api } from '@/utils/api';
-import type { Project } from '@/types';
 
 export interface SearchParams {
     page: number;
@@ -11,6 +10,7 @@ export interface SearchParams {
     gameVersion?: string;
     minDownloads?: number;
     minFavorites?: number;
+    openSource?: boolean;
     dateRange?: string;
     category?: string;
 }
