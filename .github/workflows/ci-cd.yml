@@ -178,7 +178,6 @@ jobs:
           : "${R2_BUCKET_NAME:?R2_BUCKET_NAME must be configured for preview branch deployments.}"
           : "${CLOUDFLARE_ACCOUNT_ID:?Set secret CLOUDFLARE_ACCOUNT_ID.}"
           : "${CLOUDFLARE_R2_PROVISIONER:?Set secret CLOUDFLARE_R2_PROVISIONER.}"
-          : "${CLOUDFLARE_API_TOKEN_PROVISIONER:?Set secret CLOUDFLARE_API_TOKEN_PROVISIONER.}"
           : "${RUNTIME_SERVICE_ACCOUNT:?Set environment variable GCP_BRANCH_PREVIEW_RUNTIME_SERVICE_ACCOUNT in the branch-preview GitHub environment.}"
 
           if [ "${MONGODB_SECRET_NAME:-}" = "MONGODB_URI" ]; then
@@ -219,24 +218,19 @@ jobs:
               --secret="$R2_TOKEN_ID_SECRET_NAME" 2>/dev/null || true
           )"
           echo "::add-mask::$existing_token_id"
-          export EXISTING_R2_RUNTIME_TOKEN_ID="$existing_token_id"
 
-          node .github/scripts/cloudflare-r2-preview.mjs provision
-
-          upsert_secret() {
+          latest_secret_version() {
             local name="$1"
-            local value="$2"
+            gcloud secrets versions list "$name" \
+              --project "$PROJECT_ID" \
+              --filter="state=ENABLED" \
+              --sort-by="~createTime" \
+              --limit=1 \
+              --format="value(name)"
+          }
 
-            if gcloud secrets describe "$name" --project "$PROJECT_ID" >/dev/null 2>&1; then
-              printf '%s' "$value" | gcloud secrets versions add "$name" \
-                --project "$PROJECT_ID" \
-                --data-file=-
-            else
-              printf '%s' "$value" | gcloud secrets create "$name" \
-                --project "$PROJECT_ID" \
-                --replication-policy=automatic \
-                --data-file=-
-            fi
+          ensure_secret_accessor() {
+            local name="$1"
 
             gcloud secrets add-iam-policy-binding "$name" \
               --project "$PROJECT_ID" \
@@ -245,10 +239,115 @@ jobs:
               --quiet >/dev/null
           }
 
-          upsert_secret "$R2_ACCESS_KEY_SECRET_NAME" "$R2_RUNTIME_ACCESS_KEY"
-          upsert_secret "$R2_SECRET_KEY_SECRET_NAME" "$R2_RUNTIME_SECRET_KEY"
-          upsert_secret "$R2_ENDPOINT_SECRET_NAME" "$R2_RUNTIME_ENDPOINT"
-          upsert_secret "$R2_TOKEN_ID_SECRET_NAME" "$R2_RUNTIME_TOKEN_ID"
+          write_secret() {
+            local name="$1"
+            local value="$2"
+
+            if gcloud secrets describe "$name" --project "$PROJECT_ID" >/dev/null 2>&1; then
+              printf '%s' "$value" | gcloud secrets versions add "$name" \
+                --project "$PROJECT_ID" \
+                --data-file=- >/dev/null
+            else
+              printf '%s' "$value" | gcloud secrets create "$name" \
+                --project "$PROJECT_ID" \
+                --replication-policy=automatic \
+                --data-file=- >/dev/null
+            fi
+
+            ensure_secret_accessor "$name"
+            latest_secret_version "$name"
+          }
+
+          existing_r2_access_key="$(
+            gcloud secrets versions access latest \
+              --project "$PROJECT_ID" \
+              --secret="$R2_ACCESS_KEY_SECRET_NAME" 2>/dev/null || true
+          )"
+          existing_r2_secret_key="$(
+            gcloud secrets versions access latest \
+              --project "$PROJECT_ID" \
+              --secret="$R2_SECRET_KEY_SECRET_NAME" 2>/dev/null || true
+          )"
+          existing_r2_endpoint="$(
+            gcloud secrets versions access latest \
+              --project "$PROJECT_ID" \
+              --secret="$R2_ENDPOINT_SECRET_NAME" 2>/dev/null || true
+          )"
+          existing_r2_endpoint="$(printf '%s' "$existing_r2_endpoint" | sed -E 's#(https?://[^/]+).*#\1#')"
+
+          echo "::add-mask::$existing_r2_access_key"
+          echo "::add-mask::$existing_r2_secret_key"
+
+          runtime_credentials_valid=false
+          if [ -n "$existing_r2_access_key" ] && \
+             [ -n "$existing_r2_secret_key" ] && \
+             [ -n "$existing_r2_endpoint" ]; then
+            check_file="$(mktemp)"
+            check_key=".modtale-preview/credential-check-${GITHUB_RUN_ID:-manual}-${GITHUB_RUN_ATTEMPT:-0}"
+            printf 'ok' > "$check_file"
+
+            if AWS_ACCESS_KEY_ID="$existing_r2_access_key" \
+               AWS_SECRET_ACCESS_KEY="$existing_r2_secret_key" \
+               AWS_DEFAULT_REGION=auto \
+               aws s3api put-object \
+                 --endpoint-url "$existing_r2_endpoint" \
+                 --bucket "$R2_BUCKET_NAME" \
+                 --key "$check_key" \
+                 --body "$check_file" >/dev/null && \
+               AWS_ACCESS_KEY_ID="$existing_r2_access_key" \
+               AWS_SECRET_ACCESS_KEY="$existing_r2_secret_key" \
+               AWS_DEFAULT_REGION=auto \
+               aws s3api head-object \
+                 --endpoint-url "$existing_r2_endpoint" \
+                 --bucket "$R2_BUCKET_NAME" \
+                 --key "$check_key" >/dev/null; then
+              runtime_credentials_valid=true
+            fi
+
+            AWS_ACCESS_KEY_ID="$existing_r2_access_key" \
+            AWS_SECRET_ACCESS_KEY="$existing_r2_secret_key" \
+            AWS_DEFAULT_REGION=auto \
+            aws s3api delete-object \
+              --endpoint-url "$existing_r2_endpoint" \
+              --bucket "$R2_BUCKET_NAME" \
+              --key "$check_key" >/dev/null 2>&1 || true
+            rm -f "$check_file"
+          fi
+
+          if [ "$runtime_credentials_valid" = "true" ]; then
+            echo "Reusing existing branch preview R2 runtime credentials."
+            ensure_secret_accessor "$R2_ACCESS_KEY_SECRET_NAME"
+            ensure_secret_accessor "$R2_SECRET_KEY_SECRET_NAME"
+            ensure_secret_accessor "$R2_ENDPOINT_SECRET_NAME"
+            if gcloud secrets describe "$R2_TOKEN_ID_SECRET_NAME" --project "$PROJECT_ID" >/dev/null 2>&1; then
+              ensure_secret_accessor "$R2_TOKEN_ID_SECRET_NAME"
+              R2_TOKEN_ID_SECRET_VERSION="$(latest_secret_version "$R2_TOKEN_ID_SECRET_NAME")"
+            else
+              R2_TOKEN_ID_SECRET_VERSION=""
+            fi
+
+            R2_ACCESS_KEY_SECRET_VERSION="$(latest_secret_version "$R2_ACCESS_KEY_SECRET_NAME")"
+            R2_SECRET_KEY_SECRET_VERSION="$(latest_secret_version "$R2_SECRET_KEY_SECRET_NAME")"
+            R2_ENDPOINT_SECRET_VERSION="$(latest_secret_version "$R2_ENDPOINT_SECRET_NAME")"
+            R2_RUNTIME_CREDENTIALS_REPLACED=false
+          else
+            echo "Existing branch preview R2 runtime credentials are missing or invalid; provisioning a replacement."
+            : "${CLOUDFLARE_API_TOKEN_PROVISIONER:?Set secret CLOUDFLARE_API_TOKEN_PROVISIONER.}"
+            export EXISTING_R2_RUNTIME_TOKEN_ID="$existing_token_id"
+            node .github/scripts/cloudflare-r2-preview.mjs provision
+
+            R2_ACCESS_KEY_SECRET_VERSION="$(write_secret "$R2_ACCESS_KEY_SECRET_NAME" "$R2_RUNTIME_ACCESS_KEY")"
+            R2_SECRET_KEY_SECRET_VERSION="$(write_secret "$R2_SECRET_KEY_SECRET_NAME" "$R2_RUNTIME_SECRET_KEY")"
+            R2_ENDPOINT_SECRET_VERSION="$(write_secret "$R2_ENDPOINT_SECRET_NAME" "$R2_RUNTIME_ENDPOINT")"
+            R2_TOKEN_ID_SECRET_VERSION="$(write_secret "$R2_TOKEN_ID_SECRET_NAME" "$R2_RUNTIME_TOKEN_ID")"
+            R2_RUNTIME_CREDENTIALS_REPLACED=true
+          fi
+
+          echo "R2_ACCESS_KEY_SECRET_VERSION=$R2_ACCESS_KEY_SECRET_VERSION" >> "$GITHUB_ENV"
+          echo "R2_SECRET_KEY_SECRET_VERSION=$R2_SECRET_KEY_SECRET_VERSION" >> "$GITHUB_ENV"
+          echo "R2_ENDPOINT_SECRET_VERSION=$R2_ENDPOINT_SECRET_VERSION" >> "$GITHUB_ENV"
+          echo "R2_TOKEN_ID_SECRET_VERSION=$R2_TOKEN_ID_SECRET_VERSION" >> "$GITHUB_ENV"
+          echo "R2_RUNTIME_CREDENTIALS_REPLACED=$R2_RUNTIME_CREDENTIALS_REPLACED" >> "$GITHUB_ENV"
 
       - name: Check Existing Services
         id: check_services
@@ -277,7 +376,7 @@ jobs:
 
       - name: Build and Deploy Backend
         id: deploy_backend
-        if: steps.filter.outputs.backend == 'true' || env.BACKEND_EXISTS == 'false'
+        if: steps.filter.outputs.backend == 'true' || env.BACKEND_EXISTS == 'false' || env.R2_RUNTIME_CREDENTIALS_REPLACED == 'true'
         run: |
           cd backend
 
@@ -325,10 +424,14 @@ jobs:
             "--update-env-vars" "R2_PUBLIC_DOMAIN=${{ env.R2_PUBLIC_DOMAIN }}"
           )
 
+          R2_ACCESS_KEY_SECRET_VERSION="${R2_ACCESS_KEY_SECRET_VERSION:-latest}"
+          R2_SECRET_KEY_SECRET_VERSION="${R2_SECRET_KEY_SECRET_VERSION:-latest}"
+          R2_ENDPOINT_SECRET_VERSION="${R2_ENDPOINT_SECRET_VERSION:-latest}"
+
           ARGS+=("--update-secrets" "MONGODB_URI=${{ env.MONGODB_SECRET_NAME }}:latest")
-          ARGS+=("--update-secrets" "R2_ACCESS_KEY=${{ env.R2_ACCESS_KEY_SECRET_NAME }}:latest")
-          ARGS+=("--update-secrets" "R2_SECRET_KEY=${{ env.R2_SECRET_KEY_SECRET_NAME }}:latest")
-          ARGS+=("--update-secrets" "R2_ENDPOINT=${{ env.R2_ENDPOINT_SECRET_NAME }}:latest")
+          ARGS+=("--update-secrets" "R2_ACCESS_KEY=${{ env.R2_ACCESS_KEY_SECRET_NAME }}:$R2_ACCESS_KEY_SECRET_VERSION")
+          ARGS+=("--update-secrets" "R2_SECRET_KEY=${{ env.R2_SECRET_KEY_SECRET_NAME }}:$R2_SECRET_KEY_SECRET_VERSION")
+          ARGS+=("--update-secrets" "R2_ENDPOINT=${{ env.R2_ENDPOINT_SECRET_NAME }}:$R2_ENDPOINT_SECRET_VERSION")
 
           if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
             ARGS+=("--update-env-vars" "WARDEN_URL=$WARDEN_URL_VALUE")
@@ -513,8 +616,10 @@ jobs:
           PUBLIC_API_URL="${API_URL:-}"
 
           # Define status emojis and labels
-          if [ "${{ steps.filter.outputs.backend }}" = "true" ] || [ "${{ env.BACKEND_EXISTS }}" = "false" ]; then
-            if [ "${{ steps.filter.outcome }}" = "success" ]; then
+          if [ "${{ steps.filter.outputs.backend }}" = "true" ] || [ "${{ env.BACKEND_EXISTS }}" = "false" ] || [ "${{ env.R2_RUNTIME_CREDENTIALS_REPLACED }}" = "true" ]; then
+            if [ "${{ env.R2_RUNTIME_CREDENTIALS_REPLACED }}" = "true" ] && [ "${{ steps.filter.outputs.backend }}" != "true" ] && [ "${{ env.BACKEND_EXISTS }}" != "false" ]; then
+              BACKEND_STATUS="Deployed (R2 Credentials Replaced)"
+            elif [ "${{ steps.filter.outcome }}" = "success" ]; then
               BACKEND_STATUS="Deployed (Fresh Build)"
             else
               BACKEND_STATUS="Deployment Failed"
