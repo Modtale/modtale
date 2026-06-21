@@ -1,5 +1,9 @@
 package net.modtale.service.analytics;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import net.modtale.model.analytics.AnalyticsDataPoint;
 import net.modtale.model.analytics.CreatorAnalytics;
 import net.modtale.model.analytics.ProjectAnalyticsDetail;
@@ -8,11 +12,6 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectMeta;
 import net.modtale.repository.project.ProjectRepository;
 import org.springframework.stereotype.Service;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 
 @Service
 public class CreatorProjectAnalyticsQueryService {

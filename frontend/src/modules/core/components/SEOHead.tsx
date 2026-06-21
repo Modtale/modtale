@@ -23,9 +23,8 @@ export const SEOHead: React.FC = () => {
     if (isBrowseRoutePath(path)) {
         const page = Number.parseInt(searchParams.get('page') || '0', 10) || 0;
         const sort = searchParams.get('sort') || '';
-        const view = searchParams.get('view') || '';
         const query = searchParams.get('q') || '';
-        const dynamicSEO = generateDynamicSEO({ title, description }, page, sort, view, query);
+        const dynamicSEO = generateDynamicSEO({ title, description }, page, sort, query);
         title = dynamicSEO.title;
         description = dynamicSEO.description;
     }

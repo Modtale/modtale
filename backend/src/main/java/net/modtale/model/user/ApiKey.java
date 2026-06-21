@@ -1,13 +1,11 @@
 package net.modtale.model.user;
 
+import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.Set;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
-import java.time.LocalDateTime;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
 
 @Document(collection = "api_keys")
 public class ApiKey {
@@ -73,11 +71,6 @@ public class ApiKey {
     public void setTier(Tier tier) { this.tier = tier; }
 
     public Map<String, Set<ApiPermission>> getContextPermissions() {
-        if (this.contextPermissions == null || this.contextPermissions.isEmpty()) {
-            Map<String, Set<ApiPermission>> legacy = new HashMap<>();
-            legacy.put("PERSONAL", EnumSet.allOf(ApiPermission.class));
-            return legacy;
-        }
         return this.contextPermissions;
     }
 

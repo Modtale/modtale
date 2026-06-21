@@ -2,11 +2,15 @@ import React from 'react';
 import { theme } from '@/styles/theme';
 import { FileText } from 'lucide-react';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
+import type { Project } from '@/types';
 import type { MetadataFormData } from '../components/FormShared';
+import { GalleryCarousel } from '../components/GalleryCarousel';
 import { Permission } from '@/modules/permissions/permissions';
+import { GALLERY_CAROUSEL_MARKER, splitDescriptionByGalleryCarouselMarker } from '../utils/galleryCarouselMarker';
 
 interface EditDetailsProps {
     metaData: MetadataFormData;
+    projectData: Project | null;
     setMetaData: React.Dispatch<React.SetStateAction<MetadataFormData>>;
     readOnly: boolean;
     hasProjectPermission: (perm: Permission) => boolean;
@@ -15,8 +19,18 @@ interface EditDetailsProps {
     markDirty: () => void;
 }
 
-export const EditDetails: React.FC<EditDetailsProps> = ({ metaData, setMetaData, readOnly, hasProjectPermission, editorMode, setEditorMode, markDirty }) => {
+export const EditDetails: React.FC<EditDetailsProps> = ({ metaData, projectData, setMetaData, readOnly, hasProjectPermission, editorMode, setEditorMode, markDirty }) => {
     const canEdit = !readOnly && hasProjectPermission(Permission.PROJECT_EDIT_METADATA);
+    const previewDescriptionParts = splitDescriptionByGalleryCarouselMarker(metaData.description || "*No description.*");
+    const renderGalleryCarousel = (key: string) => (
+        <GalleryCarousel
+            key={key}
+            images={projectData?.galleryImages}
+            captions={projectData?.galleryImageCaptions}
+            title={metaData.title || projectData?.title || 'Project'}
+        />
+    );
+
     return (
         <div className="h-full flex flex-col">
             <div className={`flex items-center justify-between mb-4 pb-2 border-b ${theme.colors.borderFaint}`}>
@@ -28,11 +42,24 @@ export const EditDetails: React.FC<EditDetailsProps> = ({ metaData, setMetaData,
                     </div>
                 )}
             </div>
+            {canEdit && (
+                <p className={`mb-3 text-xs ${theme.colors.textMuted}`}>
+                    Add <code className="font-mono">{GALLERY_CAROUSEL_MARKER}</code> once where the gallery carousel should appear. Leave it out if you do not want the carousel in the description.
+                </p>
+            )}
             {editorMode === 'write' && canEdit ? (
                 <textarea value={metaData.description} onChange={e => { markDirty(); setMetaData({...metaData, description: e.target.value}); }} className={`flex-1 w-full h-full min-h-[400px] bg-transparent border-none outline-none ${theme.colors.textPrimary} font-mono text-sm resize-none`} placeholder="# Description..." />
             ) : (
-                <div className="prose dark:prose-invert prose-lg max-w-none min-h-[400px] prose-code:before:hidden prose-code:after:hidden">
-                    {metaData.description ? <MarkdownRenderer content={metaData.description} /> : <p className={`${theme.colors.textMuted} italic`}>No description.</p>}
+                <div className="min-h-[400px]">
+                    {previewDescriptionParts.map((part, index) => (
+                        part.type === 'gallery'
+                            ? renderGalleryCarousel(`gallery-preview-${index}`)
+                            : (
+                                <div key={`description-preview-${index}`} className="prose dark:prose-invert prose-lg max-w-none prose-code:before:hidden prose-code:after:hidden">
+                                    <MarkdownRenderer content={part.content} />
+                                </div>
+                            )
+                    ))}
                 </div>
             )}
         </div>

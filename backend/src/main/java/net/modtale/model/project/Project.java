@@ -1,21 +1,20 @@
 package net.modtale.model.project;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.annotation.Transient;
-import org.springframework.data.mongodb.core.index.CompoundIndex;
-import org.springframework.data.mongodb.core.index.CompoundIndexes;
-import org.springframework.data.mongodb.core.index.Indexed;
-import org.springframework.data.mongodb.core.mapping.Document;
-import net.modtale.model.user.ApiKey;
-
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.time.LocalDateTime;
+import net.modtale.model.user.ApiKey;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document(collection = "projects")
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -24,7 +23,31 @@ import java.time.LocalDateTime;
         @CompoundIndex(name = "status_class_favorites_idx", def = "{'status': 1, 'classification': 1, 'favoriteCount': -1}"),
         @CompoundIndex(name = "status_class_updated_idx", def = "{'status': 1, 'classification': 1, 'updatedAt': -1}"),
         @CompoundIndex(name = "status_class_created_idx", def = "{'status': 1, 'classification': 1, 'createdAt': -1}"),
+        @CompoundIndex(name = "status_trending_rank_idx", def = "{'status': 1, 'trendingRank': 1}"),
+        @CompoundIndex(name = "status_popular_rank_idx", def = "{'status': 1, 'popularRank': 1}"),
+        @CompoundIndex(name = "status_relevance_rank_idx", def = "{'status': 1, 'relevanceRank': 1}"),
+        @CompoundIndex(name = "status_trending_score_idx", def = "{'status': 1, 'trendScore': -1}"),
+        @CompoundIndex(name = "status_popular_score_idx", def = "{'status': 1, 'popularScore': -1}"),
+        @CompoundIndex(name = "status_relevance_score_idx", def = "{'status': 1, 'relevanceScore': -1}"),
+        @CompoundIndex(name = "status_class_trending_rank_idx", def = "{'status': 1, 'classification': 1, 'trendingRank': 1}"),
+        @CompoundIndex(name = "status_class_popular_rank_idx", def = "{'status': 1, 'classification': 1, 'popularRank': 1}"),
+        @CompoundIndex(name = "status_class_relevance_rank_idx", def = "{'status': 1, 'classification': 1, 'relevanceRank': 1}"),
+        @CompoundIndex(name = "status_downloads_7d_idx", def = "{'status': 1, 'downloads7d': -1}"),
+        @CompoundIndex(name = "status_downloads_30d_idx", def = "{'status': 1, 'downloads30d': -1}"),
+        @CompoundIndex(name = "status_downloads_90d_idx", def = "{'status': 1, 'downloads90d': -1}"),
+        @CompoundIndex(name = "status_class_downloads_7d_idx", def = "{'status': 1, 'classification': 1, 'downloads7d': -1}"),
+        @CompoundIndex(name = "status_class_downloads_30d_idx", def = "{'status': 1, 'classification': 1, 'downloads30d': -1}"),
+        @CompoundIndex(name = "status_class_downloads_90d_idx", def = "{'status': 1, 'classification': 1, 'downloads90d': -1}"),
+        @CompoundIndex(name = "ranking_dirty_idx", def = "{'rankingDirty': 1}"),
         @CompoundIndex(name = "status_tags_downloads_idx", def = "{'status': 1, 'tags': 1, 'downloadCount': -1}"),
+        @CompoundIndex(name = "status_tags_relevance_rank_idx", def = "{'status': 1, 'tags': 1, 'relevanceRank': 1}"),
+        @CompoundIndex(name = "status_tags_updated_idx", def = "{'status': 1, 'tags': 1, 'updatedAt': -1}"),
+        @CompoundIndex(name = "status_author_relevance_rank_idx", def = "{'status': 1, 'authorId': 1, 'relevanceRank': 1}"),
+        @CompoundIndex(name = "status_author_updated_idx", def = "{'status': 1, 'authorId': 1, 'updatedAt': -1}"),
+        @CompoundIndex(name = "status_game_version_relevance_rank_idx", def = "{'status': 1, 'versions.gameVersions': 1, 'relevanceRank': 1}"),
+        @CompoundIndex(name = "status_game_version_downloads_idx", def = "{'status': 1, 'versions.gameVersions': 1, 'downloadCount': -1}"),
+        @CompoundIndex(name = "status_game_version_updated_idx", def = "{'status': 1, 'versions.gameVersions': 1, 'updatedAt': -1}"),
+        @CompoundIndex(name = "status_class_game_version_relevance_rank_idx", def = "{'status': 1, 'classification': 1, 'versions.gameVersions': 1, 'relevanceRank': 1}"),
         @CompoundIndex(name = "status_expires_idx", def = "{'status': 1, 'expiresAt': 1}"),
         @CompoundIndex(name = "deleted_at_idx", def = "{'deletedAt': 1}"),
         @CompoundIndex(name = "trend_score_idx", def = "{'trendScore': -1}"),
@@ -129,10 +152,16 @@ public class Project {
     private double relevanceScore;
     private double popularScore;
 
+    private long trendingRank;
+    private long popularRank;
+    private long relevanceRank;
+    private boolean rankingDirty;
+
     private String repositoryUrl;
     private String updatedAt;
     private String createdAt;
     private String license;
+    private boolean customLicenseOpenSource;
 
     private String lastTrendingNotification;
 
@@ -152,6 +181,7 @@ public class Project {
 
     private boolean hmWikiEnabled = false;
     private String hmWikiSlug;
+    private boolean galleryCarouselEnabled = false;
 
     @Indexed
     private ProjectStatus status = ProjectStatus.PUBLISHED;
@@ -168,6 +198,7 @@ public class Project {
     private String pendingTransferTo;
 
     private List<String> galleryImages = new ArrayList<>();
+    private Map<String, String> galleryImageCaptions = new HashMap<>();
     private List<Comment> comments = new ArrayList<>();
     private List<ProjectVersion> versions = new ArrayList<>();
 
@@ -219,6 +250,14 @@ public class Project {
     public void setRelevanceScore(double relevanceScore) { this.relevanceScore = relevanceScore; }
     public double getPopularScore() { return popularScore; }
     public void setPopularScore(double popularScore) { this.popularScore = popularScore; }
+    public long getTrendingRank() { return trendingRank; }
+    public void setTrendingRank(long trendingRank) { this.trendingRank = trendingRank; }
+    public long getPopularRank() { return popularRank; }
+    public void setPopularRank(long popularRank) { this.popularRank = popularRank; }
+    public long getRelevanceRank() { return relevanceRank; }
+    public void setRelevanceRank(long relevanceRank) { this.relevanceRank = relevanceRank; }
+    public boolean isRankingDirty() { return rankingDirty; }
+    public void setRankingDirty(boolean rankingDirty) { this.rankingDirty = rankingDirty; }
     public String getRepositoryUrl() { return repositoryUrl; }
     public void setRepositoryUrl(String repositoryUrl) { this.repositoryUrl = repositoryUrl; }
     public String getUpdatedAt() { return updatedAt; }
@@ -227,6 +266,8 @@ public class Project {
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
     public String getLicense() { return license; }
     public void setLicense(String license) { this.license = license; }
+    public boolean isCustomLicenseOpenSource() { return customLicenseOpenSource; }
+    public void setCustomLicenseOpenSource(boolean customLicenseOpenSource) { this.customLicenseOpenSource = customLicenseOpenSource; }
     public Map<String, String> getLinks() { return links; }
     public void setLinks(Map<String, String> links) { this.links = links; }
     public List<String> getTypes() { return types; }
@@ -253,6 +294,8 @@ public class Project {
     public void setHmWikiEnabled(boolean hmWikiEnabled) { this.hmWikiEnabled = hmWikiEnabled; }
     public String getHmWikiSlug() { return hmWikiSlug; }
     public void setHmWikiSlug(String hmWikiSlug) { this.hmWikiSlug = hmWikiSlug; }
+    public boolean isGalleryCarouselEnabled() { return galleryCarouselEnabled; }
+    public void setGalleryCarouselEnabled(boolean galleryCarouselEnabled) { this.galleryCarouselEnabled = galleryCarouselEnabled; }
     public ProjectStatus getStatus() { return status; }
     public void setStatus(ProjectStatus status) { this.status = status; }
     public String getExpiresAt() { return expiresAt; }
@@ -273,6 +316,8 @@ public class Project {
     public void setPendingTransferTo(String pendingTransferTo) { this.pendingTransferTo = pendingTransferTo; }
     public List<String> getGalleryImages() { return galleryImages; }
     public void setGalleryImages(List<String> galleryImages) { this.galleryImages = galleryImages; }
+    public Map<String, String> getGalleryImageCaptions() { return galleryImageCaptions; }
+    public void setGalleryImageCaptions(Map<String, String> galleryImageCaptions) { this.galleryImageCaptions = galleryImageCaptions; }
     public List<Comment> getComments() { return comments; }
     public void setComments(List<Comment> comments) { this.comments = comments; }
     public List<ProjectVersion> getVersions() { return versions; }

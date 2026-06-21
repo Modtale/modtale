@@ -8,11 +8,18 @@ import type { Project, User } from '@/types';
 vi.mock('@/modules/project/api/projectClient', () => ({
     projectClient: {
         getProject: vi.fn(),
+        getProjectFull: vi.fn(),
+        getProjectVersions: vi.fn(),
+        getProjectVersionChangelogs: vi.fn(),
+        getProjectGallery: vi.fn(),
+        getProjectTeam: vi.fn(),
         trackView: vi.fn(),
         getUserProfile: vi.fn(),
         getOrgMembers: vi.fn(),
         getUsersBatch: vi.fn(),
         getDependencyMeta: vi.fn(),
+        getDependencyMetaBatch: vi.fn(),
+        getComments: vi.fn(),
         followUser: vi.fn(),
         unfollowUser: vi.fn()
     }
@@ -28,20 +35,31 @@ const settle = async (times = 8) => {
     }
 };
 
+const deferred = <T,>() => {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((promiseResolve) => {
+        resolve = promiseResolve;
+    });
+    return { promise, resolve };
+};
+
 type HookSnapshot = ReturnType<typeof useProjectDetail>;
+type HookOptions = Parameters<typeof useProjectDetail>[3];
 
 const Probe = ({
     rawId,
     initialData,
     currentUser,
+    options,
     onRender
 }: {
     rawId: string | undefined;
     initialData: Project | null;
     currentUser: User | null;
+    options?: HookOptions;
     onRender: (snapshot: HookSnapshot) => void;
 }) => {
-    const snapshot = useProjectDetail(rawId, initialData, currentUser);
+    const snapshot = useProjectDetail(rawId, initialData, currentUser, options);
     onRender(snapshot);
 
     return (
@@ -55,6 +73,7 @@ const Probe = ({
             data-contributors={String(snapshot.contributors.length)}
             data-following={String(snapshot.isFollowing)}
             data-dependency-title={snapshot.depMeta['dep-1']?.title ?? ''}
+            data-incompatible-title={snapshot.depMeta['bad-1']?.title ?? ''}
         />
     );
 };
@@ -71,10 +90,22 @@ describe('useProjectDetail', () => {
         latestSnapshot = undefined as unknown as HookSnapshot;
 
         vi.clearAllMocks();
+        mockedProjectClient.getProjectVersions.mockResolvedValue([]);
+        mockedProjectClient.getProjectGallery.mockResolvedValue({
+            galleryImages: [],
+            galleryImageCaptions: {}
+        });
+        mockedProjectClient.getProjectTeam.mockResolvedValue({
+            projectRoles: [],
+            teamMembers: [],
+            teamInvites: []
+        });
+        mockedProjectClient.getComments.mockResolvedValue([]);
         mockedProjectClient.trackView.mockResolvedValue(undefined);
         mockedProjectClient.getOrgMembers.mockResolvedValue([]);
         mockedProjectClient.getUsersBatch.mockResolvedValue([]);
         mockedProjectClient.getDependencyMeta.mockResolvedValue({ icon: '', title: '', classification: 'MOD', slug: 'dep' } as any);
+        mockedProjectClient.getDependencyMetaBatch.mockResolvedValue({});
         mockedProjectClient.followUser.mockResolvedValue(undefined);
         mockedProjectClient.unfollowUser.mockResolvedValue(undefined);
     });
@@ -127,6 +158,45 @@ describe('useProjectDetail', () => {
         expect(window.__MODTALE_PROJECT_BOOTSTRAP).toBeUndefined();
     });
 
+    it('accepts canonical slug routes when bootstrapped data already matches the slug', async () => {
+        const project = {
+            id: '123e4567-e89b-12d3-a456-426614174000',
+            slug: 'levelingcore',
+            authorId: 'author-1',
+            author: 'Ada',
+            versions: []
+        } as any satisfies Project;
+
+        window.__MODTALE_PROJECT_BOOTSTRAP = Promise.resolve(project);
+        mockedProjectClient.getUserProfile.mockResolvedValue({
+            id: 'author-1',
+            username: 'Ada',
+            avatarUrl: '',
+            likedProjectIds: [],
+            accountType: 'USER'
+        } as User);
+
+        await act(async () => {
+            root.render(
+                <Probe
+                    rawId="levelingcore"
+                    initialData={null}
+                    currentUser={null}
+                    onRender={snapshot => {
+                        latestSnapshot = snapshot;
+                    }}
+                />
+            );
+        });
+        await settle();
+
+        expect(mockedProjectClient.getProject).not.toHaveBeenCalled();
+        expect(mockedProjectClient.trackView).toHaveBeenCalledWith(project.id);
+        expect(latestSnapshot.project?.id).toBe(project.id);
+        expect(latestSnapshot.loading).toBe(false);
+        expect(window.__MODTALE_PROJECT_BOOTSTRAP).toBeUndefined();
+    });
+
     it('loads related author, contributor, dependency, and analytics data from the fetched project', async () => {
         const projectId = '123e4567-e89b-12d3-a456-426614174000';
         const rawId = `sky-tools-${projectId}`;
@@ -141,7 +211,8 @@ describe('useProjectDetail', () => {
                     id: 'v2',
                     versionNumber: '1.1.0',
                     releaseDate: '2024-05-01T00:00:00Z',
-                    dependencies: [{ projectId: 'dep-1', projectTitle: 'Dependency One', versionNumber: '2.0.0' }]
+                    dependencies: [{ projectId: 'dep-1', projectTitle: 'Dependency One', versionNumber: '2.0.0' }],
+                    incompatibleProjectIds: ['bad-1']
                 }
             ]
         } as any satisfies Project;
@@ -163,12 +234,16 @@ describe('useProjectDetail', () => {
         } as User);
         mockedProjectClient.getOrgMembers.mockResolvedValue([{ id: 'member-1', username: 'Builder', avatarUrl: '', likedProjectIds: [] } as User]);
         mockedProjectClient.getUsersBatch.mockResolvedValue([{ id: 'contrib-1', username: 'Contributor', avatarUrl: '', likedProjectIds: [] } as User]);
-        mockedProjectClient.getDependencyMeta.mockResolvedValue({
-            icon: '/dep.png',
-            title: 'Dependency One',
-            classification: 'MOD',
-            slug: 'dependency-one'
+        mockedProjectClient.getDependencyMetaBatch.mockResolvedValue({
+            'dep-1': { icon: '/dep.png', title: 'Dependency One', classification: 'MOD', slug: 'dependency-one' },
+            'bad-1': { icon: '/bad.png', title: 'Bad Mod', classification: 'MOD', slug: 'bad-mod' }
         } as any);
+        mockedProjectClient.getDependencyMeta.mockImplementation(async (projectId: string) => {
+            if (projectId === 'bad-1') {
+                return { icon: '/bad.png', title: 'Bad Mod', classification: 'MOD', slug: 'bad-mod' } as any;
+            }
+            return { icon: '/dep.png', title: 'Dependency One', classification: 'MOD', slug: 'dependency-one' } as any;
+        });
 
         await act(async () => {
             root.render(
@@ -193,17 +268,125 @@ describe('useProjectDetail', () => {
         expect(probe.dataset.contributors).toBe('1');
         expect(probe.dataset.following).toBe('true');
         expect(probe.dataset.dependencyTitle).toBe('Dependency One');
+        expect(probe.dataset.incompatibleTitle).toBe('Bad Mod');
 
-        expect(mockedProjectClient.getProject).toHaveBeenCalledWith(projectId);
+        expect(mockedProjectClient.getProject).toHaveBeenCalledWith(rawId);
         expect(mockedProjectClient.trackView).toHaveBeenCalledTimes(1);
         expect(mockedProjectClient.trackView).toHaveBeenCalledWith(projectId);
         expect(mockedProjectClient.getUserProfile).toHaveBeenCalledWith('org-1');
         expect(mockedProjectClient.getOrgMembers).toHaveBeenCalledWith('org-1');
         expect(mockedProjectClient.getUsersBatch).toHaveBeenCalledWith(['contrib-1']);
-        expect(mockedProjectClient.getDependencyMeta).toHaveBeenCalledWith('dep-1');
+        expect(mockedProjectClient.getDependencyMetaBatch).toHaveBeenCalledWith(['dep-1', 'bad-1']);
+        expect(mockedProjectClient.getDependencyMeta).not.toHaveBeenCalled();
         expect(latestSnapshot.latestDependencies).toEqual([
             { projectId: 'dep-1', projectTitle: 'Dependency One', versionNumber: '2.0.0' }
         ]);
+        expect(latestSnapshot.latestIncompatibleProjectIds).toEqual(['bad-1']);
+    });
+
+    it('hydrates the gallery slice when lightweight project data starts with an empty gallery array', async () => {
+        const project = {
+            id: 'project-1',
+            authorId: 'author-1',
+            author: 'Ada',
+            versions: [],
+            galleryCarouselEnabled: false,
+            galleryImages: []
+        } as any satisfies Project;
+
+        mockedProjectClient.getProjectGallery.mockResolvedValue({
+            galleryImages: ['/gallery-one.png'],
+            galleryImageCaptions: { '/gallery-one.png': 'Opening shot' }
+        });
+        mockedProjectClient.getUserProfile.mockResolvedValue({
+            id: 'author-1',
+            username: 'Ada',
+            avatarUrl: '',
+            likedProjectIds: [],
+            accountType: 'USER'
+        } as User);
+
+        await act(async () => {
+            root.render(
+                <Probe
+                    rawId="project-1"
+                    initialData={project}
+                    currentUser={null}
+                    onRender={snapshot => {
+                        latestSnapshot = snapshot;
+                    }}
+                />
+            );
+        });
+        await settle();
+
+        expect(mockedProjectClient.getProjectGallery).toHaveBeenCalledWith('project-1');
+        expect(latestSnapshot.project?.galleryImages).toEqual(['/gallery-one.png']);
+        expect(latestSnapshot.project?.galleryImageCaptions).toEqual({ '/gallery-one.png': 'Opening shot' });
+    });
+
+    it('keeps hydrated versions when a background shell refresh resolves afterward', async () => {
+        const projectShell = deferred<Project>();
+        const initialProject = {
+            id: 'project-1',
+            title: 'Sky Tools',
+            authorId: 'author-1',
+            author: 'Ada',
+            versions: []
+        } as any satisfies Project;
+        const hydratedVersion = {
+            id: 'version-1',
+            versionNumber: '1.0.0',
+            gameVersion: '2026.03.11',
+            gameVersions: ['2026.03.11'],
+            fileUrl: '/files/sky-tools.jar',
+            downloadCount: 0,
+            releaseDate: '2026-06-01T00:00:00Z',
+            dependencies: []
+        } as any;
+
+        mockedProjectClient.getProject.mockReturnValue(projectShell.promise);
+        mockedProjectClient.getProjectVersions.mockResolvedValue([hydratedVersion]);
+        mockedProjectClient.getUserProfile.mockResolvedValue({
+            id: 'author-1',
+            username: 'Ada',
+            avatarUrl: '',
+            likedProjectIds: [],
+            accountType: 'USER'
+        } as User);
+
+        await act(async () => {
+            root.render(
+                <Probe
+                    rawId="project-1"
+                    initialData={initialProject}
+                    currentUser={null}
+                    options={{ backgroundRefresh: true }}
+                    onRender={snapshot => {
+                        latestSnapshot = snapshot;
+                    }}
+                />
+            );
+        });
+        await settle();
+
+        expect(mockedProjectClient.getProjectVersions).toHaveBeenCalledWith('project-1');
+        expect(latestSnapshot.project?.versions).toEqual([hydratedVersion]);
+
+        await act(async () => {
+            projectShell.resolve({
+                id: 'project-1',
+                title: 'Sky Tools',
+                about: 'A refreshed project shell.',
+                authorId: 'author-1',
+                author: 'Ada'
+            } as any satisfies Project);
+            await projectShell.promise;
+        });
+        await settle();
+
+        expect(latestSnapshot.project?.about).toBe('A refreshed project shell.');
+        expect(latestSnapshot.project?.versions).toEqual([hydratedVersion]);
     });
 
     it('marks the project as not found when the primary fetch fails', async () => {

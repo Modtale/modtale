@@ -1,5 +1,8 @@
 package net.modtale.service.auth;
 
+import java.net.URI;
+import java.util.Locale;
+import java.util.Set;
 import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.exception.ReservedAccountAccessException;
 import net.modtale.model.user.User;
@@ -7,10 +10,6 @@ import net.modtale.repository.user.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-
-import java.net.URI;
-import java.util.Locale;
-import java.util.Set;
 
 @Service
 public class ReservedAccountGuardService {

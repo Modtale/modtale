@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText, Wallet } from 'lucide-react';
+import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText, Wallet, CalendarClock } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { extractApiErrorMessage } from '@/utils/api';
@@ -11,6 +11,7 @@ import { ProjectManagement } from '../components/ProjectManagement';
 import { PlatformAnalytics } from '../components/PlatformAnalytics';
 import { AuditLogs } from '../components/AuditLogs';
 import { FinanceAdmin } from '../components/FinanceAdmin';
+import { StatusIncidents } from '../components/StatusIncidents';
 import { isAdminUser, isSuperAdminUser } from '../utils/access';
 import type { Project } from '@/types';
 
@@ -18,8 +19,10 @@ interface AdminPanelProps {
     currentUser: any;
 }
 
+type AdminTab = 'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'finance' | 'logs' | 'status';
+
 export function AdminPanel({ currentUser }: AdminPanelProps) {
-    const [activeTab, setActiveTab] = useState<'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'finance' | 'logs'>('verification');
+    const [activeTab, setActiveTab] = useState<AdminTab>('verification');
     const [status, setStatus] = useState<any>(null);
 
     const [pendingProjects, setPendingProjects] = useState<Project[]>([]);
@@ -109,7 +112,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         );
     }
 
-    const SidebarButton = ({ tab, icon: Icon, label, badge }: { tab: 'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'finance' | 'logs', icon: any, label: string, badge?: number }) => (
+    const SidebarButton = ({ tab, icon: Icon, label, badge }: { tab: AdminTab, icon: any, label: string, badge?: number }) => (
         <button
             onClick={() => setActiveTab(tab)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold transition-all ${
@@ -144,7 +147,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                 />
             )}
 
-            <div className="max-w-[112rem] mx-auto px-4 sm:px-12 md:px-16 lg:px-28 py-8 transition-[max-width,padding] duration-300">
+            <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 py-8 transition-[max-width,padding] duration-300">
                 <div className="flex flex-col lg:flex-row gap-8">
                     <aside className="w-full lg:w-64 flex-shrink-0">
                         <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-2xl sticky top-28">
@@ -179,6 +182,13 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                     icon={Wallet}
                                     label="Platform Finance"
                                 />
+                                {isSuperAdmin && (
+                                    <SidebarButton
+                                        tab="status"
+                                        icon={CalendarClock}
+                                        label="Status"
+                                    />
+                                )}
                                 {isSuperAdmin && (
                                     <>
                                         <SidebarButton
@@ -249,6 +259,12 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                             {activeTab === 'finance' && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <FinanceAdmin isSuperAdmin={isSuperAdmin} />
+                                </div>
+                            )}
+
+                            {activeTab === 'status' && isSuperAdmin && (
+                                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <StatusIncidents setStatus={setStatus} />
                                 </div>
                             )}
 

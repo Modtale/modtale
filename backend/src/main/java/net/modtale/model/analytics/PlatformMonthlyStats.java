@@ -1,11 +1,10 @@
 package net.modtale.model.analytics;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
-
-import java.util.HashMap;
-import java.util.Map;
 
 @Document(collection = "platform_monthly_stats")
 @CompoundIndex(def = "{'year': 1, 'month': 1}", unique = true)

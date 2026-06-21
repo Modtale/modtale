@@ -1,9 +1,10 @@
 package net.modtale.model.dto.project;
 
-import net.modtale.model.project.ProjectDependency;
-import net.modtale.model.project.ProjectVersion;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
+import net.modtale.model.project.ProjectVersion;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class ProjectVersionDTO {
     private String id;
     private String versionNumber;
@@ -12,7 +13,8 @@ public class ProjectVersionDTO {
     private int downloadCount;
     private String releaseDate;
     private String changelog;
-    private List<ProjectDependency> dependencies;
+    private List<ProjectDependencyDTO> dependencies;
+    private List<String> incompatibleProjectIds;
     private ProjectVersion.Channel channel;
 
     public String getId() { return id; }
@@ -29,8 +31,10 @@ public class ProjectVersionDTO {
     public void setReleaseDate(String releaseDate) { this.releaseDate = releaseDate; }
     public String getChangelog() { return changelog; }
     public void setChangelog(String changelog) { this.changelog = changelog; }
-    public List<ProjectDependency> getDependencies() { return dependencies; }
-    public void setDependencies(List<ProjectDependency> dependencies) { this.dependencies = dependencies; }
+    public List<ProjectDependencyDTO> getDependencies() { return dependencies; }
+    public void setDependencies(List<ProjectDependencyDTO> dependencies) { this.dependencies = dependencies; }
+    public List<String> getIncompatibleProjectIds() { return incompatibleProjectIds; }
+    public void setIncompatibleProjectIds(List<String> incompatibleProjectIds) { this.incompatibleProjectIds = incompatibleProjectIds; }
     public ProjectVersion.Channel getChannel() { return channel; }
     public void setChannel(ProjectVersion.Channel channel) { this.channel = channel; }
 }

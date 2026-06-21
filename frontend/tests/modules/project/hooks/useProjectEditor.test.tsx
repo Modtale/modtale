@@ -1,4 +1,4 @@
-import React, { act, useState } from 'react';
+import { act, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRoot, type Root } from 'react-dom/client';
 import { useProjectEditor } from '@/modules/project/hooks/useProjectEditor';
@@ -11,7 +11,7 @@ vi.mock('@/modules/project/api/projectClient', () => ({
         getGitRepos: vi.fn(),
         updateRole: vi.fn(),
         cancelInvite: vi.fn(),
-        getProject: vi.fn()
+        getProjectFull: vi.fn()
     }
 }));
 
@@ -25,7 +25,13 @@ vi.mock('@/utils/api', () => ({
 }));
 
 const mockedProjectClient = vi.mocked(projectClient);
-const mockedApi = vi.mocked(api);
+type MockApi = {
+    put: ReturnType<typeof vi.fn>;
+    post: ReturnType<typeof vi.fn>;
+    delete: ReturnType<typeof vi.fn>;
+};
+
+const mockedApi = api as unknown as MockApi;
 const mockedExtractApiErrorMessage = vi.mocked(extractApiErrorMessage);
 
 const settle = async (times = 8) => {
@@ -127,7 +133,7 @@ describe('useProjectEditor', () => {
         mockedProjectClient.getGitRepos.mockResolvedValue([]);
         mockedProjectClient.updateRole.mockResolvedValue(undefined);
         mockedProjectClient.cancelInvite.mockResolvedValue(undefined);
-        mockedProjectClient.getProject.mockResolvedValue(null as any);
+        mockedProjectClient.getProjectFull.mockResolvedValue(null as any);
         mockedExtractApiErrorMessage.mockImplementation((error: any, fallback?: string) => {
             return error?.response?.data?.message ?? error?.response?.data ?? fallback ?? 'Unknown error';
         });
@@ -163,7 +169,8 @@ describe('useProjectEditor', () => {
             repositoryUrl: 'https://github.com/sky/tools',
             iconFile: null,
             iconPreview: '/old-icon.png',
-            license: 'MIT'
+            license: 'MIT',
+            customLicenseOpenSource: false
         } satisfies MetadataFormData,
         bannerFile = null as File | null,
         bannerPreview = '/old-banner.png'
@@ -245,7 +252,7 @@ describe('useProjectEditor', () => {
         const iconFile = new File(['icon'], 'icon.png', { type: 'image/png' });
         const bannerFile = new File(['banner'], 'banner.png', { type: 'image/png' });
 
-        mockedProjectClient.getProject.mockResolvedValue({
+        mockedProjectClient.getProjectFull.mockResolvedValue({
             id: 'project-1',
             title: 'Sky Tools Reloaded',
             slug: 'sky-tools',
@@ -260,11 +267,12 @@ describe('useProjectEditor', () => {
                 summary: 'Updated summary',
                 description: 'Updated description',
                 tags: ['magic', 'utility'],
-                links: { website: 'https://modtale.net' },
+                links: { website: 'https://modtale.net', LICENSE: 'https://example.com/license' },
                 repositoryUrl: 'https://github.com/sky/tools',
                 iconFile,
                 iconPreview: '/old-icon.png',
-                license: 'Apache-2.0'
+                license: 'Sky Public License',
+                customLicenseOpenSource: true
             },
             bannerFile
         });
@@ -285,9 +293,10 @@ describe('useProjectEditor', () => {
             description: 'Updated summary',
             about: 'Updated description',
             tags: ['magic', 'utility'],
-            links: { website: 'https://modtale.net' },
+            links: { website: 'https://modtale.net', LICENSE: 'https://example.com/license' },
             repositoryUrl: 'https://github.com/sky/tools',
-            license: 'Apache-2.0',
+            license: 'Sky Public License',
+            customLicenseOpenSource: true,
             allowModpacks: true,
             allowComments: true,
             hmWikiEnabled: false,
@@ -304,7 +313,7 @@ describe('useProjectEditor', () => {
         expect(bannerUpload[1]).toBeInstanceOf(FormData);
         expect((bannerUpload[1] as FormData).get('file')).toBe(bannerFile);
 
-        expect(mockedProjectClient.getProject).toHaveBeenCalledWith('project-1');
+        expect(mockedProjectClient.getProjectFull).toHaveBeenCalledWith('project-1');
         expect(latestSnapshot.isDirty).toBe(false);
         expect(latestSnapshot.metaData.iconFile).toBeNull();
         expect(latestSnapshot.metaData.iconPreview).toBe('/new-icon.png');
@@ -312,6 +321,32 @@ describe('useProjectEditor', () => {
         expect(latestSnapshot.bannerPreview).toBe('/new-banner.png');
         expect(latestSnapshot.projectData.title).toBe('Sky Tools Reloaded');
         expect(showStatus).toHaveBeenLastCalledWith('success', 'Saved', 'Project details saved successfully.');
+    });
+
+    it('blocks saves when the gallery carousel marker is used more than once', async () => {
+        await renderHook({
+            metaData: {
+                title: 'Sky Tools',
+                slug: 'sky-tools',
+                summary: 'Summary',
+                description: 'Intro\n\n{{gallery-carousel}}\n\nMiddle\n\n{{ gallery-carousel }}',
+                tags: [],
+                links: {},
+                repositoryUrl: '',
+                iconFile: null,
+                iconPreview: null,
+                license: 'MIT',
+                customLicenseOpenSource: false
+            }
+        });
+
+        await act(async () => {
+            await latestSnapshot.handleSave();
+        });
+        await settle();
+
+        expect(mockedApi.put).not.toHaveBeenCalled();
+        expect(showStatus).toHaveBeenCalledWith('error', 'Gallery Carousel Marker', 'Use {{gallery-carousel}} only once in the project description.');
     });
 
     it('records slug validation errors from failed saves', async () => {
@@ -333,7 +368,7 @@ describe('useProjectEditor', () => {
     });
 
     it('submits the project after saving dirty changes and marks it pending', async () => {
-        mockedProjectClient.getProject.mockResolvedValue({
+        mockedProjectClient.getProjectFull.mockResolvedValue({
             id: 'project-1',
             title: 'Sky Tools',
             slug: 'sky-tools'
@@ -380,6 +415,25 @@ describe('useProjectEditor', () => {
         expect(showStatus).toHaveBeenLastCalledWith('success', 'Uploaded', 'Image added to gallery.');
     });
 
+    it('adds youtube gallery videos and replaces the project payload', async () => {
+        mockedApi.post.mockResolvedValue({
+            data: { id: 'project-1', title: 'Sky Tools', galleryImages: ['https://www.youtube.com/watch?v=dQw4w9WgXcQ'] }
+        } as any);
+
+        await renderHook();
+
+        await act(async () => {
+            await latestSnapshot.handleGalleryVideoAdd('https://youtu.be/dQw4w9WgXcQ');
+        });
+        await settle();
+
+        expect(mockedApi.post).toHaveBeenCalledWith('/projects/project-1/gallery/youtube', {
+            videoUrl: 'https://youtu.be/dQw4w9WgXcQ'
+        });
+        expect(latestSnapshot.projectData.galleryImages).toEqual(['https://www.youtube.com/watch?v=dQw4w9WgXcQ']);
+        expect(showStatus).toHaveBeenLastCalledWith('success', 'Added', 'Video added to gallery.');
+    });
+
     it('deletes gallery images using the request body payload and updates project state', async () => {
         mockedApi.delete.mockResolvedValue({
             data: { id: 'project-1', title: 'Sky Tools', galleryImages: [] }
@@ -397,5 +451,30 @@ describe('useProjectEditor', () => {
         });
         expect(latestSnapshot.projectData.galleryImages).toEqual([]);
         expect(showStatus).toHaveBeenLastCalledWith('success', 'Deleted', 'Image removed from gallery.');
+    });
+
+    it('updates gallery captions and refreshes project state', async () => {
+        mockedApi.put.mockResolvedValue({
+            data: {
+                id: 'project-1',
+                title: 'Sky Tools',
+                galleryImages: ['/gallery.png'],
+                galleryImageCaptions: { '/gallery.png': 'Opening shot' }
+            }
+        } as any);
+
+        await renderHook();
+
+        await act(async () => {
+            await latestSnapshot.handleGalleryCaptionChange('/gallery.png', 'Opening shot');
+        });
+        await settle();
+
+        expect(mockedApi.put).toHaveBeenCalledWith('/projects/project-1/gallery/caption', {
+            imageUrl: '/gallery.png',
+            caption: 'Opening shot'
+        });
+        expect(latestSnapshot.projectData.galleryImageCaptions).toEqual({ '/gallery.png': 'Opening shot' });
+        expect(showStatus).toHaveBeenLastCalledWith('success', 'Saved', 'Gallery caption updated.');
     });
 });

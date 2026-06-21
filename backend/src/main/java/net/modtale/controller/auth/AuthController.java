@@ -4,14 +4,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
+import java.time.Duration;
+import java.util.Map;
+import java.util.stream.Collectors;
 import net.modtale.exception.InvalidAuthenticationRequestException;
 import net.modtale.exception.UnauthorizedException;
-import net.modtale.model.dto.response.auth.MfaChallengeResponse;
-import net.modtale.model.dto.response.auth.MfaSetupResponse;
-import net.modtale.model.dto.response.auth.RegistrationResponse;
-import net.modtale.model.dto.response.auth.SignInResponse;
-import net.modtale.model.dto.response.common.MessageResponse;
-import net.modtale.model.dto.response.common.StatusResponse;
 import net.modtale.model.dto.request.auth.ChangePasswordRequest;
 import net.modtale.model.dto.request.auth.ForgotPasswordRequest;
 import net.modtale.model.dto.request.auth.MfaLoginRequest;
@@ -20,11 +17,17 @@ import net.modtale.model.dto.request.auth.ResetPasswordRequest;
 import net.modtale.model.dto.request.auth.SignInRequest;
 import net.modtale.model.dto.request.auth.UpdateCredentialsRequest;
 import net.modtale.model.dto.request.auth.VerifyMfaRequest;
+import net.modtale.model.dto.response.auth.MfaChallengeResponse;
+import net.modtale.model.dto.response.auth.MfaSetupResponse;
+import net.modtale.model.dto.response.auth.RegistrationResponse;
+import net.modtale.model.dto.response.auth.SignInResponse;
+import net.modtale.model.dto.response.common.MessageResponse;
+import net.modtale.model.dto.response.common.StatusResponse;
 import net.modtale.model.user.User;
 import net.modtale.service.auth.AuthenticationMutationService;
-import net.modtale.service.user.AccountService;
 import net.modtale.service.auth.AuthenticationService;
 import net.modtale.service.auth.TwoFactorService;
+import net.modtale.service.user.account.AccountService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -36,10 +39,6 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.annotation.*;
-
-import java.time.Duration;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/auth")

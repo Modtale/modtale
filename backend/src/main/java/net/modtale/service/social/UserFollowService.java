@@ -1,5 +1,9 @@
 package net.modtale.service.social;
 
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 import net.modtale.exception.ForbiddenOperationException;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.model.user.User;
@@ -9,11 +13,6 @@ import net.modtale.util.MongoIdUtils;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
-
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
 
 final class UserFollowService {
 
@@ -60,7 +59,9 @@ final class UserFollowService {
                         List.of(target.getId()),
                         "New Follower",
                         currentUser.getUsername() + " started following you.",
-                        URI.create("/creator/" + currentUser.getId()),
+                        URI.create("/creator/" + (currentUser.getUsername() != null && !currentUser.getUsername().isBlank()
+                                ? currentUser.getUsername()
+                                : currentUser.getId())),
                         currentUser.getAvatarUrl()
                 );
             }

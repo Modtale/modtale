@@ -1,10 +1,10 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { ChevronLeft, ChevronRight, Github, Globe } from 'lucide-react';
+import { ChevronLeft, Github, Globe, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
-import type { User } from '@/types';
+import type { Project, User } from '@/types';
 import { theme } from '@/styles/theme';
 import { SiteRoutes } from '@/utils/routes';
 import { generateProjectMeta } from '@/utils/meta';
@@ -20,9 +20,10 @@ import { HeaderActions, HeaderContent } from '../components/Header';
 import { ActionBar } from '../components/ActionBar';
 
 import { ViewDetails } from '../tabs/ViewDetails';
-import { useHMWiki } from '../hooks/useHMWiki';
+import { prefetchInitialWikiPage, useHMWiki } from '../hooks/useHMWiki';
 
 import { ProjectLayout } from '../components/ProjectLayout';
+import { GalleryCarouselViewer } from '../components/GalleryCarouselViewer';
 import { Spinner } from '@/components/ui/Spinner';
 import NotFound from '@/components/ui/error/NotFound';
 import { StatusModal } from '@/components/ui/StatusModal';
@@ -30,6 +31,9 @@ import { api, extractApiErrorMessage } from '@/utils/api';
 import { projectClient } from '../api/projectClient';
 import { financeClient } from '@/modules/finance/api/financeClient';
 import { DonationPromptModal } from '../components/dialogs/DonationPromptModal';
+import { mergeProjectVersionChangelogs, projectNeedsChangelogHydration } from '../utils/changelogHydration';
+import { resolveGalleryImages } from '../utils/galleryImages';
+import { countGalleryCarouselMarkers } from '../utils/galleryCarouselMarker';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import '../styles/downloadFx.css';
 
@@ -41,6 +45,7 @@ const DownloadModal = lazy(() => import('../components/dialogs/DownloadModal').t
 const DependencyModal = lazy(() => import('../components/dialogs/DependencyModal').then((module) => ({ default: module.DependencyModal })));
 const Wiki = lazy(() => import('../tabs/Wiki').then((module) => ({ default: module.Wiki })));
 const WikiSidebar = lazy(() => import('../components/HMWiki').then((module) => ({ default: module.WikiSidebar })));
+const WikiMobileNavigation = lazy(() => import('../components/HMWiki').then((module) => ({ default: module.WikiMobileNavigation })));
 
 interface ProjectDetailViewProps {
     currentUser: User | null;
@@ -64,9 +69,12 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const navigate = useNavigate();
     const location = useLocation();
     const { isMobile } = useMobile();
-    const { initialData } = useSSRData();
+    const { initialData: ssrInitialData } = useSSRData();
+    const routeStateProject = (location.state as { project?: Project | null } | null)?.project ?? null;
+    const initialData = ssrInitialData || routeStateProject;
+    const backgroundRefresh = Boolean(routeStateProject && !ssrInitialData);
 
-    const { project, setProject, loading, isNotFound, authorProfile, orgMembers, contributors, depMeta, latestDependencies, isFollowing, handleFollowToggle } = useProjectDetail(id, initialData, currentUser);
+    const { project, setProject, loading, isNotFound, authorProfile, orgMembers, contributors, depMeta, latestDependencies, latestIncompatibleProjectIds, isFollowing, handleFollowToggle } = useProjectDetail(id, initialData, currentUser, { backgroundRefresh });
 
     const [statusModal, setStatusModal] = useState<{ type: 'success' | 'error' | 'warning' | 'info'; title: string; message: string } | null>(null);
     const [isShareOpen, setIsShareOpen] = useState(false);
@@ -106,18 +114,30 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const isGalleryRoute = /\/gallery\/?$/.test(location.pathname);
     const wikiMatch = location.pathname.match(/\/wiki\/?(.*)/);
     const wikiPageSlug = wikiMatch?.[1];
+    const projectRouteKey = id?.trim();
+    const wikiLookupKey = isWikiRoute ? (projectRouteKey || project?.id) : project?.id;
+    const shouldLoadWiki = Boolean(
+        isWikiRoute
+        && wikiLookupKey
+        && (project ? project.hmWikiEnabled : true)
+    );
 
-    const { data: wikiData, loading: wikiLoading, error: wikiError } = useHMWiki(project?.id, wikiPageSlug, isWikiRoute && !!project?.hmWikiEnabled);
+    const { data: wikiData, loading: wikiLoading, error: wikiError } = useHMWiki(wikiLookupKey, wikiPageSlug, shouldLoadWiki);
     const [displayWikiData, setDisplayWikiData] = useState(wikiData);
     const [displaySlug, setDisplaySlug] = useState(wikiPageSlug);
     const wikiContentRef = useRef<HTMLDivElement>(null);
+    const pendingMobileWikiScrollRef = useRef(false);
     const [lockedHeight, setLockedHeight] = useState<number | undefined>(undefined);
 
     const prevPathnameRef = useRef(location.pathname);
     const scrollPosRef = useRef(0);
     const downloadFxTimeoutRef = useRef<number | null>(null);
+    const changelogFetchKeyRef = useRef('');
     const [galleryIndex, setGalleryIndex] = useState(0);
-    const galleryImages = project?.galleryImages || [];
+    const galleryItems = useMemo(
+        () => resolveGalleryImages(project?.galleryImages || [], project?.galleryImageCaptions || {}),
+        [project?.galleryImageCaptions, project?.galleryImages]
+    );
     const projectUrl = project ? SiteRoutes.project(project) : '';
 
     const isStableBuild = useCallback((version: any) => {
@@ -134,7 +154,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const openGalleryIndexFromHash = () => {
         const hashIndex = Number((location.hash || '').replace('#', ''));
         if (Number.isFinite(hashIndex) && hashIndex > 0) {
-            return Math.min(hashIndex - 1, Math.max(galleryImages.length - 1, 0));
+            return Math.min(hashIndex - 1, Math.max(galleryItems.length - 1, 0));
         }
         return 0;
     };
@@ -151,6 +171,11 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             if (downloadFxTimeoutRef.current) window.clearTimeout(downloadFxTimeoutRef.current);
         };
     }, []);
+
+    useEffect(() => {
+        if (!project?.id || !project.hmWikiEnabled) return;
+        prefetchInitialWikiPage(projectRouteKey || project.id);
+    }, [project?.id, project?.hmWikiEnabled, projectRouteKey]);
 
     useEffect(() => {
         if (!isDownloadOpen) return;
@@ -192,6 +217,34 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             setShowExperimental(true);
         }
     }, [isHistoryOpen, hasStableBuilds]);
+
+    const needsChangelogHydration = useMemo(() => {
+        return projectNeedsChangelogHydration(project);
+    }, [project]);
+
+    useEffect(() => {
+        if (!isHistoryOpen || !project || !needsChangelogHydration) return;
+        if (changelogFetchKeyRef.current === project.id) return;
+
+        let isCancelled = false;
+        changelogFetchKeyRef.current = project.id;
+
+        projectClient.getProjectVersionChangelogs(id || project.id)
+            .then((changelogs) => {
+                if (isCancelled) return;
+                setProject((previous) => {
+                    if (!previous || previous.id !== project.id) return previous;
+                    return mergeProjectVersionChangelogs(previous, changelogs);
+                });
+            })
+            .catch(() => {
+                if (!isCancelled) changelogFetchKeyRef.current = '';
+            });
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [isHistoryOpen, project?.id, needsChangelogHydration, id, setProject]);
 
     useEffect(() => {
         if (!project?.id) return;
@@ -242,10 +295,30 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     useEffect(() => {
         if (prevPathnameRef.current.includes('/wiki') && isWikiRoute && prevPathnameRef.current !== location.pathname) {
-            window.scrollTo(0, scrollPosRef.current);
+            if (pendingMobileWikiScrollRef.current) {
+                pendingMobileWikiScrollRef.current = false;
+                window.requestAnimationFrame(() => {
+                    const targetTop = wikiContentRef.current
+                        ? wikiContentRef.current.getBoundingClientRect().top + window.scrollY - 16
+                        : 0;
+                    window.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+                });
+            } else {
+                window.scrollTo(0, scrollPosRef.current);
+            }
         }
         prevPathnameRef.current = location.pathname;
     }, [location.pathname, isWikiRoute]);
+
+    useEffect(() => {
+        if (location.hash !== '#comments' || isDownloadOpen || isHistoryOpen || isGalleryRoute) return;
+
+        window.requestAnimationFrame(() => {
+            if (!commentsRef.current) return;
+            const y = commentsRef.current.getBoundingClientRect().top + window.scrollY - 100;
+            window.scrollTo({ top: y, behavior: 'smooth' });
+        });
+    }, [location.hash, location.pathname, isDownloadOpen, isHistoryOpen, isGalleryRoute, project?.comments]);
 
     useEffect(() => {
         if (wikiData && !wikiLoading) {
@@ -272,28 +345,32 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     useEffect(() => {
         if (!isGalleryRoute) return;
         setGalleryIndex(openGalleryIndexFromHash());
-    }, [isGalleryRoute, location.hash, project?.galleryImages]);
+    }, [isGalleryRoute, location.hash, galleryItems.length]);
 
     useEffect(() => {
-        if (!isGalleryRoute || galleryImages.length <= 1) return;
-        const escapeTarget = project ? SiteRoutes.project(project) : SiteRoutes.home();
+        if (!isGalleryRoute) return;
 
         const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                navigate(projectUrl);
+                return;
+            }
+
+            if (galleryItems.length <= 1) return;
+
             if (event.key === 'ArrowLeft') {
                 event.preventDefault();
-                setGalleryIndex((prev) => (prev - 1 + galleryImages.length) % galleryImages.length);
+                setGalleryIndex((prev) => (prev + 1) % galleryItems.length);
             } else if (event.key === 'ArrowRight') {
                 event.preventDefault();
-                setGalleryIndex((prev) => (prev + 1) % galleryImages.length);
-            } else if (event.key === 'Escape') {
-                event.preventDefault();
-                navigate(escapeTarget);
+                setGalleryIndex((prev) => (prev - 1 + galleryItems.length) % galleryItems.length);
             }
         };
 
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [isGalleryRoute, galleryImages.length, navigate, project]);
+    }, [isGalleryRoute, galleryItems.length, navigate, projectUrl]);
 
     useEffect(() => {
         if (project && id) {
@@ -334,6 +411,25 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             message: extractApiErrorMessage(error, fallback)
         });
     }, []);
+
+    const handleProjectFavoriteToggle = useCallback(() => {
+        if (!project) return;
+        const wasLiked = isLiked(project.id);
+        setProject(previous => {
+            if (!previous || previous.id !== project.id) return previous;
+            return {
+                ...previous,
+                favoriteCount: Math.max(0, (previous.favoriteCount || 0) + (wasLiked ? -1 : 1))
+            };
+        });
+        onToggleFavorite(project.id);
+    }, [isLiked, onToggleFavorite, project, setProject]);
+
+    const handleMobileWikiNavigate = useCallback((slug: string) => {
+        if (!projectUrl) return;
+        pendingMobileWikiScrollRef.current = true;
+        navigate(`${projectUrl}/wiki/${slug}`);
+    }, [navigate, projectUrl]);
 
     const sanitizeDownloadName = (input: string) => input.replace(/[^a-zA-Z0-9.-]/g, '_');
 
@@ -521,6 +617,11 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         return [...(project?.versions || [])].sort((a: any, b: any) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
     }, [project?.versions]);
 
+    const versionPayloadPending = Boolean((isHistoryOpen || isDownloadOpen) && !project?.versions);
+    const galleryPayloadPending = Boolean(isGalleryRoute && !project?.galleryImages);
+    const navigationWikiData = wikiData?.mod?.pages?.length > 0 ? wikiData : displayWikiData;
+    const navigationWikiSlug = wikiPageSlug || displaySlug;
+
     const toggleExperimental = useCallback(() => {
         setShowExperimental((prev) => !prev);
     }, []);
@@ -543,6 +644,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         project.links?.DISCORD && { type: 'DISCORD', url: project.links.DISCORD, icon: DiscordIcon, label: 'Discord', colorClass: 'text-[#5865F2] hover:bg-[#5865F2]/20 border-[#5865F2]/20' },
         project.links?.WEBSITE && { type: 'WEBSITE', url: project.links.WEBSITE, icon: Globe, label: 'Website', colorClass: 'text-blue-500 dark:text-blue-400 hover:bg-blue-500/20 border-blue-500/20' }
     ].filter(Boolean) as any[];
+    const hasInlineGalleryCarousel = countGalleryCarouselMarkers(project.about || '') > 0;
 
     return (
         <>
@@ -590,7 +692,16 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                     isProcessing={processingDonation}
                 />
 
-                {isHistoryOpen && (
+                {(isHistoryOpen || isDownloadOpen) && versionPayloadPending && (
+                    <div className={theme.components.modalOverlay}>
+                        <div className={`${theme.components.modalContent} max-w-md`}>
+                            <div className="flex items-center justify-center p-12">
+                                <Spinner />
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {isHistoryOpen && !versionPayloadPending && (
                     <HistoryModal
                         show={isHistoryOpen}
                         onClose={() => navigate(projectUrl)}
@@ -601,7 +712,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                         hasStableVersions={hasStableBuilds}
                     />
                 )}
-                {isDownloadOpen && (
+                {isDownloadOpen && !versionPayloadPending && (
                     <DownloadModal
                         show={isDownloadOpen}
                         onClose={() => navigate(projectUrl)}
@@ -642,16 +753,16 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 headerActions={
                     <HeaderActions
                         project={project} currentUser={currentUser} isLiked={isLiked(project.id)} isFollowing={isFollowing} canEdit={Boolean(canEdit)} projectUrl={projectUrl}
-                        onToggleFavorite={() => onToggleFavorite(project.id)} onShare={() => setIsShareOpen(true)} onReport={() => setIsReportOpen(true)} onFollowToggle={handleFollowToggle}
+                        onToggleFavorite={handleProjectFavoriteToggle} onShare={() => setIsShareOpen(true)} onReport={() => setIsReportOpen(true)} onFollowToggle={handleFollowToggle}
                     />
                 }
                 headerContent={<HeaderContent project={project} currentUser={currentUser} isLiked={isLiked(project.id)} isFollowing={isFollowing} onFollowToggle={handleFollowToggle} canEdit={Boolean(canEdit)} projectUrl={projectUrl} onToggleFavorite={() => {}} onShare={() => {}} onReport={() => {}} />}
-                actionBar={<ActionBar project={project} projectUrl={projectUrl} latestDependencies={latestDependencies} depMeta={depMeta} links={links} isMobile={isMobile} commentsRef={commentsRef} />}
+                actionBar={<ActionBar project={project} projectUrl={projectUrl} links={links} commentsRef={commentsRef} showGalleryButton={!hasInlineGalleryCarousel} />}
                 sidebarContent={
                     isWikiRoute ? (
                         <>
                             <Suspense fallback={null}>
-                                <WikiSidebar tree={displayWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={displaySlug} indexSlug={displayWikiData?.mod?.index?.slug} />
+                                <WikiSidebar tree={navigationWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={navigationWikiSlug} indexSlug={navigationWikiData?.mod?.index?.slug} pageCache={navigationWikiData?.pageCache} />
                             </Suspense>
                             <div className="mt-4">
                                 <Link to={projectUrl} className={`block text-sm font-bold ${theme.colors.accent} hover:underline flex items-center gap-2`}>
@@ -660,72 +771,58 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                             </div>
                         </>
                     ) : (
-                        <Sidebar project={project} navigate={navigate} dependencies={latestDependencies} depMeta={depMeta} contributors={contributors} orgMembers={orgMembers} author={authorProfile} />
+                        <Sidebar project={project} dependencies={latestDependencies} incompatibleProjectIds={latestIncompatibleProjectIds} depMeta={depMeta} showMetaSections={!isMobile} contributors={contributors} orgMembers={orgMembers} author={authorProfile} />
                     )
                 }
                 mainContent={
                     isWikiRoute ? (
                         <Suspense fallback={<div className="flex justify-center p-12"><Spinner /></div>}>
+                            <WikiMobileNavigation tree={navigationWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={navigationWikiSlug} indexSlug={navigationWikiData?.mod?.index?.slug} onNavigate={handleMobileWikiNavigate} pageCache={navigationWikiData?.pageCache} />
                             <Wiki wikiLoading={wikiLoading} wikiError={wikiError} displayWikiData={displayWikiData} displaySlug={displaySlug} project={project} wikiContentRef={wikiContentRef} lockedHeight={lockedHeight} />
                         </Suspense>
                     ) : (
-                        <ViewDetails project={project} authorProfile={authorProfile} currentUser={currentUser} canEdit={Boolean(canEdit)} commentsRef={commentsRef} setProject={setProject} setStatusModal={setStatusModal} onRefresh={onRefresh} />
+                        <ViewDetails project={project} authorProfile={authorProfile} currentUser={currentUser} canEdit={Boolean(canEdit)} commentsRef={commentsRef} setProject={setProject} setStatusModal={setStatusModal} onRefresh={onRefresh} dependencies={latestDependencies} incompatibleProjectIds={latestIncompatibleProjectIds} depMeta={depMeta} showMetaSections={isMobile} />
                     )
                 }
             />
             {isGalleryRoute && typeof document !== 'undefined' && createPortal(
                 <div className={theme.components.modalOverlay} onClick={() => navigate(projectUrl)}>
                     <div
-                        className={`${theme.components.modalContent} w-full max-w-6xl h-[90dvh]`}
+                        className="relative w-full max-w-6xl"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className={theme.components.modalHeader}>
-                            <h2 className={`text-lg font-black ${theme.colors.textPrimary}`}>Gallery</h2>
-                            <button
-                                type="button"
-                                onClick={() => navigate(projectUrl)}
-                                className={`px-3 py-1.5 rounded-lg border ${theme.colors.border} ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} ${theme.colors.bgSurfaceHover} transition-colors text-sm font-bold`}
-                            >
-                                Close
-                            </button>
-                        </div>
-                        <div className={`${theme.components.modalBody} !p-0`}>
-                            {galleryImages.length > 0 ? (
-                                <div className="relative h-[72dvh] bg-black">
-                                    <img
-                                        src={galleryImages[galleryIndex]}
-                                        alt={`${project.title} gallery image ${galleryIndex + 1}`}
-                                        className="w-full h-full object-contain"
-                                        loading="eager"
-                                    />
-                                    {galleryImages.length > 1 && (
-                                        <>
-                                            <button
-                                                type="button"
-                                                aria-label="Previous image"
-                                                onClick={() => setGalleryIndex((prev) => (prev - 1 + galleryImages.length) % galleryImages.length)}
-                                                className="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/55 hover:bg-black/75 text-white transition-colors"
-                                            >
-                                                <ChevronLeft className="w-6 h-6" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                aria-label="Next image"
-                                                onClick={() => setGalleryIndex((prev) => (prev + 1) % galleryImages.length)}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/55 hover:bg-black/75 text-white transition-colors"
-                                            >
-                                                <ChevronRight className="w-6 h-6" />
-                                            </button>
-                                        </>
-                                    )}
-                                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 text-white text-sm font-semibold">
-                                        {galleryIndex + 1} / {galleryImages.length}
-                                    </div>
+                        {galleryPayloadPending ? (
+                            <div className={`${theme.components.modalContent} mx-auto max-w-md`}>
+                                <div className="flex items-center justify-center p-12">
+                                    <Spinner />
                                 </div>
-                            ) : (
-                                <div className={`p-10 text-center ${theme.colors.textMuted}`}>No images in this gallery.</div>
-                            )}
-                        </div>
+                            </div>
+                        ) : galleryItems.length > 0 ? (
+                            <>
+                                <button
+                                    type="button"
+                                    aria-label="Close gallery"
+                                    onClick={() => navigate(projectUrl)}
+                                    className="absolute right-3 top-3 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-blue-200/50 bg-blue-950/75 text-white shadow-lg backdrop-blur-sm transition-colors hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-modtale-accent"
+                                >
+                                    <X className="h-5 w-5" aria-hidden="true" />
+                                </button>
+                                <GalleryCarouselViewer
+                                    images={project.galleryImages}
+                                    captions={project.galleryImageCaptions}
+                                    title={project.title}
+                                    activeIndex={galleryIndex}
+                                    onActiveIndexChange={setGalleryIndex}
+                                    keyboardNavigationDirection="inverted"
+                                    className="mb-0 overflow-hidden rounded-2xl border border-blue-200 bg-slate-50 shadow-xl shadow-blue-950/20 dark:border-blue-400/20 dark:bg-[#0B1120]"
+                                    mediaClassName="relative aspect-video max-h-[calc(90dvh-8rem)] bg-slate-200 outline-none dark:bg-slate-950"
+                                />
+                            </>
+                        ) : (
+                            <div className={`${theme.components.modalContent} mx-auto max-w-md`}>
+                                <div className={`p-10 text-center ${theme.colors.textMuted}`}>No media in this gallery.</div>
+                            </div>
+                        )}
                     </div>
                 </div>,
                 document.body

@@ -23,8 +23,7 @@ let ogType = "website";
 
 if (isBot && handle) {
     try {
-        const userId = SiteRoutes.extractId(handle);
-        const res = await fetch(`${BACKEND_URL}/api/v1/user/profile/${userId}`);
+        const res = await fetch(`${BACKEND_URL}/api/v1/user/profile/${handle}`);
 
         if (res.ok) {
             userData = await res.json();

@@ -6,7 +6,7 @@ import net.modtale.model.finance.PlatformFinanceSettings;
 import net.modtale.model.project.Project;
 import net.modtale.repository.finance.AdCampaignRepository;
 import net.modtale.repository.finance.FinanceLedgerEntryRepository;
-import net.modtale.service.project.ProjectService;
+import net.modtale.service.project.query.ProjectService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;

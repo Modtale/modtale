@@ -4,8 +4,8 @@ import net.modtale.model.dto.request.finance.UpdatePlatformFinanceSettingsReques
 import net.modtale.model.user.User;
 import net.modtale.service.finance.EarningsAccountService;
 import net.modtale.service.finance.AdCampaignService;
-import net.modtale.service.security.AccessControlService;
-import net.modtale.service.user.AccountService;
+import net.modtale.service.security.access.AccessControlService;
+import net.modtale.service.user.account.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

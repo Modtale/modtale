@@ -2,10 +2,8 @@ package net.modtale.controller.system;
 
 import net.modtale.config.properties.AppBackendProperties;
 import net.modtale.config.properties.AppFrontendProperties;
+import net.modtale.model.dto.response.system.ClientMetadataView;
 import org.junit.jupiter.api.Test;
-
-import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -18,10 +16,10 @@ class ClientMetadataControllerTest {
                 new AppFrontendProperties("https://modtale.test")
         );
 
-        Map<String, Object> metadata = controller.getClientMetadata();
+        ClientMetadataView metadata = controller.getClientMetadata();
 
-        assertEquals("https://api.modtale.test/client-metadata.json", metadata.get("client_id"));
-        assertEquals("https://api.modtale.test/login/oauth2/code/bluesky", ((List<?>) metadata.get("redirect_uris")).getFirst());
-        assertEquals("https://modtale.test/assets/logo.svg", metadata.get("logo_uri"));
+        assertEquals("https://api.modtale.test/client-metadata.json", metadata.clientId());
+        assertEquals("https://api.modtale.test/login/oauth2/code/bluesky", metadata.redirectUris().getFirst());
+        assertEquals("https://modtale.test/assets/logo.svg", metadata.logoUri());
     }
 }

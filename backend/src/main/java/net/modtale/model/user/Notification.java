@@ -1,12 +1,12 @@
 package net.modtale.model.user;
 
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
-import org.springframework.data.mongodb.core.mapping.Document;
 import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document(collection = "notifications")
 public class Notification {
@@ -25,7 +25,7 @@ public class Notification {
     private NotificationType type;
     private Map<String, String> metadata = new HashMap<>();
 
-    @Indexed(expireAfterSeconds = 2592000)
+    @Indexed(expireAfter = "30d")
     private LocalDateTime createdAt;
 
     public Notification() {}

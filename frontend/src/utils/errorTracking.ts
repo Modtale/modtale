@@ -26,7 +26,9 @@ export const initErrorTracking = async () => {
 };
 
 export const captureError = async (error: unknown, context?: Record<string, any>) => {
-    console.error("Caught Error:", error);
+    if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
+        console.error("Caught Error:", error);
+    }
     try {
         const Sentry = await loadSentry();
         Sentry.captureException(error, {

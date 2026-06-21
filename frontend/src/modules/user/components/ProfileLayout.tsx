@@ -65,7 +65,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
     const displayTitle = user.username;
     const linkedAccounts = (user.connectedAccounts || []).filter(a => a.visible);
 
-    const containerClasses = isEditing ? "w-full px-6" : "max-w-[112rem] px-4 sm:px-12 md:px-16 lg:px-28 mx-auto";
+    const containerClasses = isEditing ? "w-full px-6" : "max-w-[112rem] px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 mx-auto";
     const glassCardMargin = isEditing ? "-mt-8 md:-mt-16" : "-mt-2 md:-mt-32";
     const avatarMargin = isEditing ? "md:-mt-12 ml-2" : "md:-mt-24 ml-2";
 

@@ -2,27 +2,26 @@ package net.modtale.controller.analytics;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.Pattern;
-import net.modtale.model.analytics.CreatorAnalytics;
-import net.modtale.model.analytics.ProjectAnalyticsDetail;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import net.modtale.model.dto.response.analytics.CreatorAnalyticsView;
+import net.modtale.model.dto.response.analytics.ProjectAnalyticsDetailView;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.User;
 import net.modtale.service.analytics.AnalyticsAccessService;
 import net.modtale.service.analytics.AnalyticsEligibilityService;
 import net.modtale.service.analytics.QueryService;
 import net.modtale.service.analytics.TrackingService;
-import net.modtale.service.project.ProjectService;
-import net.modtale.service.user.AccountService;
+import net.modtale.service.project.query.ProjectService;
+import net.modtale.service.user.account.AccountService;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.time.Duration;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 @RestController
 @Validated
@@ -64,7 +63,7 @@ public class AnalyticsController {
 
     @GetMapping("/user/analytics")
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
-    public ResponseEntity<CreatorAnalytics> getCreatorAnalytics(
+    public ResponseEntity<CreatorAnalyticsView> getCreatorAnalytics(
             @RequestParam(defaultValue = "30d")
             @Pattern(regexp = "7d|30d|90d|1y", message = "Analytics ranges must be 7d, 30d, 90d, or 1y.")
             String range,
@@ -73,13 +72,15 @@ public class AnalyticsController {
     ) {
         User currentUser = accountService.requireCurrentUser("viewing creator analytics");
         String resolvedTargetId = analyticsAccessService.resolveCreatorAnalyticsTargetId(currentUser, userId);
-        CreatorAnalytics data = queryService.getCreatorDashboard(resolvedTargetId, range, include);
-        return ResponseEntity.ok().cacheControl(CacheControl.maxAge(getSecondsUntilMidnight(), TimeUnit.SECONDS).cachePrivate()).body(data);
+        var data = queryService.getCreatorDashboard(resolvedTargetId, range, include);
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.maxAge(getSecondsUntilMidnight(), TimeUnit.SECONDS).cachePrivate())
+                .body(CreatorAnalyticsView.from(data));
     }
 
     @GetMapping("/projects/{id}/analytics")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_READ', authentication)")
-    public ResponseEntity<ProjectAnalyticsDetail> getProjectAnalytics(
+    public ResponseEntity<ProjectAnalyticsDetailView> getProjectAnalytics(
             @PathVariable String id,
             @RequestParam(defaultValue = "30d")
             @Pattern(regexp = "7d|30d|90d|1y", message = "Analytics ranges must be 7d, 30d, 90d, or 1y.")
@@ -90,8 +91,10 @@ public class AnalyticsController {
         Project project = projectService.getProjectById(id, user);
         analyticsAccessService.assertProjectAnalyticsAccess(project, user);
         String projectId = (project != null) ? project.getId() : id;
-        ProjectAnalyticsDetail data = queryService.getProjectAnalytics(projectId, user != null ? user.getUsername() : "anon", range);
-        return ResponseEntity.ok().cacheControl(CacheControl.maxAge(getSecondsUntilMidnight(), TimeUnit.SECONDS).cachePrivate()).body(data);
+        var data = queryService.getProjectAnalytics(projectId, user != null ? user.getUsername() : "anon", range);
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.maxAge(getSecondsUntilMidnight(), TimeUnit.SECONDS).cachePrivate())
+                .body(ProjectAnalyticsDetailView.from(data));
     }
 
     @PostMapping({"/analytics/view/{id}", "/views/project/{id}"})

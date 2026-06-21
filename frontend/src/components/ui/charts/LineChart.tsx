@@ -15,7 +15,7 @@ interface Dataset {
 
 interface LineChartProps {
     datasets: Dataset[];
-    onToggle?: (id: string) => void;
+    onToggle?: (id: string, hidden: boolean) => void;
     yAxisFormatter?: (val: number) => string;
 }
 
@@ -147,7 +147,7 @@ export const LineChart: React.FC<LineChartProps> = ({ datasets, onToggle, yAxisF
                 {normalizedDatasets.map(d => (
                     <button
                         key={d.id}
-                        onClick={() => onToggle && onToggle(d.id)}
+                        onClick={() => onToggle && onToggle(d.id, !d.hidden)}
                         className={`flex items-center gap-2 text-[11px] font-bold px-3 py-1.5 rounded-full transition-all border ${
                             d.hidden
                                 ? 'bg-transparent text-slate-400 border-slate-300 dark:border-white/10 border-dashed hover:border-slate-400 dark:hover:border-white/20'

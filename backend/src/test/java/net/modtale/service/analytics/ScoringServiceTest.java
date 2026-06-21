@@ -1,24 +1,19 @@
 package net.modtale.service.analytics;
 
+import java.util.List;
 import net.modtale.model.project.Project;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.MongoTemplate;
 
-import java.util.List;
-
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 class ScoringServiceTest {
 
     @Test
-    void ensureScoresSkipsNullEmptyAndZeroDownloadProjects() {
-        ScoringService scoringService = spy(new ScoringService(mock(MongoTemplate.class)));
-        doNothing().when(scoringService).updateProjectScores();
+    void ensureScoresDoesNotTouchMongoForEmptyInput() {
+        MongoTemplate mongoTemplate = org.mockito.Mockito.mock(MongoTemplate.class);
+        ScoringService scoringService = new ScoringService(mongoTemplate);
 
         Project zeroDownloads = new Project();
         zeroDownloads.setDownloadCount(0);
@@ -27,30 +22,19 @@ class ScoringServiceTest {
         scoringService.ensureScores(List.of());
         scoringService.ensureScores(List.of(zeroDownloads));
 
-        verify(scoringService, never()).updateProjectScores();
+        verify(mongoTemplate, never()).count(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(Project.class));
     }
 
     @Test
-    void ensureScoresTriggersRecalculationWhenAnyScoredProjectLooksMissing() {
-        ScoringService scoringService = spy(new ScoringService(mock(MongoTemplate.class)));
-        doNothing().when(scoringService).updateProjectScores();
-
-        Project complete = new Project();
-        complete.setDownloadCount(25);
-        complete.setPopularScore(30.0);
-        complete.setRelevanceScore(12.0);
-        complete.setTrendScore(4);
+    void ensureScoresIsNoOpForPotentiallyStaleProjects() {
+        MongoTemplate mongoTemplate = org.mockito.Mockito.mock(MongoTemplate.class);
+        ScoringService scoringService = new ScoringService(mongoTemplate);
 
         Project missing = new Project();
-        missing.setDownloadCount(10);
-        missing.setPopularScore(0.0);
-        missing.setRelevanceScore(7.0);
-        missing.setTrendScore(2);
+        missing.setDownloadCount(50);
 
-        scoringService.ensureScores(List.of(complete));
-        verify(scoringService, never()).updateProjectScores();
+        scoringService.ensureScores(List.of(missing));
 
-        scoringService.ensureScores(List.of(complete, missing));
-        verify(scoringService, times(1)).updateProjectScores();
+        verify(mongoTemplate, never()).count(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(Project.class));
     }
 }

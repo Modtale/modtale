@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Flag, ExternalLink, Check, X, ShieldAlert, MessageSquare, User as UserIcon, Filter } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
 import { extractApiErrorMessage } from '@/utils/api';
+import { SiteRoutes } from '@/utils/routes';
 import type { Report } from '@/types';
 
 interface ReportQueueProps {
@@ -65,7 +66,12 @@ export function ReportQueue({ reports: initialReports, onRefresh }: ReportQueueP
 
     const getTargetLink = (report: Report) => {
         if (report.targetType === 'USER') return `/creator/${report.targetSummary}`;
-        if (report.targetType === 'PROJECT') return `/mod/${report.targetId}`;
+        if (report.targetType === 'PROJECT') {
+            return SiteRoutes.project({
+                id: report.targetId,
+                title: report.targetSummary || report.targetId,
+            });
+        }
         return '#';
     };
 

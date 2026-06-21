@@ -41,4 +41,34 @@ describe('MarkdownRichRenderer', () => {
         expect(paragraph?.style.textAlign).toBe('center');
         expect(paragraph?.style.color).toBe('');
     });
+
+    it('renders youtube iframes with a canonical nocookie embed source', async () => {
+        await act(async () => {
+            root.render(<MarkdownRichRenderer content={'<iframe src="https://www.youtube.com/watch?v=dQw4w9WgXcQ" title="Launch trailer"></iframe>'} />);
+        });
+
+        const iframe = container.querySelector('iframe');
+        expect(iframe).not.toBeNull();
+        expect(iframe?.getAttribute('src')).toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
+        expect(iframe?.getAttribute('title')).toBe('Launch trailer');
+        expect(iframe?.getAttribute('allow')).toContain('picture-in-picture');
+    });
+
+    it('removes non-youtube iframes', async () => {
+        await act(async () => {
+            root.render(<MarkdownRichRenderer content={'<iframe src="https://example.com/embed/unsafe"></iframe>'} />);
+        });
+
+        expect(container.querySelector('iframe')).toBeNull();
+    });
+
+    it('renders markdown images for externally hosted gallery media', async () => {
+        await act(async () => {
+            root.render(<MarkdownRichRenderer content={'![Gallery build](https://cdn.modtale.net/gallery/build.png)'} />);
+        });
+
+        const image = container.querySelector('img[alt="Gallery build"]') as HTMLImageElement | null;
+        expect(image).not.toBeNull();
+        expect(image?.getAttribute('src')).toBe('https://cdn.modtale.net/gallery/build.png');
+    });
 });

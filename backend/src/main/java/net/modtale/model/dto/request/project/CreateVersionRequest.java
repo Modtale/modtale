@@ -1,11 +1,10 @@
 package net.modtale.model.dto.request.project;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
-import org.springframework.web.multipart.MultipartFile;
-
 import java.util.List;
+import net.modtale.model.project.ProjectVersion;
+import org.springframework.web.multipart.MultipartFile;
 
 public class CreateVersionRequest {
 
@@ -15,15 +14,13 @@ public class CreateVersionRequest {
     private List<@NotBlank(message = "Game version entries cannot be blank.") String> gameVersions;
     private MultipartFile file;
     private List<@NotBlank(message = "Dependency entries cannot be blank.") String> modIds;
+    private List<@NotBlank(message = "Incompatible project entries cannot be blank.") String> incompatibleProjectIds;
 
     @Size(max = 50000, message = "Version changelogs cannot exceed 50,000 characters.")
     private String changelog;
 
-    @Pattern(
-            regexp = "(?i)RELEASE|BETA|ALPHA",
-            message = "Version channels must be RELEASE, BETA, or ALPHA."
-    )
-    private String channel = "RELEASE";
+    private ProjectVersion.Channel channel = ProjectVersion.Channel.RELEASE;
+    private boolean replaceExisting;
 
     public String getVersionNumber() {
         return versionNumber;
@@ -57,6 +54,14 @@ public class CreateVersionRequest {
         this.modIds = modIds;
     }
 
+    public List<String> getIncompatibleProjectIds() {
+        return incompatibleProjectIds;
+    }
+
+    public void setIncompatibleProjectIds(List<String> incompatibleProjectIds) {
+        this.incompatibleProjectIds = incompatibleProjectIds;
+    }
+
     public String getChangelog() {
         return changelog;
     }
@@ -65,11 +70,19 @@ public class CreateVersionRequest {
         this.changelog = changelog;
     }
 
-    public String getChannel() {
+    public ProjectVersion.Channel getChannel() {
         return channel;
     }
 
-    public void setChannel(String channel) {
+    public void setChannel(ProjectVersion.Channel channel) {
         this.channel = channel;
+    }
+
+    public boolean isReplaceExisting() {
+        return replaceExisting;
+    }
+
+    public void setReplaceExisting(boolean replaceExisting) {
+        this.replaceExisting = replaceExisting;
     }
 }

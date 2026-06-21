@@ -1,0 +1,14 @@
+{
+  "name": "modtale-mock-db",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "node scripts/generate-from-mongo.mjs",
+    "collect-r2-keys": "node scripts/collect-r2-seed-keys.mjs",
+    "load-template": "node scripts/load-template-db.mjs",
+    "validate": "node scripts/validate-fixtures.mjs"
+  },
+  "dependencies": {
+    "mongodb": "^6.12.0"
+  }
+}

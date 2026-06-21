@@ -5,6 +5,7 @@ import { api } from '@/utils/api';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { LineChart } from '@/components/ui/charts/LineChart';
 import { BarChart } from '@/components/ui/charts/BarChart';
+import { useChartVisibility } from '@/components/ui/charts/chartVisibility';
 import { COLORS, OVERALL_COLOR, BUFFER, sliceData, calculateWoW, calculateRollingAverage } from '@/utils/analytics';
 import { formatDateTime } from '@/utils/modHelpers';
 import type { Project, User } from '@/types';
@@ -44,8 +45,7 @@ export const Analytics: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [range, setRange] = useState('30d');
     const [hasProjects, setHasProjects] = useState(true);
-    const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({});
-    const [hiddenGrowth, setHiddenGrowth] = useState<Record<string, boolean>>({});
+    const { isHidden, setSeriesHidden, toggleHandler } = useChartVisibility();
 
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [myOrgs, setMyOrgs] = useState<User[]>([]);
@@ -176,13 +176,14 @@ export const Analytics: React.FC = () => {
                 } else {
                     const [analytics, info] = await Promise.all([
                         api.get(`/projects/${id}/analytics?range=${range}`),
-                        api.get(`/projects/${id}`)
+                        api.get(`/projects/${id}/details`)
                     ]).then(r => [r[0].data, r[1].data as Project]);
                     const versionDownloads = normalizeSeriesMap(analytics?.versionDownloads);
                     const views = normalizePointSeries(analytics?.views);
                     setMeta({ title: info.title, subtitle: "Project Performance & Reach" });
 
-                    const vMap = new Map(info.versions.map((v: { id: any; }) => [v.id, v]));
+                    const versions = info.versions || [];
+                    const vMap = new Map(versions.map((v: { id: any; }) => [v.id, v]));
                     setSeriesData(versionDownloads);
                     setViewsData({ 'overall': views });
                     setItems(Object.keys(versionDownloads).sort((a, b) => {
@@ -192,7 +193,7 @@ export const Analytics: React.FC = () => {
                     }));
 
                     const vMeta: Record<string, any> = {};
-                    info.versions.forEach((v: { id: string | number; versionNumber: any; gameVersions: any[]; releaseDate: any; downloadCount: any; }) => vMeta[v.id] = {
+                    versions.forEach((v: { id: string | number; versionNumber: any; gameVersions: any[]; releaseDate: any; downloadCount: any; }) => vMeta[v.id] = {
                         label: v.versionNumber,
                         gameVer: v.gameVersions?.join(', ') || 'Unknown',
                         date: v.releaseDate,
@@ -206,7 +207,7 @@ export const Analytics: React.FC = () => {
                         downloads: { value: analytics.totalDownloads, total: info.downloadCount, trend: 0 },
                         views: { value: analytics.totalViews, total: analytics.totalViews, trend: 0 },
                         conversion: analytics.totalViews > 0 ? (analytics.totalDownloads / analytics.totalViews) * 100 : 0,
-                        contentCount: { value: info.versions.length, label: "Versions" }
+                        contentCount: { value: versions.length, label: "Versions" }
                     });
 
                     setTableConfig({
@@ -214,7 +215,7 @@ export const Analytics: React.FC = () => {
                         rowRenderer: (vid, sum) => (
                             <>
                                 <td className="p-4 font-bold text-slate-900 dark:text-white flex items-center gap-2 pl-6">
-                                    <span className={`w-2.5 h-2.5 rounded-full inline-block mr-2 shadow-sm`} style={{ backgroundColor: hiddenSeries[vid] ? '#cbd5e1' : COLORS[items.indexOf(vid) % COLORS.length] }} />
+                                    <span className={`w-2.5 h-2.5 rounded-full inline-block mr-2 shadow-sm`} style={{ backgroundColor: isHidden('downloads', vid) ? '#cbd5e1' : COLORS[items.indexOf(vid) % COLORS.length] }} />
                                     {vMeta[vid]?.label || (vid === 'Unknown' ? 'Legacy' : vid.substring(0, 8))}
                                 </td>
                                 <td className="p-4 text-slate-600 dark:text-slate-300 font-mono">+{sum.toLocaleString()}</td>
@@ -233,7 +234,8 @@ export const Analytics: React.FC = () => {
                     });
                 }
 
-                setHiddenSeries(prev => { const next = { ...prev, 'overall': false }; return next; });
+                setSeriesHidden('downloads', 'overall', false);
+                setSeriesHidden('views', 'overall', false);
 
             } catch (e) {
                 console.error(e);
@@ -356,33 +358,33 @@ export const Analytics: React.FC = () => {
 
     const chartDatasets = {
         downloads: [
-            { id: 'overall', label: 'Overall', color: OVERALL_COLOR, data: sliceData(overallDownloads), hidden: !!hiddenSeries['overall'] },
-            { id: 'overallAvg7', label: 'Overall 7d Avg', color: '#14b8a6', data: sliceData(overallDownloadsAvg7), hidden: hiddenSeries['overallAvg7'] ?? true },
-            { id: 'overallAvg30', label: 'Overall 30d Avg', color: '#f97316', data: sliceData(overallDownloadsAvg30), hidden: hiddenSeries['overallAvg30'] ?? true },
+            { id: 'overall', label: 'Overall', color: OVERALL_COLOR, data: sliceData(overallDownloads), hidden: isHidden('downloads', 'overall') },
+            { id: 'overallAvg7', label: 'Overall 7d Avg', color: '#14b8a6', data: sliceData(overallDownloadsAvg7), hidden: isHidden('downloads', 'overallAvg7', true) },
+            { id: 'overallAvg30', label: 'Overall 30d Avg', color: '#f97316', data: sliceData(overallDownloadsAvg30), hidden: isHidden('downloads', 'overallAvg30', true) },
             ...items.map((key, i) => ({
                 id: key, label: itemMeta[key]?.title || itemMeta[key]?.label || key, color: COLORS[i % COLORS.length],
                 data: sliceData(seriesData[key]?.map((d: any) => ({ date: d.date, value: d.count })) || []),
-                hidden: !!hiddenSeries[key] || (i >= 5 && hiddenSeries[key] === undefined)
+                hidden: isHidden('downloads', key, i >= 5)
             }))
         ],
         views: [
-            { id: 'overall', label: 'Total Views', color: '#3b82f6', data: sliceData(overallViews), hidden: !!hiddenSeries['overall'] },
-            { id: 'viewsAvg7', label: 'Views 7d Avg', color: '#14b8a6', data: sliceData(overallViewsAvg7), hidden: hiddenSeries['viewsAvg7'] ?? true },
-            { id: 'viewsAvg30', label: 'Views 30d Avg', color: '#f97316', data: sliceData(overallViewsAvg30), hidden: hiddenSeries['viewsAvg30'] ?? true },
+            { id: 'overall', label: 'Total Views', color: '#3b82f6', data: sliceData(overallViews), hidden: isHidden('views', 'overall') },
+            { id: 'viewsAvg7', label: 'Views 7d Avg', color: '#14b8a6', data: sliceData(overallViewsAvg7), hidden: isHidden('views', 'viewsAvg7', true) },
+            { id: 'viewsAvg30', label: 'Views 30d Avg', color: '#f97316', data: sliceData(overallViewsAvg30), hidden: isHidden('views', 'viewsAvg30', true) },
             ...items.map((key, i) => ({
                 id: key,
                 label: itemMeta[key]?.title || itemMeta[key]?.label || key,
                 color: COLORS[i % COLORS.length],
                 data: sliceData(viewsData[key]?.map((d: any) => ({ date: d.date, value: d.count })) || []),
-                hidden: !!hiddenSeries[key] || (i >= 5 && hiddenSeries[key] === undefined)
+                hidden: isHidden('views', key, i >= 5)
             }))
         ],
         growth: [
-            { id: 'overall', label: 'Overall Momentum', color: '#10b981', data: sliceData(calculateWoW(overallDownloads)), hidden: !!hiddenGrowth['overall'] },
+            { id: 'overall', label: 'Overall Momentum', color: '#10b981', data: sliceData(calculateWoW(overallDownloads)), hidden: isHidden('momentum', 'overall') },
             ...items.map((key, i) => ({
                 id: key, label: itemMeta[key]?.title || itemMeta[key]?.label || key, color: COLORS[i % COLORS.length],
                 data: sliceData(calculateWoW(seriesData[key]?.map((d: any) => ({ date: d.date, value: d.count })) || [])),
-                hidden: !!hiddenGrowth[key] || true
+                hidden: isHidden('momentum', key, true)
             }))
         ],
         fourthMetric: fourthChart ? {
@@ -391,7 +393,7 @@ export const Analytics: React.FC = () => {
                 ? (fourthChart.data || []).map((d: any) => ({
                     ...d,
                     color: d.id === 'overall' ? OVERALL_COLOR : COLORS[items.indexOf(d.id) % COLORS.length],
-                    hidden: !!hiddenSeries[d.id]
+                    hidden: isHidden('breakdown', d.id)
                 }))
                 : fourthChart.data
         } : null
@@ -465,7 +467,7 @@ export const Analytics: React.FC = () => {
                             </div>
                         </div>
                         <div className="flex-1 min-h-0 px-6 pb-6">
-                            <LineChart datasets={chartDatasets.downloads} onToggle={(sid) => setHiddenSeries(p => ({ ...p, [sid]: !p[sid] }))} />
+                            <LineChart datasets={chartDatasets.downloads} onToggle={toggleHandler('downloads')} />
                         </div>
                     </div>
 
@@ -478,7 +480,7 @@ export const Analytics: React.FC = () => {
                             </div>
                         </div>
                         <div className="flex-1 min-h-0 px-6 pb-6">
-                            <LineChart datasets={chartDatasets.views} onToggle={(sid) => setHiddenSeries(p => ({ ...p, [sid]: !p[sid] }))} />
+                            <LineChart datasets={chartDatasets.views} onToggle={toggleHandler('views')} />
                         </div>
                     </div>
 
@@ -491,7 +493,7 @@ export const Analytics: React.FC = () => {
                             </div>
                         </div>
                         <div className="flex-1 min-h-0 px-6 pb-6">
-                            <LineChart datasets={chartDatasets.growth} onToggle={(sid) => setHiddenGrowth(p => ({ ...p, [sid]: !p[sid] }))} yAxisFormatter={(val) => `${val > 0 ? '+' : ''}${Math.round(val)}%`} />
+                            <LineChart datasets={chartDatasets.growth} onToggle={toggleHandler('momentum')} yAxisFormatter={(val) => `${val > 0 ? '+' : ''}${Math.round(val)}%`} />
                         </div>
                     </div>
 
@@ -507,7 +509,7 @@ export const Analytics: React.FC = () => {
                             <div className="flex-1 min-h-0 px-6 pb-6">
                                 {chartDatasets.fourthMetric.type === 'line' ?
                                     <LineChart datasets={chartDatasets.fourthMetric.data} /> :
-                                    <BarChart data={chartDatasets.fourthMetric.data} formatter={chartDatasets.fourthMetric.formatter} onToggle={(sid) => setHiddenSeries(p => ({ ...p, [sid]: !p[sid] }))} />
+                                    <BarChart data={chartDatasets.fourthMetric.data} formatter={chartDatasets.fourthMetric.formatter} onToggle={toggleHandler('breakdown')} />
                                 }
                             </div>
                         </div>

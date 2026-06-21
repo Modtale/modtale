@@ -1,13 +1,12 @@
 package net.modtale.service.storage;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
-import net.modtale.service.project.ProjectService;
+import net.modtale.service.project.query.ProjectService;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
 
 final class DownloadArchiveSupport {
 

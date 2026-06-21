@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Share2, X, Copy, Check, Twitter, Facebook, Link as LinkIcon } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { useScrollLock } from '@/hooks/useScrollLock';
+import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface ShareModalProps {
     isOpen: boolean;
@@ -41,6 +42,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, url, ti
     ];
 
     return (
+        <ModalPortal>
         <div className={theme.components.modalOverlay} onClick={onClose}>
             <div className={`${theme.components.modalContent} max-w-md`} onClick={e => e.stopPropagation()}>
                 <div className={theme.components.modalHeader}>
@@ -91,5 +93,6 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, url, ti
                 </div>
             </div>
         </div>
+        </ModalPortal>
     );
 };

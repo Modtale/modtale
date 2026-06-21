@@ -7,6 +7,7 @@ import { SSRProvider } from '@/context/SSRContext';
 import { MobileProvider } from '@/context/MobileContext';
 import { Browse } from '@/modules/discovery/views/Browse';
 import { discoveryClient } from '@/modules/discovery/api/discoveryClient';
+import { BROWSE_ITEMS_PER_PAGE_STORAGE_KEY } from '@/modules/discovery/preferences';
 
 vi.mock('@/modules/discovery/api/discoveryClient', () => ({
     discoveryClient: {
@@ -16,7 +17,8 @@ vi.mock('@/modules/discovery/api/discoveryClient', () => ({
 }));
 
 vi.mock('@/modules/project/components/ProjectCard', () => ({
-    ProjectCard: ({ project }: any) => <div data-project-id={project.id}>{project.title}</div>
+    ProjectCard: ({ project }: any) => <div data-project-id={project.id}>{project.title}</div>,
+    ProjectCardSkeletons: () => <div data-testid="project-card-skeletons" />
 }));
 
 const mockedDiscoveryClient = vi.mocked(discoveryClient);
@@ -38,6 +40,7 @@ describe('Browse SSR fallback recovery', () => {
         document.body.appendChild(container);
         root = createRoot(container);
         vi.clearAllMocks();
+        window.localStorage.clear();
 
         class MockObserver {
             observe() {}
@@ -105,5 +108,78 @@ describe('Browse SSR fallback recovery', () => {
         expect(mockedDiscoveryClient.searchProjects).toHaveBeenCalledTimes(1);
         expect(container.textContent).toContain('Skyforge Utilities');
         expect(container.textContent).not.toContain('No matches found');
+    });
+
+    it('keeps the My Favorites browse view wired to the favorites category request', async () => {
+        mockedDiscoveryClient.searchProjects.mockResolvedValue({
+            content: [{
+                id: 'project-1',
+                slug: 'skyforge-1',
+                title: 'Skyforge Utilities',
+                imageUrl: '/assets/favicon.svg'
+            }],
+            totalPages: 1,
+            totalElements: 1
+        } as any);
+
+        await act(async () => {
+            root.render(
+                <SSRProvider data={{}} initialPath="/mods?category=favorites">
+                    <HelmetProvider>
+                        <MobileProvider>
+                            <MemoryRouter initialEntries={['/mods?category=favorites']}>
+                                <Browse likedProjectIds={['project-1']} onToggleFavorite={vi.fn()} isLoggedIn={true} />
+                            </MemoryRouter>
+                        </MobileProvider>
+                    </HelmetProvider>
+                </SSRProvider>
+            );
+        });
+
+        await settle(12);
+
+        expect(container.textContent).toContain('My Favorites');
+        const browseLinks = Array.from(container.querySelectorAll('a')).map(link => link.textContent?.trim());
+        expect(browseLinks.indexOf('Recently Updated')).toBeLessThan(browseLinks.indexOf('My Favorites'));
+        expect(mockedDiscoveryClient.searchProjects).toHaveBeenCalledWith(
+            expect.objectContaining({ category: 'favorites' }),
+            expect.any(AbortSignal)
+        );
+        expect(container.textContent).toContain('Skyforge Utilities');
+    });
+
+    it('uses the saved results-per-page preference for the initial browse request', async () => {
+        window.localStorage.setItem(BROWSE_ITEMS_PER_PAGE_STORAGE_KEY, '24');
+        mockedDiscoveryClient.searchProjects.mockResolvedValue({
+            content: [{
+                id: 'project-1',
+                slug: 'skyforge-1',
+                title: 'Skyforge Utilities',
+                imageUrl: '/assets/favicon.svg'
+            }],
+            totalPages: 1,
+            totalElements: 1
+        } as any);
+
+        await act(async () => {
+            root.render(
+                <SSRProvider data={{}} initialPath="/mods">
+                    <HelmetProvider>
+                        <MobileProvider>
+                            <MemoryRouter initialEntries={['/mods']}>
+                                <Browse likedProjectIds={[]} onToggleFavorite={vi.fn()} isLoggedIn={false} />
+                            </MemoryRouter>
+                        </MobileProvider>
+                    </HelmetProvider>
+                </SSRProvider>
+            );
+        });
+
+        await settle(12);
+
+        expect(mockedDiscoveryClient.searchProjects).toHaveBeenCalledWith(
+            expect.objectContaining({ size: 24 }),
+            expect.any(AbortSignal)
+        );
     });
 });

@@ -2,6 +2,8 @@ package net.modtale.controller.project;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.io.IOException;
+import java.util.List;
 import net.modtale.model.dto.project.ManifestInspectionResult;
 import net.modtale.model.dto.request.project.CreateVersionRequest;
 import net.modtale.model.dto.request.project.UpdateVersionRequest;
@@ -9,9 +11,9 @@ import net.modtale.model.dto.response.project.BundleDownloadUrlResponse;
 import net.modtale.model.dto.response.project.DownloadUrlResponse;
 import net.modtale.model.dto.response.project.VersionDependenciesView;
 import net.modtale.model.user.User;
-import net.modtale.service.project.VersionApplicationService;
-import net.modtale.service.project.VersionDownloadPayload;
-import net.modtale.service.user.AccountService;
+import net.modtale.service.project.version.VersionApplicationService;
+import net.modtale.service.project.version.VersionDownloadPayload;
+import net.modtale.service.user.account.AccountService;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -30,9 +32,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.io.IOException;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1")
