@@ -279,17 +279,41 @@ function sanitizeVersion(version, projectId, selectedProjectIds) {
   const versionId = String(sourceVersionId);
   const dependencies = Array.isArray(version?.dependencies)
     ? version.dependencies
-        .map((dependency) => {
-          const sourceDependencyId = dependency?.modId || dependency?.projectId;
+        .map((dependency, index) => {
+          if (dependency?.source && String(dependency.source).toUpperCase() !== 'MODTALE') {
+            return null;
+          }
+
+          const sourceDependencyId = dependency?.projectId ?? dependency?.modId;
           if (!sourceDependencyId || !selectedProjectIds.has(String(sourceDependencyId))) {
             return null;
           }
+
+          const dependencyProjectId = String(sourceDependencyId);
+          const dependencyVersion = String(dependency.versionNumber || '1.0.0').slice(0, 32);
+          const rawDependencyType = dependency?.dependencyType == null
+            ? ''
+            : String(dependency.dependencyType).toUpperCase();
+          const dependencyType = ['REQUIRED', 'OPTIONAL', 'EMBEDDED'].includes(rawDependencyType)
+            ? rawDependencyType
+            : dependency?.isEmbedded
+              ? 'EMBEDDED'
+              : Boolean(dependency?.isOptional ?? dependency?.optional)
+                ? 'OPTIONAL'
+                : 'REQUIRED';
+
           return {
-            modId: String(sourceDependencyId),
-            modTitle: String(dependency.modTitle || dependency.projectTitle || 'Dependency'),
-            versionNumber: String(dependency.versionNumber || '1.0.0'),
-            isOptional: Boolean(dependency.isOptional ?? dependency.optional),
-            isEmbedded: false
+            id: boundedString(
+              dependency?.id == null ? undefined : String(dependency.id),
+              `mock-dependency-${hash(`${versionId}:${dependencyProjectId}:${dependencyVersion}:${index}`, 18)}`,
+              120
+            ),
+            projectId: dependencyProjectId,
+            projectTitle: String(dependency.projectTitle || dependency.modTitle || dependency.title || 'Dependency').slice(0, 120),
+            versionNumber: dependencyVersion,
+            source: 'MODTALE',
+            hytaleProjectConfirmed: Boolean(dependency?.hytaleProjectConfirmed),
+            dependencyType
           };
         })
         .filter(Boolean)
@@ -373,7 +397,7 @@ function sanitizeProject(project, index, selectedProjectIds, authorIdMap) {
   const classification = classifications.includes(project.classification) ? project.classification : 'PLUGIN';
   const color = ['2563eb', '16a34a', 'be123c', '0891b2', 'f59e0b'][index % 5];
   const versions = Array.isArray(project.versions)
-    ? project.versions.slice(0, 4).map((version) => sanitizeVersion(version, id, selectedProjectIds))
+    ? project.versions.map((version) => sanitizeVersion(version, id, selectedProjectIds))
     : [];
 
   return {
