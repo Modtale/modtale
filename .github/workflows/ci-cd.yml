@@ -50,6 +50,12 @@ jobs:
         run: |
           BRANCH_NAME=${GITHUB_REF#refs/heads/}
           echo "Detected branch: $BRANCH_NAME"
+          BRANCH_SLUG=$(echo "$BRANCH_NAME" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]' | sed 's/--*/-/g' | cut -c 1-20 | sed 's/^-//;s/-$//')
+          if [ -z "$BRANCH_SLUG" ]; then
+            BRANCH_SLUG="${GITHUB_SHA:0:7}"
+          fi
+          echo "GIT_BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+          echo "BRANCH_SLUG=$BRANCH_SLUG" >> $GITHUB_ENV
           
           if [ "$BRANCH_NAME" = "main" ]; then
             echo "ENV_TYPE=prod" >> $GITHUB_ENV
@@ -102,10 +108,7 @@ jobs:
             echo "WARDEN_SECRET_NAME=WARDEN_API_KEY" >> $GITHUB_ENV
           
           else
-            SLUG=$(echo $BRANCH_NAME | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]' | sed 's/--*/-/g' | cut -c 1-20 | sed 's/^-//;s/-$//')
-            if [ -z "$SLUG" ]; then
-              SLUG="${GITHUB_SHA:0:7}"
-            fi
+            SLUG="$BRANCH_SLUG"
             echo "ENV_TYPE=preview" >> $GITHUB_ENV
             echo "BUILD_SERVICE_ACCOUNT=${{ vars.GCP_BUILD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
             echo "BACKEND_SERVICE=modtale-backend-$SLUG" >> $GITHUB_ENV
@@ -345,6 +348,13 @@ jobs:
             ARGS+=("--update-secrets" "WIKI_API_KEY=WIKI_API_KEY:latest")
           else
             : "${RUNTIME_SERVICE_ACCOUNT:?Set environment variable GCP_BRANCH_PREVIEW_RUNTIME_SERVICE_ACCOUNT in the branch-preview GitHub environment.}"
+            ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_FORMAT_CONSOLE=logstash")
+            ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_JSON_RENAME_LEVEL=severity")
+            ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_JSON_ADD_SERVICE_NAME=${{ env.BACKEND_SERVICE }}")
+            ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_JSON_ADD_COMPONENT=backend")
+            ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_JSON_ADD_ENVIRONMENT=branch-preview")
+            ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_JSON_ADD_BRANCH=${{ env.BRANCH_SLUG }}")
+            ARGS+=("--labels" "app=modtale,environment=branch-preview,component=backend,branch=${{ env.BRANCH_SLUG }}")
             ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_ACCESS_KEY=${{ env.SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME }}:latest")
             ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_SECRET_KEY=${{ env.SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME }}:latest")
             ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_ENDPOINT=${{ env.SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME }}:latest")
@@ -383,14 +393,24 @@ jobs:
             --config=cloudbuild.yml \
             --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
             --substitutions=_PUBLIC_API_URL=$API_URL,_TAG=$TAG .
-          
-          gcloud run deploy $FRONTEND_SERVICE \
-            --image gcr.io/$PROJECT_ID/modtale-frontend:$TAG \
-            --region $REGION \
-            --service-account "$RUNTIME_SERVICE_ACCOUNT" \
-            --allow-unauthenticated \
-            --set-env-vars "PUBLIC_API_URL=$API_URL" \
-            --format="value(status.url)" > frontend_url.txt
+
+          FRONTEND_ARGS=(
+            "--image" "gcr.io/$PROJECT_ID/modtale-frontend:$TAG"
+            "--region" "$REGION"
+            "--service-account" "$RUNTIME_SERVICE_ACCOUNT"
+            "--allow-unauthenticated"
+            "--set-env-vars" "PUBLIC_API_URL=$API_URL"
+          )
+
+          if [ "${{ env.ENV_TYPE }}" = "preview" ]; then
+            FRONTEND_ARGS+=("--set-env-vars" "LOG_SERVICE_NAME=${{ env.FRONTEND_SERVICE }}")
+            FRONTEND_ARGS+=("--set-env-vars" "LOG_COMPONENT=frontend")
+            FRONTEND_ARGS+=("--set-env-vars" "LOG_ENVIRONMENT=branch-preview")
+            FRONTEND_ARGS+=("--set-env-vars" "LOG_BRANCH=${{ env.BRANCH_SLUG }}")
+            FRONTEND_ARGS+=("--labels" "app=modtale,environment=branch-preview,component=frontend,branch=${{ env.BRANCH_SLUG }}")
+          fi
+
+          gcloud run deploy "$FRONTEND_SERVICE" "${FRONTEND_ARGS[@]}" --format="value(status.url)" > frontend_url.txt
 
           if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
             FRONTEND_REVISION=$(gcloud run services describe "$FRONTEND_SERVICE" --region "$REGION" --format="value(status.latestReadyRevisionName)")
