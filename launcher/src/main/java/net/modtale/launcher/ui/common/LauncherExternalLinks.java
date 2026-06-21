@@ -3,9 +3,14 @@ package net.modtale.launcher.ui.common;
 import java.awt.Desktop;
 import java.net.URI;
 import java.util.function.BiConsumer;
+import net.modtale.launcher.logging.LogSanitizer;
 import net.modtale.launcher.settings.LauncherConfig;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public final class LauncherExternalLinks {
+
+    private static final Logger LOG = LogManager.getLogger(LauncherExternalLinks.class);
 
     private LauncherExternalLinks() {
     }
@@ -19,6 +24,7 @@ public final class LauncherExternalLinks {
         try {
             Desktop.getDesktop().browse(uri);
         } catch (Exception ex) {
+            LOG.warn("Could not open {}", LogSanitizer.uri(uri), ex);
             showError(toast, "Could not open " + uri + ".");
         }
     }
