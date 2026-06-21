@@ -175,6 +175,26 @@ public class StorageService {
         }
     }
 
+    public boolean exists(String fileName) {
+        try {
+            HeadObjectRequest headReq = HeadObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(fileName)
+                    .build();
+            s3Client.headObject(headReq);
+            return true;
+        } catch (NoSuchKeyException e) {
+            return false;
+        } catch (S3Exception e) {
+            if (e.statusCode() == 404) {
+                return false;
+            }
+            throw StorageDownloadException.from(e, "Failed to check the requested file.");
+        } catch (SdkException e) {
+            throw StorageDownloadException.from(e, "Failed to check the requested file.");
+        }
+    }
+
     public InputStream getStream(String fileName) {
         try {
             GetObjectRequest getReq = GetObjectRequest.builder()
