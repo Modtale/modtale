@@ -179,7 +179,13 @@ jobs:
           echo "::add-mask::$existing_token_id"
           export EXISTING_R2_RUNTIME_TOKEN_ID="$existing_token_id"
 
+          runtime_env_file="$(mktemp)"
+          trap 'rm -f "$runtime_env_file"' EXIT
+          export R2_RUNTIME_ENV_FILE="$runtime_env_file"
           node .github/scripts/cloudflare-r2-preview.mjs provision
+          set -a
+          . "$runtime_env_file"
+          set +a
 
           upsert_secret() {
             local name="$1"
