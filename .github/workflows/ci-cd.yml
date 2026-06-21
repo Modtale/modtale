@@ -109,6 +109,38 @@ jobs:
           
           else
             SLUG="$BRANCH_SLUG"
+            BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME="${{ vars.GCP_BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME }}"
+            if [ -z "$BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME" ]; then
+              BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME="${{ vars.GCP_PREVIEW_SOURCE_R2_BUCKET_NAME }}"
+            fi
+            if [ -z "$BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME" ]; then
+              BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME="modtale-binaries"
+            fi
+
+            BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME="${{ vars.GCP_BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME }}"
+            if [ -z "$BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME" ]; then
+              BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME="${{ vars.GCP_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME }}"
+            fi
+            if [ -z "$BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME" ]; then
+              BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME="R2_SOURCE_READ_ACCESS_KEY"
+            fi
+
+            BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME="${{ vars.GCP_BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME }}"
+            if [ -z "$BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME" ]; then
+              BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME="${{ vars.GCP_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME }}"
+            fi
+            if [ -z "$BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME" ]; then
+              BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME="R2_SOURCE_READ_SECRET_KEY"
+            fi
+
+            BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME="${{ vars.GCP_BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME }}"
+            if [ -z "$BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME" ]; then
+              BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME="${{ vars.GCP_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME }}"
+            fi
+            if [ -z "$BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME" ]; then
+              BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME="R2_SOURCE_READ_ENDPOINT"
+            fi
+
             echo "ENV_TYPE=preview" >> $GITHUB_ENV
             echo "BUILD_SERVICE_ACCOUNT=${{ vars.GCP_BUILD_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
             echo "BACKEND_SERVICE=modtale-backend-$SLUG" >> $GITHUB_ENV
@@ -118,7 +150,7 @@ jobs:
             echo "SEEDING_MODE=template" >> $GITHUB_ENV
             echo "SEEDING_RESET=false" >> $GITHUB_ENV
             echo "SEEDING_SOURCE_DB=modtale-mock-template" >> $GITHUB_ENV
-            echo "SEEDING_SOURCE_R2_BUCKET_NAME=modtale-binaries" >> $GITHUB_ENV
+            echo "SEEDING_SOURCE_R2_BUCKET_NAME=$BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME" >> $GITHUB_ENV
             echo "MONGODB_SECRET_NAME=BRANCH_PREVIEW_MONGODB_URI" >> $GITHUB_ENV
             echo "TAG=$SLUG" >> $GITHUB_ENV
             echo "R2_BUCKET_NAME=modtale-branch-$SLUG" >> $GITHUB_ENV
@@ -128,9 +160,9 @@ jobs:
             echo "R2_TOKEN_ID_SECRET_NAME=branch-preview-$SLUG-r2-token-id" >> $GITHUB_ENV
             echo "R2_TOKEN_NAME=modtale-branch-$SLUG-runtime" >> $GITHUB_ENV
             echo "RUNTIME_SERVICE_ACCOUNT=${{ vars.GCP_BRANCH_PREVIEW_RUNTIME_SERVICE_ACCOUNT }}" >> $GITHUB_ENV
-            echo "SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME=R2_SOURCE_READ_ACCESS_KEY" >> $GITHUB_ENV
-            echo "SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME=R2_SOURCE_READ_SECRET_KEY" >> $GITHUB_ENV
-            echo "SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME=R2_SOURCE_READ_ENDPOINT" >> $GITHUB_ENV
+            echo "SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME=$BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME" >> $GITHUB_ENV
+            echo "SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME=$BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME" >> $GITHUB_ENV
+            echo "SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME=$BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME" >> $GITHUB_ENV
             echo "R2_PUBLIC_DOMAIN=" >> $GITHUB_ENV
             echo "WARDEN_ENABLED=false" >> $GITHUB_ENV
             echo "OAUTH_ENABLED=false" >> $GITHUB_ENV
@@ -158,6 +190,13 @@ jobs:
           if [ "${MONGODB_SECRET_NAME:-}" = "MONGODB_URI" ]; then
             echo "::error::Branch previews must use BRANCH_PREVIEW_MONGODB_URI, not production MONGODB_URI."
             exit 1
+          fi
+          if [ "$SEEDING_SOURCE_R2_BUCKET_NAME" = "$R2_BUCKET_NAME" ]; then
+            echo "::error::Branch previews must seed from a source R2 bucket that differs from their per-branch target bucket."
+            exit 1
+          fi
+          if [ "$SEEDING_SOURCE_R2_BUCKET_NAME" = "modtale-binaries" ]; then
+            echo "::warning::Branch preview is seeding from modtale-binaries. Set GCP_BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME and matching source secret-name vars to use a sanitized preview source bucket."
           fi
 
           source_r2_access_key="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME")"
@@ -348,6 +387,8 @@ jobs:
             ARGS+=("--update-secrets" "WIKI_API_KEY=WIKI_API_KEY:latest")
           else
             : "${RUNTIME_SERVICE_ACCOUNT:?Set environment variable GCP_BRANCH_PREVIEW_RUNTIME_SERVICE_ACCOUNT in the branch-preview GitHub environment.}"
+            ARGS+=("--no-cpu-throttling")
+            ARGS+=("--startup-probe" "httpGet.path=/actuator/health/readiness,httpGet.port=8080,periodSeconds=10,timeoutSeconds=10,failureThreshold=60")
             ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_FORMAT_CONSOLE=logstash")
             ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_JSON_RENAME_LEVEL=severity")
             ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_JSON_ADD_SERVICE_NAME=${{ env.BACKEND_SERVICE }}")

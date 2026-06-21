@@ -310,11 +310,12 @@ const AppContent: React.FC = () => {
 
                                     {['/project/:id', '/mod/:id', '/modpack/:id', '/world/:id'].map(path => (
                                         <React.Fragment key={path}>
-                                            <Route path={path} element={renderProjectDetail()} />
-                                            <Route path={`${path}/download`} element={renderProjectDetail()} />
-                                            <Route path={`${path}/changelog`} element={renderProjectDetail()} />
-                                            <Route path={`${path}/gallery`} element={renderProjectDetail()} />
-                                            <Route path={`${path}/wiki/*`} element={renderProjectDetail()} />
+                                            <Route path={path} element={renderProjectDetail()}>
+                                                <Route path="download" element={null} />
+                                                <Route path="changelog" element={null} />
+                                                <Route path="gallery" element={null} />
+                                                <Route path="wiki/*" element={null} />
+                                            </Route>
                                             <Route path={`${path}/edit`} element={
                                                 loadingAuth ? <RouteLoading /> :
                                                     user ? <ProjectEditorView currentUser={user} onShowStatus={onShowStatus} /> :
