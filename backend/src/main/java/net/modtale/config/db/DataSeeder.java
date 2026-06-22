@@ -463,12 +463,12 @@ public class DataSeeder implements CommandLineRunner {
             case "notifications" -> List.of(
                     doc("_id", "mock-notification-1", "userId", "mock-user-1", "title", "Preview project updated",
                             "message", "Waystones published a synthetic preview update.",
-                            "link", "/projects/waystones", "iconUrl", "https://placehold.co/128x128/2563eb/f8fafc?text=W",
+                            "link", "/projects/waystones",
                             "isRead", false, "type", "PROJECT_UPDATE", "metadata", doc("projectId", "mock-plugin-waystones"),
                             "createdAt", date("2026-06-18T12:00:00Z")),
                     doc("_id", "mock-notification-2", "userId", "mock-creator-1", "title", "New mock comment",
                             "message", "A synthetic user commented on Waystones.",
-                            "link", "/projects/waystones?tab=comments", "iconUrl", "https://placehold.co/128x128/0f766e/f8fafc?text=U",
+                            "link", "/projects/waystones?tab=comments",
                             "isRead", true, "type", "COMMENT", "metadata", doc("projectId", "mock-plugin-waystones"),
                             "createdAt", date("2026-06-18T12:30:00Z"))
             );
@@ -564,8 +564,6 @@ public class DataSeeder implements CommandLineRunner {
                 "description", "Synthetic mock project used for public PR previews and local testing.",
                 "authorId", authorId,
                 "author", author,
-                "imageUrl", "https://placehold.co/512x512/334155/f8fafc?text=" + title.replace(" ", "+"),
-                "bannerUrl", "https://placehold.co/1600x420/1f2937/f8fafc?text=" + title.replace(" ", "+"),
                 "classification", classification,
                 "categories", List.of("Utilities"),
                 "tags", List.of("Utilities", "Preview"),
