@@ -1,15 +1,18 @@
 package net.modtale.service.system;
 
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import net.modtale.config.properties.AppFrontendProperties;
+import net.modtale.model.jam.Modjam;
 import net.modtale.model.project.Project;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
+import net.modtale.service.ModjamService;
 import net.modtale.service.project.query.ProjectService;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -20,17 +23,20 @@ public class SitemapService {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final ProjectService projectService;
+    private final ModjamService modjamService;
     private final String baseUrl;
 
     public SitemapService(
             ProjectRepository projectRepository,
             UserRepository userRepository,
             ProjectService projectService,
+            ModjamService modjamService,
             AppFrontendProperties frontendProperties
     ) {
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.projectService = projectService;
+        this.modjamService = modjamService;
         this.baseUrl = frontendProperties.url();
     }
 
@@ -47,9 +53,29 @@ public class SitemapService {
         addUrl(xml, baseUrl + "/worlds", "0.9", today);
         addUrl(xml, baseUrl + "/data", "0.9", today);
         addUrl(xml, baseUrl + "/art", "0.9", today);
+        addUrl(xml, baseUrl + "/jams", "0.9", today);
         addUrl(xml, baseUrl + "/api-docs", "0.8", today);
 
         Set<String> activeAuthors = new HashSet<>();
+        List<Modjam> jams = modjamService.getAllJams();
+        if (jams != null) {
+            for (Modjam jam : jams) {
+                if (jam == null || "DRAFT".equals(jam.getStatus())) continue;
+
+                if (jam.getSlug() != null && !jam.getSlug().isBlank()) {
+                    String priority = "COMPLETED".equals(jam.getStatus()) ? "0.6" : "0.8";
+                    LocalDate lastMod = jam.getUpdatedAt() != null
+                            ? jam.getUpdatedAt().atZone(ZoneOffset.UTC).toLocalDate()
+                            : today;
+                    addUrl(xml, baseUrl + "/jam/" + jam.getSlug(), priority, lastMod);
+                }
+
+                if (jam.getHostName() != null && !jam.getHostName().isBlank()) {
+                    activeAuthors.add(jam.getHostName().trim());
+                }
+            }
+        }
+
         List<Project> projects = projectRepository.findAllForSitemap();
 
         for (Project project : projects) {

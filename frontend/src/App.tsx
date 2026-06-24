@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { Route, Routes, useNavigate, useLocation, Navigate, BrowserRouter } from 'react-router-dom';
 import { StaticRouter } from 'react-router-dom/server';
 import { HelmetProvider } from 'react-helmet-async';
@@ -31,6 +31,8 @@ const Onboarding = lazy(() => import('@/modules/user/components/Onboarding').the
 const TermsOfService = lazy(() => import('@/modules/core/views/TermsOfService').then((module) => ({ default: module.TermsOfService })));
 const PrivacyPolicy = lazy(() => import('@/modules/core/views/PrivacyPolicy').then((module) => ({ default: module.PrivacyPolicy })));
 const Status = lazy(() => import('@/modules/core/views/Status').then((module) => ({ default: module.Status })));
+const JamsList = lazy(() => import('@/modules/jam/views/JamsList').then((module) => ({ default: module.JamsList })));
+const JamDetail = lazy(() => import('@/modules/jam/views/JamDetail').then((module) => ({ default: module.JamDetail })));
 const UserProfile = lazy(() => import('@/modules/user/views/UserProfile').then((module) => ({ default: module.UserProfile })));
 const Dashboard = lazy(() => import('@/modules/user/views/Dashboard').then((module) => ({ default: module.Dashboard })));
 const VerifyEmail = lazy(() => import('@/modules/auth/views/VerifyEmail').then((module) => ({ default: module.VerifyEmail })));
@@ -65,6 +67,15 @@ const ScrollToTop = () => {
 
     useEffect(() => {
         const previousPath = previousPathRef.current;
+        const jamTabPattern = /^\/jam\/[^/]+\/(overview|rules|entries)$/;
+        const previousJamTabMatch = previousPath?.match(jamTabPattern);
+        const nextJamTabMatch = pathname.match(jamTabPattern);
+        const isSameJamTabTransition = Boolean(
+            previousPath
+            && previousJamTabMatch
+            && nextJamTabMatch
+            && previousPath.replace(/\/(overview|rules|entries)$/, '') === pathname.replace(/\/(overview|rules|entries)$/, '')
+        );
         const previousProjectBase = previousPath ? projectRouteBase(previousPath) : '';
         const nextProjectBase = projectRouteBase(pathname);
         const isSameProjectModalTransition = Boolean(
@@ -76,7 +87,7 @@ const ScrollToTop = () => {
 
         previousPathRef.current = pathname;
 
-        if (isSameProjectModalTransition) {
+        if (isSameJamTabTransition || isSameProjectModalTransition) {
             return;
         }
 
@@ -275,6 +286,9 @@ const AppContent: React.FC = () => {
                                     <Route path="/worlds" element={renderBrowse('SAVE')} />
                                     <Route path="/art" element={renderBrowse('ART')} />
                                     <Route path="/data" element={renderBrowse('DATA')} />
+                                    <Route path={SiteRoutes.jams()} element={<JamsList currentUser={user} />} />
+                                    <Route path="/jam/:slug/*" element={<JamDetail currentUser={user} />} />
+                                    <Route path="/jam/:id/edit" element={<JamDetail currentUser={user} />} />
 
                                     <Route path="/upload" element={
                                         loadingAuth ? <RouteLoading /> :

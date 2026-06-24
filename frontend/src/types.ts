@@ -11,7 +11,7 @@ export interface ConnectedAccount {
     username: string;
     profileUrl: string;
     visible: boolean;
-} 
+}
 
 export interface OrganizationRole {
     id: string;
@@ -39,6 +39,7 @@ export interface User {
     likedProjectIds: string[];
     followingIds?: string[];
     followerIds?: string[];
+    joinedModjamIds?: string[];
     connectedAccounts?: ConnectedAccount[];
     badges?: string[];
     notificationPreferences?: {
@@ -261,6 +262,7 @@ export interface Project {
     createdAt?: string;
     projectIds?: string[];
     childProjectIds?: string[];
+    modjamIds?: string[];
     sizeBytes?: number;
     comments?: Comment[];
     versions?: ProjectVersion[];
@@ -309,4 +311,66 @@ export interface Report {
     createdAt: string;
     resolvedBy?: string;
     resolutionNote?: string;
+}
+export interface ModjamCategory {
+    id: string;
+    name: string;
+    description: string;
+    maxScore: number;
+}
+
+export interface Modjam {
+    id: string;
+    slug: string;
+    title: string;
+    description: string;
+    imageUrl?: string;
+    bannerUrl?: string;
+    hostId: string;
+    hostName: string;
+    startDate: string;
+    endDate: string;
+    votingEndDate: string;
+    status: 'DRAFT' | 'UPCOMING' | 'ACTIVE' | 'VOTING' | 'AWAITING_WINNERS' | 'COMPLETED';
+    participantIds: string[];
+    judgeIds?: string[];
+    pendingJudgeInvites?: string[];
+    categories: ModjamCategory[];
+    allowPublicVoting: boolean;
+    allowConcurrentVoting: boolean;
+    showResultsBeforeVotingEnds: boolean;
+    createdAt: string;
+    updatedAt?: string;
+}
+
+export interface ModjamVote {
+    id: string;
+    voterId: string;
+    categoryId: string;
+    score: number;
+    isJudge?: boolean;
+}
+
+export interface ModjamSubmission {
+    id: string;
+    jamId: string;
+    projectId: string;
+    projectTitle?: string;
+    projectImageUrl?: string;
+    projectBannerUrl?: string;
+    projectAuthor?: string;
+    projectDescription?: string;
+    submitterId: string;
+    votes: ModjamVote[];
+    categoryScores?: Record<string, number>;
+    totalScore?: number;
+    judgeCategoryScores?: Record<string, number>;
+    totalJudgeScore?: number;
+    totalPublicScore?: number;
+    rank?: number;
+    isWinner?: boolean;
+    awardTitle?: string;
+    createdAt: string;
+    votesCast?: number;
+    commentsGiven?: number;
 }

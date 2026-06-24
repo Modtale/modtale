@@ -8,6 +8,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 
 @SpringBootApplication
 @ConfigurationPropertiesScan
+@EnableCaching
 @EnableMethodSecurity
 public class ModtaleApplication {
     public static void main(String[] args) {
