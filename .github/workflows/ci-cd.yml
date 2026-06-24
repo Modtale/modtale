@@ -602,7 +602,7 @@ jobs:
           else
             PUBLIC_BACKEND_URL=$B_URL
           fi
-          
+
           gcloud run services update ${{ env.BACKEND_SERVICE }} \
             --region $REGION \
             --update-env-vars "FRONTEND_URL=$FINAL_FRONTEND_URL,BACKEND_URL=$PUBLIC_BACKEND_URL"
@@ -674,7 +674,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Component | Status | Target Service | Service URL |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|---|---|" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ -n "$PUBLIC_API_URL" ]; then
             echo "| **Backend API** | $BACKEND_STATUS | \`${{ env.BACKEND_SERVICE }}\` | [API Endpoint]($PUBLIC_API_URL) |" >> $GITHUB_STEP_SUMMARY
           elif [ -n "$B_URL" ]; then
@@ -682,13 +682,13 @@ jobs:
           else
             echo "| **Backend API** | $BACKEND_STATUS | \`${{ env.BACKEND_SERVICE }}\` | *N/A* |" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           if [ -n "$F_URL" ]; then
             echo "| **Frontend App** | $FRONTEND_STATUS | \`${{ env.FRONTEND_SERVICE }}\` | [App URL]($F_URL) |" >> $GITHUB_STEP_SUMMARY
           else
             echo "| **Frontend App** | $FRONTEND_STATUS | \`${{ env.FRONTEND_SERVICE }}\` | *N/A* |" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "*View deployment details in [Google Cloud Console](https://console.cloud.google.com/run?project=${{ env.PROJECT_ID }}).* " >> $GITHUB_STEP_SUMMARY

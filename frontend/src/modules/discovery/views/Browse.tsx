@@ -15,6 +15,7 @@ import { useProjectSearch } from '../hooks/useProjectSearch';
 import { BrowseFilters } from '../components/BrowseFilters';
 import { CategoryPillNav } from '../components/CategoryPillNav';
 import { ProjectGrid } from '../components/ProjectGrid';
+import { BrowseAdPlacement } from '../components/BrowseAdPlacement';
 import { ProjectCardSkeletons } from '@/modules/project/components/ProjectCard';
 import {
     BROWSE_ITEMS_PER_PAGE_STORAGE_KEY,
@@ -93,6 +94,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
         return generateBreadcrumbSchema(crumbs);
     }, [selectedClassification]);
 
+    const adContextProjectId = items.length > 0 ? items[0].id : '';
     useEffect(() => {
         let ticking = false;
         const handleScroll = () => {
@@ -255,6 +257,12 @@ export const Browse: React.FC<BrowseViewProps> = ({
                                 )}
                             </div>
                         </div>
+                        {adContextProjectId && (
+                            <BrowseAdPlacement
+                                projectId={adContextProjectId}
+                                placement="TALL_BANNER"
+                            />
+                        )}
                     </div>
 
                     <div className="flex-1 min-h-[500px] min-w-0" ref={cardsSectionRef}>
