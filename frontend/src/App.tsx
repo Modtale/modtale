@@ -22,6 +22,7 @@ import { ToastProvider } from '@/components/ui/Toast';
 import { MobileProvider } from '@/context/MobileContext';
 import type { User } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
+import { STATUS_PAGE_URL } from '@/utils/status';
 import type { Classification } from '@/data/categories';
 import { normalizeUser } from '@/utils/users';
 import { clearPendingSignInMethod, completeSignInMethod } from '@/modules/auth/api/authClient';
@@ -30,7 +31,6 @@ const StatusModal = lazy(() => import('@/components/ui/StatusModal').then((modul
 const Onboarding = lazy(() => import('@/modules/user/components/Onboarding').then((module) => ({ default: module.Onboarding })));
 const TermsOfService = lazy(() => import('@/modules/core/views/TermsOfService').then((module) => ({ default: module.TermsOfService })));
 const PrivacyPolicy = lazy(() => import('@/modules/core/views/PrivacyPolicy').then((module) => ({ default: module.PrivacyPolicy })));
-const Status = lazy(() => import('@/modules/core/views/Status').then((module) => ({ default: module.Status })));
 const UserProfile = lazy(() => import('@/modules/user/views/UserProfile').then((module) => ({ default: module.UserProfile })));
 const Dashboard = lazy(() => import('@/modules/user/views/Dashboard').then((module) => ({ default: module.Dashboard })));
 const VerifyEmail = lazy(() => import('@/modules/auth/views/VerifyEmail').then((module) => ({ default: module.VerifyEmail })));
@@ -49,6 +49,37 @@ const RouteLoading = () => <div className="p-20 flex justify-center"><Spinner />
 
 type FavoriteToggleOptions = {
     onError?: () => void;
+};
+
+const StatusRedirect = () => {
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            window.location.replace(STATUS_PAGE_URL);
+        }
+    }, []);
+
+    return (
+        <main className="min-h-[60vh] flex items-center justify-center bg-slate-50 px-6 dark:bg-modtale-dark">
+            <div className="max-w-md rounded-lg border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-white/10 dark:bg-slate-900">
+                <h1 className="text-xl font-black text-slate-950 dark:text-white">Opening Modtale Status</h1>
+                <p className="mt-2 text-sm font-medium leading-6 text-slate-500 dark:text-slate-400">
+                    Redirecting to {STATUS_PAGE_URL}.
+                </p>
+                <a
+                    href={STATUS_PAGE_URL}
+                    className="mt-5 inline-flex h-10 items-center justify-center rounded-lg bg-modtale-accent px-4 text-sm font-bold text-white transition hover:bg-blue-600"
+                >
+                    Open Status
+                </a>
+            </div>
+        </main>
+    );
+};
+
+const hasLikelyAuthCookie = () => {
+    if (typeof document === 'undefined') return false;
+    const cookies = document.cookie || '';
+    return /(?:^|;\s*)(SESSION|JSESSIONID|XSRF-TOKEN)=/.test(cookies);
 };
 
 const setProjectLikedState = (user: User, projectId: string, liked: boolean): User => {
@@ -138,6 +169,11 @@ const AppContent: React.FC = () => {
     }, [user]);
 
     const fetchUser = useCallback(async () => {
+        if (!hasLikelyAuthCookie()) {
+            setLoadingAuth(false);
+            return;
+        }
+
         try {
             const res = await api.get(`/user/me?t=${Date.now()}`);
             if (res.data) {
@@ -342,7 +378,7 @@ const AppContent: React.FC = () => {
 
                                     <Route path="/terms" element={<TermsOfService />} />
                                     <Route path="/privacy" element={<PrivacyPolicy />} />
-                                    <Route path="/status" element={<Status />} />
+                                    <Route path="/status" element={<StatusRedirect />} />
 
                                     <Route path="/api-docs" element={<ApiDocs />} />
                                     <Route path="/api-docs/swagger" element={<SwaggerDocs />} />

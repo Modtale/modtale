@@ -496,6 +496,7 @@ jobs:
             ARGS+=("--update-secrets" "BLUESKY_CLIENT_ID=BLUESKY_CLIENT_ID:latest")
             ARGS+=("--update-secrets" "WARDEN_API_KEY=${{ env.WARDEN_SECRET_NAME }}:latest")
             ARGS+=("--update-secrets" "WIKI_API_KEY=WIKI_API_KEY:latest")
+            ARGS+=("--remove-env-vars" "STATUS_DISCORD_WEBHOOK_URL")
           else
             : "${RUNTIME_SERVICE_ACCOUNT:?Set environment variable GCP_BRANCH_PREVIEW_RUNTIME_SERVICE_ACCOUNT in the branch-preview GitHub environment.}"
             ARGS+=("--no-cpu-throttling")

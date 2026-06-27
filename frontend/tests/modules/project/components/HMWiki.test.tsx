@@ -2,7 +2,7 @@ import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
-import { WikiMobileNavigation, WikiSidebar } from '@/modules/project/components/HMWiki';
+import { WikiContent, WikiMobileNavigation, WikiSidebar } from '@/modules/project/components/HMWiki';
 
 const tree = [
     {
@@ -211,6 +211,60 @@ describe('WikiSidebar', () => {
         });
 
         expect(onNavigate).toHaveBeenCalledWith('guides');
+    });
+
+    it('prefetches navigation targets on hover intent', async () => {
+        const onPrefetch = vi.fn();
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <WikiSidebar
+                        tree={tree}
+                        projectUrl="/mod/project"
+                        currentSlug="guides"
+                        onPrefetch={onPrefetch}
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        const installLink = [...container.querySelectorAll('a')].find((node) => node.textContent === 'Install');
+        expect(installLink).not.toBeNull();
+
+        await act(async () => {
+            installLink?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+        });
+
+        expect(onPrefetch).toHaveBeenCalledWith('guides/install');
+    });
+
+    it('renders wiki page content immediately through the fast markdown path', async () => {
+        await act(async () => {
+            root.render(
+                <WikiContent
+                    wikiLoading={false}
+                    wikiError={false}
+                    wikiPageSlug="home-1"
+                    mod={{ hmWikiSlug: 'levelingcore' }}
+                    wikiData={{
+                        mod: {
+                            name: 'LevelingCore',
+                            index: { slug: 'home-1' }
+                        },
+                        content: {
+                            title: 'Instant Wiki',
+                            content: '## Quick docs\nFast wiki content'
+                        }
+                    }}
+                />
+            );
+        });
+
+        expect(container.textContent).toContain('Instant Wiki');
+        expect(container.textContent).toContain('Quick docs');
+        expect(container.textContent).toContain('Fast wiki content');
+        expect(container.textContent).not.toContain('No Wiki Available');
     });
 
     it('keeps large mobile page trees searchable without opening every branch', async () => {

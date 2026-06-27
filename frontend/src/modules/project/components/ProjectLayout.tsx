@@ -321,7 +321,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                         {headerContent}
                                     </div>
                                     {headerActions && (
-                                        <div className="hidden md:flex items-center gap-2 flex-shrink-0 mt-2 xl:mt-0">
+                                        <div className="hidden lg:flex items-center gap-2 flex-shrink-0 mt-2 xl:mt-0">
                                             {headerActions}
                                         </div>
                                     )}
