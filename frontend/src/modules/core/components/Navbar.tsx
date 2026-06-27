@@ -246,10 +246,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                                 />
 
                                 {user ? (
-                                    <div className="relative" ref={profileRef}>
+                                    <div className="relative shrink-0" ref={profileRef}>
                                         <button
                                             onClick={() => setIsProfileOpen(!isProfileOpen)}
-                                            className={`group relative flex items-center justify-center rounded-full transition-all duration-200 ${
+                                            className={`group relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full transition-all duration-200 ${
                                                 isProfileOpen
                                                     ? 'ring-2 ring-modtale-accent ring-offset-2 dark:ring-offset-[#141d30]'
                                                     : 'hover:ring-2 hover:ring-slate-200 dark:hover:ring-white/10 ring-offset-2 dark:ring-offset-[#141d30]'
@@ -258,7 +258,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                             <img
                                                 src={user.avatarUrl}
                                                 alt={user.username}
-                                                className="h-9 w-9 rounded-full transition-transform group-active:scale-95"
+                                                className="h-full w-full shrink-0 rounded-full object-cover transition-transform group-active:scale-95"
                                             />
                                         </button>
 
@@ -362,7 +362,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     {user ? (
                         <>
                             <Link to={SiteRoutes.creator(user.id, user.username)} onClick={() => setIsMobileMenuOpen(false)} className="p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-3">
-                                <img src={user.avatarUrl} className="w-6 h-6 rounded-full" alt="" /> Profile
+                                <img src={user.avatarUrl} className="h-6 w-6 shrink-0 rounded-full object-cover" alt="" /> Profile
                             </Link>
                             <button onClick={() => { setIsFollowingOpen(true); setIsMobileMenuOpen(false); }} className="p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-3">
                                 <Users className="w-5 h-5" /> Following
