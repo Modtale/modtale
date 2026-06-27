@@ -97,6 +97,12 @@ describe('ProjectMetaSections dependencies', () => {
                     id: 'version-0-4-9',
                     gameVersion: '0.4.9',
                     gameVersions: ['0.4.9']
+                },
+                {
+                    ...baseVersion,
+                    id: 'version-legacy-date',
+                    gameVersion: '2026.03.26-89796E57B',
+                    gameVersions: ['2026.03.26-89796E57B']
                 }
             ]
         } as Project;
@@ -115,8 +121,12 @@ describe('ProjectMetaSections dependencies', () => {
 
         expect(container.textContent).toContain('0.5.x');
         expect(container.textContent).toContain('0.4.9');
+        expect(container.textContent).toContain('2026.03.26-89796E57B');
         expect(container.textContent).not.toContain('0.5.4');
         expect(container.textContent).not.toContain('0.5.3');
+        expect((container.textContent || '').indexOf('0.5.x')).toBeLessThan(
+            (container.textContent || '').indexOf('2026.03.26-89796E57B')
+        );
 
         const expandButton = container.querySelector('button[aria-label="Expand 0.5.x versions"]') as HTMLButtonElement;
 

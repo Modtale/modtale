@@ -175,7 +175,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     }, [wikiLookupKey]);
 
     useEffect(() => {
-        if (!isDownloadOpen) return;
+        if (!project?.versions?.length) return;
         if (orderedGameVersions.length > 0 || preReleaseGameVersions.length > 0) return;
 
         let isCancelled = false;
@@ -195,7 +195,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         return () => {
             isCancelled = true;
         };
-    }, [isDownloadOpen, orderedGameVersions.length, preReleaseGameVersions.length]);
+    }, [project?.versions?.length, orderedGameVersions.length, preReleaseGameVersions.length]);
 
     useEffect(() => {
         if (!isDownloadOpen) return;
@@ -653,7 +653,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                             </div>
                         </>
                     ) : (
-                        <Sidebar project={project} dependencies={latestDependencies} incompatibleProjectIds={latestIncompatibleProjectIds} depMeta={depMeta} showMetaSections={!isMobile} contributors={contributors} orgMembers={orgMembers} author={authorProfile} />
+                        <Sidebar project={project} dependencies={latestDependencies} incompatibleProjectIds={latestIncompatibleProjectIds} depMeta={depMeta} orderedGameVersions={orderedGameVersions} showMetaSections={!isMobile} contributors={contributors} orgMembers={orgMembers} author={authorProfile} />
                     )
                 }
                 mainContent={
@@ -663,7 +663,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                             <Wiki wikiLoading={wikiLoading} wikiError={wikiError} displayWikiData={displayWikiData} displaySlug={displaySlug} project={project} wikiContentRef={wikiContentRef} lockedHeight={lockedHeight} />
                         </>
                     ) : (
-                        <ViewDetails project={project} authorProfile={authorProfile} currentUser={currentUser} canEdit={Boolean(canEdit)} commentsRef={commentsRef} setProject={setProject} setStatusModal={setStatusModal} onRefresh={onRefresh} dependencies={latestDependencies} incompatibleProjectIds={latestIncompatibleProjectIds} depMeta={depMeta} showMetaSections={isMobile} />
+                        <ViewDetails project={project} authorProfile={authorProfile} currentUser={currentUser} canEdit={Boolean(canEdit)} commentsRef={commentsRef} setProject={setProject} setStatusModal={setStatusModal} onRefresh={onRefresh} dependencies={latestDependencies} incompatibleProjectIds={latestIncompatibleProjectIds} depMeta={depMeta} orderedGameVersions={orderedGameVersions} showMetaSections={isMobile} />
                     )
                 }
             />
