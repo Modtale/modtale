@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRoot, type Root } from 'react-dom/client';
-import { clearHMWikiCacheForTests, prefetchInitialWikiPage, useHMWiki } from '@/modules/project/hooks/useHMWiki';
+import { clearHMWikiCacheForTests, prefetchInitialWikiPage, prefetchWikiPage, useHMWiki } from '@/modules/project/hooks/useHMWiki';
 import { projectClient } from '@/modules/project/api/projectClient';
 
 vi.mock('@/modules/project/api/projectClient', () => ({
@@ -326,6 +326,45 @@ describe('useHMWiki', () => {
         expect(latestSnapshot.data?.mod?.pages).toHaveLength(2);
     });
 
+    it('uses inline wiki bootstrap data on the first render without API calls', async () => {
+        window.__MODTALE_WIKI_BOOTSTRAP = {
+            projectId: 'project-1',
+            metadataData: {
+                index: { slug: 'intro' },
+                pages: [
+                    { id: '1', slug: 'intro', title: 'Intro' }
+                ]
+            },
+            pages: {
+                intro: {
+                    data: {
+                        title: 'Intro',
+                        content: 'content for intro'
+                    }
+                }
+            }
+        };
+
+        await act(async () => {
+            root.render(
+                <Probe
+                    projectId="project-1"
+                    pageSlug="intro"
+                    enabled={true}
+                    onRender={(snapshot) => {
+                        latestSnapshot = snapshot;
+                    }}
+                />
+            );
+        });
+
+        expect(mockedProjectClient.getWikiData).not.toHaveBeenCalled();
+        expect(mockedProjectClient.getWikiPage).not.toHaveBeenCalled();
+        expect(latestSnapshot.loading).toBe(false);
+        expect(latestSnapshot.data?.content?.title).toBe('Intro');
+        expect(latestSnapshot.data?.mod?.pages).toHaveLength(1);
+    });
+
     it('keeps root page content visible if metadata fails after the fast-path page loads', async () => {
         const wikiDataRequest = createDeferred<any>();
         mockedProjectClient.getWikiData.mockReturnValue(wikiDataRequest.promise);
@@ -402,5 +441,64 @@ describe('useHMWiki', () => {
         expect(mockedProjectClient.getWikiPage).toHaveBeenCalledTimes(1);
         expect(latestSnapshot.loading).toBe(false);
         expect(latestSnapshot.data?.content?.title).toBe('Intro');
+    });
+
+    it('keeps automatic background page prefetch bounded to nearby pages', async () => {
+        vi.useFakeTimers();
+        mockedProjectClient.getWikiData.mockResolvedValue({
+            index: { slug: 'page-0' },
+            pages: Array.from({ length: 10 }, (_, index) => ({
+                id: `${index}`,
+                slug: `page-${index}`,
+                title: `Page ${index}`
+            }))
+        });
+        mockedProjectClient.getWikiPage.mockImplementation(async (_projectId, slug) => ({
+            title: slug,
+            content: `content for ${slug}`
+        }));
+
+        await act(async () => {
+            root.render(
+                <Probe
+                    projectId="project-1"
+                    pageSlug="page-4"
+                    enabled={true}
+                    onRender={(snapshot) => {
+                        latestSnapshot = snapshot;
+                    }}
+                />
+            );
+        });
+        await settle();
+
+        expect(latestSnapshot.loading).toBe(false);
+        expect(mockedProjectClient.getWikiPage).toHaveBeenCalledWith('project-1', 'page-4');
+
+        await act(async () => {
+            vi.advanceTimersByTime(150);
+        });
+        await settle();
+
+        const requestedSlugs = mockedProjectClient.getWikiPage.mock.calls.map((call) => call[1]);
+        expect(requestedSlugs).toEqual(expect.arrayContaining(['page-4', 'page-0', 'page-5', 'page-3', 'page-6']));
+        expect(requestedSlugs).not.toContain('page-7');
+        expect(new Set(requestedSlugs)).toHaveLength(5);
+    });
+
+    it('prefetches a specific navigation page without refetching cached pages', async () => {
+        mockedProjectClient.getWikiPage.mockImplementation(async (_projectId, slug) => ({
+            title: slug,
+            content: `content for ${slug}`
+        }));
+
+        prefetchWikiPage('project-1', 'guides/install');
+        await settle();
+        prefetchWikiPage('project-1', 'guides/install');
+        await settle();
+
+        expect(mockedProjectClient.getWikiData).not.toHaveBeenCalled();
+        expect(mockedProjectClient.getWikiPage).toHaveBeenCalledTimes(1);
+        expect(mockedProjectClient.getWikiPage).toHaveBeenCalledWith('project-1', 'guides/install');
     });
 });
