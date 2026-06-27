@@ -975,48 +975,7 @@ function buildBannedEmails() {
 }
 
 function buildStatusIncidents() {
-  return [
-    {
-      _id: 'mock-status-incident-1',
-      kind: 'INCIDENT',
-      state: 'RESOLVED',
-      impact: 'DEGRADED',
-      title: 'Synthetic preview incident',
-      affectedServices: ['Backend API'],
-      startedAt: date('2026-06-12T14:00:00.000Z'),
-      resolvedAt: date('2026-06-12T14:35:00.000Z'),
-      createdAt: date('2026-06-12T14:00:00.000Z'),
-      updatedAt: date('2026-06-12T14:35:00.000Z'),
-      createdBy: '692620f7c2f3266e23ac0dee',
-      createdByUsername: 'admin',
-      updates: [
-        {
-          id: 'mock-status-update-1',
-          state: 'RESOLVED',
-          impact: 'OPERATIONAL',
-          message: 'Synthetic incident resolved.',
-          createdAt: date('2026-06-12T14:35:00.000Z'),
-          createdBy: '692620f7c2f3266e23ac0dee',
-          createdByUsername: 'admin'
-        }
-      ]
-    },
-    {
-      _id: 'mock-maintenance-1',
-      kind: 'MAINTENANCE',
-      state: 'SCHEDULED',
-      impact: 'DEGRADED',
-      title: 'Synthetic scheduled maintenance',
-      affectedServices: ['Frontend'],
-      scheduledStart: date('2026-06-25T04:00:00.000Z'),
-      scheduledEnd: date('2026-06-25T05:00:00.000Z'),
-      createdAt: date('2026-06-18T09:00:00.000Z'),
-      updatedAt: date('2026-06-18T09:00:00.000Z'),
-      createdBy: '692620f7c2f3266e23ac0dee',
-      createdByUsername: 'admin',
-      updates: []
-    }
-  ];
+  return [];
 }
 
 function buildStatusHistory() {
@@ -1038,10 +997,10 @@ function buildStatusHistory() {
       apiLatency: 61,
       dbLatency: 24,
       storageLatency: 140,
-      overallStatus: 'DEGRADED',
+      overallStatus: 'OPERATIONAL',
       apiStatus: 'OPERATIONAL',
       dbStatus: 'OPERATIONAL',
-      storageStatus: 'DEGRADED'
+      storageStatus: 'OPERATIONAL'
     }
   ];
 }

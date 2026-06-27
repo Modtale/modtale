@@ -75,4 +75,14 @@ describe('ActionBar gallery action', () => {
 
         expect(container.textContent).not.toContain('Gallery');
     });
+
+    it('hides the Comments shortcut at tablet widths where the action row is narrow', async () => {
+        await renderActionBar();
+
+        const commentsLink = Array.from(container.querySelectorAll('a')).find((link) => (
+            link.textContent?.includes('Comments')
+        ));
+
+        expect(commentsLink?.className).toContain('[@media(min-width:768px)_and_(max-width:1279px)]:hidden');
+    });
 });

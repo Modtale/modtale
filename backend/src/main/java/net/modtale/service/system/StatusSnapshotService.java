@@ -14,6 +14,7 @@ import net.modtale.model.system.SystemStatus;
 import net.modtale.repository.system.StatusHistoryRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -34,6 +35,7 @@ public class StatusSnapshotService {
     private final StatusHistoryRepository historyRepository;
     private final StatusDiscordNotifierService statusDiscordNotifierService;
     private final StatusIncidentService statusIncidentService;
+    private final boolean embeddedCheckerEnabled;
 
     private volatile SystemStatusView cached24HourStatus;
     private volatile SystemStatusView cached30DayStatus;
@@ -44,7 +46,8 @@ public class StatusSnapshotService {
             AppR2Properties r2Properties,
             StatusHistoryRepository historyRepository,
             StatusDiscordNotifierService statusDiscordNotifierService,
-            StatusIncidentService statusIncidentService
+            StatusIncidentService statusIncidentService,
+            @Value("${app.status-checker.enabled:false}") boolean embeddedCheckerEnabled
     ) {
         this.mongoTemplate = mongoTemplate;
         this.s3Client = s3Client;
@@ -52,14 +55,23 @@ public class StatusSnapshotService {
         this.historyRepository = historyRepository;
         this.statusDiscordNotifierService = statusDiscordNotifierService;
         this.statusIncidentService = statusIncidentService;
+        this.embeddedCheckerEnabled = embeddedCheckerEnabled;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
-        refreshSnapshots();
+        if (embeddedCheckerEnabled) {
+            refreshSnapshots();
+        }
     }
 
     @Scheduled(fixedRate = 60000)
+    public synchronized void refreshSnapshotsOnSchedule() {
+        if (embeddedCheckerEnabled) {
+            refreshSnapshots();
+        }
+    }
+
     public synchronized void refreshSnapshots() {
         StatusHistory previous = findLatestHistorySafely();
         StatusHistory latest = performHealthCheck();
@@ -139,7 +151,10 @@ public class StatusSnapshotService {
                         h.getTimestamp().toEpochSecond(ZoneOffset.UTC) * 1000,
                         h.getApiLatency(),
                         h.getDbLatency(),
-                        h.getStorageLatency()
+                        h.getStorageLatency(),
+                        resolveServiceStatus(h.getApiStatus(), h.getApiLatency(), h.getOverallStatus()),
+                        resolveServiceStatus(h.getDbStatus(), h.getDbLatency(), h.getOverallStatus()),
+                        resolveServiceStatus(h.getStorageStatus(), h.getStorageLatency(), h.getOverallStatus())
                 ))
                 .toList();
 
@@ -226,12 +241,16 @@ public class StatusSnapshotService {
             return storedStatus;
         }
 
+        if (overallStatus == SystemStatus.OPERATIONAL) {
+            return SystemStatus.OPERATIONAL;
+        }
+
         if (latency <= 0 || latency >= 5000) {
             return SystemStatus.OUTAGE;
         }
 
-        if (overallStatus == SystemStatus.OPERATIONAL) {
-            return SystemStatus.OPERATIONAL;
+        if (overallStatus == SystemStatus.OUTAGE) {
+            return SystemStatus.OUTAGE;
         }
 
         return SystemStatus.DEGRADED;
@@ -249,7 +268,11 @@ public class StatusSnapshotService {
         boolean changedStatus = previousStatus != null && previousStatus != latestStatus;
 
         if (firstSnapshotNeedsAttention || changedStatus) {
-            statusDiscordNotifierService.notifyStatusChange(previous, latest);
+            statusDiscordNotifierService.notifyStatusChange(
+                    previous,
+                    latest,
+                    findHistorySafely(LocalDateTime.now().minusDays(30))
+            );
         }
     }
 }
