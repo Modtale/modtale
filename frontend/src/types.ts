@@ -291,6 +291,7 @@ export interface Project {
     favoriteCount: number;
     updatedAt: string;
     createdAt?: string;
+    projectIds?: string[];
     childProjectIds?: string[];
     sizeBytes?: number;
     comments?: Comment[];

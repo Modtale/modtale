@@ -460,8 +460,8 @@ describe('DownloadModal Toggle Visibility', () => {
             );
         });
 
-        expect(container.textContent).toContain('This modpack uses external mods');
-        expect(container.textContent).toContain('External Shader');
+        expect(pageText()).toContain('This modpack uses external mods');
+        expect(pageText()).toContain('External Shader');
     });
 
     it('does not show the external mod warning for non-modpack projects', async () => {
@@ -503,7 +503,7 @@ describe('DownloadModal Toggle Visibility', () => {
             );
         });
 
-        expect(container.textContent).not.toContain('This modpack uses external mods');
-        expect(container.textContent).not.toContain('External Library');
+        expect(pageText()).not.toContain('This modpack uses external mods');
+        expect(pageText()).not.toContain('External Library');
     });
 });
