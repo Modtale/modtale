@@ -1,6 +1,6 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '4.0.6'
+    id 'org.springframework.boot' version '4.1.0'
     id 'io.spring.dependency-management' version '1.1.7'
 }
 
@@ -22,7 +22,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
-    implementation 'org.springframework.session:spring-session-data-mongodb:3.5.7'
+    implementation 'org.springframework.session:spring-session-data-mongodb:4.0.0-M2'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-cache'
@@ -32,13 +32,13 @@ dependencies {
     implementation 'dev.samstevens.totp:totp-spring-boot-starter:1.7.1'
     implementation 'com.github.ben-manes.caffeine:caffeine'
 
-    implementation platform('software.amazon.awssdk:bom:2.46.6')
+    implementation platform('software.amazon.awssdk:bom:2.46.17')
     implementation 'software.amazon.awssdk:s3'
 
     implementation 'com.giffing.bucket4j.spring.boot.starter:bucket4j-spring-boot-starter:0.14.0'
     implementation 'com.googlecode.owasp-java-html-sanitizer:owasp-java-html-sanitizer:20260313.1'
     implementation 'net.coobird:thumbnailator:0.4.21'
-    implementation 'com.github.usefulness:webp-imageio:0.10.2'
+    implementation 'com.github.usefulness:webp-imageio:0.11.0'
 
     implementation 'com.github.weisj:jsvg:2.1.0'
 
@@ -46,7 +46,7 @@ dependencies {
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:6.1.0'
 }
 
 tasks.named('test') {

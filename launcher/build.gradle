@@ -21,22 +21,22 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.2'
-    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.2'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.0'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.22.0'
     implementation 'com.vladsch.flexmark:flexmark:0.64.8'
     implementation 'com.vladsch.flexmark:flexmark-ext-autolink:0.64.8'
     implementation 'com.vladsch.flexmark:flexmark-ext-gfm-strikethrough:0.64.8'
     implementation 'com.vladsch.flexmark:flexmark-ext-tables:0.64.8'
     implementation 'com.vladsch.flexmark:flexmark-ext-gfm-tasklist:0.64.8'
-    implementation 'net.java.dev.jna:jna:5.14.0'
-    implementation 'org.apache.logging.log4j:log4j-api:2.24.3'
-    implementation 'org.apache.logging.log4j:log4j-core:2.24.3'
-    implementation "org.openjfx:javafx-base:21.0.5:${javafxPlatform()}"
-    implementation "org.openjfx:javafx-graphics:21.0.5:${javafxPlatform()}"
-    implementation "org.openjfx:javafx-controls:21.0.5:${javafxPlatform()}"
+    implementation 'net.java.dev.jna:jna:5.19.1'
+    implementation 'org.apache.logging.log4j:log4j-api:2.26.0'
+    implementation 'org.apache.logging.log4j:log4j-core:2.26.0'
+    implementation "org.openjfx:javafx-base:21.0.11:${javafxPlatform()}"
+    implementation "org.openjfx:javafx-graphics:21.0.11:${javafxPlatform()}"
+    implementation "org.openjfx:javafx-controls:21.0.11:${javafxPlatform()}"
 
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testImplementation 'org.junit.jupiter:junit-jupiter:6.1.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:6.1.0'
 }
 
 application {

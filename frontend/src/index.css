@@ -1,8 +1,6 @@
-@import '@fontsource-variable/inter';
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "@fontsource-variable/inter";
+@import "tailwindcss";
+@config "../tailwind.config.mjs";
 
 @layer base {
     html {
