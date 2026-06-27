@@ -28,7 +28,7 @@ const VersionMultiSelectDropdown: React.FC<VersionMultiSelectDropdownProps> = ({
         group.versions.every(version => selectedSet.has(version))
     );
     const displayValue = selectedVersions.length === 0
-        ? 'Any'
+        ? versions[0] || 'No versions'
         : selectedGroup
             ? selectedGroup.label
             : selectedVersions.length === 1
@@ -48,7 +48,8 @@ const VersionMultiSelectDropdown: React.FC<VersionMultiSelectDropdownProps> = ({
 
     const commitSelection = (nextVersions: string[]) => {
         const nextSet = new Set(nextVersions.filter(Boolean));
-        onChange(versions.filter(version => nextSet.has(version)));
+        const orderedSelection = versions.filter(version => nextSet.has(version));
+        onChange(orderedSelection.length > 0 ? orderedSelection : versions.slice(0, 1));
     };
 
     const toggleVersion = (version: string) => {
@@ -91,17 +92,6 @@ const VersionMultiSelectDropdown: React.FC<VersionMultiSelectDropdownProps> = ({
             </button>
             {isOpen && (
                 <div className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-xl z-[120] py-1 overflow-hidden">
-                    <button
-                        type="button"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onChange([]);
-                        }}
-                        className={`w-full text-left px-4 py-2.5 text-xs sm:text-sm font-bold transition-colors flex justify-between items-center ${selectedVersions.length === 0 ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
-                    >
-                        Any
-                        {selectedVersions.length === 0 && <Check className="w-4 h-4" />}
-                    </button>
                     <div className="max-h-56 overflow-y-auto py-1">
                         {groups.length > 0 ? groups.map(group => {
                             if (!group.grouped) {
@@ -273,7 +263,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
 
     const gameVersionGroups = useMemo(() => buildVersionGroups(gameVersions), [gameVersions]);
 
-    const preferredGameVersions = useMemo(() => gameVersionGroups[0]?.versions || [], [gameVersionGroups]);
+    const preferredGameVersions = useMemo(() => gameVersions[0] ? [gameVersions[0]] : [], [gameVersions]);
 
     useEffect(() => {
         const isOpening = show && !wasOpenRef.current;
@@ -283,9 +273,9 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
             setIsListExpanded(false);
         } else if (show) {
             setSelectedGameVersions((current) => {
-                if (current.length === 0) return current;
+                if (preferredGameVersions.length === 0) return [];
                 const validSelections = current.filter(version => gameVersions.includes(version));
-                if (validSelections.length === current.length) return current;
+                if (validSelections.length > 0 && validSelections.length === current.length) return current;
                 return validSelections.length > 0
                     ? validSelections
                     : preferredGameVersions;
@@ -296,8 +286,9 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
     }, [show, gameVersions, preferredGameVersions]);
 
     const activeSelectedGameVersions = useMemo(() => {
-        return selectedGameVersions.length > 0 ? selectedGameVersions : gameVersions;
-    }, [selectedGameVersions, gameVersions]);
+        const availableSelections = selectedGameVersions.filter(version => gameVersions.includes(version));
+        return availableSelections.length > 0 ? availableSelections : preferredGameVersions;
+    }, [selectedGameVersions, gameVersions, preferredGameVersions]);
 
     const selectedVersionEntries = useMemo(() => {
         const entries = new Map<string, { version: any, gameVersion: string }>();
@@ -370,19 +361,19 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
             ? 'bg-purple-600 hover:bg-purple-500 shadow-purple-500/20 text-white'
             : 'bg-modtale-accent hover:bg-blue-500 shadow-blue-500/20 text-white';
 
-    const selectedSet = new Set(selectedGameVersions);
+    const selectedSet = new Set(activeSelectedGameVersions);
     const selectedGroup = gameVersionGroups.find(group =>
         group.grouped &&
-        group.versions.length === selectedGameVersions.length &&
+        group.versions.length === activeSelectedGameVersions.length &&
         group.versions.every(version => selectedSet.has(version))
     );
-    const selectedGameVersionLabel = selectedGameVersions.length === 0
-        ? 'any version'
+    const selectedGameVersionLabel = activeSelectedGameVersions.length === 0
+        ? 'selected version'
         : selectedGroup
             ? selectedGroup.label
-            : selectedGameVersions.length === 1
-                ? selectedGameVersions[0]
-                : `${selectedGameVersions.length} versions`;
+            : activeSelectedGameVersions.length === 1
+                ? activeSelectedGameVersions[0]
+                : `${activeSelectedGameVersions.length} versions`;
 
     const shouldShowEntryGameVersion = activeSelectedGameVersions.length > 1;
 
@@ -422,7 +413,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                 <div className="mb-6">
                     <label className={`block text-xs font-bold ${theme.colors.textSecondary} uppercase mb-2 tracking-wider`}>Game Versions</label>
                     <VersionMultiSelectDropdown
-                        selectedVersions={selectedGameVersions}
+                        selectedVersions={activeSelectedGameVersions}
                         versions={gameVersions}
                         groups={gameVersionGroups}
                         onChange={setSelectedGameVersions}
