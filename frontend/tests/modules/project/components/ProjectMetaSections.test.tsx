@@ -9,6 +9,7 @@ import type { Project, ProjectDependency } from '@/types';
 const project = {
     id: 'project-1',
     title: 'Skyforge',
+    description: 'A project for testing metadata rendering.',
     authorId: 'author-1',
     author: 'Builder',
     imageUrl: '/icon.png',

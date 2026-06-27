@@ -1,7 +1,7 @@
 import React from 'react';
-import {Activity, Github, FileText, Shield, Layers, Box, Database, Palette, Save, Code, Layout} from 'lucide-react';
+import {Activity, FileText, Shield, Layers, Box, Database, Palette, Save, Code, Layout} from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
-import { BlueskyBrandIcon, DiscordBrandIcon, XBrandIcon } from '@/components/ui/icons/BrandIcons';
+import { BlueskyBrandIcon, DiscordBrandIcon, GitHubBrandIcon, XBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { SiteRoutes } from '@/utils/routes';
 
 interface FooterProps {
@@ -101,7 +101,7 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
                                 <BlueskyBrandIcon className="w-4 h-4 mr-2" /> Bluesky
                             </a>
                             <a href="https://github.com/Modtale/modtale" target="_blank" rel="noopener noreferrer" className={linkClass}>
-                                <Github className="w-4 h-4 mr-2" /> GitHub
+                                <GitHubBrandIcon className="w-4 h-4 mr-2" /> GitHub
                             </a>
                         </div>
                     </div>
