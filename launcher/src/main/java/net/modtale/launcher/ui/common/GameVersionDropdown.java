@@ -35,6 +35,7 @@ public final class GameVersionDropdown extends VBox {
     private List<String> selectedVersions = List.of();
     private String emptyText = "No versions found";
     private String anyLabel = "Any";
+    private boolean allowEmptySelection = true;
     private double maxListHeight = 224;
     private Consumer<List<String>> selectionListener = ignored -> {
     };
@@ -105,6 +106,12 @@ public final class GameVersionDropdown extends VBox {
         refresh();
     }
 
+    public void setAllowEmptySelection(boolean allowEmptySelection) {
+        this.allowEmptySelection = allowEmptySelection;
+        this.selectedVersions = selectedVersions(this.selectedVersions);
+        refresh();
+    }
+
     public void setEmptyText(String emptyText) {
         this.emptyText = emptyText == null || emptyText.isBlank() ? "No versions found" : emptyText;
         refresh();
@@ -153,13 +160,20 @@ public final class GameVersionDropdown extends VBox {
     }
 
     private void refresh() {
-        toggleLabel.setText(GameVersionGroups.displayLabel(selectedVersions, versions, anyLabel));
+        String fallbackLabel = allowEmptySelection ? anyLabel : requiredSelectionFallbackLabel();
+        toggleLabel.setText(GameVersionGroups.displayLabel(selectedVersions, versions, fallbackLabel));
         options.getChildren().setAll(optionNodes());
+    }
+
+    private String requiredSelectionFallbackLabel() {
+        return versions.isEmpty() ? emptyText : versions.getFirst();
     }
 
     private List<Node> optionNodes() {
         List<Node> nodes = new ArrayList<>();
-        nodes.add(optionRow(anyLabel, selectedVersions.isEmpty(), () -> commitSelection(List.of())));
+        if (allowEmptySelection) {
+            nodes.add(optionRow(anyLabel, selectedVersions.isEmpty(), () -> commitSelection(List.of())));
+        }
         List<GameVersionGroups.Group> groups = GameVersionGroups.build(versions);
         if (groups.isEmpty()) {
             Label empty = new Label(emptyText);
@@ -308,11 +322,14 @@ public final class GameVersionDropdown extends VBox {
 
     private List<String> selectedVersions(List<String> selectedVersions) {
         if (selectedVersions == null || selectedVersions.isEmpty()) {
-            return List.of();
+            return allowEmptySelection || versions.isEmpty() ? List.of() : List.of(versions.getFirst());
         }
         Set<String> selected = new LinkedHashSet<>(selectedVersions);
-        return versions.stream()
+        List<String> ordered = versions.stream()
                 .filter(selected::contains)
                 .toList();
+        return ordered.isEmpty() && !allowEmptySelection && !versions.isEmpty()
+                ? List.of(versions.getFirst())
+                : ordered;
     }
 }

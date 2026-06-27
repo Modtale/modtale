@@ -106,9 +106,13 @@ final class NativeDownloadModal {
         this.project = project;
         this.catalog = catalog == null ? GameVersionCatalog.fromVersions(List.of()) : catalog;
         this.loading = false;
-        if (!selectedGameVersions.isEmpty() && !gameVersions().containsAll(selectedGameVersions)) {
+        List<String> availableGameVersions = gameVersions();
+        if (selectedGameVersions.isEmpty() && !availableGameVersions.isEmpty()) {
+            selectedGameVersions = preferredVisibleGameVersions();
+            listExpanded = false;
+        } else if (!selectedGameVersions.isEmpty() && !availableGameVersions.containsAll(selectedGameVersions)) {
             List<String> validSelections = selectedGameVersions.stream()
-                    .filter(gameVersions()::contains)
+                    .filter(availableGameVersions::contains)
                     .toList();
             selectedGameVersions = validSelections.isEmpty() ? preferredVisibleGameVersions() : validSelections;
             listExpanded = false;
@@ -267,14 +271,14 @@ final class NativeDownloadModal {
         versionLabel.getStyleClass().add("download-modal-field-label");
         GameVersionDropdown versions = GameVersionDropdown.multiSelect();
         versions.getStyleClass().add("download-game-version-dropdown");
-        versions.setAnyLabel("Any");
+        versions.setAllowEmptySelection(false);
         versions.setEmptyText("No compatible game versions");
         versions.setMaxListHeight(224);
         versions.setVersions(gameVersions());
-        versions.setSelectedVersions(selectedGameVersions);
+        versions.setSelectedVersions(activeSelectedGameVersions());
         versions.setOnOpenChange(open -> gameVersionDropdownOpen = open);
         versions.setOnSelectionChange(next -> {
-            selectedGameVersions = List.copyOf(next);
+            selectedGameVersions = next.isEmpty() ? preferredVisibleGameVersions() : List.copyOf(next);
             listExpanded = false;
             rebuildOverlay();
         });
@@ -603,7 +607,14 @@ final class NativeDownloadModal {
     }
 
     private List<String> activeSelectedGameVersions() {
-        return selectedGameVersions.isEmpty() ? gameVersions() : selectedGameVersions;
+        if (selectedGameVersions.isEmpty()) {
+            return preferredVisibleGameVersions();
+        }
+        List<String> versions = gameVersions();
+        List<String> validSelections = selectedGameVersions.stream()
+                .filter(versions::contains)
+                .toList();
+        return validSelections.isEmpty() ? preferredVisibleGameVersions() : validSelections;
     }
 
     private List<VersionEntry> selectedVersionEntries() {
@@ -633,9 +644,8 @@ final class NativeDownloadModal {
 
     private List<String> preferredVisibleGameVersions() {
         List<String> versions = gameVersions();
-        String preferred = preferredGameVersion.get();
-        if (preferred != null && versions.contains(preferred)) {
-            return List.of(preferred);
+        if (versions.isEmpty()) {
+            return List.of();
         }
         if (!selectedGameVersions.isEmpty()) {
             List<String> validSelections = selectedGameVersions.stream()
@@ -645,8 +655,7 @@ final class NativeDownloadModal {
                 return validSelections;
             }
         }
-        List<GameVersionGroups.Group> groups = GameVersionGroups.build(versions);
-        return groups.isEmpty() ? List.of() : groups.getFirst().versions();
+        return List.of(versions.getFirst());
     }
 
     private Map<String, List<ProjectVersion>> versionsByGame() {
@@ -728,7 +737,7 @@ final class NativeDownloadModal {
     }
 
     private String selectedGameVersionLabel() {
-        return GameVersionGroups.displayLabel(selectedGameVersions, gameVersions(), "any version");
+        return GameVersionGroups.displayLabel(activeSelectedGameVersions(), gameVersions(), "selected version");
     }
 
     private List<String> otherCompatibleVersions(ProjectVersion version, String selectedGameVersion) {
