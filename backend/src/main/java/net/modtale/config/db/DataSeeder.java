@@ -484,24 +484,7 @@ public class DataSeeder implements CommandLineRunner {
                             "reason", "Synthetic banned email for admin UI testing.",
                             "bannedBy", ADMIN_ID, "bannedAt", date("2026-06-15T10:00:00Z"))
             );
-            case "status_incidents" -> List.of(
-                    doc("_id", "mock-status-incident-1", "kind", "INCIDENT", "state", "RESOLVED",
-                            "impact", "DEGRADED", "title", "Synthetic preview incident",
-                            "affectedServices", List.of("Backend API"), "startedAt", date("2026-06-12T14:00:00Z"),
-                            "resolvedAt", date("2026-06-12T14:35:00Z"), "createdAt", date("2026-06-12T14:00:00Z"),
-                            "updatedAt", date("2026-06-12T14:35:00Z"), "createdBy", ADMIN_ID,
-                            "createdByUsername", "admin",
-                            "updates", List.of(doc("id", "mock-status-update-1", "state", "RESOLVED",
-                                    "impact", "OPERATIONAL", "message", "Synthetic incident resolved.",
-                                    "createdAt", date("2026-06-12T14:35:00Z"), "createdBy", ADMIN_ID,
-                                    "createdByUsername", "admin"))),
-                    doc("_id", "mock-maintenance-1", "kind", "MAINTENANCE", "state", "SCHEDULED",
-                            "impact", "DEGRADED", "title", "Synthetic scheduled maintenance",
-                            "affectedServices", List.of("Frontend"), "scheduledStart", date("2026-06-25T04:00:00Z"),
-                            "scheduledEnd", date("2026-06-25T05:00:00Z"), "createdAt", date("2026-06-18T09:00:00Z"),
-                            "updatedAt", date("2026-06-18T09:00:00Z"), "createdBy", ADMIN_ID,
-                            "createdByUsername", "admin", "updates", List.of())
-            );
+            case "status_incidents" -> List.of();
             case "status_history" -> List.of(
                     doc("_id", "mock-status-history-1", "timestamp", date("2026-06-18T12:00:00Z"),
                             "apiLatency", 42, "dbLatency", 18, "storageLatency", 95,
@@ -509,8 +492,8 @@ public class DataSeeder implements CommandLineRunner {
                             "dbStatus", "OPERATIONAL", "storageStatus", "OPERATIONAL"),
                     doc("_id", "mock-status-history-2", "timestamp", date("2026-06-18T12:05:00Z"),
                             "apiLatency", 61, "dbLatency", 24, "storageLatency", 140,
-                            "overallStatus", "DEGRADED", "apiStatus", "OPERATIONAL",
-                            "dbStatus", "OPERATIONAL", "storageStatus", "DEGRADED")
+                            "overallStatus", "OPERATIONAL", "apiStatus", "OPERATIONAL",
+                            "dbStatus", "OPERATIONAL", "storageStatus", "OPERATIONAL")
             );
             default -> List.of();
         };

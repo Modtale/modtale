@@ -11,7 +11,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
-import tools.jackson.databind.ObjectMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.client.ExpectedCount.once;
@@ -21,48 +20,47 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 class WikiUpstreamClientTest {
 
     @Test
-    void cachesResolvedWikiIdsThroughSpringProxy() {
-        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(TestConfig.class)) {
-            WikiUpstreamClient client = context.getBean(WikiUpstreamClient.class);
-            MockRestServiceServer server = MockRestServiceServer.createServer(context.getBean(RestTemplate.class));
-
-            server.expect(once(), requestTo("https://wiki.modtale.test/api/mods"))
-                    .andRespond(withSuccess("{\"data\":[{\"slug\":\"sky-tools\",\"id\":\"wiki-1\"}]}", MediaType.APPLICATION_JSON));
-
-            assertEquals("wiki-1", client.resolveWikiModId("sky-tools"));
-            assertEquals("wiki-1", client.resolveWikiModId("sky-tools"));
-
-            server.verify();
-        }
-    }
-
-    @Test
     void cachesProjectPayloadsThroughSpringProxy() {
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(TestConfig.class)) {
             WikiUpstreamClient client = context.getBean(WikiUpstreamClient.class);
             MockRestServiceServer server = MockRestServiceServer.createServer(context.getBean(RestTemplate.class));
 
-            server.expect(once(), requestTo("https://wiki.modtale.test/api/mods/wiki-1"))
+            server.expect(once(), requestTo("https://wiki.modtale.test/api/mods/sky-tools"))
                     .andRespond(withSuccess("{\"pages\":[]}", MediaType.APPLICATION_JSON));
 
-            assertEquals("{\"pages\":[]}", client.fetchProjectPayload("wiki-1"));
-            assertEquals("{\"pages\":[]}", client.fetchProjectPayload("wiki-1"));
+            assertEquals("{\"pages\":[]}", client.fetchProjectPayload("sky-tools"));
+            assertEquals("{\"pages\":[]}", client.fetchProjectPayload("sky-tools"));
 
             server.verify();
         }
     }
 
     @Test
-    void reusesTheModsListPayloadAcrossDifferentSlugLookups() {
+    void cachesPagePayloadsThroughSpringProxy() {
         try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(TestConfig.class)) {
             WikiUpstreamClient client = context.getBean(WikiUpstreamClient.class);
             MockRestServiceServer server = MockRestServiceServer.createServer(context.getBean(RestTemplate.class));
 
-            server.expect(once(), requestTo("https://wiki.modtale.test/api/mods"))
-                    .andRespond(withSuccess("{\"data\":[{\"slug\":\"sky-tools\",\"id\":\"wiki-1\"},{\"slug\":\"stone-tools\",\"id\":\"wiki-2\"}]}", MediaType.APPLICATION_JSON));
+            server.expect(once(), requestTo("https://wiki.modtale.test/api/mods/wiki-1/home-1"))
+                    .andRespond(withSuccess("{\"title\":\"Home\"}", MediaType.APPLICATION_JSON));
 
-            assertEquals("wiki-1", client.resolveWikiModId("sky-tools"));
-            assertEquals("wiki-2", client.resolveWikiModId("stone-tools"));
+            assertEquals("{\"title\":\"Home\"}", client.fetchPagePayload("wiki-1", "home-1"));
+            assertEquals("{\"title\":\"Home\"}", client.fetchPagePayload("wiki-1", "home-1"));
+
+            server.verify();
+        }
+    }
+
+    @Test
+    void encodesNestedPagePathsWithoutFetchingTheModsList() {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(TestConfig.class)) {
+            WikiUpstreamClient client = context.getBean(WikiUpstreamClient.class);
+            MockRestServiceServer server = MockRestServiceServer.createServer(context.getBean(RestTemplate.class));
+
+            server.expect(once(), requestTo("https://wiki.modtale.test/api/mods/wiki-1/guides/getting-started"))
+                    .andRespond(withSuccess("{\"title\":\"Getting Started\"}", MediaType.APPLICATION_JSON));
+
+            assertEquals("{\"title\":\"Getting Started\"}", client.fetchPagePayload("wiki-1", "guides/getting-started"));
 
             server.verify();
         }
@@ -75,16 +73,9 @@ class WikiUpstreamClientTest {
         @Bean
         CacheManager cacheManager() {
             return new ConcurrentMapCacheManager(
-                    "wikiSlugToId",
-                    "wikiModsPayload",
                     "wikiProjectPayload",
                     "wikiPagePayload"
             );
-        }
-
-        @Bean
-        ObjectMapper objectMapper() {
-            return new ObjectMapper();
         }
 
         @Bean
@@ -99,12 +90,10 @@ class WikiUpstreamClientTest {
 
         @Bean
         WikiUpstreamClient wikiUpstreamClient(
-                ObjectMapper objectMapper,
                 AppWikiProperties appWikiProperties,
-                RestTemplate wikiRestTemplate,
-                CacheManager cacheManager
+                RestTemplate wikiRestTemplate
         ) {
-            return new WikiUpstreamClient(objectMapper, appWikiProperties, wikiRestTemplate, cacheManager);
+            return new WikiUpstreamClient(appWikiProperties, wikiRestTemplate);
         }
     }
 }

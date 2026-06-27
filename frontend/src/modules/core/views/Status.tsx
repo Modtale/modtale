@@ -37,6 +37,9 @@ interface HistoryPoint {
     api: number;
     db: number;
     storage: number;
+    apiStatus?: string;
+    dbStatus?: string;
+    storageStatus?: string;
 }
 
 interface StatusResponse {
@@ -91,6 +94,12 @@ const SERVICE_META: Record<string, { historyKey: HistoryKey; label: string }> = 
     api: { historyKey: 'api', label: 'API Gateway' },
     database: { historyKey: 'db', label: 'Database' },
     storage: { historyKey: 'storage', label: 'Storage' },
+};
+
+const HISTORY_STATUS_FIELD: Record<HistoryKey, keyof Pick<HistoryPoint, 'apiStatus' | 'dbStatus' | 'storageStatus'>> = {
+    api: 'apiStatus',
+    db: 'dbStatus',
+    storage: 'storageStatus',
 };
 
 const STATUS_COPY: Record<StatusState, { label: string; summary: string; badge: string; iconBg: string }> = {
@@ -149,6 +158,9 @@ const formatPercent = (value: number | null) => {
     if (value === null || !Number.isFinite(value)) {
         return 'No data';
     }
+    if (value >= 99.995) {
+        return '100%';
+    }
     return `${value.toFixed(value >= 99.95 ? 2 : 1)}%`;
 };
 
@@ -164,6 +176,16 @@ const percentile = (values: number[], target: number) => {
     const index = Math.min(cleanValues.length - 1, Math.max(0, Math.ceil(cleanValues.length * target) - 1));
     return cleanValues[index];
 };
+
+const getHistoryStatus = (point: HistoryPoint, historyKey: HistoryKey): StatusState => {
+    const explicitStatus = point[HISTORY_STATUS_FIELD[historyKey]];
+    if (explicitStatus) {
+        return normalizeStatus(explicitStatus);
+    }
+    return isHealthyLatency(point[historyKey]) ? 'operational' : 'outage';
+};
+
+const isAvailableStatus = (status: StatusState) => status !== 'outage';
 
 const formatTime = (timestamp: number, range: StatusRange) => (
     range === '24h'
@@ -217,11 +239,12 @@ const createBuckets = (data: HistoryPoint[], historyKey: HistoryKey, range: Stat
             return { startTime: bucketStart, status: 'no-data' as const, percent: null };
         }
 
-        const healthyPoints = points.filter((point) => isHealthyLatency(point[historyKey])).length;
-        const percent = (healthyPoints / points.length) * 100;
-        let status: StatusState = 'outage';
-        if (percent >= 99) status = 'operational';
-        else if (percent >= 90) status = 'degraded';
+        const pointStatuses = points.map((point) => getHistoryStatus(point, historyKey));
+        const availablePoints = pointStatuses.filter(isAvailableStatus).length;
+        const percent = (availablePoints / points.length) * 100;
+        let status: StatusState = 'operational';
+        if (percent < 99) status = 'outage';
+        else if (pointStatuses.some((pointStatus) => pointStatus !== 'operational')) status = 'degraded';
 
         return { startTime: bucketStart, status, percent };
     });
@@ -395,15 +418,19 @@ export const Status: React.FC = () => {
     const latestTimestamp = data?.timestamp ? new Date(data.timestamp) : lastUpdated;
 
     const availability = useMemo(() => {
-        const measured = history.flatMap((point) => [point.api, point.db, point.storage]);
-        if (measured.length === 0) {
+        const measuredStatuses = history.flatMap((point) => [
+            getHistoryStatus(point, 'api'),
+            getHistoryStatus(point, 'db'),
+            getHistoryStatus(point, 'storage'),
+        ]);
+        if (measuredStatuses.length === 0) {
             if (services.length === 0) return null;
             const healthyServices = services.filter((service) => normalizeStatus(service.status) === 'operational').length;
             return (healthyServices / services.length) * 100;
         }
 
-        const healthy = measured.filter(isHealthyLatency).length;
-        return (healthy / measured.length) * 100;
+        const available = measuredStatuses.filter(isAvailableStatus).length;
+        return (available / measuredStatuses.length) * 100;
     }, [history, services]);
 
     const chartDatasets = useMemo(() => ([
@@ -484,7 +511,7 @@ export const Status: React.FC = () => {
                                         <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Health</span>
                                     </div>
                                     <div className="text-2xl font-black text-slate-950 dark:text-white">{formatPercent(availability)}</div>
-                                    <div className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">Measured availability</div>
+                                    <div className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">Service availability</div>
                                 </div>
 
                                 <div className={`${SOFT_CARD_CLASS} p-4`}>
@@ -615,9 +642,9 @@ export const Status: React.FC = () => {
                                     <div>
                                         <div className="mb-2 flex items-center gap-3">
                                             <AlertTriangle className="h-5 w-5 text-amber-500" />
-                                            <h2 className="text-2xl font-black text-slate-950 dark:text-white">Current Downtime Updates</h2>
+                                            <h2 className="text-2xl font-black text-slate-950 dark:text-white">Current Status Updates</h2>
                                         </div>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">Admin timeline updates as downtime moves from investigation to resolution.</p>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400">Admin timeline updates as service impact moves from investigation to resolution.</p>
                                     </div>
                                     <StatusPill status={overallStatus} />
                                 </div>
@@ -634,7 +661,7 @@ export const Status: React.FC = () => {
                                 <div className="mb-5 flex items-start gap-3">
                                     <Clock3 className="mt-1 h-5 w-5 text-violet-500" />
                                     <div>
-                                        <h2 className="text-2xl font-black text-slate-950 dark:text-white">Scheduled Downtime</h2>
+                                        <h2 className="text-2xl font-black text-slate-950 dark:text-white">Scheduled Maintenance</h2>
                                         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Planned maintenance windows.</p>
                                     </div>
                                 </div>
@@ -694,7 +721,7 @@ export const Status: React.FC = () => {
                     <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                             <h2 className="text-2xl font-black text-slate-950 dark:text-white">Availability History</h2>
-                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Green means healthy checks, amber means degraded checks, red means failed checks.</p>
+                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Green means operational service states, amber means degraded or brief outage states, red means sustained outage states.</p>
                         </div>
                         <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-white/10 dark:bg-slate-950/40" role="group" aria-label="Status history range">
                             {(['24h', '30d'] as StatusRange[]).map((option) => (

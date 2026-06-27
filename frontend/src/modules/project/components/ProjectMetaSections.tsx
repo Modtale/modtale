@@ -1,11 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Box, ExternalLink, Gamepad2, Link as LinkIcon, Tag } from 'lucide-react';
+import { AlertTriangle, Box, ChevronRight, ExternalLink, Gamepad2, Link as LinkIcon, Tag } from 'lucide-react';
 
 import { SidebarSection } from '@/modules/project/components/ProjectLayout';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { SiteRoutes } from '@/utils/routes';
 import { BACKEND_URL } from '@/utils/api';
+import { buildVersionGroups, compareGameVersionsDesc, type VersionGroup } from '@/utils/modHelpers';
 import type { Project, ProjectDependency } from '@/types';
 import { getDependencyType, isEmbeddedDependency, isExternalDependency, isOptionalDependency } from '../utils/dependencyEntries';
 
@@ -14,6 +15,7 @@ interface ProjectMetaSectionsProps {
     dependencies?: ProjectDependency[];
     incompatibleProjectIds?: string[];
     depMeta: Record<string, { icon: string; title: string; classification?: string; slug?: string }>;
+    orderedGameVersions?: string[];
 }
 
 const getSourceLabel = (source?: string) => {
@@ -27,17 +29,67 @@ const getSourceLabel = (source?: string) => {
     }
 };
 
+const SupportedVersionPill = ({ version }: { version: string }) => (
+    <span className="inline-flex items-center px-2.5 py-1 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-md text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+        {version}
+    </span>
+);
+
+const SupportedVersionGroup = ({ group }: { group: VersionGroup }) => {
+    const [isOpen, setIsOpen] = React.useState(false);
+
+    if (!group.grouped) {
+        const version = group.versions[0];
+        return version ? <SupportedVersionPill version={version} /> : null;
+    }
+
+    return (
+        <div className="w-full rounded-lg border border-slate-200 dark:border-white/5 bg-slate-50/70 dark:bg-white/[0.03] overflow-hidden">
+            <button
+                type="button"
+                aria-expanded={isOpen}
+                aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${group.label} versions`}
+                onClick={() => setIsOpen(prev => !prev)}
+                className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 text-left text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide hover:text-modtale-accent dark:hover:text-modtale-accent transition-colors"
+            >
+                <span>{group.label}</span>
+                <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400 normal-case tracking-normal">
+                    {group.versions.length}
+                    <ChevronRight className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-90' : ''}`} aria-hidden="true" />
+                </span>
+            </button>
+            {isOpen && (
+                <div className="flex flex-wrap gap-1.5 px-2.5 pb-2">
+                    {group.versions.map(version => (
+                        <SupportedVersionPill key={version} version={version} />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 export const ProjectMetaSections: React.FC<ProjectMetaSectionsProps> = React.memo(({
     project,
     dependencies,
     incompatibleProjectIds,
-    depMeta
+    depMeta,
+    orderedGameVersions = []
 }) => {
     const gameVersions = React.useMemo(() => {
         const set = new Set<string>();
         (project.versions || []).forEach(v => v.gameVersions?.forEach(gv => set.add(gv)));
-        return Array.from(set).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
-    }, [project.versions]);
+
+        const ordered = orderedGameVersions.filter(version => {
+            if (!set.has(version)) return false;
+            set.delete(version);
+            return true;
+        });
+        const unordered = Array.from(set).sort(compareGameVersionsDesc);
+
+        return [...ordered, ...unordered];
+    }, [project.versions, orderedGameVersions]);
+    const gameVersionGroups = React.useMemo(() => buildVersionGroups(gameVersions), [gameVersions]);
 
     const isModpack = project.classification === 'MODPACK';
     const getIconUrl = (path?: string) => path ? (path.startsWith('http') ? path : `${BACKEND_URL}${path}`) : null;
@@ -51,10 +103,8 @@ export const ProjectMetaSections: React.FC<ProjectMetaSectionsProps> = React.mem
             {gameVersions.length > 0 && (
                 <SidebarSection title="Supported Versions" icon={Gamepad2}>
                     <div className="flex flex-wrap gap-2">
-                        {gameVersions.map(v => (
-                            <span key={v} className="px-2.5 py-1 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-md text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
-                                {v}
-                            </span>
+                        {gameVersionGroups.map(group => (
+                            <SupportedVersionGroup key={group.label} group={group} />
                         ))}
                     </div>
                 </SidebarSection>

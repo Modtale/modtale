@@ -59,10 +59,11 @@ const WikiNode: React.FC<{
     currentSlug?: string;
     indexSlug?: string;
     onNavigate?: (slug: string) => void;
+    onPrefetch?: (slug: string) => void;
     depth: number;
     isFirst: boolean;
     pageCache?: Record<string, any>;
-}> = ({ node, projectUrl, currentSlug, indexSlug, onNavigate, depth, isFirst, pageCache }) => {
+}> = ({ node, projectUrl, currentSlug, indexSlug, onNavigate, onPrefetch, depth, isFirst, pageCache }) => {
     const hasChildren = node.children && node.children.length > 0;
     const isCategoryEmpty = hasChildren && (!node.slug || isPageEmpty(node.slug, pageCache));
     const isActive = currentSlug === node.slug || (!currentSlug && (indexSlug === node.slug || (isFirst && depth === 0 && node.slug)));
@@ -86,6 +87,9 @@ const WikiNode: React.FC<{
             window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 120, behavior: 'smooth' });
         }
     };
+    const prefetchNode = () => {
+        if (node.slug) onPrefetch?.(node.slug);
+    };
 
     if (hasChildren) {
         return (
@@ -93,9 +97,9 @@ const WikiNode: React.FC<{
                 <div className={`flex items-stretch gap-2 ${depth > 0 ? 'mt-2' : ''}`}>
                     {node.slug && !isCategoryEmpty ? (
                         onNavigate ? (
-                            <button type="button" onClick={navigateToNode} className={`flex-1 ${className}`}>{node.title}</button>
+                            <button type="button" onClick={navigateToNode} onMouseEnter={prefetchNode} onFocus={prefetchNode} className={`flex-1 ${className}`}>{node.title}</button>
                         ) : (
-                            <Link preventScrollReset={true} to={`${projectUrl}/wiki/${node.slug}`} className={`flex-1 ${className}`}>{node.title}</Link>
+                            <Link preventScrollReset={true} to={`${projectUrl}/wiki/${node.slug}`} onMouseEnter={prefetchNode} onFocus={prefetchNode} className={`flex-1 ${className}`}>{node.title}</Link>
                         )
                     ) : node.slug ? (
                         <div className={`flex-1 px-3 py-2 text-sm font-medium ${theme.colors.textMuted}`}>
@@ -119,7 +123,7 @@ const WikiNode: React.FC<{
                 {isBranchOpen && (
                     <ul className={`space-y-1 mt-1 ml-3 pl-3 border-l ${theme.colors.border}`}>
                         {node.children.map((child: any) => (
-                            <WikiNode key={child.id} node={child} projectUrl={projectUrl} currentSlug={currentSlug} indexSlug={indexSlug} onNavigate={onNavigate} depth={depth + 1} isFirst={false} pageCache={pageCache} />
+                            <WikiNode key={child.id} node={child} projectUrl={projectUrl} currentSlug={currentSlug} indexSlug={indexSlug} onNavigate={onNavigate} onPrefetch={onPrefetch} depth={depth + 1} isFirst={false} pageCache={pageCache} />
                         ))}
                     </ul>
                 )}
@@ -130,21 +134,21 @@ const WikiNode: React.FC<{
     return (
         <li key={node.id}>
             {onNavigate ? (
-                <button type="button" onClick={navigateToNode} className={className}>{node.title}</button>
+                <button type="button" onClick={navigateToNode} onMouseEnter={prefetchNode} onFocus={prefetchNode} className={className}>{node.title}</button>
             ) : (
-                <Link preventScrollReset={true} to={`${projectUrl}/wiki/${node.slug}`} className={className}>{node.title}</Link>
+                <Link preventScrollReset={true} to={`${projectUrl}/wiki/${node.slug}`} onMouseEnter={prefetchNode} onFocus={prefetchNode} className={className}>{node.title}</Link>
             )}
         </li>
     );
 };
 
-export const WikiSidebar: React.FC<{ tree: any[], projectUrl: string, currentSlug?: string, indexSlug?: string, onNavigate?: (slug: string) => void, pageCache?: Record<string, any> }> = ({ tree, projectUrl, currentSlug, indexSlug, onNavigate, pageCache }) => {
+export const WikiSidebar: React.FC<{ tree: any[], projectUrl: string, currentSlug?: string, indexSlug?: string, onNavigate?: (slug: string) => void, onPrefetch?: (slug: string) => void, pageCache?: Record<string, any> }> = ({ tree, projectUrl, currentSlug, indexSlug, onNavigate, onPrefetch, pageCache }) => {
     if (!tree || tree.length === 0) return null;
     return (
         <SidebarSection title="Wiki Navigation" icon={BookOpen} defaultOpen={true}>
             <ul className="space-y-1">
                 {tree.map((p, idx) => (
-                    <WikiNode key={p.id} node={p} projectUrl={projectUrl} currentSlug={currentSlug} indexSlug={indexSlug} onNavigate={onNavigate} depth={0} isFirst={idx === 0} pageCache={pageCache} />
+                    <WikiNode key={p.id} node={p} projectUrl={projectUrl} currentSlug={currentSlug} indexSlug={indexSlug} onNavigate={onNavigate} onPrefetch={onPrefetch} depth={0} isFirst={idx === 0} pageCache={pageCache} />
                 ))}
             </ul>
         </SidebarSection>
@@ -156,10 +160,11 @@ const WikiMobileTreeNode: React.FC<{
     projectUrl: string;
     activeSlug?: string;
     onNavigate?: (slug: string) => void;
+    onPrefetch?: (slug: string) => void;
     onClose: () => void;
     depth: number;
     pageCache?: Record<string, any>;
-}> = ({ node, projectUrl, activeSlug, onNavigate, onClose, depth, pageCache }) => {
+}> = ({ node, projectUrl, activeSlug, onNavigate, onPrefetch, onClose, depth, pageCache }) => {
     const hasChildren = Array.isArray(node.children) && node.children.length > 0;
     const isActive = activeSlug === node.slug;
     const hasActiveDescendant = useMemo(() => hasChildren && nodeContainsDescendantSlug(node, activeSlug), [node, activeSlug, hasChildren]);
@@ -180,6 +185,9 @@ const WikiMobileTreeNode: React.FC<{
         if (onNavigate) onNavigate(node.slug);
         onClose();
     };
+    const prefetchNode = () => {
+        if (node.slug) onPrefetch?.(node.slug);
+    };
 
     return (
         <li>
@@ -189,6 +197,9 @@ const WikiMobileTreeNode: React.FC<{
                         <button
                             type="button"
                             onClick={navigate}
+                            onPointerDown={prefetchNode}
+                            onMouseEnter={prefetchNode}
+                            onFocus={prefetchNode}
                             className={`flex-1 ${rowClass}`}
                             style={{ paddingLeft: `${0.75 + depth * 0.75}rem` }}
                         >
@@ -199,6 +210,9 @@ const WikiMobileTreeNode: React.FC<{
                             preventScrollReset={true}
                             to={`${projectUrl}/wiki/${node.slug}`}
                             onClick={onClose}
+                            onPointerDown={prefetchNode}
+                            onMouseEnter={prefetchNode}
+                            onFocus={prefetchNode}
                             className={`flex-1 ${rowClass}`}
                             style={{ paddingLeft: `${0.75 + depth * 0.75}rem` }}
                         >
@@ -238,6 +252,7 @@ const WikiMobileTreeNode: React.FC<{
                             projectUrl={projectUrl}
                             activeSlug={activeSlug}
                             onNavigate={onNavigate}
+                            onPrefetch={onPrefetch}
                             onClose={onClose}
                             depth={depth + 1}
                             pageCache={pageCache}
@@ -249,7 +264,7 @@ const WikiMobileTreeNode: React.FC<{
     );
 };
 
-export const WikiMobileNavigation: React.FC<{ tree: any[], projectUrl: string, currentSlug?: string, indexSlug?: string, onNavigate?: (slug: string) => void, pageCache?: Record<string, any> }> = ({ tree, projectUrl, currentSlug, indexSlug, onNavigate, pageCache }) => {
+export const WikiMobileNavigation: React.FC<{ tree: any[], projectUrl: string, currentSlug?: string, indexSlug?: string, onNavigate?: (slug: string) => void, onPrefetch?: (slug: string) => void, pageCache?: Record<string, any> }> = ({ tree, projectUrl, currentSlug, indexSlug, onNavigate, onPrefetch, pageCache }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [query, setQuery] = useState('');
     const flatPages = useMemo(() => flattenWikiPages(tree, pageCache), [tree, pageCache]);
@@ -272,6 +287,7 @@ export const WikiMobileNavigation: React.FC<{ tree: any[], projectUrl: string, c
     };
 
     const navigateToSlug = (slug: string) => {
+        onPrefetch?.(slug);
         if (onNavigate) onNavigate(slug);
         close();
     };
@@ -283,14 +299,14 @@ export const WikiMobileNavigation: React.FC<{ tree: any[], projectUrl: string, c
     const renderPageResult = (page: FlatWikiPage) => (
         <li key={page.id}>
             {onNavigate ? (
-                <button type="button" onClick={() => navigateToSlug(page.slug)} className={pageLinkClass}>
+                <button type="button" onClick={() => navigateToSlug(page.slug)} onPointerDown={() => onPrefetch?.(page.slug)} onMouseEnter={() => onPrefetch?.(page.slug)} onFocus={() => onPrefetch?.(page.slug)} className={pageLinkClass}>
                     <span className="block truncate text-sm font-bold">{page.title}</span>
                     {page.parents.length > 0 && (
                         <span className={`mt-0.5 block truncate text-[11px] font-medium ${theme.colors.textMuted}`}>{page.parents.join(' / ')}</span>
                     )}
                 </button>
             ) : (
-                <Link preventScrollReset={true} to={`${projectUrl}/wiki/${page.slug}`} onClick={close} className={pageLinkClass}>
+                <Link preventScrollReset={true} to={`${projectUrl}/wiki/${page.slug}`} onClick={close} onPointerDown={() => onPrefetch?.(page.slug)} onMouseEnter={() => onPrefetch?.(page.slug)} onFocus={() => onPrefetch?.(page.slug)} className={pageLinkClass}>
                     <span className="block truncate text-sm font-bold">{page.title}</span>
                     {page.parents.length > 0 && (
                         <span className={`mt-0.5 block truncate text-[11px] font-medium ${theme.colors.textMuted}`}>{page.parents.join(' / ')}</span>
@@ -380,6 +396,7 @@ export const WikiMobileNavigation: React.FC<{ tree: any[], projectUrl: string, c
                                             projectUrl={projectUrl}
                                             activeSlug={activeSlug}
                                             onNavigate={onNavigate}
+                                            onPrefetch={onPrefetch}
                                             onClose={close}
                                             depth={0}
                                             pageCache={pageCache}
@@ -412,7 +429,7 @@ export const Wiki: React.FC<{ wikiLoading: boolean; wikiError: boolean; wikiData
             {wikiData.content?.content ? (
                 <>
                     <h1 className="text-3xl md:text-4xl font-black mb-6 break-words">{wikiData.content.title || wikiData.mod.name}</h1>
-                    <MarkdownRenderer content={wikiData.content.content} deferRich />
+                    <MarkdownRenderer content={wikiData.content.content} deferRich fastOnly />
                 </>
             ) : (
                 <div className={`${theme.colors.textMuted} italic`}>Page content is empty.</div>

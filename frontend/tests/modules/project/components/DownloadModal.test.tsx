@@ -203,20 +203,8 @@ describe('DownloadModal Toggle Visibility', () => {
         expect(onDownload).toHaveBeenCalledWith('/files/skyforge.jar', '1.0.0', '0.5.4', [], 'RELEASE');
     });
 
-    it('defaults to the latest version family in the download modal', async () => {
+    it('defaults to the latest backend-ordered game version in the download modal', async () => {
         const versionsByGame = {
-            '0.5.4': [
-                {
-                    id: 'v54',
-                    versionNumber: '1.1.0',
-                    channel: 'RELEASE',
-                    gameVersion: '0.5.4',
-                    gameVersions: ['0.5.4'],
-                    fileUrl: '/files/skyforge-054.jar',
-                    dependencies: [],
-                    releaseDate: '2026-03-01T00:00:00.000Z'
-                }
-            ],
             '0.5.3': [
                 {
                     id: 'v53',
@@ -227,6 +215,18 @@ describe('DownloadModal Toggle Visibility', () => {
                     fileUrl: '/files/skyforge-053.jar',
                     dependencies: [],
                     releaseDate: '2026-02-01T00:00:00.000Z'
+                }
+            ],
+            '0.5.4': [
+                {
+                    id: 'v54',
+                    versionNumber: '1.1.0',
+                    channel: 'RELEASE',
+                    gameVersion: '0.5.4',
+                    gameVersions: ['0.5.4'],
+                    fileUrl: '/files/skyforge-054.jar',
+                    dependencies: [],
+                    releaseDate: '2026-03-01T00:00:00.000Z'
                 }
             ],
             '0.4.9': [
@@ -263,14 +263,14 @@ describe('DownloadModal Toggle Visibility', () => {
         await settle();
 
         const listButton = Array.from(document.body.querySelectorAll('button'))
-            .find((button) => button.textContent?.includes('View all files for 0.5.x')) as HTMLButtonElement;
+            .find((button) => button.textContent?.includes('View all files for 0.5.4')) as HTMLButtonElement;
 
         await act(async () => {
             listButton.click();
         });
 
         expect(pageText()).toContain('v1.1.0');
-        expect(pageText()).toContain('v1.0.0');
+        expect(pageText()).not.toContain('v1.0.0');
         expect(pageText()).not.toContain('v0.9.0');
 
         const dropdownButton = Array.from(document.body.querySelectorAll('button'))
@@ -280,21 +280,7 @@ describe('DownloadModal Toggle Visibility', () => {
             dropdownButton.click();
         });
 
-        const expandGroupButton = Array.from(document.body.querySelectorAll('button'))
-            .find((button) => button.getAttribute('aria-label') === 'Expand 0.5.x versions') as HTMLButtonElement;
-
-        await act(async () => {
-            expandGroupButton.click();
-        });
-
-        const versionButton = Array.from(document.body.querySelectorAll('button'))
-            .find((button) => button.textContent?.trim() === '0.5.3') as HTMLButtonElement;
-
-        await act(async () => {
-            versionButton.click();
-        });
-
-        expect(pageText()).not.toContain('1/2');
+        expect(Array.from(document.body.querySelectorAll('button')).some((button) => button.textContent?.trim() === 'Any')).toBe(false);
     });
 
     it('selects a version family as an OR-compatible set in the download modal', async () => {
@@ -363,18 +349,18 @@ describe('DownloadModal Toggle Visibility', () => {
             dropdownButton.click();
         });
 
-        const anyButton = Array.from(document.body.querySelectorAll('button'))
-            .find((button) => button.textContent?.trim() === 'Any') as HTMLButtonElement;
-
-        await act(async () => {
-            anyButton.click();
-        });
-
         const groupButton = Array.from(document.body.querySelectorAll('button'))
             .find((button) => button.getAttribute('aria-label') === 'Select all 0.5.x versions') as HTMLButtonElement;
 
         await act(async () => {
             groupButton.click();
+        });
+
+        const newestVersionButton = Array.from(document.body.querySelectorAll('button'))
+            .find((button) => button.textContent?.trim() === '0.6.0') as HTMLButtonElement;
+
+        await act(async () => {
+            newestVersionButton.click();
         });
 
         const listButton = Array.from(document.body.querySelectorAll('button'))
