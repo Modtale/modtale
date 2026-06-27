@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, Upload, Plus, Image as ImageIcon, Github, Twitter, Gitlab, Globe, Check, Copy, ExternalLink, UserPlus, UserCheck, Building2, Settings, Flag, LogIn } from 'lucide-react';
+import { ChevronLeft, Upload, Plus, Image as ImageIcon, Globe, Check, Copy, ExternalLink, UserPlus, UserCheck, Building2, Settings, Flag, LogIn } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { Spinner } from '@/components/ui/Spinner';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { DiscordBrandIcon } from '@/components/ui/icons/BrandIcons';
+import { DiscordBrandIcon, GitHubBrandIcon, GitLabBrandIcon, XBrandIcon } from '@/components/ui/icons/BrandIcons';
 import type { User } from '@/types';
 import { BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
@@ -172,9 +172,9 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
 
     const getProviderDetails = (provider: string) => {
         switch (provider?.toLowerCase()) {
-            case 'github': return { icon: Github, label: 'GitHub', activeClass: 'group-hover/social:text-slate-900 dark:group-hover/social:text-white group-hover/social:border-slate-300 dark:group-hover/social:border-white/20', iconBg: 'bg-slate-900/10 dark:bg-white/10 text-slate-900 dark:text-white', profileBtnBg: 'bg-[#24292e]' };
-            case 'gitlab': return { icon: Gitlab, label: 'GitLab', activeClass: 'group-hover/social:text-[#FC6D26] group-hover/social:border-[#FC6D26]/30', iconBg: 'bg-[#FC6D26]/10 text-[#FC6D26]', profileBtnBg: 'bg-[#FC6D26]' };
-            case 'twitter': return { icon: Twitter, label: 'Twitter', activeClass: 'group-hover/social:text-[#1DA1F2] group-hover/social:border-[#1DA1F2]/30', iconBg: 'bg-[#1DA1F2]/10 text-[#1DA1F2]', profileBtnBg: 'bg-[#1DA1F2]' };
+            case 'github': return { icon: GitHubBrandIcon, label: 'GitHub', activeClass: 'group-hover/social:text-slate-900 dark:group-hover/social:text-white group-hover/social:border-slate-300 dark:group-hover/social:border-white/20', iconBg: 'bg-slate-900/10 dark:bg-white/10 text-slate-900 dark:text-white', profileBtnBg: 'bg-[#24292e]' };
+            case 'gitlab': return { icon: GitLabBrandIcon, label: 'GitLab', activeClass: 'group-hover/social:text-[#FC6D26] group-hover/social:border-[#FC6D26]/30', iconBg: 'bg-[#FC6D26]/10 text-[#FC6D26]', profileBtnBg: 'bg-[#FC6D26]' };
+            case 'twitter': return { icon: XBrandIcon, label: 'Twitter', activeClass: 'group-hover/social:text-[#1DA1F2] group-hover/social:border-[#1DA1F2]/30', iconBg: 'bg-[#1DA1F2]/10 text-[#1DA1F2]', profileBtnBg: 'bg-[#1DA1F2]' };
             case 'discord': return { icon: DiscordBrandIcon, label: 'Discord', activeClass: 'group-hover/social:text-[#5865F2] group-hover/social:border-[#5865F2]/30', iconBg: 'bg-[#5865F2]/10 text-[#5865F2]', profileBtnBg: 'bg-[#5865F2]' };
             default: return { icon: Globe, label: 'Website', activeClass: 'group-hover/social:text-blue-500 group-hover/social:border-blue-500/30', iconBg: 'bg-blue-500/10 text-blue-500', profileBtnBg: 'bg-blue-500' };
         }
