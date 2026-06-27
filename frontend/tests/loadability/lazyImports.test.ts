@@ -1,8 +1,9 @@
 // @vitest-environment node
 import path from 'node:path';
 import net from 'node:net';
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
+import type { Readable } from 'node:stream';
 import * as ts from 'typescript';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -160,7 +161,9 @@ const reservePort = async () => {
     return port;
 };
 
-const waitForServerReady = async (origin: string, child: ChildProcessWithoutNullStreams, getLogs: () => string) => {
+type DevServerProcess = ChildProcessByStdio<null, Readable, Readable>;
+
+const waitForServerReady = async (origin: string, child: DevServerProcess, getLogs: () => string) => {
     const start = Date.now();
 
     while (Date.now() - start < startupTimeoutMs) {
@@ -183,7 +186,7 @@ const waitForServerReady = async (origin: string, child: ChildProcessWithoutNull
     throw new Error(`Timed out waiting for Astro dev server at ${origin}.\n${getLogs()}`);
 };
 
-const stopServer = async (child: ChildProcessWithoutNullStreams | null) => {
+const stopServer = async (child: DevServerProcess | null) => {
     if (!child || child.exitCode !== null) {
         return;
     }
@@ -229,7 +232,7 @@ const fetchText = async (url: string, label: string) => {
 };
 
 describe('lazy-loaded module integrity', () => {
-    let devServer: ChildProcessWithoutNullStreams | null = null;
+    let devServer: DevServerProcess | null = null;
     let origin = '';
     let stdout = '';
     let stderr = '';
@@ -240,7 +243,7 @@ describe('lazy-loaded module integrity', () => {
 
         devServer = spawn('npm', ['run', 'dev', '--', '--host', '127.0.0.1', '--port', String(port)], {
             cwd: process.cwd(),
-            env: process.env,
+            env: { ...process.env, ASTRO_DEV_BACKGROUND: '0' },
             stdio: ['ignore', 'pipe', 'pipe'],
         });
 
