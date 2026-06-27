@@ -139,7 +139,10 @@ public class StatusSnapshotService {
                         h.getTimestamp().toEpochSecond(ZoneOffset.UTC) * 1000,
                         h.getApiLatency(),
                         h.getDbLatency(),
-                        h.getStorageLatency()
+                        h.getStorageLatency(),
+                        resolveServiceStatus(h.getApiStatus(), h.getApiLatency(), h.getOverallStatus()),
+                        resolveServiceStatus(h.getDbStatus(), h.getDbLatency(), h.getOverallStatus()),
+                        resolveServiceStatus(h.getStorageStatus(), h.getStorageLatency(), h.getOverallStatus())
                 ))
                 .toList();
 
@@ -226,12 +229,16 @@ public class StatusSnapshotService {
             return storedStatus;
         }
 
+        if (overallStatus == SystemStatus.OPERATIONAL) {
+            return SystemStatus.OPERATIONAL;
+        }
+
         if (latency <= 0 || latency >= 5000) {
             return SystemStatus.OUTAGE;
         }
 
-        if (overallStatus == SystemStatus.OPERATIONAL) {
-            return SystemStatus.OPERATIONAL;
+        if (overallStatus == SystemStatus.OUTAGE) {
+            return SystemStatus.OUTAGE;
         }
 
         return SystemStatus.DEGRADED;

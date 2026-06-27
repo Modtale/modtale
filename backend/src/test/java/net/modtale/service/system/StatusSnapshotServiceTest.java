@@ -69,6 +69,51 @@ class StatusSnapshotServiceTest {
         assertEquals("api", status.services().getFirst().id());
         assertEquals(12, status.services().getFirst().latency());
         assertEquals(100, status.history().size());
+        assertEquals(SystemStatus.OPERATIONAL, status.history().getFirst().apiStatus());
+        assertEquals(SystemStatus.OPERATIONAL, status.history().getFirst().dbStatus());
+        assertEquals(SystemStatus.OPERATIONAL, status.history().getFirst().storageStatus());
+    }
+
+    @Test
+    void getSystemStatusIncludesHistoricalServiceStatuses() {
+        StatusHistory latest = history(
+                12,
+                4,
+                8,
+                SystemStatus.DEGRADED,
+                SystemStatus.DEGRADED,
+                SystemStatus.OPERATIONAL,
+                SystemStatus.OUTAGE,
+                LocalDateTime.now()
+        );
+
+        when(historyRepository.findTopByOrderByTimestampDesc()).thenReturn(latest);
+        when(historyRepository.findByTimestampAfterOrderByTimestampAsc(any())).thenReturn(List.of(latest));
+
+        SystemStatusView status = service.getSystemStatus("24h");
+
+        assertEquals(SystemStatus.DEGRADED, status.history().getFirst().apiStatus());
+        assertEquals(SystemStatus.OPERATIONAL, status.history().getFirst().dbStatus());
+        assertEquals(SystemStatus.OUTAGE, status.history().getFirst().storageStatus());
+    }
+
+    @Test
+    void getSystemStatusTreatsLegacyOperationalRowsAsOperationalWhenLatencyIsMissing() {
+        StatusHistory legacy = history(0, 0, 0, SystemStatus.OPERATIONAL, LocalDateTime.now());
+        ReflectionTestUtils.setField(legacy, "apiStatus", null);
+        ReflectionTestUtils.setField(legacy, "dbStatus", null);
+        ReflectionTestUtils.setField(legacy, "storageStatus", null);
+
+        when(historyRepository.findTopByOrderByTimestampDesc()).thenReturn(legacy);
+        when(historyRepository.findByTimestampAfterOrderByTimestampAsc(any())).thenReturn(List.of(legacy));
+
+        SystemStatusView status = service.getSystemStatus("24h");
+
+        assertEquals(SystemStatus.OPERATIONAL, status.services().getFirst().status());
+        assertTrue(status.history().stream().allMatch(point ->
+                point.apiStatus() == SystemStatus.OPERATIONAL
+                        && point.dbStatus() == SystemStatus.OPERATIONAL
+                        && point.storageStatus() == SystemStatus.OPERATIONAL));
     }
 
     @Test
@@ -126,6 +171,29 @@ class StatusSnapshotServiceTest {
             LocalDateTime timestamp
     ) {
         StatusHistory history = new StatusHistory(apiLatency, dbLatency, storageLatency, overall);
+        ReflectionTestUtils.setField(history, "timestamp", timestamp);
+        return history;
+    }
+
+    private static StatusHistory history(
+            int apiLatency,
+            int dbLatency,
+            int storageLatency,
+            SystemStatus overall,
+            SystemStatus apiStatus,
+            SystemStatus dbStatus,
+            SystemStatus storageStatus,
+            LocalDateTime timestamp
+    ) {
+        StatusHistory history = new StatusHistory(
+                apiLatency,
+                dbLatency,
+                storageLatency,
+                overall,
+                apiStatus,
+                dbStatus,
+                storageStatus
+        );
         ReflectionTestUtils.setField(history, "timestamp", timestamp);
         return history;
     }
