@@ -19,10 +19,11 @@ interface ViewDetailsProps {
     dependencies?: ProjectDependency[];
     incompatibleProjectIds?: string[];
     depMeta: Record<string, { icon: string, title: string, classification?: string, slug?: string }>;
+    orderedGameVersions?: string[];
     showMetaSections?: boolean;
 }
 
-export const ViewDetails: React.FC<ViewDetailsProps> = ({ project, authorProfile, currentUser, canEdit, commentsRef, setProject, setStatusModal, onRefresh, dependencies, incompatibleProjectIds, depMeta, showMetaSections = false }) => {
+export const ViewDetails: React.FC<ViewDetailsProps> = ({ project, authorProfile, currentUser, canEdit, commentsRef, setProject, setStatusModal, onRefresh, dependencies, incompatibleProjectIds, depMeta, orderedGameVersions = [], showMetaSections = false }) => {
     const descriptionParts = splitDescriptionByGalleryCarouselMarker(project.about || "*No description.*");
     const renderGalleryCarousel = (key: string) => (
         <GalleryCarousel key={key} images={project.galleryImages} captions={project.galleryImageCaptions} title={project.title} />
@@ -41,7 +42,7 @@ export const ViewDetails: React.FC<ViewDetailsProps> = ({ project, authorProfile
             ))}
             {showMetaSections && (
                 <div className="mt-8 pt-8 border-t border-slate-200 dark:border-white/5">
-                    <ProjectMetaSections project={project} dependencies={dependencies} incompatibleProjectIds={incompatibleProjectIds} depMeta={depMeta} />
+                    <ProjectMetaSections project={project} dependencies={dependencies} incompatibleProjectIds={incompatibleProjectIds} depMeta={depMeta} orderedGameVersions={orderedGameVersions} />
                 </div>
             )}
             <Suspense fallback={<div ref={commentsRef} id="comments" className="mt-12 pt-10 scroll-mt-24 border-t border-slate-200 dark:border-white/5" />}>

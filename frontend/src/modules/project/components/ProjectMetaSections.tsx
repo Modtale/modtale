@@ -6,7 +6,7 @@ import { SidebarSection } from '@/modules/project/components/ProjectLayout';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { SiteRoutes } from '@/utils/routes';
 import { BACKEND_URL } from '@/utils/api';
-import { buildVersionGroups, type VersionGroup } from '@/utils/modHelpers';
+import { buildVersionGroups, compareGameVersionsDesc, type VersionGroup } from '@/utils/modHelpers';
 import type { Project, ProjectDependency } from '@/types';
 
 interface ProjectMetaSectionsProps {
@@ -14,6 +14,7 @@ interface ProjectMetaSectionsProps {
     dependencies?: ProjectDependency[];
     incompatibleProjectIds?: string[];
     depMeta: Record<string, { icon: string; title: string; classification?: string; slug?: string }>;
+    orderedGameVersions?: string[];
 }
 
 const SupportedVersionPill = ({ version }: { version: string }) => (
@@ -60,13 +61,22 @@ export const ProjectMetaSections: React.FC<ProjectMetaSectionsProps> = React.mem
     project,
     dependencies,
     incompatibleProjectIds,
-    depMeta
+    depMeta,
+    orderedGameVersions = []
 }) => {
     const gameVersions = React.useMemo(() => {
         const set = new Set<string>();
         (project.versions || []).forEach(v => v.gameVersions?.forEach(gv => set.add(gv)));
-        return Array.from(set).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
-    }, [project.versions]);
+
+        const ordered = orderedGameVersions.filter(version => {
+            if (!set.has(version)) return false;
+            set.delete(version);
+            return true;
+        });
+        const unordered = Array.from(set).sort(compareGameVersionsDesc);
+
+        return [...ordered, ...unordered];
+    }, [project.versions, orderedGameVersions]);
     const gameVersionGroups = React.useMemo(() => buildVersionGroups(gameVersions), [gameVersions]);
 
     const isModpack = project.classification === 'MODPACK';
