@@ -5,10 +5,13 @@ interface Window {
     __MODTALE_PROJECT_BOOTSTRAP_URL?: string;
     __MODTALE_WIKI_BOOTSTRAP?: {
         projectId?: string;
+        bundleUrl?: string;
         metadataUrl?: string;
+        metadataData?: any;
         metadata?: Promise<any | null> | null;
         pages?: Record<string, {
             url?: string;
+            data?: any;
             promise?: Promise<any | null> | null;
         }>;
     };

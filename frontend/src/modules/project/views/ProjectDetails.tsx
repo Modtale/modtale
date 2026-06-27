@@ -21,7 +21,9 @@ import { HeaderActions, HeaderContent } from '../components/Header';
 import { ActionBar } from '../components/ActionBar';
 
 import { ViewDetails } from '../tabs/ViewDetails';
-import { prefetchInitialWikiPage, useHMWiki } from '../hooks/useHMWiki';
+import { prefetchInitialWikiPage, prefetchWikiPage, useHMWiki } from '../hooks/useHMWiki';
+import { Wiki } from '../tabs/Wiki';
+import { WikiMobileNavigation, WikiSidebar } from '../components/HMWiki';
 
 import { ProjectLayout } from '../components/ProjectLayout';
 import { GalleryCarouselViewer } from '../components/GalleryCarouselViewer';
@@ -42,9 +44,6 @@ const PostDownloadModal = lazy(() => import('../components/dialogs/PostDownloadM
 const HistoryModal = lazy(() => import('../components/dialogs/HistoryModal').then((module) => ({ default: module.HistoryModal })));
 const DownloadModal = lazy(() => import('../components/dialogs/DownloadModal').then((module) => ({ default: module.DownloadModal })));
 const DependencyModal = lazy(() => import('../components/dialogs/DependencyModal').then((module) => ({ default: module.DependencyModal })));
-const Wiki = lazy(() => import('../tabs/Wiki').then((module) => ({ default: module.Wiki })));
-const WikiSidebar = lazy(() => import('../components/HMWiki').then((module) => ({ default: module.WikiSidebar })));
-const WikiMobileNavigation = lazy(() => import('../components/HMWiki').then((module) => ({ default: module.WikiMobileNavigation })));
 
 interface ProjectDetailViewProps {
     currentUser: User | null;
@@ -170,6 +169,10 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         if (!project?.id || !project.hmWikiEnabled) return;
         prefetchInitialWikiPage(projectRouteKey || project.id);
     }, [project?.id, project?.hmWikiEnabled, projectRouteKey]);
+
+    const prefetchWikiNavigationPage = useCallback((slug: string) => {
+        prefetchWikiPage(wikiLookupKey, slug);
+    }, [wikiLookupKey]);
 
     useEffect(() => {
         if (!isDownloadOpen) return;
@@ -642,9 +645,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 sidebarContent={
                     isWikiRoute ? (
                         <>
-                            <Suspense fallback={null}>
-                                <WikiSidebar tree={navigationWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={navigationWikiSlug} indexSlug={navigationWikiData?.mod?.index?.slug} pageCache={navigationWikiData?.pageCache} />
-                            </Suspense>
+                            <WikiSidebar tree={navigationWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={navigationWikiSlug} indexSlug={navigationWikiData?.mod?.index?.slug} onPrefetch={prefetchWikiNavigationPage} pageCache={navigationWikiData?.pageCache} />
                             <div className="mt-4">
                                 <Link to={projectUrl} className={`block text-sm font-bold ${theme.colors.accent} hover:underline flex items-center gap-2`}>
                                     <ChevronLeft className="w-4 h-4" /> Back to Project
@@ -657,10 +658,10 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 }
                 mainContent={
                     isWikiRoute ? (
-                        <Suspense fallback={<div className="flex justify-center p-12"><Spinner /></div>}>
-                            <WikiMobileNavigation tree={navigationWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={navigationWikiSlug} indexSlug={navigationWikiData?.mod?.index?.slug} onNavigate={handleMobileWikiNavigate} pageCache={navigationWikiData?.pageCache} />
+                        <>
+                            <WikiMobileNavigation tree={navigationWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={navigationWikiSlug} indexSlug={navigationWikiData?.mod?.index?.slug} onNavigate={handleMobileWikiNavigate} onPrefetch={prefetchWikiNavigationPage} pageCache={navigationWikiData?.pageCache} />
                             <Wiki wikiLoading={wikiLoading} wikiError={wikiError} displayWikiData={displayWikiData} displaySlug={displaySlug} project={project} wikiContentRef={wikiContentRef} lockedHeight={lockedHeight} />
-                        </Suspense>
+                        </>
                     ) : (
                         <ViewDetails project={project} authorProfile={authorProfile} currentUser={currentUser} canEdit={Boolean(canEdit)} commentsRef={commentsRef} setProject={setProject} setStatusModal={setStatusModal} onRefresh={onRefresh} dependencies={latestDependencies} incompatibleProjectIds={latestIncompatibleProjectIds} depMeta={depMeta} showMetaSections={isMobile} />
                     )
