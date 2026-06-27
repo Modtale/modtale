@@ -163,6 +163,36 @@ const reservePort = async () => {
 
 type DevServerProcess = ChildProcessByStdio<null, Readable, Readable>;
 
+const stopRegisteredAstroDevServer = async () => {
+    await new Promise<void>((resolve, reject) => {
+        let stdout = '';
+        let stderr = '';
+        const child = spawn('npm', ['run', 'dev', '--', 'stop'], {
+            cwd: process.cwd(),
+            env: { ...process.env, ASTRO_DEV_BACKGROUND: '0' },
+            stdio: ['ignore', 'pipe', 'pipe'],
+        });
+
+        child.stdout.on('data', (chunk) => {
+            stdout += chunk.toString();
+        });
+
+        child.stderr.on('data', (chunk) => {
+            stderr += chunk.toString();
+        });
+
+        child.once('error', reject);
+        child.once('exit', (code) => {
+            if (code === 0) {
+                resolve();
+                return;
+            }
+
+            reject(new Error(`Failed to stop registered Astro dev server.\nstdout:\n${stdout}\n\nstderr:\n${stderr}`));
+        });
+    });
+};
+
 const waitForServerReady = async (origin: string, child: DevServerProcess, getLogs: () => string) => {
     const start = Date.now();
 
@@ -174,7 +204,7 @@ const waitForServerReady = async (origin: string, child: DevServerProcess, getLo
         try {
             const response = await fetch(origin);
             if (response.ok) {
-                return;
+                return origin;
             }
         } catch {
             // Keep polling until the server comes up.
@@ -238,6 +268,8 @@ describe('lazy-loaded module integrity', () => {
     let stderr = '';
 
     beforeAll(async () => {
+        await stopRegisteredAstroDevServer();
+
         const port = await reservePort();
         origin = `http://127.0.0.1:${port}`;
 
@@ -255,7 +287,7 @@ describe('lazy-loaded module integrity', () => {
             stderr += chunk.toString();
         });
 
-        await waitForServerReady(origin, devServer, () => `stdout:\n${stdout}\n\nstderr:\n${stderr}`);
+        origin = await waitForServerReady(origin, devServer, () => `stdout:\n${stdout}\n\nstderr:\n${stderr}`);
     }, startupTimeoutMs);
 
     afterAll(async () => {

@@ -34,6 +34,9 @@ public class ProjectCacheService {
         Cache changelogCache = cacheManager.getCache("projectVersionChangelogs");
         Cache metaDtoCache = cacheManager.getCache("projectMetaDtos");
         Cache permissionCache = cacheManager.getCache("projectPermissionSnapshots");
+        Cache wikiProjectJsonCache = cacheManager.getCache("wikiProjectJson");
+        Cache wikiPageJsonCache = cacheManager.getCache("wikiPageJson");
+        Cache wikiPageBundleJsonCache = cacheManager.getCache("wikiPageBundleJson");
 
         if (cache != null && project.getId() != null) cache.evict(project.getId());
         if (cache != null && project.getId() != null) cache.evict("public:" + project.getId());
@@ -47,6 +50,7 @@ public class ProjectCacheService {
         if (changelogCache != null && project.getId() != null) changelogCache.evict("public:" + project.getId());
         if (metaDtoCache != null && project.getId() != null) metaDtoCache.evict("public:" + project.getId());
         if (permissionCache != null && project.getId() != null) permissionCache.evict(project.getId());
+        if (wikiProjectJsonCache != null && project.getId() != null) wikiProjectJsonCache.evict("public:" + project.getId());
 
         String routeHandle = projectRouteService.buildProjectHandle(project);
         if (cache != null && routeHandle != null) cache.evict(routeHandle);
@@ -60,6 +64,7 @@ public class ProjectCacheService {
         if (teamDtoCache != null && routeHandle != null) teamDtoCache.evict("public:" + routeHandle);
         if (changelogCache != null && routeHandle != null) changelogCache.evict("public:" + routeHandle);
         if (metaDtoCache != null && routeHandle != null) metaDtoCache.evict("public:" + routeHandle);
+        if (wikiProjectJsonCache != null && routeHandle != null) wikiProjectJsonCache.evict("public:" + routeHandle);
         if (cache != null && project.getSlug() != null) cache.evict(project.getSlug());
         if (cache != null && project.getSlug() != null) cache.evict("public:" + project.getSlug());
         if (cache != null && project.getSlug() != null) cache.evict("public-page:" + project.getSlug());
@@ -71,6 +76,9 @@ public class ProjectCacheService {
         if (teamDtoCache != null && project.getSlug() != null) teamDtoCache.evict("public:" + project.getSlug());
         if (changelogCache != null && project.getSlug() != null) changelogCache.evict("public:" + project.getSlug());
         if (metaDtoCache != null && project.getSlug() != null) metaDtoCache.evict("public:" + project.getSlug());
+        if (wikiProjectJsonCache != null && project.getSlug() != null) wikiProjectJsonCache.evict("public:" + project.getSlug());
+        if (wikiPageJsonCache != null) wikiPageJsonCache.clear();
+        if (wikiPageBundleJsonCache != null) wikiPageBundleJsonCache.clear();
     }
 
     public void evictProjectDetailsCacheById(String projectId) {
@@ -117,6 +125,12 @@ public class ProjectCacheService {
         if (permissionCache != null) {
             permissionCache.evict(projectId);
         }
+        Cache wikiProjectJsonCache = cacheManager.getCache("wikiProjectJson");
+        if (wikiProjectJsonCache != null) {
+            wikiProjectJsonCache.evict("public:" + projectId);
+        }
+        clearCache("wikiPageJson");
+        clearCache("wikiPageBundleJson");
     }
 
     public void evictProjectSearchCache() {

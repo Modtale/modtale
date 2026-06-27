@@ -17,9 +17,13 @@ interface Props {
     projectBootstrapUrl?: string;
     wikiBootstrap?: {
         projectId?: string;
+        bundleUrl?: string;
+        bundleData?: any;
         metadataUrl?: string;
+        metadataData?: any;
         pageUrl?: string;
         pageSlug?: string;
+        pageData?: any;
     };
     robots?: string;
 }
@@ -85,6 +89,7 @@ const wikiBootstrapString = wikiBootstrap ? JSON.stringify(wikiBootstrap).replac
 
     <link rel="preconnect" href={BACKEND_URL} crossorigin />
     <link rel="dns-prefetch" href={BACKEND_URL} />
+    {wikiBootstrap?.bundleUrl && <link rel="preload" href={wikiBootstrap.bundleUrl} as="fetch" crossorigin="use-credentials" />}
 
     {jsonLdString && <script is:inline type="application/ld+json" set:html={jsonLdString} />}
 
@@ -132,18 +137,37 @@ const wikiBootstrapString = wikiBootstrap ? JSON.stringify(wikiBootstrap).replac
                     });
                 }
 
+                function hasOwn(object, key) {
+                    return !!object && Object.prototype.hasOwnProperty.call(object, key);
+                }
+
+                var hasMetadataData = hasOwn(bootstrap, 'metadataData') && bootstrap.metadataData != null;
+                var hasPageData = hasOwn(bootstrap, 'pageData') && bootstrap.pageData != null;
+                var hasBundleData = hasOwn(bootstrap, 'bundleData') && bootstrap.bundleData != null;
+                var bundlePromise = hasBundleData
+                    ? Promise.resolve(bootstrap.bundleData)
+                    : ((!hasMetadataData || !hasPageData) ? fetchJson(bootstrap.bundleUrl) : null);
+                var metadataPromise = bundlePromise
+                    ? bundlePromise.then(function(bundle) { return bundle && bundle.metadata ? bundle.metadata : null; })
+                    : null;
+                var pagePromise = bundlePromise
+                    ? bundlePromise.then(function(bundle) { return bundle && bundle.page ? bundle.page : null; })
+                    : null;
                 var pages = {};
                 if (bootstrap.pageUrl && bootstrap.pageSlug) {
                     pages[bootstrap.pageSlug] = {
                         url: bootstrap.pageUrl,
-                        promise: fetchJson(bootstrap.pageUrl)
+                        data: hasPageData ? bootstrap.pageData : undefined,
+                        promise: hasPageData ? Promise.resolve(bootstrap.pageData) : (pagePromise || fetchJson(bootstrap.pageUrl))
                     };
                 }
 
                 window.__MODTALE_WIKI_BOOTSTRAP = {
                     projectId: bootstrap.projectId,
+                    bundleUrl: bootstrap.bundleUrl,
                     metadataUrl: bootstrap.metadataUrl,
-                    metadata: fetchJson(bootstrap.metadataUrl),
+                    metadataData: hasMetadataData ? bootstrap.metadataData : undefined,
+                    metadata: hasMetadataData ? Promise.resolve(bootstrap.metadataData) : (metadataPromise || fetchJson(bootstrap.metadataUrl)),
                     pages: pages
                 };
             })();

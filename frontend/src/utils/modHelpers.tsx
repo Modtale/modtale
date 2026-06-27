@@ -2,6 +2,30 @@ import React from 'react';
 import { CheckCircle2, Beaker, Zap, Code, Database, Paintbrush, Globe, Layers, Layout } from 'lucide-react';
 import { DiscordBrandIcon } from '@/components/ui/icons/BrandIcons';
 
+const semVerRegex = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
+const legacyGameVersionRegex = /^(\d{4})\.(\d{2})\.(\d{2})-([a-zA-Z0-9]+)$/;
+
+const parseSemVer = (version: string) => {
+    const match = version.match(semVerRegex);
+    if (!match) return null;
+    return {
+        major: parseInt(match[1], 10),
+        minor: parseInt(match[2], 10),
+        patch: parseInt(match[3], 10),
+        prerelease: match[4] ? match[4].split('.') : [],
+        build: match[5]
+    };
+};
+
+const parseLegacyGameVersion = (version: string) => {
+    const match = version.match(legacyGameVersionRegex);
+    if (!match) return null;
+    return {
+        dateKey: `${match[1]}${match[2]}${match[3]}`,
+        hash: match[4]
+    };
+};
+
 export const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -44,22 +68,8 @@ export const ChannelBadge = ({ channel }: { channel?: string }) => {
 };
 
 export const compareSemVer = (a: string, b: string) => {
-    const semVerRegex = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
-
-    const parse = (v: string) => {
-        const match = v.match(semVerRegex);
-        if (!match) return null;
-        return {
-            major: parseInt(match[1], 10),
-            minor: parseInt(match[2], 10),
-            patch: parseInt(match[3], 10),
-            prerelease: match[4] ? match[4].split('.') : [],
-            build: match[5]
-        };
-    };
-
-    const va = parse(a);
-    const vb = parse(b);
+    const va = parseSemVer(a);
+    const vb = parseSemVer(b);
 
     if (!va || !vb) return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 
@@ -95,6 +105,27 @@ export const compareSemVer = (a: string, b: string) => {
     }
 
     return 0;
+};
+
+export const compareGameVersionsDesc = (a: string, b: string) => {
+    const semverA = parseSemVer(a);
+    const semverB = parseSemVer(b);
+    const legacyA = parseLegacyGameVersion(a);
+    const legacyB = parseLegacyGameVersion(b);
+
+    const rankA = semverA ? 0 : legacyA ? 1 : 2;
+    const rankB = semverB ? 0 : legacyB ? 1 : 2;
+    if (rankA !== rankB) return rankA - rankB;
+
+    if (semverA && semverB) return compareSemVer(b, a);
+
+    if (legacyA && legacyB) {
+        const dateCompare = legacyB.dateKey.localeCompare(legacyA.dateKey);
+        if (dateCompare !== 0) return dateCompare;
+        return legacyB.hash.localeCompare(legacyA.hash);
+    }
+
+    return b.localeCompare(a, undefined, { numeric: true, sensitivity: 'base' });
 };
 
 export interface VersionGroup {
