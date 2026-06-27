@@ -88,7 +88,7 @@ Ready to contribute? Follow these steps to get Modtale running on your local mac
 
 ### Prerequisites
 
-* **Node.js:** v20 or higher.
+* **Node.js:** v22.12.0 or higher.
 * **Java JDK:** Version 21 (Amazon Corretto, Eclipse Temurin, or standard OpenJDK).
 * **MongoDB:** A local instance running on port `27017`, or a valid MongoDB Atlas connection string.
 
