@@ -26,6 +26,7 @@ launcher/.gradle/
 launcher/build/
 launcher/out/
 launcher/bin/
+
 mock-db/collections/
 mock-db/generated/
 mock-db/node_modules/

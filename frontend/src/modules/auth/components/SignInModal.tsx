@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Github, ArrowRight, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
-import { DiscordBrandIcon, GitLabBrandIcon, GoogleBrandIcon } from '@/components/ui/icons/BrandIcons';
+import { X, ArrowRight, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { DiscordBrandIcon, GitHubBrandIcon, GitLabBrandIcon, GoogleBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { API_BASE_URL, extractApiErrorMessage } from '@/utils/api';
 import { StatusModal } from '@/components/ui/StatusModal';
@@ -192,7 +192,7 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                                     title={providerTitle('github')}
                                     aria-label={providerTitle('github')}
                                 >
-                                    <Github className="w-5 h-5" />
+                                    <GitHubBrandIcon className="w-5 h-5" />
                                     <span className="text-sm">GitHub</span>
                                     {renderLastUsedBadge('github')}
                                 </button>
