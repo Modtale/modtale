@@ -502,7 +502,11 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const versionsByGame = useMemo(() => {
         return (project?.versions || []).reduce((acc: any, v: any) => {
-            const keys = Array.isArray(v.gameVersions) && v.gameVersions.length > 0 ? v.gameVersions : ['Any'];
+            const keys = Array.isArray(v.gameVersions) && v.gameVersions.length > 0
+                ? v.gameVersions
+                : v.gameVersion
+                    ? [v.gameVersion]
+                    : [];
             keys.forEach((key: string) => {
                 if (!acc[key]) acc[key] = [];
                 acc[key].push(v);
