@@ -8,6 +8,7 @@ steps:
         docker build \
           --cache-from gcr.io/$PROJECT_ID/modtale-frontend:${_TAG} \
           --build-arg PUBLIC_API_URL=${_PUBLIC_API_URL} \
+          --build-arg PUBLIC_STATUS_URL=${_PUBLIC_STATUS_URL} \
           -t gcr.io/$PROJECT_ID/modtale-frontend:${_TAG} \
           .
 
@@ -16,8 +17,8 @@ steps:
 
 substitutions:
   _PUBLIC_API_URL: http://localhost:8080/api/v1
+  _PUBLIC_STATUS_URL: https://status.modtale.net
   _TAG: latest
 
 options:
   defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET
-  

@@ -13,6 +13,10 @@ java {
     }
 }
 
+springBoot {
+    mainClass = 'net.modtale.ModtaleApplication'
+}
+
 repositories {
     mavenCentral()
 }
@@ -51,4 +55,13 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+tasks.register('statusServiceJar', org.springframework.boot.gradle.tasks.bundling.BootJar) {
+    group = 'build'
+    description = 'Builds the detached Modtale status service jar.'
+    archiveClassifier = 'status'
+    mainClass = 'net.modtale.status.StatusServiceApplication'
+    targetJavaVersion = JavaVersion.VERSION_21
+    classpath = sourceSets.main.runtimeClasspath
 }
