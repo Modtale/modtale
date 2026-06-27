@@ -30,6 +30,7 @@ modtale/
 │   │   ├── models/                # MongoDB document schemas
 │   │   ├── repositories/          # Database interaction layer
 │   │   └── services/              # Core business logic (Uploads, Auth, etc.)
+│   ├── Dockerfile.status          # Detached status page/checker image
 │   └── build.gradle               # Dependencies & build definitions
 │
 ├── frontend/                      # Astro + React Web Application
@@ -61,6 +62,23 @@ modtale/
 |  | **MongoDB** | Primary NoSQL document data store |
 |  | **Bucket4j / Caffeine** | Token-bucket rate limiting and high-speed in-memory caching |
 | **Infrastructure** | **Cloudflare R2** | Zero-egress, S3-compatible Object Storage for mod files & images |
+
+### Detached Status Service
+
+The public status page is served by a separate Spring Boot entry point: `net.modtale.status.StatusServiceApplication`.
+It owns the status HTML, `/api/v1/status`, and `/api/v1/status/live`, and it does not depend on the main Astro server or the main backend process to render.
+
+Build and run it locally from `backend/`:
+
+```bash
+./gradlew statusServiceJar
+PORT=18080 \
+STATUS_TARGET_SITE_URL=http://localhost:5173 \
+STATUS_TARGET_API_URL=http://localhost:8080/actuator/health/readiness \
+java -jar build/libs/modtale-backend-0.0.1-SNAPSHOT-status.jar
+```
+
+The status image is built with `backend/Dockerfile.status` and `backend/cloudbuild-status.yml` as `modtale-status`. Deploy it to a separate Cloud Run service and map the status domain or route to that service. The main frontend `/status` path redirects to `PUBLIC_STATUS_URL` (`https://status.modtale.net` by default).
 
 ---
 
@@ -94,6 +112,21 @@ The Spring Boot backend relies on environment variables. You can set these in yo
 | `R2_ENDPOINT` | Storage Endpoint URL | `https://<accountid>.r2.cloudflarestorage.com` |
 | `WARDEN_ENABLED` | **Must be false locally** | `false` |
 | `STATUS_DISCORD_WEBHOOK_URL` | Optional Discord webhook for status-change alerts | `https://discord.com/api/webhooks/...` |
+| `STATUS_CHECKER_ENABLED` | Opt into the legacy embedded backend checker | `false` |
+
+Detached status service variables:
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `PUBLIC_STATUS_URL` | Frontend redirect target for `/status` | `https://status.modtale.net` |
+| `STATUS_TARGET_SITE_URL` | Main site URL checked by the detached service | `https://modtale.net` |
+| `STATUS_TARGET_API_URL` | API health URL checked by the detached service | `https://api.modtale.net/actuator/health/readiness` |
+| `STATUS_MONGODB_URI` | Optional status-service Mongo URI; falls back to `MONGODB_URI` | empty |
+| `STATUS_R2_BUCKET_NAME` / `STATUS_R2_ACCESS_KEY` / `STATUS_R2_SECRET_KEY` / `STATUS_R2_ENDPOINT` | Optional status-service R2 credentials; each falls back to the main R2 variable | empty |
+| `STATUS_SNAPSHOT_PATH` | Local fallback history cache file | `/tmp/modtale-status-snapshot.json` |
+| `STATUS_REQUEST_TIMEOUT` | Probe timeout for HTTP, Mongo, and R2 checks | `5s` |
+| `STATUS_REFRESH_INTERVAL_MS` | Probe interval | `60000` |
+| `STATUS_CORS_ALLOWED_ORIGINS` | Allowed origins for status API reads | `*` |
 
 > **Note on Warden:** The "Warden" malware and security scanner is proprietary to protect our threat-detection logic. You **must** set `WARDEN_ENABLED=false` to run the backend locally. This enables a "Mock Mode" where file uploads bypass the scanner and automatically return a mock "CLEAN" status.
 

@@ -26,7 +26,8 @@ export default defineConfig({
             noExternal: ['lucide-react', 'react-easy-crop', 'react-helmet-async']
         },
         define: {
-            'import.meta.env.PUBLIC_API_URL': JSON.stringify(process.env.PUBLIC_API_URL)
+            'import.meta.env.PUBLIC_API_URL': JSON.stringify(process.env.PUBLIC_API_URL),
+            'import.meta.env.PUBLIC_STATUS_URL': JSON.stringify(process.env.PUBLIC_STATUS_URL)
         },
         build: {
             target: 'esnext',

@@ -26,6 +26,11 @@ const url = Astro.url;
 const path = url.pathname;
 const cleanPath = normalizeSeoPath(path);
 const searchParams = url.searchParams;
+const statusPageUrl = import.meta.env.PUBLIC_STATUS_URL?.trim() || 'https://status.modtale.net';
+
+if (cleanPath === '/status') {
+    return Astro.redirect(statusPageUrl, 302);
+}
 
 const routeSeo = ROUTE_SEO[cleanPath];
 let title = routeSeo?.title || DEFAULT_SEO.title;

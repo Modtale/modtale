@@ -49,7 +49,7 @@ class StatusSnapshotServiceTest {
         when(statusIncidentService.getActiveIncidents()).thenReturn(List.of());
         when(statusIncidentService.getScheduledMaintenances()).thenReturn(List.of());
         when(statusIncidentService.getIncidentHistory()).thenReturn(List.of());
-        service = new StatusSnapshotService(mongoTemplate, s3Client, r2Properties, historyRepository, statusDiscordNotifierService, statusIncidentService);
+        service = new StatusSnapshotService(mongoTemplate, s3Client, r2Properties, historyRepository, statusDiscordNotifierService, statusIncidentService, false);
     }
 
     @Test
