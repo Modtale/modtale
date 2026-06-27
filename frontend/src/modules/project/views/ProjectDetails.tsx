@@ -1,8 +1,9 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { ChevronLeft, Github, Globe, X } from 'lucide-react';
+import { ChevronLeft, Globe, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { GitHubBrandIcon } from '@/components/ui/icons/BrandIcons';
 
 import type { Project, User } from '@/types';
 import { theme } from '@/styles/theme';
@@ -534,7 +535,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const breadcrumbSchema = generateBreadcrumbSchema([...getBreadcrumbsForClassification(project.classification || 'PLUGIN'), { name: project.title, url: projectUrl }]);
 
     const links = [
-        project.repositoryUrl && { type: 'SOURCE', url: project.repositoryUrl, icon: Github, label: 'Source Code', colorClass: `${theme.colors.textSecondary} ${theme.colors.bgSurfaceHover} ${theme.colors.border}` },
+        project.repositoryUrl && { type: 'SOURCE', url: project.repositoryUrl, icon: GitHubBrandIcon, label: 'Source Code', colorClass: `${theme.colors.textSecondary} ${theme.colors.bgSurfaceHover} ${theme.colors.border}` },
         project.links?.DISCORD && { type: 'DISCORD', url: project.links.DISCORD, icon: DiscordIcon, label: 'Discord', colorClass: 'text-[#5865F2] hover:bg-[#5865F2]/20 border-[#5865F2]/20' },
         project.links?.WEBSITE && { type: 'WEBSITE', url: project.links.WEBSITE, icon: Globe, label: 'Website', colorClass: 'text-blue-500 dark:text-blue-400 hover:bg-blue-500/20 border-blue-500/20' }
     ].filter(Boolean) as any[];
