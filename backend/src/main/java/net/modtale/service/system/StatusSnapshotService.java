@@ -256,7 +256,11 @@ public class StatusSnapshotService {
         boolean changedStatus = previousStatus != null && previousStatus != latestStatus;
 
         if (firstSnapshotNeedsAttention || changedStatus) {
-            statusDiscordNotifierService.notifyStatusChange(previous, latest);
+            statusDiscordNotifierService.notifyStatusChange(
+                    previous,
+                    latest,
+                    findHistorySafely(LocalDateTime.now().minusDays(30))
+            );
         }
     }
 }
