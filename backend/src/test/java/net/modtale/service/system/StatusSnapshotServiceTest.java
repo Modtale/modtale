@@ -21,6 +21,7 @@ import software.amazon.awssdk.services.s3.model.HeadBucketResponse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -147,7 +148,7 @@ class StatusSnapshotServiceTest {
 
         service.refreshSnapshots();
 
-        verify(statusDiscordNotifierService).notifyStatusChange(eq(previous), any(StatusHistory.class));
+        verify(statusDiscordNotifierService).notifyStatusChange(eq(previous), any(StatusHistory.class), anyList());
     }
 
     @Test
@@ -160,7 +161,11 @@ class StatusSnapshotServiceTest {
 
         service.refreshSnapshots();
 
-        verify(statusDiscordNotifierService, never()).notifyStatusChange(any(StatusHistory.class), any(StatusHistory.class));
+        verify(statusDiscordNotifierService, never()).notifyStatusChange(
+                any(StatusHistory.class),
+                any(StatusHistory.class),
+                anyList()
+        );
     }
 
     private static StatusHistory history(
