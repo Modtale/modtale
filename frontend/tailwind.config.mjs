@@ -11,6 +11,7 @@ export default {
             colors: {
                 modtale: {
                     dark: '#0f172a', // Slate-900
+                    navbar: '#141d30',
                     card: '#1e293b', // Slate-800
                     cardHover: '#334155', // Slate-700
                     border: 'rgba(255, 255, 255, 0.08)',

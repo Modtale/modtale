@@ -5,17 +5,19 @@
 @layer base {
     html {
         @apply bg-slate-50;
+        color-scheme: light;
         scrollbar-color: rgba(100, 116, 139, 0.72) transparent;
         scrollbar-width: thin;
     }
 
     html.dark {
-        @apply bg-slate-900;
+        @apply bg-modtale-navbar;
+        color-scheme: dark;
         scrollbar-color: rgba(148, 163, 184, 0.46) transparent;
     }
 
     body {
-        @apply font-sans antialiased text-slate-900 dark:text-slate-300 bg-slate-50 dark:bg-slate-900;
+        @apply font-sans antialiased text-slate-900 dark:text-slate-300 bg-slate-50 dark:bg-modtale-navbar;
         margin: 0;
         padding: 0;
         min-height: 100vh;

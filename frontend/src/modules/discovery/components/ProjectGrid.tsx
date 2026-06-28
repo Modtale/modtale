@@ -33,7 +33,7 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
     }
 
     return (
-        <div className={viewStyle === 'grid' ? "grid grid-cols-1 md:grid-cols-2 min-[1800px]:grid-cols-3 gap-4 md:gap-6 mt-4" : viewStyle === 'compact' ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mt-4" : "space-y-4 mt-4"}>
+        <div className={viewStyle === 'grid' ? "grid grid-cols-1 md:grid-cols-2 min-[1440px]:grid-cols-3 gap-4 md:gap-6 mt-4" : viewStyle === 'compact' ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mt-4" : "space-y-4 mt-4"}>
             {items.map((item, index) => {
                 const priorityLimit = viewStyle === 'compact' ? 4 : 2;
                 const isPriority = index < priorityLimit;
