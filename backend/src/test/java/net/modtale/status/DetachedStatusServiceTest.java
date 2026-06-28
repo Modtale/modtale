@@ -25,7 +25,7 @@ class DetachedStatusServiceTest {
 
     @Test
     void refreshBuildsStatusSnapshotWithoutDependingOnMainApplication() {
-        StatusHistoryEntry entry = entry(Instant.parse("2026-06-26T20:00:00Z"), SystemStatus.DEGRADED);
+        StatusHistoryEntry entry = entry(Instant.now().minusSeconds(60), SystemStatus.DEGRADED);
         DetachedStatusService service = serviceWith(entry);
 
         service.refreshSnapshots();
@@ -41,8 +41,9 @@ class DetachedStatusServiceTest {
 
     @Test
     void hydratePreservesExistingHistoryBeforeCurrentProbe() {
-        StatusHistoryEntry previous = entry(Instant.parse("2026-06-26T19:00:00Z"), SystemStatus.OPERATIONAL);
-        StatusHistoryEntry current = entry(Instant.parse("2026-06-26T20:00:00Z"), SystemStatus.OUTAGE);
+        Instant now = Instant.now();
+        StatusHistoryEntry previous = entry(now.minusSeconds(60 * 60), SystemStatus.OPERATIONAL);
+        StatusHistoryEntry current = entry(now.minusSeconds(60), SystemStatus.OUTAGE);
         when(snapshotFileStore.readHistory()).thenReturn(List.of(previous));
         when(mongoStatusStore.findHistoryAfter(any())).thenReturn(List.of());
         when(mongoStatusStore.findLatestHistory()).thenReturn(Optional.empty());
