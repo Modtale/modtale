@@ -72,6 +72,35 @@
 }
 
 @layer components {
+    .browse-project-results {
+        container-type: inline-size;
+    }
+
+    .browse-project-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    @container (min-width: 34rem) {
+        .browse-project-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @container (min-width: 46rem) {
+        .browse-project-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+
+    @media (min-width: 48rem) {
+        .browse-project-grid {
+            gap: 1.5rem;
+        }
+    }
+
     .pill-nav-scrollbar-hidden {
         scrollbar-width: none;
         -ms-overflow-style: none;
