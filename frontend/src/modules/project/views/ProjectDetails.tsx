@@ -126,6 +126,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const scrollPosRef = useRef(0);
     const downloadFxTimeoutRef = useRef<number | null>(null);
     const changelogFetchKeyRef = useRef('');
+    const gameVersionCatalogProjectRef = useRef<string | null>(null);
     const [galleryIndex, setGalleryIndex] = useState(0);
     const galleryItems = useMemo(
         () => resolveGalleryImages(project?.galleryImages || [], project?.galleryImageCaptions || {}),
@@ -175,10 +176,11 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     }, [wikiLookupKey]);
 
     useEffect(() => {
-        if (!project?.versions?.length) return;
-        if (orderedGameVersions.length > 0 || preReleaseGameVersions.length > 0) return;
+        if (!isDownloadOpen || !project?.id || !project.versions?.length) return;
+        if (gameVersionCatalogProjectRef.current === project.id) return;
 
         let isCancelled = false;
+        gameVersionCatalogProjectRef.current = project.id;
 
         projectClient.getMetaGameVersionCatalog()
             .then((catalog) => {
@@ -195,7 +197,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         return () => {
             isCancelled = true;
         };
-    }, [project?.versions?.length, orderedGameVersions.length, preReleaseGameVersions.length]);
+    }, [isDownloadOpen, project?.id, project?.versions?.length]);
 
     useEffect(() => {
         if (!isDownloadOpen) return;
