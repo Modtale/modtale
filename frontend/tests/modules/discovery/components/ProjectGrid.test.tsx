@@ -43,7 +43,7 @@ describe('ProjectGrid project links', () => {
         expect(markup).toContain('data-path="/mod/levelingcore"');
     });
 
-    it('switches browse grid cards to three columns on mid-desktop viewports', () => {
+    it('uses the container-query browse grid class for grid cards', () => {
         const markup = renderToStaticMarkup(
             <ProjectGrid
                 items={[baseProject as any]}
@@ -56,7 +56,7 @@ describe('ProjectGrid project links', () => {
             />
         );
 
-        expect(markup).toContain('min-[1440px]:grid-cols-3');
+        expect(markup).toContain('browse-project-grid');
         expect(markup).not.toContain('min-[1800px]:grid-cols-3');
     });
 });

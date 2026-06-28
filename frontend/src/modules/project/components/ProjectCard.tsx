@@ -102,7 +102,7 @@ export const CompactProjectCardSkeleton = () => (
 
 export const ProjectCardSkeletons: React.FC<ProjectCardSkeletonsProps> = ({ viewStyle, count = 1 }) => {
     const containerClassName = viewStyle === 'grid'
-        ? 'grid grid-cols-1 md:grid-cols-2 min-[1440px]:grid-cols-3 gap-4 md:gap-6 mt-4'
+        ? 'browse-project-grid'
         : viewStyle === 'compact'
             ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 mt-4'
             : 'space-y-4 mt-4';

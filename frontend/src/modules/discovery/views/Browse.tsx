@@ -257,7 +257,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
                         </div>
                     </div>
 
-                    <div className="flex-1 min-h-[500px] min-w-0" ref={cardsSectionRef}>
+                    <div className="browse-project-results flex-1 min-h-[500px] min-w-0" ref={cardsSectionRef}>
                         <div className={`sticky top-24 z-50 mb-4 bg-slate-50/90 dark:bg-[#0B1120]/90 backdrop-blur-xl -mx-4 sm:mx-0 px-4 sm:px-0 border-b border-slate-200 dark:border-white/10 transition-all duration-300 ${isScrolled && isMobile ? 'pt-2 pb-2 shadow-sm' : 'pt-3 pb-3'}`}>
                             <BrowseFilters
                                 categoryPills={<CategoryPillNav selectedClassification={selectedClassification} onClassificationChange={setSelectedClassification} currentSearchParams={searchParams} />}

@@ -237,7 +237,7 @@ const AppContent: React.FC = () => {
 
     return (
         <NotificationProvider userId={user?.id}>
-            <div className={`min-h-screen bg-white dark:bg-modtale-dark text-slate-900 dark:text-slate-300 font-sans flex flex-col`}>
+            <div className={`min-h-screen bg-slate-50 dark:bg-modtale-dark text-slate-900 dark:text-slate-300 font-sans flex flex-col`}>
                 <ScrollToTop /> <SEOHead />
 
                 <Suspense fallback={null}>
