@@ -60,7 +60,7 @@ public class ReportController {
     }
 
     @GetMapping("/admin/reports/queue")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('REPORT_READ', authentication)")
     public ResponseEntity<List<ReportDTO>> getReportQueue(
             @RequestParam(defaultValue = "OPEN") Report.ReportStatus status
     ) {
@@ -70,7 +70,7 @@ public class ReportController {
     }
 
     @PostMapping("/admin/reports/{id}/resolve")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('REPORT_RESOLVE', authentication)")
     public ResponseEntity<Void> resolveReport(@PathVariable String id, @Valid @RequestBody ResolveReportRequest requestPayload) {
         User admin = accountService.requireCurrentUser("resolving reports");
         reportService.resolveReport(id, requestPayload.getStatus(), requestPayload.getNote(), admin);

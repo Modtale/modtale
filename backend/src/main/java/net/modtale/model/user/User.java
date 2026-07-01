@@ -5,6 +5,7 @@ import java.io.Serializable;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -56,6 +57,7 @@ public class User implements Serializable {
 
     private ApiKey.Tier tier;
     private List<String> roles;
+    private Set<AdminPermission> adminPermissions = new LinkedHashSet<>();
 
     private AccountType accountType = AccountType.USER;
 
@@ -253,6 +255,10 @@ public class User implements Serializable {
     public void setTier(ApiKey.Tier tier) { this.tier = tier; }
     public List<String> getRoles() { return roles; }
     public void setRoles(List<String> roles) { this.roles = roles; }
+    public Set<AdminPermission> getAdminPermissions() { return adminPermissions; }
+    public void setAdminPermissions(Set<AdminPermission> adminPermissions) {
+        this.adminPermissions = adminPermissions != null ? new LinkedHashSet<>(adminPermissions) : new LinkedHashSet<>();
+    }
 
     public AccountType getAccountType() { return accountType; }
     public void setAccountType(AccountType accountType) { this.accountType = accountType; }

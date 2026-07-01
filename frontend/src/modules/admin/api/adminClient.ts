@@ -35,8 +35,7 @@ export const adminClient = {
         formData.append('tier', tier);
         return (await api.post(`/admin/users/${userId}/tier`, formData)).data;
     },
-    grantAdmin: async (userId: string) => (await api.post(`/admin/users/${userId}/role`, null, { params: { role: 'ADMIN' } })).data,
-    revokeAdmin: async (userId: string) => (await api.delete(`/admin/users/${userId}/role`, { params: { role: 'ADMIN' } })).data,
+    updateAdminPermissions: async (userId: string, permissions: string[]) => (await api.put(`/admin/users/${userId}/admin-permissions`, { permissions })).data,
     deleteUser: async (userId: string, reason: string) => (await api.delete(`/admin/users/${userId}`, { params: { reason } })).data,
     getUserRaw: async (userId: string) => (await api.get(`/admin/users/${userId}/raw`)).data,
     updateUserRaw: async (userId: string, data: any) => (await api.put(`/admin/users/${userId}/raw`, data)).data,

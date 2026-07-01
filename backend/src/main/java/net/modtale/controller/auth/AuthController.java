@@ -6,7 +6,6 @@ import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import java.time.Duration;
 import java.util.Map;
-import java.util.stream.Collectors;
 import net.modtale.exception.InvalidAuthenticationRequestException;
 import net.modtale.exception.UnauthorizedException;
 import net.modtale.model.dto.request.auth.ChangePasswordRequest;
@@ -27,6 +26,7 @@ import net.modtale.model.user.User;
 import net.modtale.service.auth.AuthenticationMutationService;
 import net.modtale.service.auth.AuthenticationService;
 import net.modtale.service.auth.TwoFactorService;
+import net.modtale.service.security.access.AdminAuthorityUtils;
 import net.modtale.service.user.account.AccountService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -34,7 +34,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.SecurityContextRepository;
@@ -198,7 +197,7 @@ public class AuthController {
         Authentication authentication = new UsernamePasswordAuthenticationToken(
                 user,
                 null,
-                user.getRoles().stream().map(role -> new SimpleGrantedAuthority("ROLE_" + role)).collect(Collectors.toList())
+                AdminAuthorityUtils.authoritiesFor(user)
         );
         context.setAuthentication(authentication);
         SecurityContextHolder.setContext(context);

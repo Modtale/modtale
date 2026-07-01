@@ -25,7 +25,7 @@ public class AuditController {
     }
 
     @GetMapping("/logs")
-    @PreAuthorize("@apiSecurity.isSuperAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('AUDIT_LOG_READ', authentication)")
     public ResponseEntity<Page<AdminLogDTO>> getAdminLogs(
             @RequestParam(required = false, defaultValue = "") String query,
             @RequestParam(required = false, defaultValue = "") String action,

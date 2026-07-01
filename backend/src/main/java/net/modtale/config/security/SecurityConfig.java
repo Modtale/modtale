@@ -314,9 +314,7 @@ public class SecurityConfig {
                                     .anyMatch(a -> a.getAuthority().equals("ROLE_API"));
                             if (isApiKeyUser) return new AuthorizationDecision(false);
 
-                            boolean isSuperAdmin = authentication.get().getAuthorities().stream()
-                                    .anyMatch(a -> a.getAuthority().equals("ROLE_SUPER_ADMIN"));
-                            return new AuthorizationDecision(authentication.get().isAuthenticated() && isSuperAdmin);
+                            return new AuthorizationDecision(authentication.get().isAuthenticated());
                         })
                         .requestMatchers("/api/v1/analytics/view/**", "/api/v1/views/project/**").access((authentication, context) -> {
                             boolean isApiKeyUser = authentication.get().getAuthorities().stream()

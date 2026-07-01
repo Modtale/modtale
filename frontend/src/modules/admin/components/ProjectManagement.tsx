@@ -2,11 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Package, Search, Trash2, EyeOff, Clock, AlertTriangle, ArrowRight, Hash, Terminal, Download, RotateCcw, Code, X, FileJson, Lock } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
 import { API_BASE_URL, extractApiErrorMessage } from '@/utils/api';
-import { isSuperAdminUser } from '../utils/access';
+import { AdminPermission, hasAdminPermission } from '../utils/access';
 import type { Project, ScanIssue } from '@/types';
 import { ModalPortal } from '@/components/ui/ModalPortal';
 
-export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }) {
+export function ProjectManagement({ setStatus, currentAdmin: initialAdmin }: { setStatus: (s: any) => void; currentAdmin?: any }) {
     const [query, setQuery] = useState('');
     const [idQuery, setIdQuery] = useState('');
     const [loading, setLoading] = useState(false);
@@ -32,10 +32,19 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
     const [jsonError, setJsonError] = useState<string | null>(null);
 
     useEffect(() => {
+        if (initialAdmin) {
+            setCurrentAdmin(initialAdmin);
+            return;
+        }
         adminClient.getCurrentAdmin().then(res => setCurrentAdmin(res)).catch(() => {});
-    }, []);
+    }, [initialAdmin]);
 
-    const isSuperAdmin = isSuperAdminUser(currentAdmin);
+    const canReadProjects = hasAdminPermission(currentAdmin, AdminPermission.PROJECT_MANAGE_READ);
+    const canEditRaw = hasAdminPermission(currentAdmin, AdminPermission.PROJECT_RAW_EDIT);
+    const canModerateProjects = hasAdminPermission(currentAdmin, AdminPermission.PROJECT_MODERATE);
+    const canDeleteProjects = hasAdminPermission(currentAdmin, AdminPermission.PROJECT_DELETE);
+    const canRestoreProjects = hasAdminPermission(currentAdmin, AdminPermission.PROJECT_RESTORE);
+    const canDeleteVersions = hasAdminPermission(currentAdmin, AdminPermission.PROJECT_VERSION_DELETE);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -57,6 +66,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
     }, [searchDeleted]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!canReadProjects) return;
         const val = e.target.value;
         setQuery(val);
         if (searchTimeout.current) clearTimeout(searchTimeout.current);
@@ -79,6 +89,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
 
     const handleIdLookup = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!canReadProjects) return;
         if (!idQuery.trim()) return;
 
         setLoading(true);
@@ -100,6 +111,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
     };
 
     const selectProject = async (mod: Project) => {
+        if (!canReadProjects) return;
         setFoundProject(mod);
         setQuery(mod.title);
         setIdQuery(mod.id);
@@ -119,6 +131,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
     };
 
     const openRawEdit = () => {
+        if (!canEditRaw) return;
         setRawJsonStr(JSON.stringify(foundProject, null, 2));
         setJsonError(null);
         setShowRawModal(true);
@@ -159,6 +172,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
 
     const saveRawEdit = async () => {
         if (!foundProject) return;
+        if (!canEditRaw) return;
         setLoading(true);
         try {
             const parsed = JSON.parse(rawJsonStr);
@@ -181,6 +195,11 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
 
     const handleAction = async () => {
         if (!foundProject) return;
+        if (confirmAction === 'DELETE' && !canDeleteProjects) return;
+        if (confirmAction === 'HARD_DELETE' && !canDeleteProjects) return;
+        if (confirmAction === 'RESTORE' && !canRestoreProjects) return;
+        if (confirmAction === 'UNLIST' && !canModerateProjects) return;
+        if (confirmAction === 'DELETE_VER' && !canDeleteVersions) return;
         setLoading(true);
         try {
             if (confirmAction === 'DELETE') {
@@ -241,6 +260,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
                             className={`w-full pl-14 px-6 py-4 bg-slate-50 dark:bg-black/20 border ${searchDeleted ? 'border-red-500/30 focus:ring-red-500' : 'border-slate-200 dark:border-white/10 focus:ring-modtale-accent'} rounded-2xl focus:ring-2 outline-none dark:text-white font-bold transition-all placeholder:font-medium`}
                             value={query}
                             onChange={handleInputChange}
+                            disabled={!canReadProjects}
                             onFocus={() => { if(searchResults.length > 0) setShowResults(true); }}
                         />
                     </div>
@@ -250,7 +270,7 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
                             <div className={`w-10 h-6 rounded-full p-1 transition-colors ${searchDeleted ? 'bg-red-500' : 'bg-slate-200 dark:bg-white/10'}`}>
                                 <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${searchDeleted ? 'translate-x-4' : ''}`} />
                             </div>
-                            <input type="checkbox" className="hidden" checked={searchDeleted} onChange={e => setSearchDeleted(e.target.checked)} />
+                            <input type="checkbox" className="hidden" checked={searchDeleted} disabled={!canReadProjects} onChange={e => setSearchDeleted(e.target.checked)} />
                             <span className={`text-xs font-bold ${searchDeleted ? 'text-red-500' : 'text-slate-500 group-hover/toggle:text-slate-700 dark:group-hover/toggle:text-slate-300'}`}>Search Deleted Projects</span>
                         </label>
                     </div>
@@ -275,8 +295,8 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
 
                 <form onSubmit={handleIdLookup} className="relative flex-1 md:flex-none md:w-80 group">
                     <Hash className="absolute left-5 top-4 w-5 h-5 text-slate-400 group-focus-within:text-modtale-accent transition-colors" />
-                    <input type="text" placeholder="Lookup exact ID/Slug..." className="w-full pl-14 pr-14 px-6 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-modtale-accent outline-none dark:text-white font-bold transition-all placeholder:font-medium font-mono" value={idQuery} onChange={(e) => setIdQuery(e.target.value)} />
-                    <button type="submit" disabled={loading || !idQuery.trim()} className="absolute right-2 top-2 bottom-2 aspect-square flex items-center justify-center bg-slate-200 dark:bg-white/10 hover:bg-modtale-accent hover:text-white text-slate-500 rounded-xl transition-all disabled:opacity-50 disabled:hover:bg-slate-200 dark:disabled:hover:bg-white/10"><ArrowRight className="w-5 h-5" /></button>
+                    <input type="text" placeholder="Lookup exact ID/Slug..." className="w-full pl-14 pr-14 px-6 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-modtale-accent outline-none dark:text-white font-bold transition-all placeholder:font-medium font-mono disabled:opacity-50" value={idQuery} onChange={(e) => setIdQuery(e.target.value)} disabled={!canReadProjects} />
+                    <button type="submit" disabled={loading || !idQuery.trim() || !canReadProjects} className="absolute right-2 top-2 bottom-2 aspect-square flex items-center justify-center bg-slate-200 dark:bg-white/10 hover:bg-modtale-accent hover:text-white text-slate-500 rounded-xl transition-all disabled:opacity-50 disabled:hover:bg-slate-200 dark:disabled:hover:bg-white/10"><ArrowRight className="w-5 h-5" /></button>
                 </form>
             </div>
 
@@ -300,25 +320,29 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
                         </div>
 
                         <div className="flex flex-wrap gap-4">
-                            <button onClick={openRawEdit} disabled={!isSuperAdmin} className={`flex-1 py-3 border-2 rounded-xl font-bold flex items-center justify-center gap-2 transition-all min-w-[200px] ${!isSuperAdmin ? 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-400 opacity-50 cursor-not-allowed' : 'border-indigo-500/20 hover:border-indigo-500 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-500'}`}>
-                                <Code className="w-4 h-4" /> Edit Raw JSON {!isSuperAdmin && <Lock className="w-4 h-4" />}
+                            <button onClick={openRawEdit} disabled={!canEditRaw} className={`flex-1 py-3 border-2 rounded-xl font-bold flex items-center justify-center gap-2 transition-all min-w-[200px] ${!canEditRaw ? 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-400 opacity-50 cursor-not-allowed' : 'border-indigo-500/20 hover:border-indigo-500 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-500'}`}>
+                                <Code className="w-4 h-4" /> Edit Raw JSON {!canEditRaw && <Lock className="w-4 h-4" />}
                             </button>
 
                             {foundProject.status === 'DELETED' ? (
                                 <>
-                                    <button onClick={() => setConfirmAction('RESTORE')} className="flex-1 py-3 border-2 border-emerald-500/20 hover:border-emerald-500 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-500 rounded-xl font-bold flex items-center justify-center gap-2 transition-all min-w-[200px]">
-                                        <RotateCcw className="w-4 h-4" /> Restore Project
-                                    </button>
-                                    <button onClick={() => setConfirmAction('HARD_DELETE')} className="flex-1 py-3 border-2 border-red-500/20 hover:border-red-500 bg-red-500/5 hover:bg-red-500/10 text-red-500 rounded-xl font-bold flex items-center justify-center gap-2 transition-all min-w-[200px]">
-                                        <Trash2 className="w-4 h-4" /> Force Hard Delete
-                                    </button>
+                                    {canRestoreProjects && (
+                                        <button onClick={() => setConfirmAction('RESTORE')} className="flex-1 py-3 border-2 border-emerald-500/20 hover:border-emerald-500 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-500 rounded-xl font-bold flex items-center justify-center gap-2 transition-all min-w-[200px]">
+                                            <RotateCcw className="w-4 h-4" /> Restore Project
+                                        </button>
+                                    )}
+                                    {canDeleteProjects && (
+                                        <button onClick={() => setConfirmAction('HARD_DELETE')} className="flex-1 py-3 border-2 border-red-500/20 hover:border-red-500 bg-red-500/5 hover:bg-red-500/10 text-red-500 rounded-xl font-bold flex items-center justify-center gap-2 transition-all min-w-[200px]">
+                                            <Trash2 className="w-4 h-4" /> Force Hard Delete
+                                        </button>
+                                    )}
                                 </>
-                            ) : (
+                            ) : canDeleteProjects ? (
                                 <button onClick={() => setConfirmAction('DELETE')} className="flex-1 py-3 border-2 border-red-500/20 hover:border-red-500 bg-red-500/5 hover:bg-red-500/10 text-red-500 rounded-xl font-bold flex items-center justify-center gap-2 transition-all">
                                     <Trash2 className="w-4 h-4" /> Delete Project
                                 </button>
-                            )}
-                            {foundProject.status !== 'UNLISTED' && foundProject.status !== 'DELETED' && (
+                            ) : null}
+                            {canModerateProjects && foundProject.status !== 'UNLISTED' && foundProject.status !== 'DELETED' && (
                                 <button onClick={() => setConfirmAction('UNLIST')} className="flex-1 py-3 border-2 border-amber-500/20 hover:border-amber-500 bg-amber-500/5 hover:bg-amber-500/10 text-amber-500 rounded-xl font-bold flex items-center justify-center gap-2 transition-all">
                                     <EyeOff className="w-4 h-4" /> Unlist Project
                                 </button>
@@ -342,7 +366,9 @@ export function ProjectManagement({ setStatus }: { setStatus: (s: any) => void }
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <a href={`${API_BASE_URL}/projects/${foundProject.id}/versions/${ver.versionNumber}/download`} target="_blank" rel="noreferrer" className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-400 rounded-lg transition-colors" title="Download Jar"><Download className="w-4 h-4" /></a>
-                                        <button onClick={() => { setTargetVersionId(ver.id); setConfirmAction('DELETE_VER'); }} className="p-2 hover:bg-red-500 hover:text-white text-slate-400 rounded-lg transition-colors" title="Delete Version"><Trash2 className="w-4 h-4" /></button>
+                                        {canDeleteVersions && (
+                                            <button onClick={() => { setTargetVersionId(ver.id); setConfirmAction('DELETE_VER'); }} className="p-2 hover:bg-red-500 hover:text-white text-slate-400 rounded-lg transition-colors" title="Delete Version"><Trash2 className="w-4 h-4" /></button>
+                                        )}
                                     </div>
                                 </div>
                             ))}

@@ -49,15 +49,14 @@ describe('adminClient', () => {
         expect((formData as FormData).get('tier')).toBe('ENTERPRISE');
     });
 
-    it('grants and revokes admin role through explicit role params', async () => {
-        mockedApi.post.mockResolvedValue({ data: null } as any);
-        mockedApi.delete.mockResolvedValue({ data: null } as any);
+    it('updates fine grained admin permissions in one request', async () => {
+        mockedApi.put.mockResolvedValue({ data: ['REPORT_READ'] } as any);
 
-        await adminClient.grantAdmin('user-1');
-        await adminClient.revokeAdmin('user-1');
+        await adminClient.updateAdminPermissions('user-1', ['REPORT_READ']);
 
-        expect(mockedApi.post).toHaveBeenCalledWith('/admin/users/user-1/role', null, { params: { role: 'ADMIN' } });
-        expect(mockedApi.delete).toHaveBeenCalledWith('/admin/users/user-1/role', { params: { role: 'ADMIN' } });
+        expect(mockedApi.put).toHaveBeenCalledWith('/admin/users/user-1/admin-permissions', {
+            permissions: ['REPORT_READ']
+        });
     });
 
     it('includes deletion reasons in admin delete requests', async () => {

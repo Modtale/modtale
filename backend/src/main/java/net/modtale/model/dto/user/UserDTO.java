@@ -3,7 +3,9 @@ package net.modtale.model.dto.user;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
+import java.util.Set;
 import net.modtale.model.user.ApiKey;
+import net.modtale.model.user.AdminPermission;
 import net.modtale.model.user.User;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -19,6 +21,7 @@ public class UserDTO {
     private String createdAt;
     private ApiKey.Tier tier;
     private List<String> roles;
+    private Set<AdminPermission> adminPermissions;
     private User.AccountType accountType;
     private List<User.OrganizationRole> organizationRoles;
     private List<User.OrganizationMember> organizationMembers;
@@ -52,6 +55,8 @@ public class UserDTO {
     public void setTier(ApiKey.Tier tier) { this.tier = tier; }
     public List<String> getRoles() { return roles; }
     public void setRoles(List<String> roles) { this.roles = roles; }
+    public Set<AdminPermission> getAdminPermissions() { return adminPermissions; }
+    public void setAdminPermissions(Set<AdminPermission> adminPermissions) { this.adminPermissions = adminPermissions; }
     public User.AccountType getAccountType() { return accountType; }
     public void setAccountType(User.AccountType accountType) { this.accountType = accountType; }
     public List<User.OrganizationRole> getOrganizationRoles() { return organizationRoles; }

@@ -1,9 +1,11 @@
 package net.modtale.service.security.access;
 
 import java.util.List;
+import java.util.Set;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.user.ApiKey;
+import net.modtale.model.user.AdminPermission;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.user.account.AccountService;
@@ -18,8 +20,6 @@ import org.springframework.stereotype.Service;
 
 @Service("apiSecurity")
 public class AccessControlService {
-    private static final String LEGACY_SUPER_ADMIN_ID = "692620f7c2f3266e23ac0ded";
-
     private final AccountService accountService;
     private final UserRepository userRepository;
     private final PermissionProjectLookupService permissionProjectLookupService;
@@ -38,25 +38,37 @@ public class AccessControlService {
     }
 
     public boolean isAdmin(User user) {
-        return user != null && (
-                isSuperAdmin(user) ||
-                        user.getRoles() != null && user.getRoles().contains("ADMIN")
-        );
-    }
-
-    public boolean isSuperAdmin(User user) {
-        return user != null && (
-                user.getRoles() != null && user.getRoles().contains("SUPER_ADMIN")
-                        || LEGACY_SUPER_ADMIN_ID.equals(user.getId())
-        );
+        return AdminPermission.hasAnyPermission(user);
     }
 
     public boolean isAdmin(Authentication authentication) {
         return isAdmin(accountService.getCurrentUser(authentication));
     }
 
-    public boolean isSuperAdmin(Authentication authentication) {
-        return isSuperAdmin(accountService.getCurrentUser(authentication));
+    public boolean hasAdminPermission(String permission, Authentication authentication) {
+        if (isApiKey(authentication)) return false;
+        AdminPermission adminPermission = parseAdminPermission(permission);
+        return adminPermission != null && hasAdminPermission(accountService.getCurrentUser(authentication), adminPermission);
+    }
+
+    public boolean hasAdminPermission(User user, AdminPermission permission) {
+        return AdminPermission.hasPermission(user, permission);
+    }
+
+    public boolean canViewPrivilegedProjectData(User user) {
+        return hasAnyAdminPermission(user,
+                AdminPermission.PROJECT_REVIEW_READ,
+                AdminPermission.PROJECT_MANAGE_READ,
+                AdminPermission.PROJECT_MODERATE,
+                AdminPermission.PROJECT_DELETE,
+                AdminPermission.PROJECT_RESTORE,
+                AdminPermission.PROJECT_VERSION_DELETE,
+                AdminPermission.PROJECT_RAW_EDIT
+        );
+    }
+
+    public boolean canApproveProjectReviews(User user) {
+        return hasAdminPermission(user, AdminPermission.PROJECT_REVIEW_DECIDE);
     }
 
     public boolean hasAnyPerm(String perm, Authentication authentication) {
@@ -89,7 +101,7 @@ public class AccessControlService {
         if (isApiKey(authentication)) {
             return hasApiKeyScope(authentication, orgId, permStr);
         }
-        if (isAdmin(user)) return true;
+        if (hasAdminPermission(user, AdminPermission.USER_PERMISSION_MANAGE)) return true;
 
         User org = userRepository.findById(orgId).orElse(null);
         if (org == null) return false;
@@ -118,7 +130,7 @@ public class AccessControlService {
                     && hasOrgProjectManagementAccess(org, user.getId());
         }
 
-        if (isAdmin(user)) return true;
+        if (hasAdminPermission(user, AdminPermission.PROJECT_MODERATE)) return true;
         if (ownerId == null || ownerId.isEmpty() || ownerId.equals(user.getId())) return true;
         User org = userRepository.findById(ownerId).orElse(null);
         if (org == null || org.getAccountType() != User.AccountType.ORGANIZATION) return false;
@@ -135,15 +147,15 @@ public class AccessControlService {
             return hasApiKeyProjectScope(project, projectId, permStr, authentication);
         }
 
+        User user = accountService.getCurrentUser(authentication);
         if (isProjectReadPermission(permStr)) {
-            return true;
+            return project == null || isPubliclyReadable(project) || canViewPrivilegedProjectData(user);
         }
 
         if (project == null) return true;
 
-        User user = accountService.getCurrentUser(authentication);
         if (user == null) return false;
-        if (isAdmin(user)) return true;
+        if (hasAdminProjectPermissionOverride(user, permStr)) return true;
 
         return hasProjectPermission(project, user, permStr);
     }
@@ -152,7 +164,7 @@ public class AccessControlService {
         if (project == null) return false;
         if (isPubliclyReadable(project)) return true;
         if (user == null) return false;
-        if (isAdmin(user)) return true;
+        if (canViewPrivilegedProjectData(user)) return true;
         return hasProjectPermission(project, user, "PROJECT_READ");
     }
 
@@ -347,6 +359,52 @@ public class AccessControlService {
         return "PROJECT_READ".equals(permStr)
                 || "PROFILE_READ".equals(permStr)
                 || "ORG_READ".equals(permStr);
+    }
+
+    private boolean hasAnyAdminPermission(User user, AdminPermission... permissions) {
+        if (user == null || permissions == null) return false;
+        Set<AdminPermission> effectivePermissions = AdminPermission.effectivePermissions(user);
+        for (AdminPermission permission : permissions) {
+            if (effectivePermissions.contains(permission)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasAdminProjectPermissionOverride(User user, String permStr) {
+        if (user == null || permStr == null) return false;
+
+        return switch (permStr) {
+            case "PROJECT_READ", "VERSION_READ" -> canViewPrivilegedProjectData(user);
+            case "PROJECT_STATUS_PUBLISH" -> hasAnyAdminPermission(
+                    user,
+                    AdminPermission.PROJECT_REVIEW_DECIDE,
+                    AdminPermission.PROJECT_MODERATE
+            );
+            case "PROJECT_EDIT_METADATA",
+                    "PROJECT_EDIT_ICON",
+                    "PROJECT_EDIT_BANNER",
+                    "PROJECT_STATUS_SUBMIT",
+                    "PROJECT_STATUS_REVERT",
+                    "PROJECT_STATUS_ARCHIVE",
+                    "PROJECT_STATUS_UNLIST",
+                    "PROJECT_GALLERY_ADD",
+                    "PROJECT_GALLERY_REMOVE",
+                    "VERSION_CREATE",
+                    "VERSION_EDIT" -> hasAdminPermission(user, AdminPermission.PROJECT_MODERATE);
+            case "PROJECT_DELETE" -> hasAdminPermission(user, AdminPermission.PROJECT_DELETE);
+            case "VERSION_DELETE" -> hasAdminPermission(user, AdminPermission.PROJECT_VERSION_DELETE);
+            default -> false;
+        };
+    }
+
+    private AdminPermission parseAdminPermission(String permission) {
+        try {
+            return AdminPermission.valueOf(permission);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            return null;
+        }
     }
 
     private ApiKey.ApiPermission parsePermission(String permStr) {

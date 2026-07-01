@@ -41,7 +41,7 @@ public class PlatformAnalyticsController {
     }
 
     @GetMapping("/full")
-    @PreAuthorize("@apiSecurity.isSuperAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('PLATFORM_ANALYTICS_READ', authentication)")
     public ResponseEntity<PlatformAnalyticsSummaryView> getPlatformAnalytics(
             @RequestParam(defaultValue = "30d")
             @Pattern(regexp = "7d|30d|90d|1y", message = "Analytics ranges must be 7d, 30d, 90d, or 1y.")
