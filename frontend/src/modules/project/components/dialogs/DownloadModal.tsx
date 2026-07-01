@@ -3,6 +3,8 @@ import { Download, X, ChevronDown, FileText, AlertCircle, ChevronRight, Check } 
 import { theme } from '@/styles/theme';
 import { buildVersionGroups, compareSemVer, formatTimeAgo, type VersionGroup } from '@/utils/modHelpers';
 import { useScrollLock } from '@/hooks/useScrollLock';
+import { getExternalDependencies } from '@/modules/project/utils/dependencyEntries';
+import type { ProjectDependency } from '@/types';
 import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface VersionMultiSelectDropdownProps {
@@ -184,12 +186,13 @@ interface DownloadModalProps {
     showExperimental: boolean;
     onToggleExperimental: () => void;
     onViewHistory: () => void;
+    isModpack?: boolean;
     isInline?: boolean;
     containerRef?: React.Ref<HTMLDivElement>;
 }
 
 export const DownloadModal: React.FC<DownloadModalProps> = ({
-                                                                show, onClose, versionsByGame, preReleaseGameVersions = [], orderedGameVersions = [], onDownload, showExperimental, onToggleExperimental, onViewHistory, isInline = false, containerRef
+                                                                show, onClose, versionsByGame, preReleaseGameVersions = [], orderedGameVersions = [], onDownload, showExperimental, onToggleExperimental, onViewHistory, isModpack = false, isInline = false, containerRef
                                                             }) => {
     useScrollLock(show && !isInline);
     const [selectedGameVersions, setSelectedGameVersions] = useState<string[]>([]);
@@ -382,6 +385,36 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
         return versions.filter((gv: string) => gv !== gameVersion);
     };
 
+    const externalDependenciesFor = (ver: any): ProjectDependency[] => (
+        isModpack ? getExternalDependencies(ver?.dependencies) : []
+    );
+
+    const formatExternalDependencyNames = (dependencies: ProjectDependency[]) => {
+        const names = dependencies.map(dep => dep.projectTitle || dep.externalId || dep.projectId).filter(Boolean);
+        const visibleNames = names.slice(0, 3);
+        const remainingCount = names.length - visibleNames.length;
+        return `${visibleNames.join(', ')}${remainingCount > 0 ? `, +${remainingCount} more` : ''}`;
+    };
+
+    const renderExternalDependencyNotice = (ver: any) => {
+        const externalDependencies = externalDependenciesFor(ver);
+        if (externalDependencies.length === 0) return null;
+
+        return (
+            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                <div className="flex items-start gap-2">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                    <div>
+                        <p className="text-sm font-black">This modpack uses external mods</p>
+                        <p className="mt-1 text-xs font-medium leading-relaxed">
+                            {formatExternalDependencyNames(externalDependencies)} {externalDependencies.length === 1 ? 'comes' : 'come'} from outside Modtale. Check the linked source pages if the download or install flow asks for them separately.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     const content = (
         <div ref={containerRef} className={`${isInline ? 'w-full overflow-hidden relative flex flex-col transform transition-transform duration-500' : 'fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-2xl max-h-[90dvh] flex flex-col z-[100]'} bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl rounded-2xl overflow-hidden`} onClick={e => e.stopPropagation()}>
             <div className={`p-6 flex justify-between items-center shrink-0 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-800/50`}>
@@ -443,6 +476,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                                 </div>
                             )}
                         </button>
+                        {renderExternalDependencyNotice(latestVer)}
 
                         <div className="relative mb-6">
                             <div className="absolute inset-0 flex items-center"><div className={`w-full border-t ${theme.colors.borderFaint}`}></div></div>
@@ -475,6 +509,12 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                                                 {otherCompatibleVersions(ver, gameVersion).length > 0 && (
                                                     <div className={`text-[11px] ${theme.colors.textSecondary}`}>
                                                         Also supports: {otherCompatibleVersions(ver, gameVersion).join(', ')}
+                                                    </div>
+                                                )}
+                                                {externalDependenciesFor(ver).length > 0 && (
+                                                    <div className="mt-1 inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                                                        <AlertCircle className="h-3 w-3" aria-hidden="true" />
+                                                        External mods
                                                     </div>
                                                 )}
                                             </div>

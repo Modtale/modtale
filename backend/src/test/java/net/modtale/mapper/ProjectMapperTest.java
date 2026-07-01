@@ -75,7 +75,6 @@ class ProjectMapperTest {
         Project project = baseProject();
         project.setAbout("Deep project details");
         project.setChildProjectIds(List.of("child-1"));
-        project.setModIds(List.of("mod-1"));
         project.setGalleryImages(List.of("https://example.com/one.png"));
         project.setGalleryImageCaptions(Map.of("https://example.com/one.png", "Opening shot"));
         project.setGalleryCarouselEnabled(true);
@@ -89,7 +88,6 @@ class ProjectMapperTest {
 
         assertEquals("Deep project details", dto.getAbout());
         assertEquals(List.of("child-1"), dto.getChildProjectIds());
-        assertEquals(List.of("mod-1"), dto.getModIds());
         assertEquals(Map.of("https://example.com/one.png", "Opening shot"), dto.getGalleryImageCaptions());
         assertTrue(dto.isGalleryCarouselEnabled());
         assertEquals(1, dto.getComments().size());
@@ -125,7 +123,12 @@ class ProjectMapperTest {
         ProjectVersionSummaryDTO withoutReview = ProjectMapper.toVersionSummaryDTO(version, false);
         ProjectVersionSummaryDTO withReview = ProjectMapper.toVersionSummaryDTO(version, true);
         AdminProjectVersionSummaryDTO adminVersion = ProjectMapper.toAdminVersionSummaryDTO(version);
-        ProjectDependency dependency = new ProjectDependency("modtale:core", "Core", "1.0.0", true, true);
+        ProjectDependency dependency = new ProjectDependency(
+                "modtale:core",
+                "Core",
+                "1.0.0",
+                ProjectDependency.DependencyType.EMBEDDED
+        );
         dependency.setIcon("/icons/core.png");
         dependency.setTitle("Core Display");
         dependency.setClassification(ProjectClassification.PLUGIN);
@@ -137,11 +140,13 @@ class ProjectMapperTest {
         assertEquals("Security review cleared", withReview.rejectionReason());
         assertNotNull(adminVersion.scanResult());
         assertEquals("modtale:core", dependencyDto.projectId());
+        assertEquals(ProjectDependency.DependencyType.EMBEDDED, dependencyDto.dependencyType());
+        assertEquals(ProjectDependency.Source.MODTALE, dependencyDto.source());
         assertEquals("/icons/core.png", dependencyDto.icon());
         assertEquals("Core Display", dependencyDto.title());
         assertEquals(ProjectClassification.PLUGIN, dependencyDto.classification());
         assertEquals("core", dependencyDto.slug());
-        assertTrue(dependencyDto.isOptional());
+        assertFalse(dependencyDto.isOptional());
         assertTrue(dependencyDto.isEmbedded());
         assertEquals("Lock in complete", ProjectMapper.toVersionDTO(version).getChangelog());
         assertEquals("Core", ProjectMapper.toVersionDTO(version).getDependencies().getFirst().projectTitle());
@@ -213,7 +218,7 @@ class ProjectMapperTest {
         version.setDownloadCount(12);
         version.setReleaseDate("2026-01-01T10:00:00");
         version.setChangelog("Lock in complete");
-        version.setDependencies(List.of(new ProjectDependency("modtale:core", "Core", "1.0.0", false, false)));
+        version.setDependencies(List.of(new ProjectDependency("modtale:core", "Core", "1.0.0")));
         version.setIncompatibleProjectIds(List.of("modtale:legacy"));
         version.setChannel(ProjectVersion.Channel.RELEASE);
         version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);

@@ -5,6 +5,9 @@ export enum VersionRelationKind {
     INCOMPATIBILITY = 'INCOMPATIBILITY'
 }
 
+export type DependencySource = 'MODTALE' | 'CURSEFORGE' | 'GITHUB' | 'WEBSITE' | 'OTHER';
+export type DependencyType = 'REQUIRED' | 'OPTIONAL' | 'EMBEDDED';
+
 export interface ConnectedAccount {
     provider: string;
     providerId: string;
@@ -57,15 +60,45 @@ export interface User {
 }
 
 export interface ProjectDependency {
+    id?: string;
     projectId: string;
     projectTitle: string;
     versionNumber: string;
+    dependencyType?: DependencyType;
+    source?: DependencySource | string;
+    externalId?: string;
+    externalUrl?: string;
+    externalFileUrl?: string;
+    externalFileName?: string;
+    cachedFileUrl?: string;
+    hytaleProjectConfirmed?: boolean;
     icon?: string;
     title?: string;
     classification?: string;
     slug?: string;
     isOptional?: boolean;
     isEmbedded?: boolean;
+}
+
+export interface ExternalProjectFile {
+    id?: string;
+    displayName?: string;
+    fileName?: string;
+    versionNumber?: string;
+    releaseType?: string;
+    downloadUrl?: string;
+}
+
+export interface ExternalProjectReference {
+    source: DependencySource;
+    externalId: string;
+    title: string;
+    versionNumber: string;
+    externalUrl: string;
+    iconUrl?: string;
+    summary?: string;
+    hytaleProjectConfirmed: boolean;
+    files?: ExternalProjectFile[];
 }
 
 export interface ManifestDependencySuggestion {
@@ -76,7 +109,6 @@ export interface ManifestDependencySuggestion {
     versionNumber: string;
     optional: boolean;
     confidence: number;
-    dependencyEntry: string;
 }
 
 export interface ManifestInspectionResult {

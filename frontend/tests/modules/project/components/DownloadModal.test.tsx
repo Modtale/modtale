@@ -405,4 +405,91 @@ describe('DownloadModal Toggle Visibility', () => {
 
         expect(onDownload).toHaveBeenCalledWith('/files/skyforge.jar', '1.0.0', '0.5.4', [], 'RELEASE');
     });
+
+    it('warns when a modpack version includes external mods', async () => {
+        const versionsByGame = {
+            '0.5.4': [
+                {
+                    id: 'v1',
+                    versionNumber: '1.0.0',
+                    channel: 'RELEASE',
+                    gameVersion: '0.5.4',
+                    releaseDate: new Date().toISOString(),
+                    dependencies: [
+                        {
+                            projectId: 'external-shader',
+                            projectTitle: 'External Shader',
+                            versionNumber: '2.0.0',
+                            source: 'CURSEFORGE'
+                        }
+                    ]
+                }
+            ]
+        };
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <DownloadModal
+                        show={true}
+                        onClose={vi.fn()}
+                        versionsByGame={versionsByGame}
+                        preReleaseGameVersions={[]}
+                        orderedGameVersions={['0.5.4']}
+                        onDownload={vi.fn()}
+                        showExperimental={false}
+                        onToggleExperimental={vi.fn()}
+                        onViewHistory={vi.fn()}
+                        isModpack={true}
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        expect(pageText()).toContain('This modpack uses external mods');
+        expect(pageText()).toContain('External Shader');
+    });
+
+    it('does not show the external mod warning for non-modpack projects', async () => {
+        const versionsByGame = {
+            '0.5.4': [
+                {
+                    id: 'v1',
+                    versionNumber: '1.0.0',
+                    channel: 'RELEASE',
+                    gameVersion: '0.5.4',
+                    releaseDate: new Date().toISOString(),
+                    dependencies: [
+                        {
+                            projectId: 'external-library',
+                            projectTitle: 'External Library',
+                            versionNumber: '2.0.0',
+                            source: 'CURSEFORGE'
+                        }
+                    ]
+                }
+            ]
+        };
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <DownloadModal
+                        show={true}
+                        onClose={vi.fn()}
+                        versionsByGame={versionsByGame}
+                        preReleaseGameVersions={[]}
+                        orderedGameVersions={['0.5.4']}
+                        onDownload={vi.fn()}
+                        showExperimental={false}
+                        onToggleExperimental={vi.fn()}
+                        onViewHistory={vi.fn()}
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        expect(pageText()).not.toContain('This modpack uses external mods');
+        expect(pageText()).not.toContain('External Library');
+    });
 });

@@ -2,6 +2,7 @@ package net.modtale.service.project.version;
 
 import java.util.List;
 import net.modtale.exception.InvalidVersionRequestException;
+import net.modtale.model.dto.request.project.DependencyReferenceRequest;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectStatus;
@@ -34,7 +35,10 @@ class VersionDependencyServiceTest {
         when(projectService.getRawProjectById("dep-2")).thenReturn(project("dep-2", "Dependency Two", ProjectStatus.PUBLISHED, "2.0.0"));
 
         VersionDependencyService.ResolvedDependencies resolved = service.resolveRequestedDependencies(
-                List.of("dep-1:1.0.0:optional", "dep-2:2.0.0:embedded"),
+                List.of(
+                        dependency("dep-1", "1.0.0", ProjectDependency.DependencyType.OPTIONAL),
+                        dependency("dep-2", "2.0.0", ProjectDependency.DependencyType.EMBEDDED)
+                ),
                 false,
                 false
         );
@@ -54,7 +58,7 @@ class VersionDependencyServiceTest {
 
         assertThrows(
                 InvalidVersionRequestException.class,
-                () -> service.resolveRequestedDependencies(List.of("dep-1:1.0.0"), true, false)
+                () -> service.resolveRequestedDependencies(List.of(dependency("dep-1", "1.0.0")), true, false)
         );
     }
 
@@ -63,10 +67,10 @@ class VersionDependencyServiceTest {
         when(projectService.getRawProjectById("draft")).thenReturn(project("draft", "Draft", ProjectStatus.DRAFT, "1.0.0"));
         when(projectService.getRawProjectById("dep-1")).thenReturn(project("dep-1", "Dependency One", ProjectStatus.PUBLISHED, "1.0.0"));
 
-        assertThrows(InvalidVersionRequestException.class, () -> service.resolveRequestedDependencies(List.of("bad-entry"), false, false));
-        assertThrows(InvalidVersionRequestException.class, () -> service.resolveRequestedDependencies(List.of("missing:1.0.0"), false, false));
-        assertThrows(InvalidVersionRequestException.class, () -> service.resolveRequestedDependencies(List.of("draft:1.0.0"), false, false));
-        assertThrows(InvalidVersionRequestException.class, () -> service.resolveRequestedDependencies(List.of("dep-1:2.0.0"), false, false));
+        assertThrows(InvalidVersionRequestException.class, () -> service.resolveRequestedDependencies(List.of(new DependencyReferenceRequest()), false, false));
+        assertThrows(InvalidVersionRequestException.class, () -> service.resolveRequestedDependencies(List.of(dependency("missing", "1.0.0")), false, false));
+        assertThrows(InvalidVersionRequestException.class, () -> service.resolveRequestedDependencies(List.of(dependency("draft", "1.0.0")), false, false));
+        assertThrows(InvalidVersionRequestException.class, () -> service.resolveRequestedDependencies(List.of(dependency("dep-1", "2.0.0")), false, false));
     }
 
     @Test
@@ -74,9 +78,30 @@ class VersionDependencyServiceTest {
         when(projectService.getRawProjectById("draft")).thenReturn(project("draft", "Draft", ProjectStatus.DRAFT, "1.0.0"));
 
         VersionDependencyService.ResolvedDependencies resolved =
-                service.resolveRequestedDependencies(List.of("draft:1.0.0"), false, true);
+                service.resolveRequestedDependencies(List.of(dependency("draft", "1.0.0")), false, true);
 
-        assertEquals("draft", resolved.dependencies().getFirst().getModId());
+        assertEquals("draft", resolved.dependencies().getFirst().getProjectId());
+    }
+
+    @Test
+    void resolveRequestedDependenciesAcceptsConfirmedExternalReferencesWithFileMetadata() {
+        DependencyReferenceRequest external = new DependencyReferenceRequest();
+        external.setSource(ProjectDependency.Source.GITHUB);
+        external.setProjectTitle("GitHub Mod");
+        external.setVersionNumber("latest");
+        external.setExternalUrl("https://github.com/modtale/example-mod");
+        external.setExternalFileUrl("https://raw.githubusercontent.com/modtale/example-mod/main/build/libs/example-mod.jar");
+        external.setExternalFileName("example-mod.jar");
+        external.setHytaleProjectConfirmed(true);
+
+        VersionDependencyService.ResolvedDependencies resolved =
+                service.resolveRequestedDependencies(List.of(external), false, false);
+
+        ProjectDependency dependency = resolved.dependencies().getFirst();
+        assertTrue(dependency.isExternal());
+        assertEquals(ProjectDependency.Source.GITHUB, dependency.getSource());
+        assertEquals("example-mod.jar", dependency.getExternalFileName());
+        assertEquals("https://raw.githubusercontent.com/modtale/example-mod/main/build/libs/example-mod.jar", dependency.getExternalFileUrl());
     }
 
     @Test
@@ -103,5 +128,21 @@ class VersionDependencyServiceTest {
             return version;
         }).toList());
         return project;
+    }
+
+    private static DependencyReferenceRequest dependency(String projectId, String versionNumber) {
+        return dependency(projectId, versionNumber, ProjectDependency.DependencyType.REQUIRED);
+    }
+
+    private static DependencyReferenceRequest dependency(
+            String projectId,
+            String versionNumber,
+            ProjectDependency.DependencyType dependencyType
+    ) {
+        DependencyReferenceRequest request = new DependencyReferenceRequest();
+        request.setProjectId(projectId);
+        request.setVersionNumber(versionNumber);
+        request.setDependencyType(dependencyType);
+        return request;
     }
 }

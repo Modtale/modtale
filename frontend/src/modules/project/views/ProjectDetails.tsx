@@ -33,6 +33,7 @@ import { StatusModal } from '@/components/ui/StatusModal';
 import { api, extractApiErrorMessage } from '@/utils/api';
 import { projectClient } from '../api/projectClient';
 import { mergeProjectVersionChangelogs, projectNeedsChangelogHydration } from '../utils/changelogHydration';
+import { isEmbeddedDependency, isExternalDependency } from '../utils/dependencyEntries';
 import { resolveGalleryImages } from '../utils/galleryImages';
 import { countGalleryCarouselMarkers } from '../utils/galleryCarouselMarker';
 import { useScrollLock } from '@/hooks/useScrollLock';
@@ -489,7 +490,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 return;
             }
 
-            const selectableDeps = (deps || []).filter(dep => getDependencyId(dep) && !dep?.isEmbedded);
+            const selectableDeps = (deps || []).filter(dep => getDependencyId(dep) && !isEmbeddedDependency(dep) && !isExternalDependency(dep));
             if (selectableDeps.length > 0) {
                 setPendingDownload({ versionNumber, gameVersion, dependencies: selectableDeps, channel: downloadChannel });
                 setIsDepModalOpen(true);
@@ -600,6 +601,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                         onToggleExperimental={toggleExperimental}
                         onDownload={handleDownloadClick}
                         hasStableVersions={hasStableBuilds}
+                        isModpack={project.classification === 'MODPACK'}
                     />
                 )}
                 {isDownloadOpen && !versionPayloadPending && (
@@ -613,6 +615,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                         showExperimental={showExperimental}
                         onToggleExperimental={toggleExperimental}
                         onViewHistory={() => navigate(projectUrl + '/changelog')}
+                        isModpack={project.classification === 'MODPACK'}
                     />
                 )}
                 {isDepModalOpen && pendingDownload && (

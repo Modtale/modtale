@@ -552,7 +552,7 @@ public class ProjectViewService {
         Set<String> dependencyIds = project.getVersions().stream()
                 .filter(version -> version.getDependencies() != null)
                 .flatMap(version -> version.getDependencies().stream())
-                .map(ProjectDependency::getModId)
+                .map(ProjectDependency::getProjectId)
                 .filter(id -> id != null && !id.isBlank())
                 .collect(Collectors.toSet());
 
@@ -582,16 +582,16 @@ public class ProjectViewService {
                 .filter(version -> version.getDependencies() != null)
                 .flatMap(version -> version.getDependencies().stream())
                 .forEach(dependency -> {
-                    Project dependencyProject = dependencyProjects.get(dependency.getModId());
+                    Project dependencyProject = dependencyProjects.get(dependency.getProjectId());
                     if (dependencyProject == null) {
-                        dependency.setTitle(dependency.getModTitle());
+                        dependency.setTitle(dependency.getProjectTitle());
                         return;
                     }
 
-                    if (dependency.getModTitle() == null || dependency.getModTitle().isBlank()) {
-                        dependency.setModTitle(dependencyProject.getTitle());
+                    if (dependency.getProjectTitle() == null || dependency.getProjectTitle().isBlank()) {
+                        dependency.setProjectTitle(dependencyProject.getTitle());
                     }
-                    dependency.setTitle(dependencyProject.getTitle() != null ? dependencyProject.getTitle() : dependency.getModTitle());
+                    dependency.setTitle(dependencyProject.getTitle() != null ? dependencyProject.getTitle() : dependency.getProjectTitle());
                     dependency.setIcon(dependencyProject.getImageUrl() != null ? dependencyProject.getImageUrl() : "");
                     dependency.setClassification(dependencyProject.getClassification());
                     dependency.setSlug(dependencyProject.getSlug() != null && !dependencyProject.getSlug().isBlank()

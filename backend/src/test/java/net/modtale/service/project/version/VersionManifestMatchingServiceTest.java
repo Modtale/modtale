@@ -58,7 +58,7 @@ class VersionManifestMatchingServiceTest {
         assertEquals("com.example:sky-library", suggestion.getManifestKey());
         assertEquals("project-1", suggestion.getProjectId());
         assertEquals("2.0.0", suggestion.getVersionNumber());
-        assertEquals("project-1:2.0.0:optional", suggestion.getDependencyEntry());
+        assertTrue(suggestion.isOptional());
         assertEquals(100, suggestion.getConfidence());
     }
 
@@ -75,7 +75,7 @@ class VersionManifestMatchingServiceTest {
         );
 
         assertEquals("1.1.0", suggestions.getFirst().getVersionNumber());
-        assertEquals("project-1:1.1.0", suggestions.getFirst().getDependencyEntry());
+        assertEquals("project-1", suggestions.getFirst().getProjectId());
     }
 
     @Test

@@ -11,15 +11,14 @@ vi.mock('@/modules/project/components/VersionFields', () => ({
 }));
 
 const versionData: VersionFormData = {
-    projectIds: [],
-    incompatibleProjectIds: [],
     versionNumber: '',
     gameVersions: [],
     changelog: '',
     file: null,
     dependencies: [],
-    modIds: [],
-    channel: 'RELEASE'
+    incompatibleProjectIds: [],
+    channel: 'RELEASE',
+    replaceExisting: false
 };
 
 const renderFiles = (projectData: any) => (
@@ -145,7 +144,13 @@ describe('Files upload rules for drafts', () => {
     it('hides previous dependency import when dependencies are already selected', async () => {
         const populatedVersionData: VersionFormData = {
             ...versionData,
-            projectIds: ['dep-2:3.0.0']
+            dependencies: [{
+                projectId: 'dep-2',
+                projectTitle: 'Dependency Two',
+                versionNumber: '3.0.0',
+                dependencyType: 'REQUIRED',
+                source: 'MODTALE'
+            }]
         };
 
         await act(async () => {
@@ -202,7 +207,8 @@ describe('Files upload rules for drafts', () => {
                                 projectId: 'dep-1',
                                 projectTitle: 'Dependency One',
                                 versionNumber: '2.0.0',
-                                isOptional: true
+                                dependencyType: 'OPTIONAL',
+                                source: 'MODTALE'
                             }],
                             channel: 'BETA',
                             fileUrl: '/download.jar',
@@ -236,7 +242,13 @@ describe('Files upload rules for drafts', () => {
         expect(updater(versionData)).toMatchObject({
             gameVersions: ['1.21'],
             channel: 'BETA',
-            projectIds: ['dep-1:2.0.0:optional']
+            dependencies: [{
+                projectId: 'dep-1',
+                projectTitle: 'Dependency One',
+                versionNumber: '2.0.0',
+                dependencyType: 'OPTIONAL',
+                source: 'MODTALE'
+            }]
         });
     });
 

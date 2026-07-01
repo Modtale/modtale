@@ -13,7 +13,7 @@ public class CreateVersionRequest {
 
     private List<@NotBlank(message = "Game version entries cannot be blank.") String> gameVersions;
     private MultipartFile file;
-    private List<@NotBlank(message = "Dependency entries cannot be blank.") String> modIds;
+    private List<DependencyReferenceRequest> dependencies;
     private List<@NotBlank(message = "Incompatible project entries cannot be blank.") String> incompatibleProjectIds;
 
     @Size(max = 50000, message = "Version changelogs cannot exceed 50,000 characters.")
@@ -46,12 +46,12 @@ public class CreateVersionRequest {
         this.file = file;
     }
 
-    public List<String> getModIds() {
-        return modIds;
+    public List<DependencyReferenceRequest> getDependencies() {
+        return dependencies;
     }
 
-    public void setModIds(List<String> modIds) {
-        this.modIds = modIds;
+    public void setDependencies(List<DependencyReferenceRequest> dependencies) {
+        this.dependencies = dependencies;
     }
 
     public List<String> getIncompatibleProjectIds() {
