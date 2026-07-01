@@ -5,6 +5,10 @@ import {
     generateFaqSchema,
     generateItemListSchema,
     generateOrganizationSchema,
+    generateProjectSchema,
+    generateProjectSchemas,
+    generateProjectWebPageSchema,
+    getProjectOgImageUrl,
     generateWebsiteSchema,
     getBreadcrumbsForClassification,
 } from '@/utils/schema';
@@ -168,6 +172,113 @@ describe('schema utils', () => {
             '@type': 'Organization',
             name: 'Modtale',
             url: 'https://modtale.net/',
+        });
+    });
+
+    it('builds rich project schema with canonical url, offer, author, and engagement facts', () => {
+        const project = {
+            id: 'p1',
+            title: 'LevelingCore',
+            slug: 'levelingcore',
+            description: 'Adds levels and progression.',
+            authorId: 'u1',
+            author: 'AzureDoom',
+            imageUrl: '/api/media/levelingcore.png',
+            classification: 'PLUGIN',
+            tags: ['rpg', 'server'],
+            downloadCount: 1234,
+            favoriteCount: 56,
+            repositoryUrl: 'https://github.com/example/levelingcore',
+            updatedAt: '2026-06-18T12:00:00',
+            createdAt: '2026-06-01',
+            versions: [{ versionNumber: '1.2.0', reviewStatus: 'APPROVED' }],
+        } as any;
+
+        expect(getProjectOgImageUrl('p1')).toBe('http://localhost:8080/api/v1/og/project/p1.png');
+        expect(generateProjectSchema(project)).toMatchObject({
+            '@context': 'https://schema.org',
+            '@type': 'SoftwareApplication',
+            '@id': 'https://modtale.net/mod/levelingcore#software',
+            name: 'LevelingCore',
+            url: 'https://modtale.net/mod/levelingcore',
+            applicationCategory: 'GameApplication',
+            applicationSubCategory: 'Hytale plugin',
+            operatingSystem: 'Windows, macOS, Linux',
+            isAccessibleForFree: true,
+            image: [
+                'http://localhost:8080/api/media/levelingcore.png',
+                'http://localhost:8080/api/v1/og/project/p1.png',
+            ],
+            author: {
+                '@type': 'Person',
+                name: 'AzureDoom',
+                url: 'https://modtale.net/creator/AzureDoom',
+            },
+            offers: {
+                '@type': 'Offer',
+                price: 0,
+                priceCurrency: 'USD',
+                availability: 'https://schema.org/InStock',
+                url: 'https://modtale.net/mod/levelingcore',
+            },
+            keywords: 'rpg, server',
+            codeRepository: 'https://github.com/example/levelingcore',
+            softwareVersion: '1.2.0',
+            datePublished: '2026-06-01',
+            dateModified: '2026-06-18T12:00:00',
+        });
+
+        expect(generateProjectSchema(project)).toMatchObject({
+            interactionStatistic: [
+                {
+                    '@type': 'InteractionCounter',
+                    interactionType: { '@type': 'DownloadAction' },
+                    userInteractionCount: 1234,
+                },
+                {
+                    '@type': 'InteractionCounter',
+                    interactionType: { '@type': 'LikeAction' },
+                    userInteractionCount: 56,
+                },
+            ],
+        });
+    });
+
+    it('builds project page and breadcrumb schemas as a reusable graph', () => {
+        const project = {
+            id: 'p2',
+            title: 'Sky Atlas',
+            description: 'A curated pack.',
+            author: 'Grace',
+            classification: 'MODPACK',
+            downloadCount: 0,
+            favoriteCount: 0,
+        } as any;
+
+        expect(generateProjectWebPageSchema(project)).toMatchObject({
+            '@context': 'https://schema.org',
+            '@type': 'WebPage',
+            '@id': 'https://modtale.net/modpack/sky-atlas~p2#webpage',
+            url: 'https://modtale.net/modpack/sky-atlas~p2',
+            headline: 'Sky Atlas',
+            mainEntity: {
+                '@id': 'https://modtale.net/modpack/sky-atlas~p2#software',
+            },
+        });
+
+        const graph = generateProjectSchemas(project);
+        expect(graph).toHaveLength(3);
+        expect(graph.map((entry: any) => entry['@type'])).toEqual([
+            'WebPage',
+            'SoftwareApplication',
+            'BreadcrumbList',
+        ]);
+        expect(graph[2]).toMatchObject({
+            itemListElement: [
+                { name: 'Home', item: 'https://modtale.net/' },
+                { name: 'Modpacks', item: 'https://modtale.net/modpacks' },
+                { name: 'Sky Atlas', item: 'https://modtale.net/modpack/sky-atlas~p2' },
+            ],
         });
     });
 });
