@@ -21,6 +21,10 @@ const requiredCollections = [
   'status_history',
 ];
 
+const collectionsAllowedToBeEmpty = new Set([
+  'status_incidents',
+]);
+
 const forbiddenKeyPattern = /(?:token|secret|accessToken|refreshToken|mfaSecret|verificationToken|passwordReset)/i;
 const forbiddenStringPatterns = [
   /mongodb(?:\+srv)?:\/\//i,
@@ -124,7 +128,7 @@ function checkCommentShape(comment, context) {
 const collections = Object.fromEntries(requiredCollections.map((name) => [name, readCollection(name)]));
 
 for (const [name, docs] of Object.entries(collections)) {
-  if (docs.length === 0) {
+  if (docs.length === 0 && !collectionsAllowedToBeEmpty.has(name)) {
     errors.push(`${name}.json must contain at least one document.`);
   }
   walk(docs, name);
