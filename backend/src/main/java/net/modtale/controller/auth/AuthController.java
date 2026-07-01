@@ -132,6 +132,14 @@ public class AuthController {
         return ResponseEntity.ok().build();
     }
 
+    @DeleteMapping("/password")
+    @PreAuthorize("!@apiSecurity.isApiKey(authentication) && @apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
+    public ResponseEntity<Void> removePassword() {
+        User user = accountService.requireCurrentUser("removing your password");
+        authenticationMutationService.removePassword(user.getId());
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/mfa/setup")
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<MfaSetupResponse> setupMfa() {

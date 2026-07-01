@@ -106,6 +106,21 @@ public class AuthenticationMutationService {
         userRepository.save(user);
     }
 
+    public void removePassword(String userId) {
+        User user = requireUser(userId);
+        boolean hasLinkedOAuthProvider = !Optional.ofNullable(user.getConnectedAccounts())
+                .orElse(Collections.emptyList())
+                .isEmpty();
+        if (!hasLinkedOAuthProvider) {
+            throw new InvalidAuthenticationRequestException("Link an OAuth provider before removing your password.");
+        }
+
+        user.setPassword(null);
+        user.setPasswordResetToken(null);
+        user.setPasswordResetTokenExpiry(null);
+        userRepository.save(user);
+    }
+
     public void verifyEmail(String token) {
         User user = userRepository.findByVerificationToken(token)
                 .orElseThrow(() -> new InvalidAuthenticationRequestException("That verification link is invalid or has already expired."));

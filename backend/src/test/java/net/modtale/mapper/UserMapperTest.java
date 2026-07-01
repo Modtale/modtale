@@ -41,6 +41,7 @@ class UserMapperTest {
         assertEquals("ItsNeil17", dto.getUsername());
         assertEquals("Always lock in", dto.getBio());
         assertNull(dto.getEmail());
+        assertNull(dto.getHasPassword());
         assertNull(dto.getAdminPermissions());
         assertNull(dto.getPendingOrgInvites());
         assertNull(dto.getLikedModIds());
@@ -61,6 +62,7 @@ class UserMapperTest {
         assertEquals("ItsNeil17", dto.getUsername());
         assertEquals("Always lock in", dto.getBio());
         assertTrue(dto.getEmailVerified());
+        assertTrue(dto.getHasPassword());
         assertTrue(dto.getMfaEnabled());
         assertTrue(dto.getAdminPermissions().contains(AdminPermission.USER_READ));
         assertNotNull(dto.getPendingOrgInvites());
@@ -74,6 +76,7 @@ class UserMapperTest {
         user.setId("user-1");
         user.setUsername("ItsNeil17");
         user.setEmail("itsneil17@example.com");
+        user.setPassword("encoded-password");
         user.setEmailVerified(true);
         user.setMfaEnabled(true);
         user.setAvatarUrl("https://example.com/avatar.png");

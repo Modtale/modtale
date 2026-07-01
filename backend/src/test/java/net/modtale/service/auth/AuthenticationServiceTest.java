@@ -136,6 +136,18 @@ class AuthenticationServiceTest {
     }
 
     @Test
+    void authenticateRejectsPasswordlessAccountsBeforePasswordValidation() {
+        User user = user("user-1", "Ada", "ada@example.com");
+
+        when(userRepository.findByUsernameIgnoreCase("Ada")).thenReturn(Optional.of(user));
+        when(bannedEmailRepository.existsByEmailIgnoreCase("ada@example.com")).thenReturn(false);
+
+        assertThrows(UnauthorizedException.class, () -> authenticationService.authenticate("Ada", "secret123"));
+
+        verify(passwordEncoder, never()).matches(anyString(), anyString());
+    }
+
+    @Test
     void validatePreAuthTokenRoundTripsForValidUsersAndRejectsTampering() {
         User user = user("user-1", "Ada", "ada@example.com");
         when(userRepository.findById("user-1")).thenReturn(Optional.of(user));
