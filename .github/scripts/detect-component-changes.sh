@@ -80,6 +80,8 @@ changed_files="$(git diff --name-only --no-renames "$base_sha" "$head_sha")"
 
 frontend=false
 backend=false
+launcher=false
+launcher_build=false
 
 while IFS= read -r path; do
   [[ -z "$path" ]] && continue
@@ -91,6 +93,13 @@ while IFS= read -r path; do
     backend/*)
       backend=true
       ;;
+    launcher/*)
+      launcher=true
+      launcher_build=true
+      ;;
+    .github/workflows/launcher-release.yml)
+      launcher=true
+      ;;
   esac
 done <<< "$changed_files"
 
@@ -98,6 +107,8 @@ done <<< "$changed_files"
   echo "Change detection range: $range_label"
   echo "Frontend changed: $frontend"
   echo "Backend changed: $backend"
+  echo "Launcher changed: $launcher"
+  echo "Launcher build needed: $launcher_build"
   echo "Changed files:"
   if [[ -n "$changed_files" ]]; then
     printf '%s\n' "$changed_files"
@@ -109,4 +120,6 @@ done <<< "$changed_files"
 {
   echo "frontend=$frontend"
   echo "backend=$backend"
+  echo "launcher=$launcher"
+  echo "launcher_build=$launcher_build"
 } >> "${GITHUB_OUTPUT:-/dev/stdout}"

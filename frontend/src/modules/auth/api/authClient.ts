@@ -103,5 +103,8 @@ export const authClient = {
     },
     validateMfaLogin: async (data: { pre_auth_token: string | null; code: string }) => {
         return await api.post('/auth/mfa/validate-login', data);
+    },
+    issueLauncherAuthCode: async (data: { redirectUri: string; state?: string | null }) => {
+        return await api.post('/auth/launcher/issue', data);
     }
 };

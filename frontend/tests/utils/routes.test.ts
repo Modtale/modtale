@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { SiteRoutes } from '@/utils/routes';
 
 describe('SiteRoutes', () => {
+    it('returns the launcher route', () => {
+        expect(SiteRoutes.launcher()).toBe('/launcher');
+    });
+
     it('maps browse routes by classification', () => {
         expect(SiteRoutes.browse('PLUGIN')).toBe('/plugins');
         expect(SiteRoutes.browse('MODPACK')).toBe('/modpacks');

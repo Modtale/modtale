@@ -53,6 +53,15 @@ describe('image utils', () => {
             .toBe('https://modtale.net/cdn-cgi/image/width=128,quality=90,format=auto,onerror=redirect/https://cdn.modtale.net/images/hero.png');
     });
 
+    it('returns raw urls on Cloud Run preview hosts that cannot serve Cloudflare image resizing', () => {
+        setWindowLocation('modtale-frontend-launcher-ptpi2wdeva-uc.a.run.app', 'https://modtale-frontend-launcher-ptpi2wdeva-uc.a.run.app');
+
+        expect(getCloudflareUrl('https://cdn.modtale.net/images/hero.png', 80, 90))
+            .toBe('https://cdn.modtale.net/images/hero.png');
+        expect(getCloudflareUrl('/images/hero.png', 500, 75))
+            .toBe('/images/hero.png');
+    });
+
     it('builds a fallback absolute url in SSR mode for relative paths', () => {
         vi.stubGlobal('window', undefined);
         expect(getCloudflareUrl('images/hero.png', 70, 80))

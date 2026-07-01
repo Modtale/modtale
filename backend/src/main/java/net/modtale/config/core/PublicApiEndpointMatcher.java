@@ -30,6 +30,7 @@ public final class PublicApiEndpointMatcher {
             "/api/v1/og/",
             "/api/v1/download/",
             "/api/v1/download-bundle/",
+            "/api/v1/lists/",
             "/api/v1/meta/",
             "/api/v1/version/",
             "/api/v1/wiki/"

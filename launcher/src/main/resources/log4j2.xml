@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+    <Properties>
+        <Property name="logDir">${sys:user.home}/.modtale/launcher/logs</Property>
+        <Property name="logPattern">%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%t] %logger{36} - %msg%n%throwable</Property>
+    </Properties>
+
+    <Appenders>
+        <RollingFile
+                name="LatestFile"
+                fileName="${logDir}/latest.log"
+                filePattern="${logDir}/%d{yyyy-MM-dd_HH-mm-ss}-%i.log.gz"
+                append="true"
+                immediateFlush="true">
+            <PatternLayout pattern="${logPattern}"/>
+            <Policies>
+                <OnStartupTriggeringPolicy minSize="1"/>
+                <SizeBasedTriggeringPolicy size="5 MB"/>
+            </Policies>
+            <DefaultRolloverStrategy fileIndex="nomax"/>
+        </RollingFile>
+    </Appenders>
+
+    <Loggers>
+        <Root level="info">
+            <AppenderRef ref="LatestFile"/>
+        </Root>
+    </Loggers>
+</Configuration>

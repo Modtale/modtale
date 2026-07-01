@@ -114,7 +114,7 @@ export function ManageProfile({ user, onUpdate }: ManageProfileProps) {
                         </div>
                     ) : (
                         <div className="flex items-center gap-3 group cursor-pointer hover:bg-white/60 dark:hover:bg-white/5 px-4 py-2 -ml-4 rounded-2xl transition-colors" onClick={() => setIsEditingUsername(true)}>
-                            <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter truncate">{user.username}</h1>
+                            <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-normal truncate">{user.username}</h1>
                             <Edit3 className="w-5 h-5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                     )}

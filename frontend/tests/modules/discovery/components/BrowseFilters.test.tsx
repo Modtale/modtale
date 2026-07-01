@@ -30,7 +30,8 @@ const renderFilters = (
     itemsPerPage = 12,
     onItemsPerPageChange = vi.fn(),
     openSourceOnly = false,
-    setOpenSourceOnly = vi.fn()
+    setOpenSourceOnly = vi.fn(),
+    isMobile = false
 ) => (
     <BrowseFilters
         pageTitle="All Projects"
@@ -58,7 +59,7 @@ const renderFilters = (
         filterDate={null}
         setFilterDate={vi.fn()}
         setPage={vi.fn()}
-        isMobile={false}
+        isMobile={isMobile}
         viewStyle="grid"
         onViewStyleChange={vi.fn()}
         itemsPerPage={itemsPerPage}
@@ -268,5 +269,17 @@ describe('BrowseFilters performance behavior', () => {
         });
 
         expect(onItemsPerPageChange).toHaveBeenCalledWith(96);
+    });
+
+    it('hides the results-per-page control on mobile', async () => {
+        await act(async () => {
+            root.render(renderFilters(false, 'Any', vi.fn(), vi.fn(), 12, 12, vi.fn(), false, vi.fn(), true));
+        });
+
+        const pageSizeButton = Array.from(container.querySelectorAll('button')).find(
+            (button) => button.getAttribute('aria-label') === 'Results per page'
+        );
+
+        expect(pageSizeButton).toBeUndefined();
     });
 });

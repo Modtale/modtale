@@ -24,7 +24,7 @@ class DownloadTokenServiceTest {
 
     @Test
     void generateTokenStoresPayloadAndConsumesItOnce() {
-        String token = downloadTokenService.generateToken("project-1", "1.2.3", "1.0.0", List.of("dep-a", "dep-b"));
+        String token = downloadTokenService.generateToken("project-1", "1.2.3", "1.0.0", List.of("dep-a", "dep-b"), "user-1");
 
         assertNotNull(token);
         assertTrue(downloadTokenService.getActiveTokenCount() >= 1);
@@ -35,6 +35,7 @@ class DownloadTokenServiceTest {
         assertEquals("project-1", result.getProjectId());
         assertEquals("1.2.3", result.getVersion());
         assertEquals("1.0.0", result.getGameVersion());
+        assertEquals("user-1", result.getUserId());
         assertEquals(List.of("dep-a", "dep-b"), result.getSelectedDependencies());
         assertTrue(result.isUsed());
         assertNull(downloadTokenService.validateAndConsume(token));

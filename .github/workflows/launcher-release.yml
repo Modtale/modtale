@@ -1,0 +1,213 @@
+name: Launcher Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'launcher-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Launcher version to package, for example 0.2.0
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  metadata:
+    name: Resolve Release Metadata
+    if: github.repository == 'Modtale/modtale'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Resolve launcher version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            raw_version="${{ inputs.version }}"
+            version="${raw_version#launcher-v}"
+            version="${version#v}"
+            tag="launcher-v$version"
+          else
+            tag="${GITHUB_REF_NAME}"
+            version="${tag#launcher-v}"
+            version="${version#v}"
+          fi
+
+          if ! [[ "$version" =~ ^[0-9]+(\.[0-9]+){0,2}([.-][A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?$ ]]; then
+            echo "::error::Launcher version '$version' is not a valid package version."
+            exit 1
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  package:
+    name: Package Launcher (${{ matrix.name }})
+    needs: metadata
+    if: github.repository == 'Modtale/modtale'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux Packages
+            os: ubuntu-latest
+            artifact: launcher-linux
+          - name: Windows Installer
+            os: windows-latest
+            artifact: launcher-windows
+          - name: macOS DMG
+            os: macos-latest
+            artifact: launcher-macos
+    defaults:
+      run:
+        working-directory: launcher
+        shell: bash
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Set up Linux packaging tooling
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            binutils \
+            flatpak \
+            rpm \
+            tar \
+            xz-utils \
+            zstd
+          sudo apt-get install -y libfuse2 || sudo apt-get install -y libfuse2t64 || true
+          sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          sudo flatpak install -y flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
+          curl -L \
+            -o "$RUNNER_TEMP/appimagetool" \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x "$RUNNER_TEMP/appimagetool"
+          echo "APPIMAGETOOL=$RUNNER_TEMP/appimagetool" >> "$GITHUB_ENV"
+          echo "APPIMAGE_EXTRACT_AND_RUN=1" >> "$GITHUB_ENV"
+
+      - name: Set up Windows installer tooling
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install wixtoolset -y --no-progress
+          $wix = Get-ChildItem "C:\Program Files (x86)" -Directory -Filter "WiX Toolset*" |
+            Sort-Object Name -Descending |
+            Select-Object -First 1
+          if ($null -eq $wix) {
+            throw "WiX Toolset was not installed."
+          }
+          "$($wix.FullName)\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Ensure Gradle wrapper is executable
+        run: chmod +x gradlew
+
+      - name: Build native launcher package
+        run: |
+          package_task="packageAll"
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            package_task="packageLinuxAll"
+          fi
+
+          ./gradlew clean "$package_task" -PlauncherVersion="${{ needs.metadata.outputs.version }}"
+
+      - name: Upload Linux AppImage package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-linux-appimage
+          path: launcher/build/distributions/*.AppImage
+          if-no-files-found: error
+
+      - name: Upload Linux Debian package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-linux-deb
+          path: launcher/build/distributions/*.deb
+          if-no-files-found: error
+
+      - name: Upload Linux RPM package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-linux-rpm
+          path: launcher/build/distributions/*.rpm
+          if-no-files-found: error
+
+      - name: Upload Linux Flatpak package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-linux-flatpak
+          path: launcher/build/distributions/*.flatpak
+          if-no-files-found: error
+
+      - name: Upload Linux pacman package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-linux-pacman
+          path: launcher/build/distributions/*.pkg.tar.zst
+          if-no-files-found: error
+
+      - name: Upload launcher package
+        if: runner.os != 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: launcher/build/distributions/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish Launcher Release
+    needs:
+      - metadata
+      - package
+    if: github.repository == 'Modtale/modtale'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ needs.metadata.outputs.tag }}
+      LAUNCHER_VERSION: ${{ needs.metadata.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download packaged launchers
+        uses: actions/download-artifact@v4
+        with:
+          path: launcher-dist
+
+      - name: Create checksums
+        run: |
+          find launcher-dist -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+
+      - name: Publish GitHub release
+        run: |
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --target "$GITHUB_SHA" \
+              --title "Modtale Launcher $LAUNCHER_VERSION" \
+              --generate-notes
+          fi
+
+          mapfile -d '' release_files < <(find launcher-dist -type f -print0)
+          gh release upload "$RELEASE_TAG" "${release_files[@]}" SHA256SUMS --clobber

@@ -107,9 +107,11 @@ The Spring Boot backend relies on environment variables. You can set these in yo
 | Variable | Description | Example |
 | --- | --- | --- |
 | `MONGODB_URI` | Connection String | `mongodb://localhost:27017/modtale` |
+| `R2_BUCKET_NAME` | Storage Bucket | `modtale-dev` |
 | `R2_ACCESS_KEY` | Storage Access Key | `your_dev_access_key` |
 | `R2_SECRET_KEY` | Storage Secret Key | `your_dev_secret_key` |
 | `R2_ENDPOINT` | Storage Endpoint URL | `https://<accountid>.r2.cloudflarestorage.com` |
+| `R2_PUBLIC_DOMAIN` | Optional public storage URL | `https://cdn.example.test` |
 | `WARDEN_ENABLED` | **Must be false locally** | `false` |
 | `STATUS_DISCORD_WEBHOOK_URL` | Optional Discord webhook for status-change alerts | `https://discord.com/api/webhooks/...` |
 | `STATUS_CHECKER_ENABLED` | Opt into the legacy embedded backend checker | `false` |
@@ -170,6 +172,26 @@ npm run dev
 ```
 
 *The web client is now accessible at `http://localhost:5173`!*
+
+### 5. Native Launcher
+
+The `launcher/` project is a native Java 21 JavaFX client for installing Modtale projects into a local Hytale mods folder. It does not use Electron.
+
+```bash
+cd launcher
+./gradlew run
+```
+
+The launcher lets users search the Modtale catalog, install the latest compatible version, include required or optional dependencies, check installed projects for updates, apply updates, and point the app at the correct Hytale mods folder.
+
+Self-contained native packages are built by default:
+
+```bash
+cd launcher
+./gradlew build
+```
+
+Package outputs land in `launcher/build/distributions/`. Windows builds produce an `.exe` installer, macOS builds produce a `.dmg`, and Linux builds produce an `.AppImage`. Each package embeds the required Java runtime, so end users do not need Java installed. Build on each target OS, or use a CI matrix, to produce all three platform artifacts.
 
 ---
 

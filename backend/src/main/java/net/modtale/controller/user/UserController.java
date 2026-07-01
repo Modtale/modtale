@@ -16,6 +16,7 @@ import net.modtale.model.dto.response.common.ResourceUrlResponse;
 import net.modtale.model.dto.user.UserDTO;
 import net.modtale.model.dto.user.UserSummaryDTO;
 import net.modtale.model.project.Project;
+import net.modtale.model.user.LauncherSettingsSnapshot;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.media.MediaUploadService;
@@ -183,6 +184,33 @@ public class UserController {
         User user = accountService.requireCurrentUser(authentication, "updating notification settings");
         accountService.updateNotificationPreferences(user.getId(), prefs);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/user/launcher-settings")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
+    public ResponseEntity<LauncherSettingsSnapshot> getLauncherSettings(Authentication authentication) {
+        User user = accountService.requireCurrentUser(authentication, "loading launcher settings");
+        return ResponseEntity.ok(accountService.getLauncherSettings(user.getId()));
+    }
+
+    @PutMapping("/user/launcher-settings")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_EDIT_BASIC', authentication)")
+    public ResponseEntity<LauncherSettingsSnapshot> updateLauncherSettings(
+            @RequestBody LauncherSettingsSnapshot snapshot,
+            Authentication authentication
+    ) {
+        User user = accountService.requireCurrentUser(authentication, "syncing launcher settings");
+        return ResponseEntity.ok(accountService.updateLauncherSettings(user.getId(), snapshot));
+    }
+
+    @PutMapping("/user/launcher-settings/preferences")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_EDIT_BASIC', authentication)")
+    public ResponseEntity<LauncherSettingsSnapshot> updateLauncherSettingsPreferences(
+            @RequestBody LauncherSettingsSnapshot snapshot,
+            Authentication authentication
+    ) {
+        User user = accountService.requireCurrentUser(authentication, "syncing launcher settings");
+        return ResponseEntity.ok(accountService.updateLauncherSettingsPreferences(user.getId(), snapshot));
     }
 
     @PostMapping("/user/follow/{targetId}")

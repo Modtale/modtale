@@ -3,20 +3,23 @@ package net.modtale.controller.auth;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import java.io.IOException;
 import jakarta.validation.Valid;
 import java.time.Duration;
-import java.util.Map;
 import java.util.stream.Collectors;
 import net.modtale.exception.InvalidAuthenticationRequestException;
 import net.modtale.exception.UnauthorizedException;
 import net.modtale.model.dto.request.auth.ChangePasswordRequest;
 import net.modtale.model.dto.request.auth.ForgotPasswordRequest;
+import net.modtale.model.dto.request.auth.LauncherAuthExchangeRequest;
+import net.modtale.model.dto.request.auth.LauncherAuthIssueRequest;
 import net.modtale.model.dto.request.auth.MfaLoginRequest;
 import net.modtale.model.dto.request.auth.RegisterRequest;
 import net.modtale.model.dto.request.auth.ResetPasswordRequest;
 import net.modtale.model.dto.request.auth.SignInRequest;
 import net.modtale.model.dto.request.auth.UpdateCredentialsRequest;
 import net.modtale.model.dto.request.auth.VerifyMfaRequest;
+import net.modtale.model.dto.response.auth.LauncherAuthIssueResponse;
 import net.modtale.model.dto.response.auth.MfaChallengeResponse;
 import net.modtale.model.dto.response.auth.MfaSetupResponse;
 import net.modtale.model.dto.response.auth.RegistrationResponse;
@@ -26,6 +29,7 @@ import net.modtale.model.dto.response.common.StatusResponse;
 import net.modtale.model.user.User;
 import net.modtale.service.auth.AuthenticationMutationService;
 import net.modtale.service.auth.AuthenticationService;
+import net.modtale.service.auth.LauncherAuthService;
 import net.modtale.service.auth.TwoFactorService;
 import net.modtale.service.user.account.AccountService;
 import org.springframework.http.HttpHeaders;
@@ -44,10 +48,13 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
+    public static final String POST_OAUTH_REDIRECT_ATTRIBUTE = "MODTALE_POST_OAUTH_REDIRECT";
+
     private final AuthenticationService authenticationService;
     private final AuthenticationMutationService authenticationMutationService;
     private final AccountService accountService;
     private final TwoFactorService twoFactorService;
+    private final LauncherAuthService launcherAuthService;
     private final SecurityContextRepository securityContextRepository;
 
     public AuthController(
@@ -55,12 +62,14 @@ public class AuthController {
             AuthenticationMutationService authenticationMutationService,
             AccountService accountService,
             TwoFactorService twoFactorService,
+            LauncherAuthService launcherAuthService,
             SecurityContextRepository securityContextRepository
     ) {
         this.authenticationService = authenticationService;
         this.authenticationMutationService = authenticationMutationService;
         this.accountService = accountService;
         this.twoFactorService = twoFactorService;
+        this.launcherAuthService = launcherAuthService;
         this.securityContextRepository = securityContextRepository;
     }
 
@@ -191,6 +200,80 @@ public class AuthController {
         return ResponseEntity.ok(new StatusResponse("success"));
     }
 
+    @GetMapping("/oauth/{provider}")
+    public void beginOAuthLogin(
+            @PathVariable String provider,
+            @RequestParam(value = "redirect", required = false) String redirect,
+            HttpServletRequest request,
+            HttpServletResponse response
+    ) throws IOException {
+        if (!provider.matches("[A-Za-z0-9_-]+")) {
+            throw new InvalidAuthenticationRequestException("That OAuth provider is not valid.");
+        }
+
+        String safeRedirect = safeInternalRedirect(redirect);
+        if (safeRedirect != null) {
+            request.getSession(true).setAttribute(POST_OAUTH_REDIRECT_ATTRIBUTE, safeRedirect);
+        }
+
+        response.sendRedirect("/oauth2/authorization/" + provider);
+    }
+
+    @GetMapping("/launcher/oauth/{provider}")
+    public void beginLauncherOAuthLogin(
+            @PathVariable String provider,
+            @RequestParam("redirect_uri") String redirectUri,
+            @RequestParam(value = "state", required = false) String state,
+            HttpServletRequest request,
+            HttpServletResponse response
+    ) throws IOException {
+        if (!provider.matches("[A-Za-z0-9_-]+")) {
+            throw new InvalidAuthenticationRequestException("That OAuth provider is not valid.");
+        }
+
+        launcherAuthService.validateLoopbackRedirectUri(redirectUri);
+        HttpSession session = request.getSession(true);
+        session.setAttribute(LauncherAuthService.OAUTH_REDIRECT_URI_SESSION_ATTRIBUTE, redirectUri.trim());
+        session.setAttribute(LauncherAuthService.OAUTH_STATE_SESSION_ATTRIBUTE, state == null ? "" : state.trim());
+
+        response.sendRedirect("/oauth2/authorization/" + provider);
+    }
+
+    @PostMapping("/launcher/issue")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
+    public ResponseEntity<LauncherAuthIssueResponse> issueLauncherAuthCode(
+            @Valid @RequestBody LauncherAuthIssueRequest requestPayload,
+            Authentication authentication
+    ) {
+        User user = accountService.requireCurrentUser(authentication, "authorizing the Modtale Launcher");
+        LauncherAuthService.LauncherAuthGrant grant = launcherAuthService.issueCode(
+                user,
+                requestPayload.getRedirectUri(),
+                requestPayload.getState()
+        );
+        return ResponseEntity.ok(new LauncherAuthIssueResponse(
+                grant.code(),
+                grant.redirectUri(),
+                grant.state(),
+                grant.expiresIn()
+        ));
+    }
+
+    @PostMapping("/launcher/exchange")
+    public ResponseEntity<StatusResponse> exchangeLauncherAuthCode(
+            @Valid @RequestBody LauncherAuthExchangeRequest requestPayload,
+            HttpServletRequest request,
+            HttpServletResponse response
+    ) {
+        User user = launcherAuthService.consumeCode(requestPayload.getCode());
+        if (user == null) {
+            throw new UnauthorizedException("That launcher authorization code is invalid or has expired. Please sign in again.");
+        }
+
+        createSession(user, request, response);
+        return ResponseEntity.ok(new StatusResponse("success"));
+    }
+
     private void createSession(User user, HttpServletRequest request, HttpServletResponse response) {
         HttpSession session = request.getSession(true);
 
@@ -212,6 +295,18 @@ public class AuthController {
                 .maxAge(Duration.ZERO)
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, expiredCookie.toString());
+    }
+
+    private String safeInternalRedirect(String redirect) {
+        if (redirect == null || redirect.isBlank()) {
+            return null;
+        }
+
+        String trimmed = redirect.trim();
+        if (!trimmed.startsWith("/") || trimmed.startsWith("//")) {
+            return null;
+        }
+        return trimmed;
     }
 
 }
