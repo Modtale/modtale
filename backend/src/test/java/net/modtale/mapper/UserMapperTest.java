@@ -4,6 +4,7 @@ import java.util.List;
 import net.modtale.model.dto.user.UserDTO;
 import net.modtale.model.dto.user.UserSummaryDTO;
 import net.modtale.model.user.ApiKey;
+import net.modtale.model.user.AdminPermission;
 import net.modtale.model.user.OAuthProvider;
 import net.modtale.model.user.User;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,7 @@ class UserMapperTest {
         assertEquals("ItsNeil17", dto.getUsername());
         assertEquals("Always lock in", dto.getBio());
         assertNull(dto.getEmail());
+        assertNull(dto.getAdminPermissions());
         assertNull(dto.getPendingOrgInvites());
         assertNull(dto.getLikedModIds());
         assertNull(dto.getNotificationPreferences());
@@ -60,6 +62,7 @@ class UserMapperTest {
         assertEquals("Always lock in", dto.getBio());
         assertTrue(dto.getEmailVerified());
         assertTrue(dto.getMfaEnabled());
+        assertTrue(dto.getAdminPermissions().contains(AdminPermission.USER_READ));
         assertNotNull(dto.getPendingOrgInvites());
         assertNotNull(dto.getLikedModIds());
         assertNotNull(dto.getNotificationPreferences());
@@ -78,7 +81,8 @@ class UserMapperTest {
         user.setBio("Always lock in");
         user.setCreatedAt("2026-01-01");
         user.setTier(ApiKey.Tier.ENTERPRISE);
-        user.setRoles(List.of("USER", "ADMIN"));
+        user.setRoles(List.of("USER"));
+        user.setAdminPermissions(java.util.Set.of(AdminPermission.USER_READ));
         user.setAccountType(User.AccountType.ORGANIZATION);
         user.setOrganizationRoles(List.of(new User.OrganizationRole()));
         user.setOrganizationMembers(List.of(new User.OrganizationMember("user-2", "role-1")));

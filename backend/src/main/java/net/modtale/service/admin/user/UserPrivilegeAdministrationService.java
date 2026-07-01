@@ -1,8 +1,11 @@
 package net.modtale.service.admin.user;
 
+import java.util.EnumSet;
+import java.util.Set;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.model.dto.response.admin.UserTierUpdateResponse;
 import net.modtale.model.user.ApiKey;
+import net.modtale.model.user.AdminPermission;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.admin.audit.AdminAuditLogger;
@@ -42,25 +45,26 @@ public class UserPrivilegeAdministrationService {
         return new UserTierUpdateResponse("success", "User " + user.getUsername() + " updated to tier " + tierEnum.name());
     }
 
-    public void addUserRole(String adminId, String userId, String role) {
+    public Set<AdminPermission> setAdminPermissions(String adminId, String userId, Set<AdminPermission> permissions) {
         User target = requireUser(userId);
-        if (target.getRoles() == null) {
-            target.setRoles(new java.util.ArrayList<>());
-        }
-        if (!target.getRoles().contains(role)) {
-            target.getRoles().add(role);
-        }
+        Set<AdminPermission> normalizedPermissions = normalizePermissions(permissions);
+        target.setAdminPermissions(normalizedPermissions);
         userRepository.save(target);
-        adminAuditLogger.logAction(adminId, "ADD_ROLE", target.getId(), "USER", "Role: " + role);
+        adminAuditLogger.logAction(
+                adminId,
+                "UPDATE_ADMIN_PERMISSIONS",
+                target.getId(),
+                "USER",
+                "Permissions: " + normalizedPermissions
+        );
+        return AdminPermission.effectivePermissions(target);
     }
 
-    public void removeUserRole(String adminId, String userId, String role) {
-        User target = requireUser(userId);
-        if (target.getRoles() != null) {
-            target.getRoles().remove(role);
-            userRepository.save(target);
+    private Set<AdminPermission> normalizePermissions(Set<AdminPermission> permissions) {
+        if (permissions == null || permissions.isEmpty()) {
+            return EnumSet.noneOf(AdminPermission.class);
         }
-        adminAuditLogger.logAction(adminId, "REMOVE_ROLE", target.getId(), "USER", "Role: " + role);
+        return EnumSet.copyOf(permissions);
     }
 
     private User requireUser(String userId) {

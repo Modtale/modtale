@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatedThemeToggler } from '@/components/ui/AnimatedThemeToggler';
 import { useMobile } from '@/context/MobileContext';
 import { SiteRoutes } from '@/utils/routes';
+import { isAdminUser } from '@/modules/admin/utils/access';
 import type { User } from "@/types.ts";
 
 const NotificationMenu = lazy(() => import('@/modules/user/components/NotificationMenu').then((module) => ({ default: module.NotificationMenu })));
@@ -279,7 +280,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                                     <Link to={SiteRoutes.dashboard()} onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
                                                         <LayoutDashboard className="w-4 h-4 text-slate-400" /> User Dashboard
                                                     </Link>
-                                                    {user.roles?.includes('ADMIN') && (
+                                                    {isAdminUser(user) && (
                                                         <Link to={SiteRoutes.admin()} onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center gap-3 transition-colors">
                                                             <Shield className="w-4 h-4" /> Admin Panel
                                                         </Link>
@@ -348,7 +349,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         </>
                     )}
 
-                    {user?.roles?.includes('ADMIN') && (
+                    {isAdminUser(user) && (
                         <Link to={SiteRoutes.admin()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 font-bold text-red-600 dark:text-red-400 text-left"><Shield className="w-4 h-4 mr-3" /> Admin Panel</Link>
                     )}
 
