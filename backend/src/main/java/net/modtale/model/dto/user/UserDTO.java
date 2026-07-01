@@ -14,6 +14,7 @@ public class UserDTO {
     private String username;
     private String email;
     private Boolean emailVerified;
+    private Boolean hasPassword;
     private Boolean mfaEnabled;
     private String avatarUrl;
     private String bannerUrl;
@@ -41,6 +42,8 @@ public class UserDTO {
     public void setEmail(String email) { this.email = email; }
     public Boolean getEmailVerified() { return emailVerified; }
     public void setEmailVerified(Boolean emailVerified) { this.emailVerified = emailVerified; }
+    public Boolean getHasPassword() { return hasPassword; }
+    public void setHasPassword(Boolean hasPassword) { this.hasPassword = hasPassword; }
     public Boolean getMfaEnabled() { return mfaEnabled; }
     public void setMfaEnabled(Boolean mfaEnabled) { this.mfaEnabled = mfaEnabled; }
     public String getAvatarUrl() { return avatarUrl; }

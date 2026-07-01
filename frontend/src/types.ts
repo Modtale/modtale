@@ -36,6 +36,8 @@ export interface User {
     bio?: string;
     email?: string;
     emailVerified?: boolean;
+    hasPassword?: boolean;
+    mfaEnabled?: boolean;
     createdAt?: string;
     likedProjectIds: string[];
     followingIds?: string[];

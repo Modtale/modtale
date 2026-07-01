@@ -60,6 +60,7 @@ public class UserMapper {
         if (includePrivate) {
             dto.setEmail(user.getEmail());
             dto.setEmailVerified(user.isEmailVerified());
+            dto.setHasPassword(user.getHasPassword());
             dto.setMfaEnabled(user.isMfaEnabled());
             dto.setAdminPermissions(AdminPermission.effectivePermissions(user));
             dto.setPendingOrgInvites(user.getPendingOrgInvites());
@@ -67,6 +68,7 @@ public class UserMapper {
             dto.setNotificationPreferences(user.getNotificationPreferences());
         } else {
             dto.setEmail(null);
+            dto.setHasPassword(null);
             dto.setAdminPermissions(null);
             dto.setPendingOrgInvites(null);
             dto.setNotificationPreferences(null);

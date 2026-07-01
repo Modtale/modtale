@@ -52,7 +52,7 @@ export function ConnectionsSettings({ user, onUpdate }: ConnectionsSettingsProps
         const account = accounts.find(a => a.provider?.toLowerCase() === provider.toLowerCase());
         const isLinked = !!account;
         const canBeVisible = provider !== 'google';
-        const isLastAuthMethod = isLinked && accounts.length <= 1 && !(user as any).hasPassword;
+        const isLastAuthMethod = isLinked && accounts.length <= 1 && !user.hasPassword;
 
         return (
             <div className={`flex flex-col justify-between p-4 rounded-2xl border transition-all h-full ${isLinked ? 'bg-white/80 dark:bg-slate-900/40 border-modtale-accent/40 shadow-md' : 'bg-slate-50/80 dark:bg-white/[0.02] border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/20'}`}>

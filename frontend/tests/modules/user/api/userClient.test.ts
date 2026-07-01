@@ -62,4 +62,12 @@ describe('userClient', () => {
         expect(mockedApi.post).toHaveBeenCalledWith('/user/connections/github/toggle-visibility');
         expect(mockedApi.put).toHaveBeenCalledWith('/user/settings/notifications', { projectUpdates: false });
     });
+
+    it('routes password removal to the auth endpoint', async () => {
+        mockedApi.delete.mockResolvedValue({ data: null } as any);
+
+        await userClient.removePassword();
+
+        expect(mockedApi.delete).toHaveBeenCalledWith('/auth/password');
+    });
 });

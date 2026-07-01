@@ -1,8 +1,11 @@
 package net.modtale.service.auth;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
+import net.modtale.exception.InvalidAuthenticationRequestException;
 import net.modtale.exception.UnauthorizedException;
+import net.modtale.model.user.OAuthProvider;
 import net.modtale.model.user.User;
 import net.modtale.repository.admin.BannedEmailRepository;
 import net.modtale.repository.user.UserRepository;
@@ -19,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -115,6 +119,38 @@ class AuthenticationMutationServiceTest {
         assertNull(user.getPasswordResetToken());
         assertNull(user.getPasswordResetTokenExpiry());
         verify(userRepository).save(user);
+    }
+
+    @Test
+    void removePasswordClearsPasswordStateWhenOAuthAccountIsLinked() {
+        User user = user("user-1", "Ada", "ada@example.com");
+        user.setPassword("encoded");
+        user.setPasswordResetToken("reset-token");
+        user.setPasswordResetTokenExpiry(LocalDateTime.now().plusMinutes(10));
+        user.setConnectedAccounts(List.of(
+                new User.ConnectedAccount(OAuthProvider.GITHUB, "gh-1", "ada", "https://github.com/ada", true)
+        ));
+
+        when(userRepository.findById("user-1")).thenReturn(Optional.of(user));
+
+        service.removePassword("user-1");
+
+        assertNull(user.getPassword());
+        assertNull(user.getPasswordResetToken());
+        assertNull(user.getPasswordResetTokenExpiry());
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void removePasswordRejectsAccountsWithoutLinkedOAuth() {
+        User user = user("user-1", "Ada", "ada@example.com");
+        user.setPassword("encoded");
+
+        when(userRepository.findById("user-1")).thenReturn(Optional.of(user));
+
+        assertThrows(InvalidAuthenticationRequestException.class, () -> service.removePassword("user-1"));
+
+        verify(userRepository, never()).save(user);
     }
 
     @Test
