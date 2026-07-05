@@ -78,9 +78,14 @@
 
     .browse-project-grid {
         display: grid;
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
         gap: 1rem;
         margin-top: 1rem;
+    }
+
+    .browse-project-grid > * {
+        min-width: 0;
+        max-width: 100%;
     }
 
     @container (min-width: 34rem) {
