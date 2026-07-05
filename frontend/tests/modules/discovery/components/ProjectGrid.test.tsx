@@ -57,6 +57,7 @@ describe('ProjectGrid project links', () => {
         );
 
         expect(markup).toContain('browse-project-grid');
+        expect(markup).toContain('min-w-0 max-w-full');
         expect(markup).not.toContain('min-[1800px]:grid-cols-3');
     });
 });

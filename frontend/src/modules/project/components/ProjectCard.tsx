@@ -37,7 +37,7 @@ const skeletonShimmer = 'absolute inset-0 -translate-x-full animate-[shimmer_1.5
 const skeletonPulse = 'animate-pulse bg-slate-200/80 dark:bg-slate-800/60';
 
 export const ProjectCardSkeleton = () => (
-    <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900">
+    <div className="relative min-w-0 max-w-full overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900">
         <div className={`aspect-[3/1] ${skeletonPulse}`} />
         <div className="px-6 pb-6">
             <div className="-mt-10 mb-3 h-20 w-20 rounded-2xl border-4 border-white dark:border-slate-800 bg-slate-300/80 dark:bg-slate-700/70" />
@@ -58,7 +58,7 @@ export const ProjectCardSkeleton = () => (
 );
 
 export const ListProjectCardSkeleton = () => (
-    <div className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-4 sm:p-5">
+    <div className="relative min-w-0 max-w-full overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-4 sm:p-5">
         <div className="flex items-center sm:items-start gap-4 sm:gap-6">
             <div className={`h-24 w-24 sm:h-32 sm:w-32 rounded-xl shrink-0 ${skeletonPulse}`} />
             <div className="flex-1 min-w-0">
@@ -83,7 +83,7 @@ export const ListProjectCardSkeleton = () => (
 );
 
 export const CompactProjectCardSkeleton = () => (
-    <div className="relative overflow-hidden rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-3">
+    <div className="relative min-w-0 max-w-full overflow-hidden rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-3">
         <div className="flex items-center gap-4">
             <div className={`h-12 w-12 rounded-lg shrink-0 ${skeletonPulse}`} />
             <div className="flex-1 min-w-0">
@@ -110,7 +110,7 @@ export const ProjectCardSkeletons: React.FC<ProjectCardSkeletonsProps> = ({ view
     return (
         <div className={containerClassName} aria-hidden="true">
             {[...Array(count)].map((_, index) => (
-                <div key={index}>
+                <div key={index} className="min-w-0 max-w-full">
                     {viewStyle === 'grid' && <ProjectCardSkeleton />}
                     {viewStyle === 'list' && <ListProjectCardSkeleton />}
                     {viewStyle === 'compact' && <CompactProjectCardSkeleton />}
@@ -240,7 +240,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
         return (
             <div
                 onMouseEnter={handleMouseEnter}
-                className={`group relative flex items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm transform-gpu hover:shadow-md hover:shadow-modtale-accent/5 hover:-translate-y-1.5 transition-[opacity,transform] duration-300 ${BASE_HOVER_CLASSES} ${VISIBILITY_CLASSES}`}
+                className={`group relative flex min-w-0 max-w-full items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-3 shadow-sm transform-gpu hover:shadow-md hover:shadow-modtale-accent/5 hover:-translate-y-1.5 transition-[opacity,transform] duration-300 ${BASE_HOVER_CLASSES} ${VISIBILITY_CLASSES}`}
             >
                 <div className="absolute inset-0 z-50 pointer-events-none rounded-xl ring-0 group-hover:ring-2 group-hover:ring-inset group-hover:ring-blue-600 dark:group-hover:ring-blue-500 transition-all duration-300" aria-hidden="true" />
                 {!disableNavigation && <Link to={canonicalPath} state={{ project }} className="absolute inset-0 z-10" />}
@@ -258,20 +258,20 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                     <h2 className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-all">
                         {title}
                     </h2>
-                    <div className="flex items-center gap-1 text-xs font-medium text-slate-500 mt-1">
-                        <span>by</span>
+                    <div className="flex min-w-0 items-center gap-1 text-xs font-medium text-slate-500 mt-1">
+                        <span className="shrink-0">by</span>
                         {authorPath ? (
                             disableNavigation ? (
-                                <span className="relative z-30 font-bold truncate">
+                                <span className="relative z-30 min-w-0 truncate font-bold">
                                     {author}
                                 </span>
                             ) : (
-                                <Link to={authorPath} onClick={(e) => e.stopPropagation()} className="relative z-30 font-bold hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate pointer-events-auto">
+                                <Link to={authorPath} onClick={(e) => e.stopPropagation()} className="relative z-30 min-w-0 truncate font-bold hover:text-blue-600 dark:hover:text-blue-400 hover:underline pointer-events-auto">
                                     {author}
                                 </Link>
                             )
                         ) : (
-                            <span className="font-bold truncate">{author}</span>
+                            <span className="min-w-0 truncate font-bold">{author}</span>
                         )}
                     </div>
                 </div>
@@ -291,7 +291,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
         return (
             <div
                 onMouseEnter={handleMouseEnter}
-                className={`group relative flex flex-row items-center sm:items-start gap-4 sm:gap-6 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-2xl overflow-hidden transform-gpu hover:-translate-y-1.5 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 p-4 sm:p-5 transition-[opacity,transform] duration-300 ${BASE_HOVER_CLASSES} ${VISIBILITY_CLASSES}`}
+                className={`group relative flex min-w-0 max-w-full flex-row items-center sm:items-start gap-4 sm:gap-6 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-2xl overflow-hidden transform-gpu hover:-translate-y-1.5 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 p-4 sm:p-5 transition-[opacity,transform] duration-300 ${BASE_HOVER_CLASSES} ${VISIBILITY_CLASSES}`}
             >
                 <div className="absolute inset-0 z-50 pointer-events-none rounded-2xl ring-0 group-hover:ring-[3px] group-hover:ring-inset group-hover:ring-blue-600 dark:group-hover:ring-blue-500 transition-all duration-300" aria-hidden="true" />
                 {!disableNavigation && <Link to={canonicalPath} state={{ project }} className="absolute inset-0 z-10" />}
@@ -318,18 +318,18 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                                     </Link>
                                 )}
                             </h2>
-                            <div className="flex items-center gap-1 text-xs sm:text-sm font-bold text-slate-500 mt-0.5 sm:mt-1">
-                                <span>by</span>
+                            <div className="flex min-w-0 items-center gap-1 text-xs sm:text-sm font-bold text-slate-500 mt-0.5 sm:mt-1">
+                                <span className="shrink-0">by</span>
                                 {authorPath ? (
                                     disableNavigation ? (
-                                        <span className="relative z-30 truncate block">{author}</span>
+                                        <span className="relative z-30 min-w-0 truncate block">{author}</span>
                                     ) : (
-                                        <Link to={authorPath} onClick={(e) => e.stopPropagation()} className="relative z-30 hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate block pointer-events-auto">
+                                        <Link to={authorPath} onClick={(e) => e.stopPropagation()} className="relative z-30 min-w-0 hover:text-blue-600 dark:hover:text-blue-400 hover:underline truncate block pointer-events-auto">
                                             {author}
                                         </Link>
                                     )
                                 ) : (
-                                    <span className="truncate block">{author}</span>
+                                    <span className="min-w-0 truncate block">{author}</span>
                                 )}
                             </div>
                         </div>
@@ -339,7 +339,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                         </div>
                     </div>
                     <p className="mt-1.5 sm:mt-3 text-xs sm:text-sm text-slate-600 dark:text-slate-400 line-clamp-2 flex-1 leading-relaxed pointer-events-none">{desc}</p>
-                    <div className="mt-3 sm:mt-5 flex items-center gap-4 sm:gap-6 text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                    <div className="mt-3 sm:mt-5 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 sm:flex-nowrap sm:gap-6 text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-widest">
                         <span className="flex items-center gap-1 sm:gap-1.5 pointer-events-none"><Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {downloads}</span>
                         <button
                             aria-label={`${favorites} favorites`}
@@ -369,7 +369,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
     return (
         <div
             onMouseEnter={handleMouseEnter}
-            className={`group relative flex flex-col h-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-2xl overflow-hidden transform-gpu hover:-translate-y-1.5 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 transition-[opacity,transform] duration-300 ${BASE_HOVER_CLASSES} ${VISIBILITY_CLASSES}`}
+            className={`group relative flex min-w-0 max-w-full flex-col h-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-2xl overflow-hidden transform-gpu hover:-translate-y-1.5 shadow-lg hover:shadow-2xl dark:shadow-xl hover:shadow-modtale-accent/10 transition-[opacity,transform] duration-300 ${BASE_HOVER_CLASSES} ${VISIBILITY_CLASSES}`}
             role="article"
             aria-label={`Project: ${title} by ${author}`}
         >
@@ -408,7 +408,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                 </div>
             </div>
 
-            <div className="px-6 pb-6 relative flex flex-col flex-1 bg-transparent z-20 pointer-events-none">
+            <div className="min-w-0 px-6 pb-6 relative flex flex-col flex-1 bg-transparent z-20 pointer-events-none">
                 {disableNavigation ? (
                     <span className="w-20 h-20 rounded-2xl bg-transparent backdrop-blur-md shadow-xl border-4 border-white dark:border-slate-800 overflow-hidden absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10 z-30 pointer-events-auto">
                         <OptimizedImage
@@ -459,22 +459,22 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                         )}
                     </h2>
 
-                    <div className="flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400 font-medium truncate mt-1">
-                        <span>By</span>
+                    <div className="flex min-w-0 items-center gap-1 text-sm text-slate-500 dark:text-slate-400 font-medium truncate mt-1">
+                        <span className="shrink-0">By</span>
                         {authorPath ? (
                             disableNavigation ? (
-                                <span className="relative z-30">{author}</span>
+                                <span className="relative z-30 min-w-0 truncate">{author}</span>
                             ) : (
                                 <Link
                                     to={authorPath}
                                     onClick={(e) => e.stopPropagation()}
-                                    className="hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none relative z-30 pointer-events-auto"
+                                    className="min-w-0 truncate hover:text-blue-600 dark:hover:text-blue-400 hover:underline focus:outline-none relative z-30 pointer-events-auto"
                                 >
                                     {author}
                                 </Link>
                             )
                         ) : (
-                            <span>{author}</span>
+                            <span className="min-w-0 truncate">{author}</span>
                         )}
                     </div>
                 </div>
@@ -485,8 +485,8 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                     </p>
                 </div>
 
-                <div className="mt-5 flex items-center justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                    <div className="flex items-center gap-4">
+                <div className="mt-5 flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 sm:flex-nowrap text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">
+                    <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                         <span className="flex items-center gap-1.5 pointer-events-none"><Download className="w-4 h-4" /> {downloads}</span>
 
                         <button
@@ -509,9 +509,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                             {favorites}
                         </button>
                     </div>
-                    <div className="flex items-center gap-1.5 pointer-events-none">
-                        <Calendar className="w-4 h-4" />
-                        <span suppressHydrationWarning>{timeAgo || 'Unknown'}</span>
+                    <div className="flex min-w-0 items-center gap-1.5 pointer-events-none">
+                        <Calendar className="w-4 h-4 shrink-0" />
+                        <span className="truncate" suppressHydrationWarning>{timeAgo || 'Unknown'}</span>
                     </div>
                 </div>
             </div>
