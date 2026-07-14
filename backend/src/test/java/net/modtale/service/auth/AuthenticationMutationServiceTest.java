@@ -156,12 +156,23 @@ class AuthenticationMutationServiceTest {
     @Test
     void enableMfaMarksTheAccountEnabled() {
         User user = user("user-1", "Ada", "ada@example.com");
+        user.setMfaSecret("someSecret");
         when(userRepository.findById("user-1")).thenReturn(Optional.of(user));
 
         service.enableMfa("user-1");
 
         assertTrue(user.isMfaEnabled());
         verify(userRepository).save(user);
+    }
+
+    @Test
+    void enableMfaWithoutSecretThrows() {
+        User user = user("user-1", "Ada", "ada@example.com");
+        when(userRepository.findById("user-1")).thenReturn(Optional.of(user));
+
+        assertThrows(net.modtale.exception.InvalidAuthenticationRequestException.class, () -> service.enableMfa("user-1"));
+        assertFalse(user.isMfaEnabled());
+        verify(userRepository, org.mockito.Mockito.never()).save(user);
     }
 
     private static User user(String id, String username, String email) {

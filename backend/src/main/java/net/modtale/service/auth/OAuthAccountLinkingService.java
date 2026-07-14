@@ -89,6 +89,9 @@ public class OAuthAccountLinkingService {
         attributes.put("login", user.getUsername());
         attributes.put("id", user.getId());
         attributes.put("is_linking", true);
-        return new DefaultOAuth2User(Collections.singleton(new SimpleGrantedAuthority("ROLE_USER")), attributes, "login");
+        java.util.List<org.springframework.security.core.GrantedAuthority> authorities = user.getRoles().stream()
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
+                .collect(java.util.stream.Collectors.toList());
+        return new DefaultOAuth2User(authorities, attributes, "login");
     }
 }

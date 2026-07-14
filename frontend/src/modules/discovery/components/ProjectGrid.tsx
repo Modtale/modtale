@@ -39,7 +39,7 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({
                 const isPriority = index < priorityLimit;
 
                 return (
-                    <div key={item.id}>
+                    <div key={item.id} className="min-w-0 max-w-full">
                         <ProjectCard
                             project={item}
                             path={SiteRoutes.project(item)}
