@@ -77,6 +77,10 @@ public class AccountService {
         return mongoTemplate.find(dbQuery, User.class);
     }
 
+    public User saveUser(User user) {
+        return userRepository.save(user);
+    }
+
     public User getPublicProfile(String userId) {
         if (userId == null || userId.isBlank()) {
             return null;

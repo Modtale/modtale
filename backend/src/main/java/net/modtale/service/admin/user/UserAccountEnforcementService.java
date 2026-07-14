@@ -124,6 +124,9 @@ public class UserAccountEnforcementService {
         updatedData.setGitlabRefreshToken(existing.getGitlabRefreshToken());
         updatedData.setGitlabTokenExpiresAt(existing.getGitlabTokenExpiresAt());
 
+        if (updatedData.isMfaEnabled() && (updatedData.getMfaSecret() == null || updatedData.getMfaSecret().isBlank())) {
+            throw new IllegalArgumentException("Cannot enable MFA without a valid MFA secret.");
+        }
         userRepository.save(updatedData);
         adminAuditLogger.logAction(adminId, "RAW_UPDATE_USER", existing.getId(), "USER", "Updated via Raw JSON");
     }

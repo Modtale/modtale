@@ -52,6 +52,9 @@ public class AuthenticationMutationService {
 
     public void enableMfa(String userId) {
         User user = requireUser(userId);
+        if (user.getMfaSecret() == null || user.getMfaSecret().isBlank()) {
+            throw new InvalidAuthenticationRequestException("Cannot enable two-factor authentication because no secret has been set.");
+        }
         user.setMfaEnabled(true);
         userRepository.save(user);
     }
