@@ -479,6 +479,11 @@ public class SecurityConfig {
             }
 
             User user = accountService.getPublicProfile(login);
+            if (user != null && user.isMfaEnabled() && (user.getMfaSecret() == null || user.getMfaSecret().isBlank())) {
+                logger.warn("OAuth User {} has MFA enabled but missing secret. Auto-disabling MFA to prevent lockout.", user.getId());
+                user.setMfaEnabled(false);
+                user = accountService.saveUser(user);
+            }
             boolean isLinking = Boolean.TRUE.equals(oauthUser.getAttribute("is_linking"));
 
             if (user != null && user.isMfaEnabled() && !isLinking) {

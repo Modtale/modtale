@@ -148,6 +148,24 @@ class AuthenticationServiceTest {
     }
 
     @Test
+    void authenticateAutoDisablesMfaWhenSecretIsMissing() {
+        User user = user("user-1", "Ada", "ada@example.com");
+        user.setPassword("encoded");
+        user.setMfaEnabled(true);
+        user.setMfaSecret(null);
+
+        when(userRepository.findByUsernameIgnoreCase("Ada")).thenReturn(Optional.of(user));
+        when(bannedEmailRepository.existsByEmailIgnoreCase("ada@example.com")).thenReturn(false);
+        when(passwordEncoder.matches("secret123", "encoded")).thenReturn(true);
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        User authenticated = authenticationService.authenticate("Ada", "secret123");
+
+        assertFalse(authenticated.isMfaEnabled());
+        verify(userRepository).save(user);
+    }
+
+    @Test
     void validatePreAuthTokenRoundTripsForValidUsersAndRejectsTampering() {
         User user = user("user-1", "Ada", "ada@example.com");
         when(userRepository.findById("user-1")).thenReturn(Optional.of(user));
