@@ -197,11 +197,13 @@ We welcome contributions from the community! Whether it's a bug fix, a new featu
 
 ## Star History
 
-<div align="center">
-  <a href="https://www.star-history.com/#Modtale/modtale&Date">
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Modtale/modtale&type=Date" />
-  </a>
-</div>
+<a href="https://www.star-history.com/?type=date&repos=Modtale%2Fmodtale">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=Modtale/modtale&type=date&theme=dark&legend=top-left&sealed_token=mCISm1HLHMHbeiFu4TkRhbvGDG4O8IuesYC-ZgTiyj6N7DxUbK8WptvIDeRcTFC3-ROvHEZ_kfioqDHmyFG3iutQMf5__idtqDVFwdZzvSaGUquK6Xsqs8K2eiVayge_quOY9ighepY4QS9s7qYkkMGSW5x79lgWueyM_5K-GBKpS7Z_q4bMuuPp57Gr" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=Modtale/modtale&type=date&legend=top-left&sealed_token=mCISm1HLHMHbeiFu4TkRhbvGDG4O8IuesYC-ZgTiyj6N7DxUbK8WptvIDeRcTFC3-ROvHEZ_kfioqDHmyFG3iutQMf5__idtqDVFwdZzvSaGUquK6Xsqs8K2eiVayge_quOY9ighepY4QS9s7qYkkMGSW5x79lgWueyM_5K-GBKpS7Z_q4bMuuPp57Gr" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=Modtale/modtale&type=date&legend=top-left&sealed_token=mCISm1HLHMHbeiFu4TkRhbvGDG4O8IuesYC-ZgTiyj6N7DxUbK8WptvIDeRcTFC3-ROvHEZ_kfioqDHmyFG3iutQMf5__idtqDVFwdZzvSaGUquK6Xsqs8K2eiVayge_quOY9ighepY4QS9s7qYkkMGSW5x79lgWueyM_5K-GBKpS7Z_q4bMuuPp57Gr" />
+ </picture>
+</a>
 
 <div align="center">
 <p>© 2026 Modtale. The Hytale Community Repository.</p>
