@@ -162,8 +162,8 @@ public class AccountService {
     }
 
     public void toggleConnectionVisibility(String userId, String provider) {
-        if ("google".equalsIgnoreCase(provider)) {
-            throw new InvalidAccountRequestException("Google accounts cannot be made visible on public profiles.");
+        if ("google".equalsIgnoreCase(provider) || "hytale".equalsIgnoreCase(provider)) {
+            throw new InvalidAccountRequestException(provider + " accounts cannot be made visible on public profiles.");
         }
 
         User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found."));

@@ -131,7 +131,10 @@ Detached status service variables:
 > **Note on Warden:** The "Warden" malware and security scanner is proprietary to protect our threat-detection logic. You **must** set `WARDEN_ENABLED=false` to run the backend locally. This enables a "Mock Mode" where file uploads bypass the scanner and automatically return a mock "CLEAN" status.
 
 **(Optional) OAuth Variables:**
-To test social logins (GitHub, Discord, Google), provide their respective Client IDs and Secrets (e.g., `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`).
+To test social logins, provide each provider's client ID and secret (for example,
+`GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`). Hytale uses the registered Modtale
+client ID by default and requires `HYTALE_CLIENT_SECRET`; its production callback
+is `https://api.modtale.net/login/oauth2/code/hytale`.
 
 ### 3. Run the Backend
 

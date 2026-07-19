@@ -58,7 +58,8 @@ public class OAuthAccountLinkingService {
         OAuthProviderProfile profile = providerProfileService.extract(providerStr, oauthUser);
 
         if (profile.provider() == net.modtale.model.user.OAuthProvider.DISCORD
-                || profile.provider() == net.modtale.model.user.OAuthProvider.GOOGLE) {
+                || profile.provider() == net.modtale.model.user.OAuthProvider.GOOGLE
+                || profile.provider() == net.modtale.model.user.OAuthProvider.HYTALE) {
             throw new InvalidAuthenticationRequestException("Organizations cannot link " + providerStr + " accounts.");
         }
 

@@ -5,7 +5,7 @@ import { userClient } from '../api/userClient';
 import { BACKEND_URL } from '@/utils/api';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { extractApiErrorMessage } from '@/utils/api';
-import { BlueskyBrandIcon, DiscordBrandIcon, GitHubBrandIcon, GitLabBrandIcon, GoogleMonoBrandIcon, XBrandIcon } from '@/components/ui/icons/BrandIcons';
+import { BlueskyBrandIcon, DiscordBrandIcon, GitHubBrandIcon, GitLabBrandIcon, GoogleMonoBrandIcon, HytaleBrandIcon, XBrandIcon } from '@/components/ui/icons/BrandIcons';
 import type { User } from '@/types';
 
 interface ConnectionsSettingsProps {
@@ -48,17 +48,17 @@ export function ConnectionsSettings({ user, onUpdate }: ConnectionsSettingsProps
         }
     };
 
-    const AccountRow = ({ provider, icon: Icon, label }: { provider: string, icon: any, label: string }) => {
+    const AccountRow = ({ provider, icon: Icon, label, iconClassName = 'w-5 h-5' }: { provider: string, icon: any, label: string, iconClassName?: string }) => {
         const account = accounts.find(a => a.provider?.toLowerCase() === provider.toLowerCase());
         const isLinked = !!account;
-        const canBeVisible = provider !== 'google';
+        const canBeVisible = provider !== 'google' && provider !== 'hytale';
         const isLastAuthMethod = isLinked && accounts.length <= 1 && !user.hasPassword;
 
         return (
             <div className={`flex flex-col justify-between p-4 rounded-2xl border transition-all h-full ${isLinked ? 'bg-white/80 dark:bg-slate-900/40 border-modtale-accent/40 shadow-md' : 'bg-slate-50/80 dark:bg-white/[0.02] border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/20'}`}>
                 <div className="flex items-center gap-3 mb-4">
                     <div className={`p-2.5 rounded-xl ${isLinked ? 'text-modtale-accent bg-modtale-accent/10' : 'text-slate-400 bg-white dark:bg-white/5 shadow-sm border border-slate-200 dark:border-white/5'}`}>
-                        <Icon className="w-5 h-5" />
+                        <Icon className={iconClassName} />
                     </div>
                     <div className="flex-1 min-w-0">
                         <h4 className="font-bold text-xs text-slate-900 dark:text-white uppercase tracking-wider">{label}</h4>
@@ -140,6 +140,7 @@ export function ConnectionsSettings({ user, onUpdate }: ConnectionsSettingsProps
                     <AccountRow provider="twitter" icon={XBrandIcon} label="X / Twitter" />
                     <AccountRow provider="bluesky" icon={BlueskyBrandIcon} label="Bluesky" />
                     <AccountRow provider="google" icon={GoogleMonoBrandIcon} label="Google" />
+                    <AccountRow provider="hytale" icon={HytaleBrandIcon} iconClassName="w-12 h-5" label="Hytale" />
                 </div>
             </div>
         </>

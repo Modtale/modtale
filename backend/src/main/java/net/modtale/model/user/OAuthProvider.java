@@ -6,7 +6,8 @@ public enum OAuthProvider {
     GOOGLE,
     DISCORD,
     TWITTER,
-    BLUESKY;
+    BLUESKY,
+    HYTALE;
 
     public static OAuthProvider fromString(String provider) {
         if (provider == null) return null;
