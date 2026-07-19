@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, ArrowRight, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
-import { DiscordBrandIcon, GitHubBrandIcon, GitLabBrandIcon, GoogleBrandIcon } from '@/components/ui/icons/BrandIcons';
+import { DiscordBrandIcon, GitHubBrandIcon, GoogleBrandIcon, HytaleBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
 import { StatusModal } from '@/components/ui/StatusModal';
@@ -159,7 +159,7 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
             )}
             <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl max-w-sm w-full shadow-2xl relative scale-100 animate-in zoom-in-95 duration-200 overflow-hidden" onClick={e => e.stopPropagation()}>
                 <div className="p-6">
-                    <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors">
+                    <button type="button" onClick={onClose} aria-label="Close sign-in modal" className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors">
                         <X className="w-5 h-5" />
                     </button>
 
@@ -182,27 +182,30 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                         <>
                             <div className="space-y-3 mb-6">
                                 <button
-                                    onClick={() => handleOAuthLogin('github')}
-                                    className={`relative w-full bg-[#24292e] text-white py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-[#2f363d] transition-colors active:scale-95 duration-200 shadow-lg shadow-black/10 ${lastMethodHighlightClass('github')}`}
-                                    title={providerTitle('github')}
-                                    aria-label={providerTitle('github')}
+                                    type="button"
+                                    onClick={() => handleOAuthLogin('hytale')}
+                                    className={`relative w-full bg-[#111827] text-white py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-[#1f2937] transition-colors active:scale-95 duration-200 shadow-lg shadow-cyan-950/20 ${lastMethodHighlightClass('hytale')}`}
+                                    title={providerTitle('hytale')}
+                                    aria-label={providerTitle('hytale')}
                                 >
-                                    <GitHubBrandIcon className="w-5 h-5" />
-                                    <span className="text-sm">GitHub</span>
-                                    {renderLastUsedBadge('github')}
+                                    <HytaleBrandIcon className="h-7 w-24 text-white" />
+                                    <span className="sr-only">Hytale</span>
+                                    {renderLastUsedBadge('hytale')}
                                 </button>
 
                                 <div className="grid grid-cols-3 gap-3">
                                     <button
-                                        onClick={() => handleOAuthLogin('gitlab')}
-                                        className={`relative w-full bg-[#FC6D26] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#e24329] transition-colors active:scale-95 duration-200 shadow-lg shadow-orange-500/20 ${lastMethodHighlightClass('gitlab')}`}
-                                        title={providerTitle('gitlab')}
-                                        aria-label={providerTitle('gitlab')}
+                                        type="button"
+                                        onClick={() => handleOAuthLogin('github')}
+                                        className={`relative w-full bg-[#24292e] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#2f363d] transition-colors active:scale-95 duration-200 shadow-lg shadow-black/10 ${lastMethodHighlightClass('github')}`}
+                                        title={providerTitle('github')}
+                                        aria-label={providerTitle('github')}
                                     >
-                                        <GitLabBrandIcon className="w-5 h-5" />
-                                        {renderLastUsedBadge('gitlab', true)}
+                                        <GitHubBrandIcon className="w-5 h-5" />
+                                        {renderLastUsedBadge('github', true)}
                                     </button>
                                     <button
+                                        type="button"
                                         onClick={() => handleOAuthLogin('discord')}
                                         className={`relative w-full bg-[#5865F2] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#4752c4] transition-colors active:scale-95 duration-200 shadow-lg shadow-indigo-500/20 ${lastMethodHighlightClass('discord')}`}
                                         title={providerTitle('discord')}
@@ -212,6 +215,7 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                                         {renderLastUsedBadge('discord', true)}
                                     </button>
                                     <button
+                                        type="button"
                                         onClick={() => handleOAuthLogin('google')}
                                         className={`relative w-full bg-white text-slate-700 border border-slate-200 py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-slate-50 transition-colors active:scale-95 duration-200 shadow-lg shadow-black/5 ${lastMethodHighlightClass('google')}`}
                                         title={providerTitle('google')}
@@ -310,6 +314,7 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
 
                     <div className="mt-6 text-center">
                         <button
+                            type="button"
                             onClick={() => {
                                 if (mode === 'forgot-password') {
                                     setMode('signin');

@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -63,6 +64,14 @@ class AccountServiceTest {
     @Test
     void getPublicProfileReturnsNullForBlankIdentifiers() {
         assertNull(accountService.getPublicProfile(" "));
+    }
+
+    @Test
+    void hytaleConnectionsCannotBeMadePublic() {
+        assertThrows(
+                net.modtale.exception.InvalidAccountRequestException.class,
+                () -> accountService.toggleConnectionVisibility("user-1", "hytale")
+        );
     }
 
     private static User user(String id, String username) {

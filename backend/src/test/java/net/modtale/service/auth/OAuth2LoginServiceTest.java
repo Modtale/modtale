@@ -80,6 +80,33 @@ class OAuth2LoginServiceTest {
     }
 
     @Test
+    void loadUserRejectsGitLabAsAnAnonymousSignInMethod() {
+        AccountService accountService = mock(AccountService.class);
+        AuthenticationService authenticationService = mock(AuthenticationService.class);
+        ObjectProvider<HttpServletRequest> requestProvider = mock(ObjectProvider.class);
+
+        DefaultOAuth2User upstreamUser = oauthUser("oauth-1", "ada-gl");
+        TestOAuth2LoginService service = new TestOAuth2LoginService(
+                accountService,
+                authenticationService,
+                requestProvider,
+                upstreamUser
+        );
+
+        OAuth2AuthenticationException error = assertThrows(
+                OAuth2AuthenticationException.class,
+                () -> service.loadUser(oauthRequest("gitlab"))
+        );
+
+        assertEquals("login_failure", error.getError().getErrorCode());
+        verify(authenticationService, never()).processUserLogin(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyString()
+        );
+    }
+
+    @Test
     void loadUserMapsAccountCollisionsToTheExpectedOAuthErrorCode() {
         AccountService accountService = mock(AccountService.class);
         AuthenticationService authenticationService = mock(AuthenticationService.class);

@@ -26,6 +26,16 @@ export const GitHubBrandIcon: React.FC<BrandIconProps> = ({ className, ...props 
     </svg>
 );
 
+export const HytaleBrandIcon: React.FC<BrandIconProps> = ({ className, ...props }) => (
+    <svg className={className} viewBox="284 301 1353 479" fill="currentColor" aria-hidden="true" {...props}>
+        <polygon points="1519.44 544.4 1572.82 544.4 1592.47 490.83 1519.44 490.83 1519.44 458.97 1611.93 458.97 1636.1 392.91 1452.67 393.15 1452.67 642.09 1628.85 642.09 1628.85 576.03 1519.44 576.03 1519.44 544.4" />
+        <polygon points="1346.48 569.03 1346.48 393.16 1252.35 393.16 1267.61 421.69 1267.61 642.09 1443.29 642.09 1416.13 569.03 1346.48 569.03" />
+        <path d="M1184.15,393.13l-131.59.26,10.15,19.12-84.79,229.58h80.14l11.66-32.75h94.84l12.99,32.75h80.22l-84.12-229.55,10.51-19.41h-.01ZM1092.47,543.28l25.42-73.76,25.74,73.76h-51.17.01Z" />
+        <polygon points="1021.03 393.13 750.4 393.13 702.61 496.43 654.83 393.13 654.71 393.51 654.55 393.13 575.03 393.13 662.23 583.75 635.01 642.57 717.62 642.57 810.67 441.29 820.34 465.19 865.85 465.21 865.85 642.71 947.76 642.71 947.76 465.19 993.41 465.19 1021.03 393.13" />
+        <polygon points="480.39 301.94 480.39 458.88 413.73 458.72 412.41 301.68 284.9 320.27 325.54 395.61 325.58 645.22 413.37 709.06 413.42 534.23 479.19 534.5 479.19 779.32 566.54 715.76 566.54 395.69 607.29 320.47 480.39 301.94" />
+    </svg>
+);
+
 export const XBrandIcon: React.FC<BrandIconProps> = ({ className, ...props }) => (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" {...props}>
         <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.005 4.15H5.059z" />
@@ -57,5 +67,6 @@ export const providerBrandIcons: Record<string, React.ComponentType<BrandIconPro
     discord: DiscordBrandIcon,
     twitter: XBrandIcon,
     bluesky: BlueskyBrandIcon,
-    google: GoogleMonoBrandIcon
+    google: GoogleMonoBrandIcon,
+    hytale: HytaleBrandIcon
 };

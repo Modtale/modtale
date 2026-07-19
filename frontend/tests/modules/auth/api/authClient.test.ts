@@ -87,6 +87,13 @@ describe('authClient', () => {
         expect(window.sessionStorage.getItem(PENDING_SIGN_IN_METHOD_STORAGE_KEY)).toBeNull();
     });
 
+    it('recognizes Hytale as a persisted sign-in method', () => {
+        stageSignInMethod('hytale');
+
+        expect(completeSignInMethod()).toBe('hytale');
+        expect(getLastSignInMethod()).toBe('hytale');
+    });
+
     it('ignores unknown stored sign-in method values', () => {
         window.localStorage.setItem(LAST_SIGN_IN_METHOD_STORAGE_KEY, 'fax-machine');
 

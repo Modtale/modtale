@@ -9,6 +9,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -87,6 +88,36 @@ class OAuthProviderProfileServiceTest {
         assertEquals("octo-user", profile.providerId());
         assertEquals("octo-user", profile.username());
         assertEquals("https://github.com/octo-user", profile.profileUrl());
+    }
+
+    @Test
+    void extractUsesStableHytaleSubjectAndKeepsConnectionPrivate() {
+        String subject = "dGVzdC1wZXItYXBwbGljYXRpb24tc3ViamVjdC0xMjM0NTY";
+        OAuthProviderProfile profile = service.extract("hytale", oauthUser(Map.of(
+                "sub", subject
+        ), subject));
+
+        assertEquals(OAuthProvider.HYTALE, profile.provider());
+        assertEquals(subject, profile.providerId());
+        assertEquals("hytale_player", profile.username());
+        assertEquals("", profile.profileUrl());
+        assertNull(profile.email());
+        assertFalse(profile.visible());
+    }
+
+    @Test
+    void extractUsesSelectedHytaleProfileNameWithoutChangingAccountIdentity() {
+        String subject = "stable-app-subject";
+        OAuthProviderProfile profile = service.extract("hytale", oauthUser(Map.of(
+                "sub", subject,
+                "profile", Map.of(
+                        "uuid", "9ecf0f82-1cf5-45ad-8440-524fe7d45d9e",
+                        "username", "Willow"
+                )
+        ), subject));
+
+        assertEquals(subject, profile.providerId());
+        assertEquals("Willow", profile.username());
     }
 
     @Test
