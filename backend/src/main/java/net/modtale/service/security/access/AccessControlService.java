@@ -149,7 +149,10 @@ public class AccessControlService {
 
         User user = accountService.getCurrentUser(authentication);
         if (isProjectReadPermission(permStr)) {
-            return project == null || isPubliclyReadable(project) || canViewPrivilegedProjectData(user);
+            return project == null
+                    || isPubliclyReadable(project)
+                    || canViewPrivilegedProjectData(user)
+                    || hasProjectPermission(project, user, permStr);
         }
 
         if (project == null) return true;
