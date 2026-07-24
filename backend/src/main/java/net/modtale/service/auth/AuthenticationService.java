@@ -121,9 +121,16 @@ public class AuthenticationService {
         if (user.isDeleted()) throw new UnauthorizedException("This account is no longer available.");
         if (bannedEmailRepository.existsByEmailIgnoreCase(user.getEmail())) throw new UnauthorizedException("This account has been suspended.");
 
-        if (!passwordEncoder.matches(password, user.getPassword())) {
+        if (!user.getHasPassword() || !passwordEncoder.matches(password, user.getPassword())) {
             throw new UnauthorizedException("We couldn't sign you in with that username and password. Double-check both fields and try again.");
         }
+
+        if (user.isMfaEnabled() && (user.getMfaSecret() == null || user.getMfaSecret().isBlank())) {
+            logger.warn("User {} has MFA enabled but missing secret. Auto-disabling MFA to prevent lockout.", user.getId());
+            user.setMfaEnabled(false);
+            user = userRepository.save(user);
+        }
+
         return user;
     }
 

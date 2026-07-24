@@ -16,6 +16,8 @@ import {
     generateCollectionPageSchema,
     generateItemListSchema,
     generateOrganizationSchema,
+    generateProjectSchemas,
+    getProjectOgImageUrl,
     generateWebsiteSchema,
     getBreadcrumbsForClassification,
 } from '../utils/schema';
@@ -101,7 +103,7 @@ const projectLookupKey = projectRouteKey ? SiteRoutes.extractId(projectRouteKey)
 const projectId = projectLookupKey;
 
 let image = (isProjectRoute && projectLookupKey)
-    ? `${BACKEND_URL}/api/v1/og/project/${projectLookupKey}.png`
+    ? getProjectOgImageUrl(projectId)
     : 'https://modtale.net/assets/logo.svg';
 
 let classification = null;
@@ -236,7 +238,8 @@ if (classification) {
     } else {
         jsonLd = baseSchemas;
     }
-} else if (isBot && projectLookupKey && isProjectRoute) {
+} else if (projectLookupKey && isProjectRoute
+    && (isBot || (pathSegments[0] === 'project' && pathSegments.length === 2))) {
     try {
         const modData = await fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects/${projectLookupKey}`, 2500);
 
@@ -258,25 +261,11 @@ if (classification) {
                 description = meta.description;
             }
 
-            const appSchema = {
-                '@context': 'https://schema.org',
-                '@type': 'SoftwareApplication',
-                name: modData.title,
-                description: meta?.description || description,
-                image,
-                author: { '@type': 'Person', name: modData.author || 'Unknown' },
-                applicationCategory: 'GameApplication',
-                operatingSystem: 'Windows, macOS, Linux',
-                offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-            };
-
-            const crumbs = getBreadcrumbsForClassification(modData.classification || 'PLUGIN');
-            const fullCrumbs = [...crumbs, { name: modData.title, url: projectUrl }];
-            const breadcrumbSchema = generateBreadcrumbSchema(fullCrumbs);
-
-            const schemas: any[] = [websiteSchema, organizationSchema, appSchema];
-            if (breadcrumbSchema) schemas.push(breadcrumbSchema);
-            jsonLd = schemas;
+            jsonLd = [
+                websiteSchema,
+                organizationSchema,
+                ...generateProjectSchemas(modData),
+            ];
             ssrSuccessfullyCompleted = true;
         } else {
             initialData = null;

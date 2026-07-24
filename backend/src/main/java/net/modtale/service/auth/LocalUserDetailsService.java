@@ -1,10 +1,9 @@
 package net.modtale.service.auth;
 
-import java.util.stream.Collectors;
 import net.modtale.exception.ReservedAccountAccessException;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import net.modtale.service.security.access.AdminAuthorityUtils;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -38,9 +37,7 @@ public class LocalUserDetailsService implements UserDetailsService {
         return new org.springframework.security.core.userdetails.User(
                 user.getUsername(),
                 user.getPassword() == null ? "" : user.getPassword(),
-                user.getRoles().stream()
-                        .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
-                        .collect(Collectors.toList())
+                AdminAuthorityUtils.authoritiesFor(user)
         );
     }
 }

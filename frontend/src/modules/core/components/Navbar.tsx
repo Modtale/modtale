@@ -5,6 +5,7 @@ import { AnimatedThemeToggler } from '@/components/ui/AnimatedThemeToggler';
 import { useMobile } from '@/context/MobileContext';
 import { SiteRoutes } from '@/utils/routes';
 import { PROJECT_TYPES } from '@/data/categories';
+import { isAdminUser } from '@/modules/admin/utils/access';
 import type { User } from "@/types.ts";
 
 const NotificationMenu = lazy(() => import('@/modules/user/components/NotificationMenu').then((module) => ({ default: module.NotificationMenu })));
@@ -99,7 +100,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     };
 
     return (
-        <nav className="bg-white/80 dark:bg-[#141d30]/90 text-slate-900 dark:text-slate-300 sticky top-0 z-[100] border-b border-slate-200 dark:border-white/5 transition-colors duration-200 h-24 backdrop-blur-xl">
+        <nav className="bg-white/80 dark:bg-modtale-navbar/90 text-slate-900 dark:text-slate-300 sticky top-0 z-[100] border-b border-slate-200 dark:border-white/5 transition-colors duration-200 h-24 backdrop-blur-xl">
             <Suspense fallback={null}>
                 {isSignInOpen && <SignInModal isOpen={isSignInOpen} onClose={handleSignInClose} />}
 
@@ -219,8 +220,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                                             onClick={() => setIsProfileOpen(!isProfileOpen)}
                                             className={`group relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full transition-all duration-200 ${
                                                 isProfileOpen
-                                                    ? 'ring-2 ring-modtale-accent ring-offset-2 dark:ring-offset-[#141d30]'
-                                                    : 'hover:ring-2 hover:ring-slate-200 dark:hover:ring-white/10 ring-offset-2 dark:ring-offset-[#141d30]'
+                                                    ? 'ring-2 ring-modtale-accent ring-offset-2 dark:ring-offset-modtale-navbar'
+                                                    : 'hover:ring-2 hover:ring-slate-200 dark:hover:ring-white/10 ring-offset-2 dark:ring-offset-modtale-navbar'
                                             }`}
                                         >
                                             <img
@@ -247,7 +248,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                                     <Link to={SiteRoutes.dashboard()} onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
                                                         <LayoutDashboard className="w-4 h-4 text-slate-400" /> User Dashboard
                                                     </Link>
-                                                    {user.roles?.includes('ADMIN') && (
+                                                    {isAdminUser(user) && (
                                                         <Link to={SiteRoutes.admin()} onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center gap-3 transition-colors">
                                                             <Shield className="w-4 h-4" /> Admin Panel
                                                         </Link>
@@ -324,7 +325,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         </>
                     )}
 
-                    {user?.roles?.includes('ADMIN') && (
+                    {isAdminUser(user) && (
                         <Link to={SiteRoutes.admin()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 font-bold text-red-600 dark:text-red-400 text-left"><Shield className="w-4 h-4 mr-3" /> Admin Panel</Link>
                     )}
 

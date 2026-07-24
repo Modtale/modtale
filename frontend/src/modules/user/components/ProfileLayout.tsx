@@ -5,7 +5,7 @@ import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { Spinner } from '@/components/ui/Spinner';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { DiscordBrandIcon, GitHubBrandIcon, GitLabBrandIcon, XBrandIcon } from '@/components/ui/icons/BrandIcons';
+import { DiscordBrandIcon, GitHubBrandIcon, GitLabBrandIcon, HytaleBrandIcon, XBrandIcon } from '@/components/ui/icons/BrandIcons';
 import type { User } from '@/types';
 import { BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
@@ -176,6 +176,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
             case 'gitlab': return { icon: GitLabBrandIcon, label: 'GitLab', activeClass: 'group-hover/social:text-[#FC6D26] group-hover/social:border-[#FC6D26]/30', iconBg: 'bg-[#FC6D26]/10 text-[#FC6D26]', profileBtnBg: 'bg-[#FC6D26]' };
             case 'twitter': return { icon: XBrandIcon, label: 'Twitter', activeClass: 'group-hover/social:text-[#1DA1F2] group-hover/social:border-[#1DA1F2]/30', iconBg: 'bg-[#1DA1F2]/10 text-[#1DA1F2]', profileBtnBg: 'bg-[#1DA1F2]' };
             case 'discord': return { icon: DiscordBrandIcon, label: 'Discord', activeClass: 'group-hover/social:text-[#5865F2] group-hover/social:border-[#5865F2]/30', iconBg: 'bg-[#5865F2]/10 text-[#5865F2]', profileBtnBg: 'bg-[#5865F2]' };
+            case 'hytale': return { icon: HytaleBrandIcon, label: 'Hytale', activeClass: 'group-hover/social:text-cyan-400 group-hover/social:border-cyan-400/30', iconBg: 'bg-cyan-500/10 text-cyan-400', profileBtnBg: 'bg-slate-900' };
             default: return { icon: Globe, label: 'Website', activeClass: 'group-hover/social:text-blue-500 group-hover/social:border-blue-500/30', iconBg: 'bg-blue-500/10 text-blue-500', profileBtnBg: 'bg-blue-500' };
         }
     };
