@@ -2,10 +2,14 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import App from '../../App';
 import { SiteRoutes } from '../../utils/routes';
-import { isBotUserAgent } from '../../utils/seo';
 import { generateProjectMeta } from '../../utils/meta';
 import { ROUTE_SEO } from '../../data/seo-constants';
-import { generateBreadcrumbSchema, getBreadcrumbsForClassification } from '../../utils/schema';
+import {
+    generateOrganizationSchema,
+    generateProjectSchemas,
+    generateWebsiteSchema,
+    getProjectOgImageUrl,
+} from '../../utils/schema';
 import { BACKEND_URL } from "@/utils/api.ts";
 
 const { slug } = Astro.params;
@@ -13,22 +17,24 @@ const path = Astro.url.pathname;
 const cleanPath = path.replace(/\/$/, "");
 const projectId = slug ? SiteRoutes.extractId(slug) : '';
 
-const userAgent = Astro.request.headers.get('user-agent') || '';
-const isBot = isBotUserAgent(userAgent);
-
 let modData = null;
+let projectUnavailable = false;
 let title = ROUTE_SEO['/modpacks'].title;
 let description = ROUTE_SEO['/modpacks'].description;
-let image = projectId ? `${BACKEND_URL}/api/v1/og/project/${projectId}.png` : 'https://modtale.net/assets/logo.svg';
+let image = getProjectOgImageUrl(projectId);
 let jsonLd: any = undefined;
 let ssrSuccessfullyCompleted = false;
 
-if (isBot && projectId) {
+if (projectId) {
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(() => controller.abort(), 2500);
+
     try {
-        const res = await fetch(`${BACKEND_URL}/api/v1/projects/${projectId}`);
+        const res = await fetch(`${BACKEND_URL}/api/v1/projects/${projectId}`, {
+            signal: controller.signal,
+        });
         if (res.ok) {
             modData = await res.json();
-            modData.classification = 'MODPACK';
 
             const canonicalUrl = SiteRoutes.project(modData);
             if (cleanPath !== canonicalUrl.replace(/\/$/, "")) {
@@ -41,25 +47,20 @@ if (isBot && projectId) {
                 description = meta.description;
             }
 
-            const appSchema = {
-                "@context": "https://schema.org",
-                "@type": "SoftwareApplication",
-                "name": modData.title,
-                "image": modData.imageUrl,
-                "author": { "@type": "Person", "name": modData.author || 'Unknown' },
-                "applicationCategory": "GameApplication",
-                "operatingSystem": "Windows, macOS, Linux",
-                "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
-            };
-
-            const crumbs = getBreadcrumbsForClassification('MODPACK');
-            const fullCrumbs = [...crumbs, { name: modData.title, url: canonicalUrl }];
-            const breadcrumbSchema = generateBreadcrumbSchema(fullCrumbs);
-
-            jsonLd = [appSchema, breadcrumbSchema];
+            jsonLd = [
+                generateWebsiteSchema(),
+                generateOrganizationSchema(),
+                ...generateProjectSchemas(modData),
+            ];
             ssrSuccessfullyCompleted = true;
+        } else if (res.status === 404 || res.status === 410) {
+            projectUnavailable = true;
         }
-    } catch (e) {}
+    } catch (e) {
+        projectUnavailable = false;
+    } finally {
+        clearTimeout(timeoutHandle);
+    }
 }
 
 if (ssrSuccessfullyCompleted) {
@@ -68,9 +69,10 @@ if (ssrSuccessfullyCompleted) {
     Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=0, must-revalidate');
 }
 
-const projectBootstrapUrl = !modData && projectId ? `${BACKEND_URL}/api/v1/projects/${projectId}` : undefined;
+const projectInitialData = modData || (projectUnavailable && projectId ? { __projectUnavailable: true, id: projectId } : null);
+const projectBootstrapUrl = !projectInitialData && projectId ? `${BACKEND_URL}/api/v1/projects/${projectId}` : undefined;
 ---
 
-<BaseLayout title={title} description={description} image={image} jsonLd={jsonLd} initialData={modData} projectBootstrapUrl={projectBootstrapUrl}>
-    <App client:load initialPath={path} ssrData={modData} />
+<BaseLayout title={title} description={description} image={image} jsonLd={jsonLd} initialData={projectInitialData} projectBootstrapUrl={projectBootstrapUrl}>
+    <App client:load initialPath={path} ssrData={projectInitialData} />
 </BaseLayout>

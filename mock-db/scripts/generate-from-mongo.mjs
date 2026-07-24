@@ -16,6 +16,38 @@ const projectLimit = Number.parseInt(process.env.MOCK_PROJECT_LIMIT || '80', 10)
 
 const passwordHash = '$2a$10$YQPnaULIFCpHYqXreH4IdeK0tSn2gCrMgOSE6bOcKCIR16cG9/Ujy';
 const classifications = ['PLUGIN', 'DATA', 'ART', 'SAVE', 'MODPACK'];
+const allAdminPermissions = [
+  'PROJECT_REVIEW_READ',
+  'PROJECT_REVIEW_DECIDE',
+  'PROJECT_MANAGE_READ',
+  'PROJECT_MODERATE',
+  'PROJECT_DELETE',
+  'PROJECT_RESTORE',
+  'PROJECT_VERSION_DELETE',
+  'PROJECT_VERSION_RESCAN',
+  'PROJECT_RAW_EDIT',
+  'REPORT_READ',
+  'REPORT_RESOLVE',
+  'USER_READ',
+  'USER_DELETE',
+  'EMAIL_BAN_READ',
+  'EMAIL_BAN_MANAGE',
+  'USER_TIER_MANAGE',
+  'USER_PERMISSION_MANAGE',
+  'USER_RAW_READ',
+  'USER_RAW_EDIT',
+  'AUDIT_LOG_READ',
+  'PLATFORM_ANALYTICS_READ',
+  'STATUS_INCIDENT_READ',
+  'STATUS_INCIDENT_MANAGE'
+];
+const seededAdminPermissions = [
+  'PROJECT_REVIEW_READ',
+  'PROJECT_REVIEW_DECIDE',
+  'PROJECT_VERSION_RESCAN',
+  'REPORT_READ',
+  'REPORT_RESOLVE'
+];
 
 if (!sourceUri) {
   console.error('MOCK_SOURCE_MONGODB_URI is required.');
@@ -191,10 +223,11 @@ function baseUsers(authorProfiles) {
       email: 'super_admin@example.test',
       emailVerified: true,
       password: passwordHash,
-      bio: 'Synthetic super admin account for preview review.',
+      bio: 'Synthetic full-permission admin account for preview review.',
       createdAt: '2026-01-05',
       tier: 'ENTERPRISE',
-      roles: ['USER', 'ADMIN'],
+      roles: ['USER'],
+      adminPermissions: allAdminPermissions,
       accountType: 'USER',
       likedModIds: [],
       followingIds: [],
@@ -211,7 +244,8 @@ function baseUsers(authorProfiles) {
       bio: 'Synthetic admin account for moderation flow testing.',
       createdAt: '2026-01-08',
       tier: 'ENTERPRISE',
-      roles: ['USER', 'ADMIN'],
+      roles: ['USER'],
+      adminPermissions: seededAdminPermissions,
       accountType: 'USER',
       likedModIds: [],
       followingIds: [],

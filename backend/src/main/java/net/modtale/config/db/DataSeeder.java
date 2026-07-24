@@ -23,6 +23,7 @@ import net.modtale.config.properties.AppSeedingProperties;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.user.ApiKey;
+import net.modtale.model.user.AdminPermission;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.auth.ReservedAccountGuardService;
@@ -74,8 +75,15 @@ public class DataSeeder implements CommandLineRunner {
     private static final String TEMPLATE_SEED_MANIFEST_ID = "template";
     private static final Set<String> VERSION_ARTIFACT_FIELDS = Set.of("fileUrl", "cachedFileUrl", "artifactUrl");
     private static final Set<String> DEPENDENCY_ARTIFACT_FIELDS = Set.of("cachedFileUrl", "externalFileUrl", "fileUrl");
-    private static final String SUPER_ADMIN_ID = "692620f7c2f3266e23ac0ded";
+    private static final String FULL_ADMIN_ID = "692620f7c2f3266e23ac0ded";
     private static final String ADMIN_ID = "692620f7c2f3266e23ac0dee";
+    private static final Set<AdminPermission> SEEDED_ADMIN_PERMISSIONS = Set.of(
+            AdminPermission.PROJECT_REVIEW_READ,
+            AdminPermission.PROJECT_REVIEW_DECIDE,
+            AdminPermission.PROJECT_VERSION_RESCAN,
+            AdminPermission.REPORT_READ,
+            AdminPermission.REPORT_RESOLVE
+    );
     private static final List<String> MOCK_COLLECTIONS = List.of(
             "users",
             "projects",
@@ -142,7 +150,7 @@ public class DataSeeder implements CommandLineRunner {
             return;
         }
 
-        ensureSuperAdmin();
+        ensureFullAdmin();
         ensureAdmin();
         ensureNormalUser();
 
@@ -502,11 +510,13 @@ public class DataSeeder implements CommandLineRunner {
     private List<Document> syntheticUsers() {
         String password = passwordEncoder.encode("password");
         return List.of(
-                doc("_id", SUPER_ADMIN_ID, "username", "super_admin", "email", "super_admin@example.test",
-                        "emailVerified", true, "password", password, "roles", List.of("USER", "ADMIN"),
-                        "tier", "ENTERPRISE", "accountType", "USER", "bio", "Synthetic super admin account."),
+                doc("_id", FULL_ADMIN_ID, "username", "super_admin", "email", "super_admin@example.test",
+                        "emailVerified", true, "password", password, "roles", List.of("USER"),
+                        "adminPermissions", adminPermissionNames(AdminPermission.allPermissions()),
+                        "tier", "ENTERPRISE", "accountType", "USER", "bio", "Synthetic full-permission admin account."),
                 doc("_id", ADMIN_ID, "username", "admin", "email", "admin@example.test",
-                        "emailVerified", true, "password", password, "roles", List.of("USER", "ADMIN"),
+                        "emailVerified", true, "password", password, "roles", List.of("USER"),
+                        "adminPermissions", adminPermissionNames(SEEDED_ADMIN_PERMISSIONS),
                         "tier", "ENTERPRISE", "accountType", "USER", "bio", "Synthetic admin account."),
                 doc("_id", "mock-user-1", "username", "user", "email", "user@example.test",
                         "emailVerified", true, "password", password, "roles", List.of("USER"),
@@ -1873,6 +1883,12 @@ public class DataSeeder implements CommandLineRunner {
         return stringValue.length() > limit ? stringValue.substring(0, limit) : stringValue;
     }
 
+    private List<String> adminPermissionNames(Set<AdminPermission> permissions) {
+        return permissions.stream()
+                .map(AdminPermission::name)
+                .toList();
+    }
+
     private ObjectId getSafeObjectId(Object id) {
         if (id == null) return null;
         if (id instanceof ObjectId) return (ObjectId) id;
@@ -1886,22 +1902,23 @@ public class DataSeeder implements CommandLineRunner {
         return null;
     }
 
-    private void ensureSuperAdmin() {
-        if (userRepository.existsById(SUPER_ADMIN_ID)) return;
+    private void ensureFullAdmin() {
+        if (userRepository.existsById(FULL_ADMIN_ID)) return;
 
         userRepository.findByUsername("super_admin").ifPresent(userRepository::delete);
 
         User user = new User();
-        user.setId(SUPER_ADMIN_ID);
+        user.setId(FULL_ADMIN_ID);
         user.setUsername("super_admin");
         user.setEmail("super_admin@example.test");
         user.setEmailVerified(true);
         user.setPassword(passwordEncoder.encode("password"));
-        user.setRoles(List.of("USER", "ADMIN"));
-        user.setBio("I am the Super Admin for this preview environment.");
+        user.setRoles(List.of("USER"));
+        user.setAdminPermissions(AdminPermission.allPermissions());
+        user.setBio("I am the full-permission admin for this preview environment.");
         user.setTier(ApiKey.Tier.ENTERPRISE);
         userRepository.save(user);
-        logger.info("Created Super Admin: super_admin / password (ID: {})", SUPER_ADMIN_ID);
+        logger.info("Created full-permission admin: super_admin / password (ID: {})", FULL_ADMIN_ID);
     }
 
     private void ensureAdmin() {
@@ -1915,7 +1932,8 @@ public class DataSeeder implements CommandLineRunner {
         user.setEmail("admin@example.test");
         user.setEmailVerified(true);
         user.setPassword(passwordEncoder.encode("password"));
-        user.setRoles(List.of("USER", "ADMIN"));
+        user.setRoles(List.of("USER"));
+        user.setAdminPermissions(SEEDED_ADMIN_PERMISSIONS);
         user.setBio("I am the Admin for this preview environment.");
         user.setTier(ApiKey.Tier.ENTERPRISE);
         userRepository.save(user);
@@ -2025,7 +2043,7 @@ public class DataSeeder implements CommandLineRunner {
         String id = rawId.toString();
         String username = boundedString(user.get("username"), "", 80);
         if (
-                id.equals(SUPER_ADMIN_ID)
+                id.equals(FULL_ADMIN_ID)
                         || id.equals(ADMIN_ID)
                         || "user".equals(username)
                         || "super_admin".equals(username)
