@@ -3,6 +3,7 @@ package net.modtale.service.auth;
 import java.util.List;
 import java.util.Optional;
 import net.modtale.exception.ReservedAccountAccessException;
+import net.modtale.model.user.AdminPermission;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +12,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doThrow;
@@ -42,7 +44,20 @@ class LocalUserDetailsServiceTest {
         assertEquals("willow", details.getUsername());
         assertEquals("", details.getPassword());
         assertTrue(details.getAuthorities().stream().anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN")));
+        assertFalse(details.getAuthorities().stream().anyMatch(authority -> authority.getAuthority().startsWith("ADMIN_PERMISSION_")));
         verify(reservedAccountGuardService).rejectReservedUserInProduction(user);
+    }
+
+    @Test
+    void loadUserByUsernameAddsExplicitAdminPermissionAuthorities() {
+        User user = user("user-1", "willow", "encoded-password", List.of("USER"));
+        user.setAdminPermissions(java.util.Set.of(AdminPermission.PROJECT_MANAGE_READ));
+
+        when(userRepository.findByUsernameIgnoreCase("willow")).thenReturn(Optional.of(user));
+
+        UserDetails details = service.loadUserByUsername("willow");
+
+        assertTrue(details.getAuthorities().stream().anyMatch(authority -> authority.getAuthority().equals("ADMIN_PERMISSION_PROJECT_MANAGE_READ")));
     }
 
     @Test

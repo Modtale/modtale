@@ -11,6 +11,7 @@ import net.modtale.model.admin.BannedEmail;
 import net.modtale.model.dto.admin.BannedEmailDTO;
 import net.modtale.model.dto.user.UserDTO;
 import net.modtale.model.user.ApiKey;
+import net.modtale.model.user.AdminPermission;
 import net.modtale.model.user.User;
 import net.modtale.repository.admin.BannedEmailRepository;
 import net.modtale.repository.user.UserRepository;
@@ -124,6 +125,9 @@ public class UserAccountEnforcementService {
         updatedData.setGitlabRefreshToken(existing.getGitlabRefreshToken());
         updatedData.setGitlabTokenExpiresAt(existing.getGitlabTokenExpiresAt());
 
+        if (updatedData.isMfaEnabled() && (updatedData.getMfaSecret() == null || updatedData.getMfaSecret().isBlank())) {
+            throw new IllegalArgumentException("Cannot enable MFA without a valid MFA secret.");
+        }
         userRepository.save(updatedData);
         adminAuditLogger.logAction(adminId, "RAW_UPDATE_USER", existing.getId(), "USER", "Updated via Raw JSON");
     }
@@ -131,7 +135,7 @@ public class UserAccountEnforcementService {
     public void deleteUser(User adminUser, String userId, String reason) {
         User target = requireUser(userId);
         if (!canManageUser(adminUser, target)) {
-            throw new ForbiddenOperationException("Only Super Admin can delete other admins.");
+            throw new ForbiddenOperationException("Deleting another admin requires admin permission management access.");
         }
 
         softDeleteUser(target);
@@ -157,10 +161,10 @@ public class UserAccountEnforcementService {
     }
 
     private boolean canManageUser(User currentUser, User targetUser) {
-        if (currentUser != null && currentUser.getRoles() != null && currentUser.getRoles().contains("SUPER_ADMIN")) {
+        if (AdminPermission.hasPermission(currentUser, AdminPermission.USER_PERMISSION_MANAGE)) {
             return true;
         }
-        return targetUser.getRoles() == null || !targetUser.getRoles().contains("ADMIN");
+        return !AdminPermission.hasAnyPermission(targetUser);
     }
 
     private void softDeleteUser(User user) {

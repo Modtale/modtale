@@ -43,25 +43,25 @@ public class ProjectManagementController {
     }
 
     @GetMapping("/verification/queue")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_REVIEW_READ', authentication)")
     public ResponseEntity<List<ProjectSummaryDTO>> getVerificationQueue() {
         return ResponseEntity.ok(projectReviewAdminService.getVerificationQueue());
     }
 
     @GetMapping("/projects/{id}/review-details")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_REVIEW_READ', authentication)")
     public ResponseEntity<AdminProjectReviewDTO> getProjectReviewDetails(@PathVariable String id) {
         return ResponseEntity.ok(projectReviewAdminService.getProjectReviewDetails(id));
     }
 
     @GetMapping("/projects/{id}")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_MANAGE_READ', authentication)")
     public ResponseEntity<AdminProjectDTO> getProjectById(@PathVariable String id) {
         return ResponseEntity.ok(projectAdminOperationsService.getProjectById(id));
     }
 
     @PutMapping("/projects/{id}/raw")
-    @PreAuthorize("@apiSecurity.isSuperAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_RAW_EDIT', authentication)")
     public ResponseEntity<Void> updateRawProject(@PathVariable String id, @RequestBody Project updatedProject) {
         User currentUser = accountService.requireCurrentUser("editing raw project data");
         projectAdminOperationsService.updateRawProject(currentUser.getId(), id, updatedProject);
@@ -69,7 +69,7 @@ public class ProjectManagementController {
     }
 
     @PostMapping("/projects/{id}/publish")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_REVIEW_DECIDE', authentication)")
     public ResponseEntity<Void> publishProject(@PathVariable String id) {
         User currentUser = accountService.requireCurrentUser("publishing projects");
         projectReviewAdminService.publishProject(currentUser, id);
@@ -77,7 +77,7 @@ public class ProjectManagementController {
     }
 
     @PostMapping("/projects/{id}/versions/{versionId}/approve")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_REVIEW_DECIDE', authentication)")
     public ResponseEntity<Void> approveVersion(@PathVariable String id, @PathVariable String versionId) {
         User currentUser = accountService.requireCurrentUser("approving project versions");
         projectReviewAdminService.approveVersion(currentUser, id, versionId);
@@ -85,7 +85,7 @@ public class ProjectManagementController {
     }
 
     @PostMapping("/projects/{id}/versions/{versionId}/reject")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_REVIEW_DECIDE', authentication)")
     public ResponseEntity<Void> rejectVersion(@PathVariable String id, @PathVariable String versionId, @Valid @RequestBody RejectReasonRequest requestPayload) {
         User currentUser = accountService.requireCurrentUser("rejecting project versions");
         projectReviewAdminService.rejectVersion(currentUser, id, versionId, requestPayload.getReason());
@@ -93,7 +93,7 @@ public class ProjectManagementController {
     }
 
     @PostMapping("/projects/{id}/reject")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_REVIEW_DECIDE', authentication)")
     public ResponseEntity<Void> rejectProject(@PathVariable String id, @Valid @RequestBody RejectReasonRequest requestPayload) {
         User currentUser = accountService.requireCurrentUser("rejecting projects");
         projectReviewAdminService.rejectProject(currentUser, id, requestPayload.getReason());
@@ -101,7 +101,7 @@ public class ProjectManagementController {
     }
 
     @DeleteMapping("/projects/{id}")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_DELETE', authentication)")
     public ResponseEntity<Void> deleteProject(
             @PathVariable String id,
             @RequestParam(required = false, defaultValue = "Administrative action.") String reason
@@ -112,7 +112,7 @@ public class ProjectManagementController {
     }
 
     @DeleteMapping("/projects/{id}/hard")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_DELETE', authentication)")
     public ResponseEntity<Void> hardDeleteProject(
             @PathVariable String id,
             @RequestParam(required = false, defaultValue = "Administrative action.") String reason
@@ -123,7 +123,7 @@ public class ProjectManagementController {
     }
 
     @PostMapping("/projects/{id}/restore")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_RESTORE', authentication)")
     public ResponseEntity<Void> restoreProject(@PathVariable String id, @RequestParam(defaultValue = "PUBLISHED") ProjectStatus status) {
         User currentUser = accountService.requireCurrentUser("restoring projects");
         projectAdminOperationsService.restoreProject(currentUser, id, status);
@@ -131,7 +131,7 @@ public class ProjectManagementController {
     }
 
     @PostMapping("/projects/{id}/unlist")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_MODERATE', authentication)")
     public ResponseEntity<Void> unlistProject(@PathVariable String id, @RequestBody(required = false) RejectReasonRequest requestPayload) {
         User currentUser = accountService.requireCurrentUser("unlisting projects");
         String reason = requestPayload != null && requestPayload.getReason() != null && !requestPayload.getReason().isBlank()
@@ -142,7 +142,7 @@ public class ProjectManagementController {
     }
 
     @DeleteMapping("/projects/{id}/versions/{versionId}")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_VERSION_DELETE', authentication)")
     public ResponseEntity<Void> deleteProjectVersion(@PathVariable String id, @PathVariable String versionId) {
         User currentUser = accountService.requireCurrentUser("deleting project versions");
         projectAdminOperationsService.deleteProjectVersion(currentUser, id, versionId);
@@ -150,13 +150,13 @@ public class ProjectManagementController {
     }
 
     @GetMapping("/projects/search")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_MANAGE_READ', authentication)")
     public ResponseEntity<List<ProjectSummaryDTO>> searchProjects(@RequestParam String query, @RequestParam(required = false, defaultValue = "false") boolean deleted) {
         return ResponseEntity.ok(projectAdminOperationsService.searchProjects(query, deleted));
     }
 
     @PostMapping("/projects/{id}/versions/{versionId}/scan")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_VERSION_RESCAN', authentication)")
     public ResponseEntity<Void> rescanVersion(@PathVariable String id, @PathVariable String versionId) {
         User currentUser = accountService.requireCurrentUser("rescanning project versions");
         projectAdminOperationsService.rescanVersion(currentUser, id, versionId);

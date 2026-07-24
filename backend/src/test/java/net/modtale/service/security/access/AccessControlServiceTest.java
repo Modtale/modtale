@@ -7,6 +7,7 @@ import java.util.Set;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.user.ApiKey;
+import net.modtale.model.user.AdminPermission;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
@@ -59,15 +60,18 @@ class AccessControlServiceTest {
     }
 
     @Test
-    void isAdminAndSuperAdminRecognizeLegacyIdsAndRoles() {
-        User legacySuperAdmin = user("692620f7c2f3266e23ac0ded", "legacy", List.of("USER"));
-        User admin = user("u-admin", "admin", List.of("ADMIN"));
+    void isAdminRequiresExplicitAdminPermissions() {
+        User adminRoleOnly = user("u-admin", "admin", List.of("ADMIN"));
+        User superAdminRoleOnly = user("u-super-role", "super-role", List.of("SUPER_ADMIN"));
+        User projectAdmin = userWithAdminPermissions("u-project-admin", "project-admin", AdminPermission.PROJECT_MODERATE);
+        User fullAdmin = userWithAdminPermissions("u-full-admin", "full-admin", AdminPermission.allPermissions().toArray(AdminPermission[]::new));
         User plain = user("u-user", "user", List.of("USER"));
 
-        assertTrue(accessControlService.isSuperAdmin(legacySuperAdmin));
-        assertTrue(accessControlService.isAdmin(legacySuperAdmin));
-        assertTrue(accessControlService.isAdmin(admin));
-        assertFalse(accessControlService.isSuperAdmin(admin));
+        assertTrue(accessControlService.isAdmin(fullAdmin));
+        assertTrue(accessControlService.isAdmin(projectAdmin));
+        assertTrue(accessControlService.hasAdminPermission(projectAdmin, AdminPermission.PROJECT_MODERATE));
+        assertFalse(accessControlService.isAdmin(adminRoleOnly));
+        assertFalse(accessControlService.isAdmin(superAdminRoleOnly));
         assertFalse(accessControlService.isAdmin(plain));
     }
 
@@ -111,7 +115,7 @@ class AccessControlServiceTest {
         when(userRepository.findById("org-1")).thenReturn(Optional.of(org));
         assertTrue(accessControlService.hasCreateProjectPerm("org-1", null));
 
-        User admin = user("u-admin", "admin", List.of("ADMIN"));
+        User admin = userWithAdminPermissions("u-admin", "admin", AdminPermission.PROJECT_MODERATE);
         when(accountService.getCurrentUser((Authentication) isNull())).thenReturn(admin);
         assertTrue(accessControlService.hasCreateProjectPerm("someone-else", null));
     }
@@ -325,6 +329,12 @@ class AccessControlServiceTest {
         user.setId(id);
         user.setUsername(username);
         user.setRoles(roles);
+        return user;
+    }
+
+    private static User userWithAdminPermissions(String id, String username, AdminPermission... permissions) {
+        User user = user(id, username, List.of("USER"));
+        user.setAdminPermissions(Set.of(permissions));
         return user;
     }
 

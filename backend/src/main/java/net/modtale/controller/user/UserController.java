@@ -21,6 +21,7 @@ import net.modtale.repository.user.UserRepository;
 import net.modtale.service.media.MediaUploadService;
 import net.modtale.service.project.query.SearchService;
 import net.modtale.service.security.access.AccessControlService;
+import net.modtale.service.security.access.AdminAuthorityUtils;
 import net.modtale.service.security.validation.FileValidationService;
 import net.modtale.service.social.SocialService;
 import net.modtale.service.user.account.AccountService;
@@ -31,7 +32,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -135,7 +135,7 @@ public class UserController {
             Authentication newAuth = new UsernamePasswordAuthenticationToken(
                     updated,
                     null,
-                    updated.getRoles().stream().map(role -> new SimpleGrantedAuthority("ROLE_" + role)).collect(Collectors.toList())
+                    AdminAuthorityUtils.authoritiesFor(updated)
             );
             SecurityContextHolder.getContext().setAuthentication(newAuth);
             HttpSession session = request.getSession(false);
