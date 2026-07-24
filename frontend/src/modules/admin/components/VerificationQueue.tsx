@@ -83,7 +83,7 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
                 <div className="flex-1 min-w-0 py-1 flex flex-col justify-center">
                     <div className="flex items-start justify-between mb-3">
                         <div>
-                            <h3 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3 truncate tracking-tight">
+                            <h3 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3 truncate tracking-normal">
                                 {mod.title}
                                 <span className="text-[10px] uppercase font-bold px-2.5 py-1 bg-modtale-accent/10 text-modtale-accent rounded-lg tracking-wider">{mod.classification}</span>
                             </h3>

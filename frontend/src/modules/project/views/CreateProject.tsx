@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Building2, User as UserIcon, ChevronDown, Check } from 'lucide-react';
 
 import { api, extractApiErrorMessage } from '@/utils/api';
@@ -10,6 +10,7 @@ import { SiteRoutes } from '@/utils/routes';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { SignInModal } from '@/modules/auth/components/SignInModal';
+import { worldListClient } from '@/modules/worldlist/api/worldListClient';
 
 interface CreateProjectProps {
     onNavigate: (page: string) => void;
@@ -19,6 +20,10 @@ interface CreateProjectProps {
 
 export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const params = new URLSearchParams(location.search);
+    const seedListId = params.get('fromList') || '';
+    const requestedType = params.get('type') || '';
 
     const [step, setStep] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
@@ -33,6 +38,35 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
     const [myOrgs, setMyOrgs] = useState<User[]>([]);
     const [ownerDropdownOpen, setOwnerDropdownOpen] = useState(false);
     const ownerDropdownRef = useRef<HTMLDivElement>(null);
+    const hydratedSeedListRef = useRef('');
+
+    useEffect(() => {
+        if (!seedListId && requestedType !== 'MODPACK') {
+            return;
+        }
+        setClassification('MODPACK');
+        setStep(1);
+
+        if (!seedListId || hydratedSeedListRef.current === seedListId) {
+            return;
+        }
+
+        hydratedSeedListRef.current = seedListId;
+        worldListClient.get(seedListId)
+            .then(list => {
+                const baseName = list.worldName || list.title || 'Shared List';
+                setTitle(current => current.trim() ? current : `${baseName} Modpack`);
+                setSummary(current => current.trim()
+                    ? current
+                    : `A modpack started from ${baseName}'s shared mod list.`);
+            })
+            .catch(() => {
+                setTitle(current => current.trim() ? current : 'Shared List Modpack');
+                setSummary(current => current.trim()
+                    ? current
+                    : 'A modpack started from a shared Modtale list.');
+            });
+    }, [requestedType, seedListId]);
 
     useEffect(() => {
         if (!currentUser) {
@@ -150,7 +184,8 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
 
             const res = await api.post('/projects', formData, uploadConfig);
 
-            navigate(SiteRoutes.projectEdit(res.data));
+            const seedQuery = seedListId ? `?seedList=${encodeURIComponent(seedListId)}` : '';
+            navigate(`${SiteRoutes.projectEdit(res.data)}${seedQuery}`);
 
         } catch (e: unknown) {
             setStatusModal({
@@ -213,7 +248,7 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
 
                         <div className="text-center pb-8 md:pb-16">
                             <div className="mb-12">
-                                <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tight mb-4 leading-none">What are you creating?</h1>
+                                <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-normal mb-4 leading-none">What are you creating?</h1>
                                 <p className="text-lg md:text-xl text-slate-500 dark:text-slate-400 font-medium">Select a project type to get started.</p>
                             </div>
 
@@ -259,7 +294,7 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
                     <div className="flex flex-col items-center">
                         <div className="w-full max-w-2xl flex flex-col">
                             <div className="text-center mb-10">
-                                <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-none">Let's give it a name.</h1>
+                                <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-none">Let's give it a name.</h1>
                                 <p className="text-slate-500 dark:text-slate-400 font-bold mt-10 uppercase tracking-widest text-xs">You can always change this later.</p>
                             </div>
 
@@ -318,7 +353,7 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
                                 <div>
                                     <div className="flex justify-between items-end mb-2 ml-1 pr-1">
                                         <label className="block text-[10px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest">Short Summary</label>
-                                        <p className="text-[10px] text-slate-500 dark:text-slate-300 font-bold uppercase tracking-tighter">{summary.length}/250</p>
+                                        <p className="text-[10px] text-slate-500 dark:text-slate-300 font-bold uppercase tracking-normal">{summary.length}/250</p>
                                     </div>
                                     <input value={summary} onChange={e => setSummary(e.target.value)} className="w-full bg-white/90 dark:bg-black/60 border border-slate-300/50 dark:border-white/20 rounded-2xl px-6 py-4 dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner backdrop-blur-md font-medium text-sm placeholder:text-slate-400 dark:placeholder:text-slate-500" placeholder="A brief description of what this does..."/>
                                 </div>

@@ -1,9 +1,25 @@
+type ProjectRouteParts = {
+    prefix: string;
+    routeKey: string;
+    subroute: string;
+    segmentCount: number;
+};
+
 export class SiteRoutes {
+    private static readonly PROJECT_ROUTE_PREFIXES = new Set(['project', 'mod', 'modpack', 'world']);
+    private static readonly PROJECT_MODAL_SUBROUTES = new Set(['download', 'changelog', 'gallery']);
+
     static home() { return '/'; }
     static upload() { return '/upload'; }
     static admin() { return '/admin'; }
+    static launcher() { return '/launcher'; }
     static apiDocs() { return '/api-docs'; }
     static swaggerDocs() { return '/api-docs/swagger'; }
+    static list(id: string) { return `/lists/${id}`; }
+    static createModpackFromList(id: string) {
+        const params = new URLSearchParams({ type: 'MODPACK', fromList: id });
+        return `/upload?${params.toString()}`;
+    }
     static login(redirectTo?: string) {
         const params = new URLSearchParams();
         if (redirectTo) params.set('redirect', redirectTo);
@@ -130,5 +146,48 @@ export class SiteRoutes {
         }
         const match = param.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
         return match ? match[0] : param;
+    }
+
+    private static projectRouteParts(pathname: string | undefined): ProjectRouteParts | null {
+        if (!pathname) return null;
+
+        const pathOnly = pathname.split(/[?#]/)[0];
+        const normalizedPath = (pathOnly || '/').replace(/\/+$/, '') || '/';
+        const segments = normalizedPath.split('/').filter(Boolean);
+        if (segments.length < 2) return null;
+
+        const prefix = segments[0].toLowerCase();
+        if (!this.PROJECT_ROUTE_PREFIXES.has(prefix)) return null;
+
+        return {
+            prefix,
+            routeKey: segments[1],
+            subroute: segments[2]?.toLowerCase() || '',
+            segmentCount: segments.length
+        };
+    }
+
+    static projectRouteKeyFromPath(pathname: string | undefined) {
+        return this.projectRouteParts(pathname)?.routeKey || '';
+    }
+
+    static projectBasePathFromPath(pathname: string | undefined) {
+        const parts = this.projectRouteParts(pathname);
+        if (!parts) return '';
+        return `/${parts.prefix}/${parts.routeKey}`;
+    }
+
+    static isProjectModalRoute(pathname: string | undefined) {
+        const parts = this.projectRouteParts(pathname);
+        if (!parts) return false;
+        return parts.segmentCount === 3 && this.PROJECT_MODAL_SUBROUTES.has(parts.subroute);
+    }
+
+    static isSameProjectModalContext(previousPathname: string | undefined, nextPathname: string | undefined) {
+        const previousBasePath = this.projectBasePathFromPath(previousPathname);
+        const nextBasePath = this.projectBasePathFromPath(nextPathname);
+
+        if (!previousBasePath || previousBasePath !== nextBasePath) return false;
+        return this.isProjectModalRoute(previousPathname) || this.isProjectModalRoute(nextPathname);
     }
 }

@@ -111,6 +111,58 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
             },
         ],
     },
+    '/launcher': {
+        title: 'Modtale Launcher | Native Hytale Mod Manager',
+        h1: 'Modtale Launcher',
+        description: 'Download the Modtale Launcher for Windows, macOS, and Linux. Install, update, and manage Hytale projects with a native launcher built for Modtale releases.',
+        keywords: 'modtale launcher, hytale launcher, hytale mod manager, hytale mods launcher, download hytale mods, modtale download',
+        intro: 'The Modtale Launcher is a native desktop app for browsing Modtale projects, installing compatible Hytale releases, resolving dependencies, and keeping your local library ready to play.',
+        contentBlocks: [
+            {
+                title: 'Desktop Launcher Packages',
+                body: 'Download a self-contained Modtale Launcher package for your desktop platform and manage Hytale mods, plugins, worlds, assets, and modpacks from one app.',
+            },
+            {
+                title: 'Install Compatible Project Releases',
+                body: 'The launcher works with Modtale project metadata to help players choose compatible builds, review dependencies, and install projects into the right local Hytale folder.',
+            },
+            {
+                title: 'Built Alongside the Modtale Platform',
+                body: 'Launcher releases are published from the same open-source Modtale project, with package formats for Windows, macOS, and Linux.',
+            },
+        ],
+        relatedLinks: [
+            {
+                href: '/mods',
+                label: 'Browse Hytale Projects',
+                description: 'Explore projects before opening them in the launcher.',
+            },
+            {
+                href: '/modpacks',
+                label: 'Hytale Modpacks',
+                description: 'Find curated collections that benefit from dependency-aware installs.',
+            },
+            {
+                href: '/upload',
+                label: 'Publish a Project',
+                description: 'Share your Hytale work with players on Modtale.',
+            },
+        ],
+        faq: [
+            {
+                question: 'Does the Modtale Launcher need Java installed?',
+                answer: 'No. The native launcher packages embed their own runtime, so players do not need to install a separate JDK or JRE.',
+            },
+            {
+                question: 'Which desktop platforms does the Modtale Launcher support?',
+                answer: 'Modtale publishes launcher packages for Windows, macOS, and Linux. The launcher page detects your platform and links to the best available release asset when GitHub release metadata is available.',
+            },
+            {
+                question: 'What does the launcher manage?',
+                answer: 'The launcher can browse Modtale projects, install compatible project releases, help with dependencies, check installed projects for updates, and connect to Hytale launch flows.',
+            },
+        ],
+    },
     '/status': {
         title: 'System Status | Modtale',
         h1: 'Modtale System Status',

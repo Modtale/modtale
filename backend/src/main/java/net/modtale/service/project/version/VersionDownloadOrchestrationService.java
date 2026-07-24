@@ -5,6 +5,7 @@ import java.util.List;
 import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.exception.InvalidDownloadTokenException;
 import net.modtale.exception.ResourceNotFoundException;
+import net.modtale.exception.UnauthorizedException;
 import net.modtale.exception.VersionNotFoundException;
 import net.modtale.model.dto.response.project.BundleDownloadUrlResponse;
 import net.modtale.model.dto.response.project.DownloadUrlResponse;
@@ -63,7 +64,7 @@ public class VersionDownloadOrchestrationService {
                 "We couldn't find that project, so no download link could be generated.");
         getVersionOrThrow(project, versionNumber, gameVersion,
                 "We couldn't find the requested version for that project.");
-        String token = downloadTokenService.generateToken(projectId, versionNumber, gameVersion);
+        String token = downloadTokenService.generateToken(projectId, versionNumber, gameVersion, null, currentUserId(currentUser));
         return new DownloadUrlResponse("/download/" + token, downloadTokenService.getTokenValiditySeconds());
     }
 
@@ -78,7 +79,7 @@ public class VersionDownloadOrchestrationService {
                 "We couldn't find that project, so no bundle download link could be generated.");
         getVersionOrThrow(project, versionNumber, gameVersion,
                 "We couldn't find the requested version for that bundle download.");
-        String token = downloadTokenService.generateToken(projectId, versionNumber, gameVersion, dependencies);
+        String token = downloadTokenService.generateToken(projectId, versionNumber, gameVersion, dependencies, currentUserId(currentUser));
         return new BundleDownloadUrlResponse("/download-bundle/" + token, downloadTokenService.getTokenValiditySeconds());
     }
 
@@ -90,12 +91,12 @@ public class VersionDownloadOrchestrationService {
             String forwardedFor,
             User currentUser
     ) throws IOException {
-        DownloadContext context = resolveDownloadContext(apiRole, referer, remoteAddress, forwardedFor, currentUser);
         DownloadTokenService.DownloadToken downloadToken = validateToken(token,
                 "This download link is invalid, expired, or has already been used.");
+        DownloadContext context = resolveDownloadContext(downloadToken, apiRole, referer, remoteAddress, forwardedFor, currentUser);
         Project project = getRawProjectOrThrow(downloadToken.getProjectId(),
                 "We couldn't find the project for this download link.");
-        ensureReadable(project, currentUser);
+        ensureReadable(project, context.currentUser());
         ProjectVersion targetVersion = getVersionOrThrow(project, downloadToken.getVersion(), downloadToken.getGameVersion(),
                 "We couldn't find the version requested by this download link.");
 
@@ -121,12 +122,12 @@ public class VersionDownloadOrchestrationService {
             String forwardedFor,
             User currentUser
     ) throws IOException {
-        DownloadContext context = resolveDownloadContext(apiRole, referer, remoteAddress, forwardedFor, currentUser);
         DownloadTokenService.DownloadToken downloadToken = validateToken(token,
                 "This bundle download link is invalid, expired, or has already been used.");
+        DownloadContext context = resolveDownloadContext(downloadToken, apiRole, referer, remoteAddress, forwardedFor, currentUser);
         Project project = getRawProjectOrThrow(downloadToken.getProjectId(),
                 "We couldn't find the project for this bundle download link.");
-        ensureReadable(project, currentUser);
+        ensureReadable(project, context.currentUser());
         ProjectVersion targetVersion = getVersionOrThrow(project, downloadToken.getVersion(), downloadToken.getGameVersion(),
                 "We couldn't find the version requested by this bundle download link.");
 
@@ -152,15 +153,17 @@ public class VersionDownloadOrchestrationService {
     }
 
     private DownloadContext resolveDownloadContext(
+            DownloadTokenService.DownloadToken downloadToken,
             boolean apiRole,
             String referer,
             String remoteAddress,
             String forwardedFor,
             User currentUser
     ) {
+        User effectiveUser = requireTokenUser(downloadToken, currentUser);
         boolean apiRequest = apiRole || referer == null || !referer.startsWith(frontendUrl);
         String clientIp = forwardedFor == null ? remoteAddress : forwardedFor.split(",")[0].trim();
-        return new DownloadContext(apiRequest, clientIp, currentUser);
+        return new DownloadContext(apiRequest, clientIp, effectiveUser);
     }
 
     private DownloadTokenService.DownloadToken validateToken(String token, String failureMessage) {
@@ -169,6 +172,22 @@ public class VersionDownloadOrchestrationService {
             throw new InvalidDownloadTokenException(failureMessage);
         }
         return downloadToken;
+    }
+
+    private User requireTokenUser(DownloadTokenService.DownloadToken downloadToken, User currentUser) {
+        String tokenUserId = downloadToken.getUserId();
+        if (tokenUserId == null || tokenUserId.isBlank()) {
+            return currentUser;
+        }
+
+        if (currentUser == null || currentUser.getId() == null || !tokenUserId.equals(currentUser.getId())) {
+            throw new UnauthorizedException("Sign in with the account that created this download link before using it.");
+        }
+        return currentUser;
+    }
+
+    private String currentUserId(User currentUser) {
+        return currentUser == null ? null : currentUser.getId();
     }
 
     private Project getProjectOrThrow(String projectId, User currentUser, String failureMessage) {
