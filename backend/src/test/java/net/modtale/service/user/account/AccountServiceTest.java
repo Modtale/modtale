@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.argThat;
@@ -155,6 +156,14 @@ class AccountServiceTest {
         assertEquals("2.0", saved.getInstalledProjects().getFirst().getInstalledVersion());
         assertNotNull(saved.getUpdatedAt());
         verify(userRepository).save(argThat(savedUser -> savedUser.getLauncherSettings() == saved));
+    }
+
+    @Test
+    void hytaleConnectionsCannotBeMadePublic() {
+        assertThrows(
+                net.modtale.exception.InvalidAccountRequestException.class,
+                () -> accountService.toggleConnectionVisibility("user-1", "hytale")
+        );
     }
 
     private static User user(String id, String username) {

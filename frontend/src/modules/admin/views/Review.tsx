@@ -14,6 +14,8 @@ interface ReviewProps {
     onApprove: () => void;
     onReject: (reason: string) => void;
     setStatus: (s: any) => void;
+    canDecide?: boolean;
+    canRescan?: boolean;
 }
 
 interface WizardStep {
@@ -56,7 +58,7 @@ const WIZARD_STEPS: WizardStep[] = [
     }
 ];
 
-export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApprove, onReject, setStatus }) => {
+export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApprove, onReject, setStatus, canDecide = false, canRescan = false }) => {
     const [currentStep, setCurrentStep] = useState(0);
     const [checklist, setChecklist] = useState<Record<string, boolean>>({});
     const [rejectReason, setRejectReason] = useState('');
@@ -166,6 +168,10 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     };
 
     const handleVersionApprove = async () => {
+        if (!canDecide) {
+            setStatus({ type: 'error', title: 'Permission Required', msg: 'You do not have permission to approve projects or versions.' });
+            return;
+        }
         try {
             if (isNewProject) {
                 await adminClient.publishProject(mod.id);
@@ -183,6 +189,10 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     };
 
     const handleVersionReject = async (reason: string) => {
+        if (!canDecide) {
+            setStatus({ type: 'error', title: 'Permission Required', msg: 'You do not have permission to reject projects or versions.' });
+            return;
+        }
         try {
             if (isNewProject) {
                 await adminClient.rejectProject(mod.id, reason);
@@ -201,6 +211,10 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
 
     const handleRescan = async () => {
         if (!pendingVersion) return;
+        if (!canRescan) {
+            setStatus({ type: 'error', title: 'Permission Required', msg: 'You do not have permission to rescan versions.' });
+            return;
+        }
         setRescanning(true);
         try {
             await adminClient.scanVersion(mod.id, pendingVersion.id);
@@ -568,14 +582,16 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                 </div>
                                             </div>
                                             <div className="flex gap-2">
-                                                <button
-                                                    onClick={handleRescan}
-                                                    disabled={rescanning}
-                                                    className="p-2 hover:bg-white/20 rounded-lg transition-colors text-red-600 dark:text-red-400"
-                                                    title="Rescan"
-                                                >
-                                                    <RefreshCw className={`w-5 h-5 ${rescanning ? 'animate-spin' : ''}`} />
-                                                </button>
+                                                {canRescan && (
+                                                    <button
+                                                        onClick={handleRescan}
+                                                        disabled={rescanning}
+                                                        className="p-2 hover:bg-white/20 rounded-lg transition-colors text-red-600 dark:text-red-400"
+                                                        title="Rescan"
+                                                    >
+                                                        <RefreshCw className={`w-5 h-5 ${rescanning ? 'animate-spin' : ''}`} />
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => setShowScanDetails(!showScanDetails)}
                                                     className="p-2 hover:bg-white/20 rounded-lg transition-colors text-red-600 dark:text-red-400"
@@ -663,14 +679,16 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                 </p>
                                             </div>
                                         </div>
-                                        <button
-                                            onClick={handleRescan}
-                                            disabled={rescanning}
-                                            className="p-2 hover:bg-emerald-500/10 rounded-lg transition-colors text-emerald-600 dark:text-emerald-400"
-                                            title="Force Rescan"
-                                        >
-                                            <RefreshCw className={`w-5 h-5 ${rescanning ? 'animate-spin' : ''}`} />
-                                        </button>
+                                        {canRescan && (
+                                            <button
+                                                onClick={handleRescan}
+                                                disabled={rescanning}
+                                                className="p-2 hover:bg-emerald-500/10 rounded-lg transition-colors text-emerald-600 dark:text-emerald-400"
+                                                title="Force Rescan"
+                                            >
+                                                <RefreshCw className={`w-5 h-5 ${rescanning ? 'animate-spin' : ''}`} />
+                                            </button>
+                                        )}
                                     </div>
                                 )}
 
@@ -868,7 +886,8 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                 <div className="flex flex-col gap-4">
                                     <button
                                         onClick={handleVersionApprove}
-                                        className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-emerald-500/20 transition-all transform hover:scale-[1.02] active:scale-95"
+                                        disabled={!canDecide}
+                                        className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-emerald-500/20 transition-all transform hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                                     >
                                         Approve & Publish
                                     </button>
@@ -889,7 +908,8 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                         <div className="flex gap-4">
                             <button
                                 onClick={() => setShowRejectPanel(true)}
-                                className="px-6 py-3 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl font-bold transition-colors"
+                                disabled={!canDecide}
+                                className="px-6 py-3 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-500/10 disabled:hover:text-red-500"
                             >
                                 Reject...
                             </button>

@@ -39,6 +39,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.client.web.OAuth2LoginAuthenticationFilter;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
@@ -210,7 +211,10 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            HttpSecurity http,
+            OAuth2AuthorizationRequestResolver authorizationRequestResolver
+    ) throws Exception {
         CookieCsrfTokenRepository tokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
         tokenRepository.setCookiePath("/");
 
@@ -270,6 +274,9 @@ public class SecurityConfig {
                         .permitAll()
                 )
                 .oauth2Login(oauth2 -> oauth2
+                        .authorizationEndpoint(authorization -> authorization
+                                .authorizationRequestResolver(authorizationRequestResolver)
+                        )
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(oauth2LoginService)
                                 .oidcUserService(oidcLoginService)
@@ -323,9 +330,7 @@ public class SecurityConfig {
                                     .anyMatch(a -> a.getAuthority().equals("ROLE_API"));
                             if (isApiKeyUser) return new AuthorizationDecision(false);
 
-                            boolean isSuperAdmin = authentication.get().getAuthorities().stream()
-                                    .anyMatch(a -> a.getAuthority().equals("ROLE_SUPER_ADMIN"));
-                            return new AuthorizationDecision(authentication.get().isAuthenticated() && isSuperAdmin);
+                            return new AuthorizationDecision(authentication.get().isAuthenticated());
                         })
                         .requestMatchers("/api/v1/analytics/view/**", "/api/v1/views/project/**").access((authentication, context) -> {
                             boolean isApiKeyUser = authentication.get().getAuthorities().stream()
@@ -490,6 +495,11 @@ public class SecurityConfig {
             }
 
             User user = accountService.getPublicProfile(login);
+            if (user != null && user.isMfaEnabled() && (user.getMfaSecret() == null || user.getMfaSecret().isBlank())) {
+                logger.warn("OAuth User {} has MFA enabled but missing secret. Auto-disabling MFA to prevent lockout.", user.getId());
+                user.setMfaEnabled(false);
+                user = accountService.saveUser(user);
+            }
             boolean isLinking = Boolean.TRUE.equals(oauthUser.getAttribute("is_linking"));
             LauncherOAuthRequest launcherOAuthRequest = consumeLauncherOAuthRequest(request);
             if (launcherOAuthRequest != null && !isLinking) {

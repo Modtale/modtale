@@ -158,4 +158,16 @@ class AuthControllerTest {
         org.springframework.security.core.context.SecurityContextHolder.clearContext();
     }
 
+    @Test
+    void removePasswordDelegatesForTheCurrentUser() {
+        User user = new User();
+        user.setId("user-1");
+
+        when(accountService.requireCurrentUser("removing your password")).thenReturn(user);
+
+        var result = controller.removePassword();
+
+        assertEquals(200, result.getStatusCode().value());
+        verify(authenticationMutationService).removePassword("user-1");
+    }
 }

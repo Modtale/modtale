@@ -31,6 +31,7 @@ import net.modtale.service.auth.AuthenticationMutationService;
 import net.modtale.service.auth.AuthenticationService;
 import net.modtale.service.auth.LauncherAuthService;
 import net.modtale.service.auth.TwoFactorService;
+import net.modtale.service.security.access.AdminAuthorityUtils;
 import net.modtale.service.user.account.AccountService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
@@ -38,7 +39,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.SecurityContextRepository;
@@ -139,6 +139,14 @@ public class AuthController {
     public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequest requestPayload) {
         User user = accountService.requireCurrentUser("changing your password");
         authenticationMutationService.changePassword(user.getId(), requestPayload.getCurrentPassword(), requestPayload.getNewPassword());
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/password")
+    @PreAuthorize("!@apiSecurity.isApiKey(authentication) && @apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
+    public ResponseEntity<Void> removePassword() {
+        User user = accountService.requireCurrentUser("removing your password");
+        authenticationMutationService.removePassword(user.getId());
         return ResponseEntity.ok().build();
     }
 
@@ -281,7 +289,7 @@ public class AuthController {
         Authentication authentication = new UsernamePasswordAuthenticationToken(
                 user,
                 null,
-                user.getRoles().stream().map(role -> new SimpleGrantedAuthority("ROLE_" + role)).collect(Collectors.toList())
+                AdminAuthorityUtils.authoritiesFor(user)
         );
         context.setAuthentication(authentication);
         SecurityContextHolder.setContext(context);
