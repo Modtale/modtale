@@ -9,7 +9,7 @@ import type { Project, User } from '@/types';
 import { theme } from '@/styles/theme';
 import { SiteRoutes } from '@/utils/routes';
 import { generateProjectMeta } from '@/utils/meta';
-import { generateProjectSchemas, getProjectOgImageUrl } from '@/utils/schema';
+import { generateProjectSchemas } from '@/utils/schema';
 import { DiscordIcon } from '@/utils/modHelpers';
 
 import { useSSRData } from '@/context/SSRContext';
@@ -542,7 +542,6 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const meta = generateProjectMeta(project);
     const projectCanonicalUrl = `https://modtale.net${projectUrl}`;
-    const projectImageUrl = getProjectOgImageUrl(project.id);
     const projectSchemas = generateProjectSchemas(project);
 
     const links = [
@@ -581,14 +580,10 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 <meta property="og:url" content={projectCanonicalUrl} />
                 <meta property="og:title" content={meta?.title} />
                 <meta property="og:description" content={meta?.description} />
-                <meta property="og:image" content={projectImageUrl} />
-                <meta property="og:image:alt" content={project.title} />
 
                 <meta name="twitter:card" content="summary_large_image" />
                 <meta name="twitter:title" content={meta?.title} />
                 <meta name="twitter:description" content={meta?.description} />
-                <meta name="twitter:image" content={projectImageUrl} />
-                <meta name="twitter:image:alt" content={project.title} />
 
                 {projectSchemas.length > 0 && (
                     <script type="application/ld+json">{JSON.stringify(projectSchemas)}</script>
