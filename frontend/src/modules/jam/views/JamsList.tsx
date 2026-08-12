@@ -6,6 +6,7 @@ import { Trophy, Plus, ArrowLeft, Calendar, Users, AlertCircle } from 'lucide-re
 import { Link, useNavigate } from 'react-router-dom';
 import { JamBuilder } from '@/modules/jam/components/JamBuilder';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
+import { useSSRData } from '@/context/SSRContext';
 
 const resolveUrl = (url?: string | null) => {
     if (!url) return '';
@@ -97,8 +98,10 @@ export const JamCard: React.FC<{ jam: Modjam }> = ({ jam }) => {
 
 export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }) => {
     const navigate = useNavigate();
-    const [jams, setJams] = useState<Modjam[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { initialData: ssrData } = useSSRData();
+    const hasSsrJams = ssrData?.jamsDataReady === true && Array.isArray(ssrData?.jamsData);
+    const [jams, setJams] = useState<Modjam[]>(() => hasSsrJams ? ssrData.jamsData : []);
+    const [loading, setLoading] = useState(!hasSsrJams);
     const [isCreating, setIsCreating] = useState(false);
     const [step, setStep] = useState(0);
     const [isSavingJam, setIsSavingJam] = useState(false);
@@ -125,11 +128,13 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
     const [activeTab, setActiveTab] = useState<'details' | 'categories' | 'settings'>('details');
 
     useEffect(() => {
+        if (hasSsrJams) return;
+
         api.get('/modjams').then(res => {
             setJams(res.data);
             setLoading(false);
         }).catch(() => setLoading(false));
-    }, []);
+    }, [hasSsrJams]);
 
     const validateSlugFormat = (val: string) => {
         if (!val) return "Slug is required.";

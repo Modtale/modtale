@@ -17,9 +17,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
@@ -156,6 +158,12 @@ public class ModjamService {
         return jam;
     }
 
+    private void requireHost(Modjam jam, String userId) {
+        if (!Objects.equals(jam.getHostId(), userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the host can manage this jam");
+        }
+    }
+
     private void enrichSubmissions(String jamId, List<ModjamSubmission> subs, Map<String, Project> projectMap) {
         if (subs == null || subs.isEmpty()) return;
 
@@ -272,9 +280,10 @@ public class ModjamService {
         return enrichAndReturn(modjamRepository.save(jam));
     }
 
-    public Modjam updateJam(String id, Modjam updatedJam) {
+    public Modjam updateJam(String id, Modjam updatedJam, String userId) {
         Modjam jam = modjamRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Jam not found"));
+        requireHost(jam, userId);
 
         if (updatedJam.getSlug() == null || updatedJam.getSlug().trim().isEmpty()) {
             throw new IllegalArgumentException("A custom URL slug is required.");
@@ -433,9 +442,12 @@ public class ModjamService {
         return enrichAndReturn(modjamRepository.save(jam));
     }
 
-    public void updateIcon(String jamId, MultipartFile file) {
+    public void updateIcon(String jamId, MultipartFile file, String userId) {
+        Modjam jam = modjamRepository.findById(jamId)
+                .orElseThrow(() -> new IllegalArgumentException("Jam not found"));
+        requireHost(jam, userId);
+
         try {
-            Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new IllegalArgumentException("Jam not found"));
             String pathPrefix = "modjams/" + jamId + "/icon";
             String storageKey = storageService.upload(file, pathPrefix);
             String publicUrl = storageService.getPublicUrl(storageKey);
@@ -447,9 +459,12 @@ public class ModjamService {
         }
     }
 
-    public void updateBanner(String jamId, MultipartFile file) {
+    public void updateBanner(String jamId, MultipartFile file, String userId) {
+        Modjam jam = modjamRepository.findById(jamId)
+                .orElseThrow(() -> new IllegalArgumentException("Jam not found"));
+        requireHost(jam, userId);
+
         try {
-            Modjam jam = modjamRepository.findById(jamId).orElseThrow(() -> new IllegalArgumentException("Jam not found"));
             String pathPrefix = "modjams/" + jamId + "/banner";
             String storageKey = storageService.upload(file, pathPrefix);
             String publicUrl = storageService.getPublicUrl(storageKey);
