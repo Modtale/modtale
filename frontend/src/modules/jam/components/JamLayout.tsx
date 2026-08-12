@@ -42,7 +42,6 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
     const [tempImage, setTempImage] = useState<string | null>(null);
     const [cropType, setCropType] = useState<'icon' | 'banner'>('icon');
     const bannerParallaxRef = useRef<HTMLDivElement>(null);
-    const bannerFadeRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         let rafId: number | null = null;
@@ -51,9 +50,6 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
             const parallaxOffset = 500 * (1 - Math.exp(-scrollY / 600));
             if (bannerParallaxRef.current) {
                 bannerParallaxRef.current.style.transform = `translateY(${parallaxOffset}px)`;
-            }
-            if (bannerFadeRef.current) {
-                bannerFadeRef.current.style.height = `calc(var(--fade-base) + ${parallaxOffset}px)`;
             }
         };
 
@@ -145,12 +141,6 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                     )}
                 </div>
 
-                <div
-                    ref={bannerFadeRef}
-                    className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-50 dark:from-[#0B1120] to-transparent z-10 pointer-events-none will-change-[height] [--fade-base:0.5rem] md:[--fade-base:8rem]"
-                    style={{ height: 'var(--fade-base)' }}
-                />
-
                 {isEditing && (
                     <label className={`cursor-pointer transition-all duration-300 pointer-events-auto ${
                         finalBanner
@@ -173,6 +163,8 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                     </label>
                 )}
             </div>
+
+            <div className="absolute top-0 left-0 right-0 z-10 w-full aspect-[3/1] pointer-events-none bg-gradient-to-t from-slate-50 via-slate-50/35 to-transparent dark:from-[#0B1120] dark:via-[#0B1120]/35" />
 
             <div className="w-full aspect-[3/1] pointer-events-none relative z-0" />
 
@@ -268,7 +260,7 @@ export const JamLayout: React.FC<JamLayoutProps> = ({
                         </div>
                     </div>
 
-                    <div className="px-6 pb-6 pt-1 md:px-12 md:pb-12 md:pt-4 overflow-visible">
+                    <div className="px-4 pb-8 pt-4 sm:px-6 md:px-12 md:pb-12 md:pt-6 overflow-visible">
                         {mainContent}
                     </div>
                 </div>

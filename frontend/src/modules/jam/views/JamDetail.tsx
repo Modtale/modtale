@@ -1,11 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
-import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
-import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
-import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import { api, BACKEND_URL } from '@/utils/api';
 import type { Modjam, ModjamSubmission, User, Project } from '@/types';
 import { Spinner } from '@/components/ui/Spinner';
@@ -15,6 +9,7 @@ import { JamLayout } from '@/modules/jam/components/JamLayout';
 import { JamBuilder } from '@/modules/jam/components/JamBuilder';
 import { JamSubmissionWizard } from '@/modules/jam/components/JamSubmissionWizard';
 import NotFound from '@/components/ui/error/NotFound';
+import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 
 const MiniTimeline: React.FC<{ jam: Modjam, now: number }> = ({ jam, now }) => {
     if (now === 0) return null;
@@ -507,64 +502,17 @@ export const JamDetail: React.FC<{ currentUser: User | null }> = ({ currentUser 
         }
     };
 
-    const MarkdownComponents = {
-        code({node, inline, className, children, ...props}: any) {
-            const match = /language-(\w+)/.exec(className || '')
-            return !inline && match ? (
-                <SyntaxHighlighter {...props} style={vscDarkPlus} language={match[1]} PreTag="div" className="rounded-lg text-sm">
-                    {String(children).replace(/\n$/, '')}
-                </SyntaxHighlighter>
-            ) : (
-                <code className={`${className || ''} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm`} {...props}>
-                    {children}
-                </code>
-            )
-        },
-        p({node, children, ...props}: any) { return <p className="my-2 [li>&]:my-0" {...props}>{children}</p> },
-        li({node, children, ...props}: any) { return <li className="my-1 [&>p]:my-0" {...props}>{children}</li> },
-        ul({node, children, ...props}: any) { return <ul className="list-disc pl-6 my-3" {...props}>{children}</ul> },
-        ol({node, children, ...props}: any) { return <ol className="list-decimal pl-6 my-3" {...props}>{children}</ol> }
-    };
-
     const memoizedDescription = useMemo(() => {
         if (!jam?.description) return <p className="text-slate-500 italic">No description provided.</p>;
 
-        return (
-            <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeRaw, [rehypeSanitize, {
-                    ...defaultSchema,
-                    attributes: {
-                        ...defaultSchema.attributes,
-                        code: ['className']
-                    }
-                }]]}
-                components={MarkdownComponents}
-            >
-                {jam.description}
-            </ReactMarkdown>
-        );
+        return <MarkdownRenderer content={jam.description} />;
     }, [jam?.description]);
 
     const memoizedRules = useMemo(() => {
         const rulesContent = (jam as any)?.rules;
         if (!rulesContent) return <p className="text-slate-500 italic">No rules have been established for this jam.</p>;
 
-        return (
-            <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeRaw, [rehypeSanitize, {
-                    ...defaultSchema,
-                    attributes: {
-                        ...defaultSchema.attributes,
-                        code: ['className']
-                    }
-                }]]}
-                components={MarkdownComponents}
-            >
-                {rulesContent}
-            </ReactMarkdown>
-        );
+        return <MarkdownRenderer content={rulesContent} />;
     }, [(jam as any)?.rules]);
 
     if (loading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><Spinner fullScreen={false} className="w-8 h-8" /></div>;

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Check, Rocket, ArrowRight, Import, LayoutGrid, Sparkles, AlertCircle } from 'lucide-react';
+import { Check, LayoutGrid, Sparkles, AlertCircle } from 'lucide-react';
 import type { Project, Modjam } from '@/types';
 import { api, BACKEND_URL } from '@/utils/api';
 import { Spinner } from '@/components/ui/Spinner';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
 
 export const JamSubmissionWizard: React.FC<{
     jam: Modjam,
@@ -51,9 +52,9 @@ export const JamSubmissionWizard: React.FC<{
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-300">
             <div className="bg-white dark:bg-modtale-card w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[90vh]">
-                <div className="p-10 text-center flex flex-col h-full overflow-hidden">
-                    <h2 className="text-3xl font-black mb-2 shrink-0 text-slate-900 dark:text-white">Submit to {jam.title}</h2>
-                    <p className="text-slate-500 font-medium mb-8 px-8 shrink-0">Select one of your existing projects to enter into the jam. All your project's details, screenshots, and files will be automatically linked.</p>
+                <div className="p-5 sm:p-10 text-center flex flex-col h-full overflow-hidden">
+                    <h2 className="text-2xl sm:text-3xl font-black mb-2 shrink-0 text-slate-900 dark:text-white">Submit to {jam.title}</h2>
+                    <p className="text-sm sm:text-base text-slate-500 font-medium mb-6 sm:mb-8 sm:px-8 shrink-0">Select one of your existing projects to enter into the jam. All your project's details, screenshots, and files will be automatically linked.</p>
 
                     {hidesSubmissions && (
                         <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-6 flex items-start gap-3 text-left shrink-0">
@@ -72,11 +73,11 @@ export const JamSubmissionWizard: React.FC<{
                                 <button
                                     key={proj.id}
                                     onClick={() => setSelectedProjectId(proj.id)}
-                                    className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all text-left ${selectedProjectId === proj.id ? 'border-modtale-accent bg-modtale-accent/5 ring-4 ring-modtale-accent/10' : 'border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-black/20 hover:border-slate-300 dark:hover:border-white/20'}`}
+                                    className={`flex items-center gap-3 sm:gap-4 p-4 sm:p-5 rounded-2xl border-2 transition-all text-left ${selectedProjectId === proj.id ? 'border-modtale-accent bg-modtale-accent/5 ring-4 ring-modtale-accent/10' : 'border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-black/20 hover:border-slate-300 dark:hover:border-white/20'}`}
                                 >
                                     <div className="w-12 h-12 rounded-xl bg-slate-200 dark:bg-white/10 overflow-hidden shrink-0 border border-slate-200 dark:border-white/5">
                                         {resolvedImage ? (
-                                            <img src={resolvedImage} className="w-full h-full object-cover" alt="" />
+                                            <OptimizedImage src={resolvedImage} className="w-full h-full object-cover" alt={proj.title} baseWidth={96} />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-slate-400">
                                                 <LayoutGrid className="w-6 h-6 opacity-20" />
@@ -112,7 +113,7 @@ export const JamSubmissionWizard: React.FC<{
                             </div>
                         )}
 
-                        <div className="flex items-center gap-4 w-full">
+                        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 w-full">
                             <button onClick={onCancel} className="flex-1 h-14 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">Go Back</button>
                             <button
                                 disabled={!selectedProjectId || (hasRules && !agreedToRules) || submitting}

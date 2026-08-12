@@ -5,6 +5,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { Trophy, Plus, ArrowLeft, Calendar, Users, AlertCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { JamBuilder } from '@/modules/jam/components/JamBuilder';
+import { OptimizedImage } from '@/components/ui/OptimizedImage';
 
 const resolveUrl = (url?: string | null) => {
     if (!url) return '';
@@ -37,9 +38,10 @@ export const JamCard: React.FC<{ jam: Modjam }> = ({ jam }) => {
         <Link to={`/jam/${jam.slug}`} className="group relative flex flex-col h-full bg-white dark:bg-slate-900 rounded-2xl border-2 border-slate-200/80 dark:border-white/10 hover:border-modtale-accent/50 dark:hover:border-modtale-accent/50 transition-all duration-300 hover:-translate-y-1 overflow-hidden shadow-lg hover:shadow-xl transform-gpu isolate">
             <div className="relative w-full aspect-[3/1] bg-slate-100 dark:bg-slate-800 shrink-0 overflow-hidden border-b border-slate-200 dark:border-white/5 rounded-t-xl z-0">
                 {resolvedBanner ? (
-                    <img
+                    <OptimizedImage
                         src={resolvedBanner}
-                        alt=""
+                        alt={`${jam.title} banner`}
+                        baseWidth={640}
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                     />
                 ) : (
@@ -57,9 +59,11 @@ export const JamCard: React.FC<{ jam: Modjam }> = ({ jam }) => {
             <div className="flex flex-col flex-1 px-6 pb-6 relative items-center text-center">
                 <div className="w-16 h-16 shrink-0 -mt-8 mb-4 relative z-10 rounded-2xl bg-white dark:bg-slate-900 shadow-xl border-4 border-white dark:border-slate-900 overflow-hidden flex items-center justify-center transition-colors duration-300 group-hover:border-modtale-accent/50">
                     {resolvedIcon ? (
-                        <img
+                        <OptimizedImage
                             src={resolvedIcon}
                             alt={jam.title}
+                            baseWidth={64}
+                            initialQuality="standard"
                             className="w-full h-full object-cover"
                         />
                     ) : (
@@ -76,7 +80,7 @@ export const JamCard: React.FC<{ jam: Modjam }> = ({ jam }) => {
                     <span className="font-bold text-slate-700 dark:text-slate-300">{jam.hostName}</span>
                 </div>
 
-                <div className="mt-auto w-full flex items-center justify-between pt-4 border-t border-slate-100 dark:border-white/5">
+                <div className="mt-auto w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-4 border-t border-slate-100 dark:border-white/5">
                     <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-white/5 px-3 py-2 rounded-lg border border-slate-200/50 dark:border-white/5">
                         <Users className="w-4 h-4 text-modtale-accent" />
                         <span>{jam.participantIds?.length || 0} Participants</span>
@@ -243,7 +247,7 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
     if (isCreating) {
         if (step === 1) {
             return (
-                <div className="max-w-xl mx-auto pt-24 px-6 animate-in fade-in zoom-in-95 pb-32">
+                <div className="max-w-xl mx-auto pt-12 sm:pt-24 px-4 sm:px-6 animate-in fade-in zoom-in-95 pb-32">
                     <button type="button" onClick={() => setIsCreating(false)} className="text-slate-500 font-bold mb-10 flex items-center gap-2 hover:text-slate-900 dark:hover:text-white transition-colors">
                         <ArrowLeft className="w-4 h-4" /> Cancel
                     </button>
@@ -252,7 +256,7 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
                         <p className="text-slate-500 font-medium text-lg">Set the stage for your community event.</p>
                     </div>
 
-                    <div className="space-y-6 bg-white dark:bg-modtale-card p-10 rounded-2xl border border-slate-200 dark:border-white/5 shadow-2xl">
+                    <div className="space-y-6 bg-white dark:bg-modtale-card p-6 sm:p-10 rounded-2xl border border-slate-200 dark:border-white/5 shadow-2xl">
                         <div className="space-y-3">
                             <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-2">Event Title</label>
                             <input
@@ -265,12 +269,12 @@ export const JamsList: React.FC<{ currentUser: User | null }> = ({ currentUser }
 
                         <div className="space-y-3 mt-4">
                             <label className="text-[10px] font-black uppercase text-slate-500 tracking-widest ml-2">Jam URL</label>
-                            <div className={`flex items-center w-full bg-slate-50 dark:bg-black/20 border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-modtale-accent transition-all ${slugError ? 'border-red-500' : 'border-slate-200 dark:border-white/5'}`}>
-                                <div className="px-4 py-4 bg-slate-100 dark:bg-white/5 border-r border-slate-200 dark:border-white/10 text-slate-400 text-sm font-mono whitespace-nowrap select-none">modtale.net/jam/</div>
+                            <div className={`flex flex-col sm:flex-row items-stretch w-full bg-slate-50 dark:bg-black/20 border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-modtale-accent transition-all ${slugError ? 'border-red-500' : 'border-slate-200 dark:border-white/5'}`}>
+                                <div className="px-4 py-2.5 sm:py-4 bg-slate-100 dark:bg-white/5 border-b sm:border-b-0 sm:border-r border-slate-200 dark:border-white/10 text-slate-400 text-xs sm:text-sm font-mono whitespace-nowrap select-none">modtale.net/jam/</div>
                                 <input
                                     value={metaData.slug}
                                     onChange={handleSlugChange}
-                                    className={`flex-1 bg-transparent border-none px-4 py-4 text-sm font-mono text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400 ${slugError ? 'text-red-500' : ''}`}
+                                    className={`min-w-0 flex-1 bg-transparent border-none px-4 py-3 sm:py-4 text-sm font-mono text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400 ${slugError ? 'text-red-500' : ''}`}
                                     placeholder="my-awesome-jam"
                                 />
                             </div>
