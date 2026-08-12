@@ -49,7 +49,7 @@ public class ModjamController {
     public ResponseEntity<Modjam> updateJam(@PathVariable String id, @RequestBody Modjam jam) {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
-        return ResponseEntity.ok(modjamService.updateJam(id, jam));
+        return ResponseEntity.ok(modjamService.updateJam(id, jam, user.getId()));
     }
 
     @PutMapping("/{id}/icon")
@@ -57,8 +57,10 @@ public class ModjamController {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
         try {
-            modjamService.updateIcon(id, file);
+            modjamService.updateIcon(id, file, user.getId());
             return ResponseEntity.ok().build();
+        } catch (ResponseStatusException e) {
+            return ResponseEntity.status(e.getStatusCode()).body(e.getReason());
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
@@ -69,8 +71,10 @@ public class ModjamController {
         User user = accountService.getCurrentUser();
         if (user == null) return ResponseEntity.status(401).build();
         try {
-            modjamService.updateBanner(id, file);
+            modjamService.updateBanner(id, file, user.getId());
             return ResponseEntity.ok().build();
+        } catch (ResponseStatusException e) {
+            return ResponseEntity.status(e.getStatusCode()).body(e.getReason());
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
