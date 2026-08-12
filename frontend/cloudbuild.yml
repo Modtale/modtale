@@ -5,8 +5,13 @@ steps:
       - '-c'
       - |
         docker pull gcr.io/$PROJECT_ID/modtale-frontend:${_TAG} || true
-        docker build \
+        if [ "${_TAG}" != "latest" ]; then
+          docker pull gcr.io/$PROJECT_ID/modtale-frontend:latest || true
+        fi
+        DOCKER_BUILDKIT=1 docker build \
           --cache-from gcr.io/$PROJECT_ID/modtale-frontend:${_TAG} \
+          --cache-from gcr.io/$PROJECT_ID/modtale-frontend:latest \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
           --build-arg PUBLIC_API_URL=${_PUBLIC_API_URL} \
           --build-arg SSR_API_URL=${_SSR_API_URL} \
           --build-arg PUBLIC_STATUS_URL=${_PUBLIC_STATUS_URL} \
