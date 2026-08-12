@@ -594,7 +594,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             <Suspense fallback={null}>
                 {isShareOpen && <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={window.location.href} title={project.title} author={project.author} />}
                 {isReportOpen && <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetId={project.id} targetType="PROJECT" targetTitle={project.title} />}
-                {showPostDownloadModal && <PostDownloadModal isOpen={showPostDownloadModal} onClose={() => setShowPostDownloadModal(false)} classification={project.classification!} title={project.title} channel={lastDownloadChannel} isBundle={lastDownloadWasBundle} fileName={lastDownloadedFileName} />}
+                {showPostDownloadModal && <PostDownloadModal isOpen={showPostDownloadModal} onClose={() => setShowPostDownloadModal(false)} classification={project.classification!} title={project.title} channel={lastDownloadChannel} isBundle={lastDownloadWasBundle} fileName={lastDownloadedFileName} tags={project.tags} />}
 
                 {(isHistoryOpen || isDownloadOpen) && versionPayloadPending && (
                     <div className={theme.components.modalOverlay}>
