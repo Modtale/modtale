@@ -1,6 +1,7 @@
 package net.modtale.service.system;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -107,11 +108,16 @@ public class SitemapService {
     }
 
     private LocalDate parseDate(String dateStr, LocalDate fallback) {
+        if (dateStr == null || dateStr.isBlank()) return fallback;
+
         try {
-            if (dateStr == null) return fallback;
             return LocalDate.parse(dateStr);
-        } catch (DateTimeParseException e) {
-            return fallback;
+        } catch (DateTimeParseException ignored) {
+            try {
+                return LocalDateTime.parse(dateStr).toLocalDate();
+            } catch (DateTimeParseException e) {
+                return fallback;
+            }
         }
     }
 

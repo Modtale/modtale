@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.stream.Collectors;
 import net.modtale.model.dto.user.UserDTO;
 import net.modtale.model.dto.user.UserSummaryDTO;
+import net.modtale.model.user.AdminPermission;
 import net.modtale.model.user.User;
 
 public class UserMapper {
@@ -59,12 +60,16 @@ public class UserMapper {
         if (includePrivate) {
             dto.setEmail(user.getEmail());
             dto.setEmailVerified(user.isEmailVerified());
+            dto.setHasPassword(user.getHasPassword());
             dto.setMfaEnabled(user.isMfaEnabled());
+            dto.setAdminPermissions(AdminPermission.effectivePermissions(user));
             dto.setPendingOrgInvites(user.getPendingOrgInvites());
             dto.setLikedModIds(user.getLikedModIds());
             dto.setNotificationPreferences(user.getNotificationPreferences());
         } else {
             dto.setEmail(null);
+            dto.setHasPassword(null);
+            dto.setAdminPermissions(null);
             dto.setPendingOrgInvites(null);
             dto.setNotificationPreferences(null);
             dto.setLikedModIds(null);

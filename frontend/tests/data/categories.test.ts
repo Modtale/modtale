@@ -31,4 +31,15 @@ describe('category data', () => {
         expect(LICENSES.some(license => license.id === 'CC-BY-NC-SA-4.0')).toBe(true);
         expect(LICENSES.some(license => license.id === 'Unlicense')).toBe(true);
     });
+
+    it('exposes prefab discovery tags within the shared world category', () => {
+        expect(GLOBAL_TAGS).toEqual(expect.arrayContaining([
+            'Prefab',
+            'Structure',
+            'Dungeon',
+            'Adventure Map',
+            'Server Hub',
+            'Template'
+        ]));
+    });
 });

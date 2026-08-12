@@ -1,0 +1,21 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        docker pull gcr.io/$PROJECT_ID/modtale-status:${_TAG} || true
+        docker build \
+          --cache-from gcr.io/$PROJECT_ID/modtale-status:${_TAG} \
+          -f Dockerfile.status \
+          -t gcr.io/$PROJECT_ID/modtale-status:${_TAG} \
+          .
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/modtale-status:${_TAG}']
+
+substitutions:
+  _TAG: latest
+
+options:
+  defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET

@@ -393,7 +393,7 @@ public class ProjectController {
 
         Project permissionSnapshot = permissionProjectLookupService.findProject(id);
         boolean privilegedViewer = permissionSnapshot != null
-                && (accessControlService.isAdmin(currentUser) || accessControlService.hasEditPermission(permissionSnapshot, currentUser));
+                && (accessControlService.canViewPrivilegedProjectData(currentUser) || accessControlService.hasEditPermission(permissionSnapshot, currentUser));
 
         if (permissionSnapshot != null
                 && accessControlService.isPubliclyReadable(permissionSnapshot)
@@ -582,7 +582,7 @@ public class ProjectController {
 
         Project permissionSnapshot = permissionProjectLookupService.findProject(id);
         boolean privilegedViewer = permissionSnapshot != null
-                && (accessControlService.isAdmin(currentUser) || accessControlService.hasEditPermission(permissionSnapshot, currentUser));
+                && (accessControlService.canViewPrivilegedProjectData(currentUser) || accessControlService.hasEditPermission(permissionSnapshot, currentUser));
         boolean publicReader = permissionSnapshot != null
                 && accessControlService.isPubliclyReadable(permissionSnapshot)
                 && !privilegedViewer;

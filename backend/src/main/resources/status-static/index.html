@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Modtale Status</title>
+    <meta name="description" content="Live Modtale service status, incidents, and uptime history.">
+    <meta name="robots" content="index,follow">
+    <meta name="theme-color" content="#0f172a">
+    <style>
+        :root {
+            color-scheme: light dark;
+            --bg: #f8fafc;
+            --panel: #ffffff;
+            --panel-soft: #f1f5f9;
+            --text: #0f172a;
+            --muted: #64748b;
+            --line: #dbe3ee;
+            --brand: #2563eb;
+            --ok: #059669;
+            --warn: #d97706;
+            --bad: #dc2626;
+            --shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #020617;
+                --panel: #0f172a;
+                --panel-soft: #111c31;
+                --text: #e5edf8;
+                --muted: #94a3b8;
+                --line: rgba(148, 163, 184, 0.2);
+                --brand: #60a5fa;
+                --ok: #34d399;
+                --warn: #fbbf24;
+                --bad: #fb7185;
+                --shadow: 0 18px 45px rgba(0, 0, 0, 0.25);
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            letter-spacing: 0;
+        }
+
+        a {
+            color: inherit;
+        }
+
+        .shell {
+            width: min(1180px, calc(100% - 32px));
+            margin: 0 auto;
+            padding: 28px 0 44px;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .brand-mark {
+            width: 38px;
+            height: 38px;
+            border-radius: 8px;
+            background: var(--text);
+            color: var(--bg);
+            display: grid;
+            place-items: center;
+            font-weight: 900;
+        }
+
+        .brand-title {
+            margin: 0;
+            font-size: 18px;
+            line-height: 1.1;
+        }
+
+        .brand-subtitle {
+            margin: 3px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 650;
+        }
+
+        .actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        button,
+        .button {
+            border: 1px solid var(--line);
+            background: var(--panel);
+            color: var(--text);
+            height: 40px;
+            border-radius: 8px;
+            padding: 0 13px;
+            font: inherit;
+            font-size: 13px;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: none;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        button:hover,
+        .button:hover {
+            border-color: var(--brand);
+        }
+
+        button[aria-pressed="true"] {
+            background: var(--text);
+            color: var(--bg);
+            border-color: var(--text);
+        }
+
+        .overview {
+            display: grid;
+            grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.6fr);
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+        }
+
+        .summary-panel {
+            padding: 26px;
+        }
+
+        .status-line {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 999px;
+            background: var(--muted);
+            box-shadow: 0 0 0 5px rgba(100, 116, 139, 0.14);
+        }
+
+        .status-dot.operational {
+            background: var(--ok);
+            box-shadow: 0 0 0 5px rgba(5, 150, 105, 0.14);
+        }
+
+        .status-dot.degraded {
+            background: var(--warn);
+            box-shadow: 0 0 0 5px rgba(217, 119, 6, 0.16);
+        }
+
+        .status-dot.outage {
+            background: var(--bad);
+            box-shadow: 0 0 0 5px rgba(220, 38, 38, 0.14);
+        }
+
+        .pill {
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 5px 10px;
+            font-size: 12px;
+            font-weight: 850;
+            color: var(--muted);
+            background: var(--panel-soft);
+            white-space: nowrap;
+        }
+
+        .pill.operational {
+            color: var(--ok);
+        }
+
+        .pill.degraded {
+            color: var(--warn);
+        }
+
+        .pill.outage {
+            color: var(--bad);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(32px, 5vw, 58px);
+            line-height: 0.95;
+            letter-spacing: 0;
+        }
+
+        .summary-copy {
+            margin: 16px 0 0;
+            max-width: 680px;
+            color: var(--muted);
+            font-size: 16px;
+            line-height: 1.65;
+            font-weight: 560;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 24px;
+        }
+
+        .metric {
+            border: 1px solid var(--line);
+            background: var(--panel-soft);
+            border-radius: 8px;
+            padding: 14px;
+            min-width: 0;
+        }
+
+        .metric-label {
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 850;
+        }
+
+        .metric-value {
+            margin-top: 8px;
+            font-size: 22px;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+
+        .side-panel {
+            padding: 18px;
+        }
+
+        .panel-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        h2 {
+            margin: 0;
+            font-size: 18px;
+            line-height: 1.2;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        .small {
+            font-size: 13px;
+            line-height: 1.5;
+            font-weight: 650;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .service-card {
+            padding: 16px;
+        }
+
+        .service-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .service-name {
+            margin: 0;
+            font-size: 15px;
+            line-height: 1.25;
+        }
+
+        .latency {
+            margin-top: 5px;
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 750;
+        }
+
+        .heatmap {
+            display: flex;
+            gap: 3px;
+            height: 34px;
+            width: 100%;
+            align-items: stretch;
+        }
+
+        .heat {
+            flex: 1;
+            min-width: 2px;
+            border-radius: 3px;
+            background: var(--line);
+        }
+
+        .heat.operational {
+            background: var(--ok);
+        }
+
+        .heat.degraded {
+            background: var(--warn);
+        }
+
+        .heat.outage {
+            background: var(--bad);
+        }
+
+        .section {
+            margin-top: 18px;
+            padding: 20px;
+        }
+
+        .section-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .range-control {
+            display: flex;
+            padding: 4px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--panel-soft);
+            gap: 4px;
+        }
+
+        .range-control button {
+            height: 32px;
+            border-radius: 6px;
+            border-color: transparent;
+            background: transparent;
+        }
+
+        .range-control button[aria-pressed="true"] {
+            background: var(--panel);
+            color: var(--text);
+            border-color: var(--line);
+        }
+
+        .incident-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .incident {
+            border: 1px solid var(--line);
+            background: var(--panel-soft);
+            border-radius: 8px;
+            padding: 14px;
+        }
+
+        .incident-title {
+            margin: 0;
+            font-size: 15px;
+            line-height: 1.35;
+        }
+
+        .incident-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .updates {
+            margin-top: 12px;
+            display: grid;
+            gap: 9px;
+        }
+
+        .update {
+            border-left: 2px solid var(--line);
+            padding-left: 10px;
+        }
+
+        .update p {
+            margin: 4px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.55;
+            font-weight: 560;
+        }
+
+        .empty {
+            border: 1px dashed var(--line);
+            background: var(--panel-soft);
+            border-radius: 8px;
+            padding: 14px;
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 750;
+        }
+
+        .error {
+            display: none;
+            margin-bottom: 12px;
+            border: 1px solid rgba(217, 119, 6, 0.35);
+            background: rgba(217, 119, 6, 0.08);
+            color: var(--warn);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 13px;
+            font-weight: 750;
+        }
+
+        .footer {
+            margin-top: 22px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 650;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        @media (max-width: 980px) {
+            .overview,
+            .grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        @media (max-width: 680px) {
+            .shell {
+                width: min(100% - 20px, 1180px);
+                padding-top: 16px;
+            }
+
+            .topbar,
+            .section-head {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .actions {
+                width: 100%;
+            }
+
+            .actions button,
+            .actions .button {
+                flex: 1;
+            }
+
+            .overview,
+            .grid,
+            .metrics {
+                grid-template-columns: 1fr;
+            }
+
+            .summary-panel {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+<main class="shell">
+    <header class="topbar">
+        <div class="brand">
+            <div class="brand-mark">M</div>
+            <div>
+                <p class="brand-title"><strong>Modtale Status</strong></p>
+                <p class="brand-subtitle">Detached monitor</p>
+            </div>
+        </div>
+        <div class="actions">
+            <a class="button" href="https://modtale.net">Main Site</a>
+            <button id="refresh" type="button">Refresh</button>
+        </div>
+    </header>
+
+    <div id="error" class="error"></div>
+
+    <section class="overview">
+        <div class="panel summary-panel">
+            <div class="status-line">
+                <span id="overallDot" class="status-dot"></span>
+                <span id="overallPill" class="pill">Checking</span>
+            </div>
+            <h1 id="headline">Checking systems</h1>
+            <p id="summary" class="summary-copy">Status data is loading.</p>
+
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-label">Availability</div>
+                    <div id="availability" class="metric-value">--</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">P95 Latency</div>
+                    <div id="p95" class="metric-value">--</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Last Check</div>
+                    <div id="lastCheck" class="metric-value">--</div>
+                </div>
+            </div>
+        </div>
+
+        <aside class="panel side-panel">
+            <div class="panel-heading">
+                <div>
+                    <h2>Active Incidents</h2>
+                    <div class="small muted">Current impact</div>
+                </div>
+                <span id="activeCount" class="pill">0</span>
+            </div>
+            <div id="activeIncidents" class="incident-list"></div>
+        </aside>
+    </section>
+
+    <section id="services" class="grid"></section>
+
+    <section class="panel section">
+        <div class="section-head">
+            <div>
+                <h2>Availability History</h2>
+                <div class="small muted">Measured from the detached checker</div>
+            </div>
+            <div class="range-control" role="group" aria-label="Status history range">
+                <button type="button" data-range="24h" aria-pressed="true">24h</button>
+                <button type="button" data-range="30d" aria-pressed="false">30d</button>
+            </div>
+        </div>
+        <div id="history"></div>
+    </section>
+
+    <section class="panel section">
+        <div class="section-head">
+            <div>
+                <h2>Scheduled Maintenance</h2>
+                <div class="small muted">Planned windows</div>
+            </div>
+        </div>
+        <div id="scheduled" class="incident-list"></div>
+    </section>
+
+    <section class="panel section">
+        <div class="section-head">
+            <div>
+                <h2>Past Incidents</h2>
+                <div class="small muted">Recently resolved events</div>
+            </div>
+        </div>
+        <div id="past" class="incident-list"></div>
+    </section>
+
+    <footer class="footer">
+        <span>This page is served by the detached Modtale status service.</span>
+        <span id="fetchedAt">Waiting for data</span>
+    </footer>
+</main>
+
+<script>
+(() => {
+    const apiPath = '/api/v1/status';
+    let currentRange = '24h';
+    let lastData = null;
+
+    const serviceKeys = {
+        site: { value: 'site', status: 'siteStatus' },
+        api: { value: 'api', status: 'apiStatus' },
+        database: { value: 'db', status: 'dbStatus' },
+        storage: { value: 'storage', status: 'storageStatus' }
+    };
+
+    const copy = {
+        operational: {
+            title: 'All systems operational',
+            summary: 'The main site, API, database, and storage checks are responding normally.'
+        },
+        degraded: {
+            title: 'Partial system degradation',
+            summary: 'At least one monitored service is slow or unavailable while this status service remains online.'
+        },
+        outage: {
+            title: 'Major system outage',
+            summary: 'All monitored Modtale services are failing their checks. This status service is isolated and still reachable.'
+        }
+    };
+
+    const $ = (id) => document.getElementById(id);
+
+    const normalize = (value) => {
+        const text = String(value || '').toLowerCase();
+        return ['operational', 'degraded', 'outage'].includes(text) ? text : 'degraded';
+    };
+
+    const label = (value) => {
+        const text = String(value || '').toLowerCase().replace(/_/g, ' ');
+        return text ? text.replace(/^\w/, (char) => char.toUpperCase()) : 'Unknown';
+    };
+
+    const formatLatency = (value) => {
+        const number = Number(value);
+        if (!Number.isFinite(number) || number <= 0) return 'n/a';
+        return number >= 1000 ? `${(number / 1000).toFixed(1)}s` : `${Math.round(number)}ms`;
+    };
+
+    const formatPercent = (value) => {
+        if (!Number.isFinite(value)) return 'No data';
+        if (value >= 99.995) return '100%';
+        return `${value.toFixed(value >= 99.95 ? 2 : 1)}%`;
+    };
+
+    const formatDateTime = (value) => {
+        if (!value) return 'n/a';
+        return new Date(value).toLocaleString([], {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    };
+
+    const percentile = (values, target) => {
+        const clean = values.filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
+        if (!clean.length) return 0;
+        const index = Math.min(clean.length - 1, Math.max(0, Math.ceil(clean.length * target) - 1));
+        return clean[index];
+    };
+
+    const serviceHistoryStatus = (point, serviceId) => {
+        const keys = serviceKeys[serviceId] || serviceKeys.api;
+        return normalize(point[keys.status]);
+    };
+
+    const serviceHistoryValue = (point, serviceId) => {
+        const keys = serviceKeys[serviceId] || serviceKeys.api;
+        return Number(point[keys.value] || 0);
+    };
+
+    const availability = (data) => {
+        const history = data.history || [];
+        if (history.length) {
+            const statuses = history.flatMap((point) =>
+                (data.services || []).map((service) => serviceHistoryStatus(point, service.id))
+            );
+            if (statuses.length) {
+                return statuses.filter((status) => status !== 'outage').length / statuses.length * 100;
+            }
+        }
+        const services = data.services || [];
+        if (!services.length) return NaN;
+        return services.filter((service) => normalize(service.status) !== 'outage').length / services.length * 100;
+    };
+
+    const bucketsFor = (history, serviceId) => {
+        const bucketCount = currentRange === '24h' ? 48 : 30;
+        const windowMs = currentRange === '24h' ? 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+        const bucketMs = windowMs / bucketCount;
+        const start = Date.now() - windowMs;
+
+        return Array.from({ length: bucketCount }, (_, index) => {
+            const bucketStart = start + index * bucketMs;
+            const bucketEnd = bucketStart + bucketMs;
+            const points = history.filter((point) => point.time >= bucketStart && point.time < bucketEnd);
+            if (!points.length) return 'none';
+            const statuses = points.map((point) => serviceHistoryStatus(point, serviceId));
+            if (statuses.every((status) => status === 'operational')) return 'operational';
+            if (statuses.every((status) => status === 'outage')) return 'outage';
+            return 'degraded';
+        });
+    };
+
+    const renderSummary = (data) => {
+        const status = normalize(data.overall);
+        $('overallDot').className = `status-dot ${status}`;
+        $('overallPill').className = `pill ${status}`;
+        $('overallPill').textContent = label(status);
+        $('headline').textContent = copy[status].title;
+        $('summary').textContent = copy[status].summary;
+        $('availability').textContent = formatPercent(availability(data));
+
+        const latencyValues = (data.history || []).flatMap((point) =>
+            (data.services || []).map((service) => serviceHistoryValue(point, service.id))
+        );
+        $('p95').textContent = formatLatency(percentile(latencyValues, 0.95));
+
+        const lastCheck = data.timestamp ? new Date(data.timestamp) : new Date();
+        $('lastCheck').textContent = lastCheck.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        $('fetchedAt').textContent = `Fetched ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    };
+
+    const renderServices = (data) => {
+        const history = data.history || [];
+        $('services').innerHTML = (data.services || []).map((service) => {
+            const status = normalize(service.status);
+            const values = history.map((point) => serviceHistoryValue(point, service.id));
+            const p95 = percentile(values, 0.95);
+            const heat = bucketsFor(history, service.id)
+                .map((bucket, index) => `<span class="heat ${bucket === 'none' ? '' : bucket}" title="${bucket}" aria-label="${bucket || 'no data'} ${index + 1}"></span>`)
+                .join('');
+
+            return `
+                <article class="panel service-card">
+                    <div class="service-top">
+                        <div>
+                            <h2 class="service-name">${escapeHtml(service.name)}</h2>
+                            <div class="latency">Current ${formatLatency(service.latency)} · P95 ${formatLatency(p95)}</div>
+                        </div>
+                        <span class="pill ${status}">${label(status)}</span>
+                    </div>
+                    <div class="heatmap">${heat}</div>
+                </article>
+            `;
+        }).join('');
+    };
+
+    const renderHistory = (data) => {
+        const history = data.history || [];
+        $('history').innerHTML = (data.services || []).map((service) => {
+            const heat = bucketsFor(history, service.id)
+                .map((bucket, index) => `<span class="heat ${bucket === 'none' ? '' : bucket}" title="${bucket}" aria-label="${bucket || 'no data'} ${index + 1}"></span>`)
+                .join('');
+            return `
+                <div style="margin-bottom: 16px">
+                    <div class="service-top" style="margin-bottom: 8px">
+                        <h2 class="service-name">${escapeHtml(service.name)}</h2>
+                        <span class="small muted">${currentRange}</span>
+                    </div>
+                    <div class="heatmap">${heat}</div>
+                </div>
+            `;
+        }).join('');
+    };
+
+    const renderIncidents = (id, incidents, emptyText, limit) => {
+        const items = (incidents || []).slice(0, limit || incidents.length);
+        $(id).innerHTML = items.length ? items.map((incident) => `
+            <article class="incident">
+                <h3 class="incident-title">${escapeHtml(incident.title || 'Untitled status event')}</h3>
+                <div class="incident-meta">
+                    <span class="pill ${normalize(incident.impact)}">${label(incident.impact)}</span>
+                    <span class="pill">${label(incident.state)}</span>
+                    ${incident.affectedServices && incident.affectedServices.length ? `<span class="pill">${escapeHtml(incident.affectedServices.join(', '))}</span>` : ''}
+                </div>
+                <div class="small muted" style="margin-top: 8px">
+                    ${incident.scheduledStart ? `Starts ${formatDateTime(incident.scheduledStart)}` : `Opened ${formatDateTime(incident.startedAt || incident.createdAt)}`}
+                </div>
+                <div class="updates">
+                    ${(incident.updates || []).slice(0, 2).map((update) => `
+                        <div class="update">
+                            <div class="small"><strong>${label(update.state)}</strong> <span class="muted">${formatDateTime(update.createdAt)}</span></div>
+                            <p>${escapeHtml(update.message || '')}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            </article>
+        `).join('') : `<div class="empty">${emptyText}</div>`;
+    };
+
+    const renderAll = (data) => {
+        lastData = data;
+        renderSummary(data);
+        renderServices(data);
+        renderHistory(data);
+        $('activeCount').textContent = String((data.activeIncidents || []).length);
+        renderIncidents('activeIncidents', data.activeIncidents || [], 'No active incidents.', 4);
+        renderIncidents('scheduled', data.scheduledMaintenances || [], 'No scheduled maintenance.', 10);
+        renderIncidents('past', data.incidentHistory || [], 'No past incidents yet.', 6);
+    };
+
+    const fetchStatus = async () => {
+        $('refresh').disabled = true;
+        try {
+            const response = await fetch(`${apiPath}?range=${currentRange}&t=${Date.now()}`, {
+                headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
+                cache: 'no-store'
+            });
+            if (!response.ok) throw new Error(`Status API returned ${response.status}`);
+            const data = await response.json();
+            $('error').style.display = 'none';
+            renderAll(data);
+        } catch (error) {
+            $('error').textContent = 'The detached status API could not be reached from this browser.';
+            $('error').style.display = 'block';
+            if (!lastData) {
+                renderAll({
+                    overall: 'OUTAGE',
+                    timestamp: Date.now(),
+                    services: [],
+                    history: [],
+                    activeIncidents: [],
+                    scheduledMaintenances: [],
+                    incidentHistory: []
+                });
+            }
+            console.error(error);
+        } finally {
+            $('refresh').disabled = false;
+        }
+    };
+
+    const escapeHtml = (value) => String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+    document.querySelectorAll('[data-range]').forEach((button) => {
+        button.addEventListener('click', () => {
+            currentRange = button.dataset.range;
+            document.querySelectorAll('[data-range]').forEach((other) => {
+                other.setAttribute('aria-pressed', String(other === button));
+            });
+            fetchStatus();
+        });
+    });
+
+    $('refresh').addEventListener('click', fetchStatus);
+    fetchStatus();
+    window.setInterval(fetchStatus, 60000);
+})();
+</script>
+</body>
+</html>

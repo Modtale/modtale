@@ -16,6 +16,38 @@ const projectLimit = Number.parseInt(process.env.MOCK_PROJECT_LIMIT || '80', 10)
 
 const passwordHash = '$2a$10$YQPnaULIFCpHYqXreH4IdeK0tSn2gCrMgOSE6bOcKCIR16cG9/Ujy';
 const classifications = ['PLUGIN', 'DATA', 'ART', 'SAVE', 'MODPACK'];
+const allAdminPermissions = [
+  'PROJECT_REVIEW_READ',
+  'PROJECT_REVIEW_DECIDE',
+  'PROJECT_MANAGE_READ',
+  'PROJECT_MODERATE',
+  'PROJECT_DELETE',
+  'PROJECT_RESTORE',
+  'PROJECT_VERSION_DELETE',
+  'PROJECT_VERSION_RESCAN',
+  'PROJECT_RAW_EDIT',
+  'REPORT_READ',
+  'REPORT_RESOLVE',
+  'USER_READ',
+  'USER_DELETE',
+  'EMAIL_BAN_READ',
+  'EMAIL_BAN_MANAGE',
+  'USER_TIER_MANAGE',
+  'USER_PERMISSION_MANAGE',
+  'USER_RAW_READ',
+  'USER_RAW_EDIT',
+  'AUDIT_LOG_READ',
+  'PLATFORM_ANALYTICS_READ',
+  'STATUS_INCIDENT_READ',
+  'STATUS_INCIDENT_MANAGE'
+];
+const seededAdminPermissions = [
+  'PROJECT_REVIEW_READ',
+  'PROJECT_REVIEW_DECIDE',
+  'PROJECT_VERSION_RESCAN',
+  'REPORT_READ',
+  'REPORT_RESOLVE'
+];
 
 if (!sourceUri) {
   console.error('MOCK_SOURCE_MONGODB_URI is required.');
@@ -49,9 +81,6 @@ const boundedString = (value, fallback = '', limit = 1000) => {
   const trimmed = value.trim();
   return trimmed ? trimmed.slice(0, limit) : fallback;
 };
-
-const placeholder = (label, color = '334155', size = '512x512') =>
-  `https://placehold.co/${size}/${color}/f8fafc?text=${encodeURIComponent(label).replace(/%20/g, '+')}`;
 
 const cleanDate = (value, fallback = '2026-01-01') => {
   if (!value) return fallback;
@@ -194,12 +223,11 @@ function baseUsers(authorProfiles) {
       email: 'super_admin@example.test',
       emailVerified: true,
       password: passwordHash,
-      avatarUrl: placeholder('SA', '111827'),
-      bannerUrl: placeholder('Mock Super Admin', '1f2937', '1200x300'),
-      bio: 'Synthetic super admin account for preview review.',
+      bio: 'Synthetic full-permission admin account for preview review.',
       createdAt: '2026-01-05',
       tier: 'ENTERPRISE',
-      roles: ['USER', 'ADMIN'],
+      roles: ['USER'],
+      adminPermissions: allAdminPermissions,
       accountType: 'USER',
       likedModIds: [],
       followingIds: [],
@@ -213,12 +241,11 @@ function baseUsers(authorProfiles) {
       email: 'admin@example.test',
       emailVerified: true,
       password: passwordHash,
-      avatarUrl: placeholder('AD', '334155'),
-      bannerUrl: placeholder('Mock Admin', '334155', '1200x300'),
       bio: 'Synthetic admin account for moderation flow testing.',
       createdAt: '2026-01-08',
       tier: 'ENTERPRISE',
-      roles: ['USER', 'ADMIN'],
+      roles: ['USER'],
+      adminPermissions: seededAdminPermissions,
       accountType: 'USER',
       likedModIds: [],
       followingIds: [],
@@ -232,8 +259,6 @@ function baseUsers(authorProfiles) {
       email: 'user@example.test',
       emailVerified: true,
       password: passwordHash,
-      avatarUrl: placeholder('U', '0f766e'),
-      bannerUrl: placeholder('Mock User', '0f766e', '1200x300'),
       bio: 'Synthetic standard user for sign-in and profile testing.',
       createdAt: '2026-01-12',
       tier: 'USER',
@@ -256,8 +281,6 @@ function baseUsers(authorProfiles) {
       email: `creator_${ordinal}@example.test`,
       emailVerified: true,
       password: passwordHash,
-      avatarUrl: placeholder(`C${ordinal}`, index % 2 === 0 ? '7c3aed' : 'be123c'),
-      bannerUrl: placeholder(`Creator ${ordinal}`, index % 2 === 0 ? '4c1d95' : '881337', '1200x300'),
       bio: 'Synthetic creator generated from public project shape.',
       createdAt: '2026-01-16',
       tier: index === 0 ? 'ENTERPRISE' : 'USER',
@@ -395,10 +418,12 @@ function sanitizeProject(project, index, selectedProjectIds, authorIdMap) {
     ? project.title.trim().slice(0, 120)
     : `Project ${String(index + 1).padStart(2, '0')}`;
   const classification = classifications.includes(project.classification) ? project.classification : 'PLUGIN';
-  const color = ['2563eb', '16a34a', 'be123c', '0891b2', 'f59e0b'][index % 5];
   const versions = Array.isArray(project.versions)
     ? project.versions.map((version) => sanitizeVersion(version, id, selectedProjectIds))
     : [];
+  const imageUrl = typeof project.imageUrl === 'string' ? project.imageUrl : undefined;
+  const bannerUrl = typeof project.bannerUrl === 'string' ? project.bannerUrl : undefined;
+  const galleryImages = list(project.galleryImages, 12);
 
   return {
     _id: id,
@@ -408,8 +433,8 @@ function sanitizeProject(project, index, selectedProjectIds, authorIdMap) {
     description: typeof project.description === 'string' ? project.description.slice(0, 20000) : '',
     authorId: authorIdMap.get(sourceAuthorId) || sourceAuthorId,
     author: typeof project.author === 'string' && project.author.trim() ? project.author.trim().slice(0, 80) : 'creator',
-    imageUrl: typeof project.imageUrl === 'string' ? project.imageUrl : placeholder(title, color),
-    bannerUrl: typeof project.bannerUrl === 'string' ? project.bannerUrl : placeholder(title, color, '1600x420'),
+    ...(imageUrl ? { imageUrl } : {}),
+    ...(bannerUrl ? { bannerUrl } : {}),
     classification,
     categories: list(project.categories, 4),
     tags: list(project.tags, 8),
@@ -439,13 +464,13 @@ function sanitizeProject(project, index, selectedProjectIds, authorIdMap) {
     allowComments: Boolean(project.allowComments ?? true),
     hmWikiEnabled: Boolean(project.hmWikiEnabled && project.hmWikiSlug),
     hmWikiSlug: project.hmWikiEnabled && project.hmWikiSlug ? slugify(project.hmWikiSlug) : undefined,
-    galleryCarouselEnabled: Boolean(project.galleryCarouselEnabled),
+    galleryCarouselEnabled: Boolean(project.galleryCarouselEnabled && galleryImages.length > 0),
     status: project.status === 'ARCHIVED' ? 'ARCHIVED' : 'PUBLISHED',
     approvedBy: '692620f7c2f3266e23ac0dee',
     projectRoles: [],
     teamMembers: [],
     teamInvites: [],
-    galleryImages: list(project.galleryImages, 12),
+    galleryImages,
     galleryImageCaptions: project.galleryImageCaptions && typeof project.galleryImageCaptions === 'object'
       ? project.galleryImageCaptions
       : {},
@@ -464,8 +489,6 @@ function syntheticPrivateProjects() {
       description: 'This is not sourced from production. It exists to populate admin review screens safely.',
       authorId: 'mock-user-1',
       author: 'user',
-      imageUrl: placeholder('Review', '7c2d12'),
-      bannerUrl: placeholder('Review Me', '7c2d12', '1600x420'),
       classification: 'PLUGIN',
       categories: ['API', 'Library'],
       tags: ['API', 'Library', 'Mechanics'],
@@ -540,8 +563,6 @@ function syntheticPrivateProjects() {
       description: 'Used for dashboard, editor, and draft visibility checks.',
       authorId: 'mock-user-1',
       author: 'user',
-      imageUrl: placeholder('Draft', '0f766e'),
-      bannerUrl: placeholder('Draft Sandbox', '0f766e', '1600x420'),
       classification: 'DATA',
       categories: ['Functions'],
       tags: ['Functions', 'Puzzle'],
@@ -586,8 +607,6 @@ function syntheticPrivateProjects() {
       description: 'Used for private project visibility and dashboard filtering.',
       authorId: 'mock-user-1',
       author: 'user',
-      imageUrl: placeholder('Private', '6d28d9'),
-      bannerUrl: placeholder('Private Lab', '5b21b6', '1600x420'),
       classification: 'ART',
       categories: ['Particles'],
       tags: ['Particles', 'Animations'],
@@ -632,8 +651,6 @@ function syntheticPrivateProjects() {
       description: 'This is not sourced from production. It exists to populate unlisted project flows safely.',
       authorId: 'mock-user-1',
       author: 'user',
-      imageUrl: placeholder('Admin', '475569'),
-      bannerUrl: placeholder('Admin Kit', '334155', '1600x420'),
       classification: 'PLUGIN',
       categories: ['Admin Tools', 'Protection'],
       tags: ['Admin Tools', 'Protection', 'Chat'],
@@ -694,8 +711,6 @@ function syntheticPrivateProjects() {
       description: 'This record is intentionally archived and still public for route and badge checks.',
       authorId: 'mock-user-1',
       author: 'user',
-      imageUrl: placeholder('Archive', '64748b'),
-      bannerUrl: placeholder('Tutorial Town Legacy', '475569', '1600x420'),
       classification: 'SAVE',
       categories: ['Spawn'],
       tags: ['Spawn', 'Medieval'],
@@ -756,8 +771,6 @@ function syntheticPrivateProjects() {
       description: 'This is not sourced from production. It exists to populate modpack flows safely.',
       authorId: 'mock-user-1',
       author: 'user',
-      imageUrl: placeholder('Pack', 'f59e0b'),
-      bannerUrl: placeholder('Frontier Pack', 'b45309', '1600x420'),
       classification: 'MODPACK',
       categories: ['Adventure', 'Vanilla+'],
       tags: ['Adventure', 'Vanilla+', 'Exploration'],
@@ -784,13 +797,13 @@ function syntheticPrivateProjects() {
       allowModpacks: false,
       allowComments: true,
       hmWikiEnabled: false,
-      galleryCarouselEnabled: true,
+      galleryCarouselEnabled: false,
       status: 'PUBLISHED',
       approvedBy: '692620f7c2f3266e23ac0dee',
       projectRoles: [],
       teamMembers: [],
       teamInvites: [],
-      galleryImages: [placeholder('Frontier Pack', 'f59e0b', '1280x720')],
+      galleryImages: [],
       galleryImageCaptions: {},
       comments: [],
       versions: [
@@ -947,7 +960,6 @@ function buildNotifications(projects, users) {
       title: 'Preview project updated',
       message: `${firstProject?.title || 'A mock project'} published a synthetic preview update.`,
       link: `/projects/${firstProject?.slug || 'mock-project'}`,
-      iconUrl: placeholder('N', '2563eb', '128x128'),
       isRead: false,
       type: 'PROJECT_UPDATE',
       metadata: { projectId: firstProject?._id || 'mock-project' },
@@ -959,7 +971,6 @@ function buildNotifications(projects, users) {
       title: 'New mock comment',
       message: 'A synthetic user commented on a preview project.',
       link: `/projects/${firstProject?.slug || 'mock-project'}?tab=comments`,
-      iconUrl: placeholder('C', '0f766e', '128x128'),
       isRead: true,
       type: 'COMMENT',
       metadata: { projectId: firstProject?._id || 'mock-project' },
@@ -998,48 +1009,7 @@ function buildBannedEmails() {
 }
 
 function buildStatusIncidents() {
-  return [
-    {
-      _id: 'mock-status-incident-1',
-      kind: 'INCIDENT',
-      state: 'RESOLVED',
-      impact: 'DEGRADED',
-      title: 'Synthetic preview incident',
-      affectedServices: ['Backend API'],
-      startedAt: date('2026-06-12T14:00:00.000Z'),
-      resolvedAt: date('2026-06-12T14:35:00.000Z'),
-      createdAt: date('2026-06-12T14:00:00.000Z'),
-      updatedAt: date('2026-06-12T14:35:00.000Z'),
-      createdBy: '692620f7c2f3266e23ac0dee',
-      createdByUsername: 'admin',
-      updates: [
-        {
-          id: 'mock-status-update-1',
-          state: 'RESOLVED',
-          impact: 'OPERATIONAL',
-          message: 'Synthetic incident resolved.',
-          createdAt: date('2026-06-12T14:35:00.000Z'),
-          createdBy: '692620f7c2f3266e23ac0dee',
-          createdByUsername: 'admin'
-        }
-      ]
-    },
-    {
-      _id: 'mock-maintenance-1',
-      kind: 'MAINTENANCE',
-      state: 'SCHEDULED',
-      impact: 'DEGRADED',
-      title: 'Synthetic scheduled maintenance',
-      affectedServices: ['Frontend'],
-      scheduledStart: date('2026-06-25T04:00:00.000Z'),
-      scheduledEnd: date('2026-06-25T05:00:00.000Z'),
-      createdAt: date('2026-06-18T09:00:00.000Z'),
-      updatedAt: date('2026-06-18T09:00:00.000Z'),
-      createdBy: '692620f7c2f3266e23ac0dee',
-      createdByUsername: 'admin',
-      updates: []
-    }
-  ];
+  return [];
 }
 
 function buildStatusHistory() {
@@ -1061,10 +1031,10 @@ function buildStatusHistory() {
       apiLatency: 61,
       dbLatency: 24,
       storageLatency: 140,
-      overallStatus: 'DEGRADED',
+      overallStatus: 'OPERATIONAL',
       apiStatus: 'OPERATIONAL',
       dbStatus: 'OPERATIONAL',
-      storageStatus: 'DEGRADED'
+      storageStatus: 'OPERATIONAL'
     }
   ];
 }

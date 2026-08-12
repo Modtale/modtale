@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { compareSemVer, formatDateTime, formatTimeAgo, getLicenseInfo, toTitleCase } from '@/utils/modHelpers';
+import { compareGameVersionsDesc, compareSemVer, formatDateTime, formatTimeAgo, getLicenseInfo, toTitleCase } from '@/utils/modHelpers';
 
 describe('mod helpers', () => {
     afterEach(() => {
@@ -41,6 +41,22 @@ describe('mod helpers', () => {
 
     it('falls back to locale-aware comparison for invalid versions', () => {
         expect(compareSemVer('version10', 'version2')).toBe(1);
+    });
+
+    it('sorts game versions newest-first with semver before legacy date builds', () => {
+        expect([
+            '2026.03.26-89796E57B',
+            '0.5.3',
+            '2026.02.01-ABCDEF123',
+            '0.6.0-pre.3',
+            '0.5.4'
+        ].sort(compareGameVersionsDesc)).toEqual([
+            '0.6.0-pre.3',
+            '0.5.4',
+            '0.5.3',
+            '2026.03.26-89796E57B',
+            '2026.02.01-ABCDEF123'
+        ]);
     });
 
     it('maps common license identifiers to friendly names and urls', () => {

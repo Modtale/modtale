@@ -17,10 +17,10 @@ interface ReportModalProps {
 type ReportReasonOption = {
     id: string;
     label: string;
-    targetTypes?: Array<NonNullable<ReportModalProps['targetType']>>;
+    targetTypes?: ReadonlyArray<NonNullable<ReportModalProps['targetType']>>;
 };
 
-const REPORT_REASONS = [
+const REPORT_REASONS: readonly ReportReasonOption[] = [
     { id: 'MALWARE', label: 'Malware / Virus' },
     { id: 'SPAM', label: 'Spam / Misleading' },
     { id: 'INAPPROPRIATE', label: 'Inappropriate Content' },
@@ -28,7 +28,7 @@ const REPORT_REASONS = [
     { id: 'IP_INFRINGEMENT', label: 'Intellectual Property Violation' },
     { id: 'HARASSMENT', label: 'Harassment / Hate Speech' },
     { id: 'OTHER', label: 'Other' }
-] satisfies ReportReasonOption[];
+];
 
 export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targetId, targetType = 'PROJECT', targetTitle }) => {
     const [reason, setReason] = useState(REPORT_REASONS[0].id);

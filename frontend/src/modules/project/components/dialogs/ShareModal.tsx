@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Share2, X, Copy, Check, Twitter, Facebook, Link as LinkIcon } from 'lucide-react';
+import { Share2, X, Copy, Check, MessageCircle, Send, Link as LinkIcon } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { ModalPortal } from '@/components/ui/ModalPortal';
@@ -29,13 +29,13 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, url, ti
     const shareLinks = [
         {
             name: 'Twitter',
-            icon: Twitter,
+            icon: MessageCircle,
             url: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`,
             color: 'bg-[#1DA1F2] hover:bg-[#1a91da]'
         },
         {
             name: 'Facebook',
-            icon: Facebook,
+            icon: Send,
             url: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
             color: 'bg-[#4267B2] hover:bg-[#3b5ca0]'
         }

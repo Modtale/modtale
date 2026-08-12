@@ -18,7 +18,10 @@ class ValidationServiceTest {
 
     @Test
     void validateTagsNormalizesKnownTagsAndRejectsUnknownOnes() {
-        assertIterableEquals(List.of("Adventure", "Admin Tools"), validationService.validateTags(List.of("adventure", "admin tools")));
+        assertIterableEquals(
+                List.of("Adventure", "Admin Tools", "Prefab", "Server Hub"),
+                validationService.validateTags(List.of("adventure", "admin tools", "prefab", "server hub"))
+        );
 
         IllegalArgumentException error = assertThrows(
                 IllegalArgumentException.class,

@@ -13,6 +13,7 @@ interface SidebarProps {
     dependencies?: ProjectDependency[];
     incompatibleProjectIds?: string[];
     depMeta: Record<string, { icon: string, title: string, classification?: string, slug?: string }>;
+    orderedGameVersions?: string[];
     showMetaSections?: boolean;
     contributors: User[];
     orgMembers: User[];
@@ -20,7 +21,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = React.memo(({
-                                                               project, dependencies, incompatibleProjectIds, depMeta, showMetaSections = true, contributors, orgMembers, author
+                                                               project, dependencies, incompatibleProjectIds, depMeta, orderedGameVersions = [], showMetaSections = true, contributors, orgMembers, author
                                                            }) => {
     const [copiedId, setCopiedId] = useState(false);
 
@@ -62,7 +63,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             </div>
 
             {showMetaSections && (
-                <ProjectMetaSections project={project} dependencies={dependencies} incompatibleProjectIds={incompatibleProjectIds} depMeta={depMeta} />
+                <ProjectMetaSections project={project} dependencies={dependencies} incompatibleProjectIds={incompatibleProjectIds} depMeta={depMeta} orderedGameVersions={orderedGameVersions} />
             )}
 
             {author && author.accountType === 'ORGANIZATION' && orgMembers.length > 0 && (

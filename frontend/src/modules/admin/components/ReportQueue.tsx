@@ -8,9 +8,10 @@ import type { Report } from '@/types';
 interface ReportQueueProps {
     reports: Report[];
     onRefresh: () => void;
+    canResolve?: boolean;
 }
 
-export function ReportQueue({ reports: initialReports, onRefresh }: ReportQueueProps) {
+export function ReportQueue({ reports: initialReports, onRefresh, canResolve = false }: ReportQueueProps) {
     const [reports, setReports] = useState<Report[]>(initialReports);
     const [processing, setProcessing] = useState<string | null>(null);
     const [responses, setResponses] = useState<Record<string, string>>({});
@@ -154,7 +155,7 @@ export function ReportQueue({ reports: initialReports, onRefresh }: ReportQueueP
                                 <span>Reported by: <span className="text-slate-700 dark:text-slate-300">{report.reporterUsername}</span></span>
                             </div>
 
-                            {report.status === 'OPEN' && (
+                            {report.status === 'OPEN' && canResolve && (
                                 <textarea
                                     value={responses[report.id] || ''}
                                     onChange={(e) => setResponses(prev => ({ ...prev, [report.id]: e.target.value }))}
@@ -182,7 +183,7 @@ export function ReportQueue({ reports: initialReports, onRefresh }: ReportQueueP
                                 </a>
                             )}
 
-                            {report.status === 'OPEN' && (
+                            {report.status === 'OPEN' && canResolve && (
                                 <>
                                     <button
                                         onClick={() => handleResolve(report.id, 'RESOLVED')}

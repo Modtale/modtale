@@ -1,10 +1,12 @@
 package net.modtale.service.admin.user;
 
 import java.util.List;
+import java.util.Set;
 import net.modtale.model.dto.admin.BannedEmailDTO;
 import net.modtale.model.dto.response.admin.UserTierUpdateResponse;
 import net.modtale.model.dto.user.UserDTO;
 import net.modtale.model.user.ApiKey;
+import net.modtale.model.user.AdminPermission;
 import net.modtale.model.user.User;
 import org.springframework.stereotype.Service;
 
@@ -54,11 +56,7 @@ public class UserManagementService {
         return userPrivilegeAdministrationService.setUserTier(adminId, userId, tier);
     }
 
-    public void addUserRole(String adminId, String userId, String role) {
-        userPrivilegeAdministrationService.addUserRole(adminId, userId, role);
-    }
-
-    public void removeUserRole(String adminId, String userId, String role) {
-        userPrivilegeAdministrationService.removeUserRole(adminId, userId, role);
+    public Set<AdminPermission> setAdminPermissions(String adminId, String userId, Set<AdminPermission> permissions) {
+        return userPrivilegeAdministrationService.setAdminPermissions(adminId, userId, permissions);
     }
 }
