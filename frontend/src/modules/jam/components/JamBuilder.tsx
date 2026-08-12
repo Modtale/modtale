@@ -1,16 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircle2, AlertCircle, LayoutGrid, Clock, Check, X, Shield, Calendar, Play, ChevronDown, Loader2, BookOpen, Wand2, ChevronLeft, ChevronRight, Users, UserPlus, User as UserIcon, Link2, Edit3, XCircle } from 'lucide-react';
+import { Settings, Plus, Trash2, List, Trophy, FileText, Scale, Save, CheckCircle2, LayoutGrid, Clock, Check, X, Shield, Calendar, Play, ChevronDown, Loader2, BookOpen, Wand2, ChevronLeft, ChevronRight, Users, UserPlus, User as UserIcon, Link2, Edit3, XCircle } from 'lucide-react';
 import { JamLayout } from '@/modules/jam/components/JamLayout';
-import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
-import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
-import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 import { Spinner } from '@/components/ui/Spinner.tsx';
+import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import { api, BACKEND_URL } from '@/utils/api';
 import type { User } from '@/types';
+import { getClampedJamMilestoneDate, getJamMilestoneMinimum } from '@/modules/jam/utils/timeline';
 
 const CalendarWidget = ({ viewDate, setViewDate, selectedDate, onSelect, minDate }: { viewDate: Date, setViewDate: (d: Date) => void, selectedDate: Date, onSelect: (d: Date) => void, minDate: Date }) => {
     const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
@@ -111,18 +107,19 @@ const CustomDateTimePicker: React.FC<{ label: string, icon: any, value: string, 
     const isPassed = value && new Date(value).getTime() <= Date.now();
 
     const todayStartMs = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
+    const minimumDateMs = getJamMilestoneMinimum(todayStartMs, minDate);
 
-    const initialDate = value ? new Date(value) : new Date(todayStartMs);
+    const initialDate = getClampedJamMilestoneDate(value, minimumDateMs);
     const [tempDate, setTempDate] = useState<Date>(initialDate);
     const [viewDate, setViewDate] = useState<Date>(initialDate);
 
     useEffect(() => {
         if (isOpen) {
-            const start = value ? new Date(value) : new Date(todayStartMs);
+            const start = getClampedJamMilestoneDate(value, minimumDateMs);
             setTempDate(start);
             setViewDate(start);
         }
-    }, [isOpen, value, todayStartMs]);
+    }, [isOpen, value, minimumDateMs]);
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
@@ -188,8 +185,8 @@ const CustomDateTimePicker: React.FC<{ label: string, icon: any, value: string, 
     };
 
     const handleApply = () => {
-        if (tempDate.getTime() < todayStartMs) {
-            alert("Please select a valid time (dates in the past are not allowed).");
+        if (tempDate.getTime() < minimumDateMs) {
+            alert("Please select a time on or after the preceding jam milestone.");
             return;
         }
         onChange(tempDate.toISOString());
@@ -229,7 +226,7 @@ const CustomDateTimePicker: React.FC<{ label: string, icon: any, value: string, 
 
             {isOpen && !isPassed && popupRect && createPortal(
                 <div ref={popupRef} className="w-[300px] md:w-[320px] max-w-[90vw] bg-white dark:bg-modtale-card border border-slate-200 dark:border-white/10 rounded-2xl shadow-[0_10px_50px_rgba(0,0,0,0.25)] p-4 animate-in fade-in zoom-in-95 duration-200 origin-top" style={{ position: 'fixed', top: popupRect.top, left: popupRect.left + (popupRect.width / 2), transform: 'translateX(-50%)', zIndex: 10000 }}>
-                    <CalendarWidget viewDate={viewDate} setViewDate={setViewDate} selectedDate={tempDate} onSelect={handleDateSelect} minDate={new Date(todayStartMs)} />
+                    <CalendarWidget viewDate={viewDate} setViewDate={setViewDate} selectedDate={tempDate} onSelect={handleDateSelect} minDate={new Date(minimumDateMs)} />
 
                     <div className="mt-4 flex items-center justify-between gap-2 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-white/5">
                         <div className="flex items-center gap-2 pl-1">
@@ -673,25 +670,6 @@ export const JamBuilder: React.FC<any> = ({
         setRulesEditorMode('write');
     };
 
-    const MarkdownComponents = {
-        code({node, inline, className, children, ...props}: any) {
-            const match = /language-(\w+)/.exec(className || '');
-            return !inline && match ? (
-                <SyntaxHighlighter {...props} style={vscDarkPlus} language={match[1]} PreTag="div" className="rounded-lg text-sm">
-                    {String(children).replace(/\n$/, '')}
-                </SyntaxHighlighter>
-            ) : (
-                <code className={`${className || ''} bg-slate-100 dark:bg-white/10 px-1 py-0.5 rounded text-sm`} {...props}>
-                    {children}
-                </code>
-            );
-        },
-        p({node, children, ...props}: any) { return <p className="my-2 [li>&]:my-0" {...props}>{children}</p>; },
-        li({node, children, ...props}: any) { return <li className="my-1 [&>p]:my-0" {...props}>{children}</li>; },
-        ul({node, children, ...props}: any) { return <ul className="list-disc pl-6 my-3" {...props}>{children}</ul>; },
-        ol({node, children, ...props}: any) { return <ol className="list-decimal pl-6 my-3" {...props}>{children}</ol>; }
-    };
-
     const classificationOptions = [
         { label: 'Plugin', value: 'PLUGIN' },
         { label: 'Modpack', value: 'MODPACK' },
@@ -854,9 +832,7 @@ export const JamBuilder: React.FC<any> = ({
                             ) : (
                                 <div className="prose dark:prose-invert prose-lg max-w-none min-h-[500px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-[2rem] p-6 md:p-8 shadow-sm">
                                     {metaData.description ? (
-                                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw, [rehypeSanitize, {...defaultSchema, attributes: {...defaultSchema.attributes, code: ['className']}}]]} components={MarkdownComponents}>
-                                            {metaData.description}
-                                        </ReactMarkdown>
+                                        <MarkdownRenderer content={metaData.description} />
                                     ) : <p className="text-slate-500 italic">No description provided.</p>}
                                 </div>
                             )}
@@ -1041,9 +1017,7 @@ export const JamBuilder: React.FC<any> = ({
                             {rulesEditorMode === 'preview' && (
                                 <div className="prose dark:prose-invert prose-lg max-w-none min-h-[500px] bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-[2rem] p-6 md:p-8 shadow-sm">
                                     {metaData.rules ? (
-                                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw, [rehypeSanitize, {...defaultSchema, attributes: {...defaultSchema.attributes, code: ['className']}}]]} components={MarkdownComponents}>
-                                            {metaData.rules}
-                                        </ReactMarkdown>
+                                        <MarkdownRenderer content={metaData.rules} />
                                     ) : <p className="text-slate-500 italic">No rules generated yet.</p>}
                                 </div>
                             )}
@@ -1524,9 +1498,9 @@ export const JamBuilder: React.FC<any> = ({
                                 <div className="mb-6 pb-6 border-b border-slate-200 dark:border-white/5">
                                     <div className="flex flex-col gap-2">
                                         <div><h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2"><Link2 className="w-4 h-4 text-slate-500" /> Jam Slug</h3><p className="text-xs text-slate-500">Customize the URL.</p></div>
-                                        <div className={`flex items-center w-full bg-white dark:bg-black/20 border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-modtale-accent transition-all ${slugError ? 'border-red-500' : 'border-slate-200 dark:border-white/10'}`}>
-                                            <div className="px-4 py-3 bg-slate-50 dark:bg-white/5 border-r border-slate-200 dark:border-white/10 text-slate-500 text-sm font-mono whitespace-nowrap select-none">modtale.net/jam/</div>
-                                            <input value={metaData.slug || ''} onChange={handleSlugChange} className={`flex-1 bg-transparent border-none px-4 py-3 text-sm font-mono text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400 ${slugError ? 'text-red-500' : ''}`} placeholder="jam-slug" />
+                                        <div className={`flex flex-col sm:flex-row items-stretch w-full bg-white dark:bg-black/20 border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-modtale-accent transition-all ${slugError ? 'border-red-500' : 'border-slate-200 dark:border-white/10'}`}>
+                                            <div className="px-4 py-2.5 sm:py-3 bg-slate-50 dark:bg-white/5 border-b sm:border-b-0 sm:border-r border-slate-200 dark:border-white/10 text-slate-500 text-xs sm:text-sm font-mono whitespace-nowrap select-none">modtale.net/jam/</div>
+                                            <input value={metaData.slug || ''} onChange={handleSlugChange} className={`min-w-0 flex-1 bg-transparent border-none px-4 py-3 text-sm font-mono text-slate-900 dark:text-white focus:outline-none placeholder:text-slate-400 ${slugError ? 'text-red-500' : ''}`} placeholder="jam-slug" />
                                         </div>
                                         {slugError && <p className="text-[10px] text-red-500 font-bold">{slugError}</p>}
                                     </div>
