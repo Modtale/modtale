@@ -97,7 +97,7 @@ public class OAuthProviderProfileService {
             return user.getAttribute("web_url");
         }
         if ("twitter".equals(provider)) {
-            return "https://twitter.com/" + username;
+            return "https://x.com/" + username;
         }
         if ("github".equals(provider)) {
             return "https://github.com/" + username;
