@@ -46,7 +46,14 @@ final class ModpackArchiveService {
         }
 
         try {
-            return archiveSupport.download(version.getFileUrl());
+            byte[] cachedArchive = archiveSupport.download(version.getFileUrl());
+            if (cachedArchive != null && cachedArchive.length > 0) {
+                return cachedArchive;
+            }
+            logger.warn("Cached modpack archive was empty for project={} version={}. Rebuilding archive.",
+                    pack.getId(), version.getVersionNumber());
+            version.setFileUrl(null);
+            return null;
         } catch (StorageDownloadException ex) {
             logger.warn("Cached modpack archive could not be downloaded for project={} version={}. Rebuilding archive.",
                     pack.getId(), version.getVersionNumber(), ex);
@@ -222,7 +229,27 @@ final class ModpackArchiveService {
         if (value == null) {
             return "";
         }
-        return value.replace("\\", "\\\\").replace("\"", "\\\"");
+        StringBuilder escaped = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char character = value.charAt(i);
+            switch (character) {
+                case '\"' -> escaped.append("\\\"");
+                case '\\' -> escaped.append("\\\\");
+                case '\b' -> escaped.append("\\b");
+                case '\f' -> escaped.append("\\f");
+                case '\n' -> escaped.append("\\n");
+                case '\r' -> escaped.append("\\r");
+                case '\t' -> escaped.append("\\t");
+                default -> {
+                    if (character < 0x20) {
+                        escaped.append(String.format("\\u%04x", (int) character));
+                    } else {
+                        escaped.append(character);
+                    }
+                }
+            }
+        }
+        return escaped.toString();
     }
 
     private String trimToNull(String value) {

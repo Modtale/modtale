@@ -5,11 +5,12 @@ import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { Spinner } from '@/components/ui/Spinner';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { DiscordBrandIcon, GitHubBrandIcon, GitLabBrandIcon, HytaleBrandIcon, XBrandIcon } from '@/components/ui/icons/BrandIcons';
+import { BlueskyBrandIcon, DiscordBrandIcon, GitHubBrandIcon, GitLabBrandIcon, HytaleBrandIcon, XBrandIcon } from '@/components/ui/icons/BrandIcons';
 import type { User } from '@/types';
 import { BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
 import { Link } from 'react-router-dom';
+import { getConnectedAccountProfileUrl } from '@/modules/user/utils/connectedAccountLinks';
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
@@ -174,7 +175,8 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
         switch (provider?.toLowerCase()) {
             case 'github': return { icon: GitHubBrandIcon, label: 'GitHub', activeClass: 'group-hover/social:text-slate-900 dark:group-hover/social:text-white group-hover/social:border-slate-300 dark:group-hover/social:border-white/20', iconBg: 'bg-slate-900/10 dark:bg-white/10 text-slate-900 dark:text-white', profileBtnBg: 'bg-[#24292e]' };
             case 'gitlab': return { icon: GitLabBrandIcon, label: 'GitLab', activeClass: 'group-hover/social:text-[#FC6D26] group-hover/social:border-[#FC6D26]/30', iconBg: 'bg-[#FC6D26]/10 text-[#FC6D26]', profileBtnBg: 'bg-[#FC6D26]' };
-            case 'twitter': return { icon: XBrandIcon, label: 'Twitter', activeClass: 'group-hover/social:text-[#1DA1F2] group-hover/social:border-[#1DA1F2]/30', iconBg: 'bg-[#1DA1F2]/10 text-[#1DA1F2]', profileBtnBg: 'bg-[#1DA1F2]' };
+            case 'twitter': return { icon: XBrandIcon, label: 'X / Twitter', activeClass: 'group-hover/social:text-slate-900 dark:group-hover/social:text-white group-hover/social:border-slate-400 dark:group-hover/social:border-white/30', iconBg: 'bg-slate-900/10 dark:bg-white/10 text-slate-900 dark:text-white', profileBtnBg: 'bg-black' };
+            case 'bluesky': return { icon: BlueskyBrandIcon, label: 'Bluesky', activeClass: 'group-hover/social:text-[#1185FE] group-hover/social:border-[#1185FE]/30', iconBg: 'bg-[#1185FE]/10 text-[#1185FE]', profileBtnBg: 'bg-[#1185FE]' };
             case 'discord': return { icon: DiscordBrandIcon, label: 'Discord', activeClass: 'group-hover/social:text-[#5865F2] group-hover/social:border-[#5865F2]/30', iconBg: 'bg-[#5865F2]/10 text-[#5865F2]', profileBtnBg: 'bg-[#5865F2]' };
             case 'hytale': return { icon: HytaleBrandIcon, label: 'Hytale', activeClass: 'group-hover/social:text-cyan-400 group-hover/social:border-cyan-400/30', iconBg: 'bg-cyan-500/10 text-cyan-400', profileBtnBg: 'bg-slate-900' };
             default: return { icon: Globe, label: 'Website', activeClass: 'group-hover/social:text-blue-500 group-hover/social:border-blue-500/30', iconBg: 'bg-blue-500/10 text-blue-500', profileBtnBg: 'bg-blue-500' };
@@ -192,9 +194,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
 
     const SocialButton = ({ account, compact = false, isRightMost = false }: { account: any, compact?: boolean, isRightMost?: boolean }) => {
         const { icon: Icon, label, activeClass, iconBg, profileBtnBg } = getProviderDetails(account.provider);
-        const displayUrl = account.profileUrl || '#';
-        const isDiscord = account.provider?.toLowerCase() === 'discord';
-        const finalUrl = isDiscord ? `https://discord.com/users/${account.providerId}` : displayUrl;
+        const finalUrl = getConnectedAccountProfileUrl(account);
 
         const popupPositionClasses = isRightMost ? "right-0 left-auto translate-x-0" : "left-1/2 -translate-x-1/2";
         const trianglePositionClasses = isRightMost ? "right-3 left-auto translate-x-0" : "left-1/2 -translate-x-1/2";

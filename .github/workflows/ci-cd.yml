@@ -419,10 +419,16 @@ jobs:
             echo "::add-mask::$WARDEN_URL_VALUE"
           fi
 
-          gcloud builds submit \
-            --config=cloudbuild.yml \
-            --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
-            --substitutions=_TAG=${{ env.TAG }} .
+          # Rotating preview credentials needs a new Cloud Run revision, but the
+          # application image is unchanged. Avoid paying to compile it again.
+          if [ "${{ steps.filter.outputs.backend }}" = "true" ] || [ "$BACKEND_EXISTS" = "false" ]; then
+            gcloud builds submit \
+              --config=cloudbuild.yml \
+              --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
+              --substitutions=_TAG=${{ env.TAG }} .
+          else
+            echo "Reusing the existing backend image for a configuration-only rollout."
+          fi
           
           ARGS=(
             "--image" "gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }}"
@@ -431,6 +437,7 @@ jobs:
             "--allow-unauthenticated"
             "--use-http2"
             "--memory" "1Gi"
+            "--concurrency" "80"
             "--update-env-vars" "MONGODB_DATABASE_NAME=${{ env.DB_NAME }}"
             "--update-env-vars" "APP_SEEDING_ENABLED=${{ env.SEEDING_ENABLED }}"
             "--update-env-vars" "APP_SEEDING_MODE=${{ env.SEEDING_MODE }}"
@@ -439,7 +446,8 @@ jobs:
             "--update-env-vars" "APP_SEEDING_SOURCE_R2_BUCKET_NAME=${{ env.SEEDING_SOURCE_R2_BUCKET_NAME }}"
             "--update-env-vars" "WARDEN_ENABLED=${{ env.WARDEN_ENABLED }}"
             "--update-env-vars" "OAUTH_ENABLED=${{ env.OAUTH_ENABLED }}"
-            "--update-env-vars" "FRONTEND_URL=placeholder"
+            "--update-env-vars" "FRONTEND_URL=${FRONTEND_DOMAIN:-placeholder}"
+            "--update-env-vars" "BACKEND_URL=${BACKEND_DOMAIN:-placeholder}"
             "--update-env-vars" "R2_BUCKET_NAME=${{ env.R2_BUCKET_NAME }}"
             "--update-env-vars" "R2_PUBLIC_DOMAIN=${{ env.R2_PUBLIC_DOMAIN }}"
           )
@@ -454,6 +462,11 @@ jobs:
           ARGS+=("--update-secrets" "R2_ENDPOINT=${{ env.R2_ENDPOINT_SECRET_NAME }}:$R2_ENDPOINT_SECRET_VERSION")
 
           if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
+            # Keep one production instance warm to prevent user-facing cold starts.
+            ARGS+=("--cpu" "2")
+            ARGS+=("--min-instances" "1")
+            ARGS+=("--max-instances" "10")
+            ARGS+=("--cpu-throttling")
             ARGS+=("--update-env-vars" "WARDEN_URL=$WARDEN_URL_VALUE")
             ARGS+=("--update-secrets" "SMTP_HOST=SMTP_HOST:latest")
             ARGS+=("--update-secrets" "SMTP_USERNAME=SMTP_USERNAME:latest")
@@ -478,6 +491,10 @@ jobs:
             ARGS+=("--update-secrets" "ADMIN_DISCORD_WEBHOOK_URL=ADMIN_DISCORD_WEBHOOK_URL:latest")
             ARGS+=("--update-secrets" "STATUS_DISCORD_WEBHOOK_URL=STATUS_DISCORD_WEBHOOK_URL:latest")
           elif [ "${{ env.ENV_TYPE }}" = "dev" ]; then
+            ARGS+=("--cpu" "1")
+            ARGS+=("--min-instances" "0")
+            ARGS+=("--max-instances" "3")
+            ARGS+=("--cpu-throttling")
             ARGS+=("--update-env-vars" "WARDEN_URL=$WARDEN_URL_VALUE")
             ARGS+=("--update-secrets" "SMTP_HOST=SMTP_HOST:latest")
             ARGS+=("--update-secrets" "SMTP_USERNAME=SMTP_USERNAME:latest")
@@ -499,7 +516,12 @@ jobs:
             ARGS+=("--remove-env-vars" "STATUS_DISCORD_WEBHOOK_URL")
           else
             : "${RUNTIME_SERVICE_ACCOUNT:?Set environment variable GCP_BRANCH_PREVIEW_RUNTIME_SERVICE_ACCOUNT in the branch-preview GitHub environment.}"
-            ARGS+=("--no-cpu-throttling")
+            # Preview services are usually idle. Request-based CPU billing avoids
+            # charging for CPU between requests without changing request capacity.
+            ARGS+=("--cpu" "1")
+            ARGS+=("--min-instances" "0")
+            ARGS+=("--max-instances" "2")
+            ARGS+=("--cpu-throttling")
             ARGS+=("--startup-probe" "httpGet.path=/actuator/health/readiness,httpGet.port=8080,periodSeconds=10,timeoutSeconds=10,failureThreshold=60")
             ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_FORMAT_CONSOLE=logstash")
             ARGS+=("--update-env-vars" "LOGGING_STRUCTURED_JSON_RENAME_LEVEL=severity")
@@ -523,14 +545,19 @@ jobs:
 
       - name: Determine API URL
         run: |
+          if [ -f backend/backend_url.txt ]; then
+            BACKEND_SERVICE_URL=$(cat backend/backend_url.txt)
+          else
+            BACKEND_SERVICE_URL=$EXISTING_BACKEND_URL
+          fi
+
+          : "${BACKEND_SERVICE_URL:?Backend service URL was not resolved.}"
+          echo "SSR_API_URL=$BACKEND_SERVICE_URL/api/v1" >> $GITHUB_ENV
+
           if [ -n "${BACKEND_DOMAIN:-}" ]; then
             echo "API_URL=$BACKEND_DOMAIN/api/v1" >> $GITHUB_ENV
           else
-            if [ -f backend/backend_url.txt ]; then
-              echo "API_URL=$(cat backend/backend_url.txt)/api/v1" >> $GITHUB_ENV
-            else
-              echo "API_URL=$EXISTING_BACKEND_URL/api/v1" >> $GITHUB_ENV
-            fi
+            echo "API_URL=$BACKEND_SERVICE_URL/api/v1" >> $GITHUB_ENV
           fi
 
       - name: Build and Deploy Frontend
@@ -545,22 +572,34 @@ jobs:
           gcloud builds submit \
             --config=cloudbuild.yml \
             --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
-            --substitutions=_PUBLIC_API_URL=$API_URL,_TAG=$TAG .
+            --substitutions=_PUBLIC_API_URL=$API_URL,_SSR_API_URL=$SSR_API_URL,_TAG=$TAG .
 
           FRONTEND_ARGS=(
             "--image" "gcr.io/$PROJECT_ID/modtale-frontend:$TAG"
             "--region" "$REGION"
             "--service-account" "$RUNTIME_SERVICE_ACCOUNT"
             "--allow-unauthenticated"
+            "--cpu" "1"
+            "--memory" "256Mi"
+            "--concurrency" "80"
+            "--cpu-throttling"
             "--set-env-vars" "PUBLIC_API_URL=$API_URL"
           )
 
           if [ "${{ env.ENV_TYPE }}" = "preview" ]; then
+            FRONTEND_ARGS+=("--min-instances" "0")
+            FRONTEND_ARGS+=("--max-instances" "2")
             FRONTEND_ARGS+=("--set-env-vars" "LOG_SERVICE_NAME=${{ env.FRONTEND_SERVICE }}")
             FRONTEND_ARGS+=("--set-env-vars" "LOG_COMPONENT=frontend")
             FRONTEND_ARGS+=("--set-env-vars" "LOG_ENVIRONMENT=branch-preview")
             FRONTEND_ARGS+=("--set-env-vars" "LOG_BRANCH=${{ env.BRANCH_SLUG }}")
             FRONTEND_ARGS+=("--labels" "app=modtale,environment=branch-preview,component=frontend,branch=${{ env.BRANCH_SLUG }}")
+          elif [ "${{ env.ENV_TYPE }}" = "dev" ]; then
+            FRONTEND_ARGS+=("--min-instances" "0")
+            FRONTEND_ARGS+=("--max-instances" "3")
+          else
+            FRONTEND_ARGS+=("--min-instances" "1")
+            FRONTEND_ARGS+=("--max-instances" "3")
           fi
 
           gcloud run deploy "$FRONTEND_SERVICE" "${FRONTEND_ARGS[@]}" --format="value(status.url)" > frontend_url.txt
@@ -594,7 +633,9 @@ jobs:
 
       - name: Update Backend CORS and Self-Awareness
         id: update_backend_self_awareness
-        if: (steps.filter.outputs.backend == 'true' || env.BACKEND_EXISTS == 'false' || steps.filter.outputs.frontend == 'true' || env.FRONTEND_EXISTS == 'false')
+        # Only preview URLs are unknown during the initial backend deploy. Production
+        # and develop use their configured domains and avoid a second paid rollout.
+        if: env.ENV_TYPE == 'preview' && (steps.filter.outputs.backend == 'true' || env.BACKEND_EXISTS == 'false' || steps.filter.outputs.frontend == 'true' || env.FRONTEND_EXISTS == 'false')
         run: |
           BEFORE_REVISION=$(gcloud run services describe "${{ env.BACKEND_SERVICE }}" --region "$REGION" --format="value(status.latestReadyRevisionName)" 2>/dev/null || true)
 
@@ -645,6 +686,41 @@ jobs:
           SERVICE_URL: ${{ env.BACKEND_DOMAIN }}
           DEPLOYED_REVISION: ${{ steps.update_backend_self_awareness.outputs.revision || steps.deploy_backend.outputs.revision }}
         run: bash .github/scripts/notify-status-deploy.sh
+
+      - name: Retain two preview R2 credential versions
+        if: env.ENV_TYPE == 'preview' && env.R2_RUNTIME_CREDENTIALS_REPLACED == 'true'
+        run: |
+          set -euo pipefail
+
+          for secret_name in \
+            "$R2_ACCESS_KEY_SECRET_NAME" \
+            "$R2_SECRET_KEY_SECRET_NAME" \
+            "$R2_ENDPOINT_SECRET_NAME" \
+            "$R2_TOKEN_ID_SECRET_NAME"; do
+            # Keep the current version plus one rollback version. Delayed
+            # destruction preserves a seven-day recovery window without letting
+            # rotated preview credentials accumulate indefinitely.
+            gcloud secrets update "$secret_name" \
+              --project "$PROJECT_ID" \
+              --version-destroy-ttl="604800s" \
+              --quiet
+
+            mapfile -t old_versions < <(
+              gcloud secrets versions list "$secret_name" \
+                --project "$PROJECT_ID" \
+                --filter='state=ENABLED' \
+                --format='value(name.basename())' \
+                | sort -rn \
+                | tail -n +3
+            )
+
+            for version in "${old_versions[@]}"; do
+              gcloud secrets versions destroy "$version" \
+                --secret "$secret_name" \
+                --project "$PROJECT_ID" \
+                --quiet
+            done
+          done
 
       - name: Generate Deployment Summary
         if: always()

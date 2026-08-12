@@ -3,8 +3,10 @@ package net.modtale.service.project.version;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import net.modtale.exception.InvalidVersionRequestException;
 import net.modtale.model.dto.request.project.DependencyReferenceRequest;
 import net.modtale.model.project.Project;
@@ -38,6 +40,7 @@ public class VersionDependencyService {
 
         List<ProjectDependency> dependencies = new ArrayList<>();
         List<String> simpleProjectIds = new ArrayList<>();
+        Set<String> dependencyKeys = new HashSet<>();
 
         for (DependencyReferenceRequest reference : dependencyReferences) {
             if (reference == null) {
@@ -48,6 +51,10 @@ public class VersionDependencyService {
             ProjectDependency dependency = source == ProjectDependency.Source.MODTALE
                     ? resolveModtaleDependency(reference, isModpack, allowDraftDependencies)
                     : resolveExternalDependency(reference, source, isModpack);
+            String dependencyKey = dependency.getSource().name() + ":" + dependency.getProjectId().toLowerCase(Locale.ROOT);
+            if (!dependencyKeys.add(dependencyKey)) {
+                throw new InvalidVersionRequestException("Each dependency can only be included once.");
+            }
             dependencies.add(dependency);
             if (!dependency.isExternal()) {
                 simpleProjectIds.add(dependency.getProjectId());

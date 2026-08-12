@@ -21,7 +21,7 @@ import {
     generateWebsiteSchema,
     getBreadcrumbsForClassification,
 } from '../utils/schema';
-import { BACKEND_URL } from '@/utils/api.ts';
+import { BACKEND_URL, SERVER_BACKEND_URL } from '@/utils/api.ts';
 
 const url = Astro.url;
 const path = url.pathname;
@@ -164,10 +164,10 @@ if (classification) {
                 headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=86400' },
             };
             const [marquee, trending, newest, stats] = await Promise.all([
-                fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects?size=16&sort=popular&view=marquee`, 1200, homeRequestInit),
-                fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects?size=12&sort=trending`, 1200, homeRequestInit),
-                fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects?size=12&sort=newest`, 1200, homeRequestInit),
-                fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/analytics/platform/stats`, 1200, homeRequestInit),
+                fetchJsonWithTimeout(`${SERVER_BACKEND_URL}/api/v1/projects?size=16&sort=popular&view=marquee`, 1200, homeRequestInit),
+                fetchJsonWithTimeout(`${SERVER_BACKEND_URL}/api/v1/projects?size=12&sort=trending`, 1200, homeRequestInit),
+                fetchJsonWithTimeout(`${SERVER_BACKEND_URL}/api/v1/projects?size=12&sort=newest`, 1200, homeRequestInit),
+                fetchJsonWithTimeout(`${SERVER_BACKEND_URL}/api/v1/analytics/platform/stats`, 1200, homeRequestInit),
             ]);
 
             const unique = trending?.content || newest?.content || [];
@@ -203,7 +203,7 @@ if (classification) {
                 const tagsParamStr = tagsVal ? `&tags=${encodeURIComponent(tagsVal)}` : '';
 
                 const classParam = classification === 'ALL' ? '' : `&classification=${classification}`;
-                const endpoint = `${BACKEND_URL}/api/v1/projects?size=12&page=${page}${classParam}&sort=${sort}${searchParamStr}${tagsParamStr}`;
+                const endpoint = `${SERVER_BACKEND_URL}/api/v1/projects?size=12&page=${page}${classParam}&sort=${sort}${searchParamStr}${tagsParamStr}`;
 
                 const data = await fetchJsonWithTimeout(endpoint, 2000, {
                     headers: { 'Cache-Control': 'public, s-maxage=300' },
@@ -241,7 +241,7 @@ if (classification) {
 } else if (projectLookupKey && isProjectRoute
     && (isBot || (pathSegments[0] === 'project' && pathSegments.length === 2))) {
     try {
-        const modData = await fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects/${projectLookupKey}`, 2500);
+        const modData = await fetchJsonWithTimeout(`${SERVER_BACKEND_URL}/api/v1/projects/${projectLookupKey}`, 2500);
 
         if (modData) {
             const projectUrl = SiteRoutes.project(modData);
@@ -278,13 +278,13 @@ if (classification) {
 if (wikiSegmentIndex >= 0 && projectId) {
     const wikiBundlePath = wikiPagePath ? `/_bundle/${wikiPagePath}` : '/_bundle';
     const wikiBundleRequest = fetchJsonWithTimeout(
-        `${BACKEND_URL}/api/v1/wiki/${encodeURIComponent(projectId)}${wikiBundlePath}`,
+        `${SERVER_BACKEND_URL}/api/v1/wiki/${encodeURIComponent(projectId)}${wikiBundlePath}`,
         WIKI_SSR_FAST_PATH_TIMEOUT_MS,
         { headers: { 'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=3600' } }
     );
     const projectRequest = initialData
         ? Promise.resolve(initialData)
-        : fetchJsonWithTimeout(`${BACKEND_URL}/api/v1/projects/${projectId}`, WIKI_SSR_FAST_PATH_TIMEOUT_MS);
+        : fetchJsonWithTimeout(`${SERVER_BACKEND_URL}/api/v1/projects/${projectId}`, WIKI_SSR_FAST_PATH_TIMEOUT_MS);
     const wikiBundleData = await wikiBundleRequest;
     const projectData = initialData
         ? initialData

@@ -2,15 +2,17 @@ FROM node:22.12.0-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 COPY scripts ./scripts
-RUN npm install --legacy-peer-deps
+RUN npm ci --legacy-peer-deps
 COPY . .
 
 ARG PUBLIC_API_URL
 ENV PUBLIC_API_URL=$PUBLIC_API_URL
+ARG SSR_API_URL
+ENV SSR_API_URL=$SSR_API_URL
 ARG PUBLIC_STATUS_URL
 ENV PUBLIC_STATUS_URL=$PUBLIC_STATUS_URL
 
-RUN npm run build
+RUN npm run build && npm prune --omit=dev --legacy-peer-deps
 
 FROM node:22.12.0-alpine
 WORKDIR /app

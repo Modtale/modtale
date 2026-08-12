@@ -1,9 +1,10 @@
 .git
 .gitignore
-node_modules/
-dist/
+.gradle/
 build/
-.env.local
+out/
+generated/
+bin/
 .idea/
 *.iml
 *.log
