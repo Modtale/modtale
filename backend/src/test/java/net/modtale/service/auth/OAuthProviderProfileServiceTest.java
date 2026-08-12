@@ -60,7 +60,7 @@ class OAuthProviderProfileServiceTest {
         assertEquals(OAuthProvider.TWITTER, profile.provider());
         assertEquals("tw-1", profile.providerId());
         assertEquals("modtale_dev", profile.username());
-        assertEquals("https://twitter.com/modtale_dev", profile.profileUrl());
+        assertEquals("https://x.com/modtale_dev", profile.profileUrl());
     }
 
     @Test
