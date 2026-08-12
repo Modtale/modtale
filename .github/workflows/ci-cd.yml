@@ -413,10 +413,16 @@ jobs:
             echo "::add-mask::$WARDEN_URL_VALUE"
           fi
 
-          gcloud builds submit \
-            --config=cloudbuild.yml \
-            --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
-            --substitutions=_TAG=${{ env.TAG }} .
+          # Rotating preview credentials needs a new Cloud Run revision, but the
+          # application image is unchanged. Avoid paying to compile it again.
+          if [ "${{ steps.filter.outputs.backend }}" = "true" ] || [ "$BACKEND_EXISTS" = "false" ]; then
+            gcloud builds submit \
+              --config=cloudbuild.yml \
+              --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
+              --substitutions=_TAG=${{ env.TAG }} .
+          else
+            echo "Reusing the existing backend image for a configuration-only rollout."
+          fi
           
           ARGS=(
             "--image" "gcr.io/$PROJECT_ID/modtale-backend:${{ env.TAG }}"
