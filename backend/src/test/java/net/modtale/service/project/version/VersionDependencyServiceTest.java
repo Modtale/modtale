@@ -63,6 +63,22 @@ class VersionDependencyServiceTest {
     }
 
     @Test
+    void resolveRequestedDependenciesRejectsDuplicateProjects() {
+        when(projectService.getRawProjectById("dep-1")).thenReturn(project("dep-1", "Dependency One", ProjectStatus.PUBLISHED, "1.0.0", "2.0.0"));
+
+        InvalidVersionRequestException error = assertThrows(
+                InvalidVersionRequestException.class,
+                () -> service.resolveRequestedDependencies(
+                        List.of(dependency("dep-1", "1.0.0"), dependency("dep-1", "2.0.0")),
+                        true,
+                        false
+                )
+        );
+
+        assertEquals("Each dependency can only be included once.", error.getMessage());
+    }
+
+    @Test
     void resolveRequestedDependenciesRejectsMalformedMissingDraftOrUnknownVersions() {
         when(projectService.getRawProjectById("draft")).thenReturn(project("draft", "Draft", ProjectStatus.DRAFT, "1.0.0"));
         when(projectService.getRawProjectById("dep-1")).thenReturn(project("dep-1", "Dependency One", ProjectStatus.PUBLISHED, "1.0.0"));

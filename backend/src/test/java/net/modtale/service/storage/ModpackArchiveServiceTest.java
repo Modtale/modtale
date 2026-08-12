@@ -1,5 +1,7 @@
 package net.modtale.service.storage;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -49,6 +51,44 @@ class ModpackArchiveServiceTest {
 
         assertArrayEquals(new byte[]{1, 2, 3}, service.generateModpackZip(pack, version));
         verify(projectRepository, never()).save(pack);
+    }
+
+    @Test
+    void generateModpackZipRebuildsAnEmptyCachedArchive() throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", "modpacks/empty.zip");
+
+        when(archiveSupport.download("modpacks/empty.zip")).thenReturn(new byte[0]);
+        when(archiveSupport.newZipMultipartFile(eq("sky-pack-1.0.0.zip"), any())).thenAnswer(invocation -> mock(MultipartFile.class));
+        when(archiveSupport.upload(any(MultipartFile.class), eq("modpacks"))).thenReturn("modpacks/rebuilt.zip");
+
+        Map<String, String> entries = unzip(service.generateModpackZip(pack, version));
+
+        assertEquals(true, entries.containsKey("modpack.json"));
+        assertEquals("modpacks/rebuilt.zip", version.getFileUrl());
+        verify(projectRepository).save(pack);
+    }
+
+    @Test
+    void generateModpackZipWritesValidJsonForTitlesWithControlCharacters() throws Exception {
+        Project pack = pack();
+        pack.setTitle("Sky \"Pack\"\nNight\tBuild");
+        ProjectVersion version = version("1.0.0", null);
+        ProjectDependency dependency = new ProjectDependency("plugin", "Plugin\nDeluxe", "2.0.0");
+        version.setDependencies(List.of(dependency));
+        Project plugin = dependencyProject("plugin", ProjectClassification.PLUGIN);
+        ProjectVersion pluginVersion = version("2.0.0", null);
+
+        when(archiveSupport.resolveDependency(dependency))
+                .thenReturn(new DownloadArchiveSupport.ResolvedDependency(plugin, pluginVersion));
+        when(archiveSupport.newZipMultipartFile(eq("sky-pack-1.0.0.zip"), any())).thenAnswer(invocation -> mock(MultipartFile.class));
+        when(archiveSupport.upload(any(MultipartFile.class), eq("modpacks"))).thenReturn("modpacks/generated.zip");
+
+        String manifest = unzip(service.generateModpackZip(pack, version)).get("modpack.json");
+        JsonNode parsed = new ObjectMapper().readTree(manifest);
+
+        assertEquals("Sky \"Pack\"\nNight\tBuild", parsed.get("name").asText());
+        assertEquals("Plugin\nDeluxe", parsed.get("files").get(0).get("title").asText());
     }
 
     @Test
