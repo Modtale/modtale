@@ -5,8 +5,13 @@ steps:
       - '-c'
       - |
         docker pull gcr.io/$PROJECT_ID/modtale-backend:${_TAG} || true
-        docker build \
+        if [ "${_TAG}" != "latest" ]; then
+          docker pull gcr.io/$PROJECT_ID/modtale-backend:latest || true
+        fi
+        DOCKER_BUILDKIT=1 docker build \
           --cache-from gcr.io/$PROJECT_ID/modtale-backend:${_TAG} \
+          --cache-from gcr.io/$PROJECT_ID/modtale-backend:latest \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
           -t gcr.io/$PROJECT_ID/modtale-backend:${_TAG} \
           .
 

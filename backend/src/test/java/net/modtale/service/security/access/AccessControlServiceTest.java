@@ -150,6 +150,34 @@ class AccessControlServiceTest {
     }
 
     @Test
+    void hasProjectPermAllowsOwnersAndAuthorizedTeamMembersToReadDrafts() {
+        Project project = new Project();
+        project.setId("draft-1");
+        project.setAuthorId("u-owner");
+        project.setStatus(ProjectStatus.DRAFT);
+        project.setTeamMembers(List.of(new Project.ProjectMember("u-reader", "reader-role")));
+        project.setProjectRoles(List.of(new Project.ProjectRole(
+                "reader-role",
+                "Reader",
+                "#fff",
+                Set.of(ApiKey.ApiPermission.PROJECT_READ)
+        )));
+        when(projectRepository.findPermissionSnapshotById("draft-1")).thenReturn(Optional.of(project));
+
+        when(accountService.getCurrentUser((Authentication) isNull()))
+                .thenReturn(user("u-owner", "owner", List.of("USER")));
+        assertTrue(accessControlService.hasProjectPerm("draft-1", "PROJECT_READ", null));
+
+        when(accountService.getCurrentUser((Authentication) isNull()))
+                .thenReturn(user("u-reader", "reader", List.of("USER")));
+        assertTrue(accessControlService.hasProjectPerm("draft-1", "PROJECT_READ", null));
+
+        when(accountService.getCurrentUser((Authentication) isNull()))
+                .thenReturn(user("u-stranger", "stranger", List.of("USER")));
+        assertFalse(accessControlService.hasProjectPerm("draft-1", "PROJECT_READ", null));
+    }
+
+    @Test
     void hasProjectPermHonorsApiKeyProjectScopesForMutations() {
         Project project = new Project();
         project.setId("project-1");
