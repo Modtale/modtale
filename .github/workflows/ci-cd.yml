@@ -434,7 +434,8 @@ jobs:
             "--update-env-vars" "APP_SEEDING_SOURCE_R2_BUCKET_NAME=${{ env.SEEDING_SOURCE_R2_BUCKET_NAME }}"
             "--update-env-vars" "WARDEN_ENABLED=${{ env.WARDEN_ENABLED }}"
             "--update-env-vars" "OAUTH_ENABLED=${{ env.OAUTH_ENABLED }}"
-            "--update-env-vars" "FRONTEND_URL=placeholder"
+            "--update-env-vars" "FRONTEND_URL=${FRONTEND_DOMAIN:-placeholder}"
+            "--update-env-vars" "BACKEND_URL=${BACKEND_DOMAIN:-placeholder}"
             "--update-env-vars" "R2_BUCKET_NAME=${{ env.R2_BUCKET_NAME }}"
             "--update-env-vars" "R2_PUBLIC_DOMAIN=${{ env.R2_PUBLIC_DOMAIN }}"
           )
@@ -532,14 +533,19 @@ jobs:
 
       - name: Determine API URL
         run: |
+          if [ -f backend/backend_url.txt ]; then
+            BACKEND_SERVICE_URL=$(cat backend/backend_url.txt)
+          else
+            BACKEND_SERVICE_URL=$EXISTING_BACKEND_URL
+          fi
+
+          : "${BACKEND_SERVICE_URL:?Backend service URL was not resolved.}"
+          echo "SSR_API_URL=$BACKEND_SERVICE_URL/api/v1" >> $GITHUB_ENV
+
           if [ -n "${BACKEND_DOMAIN:-}" ]; then
             echo "API_URL=$BACKEND_DOMAIN/api/v1" >> $GITHUB_ENV
           else
-            if [ -f backend/backend_url.txt ]; then
-              echo "API_URL=$(cat backend/backend_url.txt)/api/v1" >> $GITHUB_ENV
-            else
-              echo "API_URL=$EXISTING_BACKEND_URL/api/v1" >> $GITHUB_ENV
-            fi
+            echo "API_URL=$BACKEND_SERVICE_URL/api/v1" >> $GITHUB_ENV
           fi
 
       - name: Build and Deploy Frontend
@@ -554,7 +560,7 @@ jobs:
           gcloud builds submit \
             --config=cloudbuild.yml \
             --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
-            --substitutions=_PUBLIC_API_URL=$API_URL,_TAG=$TAG .
+            --substitutions=_PUBLIC_API_URL=$API_URL,_SSR_API_URL=$SSR_API_URL,_TAG=$TAG .
 
           FRONTEND_ARGS=(
             "--image" "gcr.io/$PROJECT_ID/modtale-frontend:$TAG"
@@ -562,7 +568,7 @@ jobs:
             "--service-account" "$RUNTIME_SERVICE_ACCOUNT"
             "--allow-unauthenticated"
             "--cpu" "1"
-            "--memory" "512Mi"
+            "--memory" "256Mi"
             "--concurrency" "80"
             "--cpu-throttling"
             "--set-env-vars" "PUBLIC_API_URL=$API_URL"
@@ -615,7 +621,9 @@ jobs:
 
       - name: Update Backend CORS and Self-Awareness
         id: update_backend_self_awareness
-        if: (steps.filter.outputs.backend == 'true' || env.BACKEND_EXISTS == 'false' || steps.filter.outputs.frontend == 'true' || env.FRONTEND_EXISTS == 'false')
+        # Only preview URLs are unknown during the initial backend deploy. Production
+        # and develop use their configured domains and avoid a second paid rollout.
+        if: env.ENV_TYPE == 'preview' && (steps.filter.outputs.backend == 'true' || env.BACKEND_EXISTS == 'false' || steps.filter.outputs.frontend == 'true' || env.FRONTEND_EXISTS == 'false')
         run: |
           BEFORE_REVISION=$(gcloud run services describe "${{ env.BACKEND_SERVICE }}" --region "$REGION" --format="value(status.latestReadyRevisionName)" 2>/dev/null || true)
 
@@ -651,6 +659,41 @@ jobs:
           SERVICE_URL: ${{ env.BACKEND_DOMAIN }}
           DEPLOYED_REVISION: ${{ steps.update_backend_self_awareness.outputs.revision || steps.deploy_backend.outputs.revision }}
         run: bash .github/scripts/notify-status-deploy.sh
+
+      - name: Retain two preview R2 credential versions
+        if: env.ENV_TYPE == 'preview' && env.R2_RUNTIME_CREDENTIALS_REPLACED == 'true'
+        run: |
+          set -euo pipefail
+
+          for secret_name in \
+            "$R2_ACCESS_KEY_SECRET_NAME" \
+            "$R2_SECRET_KEY_SECRET_NAME" \
+            "$R2_ENDPOINT_SECRET_NAME" \
+            "$R2_TOKEN_ID_SECRET_NAME"; do
+            # Keep the current version plus one rollback version. Delayed
+            # destruction preserves a seven-day recovery window without letting
+            # rotated preview credentials accumulate indefinitely.
+            gcloud secrets update "$secret_name" \
+              --project "$PROJECT_ID" \
+              --version-destroy-ttl="604800s" \
+              --quiet
+
+            mapfile -t old_versions < <(
+              gcloud secrets versions list "$secret_name" \
+                --project "$PROJECT_ID" \
+                --filter='state=ENABLED' \
+                --format='value(name.basename())' \
+                | sort -rn \
+                | tail -n +3
+            )
+
+            for version in "${old_versions[@]}"; do
+              gcloud secrets versions destroy "$version" \
+                --secret "$secret_name" \
+                --project "$PROJECT_ID" \
+                --quiet
+            done
+          done
 
       - name: Generate Deployment Summary
         if: always()

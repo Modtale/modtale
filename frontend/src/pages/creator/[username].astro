@@ -4,7 +4,7 @@ import App from '../../App';
 import { isBotUserAgent } from '../../utils/seo';
 import { generateUserMeta } from '../../utils/meta';
 import { ROUTE_SEO } from '../../data/seo-constants';
-import { BACKEND_URL } from "@/utils/api.ts";
+import { SERVER_BACKEND_URL } from "@/utils/api.ts";
 import { SiteRoutes } from '../../utils/routes';
 
 const { username: handle } = Astro.params;
@@ -23,7 +23,7 @@ let ogType = "website";
 
 if (isBot && handle) {
     try {
-        const res = await fetch(`${BACKEND_URL}/api/v1/user/profile/${handle}`);
+        const res = await fetch(`${SERVER_BACKEND_URL}/api/v1/user/profile/${handle}`);
 
         if (res.ok) {
             userData = await res.json();
