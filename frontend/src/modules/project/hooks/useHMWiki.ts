@@ -7,9 +7,11 @@ type WikiCacheEntry = {
     pages: Map<string, any>;
     pagePromises: Map<string, Promise<any>>;
     prefetchRunId: number;
+    bootstrapSeeded?: boolean;
 };
 
 const ROOT_WIKI_PAGE_FAST_PATH_SLUG = 'home-1';
+const WIKI_BACKGROUND_PREFETCH_LIMIT = 4;
 
 const collectWikiSlugs = (nodes: any[] | undefined, slugs = new Set<string>()) => {
     for (const node of nodes || []) {
@@ -64,8 +66,38 @@ const getWikiBootstrap = (projectId: string) => {
     return sameWikiProject(bootstrap?.projectId, projectId) ? bootstrap : null;
 };
 
+const hasOwn = (value: object | null | undefined, key: string) => (
+    Boolean(value && Object.prototype.hasOwnProperty.call(value, key))
+);
+
+const seedWikiCacheFromBootstrap = (projectId: string) => {
+    const entry = getWikiCacheEntry(projectId);
+    if (entry.bootstrapSeeded) return entry;
+    entry.bootstrapSeeded = true;
+
+    const bootstrap = getWikiBootstrap(projectId);
+    if (!bootstrap) return entry;
+
+    if (hasOwn(bootstrap, 'metadataData') && bootstrap.metadataData) {
+        entry.modData = bootstrap.metadataData;
+    }
+
+    for (const [slug, page] of Object.entries(bootstrap.pages || {})) {
+        if (hasOwn(page, 'data') && page.data) {
+            entry.pages.set(slug, page.data);
+        }
+    }
+
+    return entry;
+};
+
 const getBootstrappedWikiData = (projectId: string) => {
-    const metadata = getWikiBootstrap(projectId)?.metadata;
+    const bootstrap = getWikiBootstrap(projectId);
+    if (hasOwn(bootstrap, 'metadataData')) {
+        return bootstrap?.metadataData ? Promise.resolve(bootstrap.metadataData) : null;
+    }
+
+    const metadata = bootstrap?.metadata;
     if (!metadata) return null;
 
     return metadata.then((data) => (
@@ -74,7 +106,12 @@ const getBootstrappedWikiData = (projectId: string) => {
 };
 
 const getBootstrappedWikiPage = (projectId: string, slug: string) => {
-    const page = getWikiBootstrap(projectId)?.pages?.[slug]?.promise;
+    const pageRecord = getWikiBootstrap(projectId)?.pages?.[slug];
+    if (hasOwn(pageRecord, 'data')) {
+        return pageRecord?.data ? Promise.resolve(pageRecord.data) : null;
+    }
+
+    const page = pageRecord?.promise;
     if (!page) return null;
 
     return page.then((data) => (
@@ -95,8 +132,40 @@ const collectWikiSlugList = (modData: any, pageSlug?: string) => {
         .filter((slug): slug is string => Boolean(slug));
 };
 
+const collectNearbyWikiSlugs = (modData: any, pageSlug?: string) => {
+    const slugs = collectWikiSlugList(modData, pageSlug);
+    const targetSlug = resolveTargetSlug(modData, pageSlug);
+    const targetIndex = targetSlug ? slugs.indexOf(targetSlug) : -1;
+    const prioritized: string[] = [];
+    const seen = new Set<string>();
+
+    const addSlug = (slug?: string | null) => {
+        const normalized = normalizeSlug(slug);
+        if (!normalized || seen.has(normalized)) return;
+        seen.add(normalized);
+        prioritized.push(normalized);
+    };
+
+    addSlug(targetSlug);
+    addSlug(modData?.index?.slug);
+
+    if (targetIndex >= 0) {
+        for (let offset = 1; prioritized.length < WIKI_BACKGROUND_PREFETCH_LIMIT + 1 && offset <= slugs.length; offset += 1) {
+            addSlug(slugs[targetIndex + offset]);
+            addSlug(slugs[targetIndex - offset]);
+        }
+    }
+
+    for (const slug of slugs) {
+        if (prioritized.length >= WIKI_BACKGROUND_PREFETCH_LIMIT + 1) break;
+        addSlug(slug);
+    }
+
+    return prioritized;
+};
+
 const fetchWikiDataCached = (projectId: string) => {
-    const entry = getWikiCacheEntry(projectId);
+    const entry = seedWikiCacheFromBootstrap(projectId);
     if (entry.modData) return Promise.resolve(entry.modData);
     if (entry.modPromise) return entry.modPromise;
 
@@ -114,7 +183,7 @@ const fetchWikiDataCached = (projectId: string) => {
 };
 
 const fetchWikiPageCached = (projectId: string, slug: string) => {
-    const entry = getWikiCacheEntry(projectId);
+    const entry = seedWikiCacheFromBootstrap(projectId);
     if (entry.pages.has(slug)) {
         return Promise.resolve(entry.pages.get(slug));
     }
@@ -175,16 +244,25 @@ export const prefetchInitialWikiPage = (projectId?: string) => {
         });
 };
 
+export const prefetchWikiPage = (projectId?: string, slug?: string | null) => {
+    const normalizedSlug = normalizeSlug(slug);
+    if (!projectId || !normalizedSlug) return;
+
+    void fetchWikiPageCached(projectId, normalizedSlug).catch(() => {
+        // Hover/focus prefetch should never surface user-facing errors.
+    });
+};
+
 export const clearHMWikiCacheForTests = () => {
     wikiCache.clear();
 };
 
 export const useHMWiki = (projectId?: string, pageSlug?: string, enabled: boolean = false) => {
     const [modData, setModData] = useState<any>(() => (
-        enabled && projectId ? getWikiCacheEntry(projectId).modData ?? null : null
+        enabled && projectId ? seedWikiCacheFromBootstrap(projectId).modData ?? null : null
     ));
     const [pageCache, setPageCache] = useState<Record<string, any>>(() => (
-        enabled && projectId ? getCachedPageRecord(projectId) : {}
+        enabled && projectId ? (seedWikiCacheFromBootstrap(projectId), getCachedPageRecord(projectId)) : {}
     ));
     const [wikiSlugs, setWikiSlugs] = useState<string[]>([]);
     const [metadataLoading, setMetadataLoading] = useState(false);
@@ -215,10 +293,10 @@ export const useHMWiki = (projectId?: string, pageSlug?: string, enabled: boolea
 
         const requestId = requestIdRef.current + 1;
         requestIdRef.current = requestId;
-        const cachedModData = getWikiCacheEntry(projectId).modData ?? null;
+        const cachedModData = seedWikiCacheFromBootstrap(projectId).modData ?? null;
 
         setModData(cachedModData);
-        setWikiSlugs(cachedModData ? collectWikiSlugList(cachedModData, pageSlugRef.current) : []);
+        setWikiSlugs(cachedModData ? collectNearbyWikiSlugs(cachedModData, pageSlugRef.current) : []);
         syncCachedPages(projectId);
         setMetadataLoading(!cachedModData);
         setPageLoading(false);
@@ -228,7 +306,7 @@ export const useHMWiki = (projectId?: string, pageSlug?: string, enabled: boolea
             .then((data) => {
                 if (requestIdRef.current !== requestId) return;
                 setModData(data);
-                setWikiSlugs(collectWikiSlugList(data, pageSlugRef.current));
+                setWikiSlugs(collectNearbyWikiSlugs(data, pageSlugRef.current));
             })
             .catch(() => {
                 if (requestIdRef.current === requestId) {
@@ -305,7 +383,9 @@ export const useHMWiki = (projectId?: string, pageSlug?: string, enabled: boolea
         const entry = getWikiCacheEntry(projectId);
         const prefetchRunId = entry.prefetchRunId + 1;
         entry.prefetchRunId = prefetchRunId;
-        const slugsToPrefetch = wikiSlugs.filter((slug) => slug !== targetSlug);
+        const slugsToPrefetch = wikiSlugs
+            .filter((slug) => slug !== targetSlug)
+            .slice(0, WIKI_BACKGROUND_PREFETCH_LIMIT);
 
         const cancelScheduledWork = scheduleLowPriorityWikiWork(() => {
             void (async () => {

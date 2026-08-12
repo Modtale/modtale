@@ -1,4 +1,5 @@
 import type { Permission } from '@/modules/permissions/permissions';
+import type { AdminPermission } from '@/modules/admin/utils/access';
 
 export enum VersionRelationKind {
     DEPENDENCY = 'DEPENDENCY',
@@ -35,6 +36,8 @@ export interface User {
     bio?: string;
     email?: string;
     emailVerified?: boolean;
+    hasPassword?: boolean;
+    mfaEnabled?: boolean;
     createdAt?: string;
     likedProjectIds: string[];
     followingIds?: string[];
@@ -50,6 +53,7 @@ export interface User {
         dependencyUpdates: 'OFF' | 'ON';
     };
     roles?: string[];
+    adminPermissions?: AdminPermission[];
     tier?: string;
     accountType?: 'USER' | 'ORGANIZATION';
     organizationMembers?: OrganizationMember[];
