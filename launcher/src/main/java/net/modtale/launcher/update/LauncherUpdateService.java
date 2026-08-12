@@ -216,22 +216,16 @@ public class LauncherUpdateService {
         String normalizedArch = normalizeArch(arch);
 
         if (os.contains("win")) {
-            return name.endsWith(".exe") || name.endsWith(".msi");
+            return (name.endsWith(".exe") || name.endsWith(".msi"))
+                    && architectureMatchesOrIsUnspecified(name, normalizedArch);
         }
         if (os.contains("mac") || os.contains("darwin")) {
-            return name.endsWith(".dmg") || name.endsWith(".pkg");
+            return (name.endsWith(".dmg") || name.endsWith(".pkg"))
+                    && architectureMatchesOrIsUnspecified(name, normalizedArch);
         }
         if (os.contains("linux")) {
-            if (!name.endsWith(".appimage")) {
-                return false;
-            }
-            if ("aarch64".equals(normalizedArch)) {
-                return name.contains("aarch64") || name.contains("arm64");
-            }
-            if ("x86_64".equals(normalizedArch)) {
-                return name.contains("x86_64") || name.contains("amd64") || !name.contains("aarch64");
-            }
-            return true;
+            return name.endsWith(".appimage")
+                    && architectureMatchesOrIsUnspecified(name, normalizedArch);
         }
         return false;
     }
@@ -253,19 +247,39 @@ public class LauncherUpdateService {
         if (os.contains("win")) {
             score += name.endsWith(".exe") ? 20 : 10;
             score += name.contains("windows") || name.contains("win") ? 4 : 0;
+            score += architectureScore(name, normalizedArch);
         } else if (os.contains("mac") || os.contains("darwin")) {
             score += name.endsWith(".dmg") ? 20 : 10;
             score += name.contains("mac") || name.contains("darwin") ? 4 : 0;
+            score += architectureScore(name, normalizedArch);
         } else if (os.contains("linux")) {
             score += name.endsWith(".appimage") ? 20 : 0;
-            if ("aarch64".equals(normalizedArch) && (name.contains("aarch64") || name.contains("arm64"))) {
-                score += 8;
-            }
-            if ("x86_64".equals(normalizedArch) && (name.contains("x86_64") || name.contains("amd64"))) {
-                score += 8;
-            }
+            score += architectureScore(name, normalizedArch);
         }
         return score;
+    }
+
+    private static boolean architectureMatchesOrIsUnspecified(String name, String normalizedArch) {
+        boolean armAsset = name.contains("aarch64") || name.contains("arm64");
+        boolean x64Asset = name.contains("x86_64") || name.contains("amd64") || name.contains("x64");
+        if ("aarch64".equals(normalizedArch)) {
+            return !x64Asset;
+        }
+        if ("x86_64".equals(normalizedArch)) {
+            return !armAsset;
+        }
+        return true;
+    }
+
+    private static int architectureScore(String name, String normalizedArch) {
+        if ("aarch64".equals(normalizedArch) && (name.contains("aarch64") || name.contains("arm64"))) {
+            return 8;
+        }
+        if ("x86_64".equals(normalizedArch)
+                && (name.contains("x86_64") || name.contains("amd64") || name.contains("x64"))) {
+            return 8;
+        }
+        return 0;
     }
 
     private Path installerTarget(String assetName) {

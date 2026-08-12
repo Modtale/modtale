@@ -1,5 +1,6 @@
 package net.modtale.launcher.update;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -29,14 +30,14 @@ public final class LauncherVersion {
         return compare(candidateVersion, currentVersion) > 0;
     }
 
-    static int compare(String left, String right) {
+    public static int compare(String left, String right) {
         VersionParts leftParts = VersionParts.parse(left);
         VersionParts rightParts = VersionParts.parse(right);
         int segmentCount = Math.max(leftParts.numbers().size(), rightParts.numbers().size());
         for (int i = 0; i < segmentCount; i++) {
-            int leftNumber = i < leftParts.numbers().size() ? leftParts.numbers().get(i) : 0;
-            int rightNumber = i < rightParts.numbers().size() ? rightParts.numbers().get(i) : 0;
-            int comparison = Integer.compare(leftNumber, rightNumber);
+            BigInteger leftNumber = i < leftParts.numbers().size() ? leftParts.numbers().get(i) : BigInteger.ZERO;
+            BigInteger rightNumber = i < rightParts.numbers().size() ? rightParts.numbers().get(i) : BigInteger.ZERO;
+            int comparison = leftNumber.compareTo(rightNumber);
             if (comparison != 0) {
                 return comparison;
             }
@@ -88,7 +89,7 @@ public final class LauncherVersion {
             boolean rightNumeric = rightToken.matches("\\d+");
             int comparison;
             if (leftNumeric && rightNumeric) {
-                comparison = Integer.compare(Integer.parseInt(leftToken), Integer.parseInt(rightToken));
+                comparison = new BigInteger(leftToken).compareTo(new BigInteger(rightToken));
             } else if (leftNumeric) {
                 comparison = -1;
             } else if (rightNumeric) {
@@ -103,19 +104,19 @@ public final class LauncherVersion {
         return 0;
     }
 
-    private record VersionParts(List<Integer> numbers, String preRelease) {
+    private record VersionParts(List<BigInteger> numbers, String preRelease) {
 
         static VersionParts parse(String rawVersion) {
             String version = normalizeTagVersion(rawVersion).toLowerCase(Locale.ROOT);
             String[] pieces = version.split("-", 2);
-            List<Integer> numbers = new ArrayList<>();
+            List<BigInteger> numbers = new ArrayList<>();
             for (String token : pieces[0].split("\\.")) {
                 if (token.isBlank()) {
-                    numbers.add(0);
+                    numbers.add(BigInteger.ZERO);
                     continue;
                 }
                 String digits = token.replaceAll("[^0-9].*$", "");
-                numbers.add(digits.isBlank() ? 0 : Integer.parseInt(digits));
+                numbers.add(digits.isBlank() ? BigInteger.ZERO : new BigInteger(digits));
             }
             String preRelease = pieces.length > 1 ? pieces[1] : "";
             return new VersionParts(numbers, preRelease);

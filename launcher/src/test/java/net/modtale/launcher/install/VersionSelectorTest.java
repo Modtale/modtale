@@ -40,6 +40,16 @@ class VersionSelectorTest {
         assertTrue(VersionSelector.latestCompatible(List.of(wrongGame), "1.0").isEmpty());
     }
 
+    @Test
+    void comparesVersionNumbersSemanticallyWhenReleaseDatesMatch() {
+        ProjectVersion older = version("1.9.0", "2026-04-01T00:00:00Z", "RELEASE", "1.0");
+        ProjectVersion newer = version("1.10.0", "2026-04-01T00:00:00Z", "RELEASE", "1.0");
+
+        ProjectVersion selected = VersionSelector.latestCompatible(List.of(older, newer), "1.0").orElseThrow();
+
+        assertEquals("1.10.0", selected.versionNumber());
+    }
+
     private static ProjectVersion version(String number, String releaseDate, String channel, String gameVersion) {
         return new ProjectVersion(number, number, List.of(gameVersion), null, 0, releaseDate, "", List.of(), channel);
     }

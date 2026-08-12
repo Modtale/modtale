@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 import net.modtale.launcher.model.project.ProjectDetail;
 import net.modtale.launcher.model.project.ProjectVersion;
+import net.modtale.launcher.update.LauncherVersion;
 
 public final class VersionSelector {
 
@@ -29,7 +30,7 @@ public final class VersionSelector {
                 .max(Comparator
                         .comparingInt(VersionSelector::channelRank)
                         .thenComparing(VersionSelector::releaseInstant, Comparator.nullsFirst(Comparator.naturalOrder()))
-                        .thenComparing(ProjectVersion::versionNumber, Comparator.nullsFirst(Comparator.naturalOrder())));
+                        .thenComparing(ProjectVersion::versionNumber, Comparator.nullsFirst(LauncherVersion::compare)));
     }
 
     private static int channelRank(ProjectVersion version) {
