@@ -426,7 +426,6 @@ jobs:
             "--use-http2"
             "--memory" "1Gi"
             "--concurrency" "80"
-            "--min-instances" "0"
             "--update-env-vars" "MONGODB_DATABASE_NAME=${{ env.DB_NAME }}"
             "--update-env-vars" "APP_SEEDING_ENABLED=${{ env.SEEDING_ENABLED }}"
             "--update-env-vars" "APP_SEEDING_MODE=${{ env.SEEDING_MODE }}"
@@ -450,9 +449,9 @@ jobs:
           ARGS+=("--update-secrets" "R2_ENDPOINT=${{ env.R2_ENDPOINT_SECRET_NAME }}:$R2_ENDPOINT_SECRET_VERSION")
 
           if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
-            # Production traffic keeps the service warm. Preserve its current
-            # compute headroom while retaining scale-to-zero during real lulls.
+            # Keep one production instance warm to prevent user-facing cold starts.
             ARGS+=("--cpu" "2")
+            ARGS+=("--min-instances" "1")
             ARGS+=("--max-instances" "10")
             ARGS+=("--cpu-throttling")
             ARGS+=("--update-env-vars" "WARDEN_URL=$WARDEN_URL_VALUE")
@@ -480,6 +479,7 @@ jobs:
             ARGS+=("--update-secrets" "STATUS_DISCORD_WEBHOOK_URL=STATUS_DISCORD_WEBHOOK_URL:latest")
           elif [ "${{ env.ENV_TYPE }}" = "dev" ]; then
             ARGS+=("--cpu" "1")
+            ARGS+=("--min-instances" "0")
             ARGS+=("--max-instances" "3")
             ARGS+=("--cpu-throttling")
             ARGS+=("--update-env-vars" "WARDEN_URL=$WARDEN_URL_VALUE")
@@ -506,6 +506,7 @@ jobs:
             # Preview services are usually idle. Request-based CPU billing avoids
             # charging for CPU between requests without changing request capacity.
             ARGS+=("--cpu" "1")
+            ARGS+=("--min-instances" "0")
             ARGS+=("--max-instances" "2")
             ARGS+=("--cpu-throttling")
             ARGS+=("--startup-probe" "httpGet.path=/actuator/health/readiness,httpGet.port=8080,periodSeconds=10,timeoutSeconds=10,failureThreshold=60")
@@ -563,19 +564,23 @@ jobs:
             "--cpu" "1"
             "--memory" "512Mi"
             "--concurrency" "80"
-            "--min-instances" "0"
             "--cpu-throttling"
             "--set-env-vars" "PUBLIC_API_URL=$API_URL"
           )
 
           if [ "${{ env.ENV_TYPE }}" = "preview" ]; then
+            FRONTEND_ARGS+=("--min-instances" "0")
             FRONTEND_ARGS+=("--max-instances" "2")
             FRONTEND_ARGS+=("--set-env-vars" "LOG_SERVICE_NAME=${{ env.FRONTEND_SERVICE }}")
             FRONTEND_ARGS+=("--set-env-vars" "LOG_COMPONENT=frontend")
             FRONTEND_ARGS+=("--set-env-vars" "LOG_ENVIRONMENT=branch-preview")
             FRONTEND_ARGS+=("--set-env-vars" "LOG_BRANCH=${{ env.BRANCH_SLUG }}")
             FRONTEND_ARGS+=("--labels" "app=modtale,environment=branch-preview,component=frontend,branch=${{ env.BRANCH_SLUG }}")
+          elif [ "${{ env.ENV_TYPE }}" = "dev" ]; then
+            FRONTEND_ARGS+=("--min-instances" "0")
+            FRONTEND_ARGS+=("--max-instances" "3")
           else
+            FRONTEND_ARGS+=("--min-instances" "1")
             FRONTEND_ARGS+=("--max-instances" "3")
           fi
 
