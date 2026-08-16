@@ -185,6 +185,7 @@ Modtale is free software: you can redistribute it and/or modify it under the ter
 ## Community & Support
 
 * **Docs:** [modtale.net/api-docs](https://modtale.net/api-docs)
+* **Hytale Character Recipes:** [hytalecharacter.com](https://hytalecharacter.com/) - unofficial character recipe references and recreation notes for players.
 * **Discord:** [Join the Server](https://discord.gg/PcFaDVYqVe)
 * **X (Twitter):** [@modtalenet](https://x.com/modtalenet)
 * **Bluesky:** [@modtale.net](https://bsky.app/profile/modtale.net)
