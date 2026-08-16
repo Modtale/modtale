@@ -96,8 +96,8 @@ class DownloadServiceTest {
         assertTrue(entries.containsKey("modpack.json"));
         assertTrue(entries.get("modpack.json").contains("\"id\": \"plugin-1\""));
         assertTrue(entries.get("modpack.json").contains("\"version\": \"3.0.0\""));
-        assertEquals("plugin-binary", entries.get("plugins/plugin.jar"));
-        assertEquals("asset-binary", entries.get("asset-packs/assets.zip"));
+        assertEquals("plugin-binary", entries.get("plugin.jar"));
+        assertEquals("asset-binary", entries.get("assets.zip"));
         assertEquals("modpacks/generated.zip", version.getFileUrl());
 
         ArgumentCaptor<MultipartFile> uploadCaptor = ArgumentCaptor.forClass(MultipartFile.class);
@@ -132,7 +132,7 @@ class DownloadServiceTest {
         mainVersion.setDependencies(List.of(
                 new ProjectDependency("dep-a", "Dependency A", "1.0.0"),
                 new ProjectDependency("dep-b", "Dependency B", "2.0.0"),
-                new ProjectDependency("dep-c", "Dependency C", "3.0.0", false, true)
+                new ProjectDependency("dep-c", "Dependency C", "3.0.0", ProjectDependency.DependencyType.EMBEDDED)
         ));
 
         Project dependencyB = dependencyProject("dep-b", ProjectClassification.DATA, "2.0.0", "files/123456789012345678901234567890123456-depb.jar");

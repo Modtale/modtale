@@ -1,40 +1,25 @@
-import type { ProjectDependency } from '@/types';
+import type { DependencyType, ProjectDependency } from '@/types';
 
-export interface ParsedDependencyEntry {
-    projectId: string;
-    versionNumber: string;
-    isOptional: boolean;
-    isEmbedded: boolean;
-}
+export const getDependencyType = (dependency?: Pick<ProjectDependency, 'dependencyType'>): DependencyType =>
+    dependency?.dependencyType || 'REQUIRED';
 
-export const parseDependencyEntry = (entry: string): ParsedDependencyEntry => {
-    const [projectId = '', versionNumber = '', ...flagParts] = entry.split(':');
-    const flags = new Set(flagParts.map((flag) => flag.trim().toLowerCase()).filter(Boolean));
+export const isOptionalDependency = (dependency?: Pick<ProjectDependency, 'dependencyType'>): boolean =>
+    getDependencyType(dependency) === 'OPTIONAL';
 
-    return {
-        projectId,
-        versionNumber,
-        isOptional: flags.has('optional'),
-        isEmbedded: flags.has('embedded')
-    };
-};
+export const isEmbeddedDependency = (dependency?: Pick<ProjectDependency, 'dependencyType'>): boolean =>
+    getDependencyType(dependency) === 'EMBEDDED';
 
-export const serializeDependencyEntry = ({
-    projectId,
-    versionNumber,
-    isOptional,
-    isEmbedded
-}: ParsedDependencyEntry): string => {
-    const flags: string[] = [];
-    if (isOptional) flags.push('optional');
-    if (isEmbedded) flags.push('embedded');
-    return [projectId, versionNumber, ...flags].join(':');
-};
+export const isExternalDependency = (dependency?: Pick<ProjectDependency, 'source'>): boolean =>
+    (dependency?.source || 'MODTALE') !== 'MODTALE';
 
-export const serializeProjectDependency = (dependency: ProjectDependency): string =>
-    serializeDependencyEntry({
-        projectId: dependency.projectId,
-        versionNumber: dependency.versionNumber,
-        isOptional: Boolean(dependency.isOptional),
-        isEmbedded: Boolean(dependency.isEmbedded)
-    });
+export const getExternalDependencies = (dependencies?: ProjectDependency[] | null): ProjectDependency[] =>
+    (dependencies || []).filter(dependency => isExternalDependency(dependency) && !isEmbeddedDependency(dependency));
+
+export const normalizeDependencyReference = (dependency: ProjectDependency): ProjectDependency => ({
+    ...dependency,
+    dependencyType: dependency.dependencyType || 'REQUIRED',
+    source: dependency.source || 'MODTALE'
+});
+
+export const dependencyProjectKey = (dependency: ProjectDependency): string =>
+    `${dependency.source || 'MODTALE'}:${dependency.projectId}`;

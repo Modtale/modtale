@@ -1,6 +1,7 @@
 package net.modtale.service.project.version;
 
 import java.util.List;
+import net.modtale.model.dto.request.project.DependencyReferenceRequest;
 import net.modtale.exception.InvalidVersionRequestException;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
@@ -12,6 +13,7 @@ import net.modtale.service.project.lifecycle.ProjectDeletionService;
 import net.modtale.service.project.validation.ValidationService;
 import net.modtale.service.security.scan.ScanService;
 import net.modtale.service.security.validation.SanitizationService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -23,7 +25,27 @@ public class VersionMutationOrchestrationService {
     private final SanitizationService sanitizationService;
     private final VersionArtifactService versionArtifactService;
     private final VersionDependencyService versionDependencyService;
+    private final ExternalDependencyArtifactService externalDependencyArtifactService;
     private final ProjectDeletionService projectDeletionService;
+
+    @Autowired
+    public VersionMutationOrchestrationService(
+            ValidationService validationService,
+            ScanService scanService,
+            SanitizationService sanitizationService,
+            VersionArtifactService versionArtifactService,
+            VersionDependencyService versionDependencyService,
+            ExternalDependencyArtifactService externalDependencyArtifactService,
+            ProjectDeletionService projectDeletionService
+    ) {
+        this.validationService = validationService;
+        this.scanService = scanService;
+        this.sanitizationService = sanitizationService;
+        this.versionArtifactService = versionArtifactService;
+        this.versionDependencyService = versionDependencyService;
+        this.externalDependencyArtifactService = externalDependencyArtifactService;
+        this.projectDeletionService = projectDeletionService;
+    }
 
     public VersionMutationOrchestrationService(
             ValidationService validationService,
@@ -33,12 +55,15 @@ public class VersionMutationOrchestrationService {
             VersionDependencyService versionDependencyService,
             ProjectDeletionService projectDeletionService
     ) {
-        this.validationService = validationService;
-        this.scanService = scanService;
-        this.sanitizationService = sanitizationService;
-        this.versionArtifactService = versionArtifactService;
-        this.versionDependencyService = versionDependencyService;
-        this.projectDeletionService = projectDeletionService;
+        this(
+                validationService,
+                scanService,
+                sanitizationService,
+                versionArtifactService,
+                versionDependencyService,
+                null,
+                projectDeletionService
+        );
     }
 
     public void validateVersionNumber(String versionNumber) {
@@ -67,11 +92,16 @@ public class VersionMutationOrchestrationService {
     }
 
     public VersionDependencyService.ResolvedDependencies resolveRequestedDependencies(
-            List<String> projectIds,
+            List<DependencyReferenceRequest> dependencies,
             boolean modpack,
             boolean allowVersionlessDependencies
     ) {
-        return versionDependencyService.resolveRequestedDependencies(projectIds, modpack, allowVersionlessDependencies);
+        VersionDependencyService.ResolvedDependencies resolvedDependencies =
+                versionDependencyService.resolveRequestedDependencies(dependencies, modpack, allowVersionlessDependencies);
+        if (externalDependencyArtifactService != null) {
+            externalDependencyArtifactService.prepareExternalArtifacts(resolvedDependencies.dependencies());
+        }
+        return resolvedDependencies;
     }
 
     public List<String> resolveRequestedProjectIds(List<String> projectIds, boolean allowDraftProjects) {
