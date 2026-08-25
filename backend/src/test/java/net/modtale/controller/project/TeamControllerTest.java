@@ -76,6 +76,17 @@ class TeamControllerTest {
         );
     }
 
+    @Test
+    void acceptInviteRouteUsesTheAuthenticatedUser() throws Exception {
+        User user = user("user-2");
+        when(accountService.requireCurrentUser("accepting a project invite")).thenReturn(user);
+
+        mockMvc.perform(post("/api/v1/projects/project-1/invite/accept"))
+                .andExpect(status().isOk());
+
+        verify(teamService).acceptInvite("project-1", "user-2");
+    }
+
     private static User user(String id) {
         User user = new User();
         user.setId(id);
