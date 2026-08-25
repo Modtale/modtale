@@ -34,12 +34,8 @@ describe('resolveNotificationAction', () => {
         });
     });
 
-    it('supports legacy modId metadata without consuming malformed actions', () => {
-        expect(resolveNotificationAction(
-            notification('CONTRIBUTOR_INVITE', { modId: 'legacy-project' }),
-            true
-        )).toEqual({ endpoint: '/projects/legacy-project/invite/accept' });
-
+    it('rejects contributor invitations without projectId metadata', () => {
+        expect(resolveNotificationAction(notification('CONTRIBUTOR_INVITE', { modId: 'project-1' }), true)).toBeNull();
         expect(resolveNotificationAction(notification('CONTRIBUTOR_INVITE'), true)).toBeNull();
     });
 });
