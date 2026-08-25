@@ -54,6 +54,7 @@ public class TeamMembershipService {
         Project project = projectAccessService.requireProjectPermission(id, requester, "PROJECT_TEAM_INVITE",
                 "You do not have permission to invite contributors to this project.");
         projectMutationGuard.ensureEditable(project);
+        requireRole(project, roleId);
 
         User invitee = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("We couldn't find the contributor you tried to invite."));
@@ -122,23 +123,38 @@ public class TeamMembershipService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("We couldn't find that user."));
         Project project = projectService.getRawProjectById(id);
-        if (project != null && project.getTeamInvites() != null) {
-            Project.ProjectMember invite = project.getTeamInvites().stream()
-                    .filter(member -> member.getUserId().equals(userId))
-                    .findFirst()
-                    .orElse(null);
-            if (invite != null) {
-                project.getTeamInvites().remove(invite);
-                if (project.getTeamMembers() == null) {
-                    project.setTeamMembers(new ArrayList<>());
-                }
-                project.getTeamMembers().add(invite);
-                saveProject(project);
-
-                User owner = userRepository.findById(project.getAuthorId()).orElse(null);
-                teamNotificationService.sendInviteAccepted(project, owner, user);
-            }
+        if (project == null) {
+            throw new ResourceNotFoundException("We couldn't find the project for that invite.");
         }
+
+        if (project.getTeamMembers() != null
+                && project.getTeamMembers().stream().anyMatch(member -> userId.equals(member.getUserId()))) {
+            return;
+        }
+
+        Project.ProjectMember invite = project.getTeamInvites() != null
+                ? project.getTeamInvites().stream()
+                        .filter(member -> userId.equals(member.getUserId()))
+                        .findFirst()
+                        .orElse(null)
+                : null;
+        if (invite == null) {
+            throw new InvalidProjectRequestException("We couldn't find a pending project invite for your account.");
+        }
+
+        Project.ProjectRole role = requireRole(project, invite.getRoleId());
+        project.getTeamInvites().remove(invite);
+        if (project.getTeamMembers() == null) {
+            project.setTeamMembers(new ArrayList<>());
+        }
+        project.getTeamMembers().add(invite);
+        saveProject(project);
+        apiKeyService.syncUserProjectPermissions(userId, id, role.getPermissions() != null
+                ? role.getPermissions()
+                : EnumSet.noneOf(ApiKey.ApiPermission.class));
+
+        User owner = userRepository.findById(project.getAuthorId()).orElse(null);
+        teamNotificationService.sendInviteAccepted(project, owner, user);
     }
 
     public void declineInvite(String id, String userId) {
@@ -152,5 +168,15 @@ public class TeamMembershipService {
     private void saveProject(Project project) {
         projectRepository.save(project);
         projectService.evictProjectCache(project);
+    }
+
+    private Project.ProjectRole requireRole(Project project, String roleId) {
+        if (project.getProjectRoles() == null) {
+            throw new InvalidProjectRequestException("We couldn't find that project role.");
+        }
+        return project.getProjectRoles().stream()
+                .filter(role -> roleId.equals(role.getId()))
+                .findFirst()
+                .orElseThrow(() -> new InvalidProjectRequestException("We couldn't find that project role."));
     }
 }
