@@ -9,7 +9,7 @@ export const resolveNotificationAction = (
     notification: Notification,
     accept: boolean
 ): NotificationActionRequest | null => {
-    const projectId = notification.metadata?.projectId || notification.metadata?.modId;
+    const projectId = notification.metadata?.projectId;
 
     if (notification.type === 'TRANSFER_REQUEST') {
         return projectId
