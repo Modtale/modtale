@@ -27,6 +27,14 @@ export interface OrganizationMember {
     roleId: string;
 }
 
+export interface ProfileBadge {
+    id: string;
+    label: string;
+    tooltip?: string;
+    imageUrl?: string;
+    darkImageUrl?: string;
+}
+
 export interface User {
     id: string;
     username: string;
@@ -43,7 +51,7 @@ export interface User {
     followingIds?: string[];
     followerIds?: string[];
     connectedAccounts?: ConnectedAccount[];
-    badges?: string[];
+    badges?: Array<string | ProfileBadge>;
     notificationPreferences?: {
         projectUpdates: 'OFF' | 'ON';
         creatorUploads: 'OFF' | 'ON';

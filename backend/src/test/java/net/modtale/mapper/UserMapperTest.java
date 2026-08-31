@@ -29,6 +29,8 @@ class UserMapperTest {
         assertEquals("Always lock in", dto.bio());
         assertEquals(ApiKey.Tier.ENTERPRISE, dto.tier());
         assertEquals(User.AccountType.ORGANIZATION, dto.accountType());
+        assertEquals("founder", dto.badges().get(0));
+        assertEquals("community-team", ((User.ProfileBadge) dto.badges().get(1)).getId());
     }
 
     @Test
@@ -94,6 +96,13 @@ class UserMapperTest {
         user.setFollowingIds(List.of("user-2"));
         user.setFollowerIds(List.of("user-4"));
         user.setBadges(List.of("founder"));
+        user.setProfileBadges(List.of(new User.ProfileBadge(
+                "community-team",
+                "Community Team",
+                "Community Team Member",
+                "https://cdn.example.com/community-team-dark.svg",
+                "https://cdn.example.com/community-team-light.svg"
+        )));
         user.setConnectedAccounts(List.of(
                 new User.ConnectedAccount(OAuthProvider.GITHUB, "gh-1", "ada", "https://github.com/ada", true),
                 new User.ConnectedAccount(OAuthProvider.GITLAB, "gl-1", "ada", "https://gitlab.com/ada", false)
