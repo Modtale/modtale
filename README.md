@@ -110,6 +110,10 @@ The Spring Boot backend relies on environment variables. You can set these in yo
 | `R2_ACCESS_KEY` | Storage Access Key | `your_dev_access_key` |
 | `R2_SECRET_KEY` | Storage Secret Key | `your_dev_secret_key` |
 | `R2_ENDPOINT` | Storage Endpoint URL | `https://<accountid>.r2.cloudflarestorage.com` |
+| `SMTP_HOST` | Transactional email SMTP host | `smtp.resend.com` |
+| `SMTP_PORT` | SMTP submission port using STARTTLS | `587` |
+| `SMTP_USERNAME` | Transactional email SMTP username | `resend` |
+| `SMTP_PASSWORD` | Transactional email API key; store as a secret | `re_...` |
 | `WARDEN_ENABLED` | **Must be false locally** | `false` |
 | `STATUS_DISCORD_WEBHOOK_URL` | Optional Discord webhook for status-change alerts | `https://discord.com/api/webhooks/...` |
 | `STATUS_CHECKER_ENABLED` | Opt into the legacy embedded backend checker | `false` |
@@ -129,6 +133,21 @@ Detached status service variables:
 | `STATUS_CORS_ALLOWED_ORIGINS` | Allowed origins for status API reads | `*` |
 
 > **Note on Warden:** The "Warden" malware and security scanner is proprietary to protect our threat-detection logic. You **must** set `WARDEN_ENABLED=false` to run the backend locally. This enables a "Mock Mode" where file uploads bypass the scanner and automatically return a mock "CLEAN" status.
+
+### Transactional Email
+
+Production and development send transactional email through Resend's SMTP relay.
+Cloud Run reads `SMTP_HOST`, `SMTP_USERNAME`, and `SMTP_PASSWORD` from Google
+Secret Manager; never commit the API key. The application sends from
+`Modtale <noreply@modtale.net>` over port `587` with STARTTLS.
+
+The `modtale.net` sending domain must remain verified in Resend. Its Cloudflare
+DNS configuration includes Resend's DKIM record, the `send.modtale.net` SPF and
+return-path records, and a DMARC policy at `_dmarc.modtale.net`. Keep DMARC in
+monitoring mode (`p=none`) until reports show that all legitimate senders align,
+then tighten the policy gradually. After rotating an SMTP key, deploy a new Cloud
+Run revision and confirm delivery with a controlled message before disabling the
+previous Secret Manager version.
 
 **(Optional) OAuth Variables:**
 To test social logins, provide each provider's client ID and secret (for example,
