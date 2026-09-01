@@ -288,6 +288,33 @@ export interface Project {
     isOwner?: boolean;
 }
 
+export interface AdminVerificationQueueScan {
+    status?: ScanResult['status'];
+    verdict?: ScanResult['verdict'];
+    riskScore: number;
+    knownIssueCount: number;
+    newIssueCount: number;
+    escalatedIssueCount: number;
+}
+
+export interface AdminVerificationQueueItem {
+    id: string;
+    title: string;
+    description?: string;
+    author: string;
+    imageUrl?: string;
+    classification: Project['classification'];
+    status: Project['status'];
+    updatedAt?: string;
+    pendingVersion?: {
+        id: string;
+        versionNumber: string;
+        changelog?: string;
+        reviewStatus?: ProjectVersion['reviewStatus'];
+        scan?: AdminVerificationQueueScan;
+    };
+}
+
 export interface AnalyticsDataPoint {
     date: string;
     value: number;
