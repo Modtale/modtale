@@ -401,11 +401,11 @@ public final class LauncherShell {
                                     ? LauncherLayout.LAUNCHER_WORKSPACE_INSETS
                                     : LauncherLayout.WORKSPACE_INSETS;
             workspaceRoot.setPadding(new Insets(
-                    pageInsets.getTop(), 0, pageInsets.getBottom(), pageInsets.getLeft()));
+                    pageInsets.getTop(), 0, 0, pageInsets.getLeft()));
             mainToolbar.setPadding(new Insets(0, pageInsets.getRight(), 8, 0));
             contentBody.setPadding(new Insets(
                     webMode || discoverMode || launcherPage ? 0 : 16,
-                    pageInsets.getRight(), 0, 0));
+                    pageInsets.getRight(), pageInsets.getBottom(), 0));
         }
         if (contentBody != null) {
             contentBody.setSpacing(webMode ? 0 : 16);
@@ -847,7 +847,7 @@ public final class LauncherShell {
         workspaceRoot.getStyleClass().add("workspace");
         workspaceRoot.setPadding(new Insets(
                 LauncherLayout.WORKSPACE_INSETS.getTop(), 0,
-                LauncherLayout.WORKSPACE_INSETS.getBottom(), LauncherLayout.WORKSPACE_INSETS.getLeft()));
+                0, LauncherLayout.WORKSPACE_INSETS.getLeft()));
         workspaceRoot.setFillHeight(true);
         workspaceRoot.setMaxHeight(Double.MAX_VALUE);
         railNode = rail();
