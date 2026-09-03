@@ -30,6 +30,14 @@ export interface OrganizationMember {
     roleId: string;
 }
 
+export interface ProfileBadge {
+    id: string;
+    label: string;
+    tooltip?: string;
+    imageUrl?: string;
+    darkImageUrl?: string;
+}
+
 export interface User {
     id: string;
     username: string;
@@ -46,7 +54,7 @@ export interface User {
     followingIds?: string[];
     followerIds?: string[];
     connectedAccounts?: ConnectedAccount[];
-    badges?: string[];
+    badges?: Array<string | ProfileBadge>;
     notificationPreferences?: {
         projectUpdates: 'OFF' | 'ON';
         creatorUploads: 'OFF' | 'ON';
@@ -318,6 +326,33 @@ export interface Project {
     expiresAt?: string;
     canEdit?: boolean;
     isOwner?: boolean;
+}
+
+export interface AdminVerificationQueueScan {
+    status?: ScanResult['status'];
+    verdict?: ScanResult['verdict'];
+    riskScore: number;
+    knownIssueCount: number;
+    newIssueCount: number;
+    escalatedIssueCount: number;
+}
+
+export interface AdminVerificationQueueItem {
+    id: string;
+    title: string;
+    description?: string;
+    author: string;
+    imageUrl?: string;
+    classification: Project['classification'];
+    status: Project['status'];
+    updatedAt?: string;
+    pendingVersion?: {
+        id: string;
+        versionNumber: string;
+        changelog?: string;
+        reviewStatus?: ProjectVersion['reviewStatus'];
+        scan?: AdminVerificationQueueScan;
+    };
 }
 
 export interface AnalyticsDataPoint {

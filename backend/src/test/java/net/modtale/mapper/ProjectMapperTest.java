@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import net.modtale.model.dto.admin.AdminProjectVersionSummaryDTO;
+import net.modtale.model.dto.admin.AdminVerificationQueueItemDTO;
 import net.modtale.model.dto.project.ProjectCommentDTO;
 import net.modtale.model.dto.project.ProjectDTO;
 import net.modtale.model.dto.project.ProjectDependencyDTO;
@@ -17,6 +18,7 @@ import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.project.ScanResult;
+import net.modtale.model.project.ScanStatus;
 import net.modtale.model.user.ApiKey;
 import org.junit.jupiter.api.Test;
 
@@ -151,6 +153,32 @@ class ProjectMapperTest {
         assertEquals("Lock in complete", ProjectMapper.toVersionDTO(version).getChangelog());
         assertEquals("Core", ProjectMapper.toVersionDTO(version).getDependencies().getFirst().projectTitle());
         assertEquals(List.of("modtale:legacy"), ProjectMapper.toVersionDTO(version).getIncompatibleProjectIds());
+    }
+
+    @Test
+    void verificationQueueMappingSelectsPendingVersionAndKeepsScanPayloadSmall() {
+        Project project = baseProject();
+        ProjectVersion approvedVersion = version("approved");
+        ProjectVersion pendingVersion = version("pending");
+        pendingVersion.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
+        pendingVersion.setChangelog("Needs review");
+        pendingVersion.getScanResult().setStatus(ScanStatus.SUSPICIOUS);
+        pendingVersion.getScanResult().setVerdict("REVIEW");
+        pendingVersion.getScanResult().setRiskScore(73);
+        pendingVersion.getScanResult().setKnownIssueCount(2);
+        pendingVersion.getScanResult().setNewIssueCount(3);
+        pendingVersion.getScanResult().setEscalatedIssueCount(1);
+        project.setVersions(List.of(approvedVersion, pendingVersion));
+
+        AdminVerificationQueueItemDTO item = ProjectMapper.toVerificationQueueItemDTO(project);
+
+        assertEquals("pending", item.pendingVersion().id());
+        assertEquals("Needs review", item.pendingVersion().changelog());
+        assertEquals(ScanStatus.SUSPICIOUS, item.pendingVersion().scan().status());
+        assertEquals("REVIEW", item.pendingVersion().scan().verdict());
+        assertEquals(73, item.pendingVersion().scan().riskScore());
+        assertEquals(3, item.pendingVersion().scan().newIssueCount());
+        assertEquals(1, item.pendingVersion().scan().escalatedIssueCount());
     }
 
     private static Project baseProject() {

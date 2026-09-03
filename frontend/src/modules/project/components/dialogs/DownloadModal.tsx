@@ -181,7 +181,7 @@ interface DownloadModalProps {
     onClose: () => void;
     versionsByGame: Record<string, any[]>;
     preReleaseGameVersions?: string[];
-    orderedGameVersions?: string[];
+    orderedGameVersions: string[];
     onDownload: (url: string, number: string, gameVersion: string, deps: any[], channel: string) => void;
     showExperimental: boolean;
     onToggleExperimental: () => void;
@@ -256,9 +256,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
         const available = new Set(Object.keys(versionsByGame));
         const orderedAvailable = orderedGameVersions.filter(version => available.has(version));
         const orderedSet = new Set(orderedAvailable);
-        const unordered = Object.keys(versionsByGame)
-            .filter(version => !orderedSet.has(version))
-            .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
+        const unordered = Object.keys(versionsByGame).filter(version => !orderedSet.has(version));
         const all = [...orderedAvailable, ...unordered];
         if (effectiveShowPreReleaseGameVersions) return all;
         return all.filter(version => !preReleaseGameVersionSet.has(version));

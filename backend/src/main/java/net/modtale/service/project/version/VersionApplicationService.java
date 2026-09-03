@@ -8,6 +8,7 @@ import net.modtale.exception.VersionNotFoundException;
 import net.modtale.mapper.ProjectMapper;
 import net.modtale.model.dto.project.ManifestInspectionResult;
 import net.modtale.model.dto.project.ProjectDependencyDTO;
+import net.modtale.model.dto.project.ProjectVersionDTO;
 import net.modtale.model.dto.request.project.CreateVersionRequest;
 import net.modtale.model.dto.request.project.UpdateVersionRequest;
 import net.modtale.model.dto.response.project.BundleDownloadUrlResponse;
@@ -27,17 +28,20 @@ public class VersionApplicationService {
 
     private final VersionMutationApplicationService versionMutationApplicationService;
     private final VersionDownloadOrchestrationService versionDownloadOrchestrationService;
+    private final VersionService versionService;
     private final ProjectVersionAccessService projectVersionAccessService;
     private final ProjectService projectService;
 
     public VersionApplicationService(
             VersionMutationApplicationService versionMutationApplicationService,
             VersionDownloadOrchestrationService versionDownloadOrchestrationService,
+            VersionService versionService,
             ProjectVersionAccessService projectVersionAccessService,
             ProjectService projectService
     ) {
         this.versionMutationApplicationService = versionMutationApplicationService;
         this.versionDownloadOrchestrationService = versionDownloadOrchestrationService;
+        this.versionService = versionService;
         this.projectVersionAccessService = projectVersionAccessService;
         this.projectService = projectService;
     }
@@ -51,6 +55,22 @@ public class VersionApplicationService {
                 .map(ProjectMapper::toDependencyDTO)
                 .collect(Collectors.toList());
         return new VersionDependenciesView(dependencies);
+    }
+
+    public ProjectVersionDTO getVersionByHash(String projectId, String hash, User currentUser) {
+        Project project = projectService.getProjectVersionsByRouteKey(projectId, currentUser);
+        if (project == null) {
+            throw new ResourceNotFoundException("We couldn't find that project.");
+        }
+        ProjectVersion version = projectVersionAccessService.requireByHash(project, hash,
+                () -> new VersionNotFoundException("We couldn't find a version with that file hash for the requested project."));
+        return ProjectMapper.toVersionDTO(version);
+    }
+
+    public ProjectVersionDTO getVersionByHash(String hash) {
+        ProjectVersion version = versionService.getVersionByHash(hash)
+                .orElseThrow(() -> new VersionNotFoundException("We couldn't find a version with that file hash."));
+        return ProjectMapper.toVersionDTO(version);
     }
 
     public void addVersion(String projectId, CreateVersionRequest requestPayload, User currentUser) {

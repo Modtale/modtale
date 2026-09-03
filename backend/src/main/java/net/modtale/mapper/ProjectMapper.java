@@ -6,6 +6,9 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import net.modtale.model.dto.admin.AdminProjectDTO;
 import net.modtale.model.dto.admin.AdminProjectVersionSummaryDTO;
+import net.modtale.model.dto.admin.AdminVerificationQueueItemDTO;
+import net.modtale.model.dto.admin.AdminVerificationQueueScanDTO;
+import net.modtale.model.dto.admin.AdminVerificationQueueVersionDTO;
 import net.modtale.model.dto.project.ProjectCommentsDTO;
 import net.modtale.model.dto.project.ProjectCommentDTO;
 import net.modtale.model.dto.project.ProjectCommentReplyDTO;
@@ -24,6 +27,7 @@ import net.modtale.model.project.Comment;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
+import net.modtale.model.project.ScanResult;
 
 public class ProjectMapper {
 
@@ -363,6 +367,52 @@ public class ProjectMapper {
         return versions.stream()
                 .map(ProjectMapper::toAdminVersionSummaryDTO)
                 .collect(Collectors.toList());
+    }
+
+    public static AdminVerificationQueueItemDTO toVerificationQueueItemDTO(Project project) {
+        if (project == null) return null;
+
+        ProjectVersion pendingVersion = project.getVersions() == null
+                ? null
+                : project.getVersions().stream()
+                        .filter(version -> version != null && version.getReviewStatus() == ProjectVersion.ReviewStatus.PENDING)
+                        .findFirst()
+                        .orElseGet(() -> project.getVersions().stream().filter(java.util.Objects::nonNull).findFirst().orElse(null));
+
+        return new AdminVerificationQueueItemDTO(
+                project.getId(),
+                project.getTitle(),
+                project.getDescription(),
+                project.getAuthor(),
+                project.getImageUrl(),
+                project.getClassification(),
+                project.getStatus(),
+                project.getUpdatedAt(),
+                toVerificationQueueVersionDTO(pendingVersion)
+        );
+    }
+
+    private static AdminVerificationQueueVersionDTO toVerificationQueueVersionDTO(ProjectVersion version) {
+        if (version == null) return null;
+        return new AdminVerificationQueueVersionDTO(
+                version.getId(),
+                version.getVersionNumber(),
+                version.getChangelog(),
+                version.getReviewStatus(),
+                toVerificationQueueScanDTO(version.getScanResult())
+        );
+    }
+
+    private static AdminVerificationQueueScanDTO toVerificationQueueScanDTO(ScanResult scanResult) {
+        if (scanResult == null) return null;
+        return new AdminVerificationQueueScanDTO(
+                scanResult.getStatus(),
+                scanResult.getVerdict(),
+                scanResult.getRiskScore(),
+                scanResult.getKnownIssueCount(),
+                scanResult.getNewIssueCount(),
+                scanResult.getEscalatedIssueCount()
+        );
     }
 
     public static ProjectDependencyDTO toDependencyDTO(ProjectDependency dependency) {
