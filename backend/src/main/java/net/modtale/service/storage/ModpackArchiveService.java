@@ -79,6 +79,12 @@ final class ModpackArchiveService {
 
         StringBuilder json = new StringBuilder("{\n  \"name\": \"")
                 .append(jsonEscape(pack.getTitle()))
+                .append("\",\n  \"formatVersion\": 1,\n  \"game\": \"hytale\",\n  \"packId\": \"")
+                .append(jsonEscape(pack.getId()))
+                .append("\",\n  \"versionId\": \"")
+                .append(jsonEscape(version.getId()))
+                .append("\",\n  \"versionNumber\": \"")
+                .append(jsonEscape(version.getVersionNumber()))
                 .append("\",\n  \"files\": [\n");
         if (version.getDependencies() != null) {
             for (int i = 0; i < version.getDependencies().size(); i++) {
@@ -89,7 +95,8 @@ final class ModpackArchiveService {
                         .append("\", \"source\": \"").append(jsonEscape(dep.getSource().name())).append("\"");
                 if (dep.isExternal()) {
                     json.append(", \"externalId\": \"").append(jsonEscape(dep.getExternalId()))
-                            .append("\", \"url\": \"").append(jsonEscape(dep.getExternalUrl())).append("\"");
+                            .append("\", \"url\": \"").append(jsonEscape(dep.getExternalUrl())).append("\"")
+                            .append(", \"distribution\": \"REFERENCE_ONLY\"");
                     if (dep.getExternalFileUrl() != null) {
                         json.append(", \"externalFileUrl\": \"").append(jsonEscape(dep.getExternalFileUrl())).append("\"");
                     }
@@ -137,6 +144,11 @@ final class ModpackArchiveService {
     }
 
     private void writeExternalDependencyFile(ZipOutputStream zos, ProjectDependency dependency, Set<String> archiveEntries) throws IOException {
+        if (dependency.getSource() == ProjectDependency.Source.CURSEFORGE) {
+            // CurseForge-hosted files remain references so downloads stay attributable to
+            // CurseForge and the author. Never mirror a previously cached file into a pack.
+            return;
+        }
         String cachedFileUrl = trimToNull(dependency.getCachedFileUrl());
         if (cachedFileUrl == null) {
             return;

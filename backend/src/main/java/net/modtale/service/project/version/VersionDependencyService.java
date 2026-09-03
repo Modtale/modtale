@@ -181,7 +181,10 @@ public class VersionDependencyService {
             URI uri = new URI(value);
             String host = uri.getHost();
             String path = uri.getPath();
-            return host != null
+            return "https".equalsIgnoreCase(uri.getScheme())
+                    && uri.getRawUserInfo() == null
+                    && (uri.getPort() == -1 || uri.getPort() == 443)
+                    && host != null
                     && (host.equalsIgnoreCase(CURSEFORGE_HOST) || host.toLowerCase().endsWith("." + CURSEFORGE_HOST))
                     && path != null
                     && path.toLowerCase().startsWith("/hytale/")

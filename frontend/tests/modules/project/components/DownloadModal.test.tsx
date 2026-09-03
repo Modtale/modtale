@@ -472,7 +472,8 @@ describe('DownloadModal Toggle Visibility', () => {
                             projectId: 'external-shader',
                             projectTitle: 'External Shader',
                             versionNumber: '2.0.0',
-                            source: 'CURSEFORGE'
+                            source: 'CURSEFORGE',
+                            externalUrl: 'https://www.curseforge.com/hytale/mods/external-shader/files/1234'
                         }
                     ]
                 }
@@ -500,6 +501,11 @@ describe('DownloadModal Toggle Visibility', () => {
 
         expect(pageText()).toContain('This modpack uses external mods');
         expect(pageText()).toContain('External Shader');
+        expect(pageText()).toContain('is not redistributed in this archive');
+        expect(pageText()).toContain("authors' chosen platform");
+        const sourceLink = document.body.querySelector('a[href="https://www.curseforge.com/hytale/mods/external-shader/files/1234"]');
+        expect(sourceLink?.getAttribute('target')).toBe('_blank');
+        expect(sourceLink?.getAttribute('rel')).toBe('noopener noreferrer');
     });
 
     it('does not show the external mod warning for non-modpack projects', async () => {

@@ -121,6 +121,27 @@ class VersionDependencyServiceTest {
     }
 
     @Test
+    void resolveRequestedDependenciesRequiresSecureCanonicalCurseForgeUrls() {
+        DependencyReferenceRequest valid = curseForgeDependency(
+                "https://www.curseforge.com/hytale/mods/simple-compost/files/8227810"
+        );
+
+        ProjectDependency resolved = service.resolveRequestedDependencies(List.of(valid), false, false)
+                .dependencies().getFirst();
+        assertTrue(resolved.isHytaleProjectConfirmed());
+
+        for (String invalidUrl : List.of(
+                "http://www.curseforge.com/hytale/mods/simple-compost/files/8227810",
+                "https://attacker@www.curseforge.com/hytale/mods/simple-compost/files/8227810",
+                "https://curseforge.com.evil.example/hytale/mods/simple-compost/files/8227810",
+                "https://www.curseforge.com/minecraft/mc-mods/simple-compost/files/8227810"
+        )) {
+            assertThrows(InvalidVersionRequestException.class, () ->
+                    service.resolveRequestedDependencies(List.of(curseForgeDependency(invalidUrl)), false, false));
+        }
+    }
+
+    @Test
     void resolveRequestedProjectIdsTrimsBlanksAndCanRejectDrafts() {
         when(projectService.getRawProjectById("dep-1")).thenReturn(project("dep-1", "Dependency One", ProjectStatus.PUBLISHED, "1.0.0"));
         when(projectService.getRawProjectById("draft")).thenReturn(project("draft", "Draft", ProjectStatus.DRAFT, "1.0.0"));
@@ -159,6 +180,16 @@ class VersionDependencyServiceTest {
         request.setProjectId(projectId);
         request.setVersionNumber(versionNumber);
         request.setDependencyType(dependencyType);
+        return request;
+    }
+
+    private static DependencyReferenceRequest curseForgeDependency(String url) {
+        DependencyReferenceRequest request = new DependencyReferenceRequest();
+        request.setSource(ProjectDependency.Source.CURSEFORGE);
+        request.setProjectTitle("Simple Compost");
+        request.setVersionNumber("1.0.0");
+        request.setExternalUrl(url);
+        request.setExternalFileUrl(url);
         return request;
     }
 }

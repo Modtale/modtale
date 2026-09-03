@@ -552,8 +552,8 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
         }
 
         const source = resolved.source;
-        if (source === 'CURSEFORGE' && !selectedExternalFile?.downloadUrl) {
-            setExternalError('Choose a CurseForge file so Modtale can cache it.');
+        if (source === 'CURSEFORGE' && !selectedExternalFile?.id) {
+            setExternalError('Paste a specific CurseForge file page so the mod can be referenced safely.');
             return;
         }
 
@@ -576,7 +576,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
             source,
             externalId: resolved.externalId,
             externalUrl: referenceUrl,
-            externalFileUrl: selectedExternalFile?.downloadUrl,
+            externalFileUrl: source === 'CURSEFORGE' ? referenceUrl : selectedExternalFile?.downloadUrl,
             externalFileName: selectedExternalFile?.fileName || selectedExternalFile?.displayName,
             hytaleProjectConfirmed
         };

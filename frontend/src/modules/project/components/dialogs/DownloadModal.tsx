@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Download, X, ChevronDown, FileText, AlertCircle, ChevronRight, Check } from 'lucide-react';
+import { Download, X, ChevronDown, FileText, AlertCircle, ChevronRight, Check, ExternalLink } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { buildVersionGroups, compareSemVer, formatTimeAgo, type VersionGroup } from '@/utils/modHelpers';
 import { useScrollLock } from '@/hooks/useScrollLock';
@@ -405,8 +405,27 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                     <div>
                         <p className="text-sm font-black">This modpack uses external mods</p>
                         <p className="mt-1 text-xs font-medium leading-relaxed">
-                            {formatExternalDependencyNames(externalDependencies)} {externalDependencies.length === 1 ? 'comes' : 'come'} from outside Modtale. Check the linked source pages if the download or install flow asks for them separately.
+                            {formatExternalDependencyNames(externalDependencies)} {externalDependencies.length === 1 ? 'comes' : 'come'} from outside Modtale and is not redistributed in this archive. Use the linked source pages to obtain those files from their authors' chosen platform.
                         </p>
+                        <ul className="mt-2 space-y-1" aria-label="External mod source pages">
+                            {externalDependencies.map((dependency, index) => (
+                                <li key={dependency.id || `${dependency.source}-${dependency.externalId || dependency.projectId}-${index}`}>
+                                    {dependency.externalUrl ? (
+                                        <a
+                                            href={dependency.externalUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-xs font-bold underline decoration-amber-500/50 underline-offset-2 hover:decoration-current"
+                                        >
+                                            {dependency.projectTitle || dependency.externalId || dependency.projectId}
+                                            <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                                        </a>
+                                    ) : (
+                                        <span className="text-xs font-bold">{dependency.projectTitle || dependency.externalId || dependency.projectId}</span>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
                     </div>
                 </div>
             </div>

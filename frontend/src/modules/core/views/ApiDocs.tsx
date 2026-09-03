@@ -734,7 +734,7 @@ const endpointSpecificExample = (method: string, path: string, code: string): un
             dependencies: [
                 { id: 'b612a7db-3475-4c43-bb46-c951b330bcd2', projectId: '67f70e06d5de9b5f94b6a111', projectTitle: 'Skyforge Core', versionNumber: '3.1.0', dependencyType: 'REQUIRED', source: 'MODTALE' },
                 { id: '3c6b637b-76cb-4efe-9d20-c7b5356e2676', projectId: '67f70e06d5de9b5f94b6a222', projectTitle: 'Skyforge Map Layer', versionNumber: '1.4.2', dependencyType: 'OPTIONAL', source: 'MODTALE' },
-                { id: '7737a837-76d3-414a-a149-c078ff981c0b', projectId: 'curseforge:1450386', projectTitle: 'SimpleCompost', versionNumber: '1.0.0', dependencyType: 'REQUIRED', source: 'CURSEFORGE', externalId: '1450386', externalUrl: 'https://www.curseforge.com/hytale/mods/simplecompost/files/8227810', externalFileUrl: 'https://www.curseforge.com/api/v1/mods/1450386/files/8227810/download', externalFileName: 'SimpleCompost-1.0.0.jar', cachedFileUrl: 'external-dependencies/curseforge/1450386/8227810/SimpleCompost-1.0.0.jar' },
+                { id: '7737a837-76d3-414a-a149-c078ff981c0b', projectId: 'curseforge:1450386', projectTitle: 'SimpleCompost', versionNumber: '1.0.0', dependencyType: 'REQUIRED', source: 'CURSEFORGE', externalId: '1450386', externalUrl: 'https://www.curseforge.com/hytale/mods/simplecompost/files/8227810', externalFileUrl: 'https://www.curseforge.com/hytale/mods/simplecompost/files/8227810', externalFileName: 'SimpleCompost-1.0.0.jar' },
             ],
         };
     }

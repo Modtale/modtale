@@ -88,6 +88,10 @@ class ModpackArchiveServiceTest {
         JsonNode parsed = new ObjectMapper().readTree(manifest);
 
         assertEquals("Sky \"Pack\"\nNight\tBuild", parsed.get("name").asText());
+        assertEquals(1, parsed.get("formatVersion").asInt());
+        assertEquals("hytale", parsed.get("game").asText());
+        assertEquals("pack-1", parsed.get("packId").asText());
+        assertEquals("1.0.0", parsed.get("versionNumber").asText());
         assertEquals("Plugin\nDeluxe", parsed.get("files").get(0).get("title").asText());
     }
 
@@ -133,9 +137,11 @@ class ModpackArchiveServiceTest {
         assertEquals("modpacks/generated.zip", version.getFileUrl());
         assertEquals("plugin-binary", entries.get("plugin.jar"));
         assertEquals("data-binary", entries.get("data.zip"));
-        assertEquals("external-binary", entries.get("External-Mod-1.0.0.jar"));
+        assertEquals(false, entries.containsKey("External-Mod-1.0.0.jar"));
         assertEquals(true, entries.get("modpack.json").contains("\"id\": \"plugin\""));
         assertEquals(true, entries.get("modpack.json").contains("\"externalId\": \"1450386\""));
+        assertEquals(true, entries.get("modpack.json").contains("\"distribution\": \"REFERENCE_ONLY\""));
+        assertEquals(true, entries.get("modpack.json").contains("https://www.curseforge.com/hytale/mods/external-mod/files/8227810"));
         verify(projectRepository).save(pack);
     }
 
