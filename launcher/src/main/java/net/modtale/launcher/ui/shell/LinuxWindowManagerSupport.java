@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.OptionalLong;
 import java.util.Set;
+import javafx.scene.Cursor;
 import javafx.scene.input.MouseEvent;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
@@ -58,6 +59,91 @@ final class LinuxWindowManagerSupport {
 
     static boolean beginResize(Stage stage, MouseEvent event, ResizeDirection direction) {
         return direction != null && beginMoveResize(stage, event, direction.ewmhCode);
+    }
+
+    static boolean applySystemCursor(Stage stage, Cursor cursor) {
+        String cursorName = systemCursorName(cursor);
+        if (!isLinux() || stage == null || cursorName == null || System.getenv("DISPLAY") == null) {
+            return false;
+        }
+
+        Pointer display = null;
+        NativeLong nativeCursor = null;
+        try {
+            display = X11.INSTANCE.XOpenDisplay(null);
+            if (display == null) {
+                return false;
+            }
+            NativeLong root = X11.INSTANCE.XDefaultRootWindow(display);
+            OptionalLong window = findStageWindow(display, root, stage);
+            if (window.isEmpty()) {
+                return false;
+            }
+            nativeCursor = XCursor.INSTANCE.XcursorLibraryLoadCursor(display, cursorName);
+            if (nativeCursor == null || nativeCursor.longValue() == 0) {
+                return false;
+            }
+            defineCursorTree(display, new NativeLong(window.getAsLong()), nativeCursor, 0);
+            X11.INSTANCE.XFlush(display);
+            return true;
+        } catch (UnsatisfiedLinkError | RuntimeException ex) {
+            return false;
+        } finally {
+            if (display != null) {
+                if (nativeCursor != null && nativeCursor.longValue() != 0) {
+                    X11.INSTANCE.XFreeCursor(display, nativeCursor);
+                }
+                X11.INSTANCE.XCloseDisplay(display);
+            }
+        }
+    }
+
+    static String systemCursorName(Cursor cursor) {
+        if (cursor == null || cursor == Cursor.DEFAULT) return "default";
+        if (cursor == Cursor.HAND) return "pointer";
+        if (cursor == Cursor.TEXT) return "text";
+        if (cursor == Cursor.CROSSHAIR) return "crosshair";
+        if (cursor == Cursor.WAIT) return "wait";
+        if (cursor == Cursor.MOVE) return "move";
+        if (cursor == Cursor.H_RESIZE) return "ew-resize";
+        if (cursor == Cursor.V_RESIZE) return "ns-resize";
+        if (cursor == Cursor.NE_RESIZE || cursor == Cursor.SW_RESIZE) return "nesw-resize";
+        if (cursor == Cursor.NW_RESIZE || cursor == Cursor.SE_RESIZE) return "nwse-resize";
+        if (cursor == Cursor.N_RESIZE) return "n-resize";
+        if (cursor == Cursor.S_RESIZE) return "s-resize";
+        if (cursor == Cursor.E_RESIZE) return "e-resize";
+        if (cursor == Cursor.W_RESIZE) return "w-resize";
+        if (cursor == Cursor.OPEN_HAND) return "grab";
+        if (cursor == Cursor.CLOSED_HAND) return "grabbing";
+        return null;
+    }
+
+    private static void defineCursorTree(Pointer display, NativeLong window, NativeLong cursor, int depth) {
+        X11.INSTANCE.XDefineCursor(display, window, cursor);
+        if (depth >= MAX_WINDOW_SEARCH_DEPTH) {
+            return;
+        }
+
+        NativeLongByReference root = new NativeLongByReference();
+        NativeLongByReference parent = new NativeLongByReference();
+        PointerByReference children = new PointerByReference();
+        IntByReference childCount = new IntByReference();
+        int queried = X11.INSTANCE.XQueryTree(display, window, root, parent, children, childCount);
+        Pointer childPointer = children.getValue();
+        if (queried == 0 || childPointer == null || childCount.getValue() <= 0) {
+            if (childPointer != null) {
+                X11.INSTANCE.XFree(childPointer);
+            }
+            return;
+        }
+        try {
+            for (int index = 0; index < childCount.getValue(); index++) {
+                NativeLong child = childPointer.getNativeLong((long) index * NativeLong.SIZE);
+                defineCursorTree(display, child, cursor, depth + 1);
+            }
+        } finally {
+            X11.INSTANCE.XFree(childPointer);
+        }
     }
 
     private static boolean beginMoveResize(Stage stage, MouseEvent event, int direction) {
@@ -378,6 +464,10 @@ final class LinuxWindowManagerSupport {
 
         int XFlush(Pointer display);
 
+        int XDefineCursor(Pointer display, NativeLong window, NativeLong cursor);
+
+        int XFreeCursor(Pointer display, NativeLong cursor);
+
         int XUngrabPointer(Pointer display, NativeLong time);
 
         int XQueryTree(
@@ -407,5 +497,11 @@ final class LinuxWindowManagerSupport {
         );
 
         int XFetchName(Pointer display, NativeLong window, PointerByReference windowNameReturn);
+    }
+
+    private interface XCursor extends Library {
+        XCursor INSTANCE = Native.load("Xcursor", XCursor.class);
+
+        NativeLong XcursorLibraryLoadCursor(Pointer display, String name);
     }
 }
