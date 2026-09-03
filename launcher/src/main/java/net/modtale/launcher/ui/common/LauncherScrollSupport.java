@@ -23,19 +23,40 @@ public final class LauncherScrollSupport {
     private static final Duration INTERACTION_IDLE_DELAY = Duration.millis(140);
 
     private final Supplier<Node> rootSupplier;
-    private final PauseTransition interactionCooldown = new PauseTransition(INTERACTION_IDLE_DELAY);
+    private final InteractionIdleTimer interactionIdleTimer;
 
     public LauncherScrollSupport(Supplier<Node> rootSupplier) {
         this.rootSupplier = rootSupplier;
-        interactionCooldown.setOnFinished(event -> clearScrollInteraction());
+        PauseTransition transition = new PauseTransition(INTERACTION_IDLE_DELAY);
+        transition.setOnFinished(event -> clearScrollInteraction());
+        this.interactionIdleTimer = new InteractionIdleTimer() {
+            @Override
+            public void restart() {
+                transition.playFromStart();
+            }
+
+            @Override
+            public void stop() {
+                transition.stop();
+            }
+        };
+    }
+
+    LauncherScrollSupport(Supplier<Node> rootSupplier, InteractionIdleTimer interactionIdleTimer) {
+        this.rootSupplier = rootSupplier;
+        this.interactionIdleTimer = interactionIdleTimer;
     }
 
     public void configure(ScrollPane scrollPane, boolean horizontal) {
-        if (scrollPane == null || Boolean.TRUE.equals(scrollPane.getProperties().get(INSTALLED_PROPERTY))) {
+        configureNode(scrollPane);
+    }
+
+    void configureNode(Node scrollNode) {
+        if (scrollNode == null || Boolean.TRUE.equals(scrollNode.getProperties().get(INSTALLED_PROPERTY))) {
             return;
         }
-        scrollPane.getProperties().put(INSTALLED_PROPERTY, Boolean.TRUE);
-        scrollPane.addEventFilter(ScrollEvent.SCROLL, this::observeNativeScroll);
+        scrollNode.getProperties().put(INSTALLED_PROPERTY, Boolean.TRUE);
+        scrollNode.addEventFilter(ScrollEvent.SCROLL, this::observeNativeScroll);
     }
 
     private void observeNativeScroll(ScrollEvent event) {
@@ -45,14 +66,14 @@ public final class LauncherScrollSupport {
                 return;
             }
             activateScrollInteraction();
-            interactionCooldown.playFromStart();
+            interactionIdleTimer.restart();
         } finally {
             LauncherPerformanceProbe.recordOperation("scroll.input", operationStart);
         }
     }
 
     private void activateScrollInteraction() {
-        interactionCooldown.stop();
+        interactionIdleTimer.stop();
         Node root = rootSupplier.get();
         if (root != null) {
             root.getProperties().put(ProjectCardFactory.SCROLL_ACTIVE_PROPERTY, Boolean.TRUE);
@@ -64,5 +85,11 @@ public final class LauncherScrollSupport {
         if (root != null) {
             root.getProperties().remove(ProjectCardFactory.SCROLL_ACTIVE_PROPERTY);
         }
+    }
+
+    interface InteractionIdleTimer {
+        void restart();
+
+        void stop();
     }
 }
