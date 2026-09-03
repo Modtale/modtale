@@ -124,14 +124,16 @@ final class LibraryWorldRenderer {
         refresh.setAccessibleText("Refresh library");
         refresh.setTooltip(new Tooltip("Rescan installed projects and worlds"));
         refresh.setOnAction(event -> refreshLibrary.run());
-        Button updates = secondaryButton("Updates");
+        Button updates = secondaryButton("Check updates");
         updates.getStyleClass().addAll("small", "library-world-utility-action");
         updates.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 14));
         updates.setMinWidth(Region.USE_PREF_SIZE);
         updates.setTooltip(new Tooltip("Check installed projects for updates"));
         updates.setOnAction(event -> checkUpdates.run());
-        Region actionDivider = new Region();
-        actionDivider.getStyleClass().add("library-action-divider");
+        Region actionGap = new Region();
+        actionGap.setMinWidth(6);
+        actionGap.setPrefWidth(6);
+        actionGap.setMaxWidth(6);
         Button share = secondaryButton("Share");
         share.getStyleClass().addAll("small", "library-compact-icon-action");
         share.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.SHARE_2, 14));
@@ -145,7 +147,7 @@ final class LibraryWorldRenderer {
         pack.setMinWidth(Region.USE_PREF_SIZE);
         pack.setTooltip(new Tooltip("Start a Modtale modpack from this world's enabled mods"));
         pack.setOnAction(event -> createModpackFromWorld.accept(model.world()));
-        actions.getChildren().addAll(refresh, updates, actionDivider, share, pack);
+        actions.getChildren().addAll(refresh, updates, actionGap, share, pack);
 
         row.getChildren().addAll(icon, copy, actions);
         section.getChildren().add(row);
