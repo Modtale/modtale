@@ -402,8 +402,8 @@ describe('DownloadModal Toggle Visibility', () => {
         await settle();
 
         expect(pageText()).toContain('View all files for 0.5.7');
-        expect(pageText()).toContain('v0.5.7');
-        expect(pageText()).not.toContain('v0.4.0');
+        expect(pageText()).toContain('Version 0.5.7');
+        expect(pageText()).not.toContain('Version 0.4.0');
     });
 
     it('selects a version family as an OR-compatible set in the download modal', async () => {

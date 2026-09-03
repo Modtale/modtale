@@ -3765,38 +3765,11 @@
 
 }
 
-.download-modal-version-badge {
-    -fx-padding: 4px 12px;
-    -fx-background-radius: 999px;
-    -fx-border-radius: 999px;
-    -fx-border-width: 1px;
-}
-
-.download-modal-version-badge.release {
-    -fx-background-color: rgba(255, 255, 255, 0.05);
-    -fx-border-color: rgba(255, 255, 255, 0.10);
-}
-
-.download-modal-version-badge.beta {
-    -fx-background-color: rgba(168, 85, 247, 0.20);
-    -fx-border-color: rgba(168, 85, 247, 0.30);
-}
-
-.download-modal-version-badge.alpha {
-    -fx-background-color: rgba(239, 68, 68, 0.20);
-    -fx-border-color: rgba(239, 68, 68, 0.30);
-}
-
-.download-modal-version-number,
-.download-modal-version-channel {
-    -fx-text-fill: #ffffff;
-    -fx-font-family: "JetBrains Mono", "Consolas", "monospace";
+.download-modal-latest-version {
+    -fx-text-fill: rgba(255, 255, 255, 0.80);
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-size: 12px;
-    -fx-font-weight: 700;
-}
-
-.download-modal-version-channel {
-    -fx-text-transform: uppercase;
+    -fx-font-weight: 600;
 }
 
 .download-modal-also-supports {
