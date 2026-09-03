@@ -393,17 +393,22 @@ public final class LauncherShell {
         if (workspaceRoot != null) {
             toggleStyleClass(workspaceRoot, "play-workspace", playPage);
             workspaceRoot.setSpacing(discoverMode ? WORKSPACE_SPACING : 0);
-            workspaceRoot.setPadding(webMode
+            Insets pageInsets = webMode
                     ? Insets.EMPTY
                     : libraryPage
                             ? LauncherLayout.navbarInsets(18, 28)
                             : launcherPage
                                     ? LauncherLayout.LAUNCHER_WORKSPACE_INSETS
-                                    : LauncherLayout.WORKSPACE_INSETS);
+                                    : LauncherLayout.WORKSPACE_INSETS;
+            workspaceRoot.setPadding(new Insets(
+                    pageInsets.getTop(), 0, pageInsets.getBottom(), pageInsets.getLeft()));
+            mainToolbar.setPadding(new Insets(0, pageInsets.getRight(), 8, 0));
+            contentBody.setPadding(new Insets(
+                    webMode || discoverMode || launcherPage ? 0 : 16,
+                    pageInsets.getRight(), 0, 0));
         }
         if (contentBody != null) {
             contentBody.setSpacing(webMode ? 0 : 16);
-            contentBody.setPadding(webMode || discoverMode || launcherPage ? Insets.EMPTY : new Insets(16, 0, 0, 0));
             contentBody.setMinHeight(documentMode ? Region.USE_PREF_SIZE : 0);
         }
         if (contentScroll != null) {
@@ -840,7 +845,9 @@ public final class LauncherShell {
     private Node workspace() {
         workspaceRoot = new HBox(WORKSPACE_SPACING);
         workspaceRoot.getStyleClass().add("workspace");
-        workspaceRoot.setPadding(LauncherLayout.WORKSPACE_INSETS);
+        workspaceRoot.setPadding(new Insets(
+                LauncherLayout.WORKSPACE_INSETS.getTop(), 0,
+                LauncherLayout.WORKSPACE_INSETS.getBottom(), LauncherLayout.WORKSPACE_INSETS.getLeft()));
         workspaceRoot.setFillHeight(true);
         workspaceRoot.setMaxHeight(Double.MAX_VALUE);
         railNode = rail();
