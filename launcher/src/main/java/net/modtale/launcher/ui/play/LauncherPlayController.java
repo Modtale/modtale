@@ -656,7 +656,7 @@ public final class LauncherPlayController {
         control.setAlignment(Pos.CENTER);
         control.setMaxWidth(Region.USE_PREF_SIZE);
 
-        HBox split = new HBox(0);
+        StackPane split = new StackPane();
         split.getStyleClass().add("play-launch-split");
         split.setAlignment(Pos.CENTER);
         split.setMaxWidth(Region.USE_PREF_SIZE);
@@ -666,35 +666,16 @@ public final class LauncherPlayController {
         play.setFont(Font.font("Inter", FontWeight.EXTRA_BOLD, PLAY_BUTTON_FONT_SIZE));
         play.setOnAction(event -> launchHytale());
 
-        Button setup = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_DOWN, 20));
+        Button setup = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_DOWN, 18));
         setup.getStyleClass().add("play-launch-arrow");
         setup.setTooltip(new Tooltip("Select launch build"));
         setup.setOnAction(event -> showLaunchDropdown(setup));
+        StackPane.setAlignment(setup, Pos.CENTER_RIGHT);
+        StackPane.setMargin(setup, new Insets(0, 7, 0, 0));
 
         split.getChildren().addAll(play, setup);
-
-        HBox meta = new HBox(10);
-        meta.getStyleClass().add("play-launch-meta");
-        meta.setAlignment(Pos.CENTER);
-        meta.getChildren().addAll(
-                launchMetaText("Version", buildMetric),
-                launchMetaText("Patchline", patchlineMetric),
-                launchMetaText("Playtime", playtimeMetric)
-        );
-
-        control.getChildren().addAll(split, meta);
+        control.getChildren().add(split);
         return control;
-    }
-
-    private Node launchMetaText(String label, Label valueLabel) {
-        HBox item = new HBox(5);
-        item.getStyleClass().add("play-launch-meta-item");
-        item.setAlignment(Pos.CENTER_LEFT);
-        Label heading = new Label(label);
-        heading.getStyleClass().add("play-launch-meta-label");
-        valueLabel.getStyleClass().add("play-launch-meta-value");
-        item.getChildren().addAll(heading, valueLabel);
-        return item;
     }
 
     private VBox setupPopover() {
