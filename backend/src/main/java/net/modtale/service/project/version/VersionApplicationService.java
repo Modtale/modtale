@@ -93,6 +93,17 @@ public class VersionApplicationService {
         return versionDownloadOrchestrationService.createDownloadUrl(projectId, versionNumber, gameVersion, currentUser);
     }
 
+    public DownloadUrlResponse createDownloadUrl(
+            String projectId,
+            String versionNumber,
+            String gameVersion,
+            User currentUser,
+            boolean launcherClient
+    ) {
+        return versionDownloadOrchestrationService.createDownloadUrl(
+                projectId, versionNumber, gameVersion, currentUser, launcherClient);
+    }
+
     public BundleDownloadUrlResponse createBundleDownloadUrl(
             String projectId,
             String versionNumber,
@@ -124,6 +135,26 @@ public class VersionApplicationService {
                 remoteAddress,
                 forwardedFor,
                 currentUser
+        );
+    }
+
+    public VersionDownloadPayload downloadVersion(
+            String token,
+            boolean apiRole,
+            String referer,
+            String remoteAddress,
+            String forwardedFor,
+            User currentUser,
+            boolean launcherClient
+    ) throws IOException {
+        return versionDownloadOrchestrationService.downloadVersion(
+                token,
+                apiRole,
+                referer,
+                remoteAddress,
+                forwardedFor,
+                currentUser,
+                launcherClient
         );
     }
 

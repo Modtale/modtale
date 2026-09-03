@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -37,6 +38,9 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/v1")
 public class VersionController {
+
+    private static final String CLIENT_HEADER = "X-Modtale-Client";
+    private static final String LAUNCHER_CLIENT = "launcher";
 
     private final VersionApplicationService versionApplicationService;
     private final AccountService accountService;
@@ -136,13 +140,15 @@ public class VersionController {
             @PathVariable String id,
             @PathVariable String version,
             @RequestParam(value = "gameVersion", required = false) String gameVersion,
+            @RequestHeader(value = CLIENT_HEADER, required = false) String client,
             Authentication authentication
     ) {
         return ResponseEntity.ok(versionApplicationService.createDownloadUrl(
                 id,
                 version,
                 gameVersion,
-                accountService.getCurrentUser(authentication)
+                accountService.getCurrentUser(authentication),
+                isLauncherClient(client)
         ));
     }
 
@@ -158,9 +164,14 @@ public class VersionController {
                 request.getHeader("Referer"),
                 request.getRemoteAddr(),
                 request.getHeader("X-Forwarded-For"),
-                accountService.getCurrentUser(authentication)
+                accountService.getCurrentUser(authentication),
+                isLauncherClient(request.getHeader(CLIENT_HEADER))
         );
         return asDownloadResponse(payload);
+    }
+
+    private boolean isLauncherClient(String client) {
+        return LAUNCHER_CLIENT.equalsIgnoreCase(client);
     }
 
     @GetMapping("/projects/{id}/versions/{version}/download-bundle-url")

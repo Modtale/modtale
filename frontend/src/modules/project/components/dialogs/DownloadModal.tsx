@@ -3,7 +3,7 @@ import { Download, X, ChevronDown, FileText, AlertCircle, ChevronRight, MonitorD
 import { theme } from '@/styles/theme';
 import { buildVersionGroups, compareSemVer, formatTimeAgo, type VersionGroup } from '@/utils/modHelpers';
 import { useScrollLock } from '@/hooks/useScrollLock';
-import { getExternalDependencies } from '@/modules/project/utils/dependencyEntries';
+import { getExternalDependencies, hasCurseForgeDependencies } from '@/modules/project/utils/dependencyEntries';
 import { openLauncherInstallOrFallback } from '@/modules/launcher/utils/launcherProtocol';
 import { SiteRoutes } from '@/utils/routes';
 import type { ProjectDependency } from '@/types';
@@ -452,8 +452,11 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
     };
 
     const download = (ver: any, gameVersion: string) => {
+        if (isModpack && hasCurseForgeDependencies(ver?.dependencies)) return;
         onDownload(ver.fileUrl, ver.versionNumber, gameVersion, ver.dependencies, ver.channel);
     };
+
+    const latestRequiresLauncher = isModpack && hasCurseForgeDependencies(latestVer?.dependencies);
 
     const content = (
         <div ref={containerRef} className={`${isInline ? 'w-full overflow-hidden relative flex flex-col transform transition-transform duration-500' : 'fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-2xl max-h-[90dvh] flex flex-col z-[100]'} bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl rounded-2xl overflow-hidden`} onClick={e => e.stopPropagation()}>
@@ -497,10 +500,11 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                     <>
                         <button
                             type="button"
+                            disabled={latestRequiresLauncher}
                             onClick={() => download(latestVer, latestGameVersion)}
-                            className={`w-full p-5 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 ${projectId ? 'mb-3' : 'mb-6'} group relative overflow-hidden ${themeClass}`}
+                            className={`w-full p-5 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-1.5 transition-all ${projectId ? 'mb-3' : 'mb-6'} group relative overflow-hidden ${latestRequiresLauncher ? 'cursor-not-allowed bg-slate-200 text-slate-500 shadow-none dark:bg-slate-800 dark:text-slate-400' : `active:scale-95 ${themeClass}`}`}
                         >
-                            <div className="font-black text-xl flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-6 h-6" /> Download Latest</div>
+                            <div className="font-black text-xl flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-6 h-6" /> {latestRequiresLauncher ? 'Modtale Launcher Required' : 'Download Latest'}</div>
                             <div className={`text-xs font-bold font-mono px-3 py-1 rounded-full border flex items-center gap-2 z-10 ${getVersionBadgeColor(latestVer.channel || 'RELEASE')}`}>
                                 v{latestVer.versionNumber}
                                 {latestVer.channel !== 'RELEASE' && <span className="uppercase tracking-wider opacity-90">{latestVer.channel}</span>}
@@ -526,6 +530,11 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                                 <MonitorDown className="h-4 w-4" aria-hidden="true" />
                                 Install with launcher
                             </button>
+                        )}
+                        {latestRequiresLauncher && (
+                            <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm font-bold text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-100">
+                                This version contains CurseForge projects. Install it through Modtale Launcher so those files are downloaded directly to your device.
+                            </div>
                         )}
                         {renderExternalDependencyNotice(latestVer)}
 
@@ -572,9 +581,10 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                                         </div>
                                         <button
                                             type="button"
+                                            disabled={isModpack && hasCurseForgeDependencies(ver?.dependencies)}
                                             onClick={() => download(ver, gameVersion)}
-                                            className={`p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-modtale-accent hover:text-white transition-colors`}
-                                            aria-label={`Download version ${ver.versionNumber}`}
+                                            className={`p-2 rounded-lg transition-colors ${isModpack && hasCurseForgeDependencies(ver?.dependencies) ? 'cursor-not-allowed bg-slate-100 text-slate-300 dark:bg-white/5 dark:text-slate-600' : 'bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-modtale-accent hover:text-white'}`}
+                                            aria-label={isModpack && hasCurseForgeDependencies(ver?.dependencies) ? `Version ${ver.versionNumber} requires Modtale Launcher` : `Download version ${ver.versionNumber}`}
                                         >
                                             <Download className="w-4 h-4" />
                                         </button>

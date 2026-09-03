@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.List;
 import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.exception.InvalidDownloadTokenException;
+import net.modtale.exception.InvalidVersionRequestException;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.exception.UnauthorizedException;
 import net.modtale.exception.VersionNotFoundException;
@@ -60,10 +61,21 @@ public class VersionDownloadOrchestrationService {
     }
 
     public DownloadUrlResponse createDownloadUrl(String projectId, String versionNumber, String gameVersion, User currentUser) {
+        return createDownloadUrl(projectId, versionNumber, gameVersion, currentUser, false);
+    }
+
+    public DownloadUrlResponse createDownloadUrl(
+            String projectId,
+            String versionNumber,
+            String gameVersion,
+            User currentUser,
+            boolean launcherClient
+    ) {
         Project project = getProjectOrThrow(projectId, currentUser,
                 "We couldn't find that project, so no download link could be generated.");
-        getVersionOrThrow(project, versionNumber, gameVersion,
+        ProjectVersion version = getVersionOrThrow(project, versionNumber, gameVersion,
                 "We couldn't find the requested version for that project.");
+        ensureDownloadable(project, version, launcherClient);
         String token = downloadTokenService.generateToken(
                 projectId, versionNumber, gameVersion, null, currentUserId(currentUser));
         return new DownloadUrlResponse("/download/" + token, downloadTokenService.getTokenValiditySeconds());
@@ -92,6 +104,18 @@ public class VersionDownloadOrchestrationService {
             String forwardedFor,
             User currentUser
     ) throws IOException {
+        return downloadVersion(token, apiRole, referer, remoteAddress, forwardedFor, currentUser, false);
+    }
+
+    public VersionDownloadPayload downloadVersion(
+            String token,
+            boolean apiRole,
+            String referer,
+            String remoteAddress,
+            String forwardedFor,
+            User currentUser,
+            boolean launcherClient
+    ) throws IOException {
         DownloadTokenService.DownloadToken downloadToken = validateToken(token,
                 "This download link is invalid, expired, or has already been used.");
         DownloadContext context = resolveDownloadContext(downloadToken, apiRole, referer, remoteAddress, forwardedFor, currentUser);
@@ -100,6 +124,7 @@ public class VersionDownloadOrchestrationService {
         ensureReadable(project, context.currentUser());
         ProjectVersion targetVersion = getVersionOrThrow(project, downloadToken.getVersion(), downloadToken.getGameVersion(),
                 "We couldn't find the version requested by this download link.");
+        ensureDownloadable(project, targetVersion, launcherClient);
 
         trackDownload(project, targetVersion.getId(), context);
 
@@ -216,6 +241,18 @@ public class VersionDownloadOrchestrationService {
     private void ensureReadable(Project project, User currentUser) {
         if (!accessControlService.canReadProject(project, currentUser)) {
             throw new ResourceNotFoundException("We couldn't find the project for this download link.");
+        }
+    }
+
+    private void ensureDownloadable(Project project, ProjectVersion version, boolean launcherClient) {
+        if (!launcherClient
+                && project.getClassification() == ProjectClassification.MODPACK
+                && version.getDependencies() != null
+                && version.getDependencies().stream()
+                        .anyMatch(dependency -> dependency.getSource() == ProjectDependency.Source.CURSEFORGE)) {
+            throw new InvalidVersionRequestException(
+                    "This modpack contains CurseForge projects and can only be installed with Modtale Launcher."
+            );
         }
     }
 

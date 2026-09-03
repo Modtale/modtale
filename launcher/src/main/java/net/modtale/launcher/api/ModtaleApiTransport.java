@@ -24,6 +24,8 @@ final class ModtaleApiTransport {
 
     private static final LauncherLogger LOG = LauncherLog.getLogger(ModtaleApiTransport.class);
     private static final String CSRF_HEADER_NAME = "X-XSRF-TOKEN";
+    static final String CLIENT_HEADER_NAME = "X-Modtale-Client";
+    static final String CLIENT_HEADER_VALUE = "launcher";
 
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
@@ -247,6 +249,7 @@ final class ModtaleApiTransport {
         return HttpRequest.newBuilder(uri)
                 .timeout(Duration.ofSeconds(60))
                 .header("Accept", "application/json")
+                .header(CLIENT_HEADER_NAME, CLIENT_HEADER_VALUE)
                 .header("User-Agent", "ModtaleLauncher/0.1");
     }
 

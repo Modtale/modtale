@@ -236,6 +236,44 @@ describe('DownloadModal Toggle Visibility', () => {
         expect(onDownload).toHaveBeenCalledWith('/packs/sky.zip', '1.0.0', '0.5.4', [], 'RELEASE');
     });
 
+    it('directs CurseForge modpacks to the launcher instead of browser download', async () => {
+        const onDownload = vi.fn();
+        const version = {
+            id: 'pack-v1', versionNumber: '1.0.0', channel: 'RELEASE',
+            gameVersions: ['0.5.4'], fileUrl: '/packs/sky.zip',
+            dependencies: [{
+                projectId: 'curseforge:1450386', projectTitle: 'Simple Compost',
+                versionNumber: '1.0.0', dependencyType: 'REQUIRED', source: 'CURSEFORGE'
+            }],
+            releaseDate: new Date().toISOString()
+        };
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <DownloadModal
+                        show={true}
+                        onClose={vi.fn()}
+                        versionsByGame={{ '0.5.4': [version] }}
+                        orderedGameVersions={['0.5.4']}
+                        onDownload={onDownload}
+                        showExperimental={false}
+                        onToggleExperimental={vi.fn()}
+                        onViewHistory={vi.fn()}
+                        isModpack={true}
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        const launcherButton = Array.from(document.body.querySelectorAll('button'))
+            .find(button => button.textContent?.includes('Modtale Launcher Required')) as HTMLButtonElement;
+        expect(launcherButton.disabled).toBe(true);
+        expect(pageText()).toContain('downloaded directly to your device');
+        await act(async () => launcherButton.click());
+        expect(onDownload).not.toHaveBeenCalled();
+    });
+
     it('defaults to the latest backend-ordered game version in the download modal', async () => {
         const versionsByGame = {
             '0.5.3': [
