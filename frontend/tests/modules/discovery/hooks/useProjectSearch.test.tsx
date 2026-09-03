@@ -141,7 +141,7 @@ describe('useProjectSearch', () => {
 
         await act(async () => {
             root.render(
-                <MemoryRouter initialEntries={['/mods?q=sky&version=1.20.1&minDl=10&minFav=3&date=30d&tags=magic,tech&sort=popular&page=2']}>
+                <MemoryRouter initialEntries={['/mods?q=sky&version=1.20.1&minDl=10&minFav=3&openSource=true&date=30d&tags=magic,tech&sort=popular&page=2']}>
                     <Probe
                         initialClassification="All"
                         useSSRData={false}
@@ -167,11 +167,13 @@ describe('useProjectSearch', () => {
             gameVersion: '1.20.1',
             minDownloads: 10,
             minFavorites: 3,
+            openSource: true,
             dateRange: '30d',
         }, expect.any(AbortSignal));
         expect(latestSnapshot.items).toEqual([{ id: 'project-9' }]);
         expect(latestSnapshot.totalPages).toBe(4);
         expect(latestSnapshot.totalItems).toBe(48);
+        expect(latestSnapshot.openSourceOnly).toBe(true);
     });
 
     it('passes browse sort params through to the discovery request', async () => {
@@ -294,7 +296,7 @@ describe('useProjectSearch', () => {
         await settle();
 
         await act(async () => {
-            latestSnapshot.updateParams({ version: null, minDl: null, minFav: null, date: null, tags: null });
+            latestSnapshot.updateParams({ version: null, minDl: null, minFav: null, openSource: null, date: null, tags: null });
         });
         await settle();
 

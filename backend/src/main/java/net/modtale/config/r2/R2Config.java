@@ -1,11 +1,13 @@
 package net.modtale.config.r2;
 
 import java.net.URI;
+import java.time.Duration;
 import net.modtale.config.properties.AppR2Properties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import software.amazon.awssdk.core.client.config.ClientOverrideConfiguration;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -36,6 +38,10 @@ public class R2Config {
         return S3Client.builder()
                 .endpointOverride(URI.create(cleanEndpoint))
                 .region(Region.US_EAST_1)
+                .overrideConfiguration(ClientOverrideConfiguration.builder()
+                        .apiCallAttemptTimeout(Duration.ofMinutes(2))
+                        .apiCallTimeout(Duration.ofMinutes(2))
+                        .build())
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create(r2Properties.accessKey(), r2Properties.secretKey())
                 ))

@@ -25,6 +25,7 @@ public record ProjectPageDTO(
         String updatedAt,
         String createdAt,
         String license,
+        boolean customLicenseOpenSource,
         Map<String, String> links,
         boolean allowModpacks,
         boolean allowComments,

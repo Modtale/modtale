@@ -1,24 +1,29 @@
-FROM node:20-alpine AS builder
+FROM node:22.12.0-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 COPY scripts ./scripts
-RUN npm install --legacy-peer-deps
+RUN npm ci --legacy-peer-deps
 COPY . .
 
 ARG PUBLIC_API_URL
 ENV PUBLIC_API_URL=$PUBLIC_API_URL
+ARG SSR_API_URL
+ENV SSR_API_URL=$SSR_API_URL
+ARG PUBLIC_STATUS_URL
+ENV PUBLIC_STATUS_URL=$PUBLIC_STATUS_URL
 
-RUN npm run build
+RUN npm run build && npm prune --omit=dev --legacy-peer-deps
 
-FROM node:20-alpine
+FROM node:22.12.0-alpine
 WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/scripts ./scripts
 
 ENV HOST=0.0.0.0
 ENV PORT=8080
 
 EXPOSE 8080
 
-CMD ["node", "./dist/server/entry.mjs"]
+CMD ["node", "./scripts/start-server.mjs"]

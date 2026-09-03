@@ -77,6 +77,10 @@ public class AccountService {
         return mongoTemplate.find(dbQuery, User.class);
     }
 
+    public User saveUser(User user) {
+        return userRepository.save(user);
+    }
+
     public User getPublicProfile(String userId) {
         if (userId == null || userId.isBlank()) {
             return null;
@@ -105,7 +109,7 @@ public class AccountService {
             return new ArrayList<>();
         }
         Query query = new Query(Criteria.where("_id").in(MongoIdUtils.expandIds(userIds)).and("deletedAt").is(null));
-        query.fields().include("username", "avatarUrl", "accountType", "badges", "id", "roles", "tier");
+        query.fields().include("username", "avatarUrl", "accountType", "badges", "profileBadges", "id", "roles", "tier");
         List<User> users = mongoTemplate.find(query, User.class);
         users.forEach(oauthAvatarHealingService::maybeHealOAuthAvatar);
         return users;
@@ -158,8 +162,8 @@ public class AccountService {
     }
 
     public void toggleConnectionVisibility(String userId, String provider) {
-        if ("google".equalsIgnoreCase(provider)) {
-            throw new InvalidAccountRequestException("Google accounts cannot be made visible on public profiles.");
+        if ("google".equalsIgnoreCase(provider) || "hytale".equalsIgnoreCase(provider)) {
+            throw new InvalidAccountRequestException(provider + " accounts cannot be made visible on public profiles.");
         }
 
         User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found."));

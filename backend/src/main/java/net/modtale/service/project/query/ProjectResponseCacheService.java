@@ -51,7 +51,7 @@ public class ProjectResponseCacheService {
 
     @Cacheable(
             value = "projectSummarySearch",
-            key = "T(java.util.Arrays).asList(#tags, #search, #page, #size, #sortBy, #gameVersion, #classification, #minDownloads, #minFavorites, #viewCategory, #dateRange, #authorId)",
+            key = "T(java.util.Arrays).asList(#tags, #search, #page, #size, #sortBy, #gameVersion, #classification, #minDownloads, #minFavorites, #viewCategory, #dateRange, #authorId, #openSource)",
             condition = "#viewCategory == null || !#viewCategory.personalView",
             sync = true
     )
@@ -67,7 +67,8 @@ public class ProjectResponseCacheService {
             Integer minFavorites,
             ProjectViewCategory viewCategory,
             String dateRange,
-            String authorId
+            String authorId,
+            Boolean openSource
     ) {
         return searchService.searchProjects(
                 tags,
@@ -82,13 +83,14 @@ public class ProjectResponseCacheService {
                 viewCategory,
                 dateRange,
                 authorId,
+                openSource,
                 null
         ).map(ProjectMapper::toSummaryDTO);
     }
 
     @Cacheable(
             value = "projectMarqueeSummarySearch",
-            key = "T(java.util.Arrays).asList(#tags, #search, #page, #size, #sortBy, #gameVersion, #classification, #minDownloads, #minFavorites, #viewCategory, #dateRange, #authorId)",
+            key = "T(java.util.Arrays).asList(#tags, #search, #page, #size, #sortBy, #gameVersion, #classification, #minDownloads, #minFavorites, #viewCategory, #dateRange, #authorId, #openSource)",
             condition = "#viewCategory == null || !#viewCategory.personalView",
             sync = true
     )
@@ -104,7 +106,8 @@ public class ProjectResponseCacheService {
             Integer minFavorites,
             ProjectViewCategory viewCategory,
             String dateRange,
-            String authorId
+            String authorId,
+            Boolean openSource
     ) {
         return searchService.searchProjectMarquee(
                 tags,
@@ -118,7 +121,8 @@ public class ProjectResponseCacheService {
                 minFavorites,
                 viewCategory,
                 dateRange,
-                authorId
+                authorId,
+                openSource
         ).map(ProjectMapper::toMarqueeDTO);
     }
 

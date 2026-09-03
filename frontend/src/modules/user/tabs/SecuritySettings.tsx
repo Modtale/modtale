@@ -31,12 +31,17 @@ export function SecuritySettings({ user, onUpdate }: SecuritySettingsProps) {
     const [emailSent, setEmailSent] = useState(false);
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [showRemovePasswordModal, setShowRemovePasswordModal] = useState(false);
+    const [removingPassword, setRemovingPassword] = useState(false);
     const showError = (title: string, error: unknown, fallback: string) => {
         setStatusModal({
             title,
             msg: extractApiErrorMessage(error, fallback)
         });
     };
+
+    const hasPassword = Boolean(user.hasPassword);
+    const hasLinkedOAuthProvider = (user.connectedAccounts?.length ?? 0) > 0;
 
     const handleSaveCredentials = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -87,6 +92,24 @@ export function SecuritySettings({ user, onUpdate }: SecuritySettingsProps) {
             showError('Password Change Failed', e, 'We could not change your password.');
         } finally {
             setSavingCreds(false);
+        }
+    };
+
+    const handleRemovePassword = async () => {
+        setRemovingPassword(true);
+        try {
+            await userClient.removePassword();
+            setShowRemovePasswordModal(false);
+            setCurrentPassword('');
+            setCredPassword('');
+            setConfirmPassword('');
+            setStatusModal(null);
+            onUpdate();
+        } catch (e: unknown) {
+            setShowRemovePasswordModal(false);
+            showError('Password Removal Failed', e, 'We could not remove your password.');
+        } finally {
+            setRemovingPassword(false);
         }
     };
 
@@ -152,6 +175,10 @@ export function SecuritySettings({ user, onUpdate }: SecuritySettingsProps) {
                 <StatusModal type="error" title="Delete Account?" message="This action is permanent and cannot be undone. All your data, including preferences and API keys, will be removed." actionLabel="Yes, Delete My Account" onAction={handleDeleteAccount} onClose={() => setShowDeleteModal(false)} secondaryLabel="Cancel" />,
                 document.body
             )}
+            {showRemovePasswordModal && createPortal(
+                <StatusModal type="warning" title="Remove Password?" message="You will only be able to sign in with a linked OAuth provider after this." actionLabel={removingPassword ? 'Removing...' : 'Remove Password'} onAction={handleRemovePassword} onClose={() => setShowRemovePasswordModal(false)} secondaryLabel="Cancel" />,
+                document.body
+            )}
 
             <div className="bg-white/60 dark:bg-slate-900/40 border border-slate-200 dark:border-white/10 rounded-[2rem] p-6 md:p-8 shadow-sm backdrop-blur-xl">
                 <div className="flex items-center gap-4 mb-8 border-b border-slate-200 dark:border-white/10 pb-6">
@@ -203,7 +230,7 @@ export function SecuritySettings({ user, onUpdate }: SecuritySettingsProps) {
 
                     <div className="border-t border-slate-200 dark:border-white/10 pt-8">
                         <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-3 flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-slate-400" /> Two-Factor Authentication</h4>
-                        {(user as any).mfaEnabled ? (
+                        {user.mfaEnabled ? (
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-2xl bg-green-50/50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30 shadow-sm">
                                 <div className="flex items-center gap-4 text-green-700 dark:text-green-400">
                                     <div className="bg-green-200 dark:bg-green-800/50 p-2.5 rounded-xl shadow-sm border border-green-300 dark:border-green-700/50">
@@ -260,11 +287,11 @@ export function SecuritySettings({ user, onUpdate }: SecuritySettingsProps) {
                     <div className="border-t border-slate-200 dark:border-white/10 pt-8">
                         <h4 className="font-bold text-slate-900 dark:text-white text-sm mb-3 flex items-center gap-2">
                             <Lock className="w-4 h-4 text-slate-400" />
-                            {(user as any).hasPassword ? 'Change Password' : 'Set Password'}
+                            {hasPassword ? 'Change Password' : 'Set Password'}
                         </h4>
 
                         <div className="p-6 rounded-2xl bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 shadow-sm">
-                            {(user as any).hasPassword ? (
+                            {hasPassword ? (
                                 <div>
                                     <p className="text-sm text-slate-600 dark:text-slate-400 font-medium mb-6 max-w-xl">Update your account password to maintain security.</p>
                                     <form onSubmit={handleChangePassword} className="max-w-md space-y-5">
@@ -284,6 +311,17 @@ export function SecuritySettings({ user, onUpdate }: SecuritySettingsProps) {
                                             {savingCreds ? <Spinner className="w-4 h-4" /> : (credsSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />)} {credsSaved ? 'Saved' : 'Update Password'}
                                         </button>
                                     </form>
+                                    <div className="mt-6 pt-5 border-t border-slate-100 dark:border-white/5 max-w-md">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowRemovePasswordModal(true)}
+                                            disabled={!hasLinkedOAuthProvider || savingCreds || removingPassword}
+                                            title={hasLinkedOAuthProvider ? 'Remove password' : 'Link an OAuth provider before removing your password.'}
+                                            className="w-full sm:w-auto bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50 px-5 py-3 rounded-xl font-bold text-sm hover:bg-red-100 dark:hover:bg-red-900/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                        >
+                                            <Trash2 className="w-4 h-4" /> Remove Password
+                                        </button>
+                                    </div>
                                 </div>
                             ) : (
                                 <div>

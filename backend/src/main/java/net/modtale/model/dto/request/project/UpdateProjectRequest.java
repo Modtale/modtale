@@ -30,6 +30,7 @@ public class UpdateProjectRequest {
     )
     private String repositoryUrl;
     private String license;
+    private Boolean customLicenseOpenSource;
     private Boolean allowModpacks;
     private Boolean allowComments;
     private Boolean hmWikiEnabled;
@@ -57,6 +58,8 @@ public class UpdateProjectRequest {
     public void setRepositoryUrl(String repositoryUrl) { this.repositoryUrl = repositoryUrl; }
     public String getLicense() { return license; }
     public void setLicense(String license) { this.license = license; }
+    public Boolean getCustomLicenseOpenSource() { return customLicenseOpenSource; }
+    public void setCustomLicenseOpenSource(Boolean customLicenseOpenSource) { this.customLicenseOpenSource = customLicenseOpenSource; }
     public Boolean getAllowModpacks() { return allowModpacks; }
     public void setAllowModpacks(Boolean allowModpacks) { this.allowModpacks = allowModpacks; }
     public Boolean getAllowComments() { return allowComments; }

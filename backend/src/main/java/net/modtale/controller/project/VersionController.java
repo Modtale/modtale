@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import java.io.IOException;
 import java.util.List;
 import net.modtale.model.dto.project.ManifestInspectionResult;
+import net.modtale.model.dto.project.ProjectVersionDTO;
 import net.modtale.model.dto.request.project.CreateVersionRequest;
 import net.modtale.model.dto.request.project.UpdateVersionRequest;
 import net.modtale.model.dto.response.project.BundleDownloadUrlResponse;
@@ -59,6 +60,26 @@ public class VersionController {
                 gameVersion,
                 accountService.getCurrentUser(authentication)
         ));
+    }
+
+    @GetMapping("/projects/{id}/versions/hash/{hash}")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_READ', authentication)")
+    public ResponseEntity<ProjectVersionDTO> getVersionByHash(
+            @PathVariable String id,
+            @PathVariable String hash,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(versionApplicationService.getVersionByHash(
+                id,
+                hash,
+                accountService.getCurrentUser(authentication)
+        ));
+    }
+
+    @GetMapping("/version/{hash}")
+    @PreAuthorize("@apiSecurity.hasAnyPerm('VERSION_READ', authentication)")
+    public ResponseEntity<ProjectVersionDTO> getVersionByHash(@PathVariable String hash) {
+        return ResponseEntity.ok(versionApplicationService.getVersionByHash(hash));
     }
 
     @PostMapping("/projects/{id}/versions")

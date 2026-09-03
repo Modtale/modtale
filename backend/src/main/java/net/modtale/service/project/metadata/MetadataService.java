@@ -5,6 +5,7 @@ import java.util.regex.Pattern;
 import net.modtale.exception.InvalidProjectRequestException;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
+import net.modtale.model.project.ProjectLicenseSupport;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.service.project.access.ProjectAccessService;
@@ -84,8 +85,16 @@ public class MetadataService {
             }
         }
 
-        if (existing.getClassification() == ProjectClassification.MODPACK) existing.setLicense(null);
-        else existing.setLicense(updated.getLicense());
+        if (existing.getClassification() == ProjectClassification.MODPACK) {
+            existing.setLicense(null);
+            existing.setCustomLicenseOpenSource(false);
+        } else {
+            existing.setLicense(updated.getLicense());
+            existing.setCustomLicenseOpenSource(ProjectLicenseSupport.shouldPersistCustomOpenSource(
+                    updated.getLicense(),
+                    updated.isCustomLicenseOpenSource()
+            ));
+        }
 
         existing.setRepositoryUrl(updated.getRepositoryUrl());
         existing.setTypes(updated.getTypes());

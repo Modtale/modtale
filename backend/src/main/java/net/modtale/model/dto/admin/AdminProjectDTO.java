@@ -27,6 +27,7 @@ public record AdminProjectDTO(
         String updatedAt,
         String createdAt,
         String license,
+        boolean customLicenseOpenSource,
         Map<String, String> links,
         List<String> childProjectIds,
         boolean allowModpacks,

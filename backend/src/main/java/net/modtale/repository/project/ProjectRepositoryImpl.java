@@ -9,6 +9,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
+import net.modtale.model.project.ProjectLicenseSupport;
 import net.modtale.model.project.ProjectSort;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectViewCategory;
@@ -24,7 +25,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
-
     private final MongoTemplate mongoTemplate;
     private final ProjectSearchResultDecorator projectSearchResultDecorator;
 
@@ -38,7 +38,7 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
             String search, List<String> tags, String gameVersion, ProjectClassification classification,
             Integer minDownloads, Integer minFavorites, Pageable pageable,
             String currentUserId, ProjectSort sortBy,
-            ProjectViewCategory viewCategory, LocalDate dateCutoff, String authorId
+            ProjectViewCategory viewCategory, LocalDate dateCutoff, String authorId, Boolean openSource
     ) {
         return searchProjectsInternal(
                 search,
@@ -53,6 +53,7 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
                 viewCategory,
                 dateCutoff,
                 authorId,
+                openSource,
                 SearchProjection.CATALOG
         );
     }
@@ -62,7 +63,7 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
             String search, List<String> tags, String gameVersion, ProjectClassification classification,
             Integer minDownloads, Integer minFavorites, Pageable pageable,
             ProjectSort sortBy,
-            ProjectViewCategory viewCategory, LocalDate dateCutoff, String authorId
+            ProjectViewCategory viewCategory, LocalDate dateCutoff, String authorId, Boolean openSource
     ) {
         return searchProjectsInternal(
                 search,
@@ -77,6 +78,7 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
                 viewCategory,
                 dateCutoff,
                 authorId,
+                openSource,
                 SearchProjection.MARQUEE
         );
     }
@@ -86,6 +88,7 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
             Integer minDownloads, Integer minFavorites, Pageable pageable,
             String currentUserId, ProjectSort sortBy,
             ProjectViewCategory viewCategory, LocalDate dateCutoff, String authorId,
+            Boolean openSource,
             SearchProjection projection
     ) {
         List<Criteria> criteriaList = new ArrayList<>();
@@ -123,6 +126,7 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
             criteriaList.add(Criteria.where("versions.gameVersions").in(gameVersions));
         if (minDownloads != null) criteriaList.add(Criteria.where("downloadCount").gte(minDownloads));
         if (minFavorites != null) criteriaList.add(Criteria.where("favoriteCount").gte(minFavorites));
+        if (Boolean.TRUE.equals(openSource)) criteriaList.add(openSourceLicenseCriteria());
 
         boolean isTimeBasedDownloadSort = sortBy == ProjectSort.DOWNLOADS && dateCutoff != null;
         if (dateCutoff != null && !isTimeBasedDownloadSort) {
@@ -220,6 +224,16 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
         return Sort.by(Sort.Order.desc("updatedAt"));
     }
 
+    private Criteria openSourceLicenseCriteria() {
+        return new Criteria().orOperator(
+                Criteria.where("license").in(ProjectLicenseSupport.OPEN_SOURCE_LICENSES),
+                new Criteria().andOperator(
+                        Criteria.where("customLicenseOpenSource").is(true),
+                        Criteria.where("license").nin(ProjectLicenseSupport.SELECTABLE_LICENSES).ne(null)
+                )
+        );
+    }
+
     private List<String> parseGameVersions(String gameVersion) {
         if (gameVersion == null || gameVersion.trim().isEmpty()) {
             return List.of();
@@ -263,7 +277,7 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
     }
 
     @Override
-    public Page<Project> findFavorites(List<String> projectIds, String search, Pageable pageable) {
+    public Page<Project> findFavorites(List<String> projectIds, String search, Pageable pageable, Boolean openSource) {
         if (projectIds == null || projectIds.isEmpty()) {
             return Page.empty(pageable);
         }
@@ -271,6 +285,9 @@ public class ProjectRepositoryImpl implements ProjectRepositoryCustom {
         Query query = new Query();
         query.addCriteria(Criteria.where("id").in(projectIds));
         query.addCriteria(Criteria.where("status").in(ProjectStatus.PUBLISHED, ProjectStatus.ARCHIVED));
+        if (Boolean.TRUE.equals(openSource)) {
+            query.addCriteria(openSourceLicenseCriteria());
+        }
 
         if (search != null && !search.trim().isEmpty()) {
             String regex = Pattern.quote(search);

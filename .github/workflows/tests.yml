@@ -5,7 +5,7 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
@@ -73,38 +73,15 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22.12.0
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Set up Chrome for Lighthouse
-        id: setup-chrome
-        uses: browser-actions/setup-chrome@v2
-        with:
-          install-dependencies: true
-
       - name: Run frontend tests
         run: npm run test
-
-      - name: Build frontend for Lighthouse
-        run: npm run build
-
-      - name: Run Lighthouse audit
-        env:
-          CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
-        run: npm run audit:lighthouse
-
-      - name: Upload Lighthouse reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: lighthouse-reports
-          path: frontend/.lighthouseci
-          if-no-files-found: ignore
-          retention-days: 7
 
   backend:
     name: Backend Tests

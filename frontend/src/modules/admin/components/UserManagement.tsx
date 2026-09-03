@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { User as UserIcon, Search, Shield, Check, Zap, Trash2, Ban, Mail, Code, Lock, X, AlertTriangle, FileJson } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
 import { extractApiErrorMessage } from '@/utils/api';
-import { isSuperAdminUser } from '../utils/access';
+import { ADMIN_PERMISSION_GROUPS, AdminPermission, getEffectiveAdminPermissions, hasAdminPermission, hasAnyAdminPermission, isAdminUser } from '../utils/access';
 import { ModalPortal } from '@/components/ui/ModalPortal';
 
-export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
+export function UserManagement({ setStatus, currentAdmin: initialAdmin }: { setStatus: (s: any) => void; currentAdmin?: any }) {
     const [viewMode, setViewMode] = useState<'users' | 'bans'>('users');
     const [username, setUsername] = useState('');
     const [loading, setLoading] = useState(false);
@@ -33,14 +33,42 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
     const [showRawModal, setShowRawModal] = useState(false);
     const [rawJsonStr, setRawJsonStr] = useState('');
     const [jsonError, setJsonError] = useState<string | null>(null);
+    const [selectedAdminPermissions, setSelectedAdminPermissions] = useState<AdminPermission[]>([]);
 
     useEffect(() => {
+        if (initialAdmin) {
+            setCurrentAdmin(initialAdmin);
+            return;
+        }
         adminClient.getCurrentAdmin().then(res => setCurrentAdmin(res)).catch(() => {});
-    }, []);
+    }, [initialAdmin]);
+
+    const canReadUsers = hasAdminPermission(currentAdmin, AdminPermission.USER_READ);
+    const canReadBans = hasAnyAdminPermission(currentAdmin, [AdminPermission.EMAIL_BAN_READ, AdminPermission.EMAIL_BAN_MANAGE]);
+    const canManageBans = hasAdminPermission(currentAdmin, AdminPermission.EMAIL_BAN_MANAGE);
+    const canDeleteUsers = hasAdminPermission(currentAdmin, AdminPermission.USER_DELETE);
+    const canManageTiers = hasAdminPermission(currentAdmin, AdminPermission.USER_TIER_MANAGE);
+    const canManagePermissions = hasAdminPermission(currentAdmin, AdminPermission.USER_PERMISSION_MANAGE);
+    const canReadRaw = hasAnyAdminPermission(currentAdmin, [AdminPermission.USER_RAW_READ, AdminPermission.USER_RAW_EDIT]);
+    const canEditRaw = hasAdminPermission(currentAdmin, AdminPermission.USER_RAW_EDIT);
+    const isTargetAdmin = isAdminUser(foundUser);
+    const canManageTargetUser = canManagePermissions || !isTargetAdmin;
 
     useEffect(() => {
-        if (viewMode === 'bans') fetchBannedEmails();
-    }, [viewMode]);
+        if (viewMode === 'bans' && canReadBans) fetchBannedEmails();
+    }, [viewMode, canReadBans]);
+
+    useEffect(() => {
+        setSelectedAdminPermissions(Array.from(getEffectiveAdminPermissions(foundUser)));
+    }, [foundUser]);
+
+    useEffect(() => {
+        if (viewMode === 'users' && !canReadUsers && canReadBans) {
+            setViewMode('bans');
+        } else if (viewMode === 'bans' && !canReadBans && canReadUsers) {
+            setViewMode('users');
+        }
+    }, [canReadBans, canReadUsers, viewMode]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -52,11 +80,8 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const isSuperAdmin = isSuperAdminUser(currentAdmin);
-    const isTargetAdmin = foundUser?.roles?.includes('ADMIN');
-    const canManageUser = isSuperAdmin || !isTargetAdmin;
-
     const fetchBannedEmails = async () => {
+        if (!canReadBans) return;
         setLoading(true);
         try {
             setBannedEmails(await adminClient.getBannedEmails());
@@ -69,6 +94,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
 
     const handleBanEmail = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!canManageBans) return;
         if (!banEmailInput || !banReasonInput) return;
         setLoading(true);
         try {
@@ -85,6 +111,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
     };
 
     const handleBanUserEmail = async () => {
+        if (!canManageBans || !canManageTargetUser) return;
         if (!foundUser || !foundUser.email || banConfirmInput !== foundUser.email) return;
 
         setLoading(true);
@@ -104,6 +131,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
     };
 
     const handleUnbanEmail = async (email: string) => {
+        if (!canManageBans) return;
         setLoading(true);
         try {
             await adminClient.unbanEmail(email);
@@ -145,6 +173,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
     };
 
     const fetchUserProfile = async (userId: string) => {
+        if (!canReadUsers) return;
         setLoading(true);
         try {
             const data = await adminClient.getUserProfile(userId);
@@ -158,6 +187,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!canReadUsers) return;
         setFoundUser(null);
         const selectedUserId = searchResults.find(user => user.username === username)?.id || foundUser?.id;
         if (selectedUserId) {
@@ -186,6 +216,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
 
     const handleUpdateTier = async (newTier: 'USER' | 'ENTERPRISE') => {
         if (!foundUser) return;
+        if (!canManageTiers) return;
         setLoading(true);
         try {
             await adminClient.updateUserTier(foundUser.id, newTier);
@@ -198,32 +229,32 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
         }
     };
 
-    const handleToggleAdmin = async () => {
+    const handleSaveAdminPermissions = async () => {
         if (!foundUser) return;
+        if (!canManagePermissions) return;
         setLoading(true);
-        const hasAdmin = foundUser.roles && foundUser.roles.includes('ADMIN');
 
         try {
-            if (hasAdmin) {
-                await adminClient.revokeAdmin(foundUser.id);
-                const roles = foundUser.roles.filter((r: string) => r !== 'ADMIN');
-                setFoundUser({ ...foundUser, roles });
-                setStatus({ type: 'info', title: 'Role Updated', msg: `Admin role revoked from ${foundUser.username}.` });
-            } else {
-                await adminClient.grantAdmin(foundUser.id);
-                const roles = foundUser.roles || [];
-                roles.push('ADMIN');
-                setFoundUser({ ...foundUser, roles });
-                setStatus({ type: 'success', title: 'Role Updated', msg: `Admin role granted to ${foundUser.username}.` });
-            }
+            const permissions = await adminClient.updateAdminPermissions(foundUser.id, selectedAdminPermissions);
+            setFoundUser({ ...foundUser, adminPermissions: permissions });
+            setStatus({ type: 'success', title: 'Permissions Updated', msg: `Admin permissions updated for ${foundUser.username}.` });
         } catch (e: any) {
-            setStatus({ type: 'error', title: 'Update Failed', msg: extractApiErrorMessage(e, "We could not update this user's roles.") });
+            setStatus({ type: 'error', title: 'Update Failed', msg: extractApiErrorMessage(e, "We could not update this user's admin permissions.") });
         } finally {
             setLoading(false);
         }
     };
 
+    const toggleAdminPermission = (permission: AdminPermission) => {
+        setSelectedAdminPermissions(prev =>
+            prev.includes(permission)
+                ? prev.filter(item => item !== permission)
+                : [...prev, permission]
+        );
+    };
+
     const handleDeleteUser = async () => {
+        if (!canDeleteUsers || !canManageTargetUser) return;
         if (!foundUser || deleteConfirmUsername !== foundUser.username) return;
         setLoading(true);
         try {
@@ -242,6 +273,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
     };
 
     const openRawEdit = async () => {
+        if (!canReadRaw) return;
         setLoading(true);
         try {
             const data = await adminClient.getUserRaw(foundUser.id);
@@ -276,6 +308,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
     const formatJson = () => { try { const parsed = JSON.parse(rawJsonStr); setRawJsonStr(JSON.stringify(parsed, null, 2)); setJsonError(null); } catch (e) {} };
 
     const saveRawEdit = async () => {
+        if (!canEditRaw) return;
         try {
             setLoading(true);
             const parsed = JSON.parse(rawJsonStr);
@@ -299,11 +332,15 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
     return (
         <div className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-8 shadow-sm backdrop-blur-md">
             <div className="flex gap-4 mb-8 border-b border-slate-200 dark:border-white/5 pb-4">
-                <button onClick={() => setViewMode('users')} className={`px-4 py-2 rounded-xl font-bold transition-all ${viewMode === 'users' ? 'bg-modtale-accent text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5'}`}>User Search</button>
-                <button onClick={() => setViewMode('bans')} className={`px-4 py-2 rounded-xl font-bold transition-all ${viewMode === 'bans' ? 'bg-red-500 text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5'}`}>Email Bans</button>
+                {canReadUsers && (
+                    <button onClick={() => setViewMode('users')} className={`px-4 py-2 rounded-xl font-bold transition-all ${viewMode === 'users' ? 'bg-modtale-accent text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5'}`}>User Search</button>
+                )}
+                {canReadBans && (
+                    <button onClick={() => setViewMode('bans')} className={`px-4 py-2 rounded-xl font-bold transition-all ${viewMode === 'bans' ? 'bg-red-500 text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5'}`}>Email Bans</button>
+                )}
             </div>
 
-            {viewMode === 'users' && (
+            {viewMode === 'users' && canReadUsers && (
                 <>
                     {showBanConfirm && foundUser?.email && (
                         <ModalPortal>
@@ -317,7 +354,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
                                 <input type="email" value={banConfirmInput} onChange={e => setBanConfirmInput(e.target.value)} placeholder={foundUser.email} className="w-full p-3 mb-6 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl font-bold dark:text-white" />
                                 <div className="flex gap-3">
                                     <button onClick={() => setShowBanConfirm(false)} className="flex-1 py-3 bg-slate-100 dark:bg-white/5 font-bold rounded-xl text-slate-600 dark:text-slate-300">Cancel</button>
-                                    <button onClick={handleBanUserEmail} disabled={banConfirmInput !== foundUser.email || loading || !banUserReason} className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl disabled:opacity-50">Confirm Ban</button>
+                                    <button onClick={handleBanUserEmail} disabled={banConfirmInput !== foundUser.email || loading || !banUserReason || !canManageBans || !canManageTargetUser} className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl disabled:opacity-50">Confirm Ban</button>
                                 </div>
                             </div>
                         </div>
@@ -336,7 +373,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
                                 <input type="text" value={deleteConfirmUsername} onChange={e => setDeleteConfirmUsername(e.target.value)} placeholder={foundUser.username} className="w-full p-3 mb-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl font-bold dark:text-white" />
                                 <div className="flex gap-3">
                                     <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-3 bg-slate-100 dark:bg-white/5 font-bold rounded-xl text-slate-600 dark:text-slate-300">Cancel</button>
-                                    <button onClick={handleDeleteUser} disabled={deleteConfirmUsername !== foundUser.username || loading || !deleteUserReason} className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl disabled:opacity-50">Delete User</button>
+                                    <button onClick={handleDeleteUser} disabled={deleteConfirmUsername !== foundUser.username || loading || !deleteUserReason || !canDeleteUsers || !canManageTargetUser} className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl disabled:opacity-50">Delete User</button>
                                 </div>
                             </div>
                         </div>
@@ -363,7 +400,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
                                 </div>
                                 <div className="p-4 border-t border-white/10 bg-black/40 flex justify-end gap-3 px-6">
                                     <button onClick={() => setShowRawModal(false)} className="px-6 py-2.5 rounded-xl font-bold text-slate-300 hover:bg-white/5 transition-colors">Cancel</button>
-                                    <button onClick={saveRawEdit} disabled={loading || !!jsonError} className="px-8 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-bold transition-colors disabled:opacity-50 shadow-lg shadow-indigo-500/20 flex items-center gap-2">{loading ? 'Saving...' : 'Save Changes'}</button>
+                                    <button onClick={saveRawEdit} disabled={loading || !!jsonError || !canEditRaw} className="px-8 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-bold transition-colors disabled:opacity-50 shadow-lg shadow-indigo-500/20 flex items-center gap-2">{loading ? 'Saving...' : 'Save Changes'}</button>
                                 </div>
                             </div>
                         </div>
@@ -373,7 +410,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
                     <form onSubmit={handleSearch} className="flex gap-4 mb-10 relative z-50">
                         <div className="relative flex-1 group" ref={wrapperRef}>
                             <UserIcon className="absolute left-5 top-4 w-5 h-5 text-slate-400 group-focus-within:text-modtale-accent transition-colors" />
-                            <input type="text" placeholder="Enter Username to manage..." className="w-full pl-14 px-6 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-modtale-accent outline-none dark:text-white font-bold transition-all placeholder:font-medium" value={username} onChange={handleInputChange} onFocus={() => { if(searchResults.length > 0) setShowResults(true); }} />
+                            <input type="text" placeholder="Enter Username to manage..." className="w-full pl-14 px-6 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-modtale-accent outline-none dark:text-white font-bold transition-all placeholder:font-medium disabled:opacity-50" value={username} onChange={handleInputChange} disabled={!canReadUsers} onFocus={() => { if(searchResults.length > 0) setShowResults(true); }} />
                             {showResults && searchResults.length > 0 && (
                                 <div className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl overflow-hidden max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200">
                                     {searchResults.map(user => (
@@ -385,7 +422,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
                                 </div>
                             )}
                         </div>
-                        <button type="submit" disabled={loading || !username} className="bg-modtale-accent text-white px-10 rounded-2xl font-black hover:bg-modtale-accentHover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-xl shadow-modtale-accent/20">
+                        <button type="submit" disabled={loading || !username || !canReadUsers} className="bg-modtale-accent text-white px-10 rounded-2xl font-black hover:bg-modtale-accentHover transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-xl shadow-modtale-accent/20">
                             {loading ? '...' : <><Search className="w-5 h-5" /> Search</>}
                         </button>
                     </form>
@@ -416,42 +453,63 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                <button onClick={openRawEdit} disabled={loading || !isSuperAdmin} className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${!isSuperAdmin ? 'opacity-50 cursor-not-allowed border-slate-200 dark:border-white/5' : 'border-indigo-500/20 hover:border-indigo-600 hover:bg-indigo-600/10 shadow-sm hover:shadow-xl'}`}>
+                                <button onClick={openRawEdit} disabled={loading || !canReadRaw} className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${!canReadRaw ? 'opacity-50 cursor-not-allowed border-slate-200 dark:border-white/5' : 'border-indigo-500/20 hover:border-indigo-600 hover:bg-indigo-600/10 shadow-sm hover:shadow-xl'}`}>
                                     <div className="relative z-10">
-                                        <div className="flex justify-between items-start mb-4"><span className={`font-black text-xl flex items-center gap-3 ${!isSuperAdmin ? 'text-slate-900 dark:text-white' : 'text-indigo-600 dark:text-indigo-400'}`}><Code className="w-6 h-6" /> Edit Raw JSON</span>{!isSuperAdmin && <Lock className="w-5 h-5 text-slate-400" />}</div>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">{!isSuperAdmin ? 'Only the Super Admin can edit raw user metadata.' : 'Modify the underlying MongoDB document for this user. Advanced use only.'}</p>
+                                        <div className="flex justify-between items-start mb-4"><span className={`font-black text-xl flex items-center gap-3 ${!canReadRaw ? 'text-slate-900 dark:text-white' : 'text-indigo-600 dark:text-indigo-400'}`}><Code className="w-6 h-6" /> Raw JSON</span>{!canReadRaw && <Lock className="w-5 h-5 text-slate-400" />}</div>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">{canEditRaw ? 'Modify the underlying MongoDB document for this user. Advanced use only.' : canReadRaw ? 'Inspect raw user metadata without saving changes.' : 'Raw user metadata is locked for this admin account.'}</p>
                                     </div>
                                 </button>
-                                <button onClick={handleToggleAdmin} disabled={loading || !isSuperAdmin} className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${!isSuperAdmin ? 'opacity-50 cursor-not-allowed border-slate-200 dark:border-white/5' : (foundUser.roles?.includes('ADMIN') ? 'border-red-500/30 bg-red-500/5 hover:bg-red-500/10' : 'border-slate-200 dark:border-white/5 hover:border-red-500 hover:bg-white dark:hover:bg-white/5 shadow-sm hover:shadow-xl')}`}>
+                                <button onClick={() => handleUpdateTier(foundUser.tier === 'ENTERPRISE' ? 'USER' : 'ENTERPRISE')} disabled={loading || !canManageTiers} className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${!canManageTiers ? 'opacity-50 cursor-not-allowed border-slate-200 dark:border-white/5' : (foundUser.tier === 'ENTERPRISE' ? 'border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10' : 'border-slate-200 dark:border-white/5 hover:border-purple-500 hover:bg-white dark:hover:bg-white/5 shadow-sm hover:shadow-xl')}`}>
                                     <div className="relative z-10">
                                         <div className="flex justify-between items-start mb-4">
-                                            <span className={`font-black text-xl flex items-center gap-3 ${foundUser.roles?.includes('ADMIN') && isSuperAdmin ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-white group-hover:text-red-600 dark:group-hover:text-red-400'}`}><Shield className="w-6 h-6" /> Admin Privileges</span>
-                                            {!isSuperAdmin && <Lock className="w-5 h-5 text-slate-400" />}
-                                            {isSuperAdmin && foundUser.roles?.includes('ADMIN') && <Check className="w-8 h-8 text-red-500 bg-red-100 dark:bg-red-900/30 p-1.5 rounded-full" />}
+                                            <span className={`font-black text-xl flex items-center gap-3 ${foundUser.tier === 'ENTERPRISE' && canManageTiers ? 'text-purple-600 dark:text-purple-400' : 'text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400'}`}><Zap className="w-6 h-6" /> Enterprise Tier</span>
+                                            {!canManageTiers && <Lock className="w-5 h-5 text-slate-400" />}
+                                            {canManageTiers && foundUser.tier === 'ENTERPRISE' && <Check className="w-8 h-8 text-purple-500 bg-purple-100 dark:bg-purple-900/30 p-1.5 rounded-full" />}
                                         </div>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">{!isSuperAdmin ? 'Only the Super Admin can modify administrative roles.' : (foundUser.roles?.includes('ADMIN') ? 'User currently has full administrative access. Click to revoke immediately.' : 'Granting Admin access will allow this user to approve projects, manage users, and modify content.')}</p>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">{!canManageTiers ? 'API tier changes are locked for this admin account.' : (foundUser.tier === 'ENTERPRISE' ? 'User is on the Enterprise Tier. Click to downgrade to Standard User.' : 'Granting Enterprise status allows higher API rate limits (1000 req/min) for CI/CD.')}</p>
                                     </div>
                                 </button>
-                                <button onClick={() => handleUpdateTier(foundUser.tier === 'ENTERPRISE' ? 'USER' : 'ENTERPRISE')} disabled={loading || !isSuperAdmin} className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${!isSuperAdmin ? 'opacity-50 cursor-not-allowed border-slate-200 dark:border-white/5' : (foundUser.tier === 'ENTERPRISE' ? 'border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10' : 'border-slate-200 dark:border-white/5 hover:border-purple-500 hover:bg-white dark:hover:bg-white/5 shadow-sm hover:shadow-xl')}`}>
-                                    <div className="relative z-10">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <span className={`font-black text-xl flex items-center gap-3 ${foundUser.tier === 'ENTERPRISE' && isSuperAdmin ? 'text-purple-600 dark:text-purple-400' : 'text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400'}`}><Zap className="w-6 h-6" /> Enterprise Tier</span>
-                                            {!isSuperAdmin && <Lock className="w-5 h-5 text-slate-400" />}
-                                            {isSuperAdmin && foundUser.tier === 'ENTERPRISE' && <Check className="w-8 h-8 text-purple-500 bg-purple-100 dark:bg-purple-900/30 p-1.5 rounded-full" />}
+                                {canManagePermissions && (
+                                    <div className="md:col-span-2 lg:col-span-3 rounded-3xl border-2 border-slate-200 bg-white/70 p-6 text-left shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
+                                        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                            <div>
+                                                <h4 className="flex items-center gap-3 text-xl font-black text-slate-900 dark:text-white"><Shield className="h-5 w-5 text-modtale-accent" /> Admin Permissions</h4>
+                                                <p className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">{selectedAdminPermissions.length} permissions selected</p>
+                                            </div>
+                                            <button onClick={handleSaveAdminPermissions} disabled={loading} className="rounded-xl bg-modtale-accent px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-modtale-accent/20 transition-colors hover:bg-modtale-accentHover disabled:opacity-50">
+                                                Save Permissions
+                                            </button>
                                         </div>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">{!isSuperAdmin ? 'Only the Super Admin can grant Enterprise API tiers.' : (foundUser.tier === 'ENTERPRISE' ? 'User is on the Enterprise Tier. Click to downgrade to Standard User.' : 'Granting Enterprise status allows higher API rate limits (1000 req/min) for CI/CD.')}</p>
+                                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                            {ADMIN_PERMISSION_GROUPS.map(group => (
+                                                <div key={group.group} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-white/10 dark:bg-black/20">
+                                                    <div className="mb-3 text-xs font-black uppercase tracking-wider text-slate-500">{group.group}</div>
+                                                    <div className="space-y-2">
+                                                        {group.permissions.map(permission => {
+                                                            const checked = selectedAdminPermissions.includes(permission.id);
+                                                            return (
+                                                                <label key={permission.id} className="flex cursor-pointer items-center gap-3 rounded-xl px-2 py-1.5 text-sm font-bold text-slate-700 transition-colors hover:bg-white dark:text-slate-200 dark:hover:bg-white/5">
+                                                                    <input type="checkbox" checked={checked} onChange={() => toggleAdminPermission(permission.id)} className="h-4 w-4 rounded border-slate-300 text-modtale-accent focus:ring-modtale-accent" />
+                                                                    <span>{permission.label}</span>
+                                                                </label>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
-                                </button>
-                                <button onClick={() => setShowDeleteConfirm(true)} disabled={loading || !canManageUser} className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${!canManageUser ? 'opacity-50 cursor-not-allowed border-slate-200 dark:border-white/5' : 'border-slate-200 dark:border-white/5 hover:border-red-500 hover:bg-red-500/5'}`}>
+                                )}
+                                <button onClick={() => setShowDeleteConfirm(true)} disabled={loading || !canDeleteUsers || !canManageTargetUser} className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${!canDeleteUsers || !canManageTargetUser ? 'opacity-50 cursor-not-allowed border-slate-200 dark:border-white/5' : 'border-slate-200 dark:border-white/5 hover:border-red-500 hover:bg-red-500/5'}`}>
                                     <div className="relative z-10">
-                                        <div className="flex justify-between items-start mb-4"><span className="font-black text-xl flex items-center gap-3 text-slate-900 dark:text-white group-hover:text-red-500"><Trash2 className="w-6 h-6" /> Delete Account</span>{!canManageUser && <Lock className="w-5 h-5 text-slate-400" />}</div>
+                                        <div className="flex justify-between items-start mb-4"><span className="font-black text-xl flex items-center gap-3 text-slate-900 dark:text-white group-hover:text-red-500"><Trash2 className="w-6 h-6" /> Delete Account</span>{(!canDeleteUsers || !canManageTargetUser) && <Lock className="w-5 h-5 text-slate-400" />}</div>
                                         <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">Permanently delete this user, their projects, and all associated data. This action cannot be undone.</p>
                                     </div>
                                 </button>
                                 {foundUser.email && (
-                                    <button onClick={() => setShowBanConfirm(true)} disabled={loading || !canManageUser} className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${!canManageUser ? 'opacity-50 cursor-not-allowed border-slate-200 dark:border-white/5' : 'border-red-500/20 hover:border-red-600 hover:bg-red-600/10'}`}>
+                                    <button onClick={() => setShowBanConfirm(true)} disabled={loading || !canManageBans || !canManageTargetUser} className={`relative p-8 rounded-3xl border-2 text-left transition-all duration-300 group overflow-hidden ${!canManageBans || !canManageTargetUser ? 'opacity-50 cursor-not-allowed border-slate-200 dark:border-white/5' : 'border-red-500/20 hover:border-red-600 hover:bg-red-600/10'}`}>
                                         <div className="relative z-10">
-                                            <div className="flex justify-between items-start mb-4"><span className="font-black text-xl flex items-center gap-3 text-slate-900 dark:text-white group-hover:text-red-600"><Ban className="w-6 h-6" /> Ban Email & Delete</span>{!canManageUser && <Lock className="w-5 h-5 text-slate-400" />}</div>
+                                            <div className="flex justify-between items-start mb-4"><span className="font-black text-xl flex items-center gap-3 text-slate-900 dark:text-white group-hover:text-red-600"><Ban className="w-6 h-6" /> Ban Email & Delete</span>{(!canManageBans || !canManageTargetUser) && <Lock className="w-5 h-5 text-slate-400" />}</div>
                                             <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">Ban <strong>{foundUser.email}</strong> from ever registering again and immediately delete this account.</p>
                                         </div>
                                     </button>
@@ -462,14 +520,14 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
                 </>
             )}
 
-            {viewMode === 'bans' && (
+            {viewMode === 'bans' && canReadBans && (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300">
                     <form onSubmit={handleBanEmail} className="mb-8 p-6 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/5">
                         <h3 className="font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2"><Ban className="w-5 h-5 text-red-500" /> Ban New Email</h3>
                         <div className="flex flex-col md:flex-row gap-4">
                             <div className="flex-1"><input type="email" placeholder="email@example.com" value={banEmailInput} onChange={e => setBanEmailInput(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-red-500 outline-none" /></div>
                             <div className="flex-[2]"><input type="text" placeholder="Reason for ban..." value={banReasonInput} onChange={e => setBanReasonInput(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-red-500 outline-none" /></div>
-                            <button type="submit" disabled={loading || !banEmailInput || !banReasonInput} className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-500/20 disabled:opacity-50 transition-all">Ban Email</button>
+                            <button type="submit" disabled={loading || !banEmailInput || !banReasonInput || !canManageBans} className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-500/20 disabled:opacity-50 transition-all">Ban Email</button>
                         </div>
                     </form>
 
@@ -486,7 +544,7 @@ export function UserManagement({ setStatus }: { setStatus: (s: any) => void }) {
                                             <p className="text-xs text-slate-500">Reason: {ban.reason} • By: {ban.bannedBy}</p>
                                         </div>
                                     </div>
-                                    <button onClick={() => handleUnbanEmail(ban.email)} className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors">Unban</button>
+                                    <button onClick={() => handleUnbanEmail(ban.email)} disabled={!canManageBans} className="px-4 py-2 text-sm font-bold text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Unban</button>
                                 </div>
                             ))
                         )}

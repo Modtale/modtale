@@ -1,23 +1,28 @@
 import React from 'react';
-import type { Project } from '@/types';
+import type { AdminVerificationQueueItem } from '@/types';
 import { CheckCircle, Clock, Shield, AlertCircle, ShieldAlert } from 'lucide-react';
 
 interface VerificationQueueProps {
-    pendingProjects: Project[];
+    pendingProjects: AdminVerificationQueueItem[];
     loadingQueue: boolean;
+    loadFailed?: boolean;
     loadingReview: boolean;
     reviewingId?: string;
     onReview: (id: string) => void;
 }
 
 export const VerificationQueue: React.FC<VerificationQueueProps> = ({
-                                                                        pendingProjects, loadingQueue, loadingReview, reviewingId, onReview
+                                                                        pendingProjects, loadingQueue, loadFailed, loadingReview, reviewingId, onReview
                                                                     }) => {
     if (loadingQueue) {
         return <div className="text-center py-24 text-slate-400 font-bold animate-pulse">Loading queue...</div>;
     }
 
-    if (!pendingProjects || pendingProjects.length === 0) {
+    if (loadFailed && pendingProjects.length === 0) {
+        return null;
+    }
+
+    if (pendingProjects.length === 0) {
         return (
             <div className="text-center py-32 bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-md">
                 <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -29,39 +34,10 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
         );
     }
 
-    const scanPriority = (mod: Project) => {
-        const versions = mod.versions || [];
-        const pendingVersions = versions.filter(v => v.reviewStatus === 'PENDING');
-        const targetVersion = pendingVersions[0] || versions[0];
-        const scan = targetVersion?.scanResult;
-        const verdict = scan?.verdict?.toUpperCase();
-        const status = scan?.status?.toUpperCase();
-        const newIssues = scan?.newIssueCount || 0;
-        const escalated = scan?.escalatedIssueCount || 0;
-        const riskScore = scan?.riskScore || 0;
-
-        if (status === 'SCANNING') return 9_000 + riskScore;
-        if (verdict === 'BLOCK' || status === 'INFECTED') return 8_000 + riskScore + newIssues * 10 + escalated * 15;
-        if (newIssues > 0 || escalated > 0) return 6_000 + riskScore + newIssues * 6 + escalated * 10;
-        if (verdict === 'REVIEW' || status === 'SUSPICIOUS' || status === 'FLAGGED') return 4_000 + riskScore;
-        return 2_000 + riskScore;
-    };
-
-    const sortedProjects = [...pendingProjects].sort((a, b) => {
-        const pA = scanPriority(a);
-        const pB = scanPriority(b);
-        if (pA !== pB) return pB - pA;
-        const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-        const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-        return timeA - timeB;
-    });
-
-    const renderQueueItem = (mod: Project) => {
+    const renderQueueItem = (mod: AdminVerificationQueueItem) => {
         const isProjectPending = mod.status === 'PENDING';
-        const versions = mod.versions || [];
-        const pendingVersions = versions.filter(v => v.reviewStatus === 'PENDING');
-        const targetVersion = pendingVersions[0] || versions[0];
-        const scan = targetVersion?.scanResult;
+        const targetVersion = mod.pendingVersion;
+        const scan = targetVersion?.scan;
         const hasIssues = scan && scan.status !== 'CLEAN';
         const newIssues = scan?.newIssueCount || 0;
         const knownIssues = scan?.knownIssueCount || 0;
@@ -76,7 +52,7 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
                     {isProjectPending && (
                         <div className="absolute top-0 left-0 right-0 bg-orange-500 text-white text-[10px] font-bold text-center py-1 uppercase">New Project</div>
                     )}
-                    {!isProjectPending && pendingVersions.length > 0 && (
+                    {!isProjectPending && targetVersion && (
                         <div className="absolute top-0 left-0 right-0 bg-blue-500 text-white text-[10px] font-bold text-center py-1 uppercase">Update</div>
                     )}
                 </div>
@@ -144,7 +120,7 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
 
     return (
         <div className="grid gap-4">
-            {sortedProjects.map(renderQueueItem)}
+            {pendingProjects.map(renderQueueItem)}
         </div>
     );
 };

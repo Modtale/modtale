@@ -261,7 +261,7 @@ class LifecycleServiceTest {
         project.setVersions(new ArrayList<>(List.of(scheduled, approved)));
 
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
-        when(accessControlService.isAdmin(admin)).thenReturn(true);
+        when(accessControlService.canApproveProjectReviews(admin)).thenReturn(true);
         when(projectRepository.save(project)).thenReturn(project);
 
         lifecycleService.publishProject("project-1", admin);

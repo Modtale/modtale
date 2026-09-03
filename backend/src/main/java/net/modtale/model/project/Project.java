@@ -44,6 +44,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
         @CompoundIndex(name = "status_tags_updated_idx", def = "{'status': 1, 'tags': 1, 'updatedAt': -1}"),
         @CompoundIndex(name = "status_author_relevance_rank_idx", def = "{'status': 1, 'authorId': 1, 'relevanceRank': 1}"),
         @CompoundIndex(name = "status_author_updated_idx", def = "{'status': 1, 'authorId': 1, 'updatedAt': -1}"),
+        @CompoundIndex(name = "status_review_updated_idx", def = "{'status': 1, 'versions.reviewStatus': 1, 'updatedAt': 1}"),
         @CompoundIndex(name = "status_game_version_relevance_rank_idx", def = "{'status': 1, 'versions.gameVersions': 1, 'relevanceRank': 1}"),
         @CompoundIndex(name = "status_game_version_downloads_idx", def = "{'status': 1, 'versions.gameVersions': 1, 'downloadCount': -1}"),
         @CompoundIndex(name = "status_game_version_updated_idx", def = "{'status': 1, 'versions.gameVersions': 1, 'updatedAt': -1}"),
@@ -161,6 +162,7 @@ public class Project {
     private String updatedAt;
     private String createdAt;
     private String license;
+    private boolean customLicenseOpenSource;
 
     private String lastTrendingNotification;
 
@@ -260,6 +262,8 @@ public class Project {
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
     public String getLicense() { return license; }
     public void setLicense(String license) { this.license = license; }
+    public boolean isCustomLicenseOpenSource() { return customLicenseOpenSource; }
+    public void setCustomLicenseOpenSource(boolean customLicenseOpenSource) { this.customLicenseOpenSource = customLicenseOpenSource; }
     public Map<String, String> getLinks() { return links; }
     public void setLinks(Map<String, String> links) { this.links = links; }
     public List<String> getTypes() { return types; }

@@ -53,6 +53,12 @@ public class OAuth2LoginService extends DefaultOAuth2UserService {
                 }
             }
 
+            if ("gitlab".equals(provider)) {
+                throw new InvalidAuthenticationRequestException(
+                        "GitLab can only be linked from an existing Modtale account."
+                );
+            }
+
             return authenticationService.processUserLogin(provider, oauthUser, accessToken);
         } catch (OAuthAccountCollisionException ex) {
             throw new OAuth2AuthenticationException(new OAuth2Error("account_collision"), ex.getMessage());

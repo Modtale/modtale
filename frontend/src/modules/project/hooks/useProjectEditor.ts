@@ -96,6 +96,7 @@ export const useProjectEditor = (
                 links: metaData.links,
                 repositoryUrl: metaData.repositoryUrl,
                 license: metaData.license,
+                customLicenseOpenSource: metaData.customLicenseOpenSource,
                 allowModpacks: projectData.allowModpacks,
                 allowComments: projectData.allowComments,
                 hmWikiEnabled: projectData.hmWikiEnabled,
@@ -139,7 +140,8 @@ export const useProjectEditor = (
                     tags: metaData.tags,
                     links: metaData.links,
                     repositoryUrl: metaData.repositoryUrl,
-                    license: metaData.license
+                    license: metaData.license,
+                    customLicenseOpenSource: metaData.customLicenseOpenSource
                 };
             });
             setIsDirty(false);

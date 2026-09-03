@@ -2,6 +2,20 @@ import React from 'react';
 import { CheckCircle2, Beaker, Zap, Code, Database, Paintbrush, Globe, Layers, Layout } from 'lucide-react';
 import { DiscordBrandIcon } from '@/components/ui/icons/BrandIcons';
 
+const semVerRegex = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
+
+const parseSemVer = (version: string) => {
+    const match = version.match(semVerRegex);
+    if (!match) return null;
+    return {
+        major: parseInt(match[1], 10),
+        minor: parseInt(match[2], 10),
+        patch: parseInt(match[3], 10),
+        prerelease: match[4] ? match[4].split('.') : [],
+        build: match[5]
+    };
+};
+
 export const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -44,22 +58,8 @@ export const ChannelBadge = ({ channel }: { channel?: string }) => {
 };
 
 export const compareSemVer = (a: string, b: string) => {
-    const semVerRegex = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
-
-    const parse = (v: string) => {
-        const match = v.match(semVerRegex);
-        if (!match) return null;
-        return {
-            major: parseInt(match[1], 10),
-            minor: parseInt(match[2], 10),
-            patch: parseInt(match[3], 10),
-            prerelease: match[4] ? match[4].split('.') : [],
-            build: match[5]
-        };
-    };
-
-    const va = parse(a);
-    const vb = parse(b);
+    const va = parseSemVer(a);
+    const vb = parseSemVer(b);
 
     if (!va || !vb) return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 
@@ -95,6 +95,39 @@ export const compareSemVer = (a: string, b: string) => {
     }
 
     return 0;
+};
+
+export interface VersionGroup {
+    label: string;
+    versions: string[];
+    grouped: boolean;
+}
+
+export const parseSelectedVersions = (value: string) => {
+    if (!value || value === 'Any') return [];
+    return value.split(',').map(v => v.trim()).filter(v => v && v !== 'Any');
+};
+
+export const getVersionRangeLabel = (version: string) => {
+    const [baseVersion] = version.split('-');
+    const parts = baseVersion.split('.');
+    if (parts.length < 2 || !parts[0] || !parts[1]) return null;
+    if (!/^\d+$/.test(parts[0]) || !/^\d+$/.test(parts[1])) return null;
+    return `${parts[0]}.${parts[1]}.x`;
+};
+
+export const buildVersionGroups = (versions: string[]): VersionGroup[] => {
+    const groups = new Map<string, string[]>();
+    for (const version of versions) {
+        const label = getVersionRangeLabel(version);
+        const key = label || version;
+        groups.set(key, [...(groups.get(key) || []), version]);
+    }
+    return Array.from(groups, ([label, groupVersions]) => ({
+        label,
+        versions: groupVersions,
+        grouped: groupVersions.length > 1
+    }));
 };
 
 export const getClassificationIcon = (cls: string, className: string = "w-4 h-4") => {

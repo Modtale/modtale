@@ -768,7 +768,7 @@ const endpointSpecificExample = (method: string, path: string, code: string): un
             expiresIn: 300,
         };
     }
-    if (path === '/api/v1/version/{hash}' && code === '200') {
+    if ((path === '/api/v1/projects/{id}/versions/hash/{hash}' || path === '/api/v1/version/{hash}') && code === '200') {
         return {
             id: sampleVersionSummary.id,
             versionNumber: sampleVersionSummary.versionNumber,
@@ -1509,6 +1509,24 @@ export const ApiDocs: React.FC = () => {
                                             <div className="text-3xl font-black text-purple-900 dark:text-white mb-1">{fmt(enterpriseTier?.readPerMinute)} <span className="text-sm font-medium text-purple-400">req/min</span></div>
                                             <div className="text-xl font-bold text-purple-700 dark:text-purple-300">{fmt(enterpriseTier?.writePerMinute)} <span className="text-sm font-medium text-purple-400">write/min</span></div>
                                             <p className="text-xs text-purple-700 dark:text-purple-300 mt-2">For high-volume integrations.</p>
+                                            <a href="mailto:support@modtale.net?subject=Modtale%20Enterprise%20API" className="relative z-10 mt-3 inline-flex items-center gap-1 text-xs font-bold text-purple-700 dark:text-purple-300 hover:underline">
+                                                Contact support for enterprise access <ExternalLink className="h-3 w-3" />
+                                            </a>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-6 rounded-2xl border border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-white/5 p-5 text-left">
+                                        <h3 className="text-sm font-black text-slate-900 dark:text-white">Building something with the Modtale API?</h3>
+                                        <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                                            Share integrations, request missing API capabilities, or contribute improvements on GitHub. Useful community projects may be highlighted as examples for other developers.
+                                        </p>
+                                        <div className="mt-3 flex flex-wrap gap-3 text-sm font-bold">
+                                            <a href="https://github.com/Modtale/modtale/issues/new/choose" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-modtale-accent hover:underline">
+                                                Open an issue <ExternalLink className="h-3.5 w-3.5" />
+                                            </a>
+                                            <a href="https://github.com/Modtale/modtale/pulls" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-modtale-accent hover:underline">
+                                                Contribute a pull request <ExternalLink className="h-3.5 w-3.5" />
+                                            </a>
                                         </div>
                                     </div>
                                 </div>

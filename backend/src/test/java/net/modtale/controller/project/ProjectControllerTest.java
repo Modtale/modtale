@@ -112,6 +112,7 @@ class ProjectControllerTest {
                 eq(ProjectViewCategory.FAVORITES),
                 eq("30d"),
                 eq("Ada"),
+                eq(true),
                 eq(currentUser)
         )).thenReturn(page);
 
@@ -127,6 +128,7 @@ class ProjectControllerTest {
                 5,
                 "Favorites",
                 "30d",
+                true,
                 "Ada",
                 "catalog",
                 null
@@ -161,7 +163,8 @@ class ProjectControllerTest {
                 isNull(),
                 eq(ProjectViewCategory.ALL),
                 isNull(),
-                eq("creator-name")
+                eq("creator-name"),
+                isNull()
         )).thenReturn(page);
 
         var response = controller.getProjects(
@@ -175,6 +178,7 @@ class ProjectControllerTest {
                 null,
                 null,
                 "Your Projects",
+                null,
                 null,
                 "creator-name",
                 "catalog",
@@ -196,7 +200,8 @@ class ProjectControllerTest {
                 isNull(),
                 eq(ProjectViewCategory.ALL),
                 isNull(),
-                eq("creator-name")
+                eq("creator-name"),
+                isNull()
         );
     }
 
@@ -221,7 +226,8 @@ class ProjectControllerTest {
                 isNull(),
                 eq(ProjectViewCategory.ALL),
                 eq("all"),
-                isNull()
+                isNull(),
+                eq(true)
         )).thenReturn(page);
 
         var response = controller.getProjects(
@@ -236,6 +242,7 @@ class ProjectControllerTest {
                 null,
                 "all",
                 "all",
+                true,
                 null,
                 "catalog",
                 authentication
@@ -256,7 +263,8 @@ class ProjectControllerTest {
                 isNull(),
                 eq(ProjectViewCategory.ALL),
                 eq("all"),
-                isNull()
+                isNull(),
+                eq(true)
         );
     }
 
@@ -276,6 +284,7 @@ class ProjectControllerTest {
                 isNull(),
                 eq(ProjectViewCategory.ALL),
                 isNull(),
+                isNull(),
                 isNull()
         )).thenReturn(page);
 
@@ -290,6 +299,7 @@ class ProjectControllerTest {
                 null,
                 null,
                 "all",
+                null,
                 null,
                 null,
                 "marquee",
@@ -312,6 +322,7 @@ class ProjectControllerTest {
                 isNull(),
                 eq(ProjectViewCategory.ALL),
                 isNull(),
+                isNull(),
                 isNull()
         );
         verify(projectResponseCacheService, never()).searchPublicProjectSummaries(
@@ -319,6 +330,7 @@ class ProjectControllerTest {
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.anyInt(),
                 org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
@@ -539,6 +551,32 @@ class ProjectControllerTest {
         assertTrue(updated.isHmWikiEnabled());
         assertEquals("existing-wiki", updated.getHmWikiSlug());
         assertTrue(updated.isGalleryCarouselEnabled());
+    }
+
+    @Test
+    void updateProjectPassesCustomLicenseOpenSourceFlag() {
+        User currentUser = user("user-1", "ada");
+        Project existing = project("project-1", "Existing", ProjectStatus.DRAFT);
+
+        UpdateProjectRequest request = new UpdateProjectRequest();
+        request.setTitle("Updated Title");
+        request.setLicense("Sky Public License");
+        request.setCustomLicenseOpenSource(true);
+
+        when(accountService.requireCurrentUser(null, "editing project metadata")).thenReturn(currentUser);
+        when(projectService.getRawProjectById("project-1")).thenReturn(existing);
+        doNothing().when(metadataService).updateMetadata(eq("project-1"), org.mockito.ArgumentMatchers.any(Project.class), eq(currentUser));
+
+        var response = controller.updateProject("project-1", request, null);
+
+        assertEquals(200, response.getStatusCode().value());
+
+        ArgumentCaptor<Project> captor = ArgumentCaptor.forClass(Project.class);
+        verify(metadataService).updateMetadata(eq("project-1"), captor.capture(), eq(currentUser));
+
+        Project updated = captor.getValue();
+        assertEquals("Sky Public License", updated.getLicense());
+        assertTrue(updated.isCustomLicenseOpenSource());
     }
 
     @Test

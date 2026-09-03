@@ -1,29 +1,33 @@
 import { defineConfig } from 'astro/config';
 import react from '@astrojs/react';
-import tailwind from '@astrojs/tailwind';
 import node from '@astrojs/node';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
     output: 'server',
     adapter: node({
-        mode: 'standalone',
+        mode: 'middleware',
     }),
     integrations: [
-        react(),
-        tailwind({
-            applyBaseStyles: false,
-        })
+        react()
     ],
     server: {
         port: Number(process.env.PORT) || 5173,
         host: true
     },
     vite: {
+        plugins: [
+            tailwindcss()
+        ],
+        optimizeDeps: {
+            include: ['@sentry/react', 'react-easy-crop']
+        },
         ssr: {
-            noExternal: ['react-router-dom', 'lucide-react', 'react-easy-crop', 'react-helmet-async']
+            noExternal: ['lucide-react', 'react-easy-crop', 'react-helmet-async']
         },
         define: {
-            'import.meta.env.PUBLIC_API_URL': JSON.stringify(process.env.PUBLIC_API_URL)
+            'import.meta.env.PUBLIC_API_URL': JSON.stringify(process.env.PUBLIC_API_URL),
+            'import.meta.env.PUBLIC_STATUS_URL': JSON.stringify(process.env.PUBLIC_STATUS_URL)
         },
         build: {
             target: 'esnext',

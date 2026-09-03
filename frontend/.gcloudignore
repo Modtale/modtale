@@ -4,3 +4,7 @@ node_modules/
 dist/
 build/
 .env.local
+.idea/
+*.iml
+*.log
+.DS_Store

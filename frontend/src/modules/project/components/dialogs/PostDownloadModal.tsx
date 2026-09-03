@@ -12,10 +12,11 @@ interface PostDownloadModalProps {
     channel?: 'RELEASE' | 'BETA' | 'ALPHA';
     isBundle?: boolean;
     fileName?: string;
+    tags?: string[];
 }
 
 export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
-                                                                        isOpen, onClose, classification, title, channel = 'RELEASE', isBundle = false, fileName = ''
+                                                                        isOpen, onClose, classification, title, channel = 'RELEASE', isBundle = false, fileName = '', tags = []
                                                                     }) => {
     useScrollLock(isOpen);
     const [os, setOs] = useState<'windows' | 'macos' | 'linux'>('windows');
@@ -35,7 +36,8 @@ export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
     if (!isOpen) return null;
 
     const isWorld = classification === 'SAVE';
-    const folderName = isWorld ? 'Saves' : 'Mods';
+    const isPrefab = isWorld && tags.some(tag => tag.toLowerCase() === 'prefab');
+    const folderName = isWorld && !isPrefab ? 'Saves' : 'Mods';
 
     const paths = {
         windows: `C:\\Program Files\\Hypixel Studios\\Hytale Launcher\\UserData\\${folderName}`,
@@ -181,7 +183,11 @@ export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
                             <div className={`flex gap-4 p-4 rounded-2xl border shadow-sm ${theme.colors.bgBase} ${theme.colors.border}`}>
                                 <div className={`w-8 h-8 rounded-full ${themeColors.bgAlpha} ${themeColors.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>{isBundle ? '3' : '2'}</div>
                                 <div className="w-full min-w-0 pt-1.5">
-                                    <p className="mb-3">{isWorld ? 'Extract and move the world folder into your Hytale Saves directory:' : `Move ${isBundle ? 'ALL extracted files' : 'the downloaded file'} to your Hytale Mods directory:`}</p>
+                                    <p className="mb-3">{isPrefab
+                                        ? 'If the download is archived, extract it, then place the prefab files inside a Hytale asset pack in your Mods directory:'
+                                        : isWorld
+                                            ? 'Extract and move the world folder into your Hytale Saves directory:'
+                                            : `Move ${isBundle ? 'ALL extracted files' : 'the downloaded file'} to your Hytale Mods directory:`}</p>
                                     <div className={`flex items-center gap-3 border rounded-xl p-2 pl-3 ${theme.colors.bgSurface} ${theme.colors.border}`}>
                                         <code className={`flex-1 font-mono text-[11px] ${theme.colors.textSecondary} break-all select-all leading-relaxed`}>{paths[os]}</code>
                                         <button type="button" onClick={handleCopy} className={`p-2 rounded-lg border transition-colors shadow-sm shrink-0 self-start ${theme.colors.bgBase} ${theme.colors.border} ${theme.colors.textMuted} hover:${theme.colors.textPrimary} ${theme.colors.bgSurfaceHover}`} title="Copy Path">
@@ -194,7 +200,11 @@ export const PostDownloadModal: React.FC<PostDownloadModalProps> = ({
                             <div className={`flex gap-4 p-4 rounded-2xl border shadow-sm ${theme.colors.bgBase} ${theme.colors.border}`}>
                                 <div className={`w-8 h-8 rounded-full ${themeColors.bgAlpha} ${themeColors.text} font-black flex items-center justify-center shrink-0 shadow-inner`}>{isBundle ? '4' : '3'}</div>
                                 <div className="pt-1.5">
-                                    {isWorld ? 'Launch Hytale and select the world from the Singleplayer menu.' : `Restart your Hytale Launcher to load the new project${isBundle ? 's' : ''}.`}
+                                    {isPrefab
+                                        ? 'Enable the asset pack in the target world, load the prefab from the Prefab List, then use the Paste Tool to place it.'
+                                        : isWorld
+                                            ? 'Launch Hytale and select the world from the Singleplayer menu.'
+                                            : `Restart your Hytale Launcher to load the new project${isBundle ? 's' : ''}.`}
                                 </div>
                             </div>
                         </div>

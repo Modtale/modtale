@@ -171,6 +171,27 @@ class OAuthUserLoginServiceTest {
         verify(trackingService).logNewUser("user-1");
     }
 
+    @Test
+    void processUserLoginMapsMultipleRolesToAuthorities() {
+        OAuth2User oauthUser = oauthUser();
+        OAuthProviderProfile profile = profile(OAuthProvider.GITHUB, "willow", "willow@example.com");
+        User existingUser = user("user-1", "willow");
+        existingUser.setRoles(java.util.List.of("USER", "ADMIN", "SUPER_ADMIN"));
+
+        when(providerProfileService.extract("github", oauthUser)).thenReturn(profile);
+        when(userRepository.findByConnectedAccountsProviderAndProviderId(OAuthProvider.GITHUB, "provider-1"))
+                .thenReturn(Optional.of(existingUser));
+
+        DefaultOAuth2User principal = service.processUserLogin("github", oauthUser, "token");
+
+        java.util.Set<String> authorities = principal.getAuthorities().stream()
+                .map(org.springframework.security.core.GrantedAuthority::getAuthority)
+                .collect(java.util.stream.Collectors.toSet());
+        assertTrue(authorities.contains("ROLE_USER"));
+        assertTrue(authorities.contains("ROLE_ADMIN"));
+        assertTrue(authorities.contains("ROLE_SUPER_ADMIN"));
+    }
+
     private static OAuthProviderProfile profile(OAuthProvider provider, String username, String email) {
         return new OAuthProviderProfile(
                 provider,

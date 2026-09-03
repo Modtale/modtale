@@ -61,14 +61,14 @@ export const Browse: React.FC<BrowseViewProps> = ({
     const { isMobile } = useMobile();
     const { initialData } = useSSRData();
 
-    const hasComplexParams = searchParams.has('q') || searchParams.has('tags') || searchParams.has('version') || searchParams.has('minDl') || searchParams.has('minFav') || searchParams.has('date') || searchParams.has('category') || (searchParams.get('page') && parseInt(searchParams.get('page')!, 10) > 0);
-    const hasUsableBrowseSSRData = Boolean(initialData?.browseData) && initialData?.browseDataReady !== false;
+    const hasComplexParams = searchParams.has('q') || searchParams.has('tags') || searchParams.has('version') || searchParams.has('minDl') || searchParams.has('minFav') || searchParams.has('openSource') || searchParams.has('date') || searchParams.has('category') || (searchParams.get('page') && parseInt(searchParams.get('page')!, 10) > 0);
+    const hasUsableBrowseSSRData = Boolean(initialData?.browseData && initialData?.browseDataReady !== false);
     const useSSR = hasUsableBrowseSSRData && !hasComplexParams;
     const initialPreferences = useMemo(() => getInitialBrowsePreferences(), []);
     const [viewStyle, setViewStyle] = useState<BrowseViewStyle>(initialPreferences.viewStyle);
 
     const {
-        page, sortBy, selectedVersion, minDownloads, minFavorites, filterDate, selectedTags, urlSearchTerm,
+        page, sortBy, selectedVersion, minDownloads, minFavorites, openSourceOnly, filterDate, selectedTags, urlSearchTerm,
         viewCategory, searchTerm, setSearchTerm, selectedClassification, setSelectedClassification, totalPages, totalItems, loading, isPending, items,
         itemsPerPage, setItemsPerPage, updateParams
     } = useProjectSearch(initialClassification || 'All', !!useSSR, useSSR ? initialData.browseData.content : [], useSSR ? initialData.browseData.totalPages : 0, useSSR ? initialData.browseData.totalElements : 0, initialPreferences.itemsPerPage);
@@ -257,7 +257,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
                         </div>
                     </div>
 
-                    <div className="flex-1 min-h-[500px] min-w-0" ref={cardsSectionRef}>
+                    <div className="browse-project-results flex-1 min-h-[500px] min-w-0" ref={cardsSectionRef}>
                         <div className={`sticky top-24 z-50 mb-4 bg-slate-50/90 dark:bg-[#0B1120]/90 backdrop-blur-xl -mx-4 sm:mx-0 px-4 sm:px-0 border-b border-slate-200 dark:border-white/10 transition-all duration-300 ${isScrolled && isMobile ? 'pt-2 pb-2 shadow-sm' : 'pt-3 pb-3'}`}>
                             <BrowseFilters
                                 categoryPills={<CategoryPillNav selectedClassification={selectedClassification} onClassificationChange={setSelectedClassification} currentSearchParams={searchParams} />}
@@ -273,7 +273,7 @@ export const Browse: React.FC<BrowseViewProps> = ({
                                 }}
                                 onClearTags={() => updateParams({ tags: null })}
                                 activeFilterCount={0}
-                                onResetFilters={() => updateParams({ version: null, minDl: null, minFav: null, date: null, tags: null })}
+                                onResetFilters={() => updateParams({ version: null, minDl: null, minFav: null, openSource: null, date: null, tags: null })}
                                 isFilterOpen={isFilterOpen}
                                 onToggleFilterMenu={() => setIsFilterOpen(prev => !prev)}
                                 searchTerm={searchTerm}
@@ -284,6 +284,8 @@ export const Browse: React.FC<BrowseViewProps> = ({
                                 setMinFavorites={(v) => updateParams({ minFav: v > 0 ? v.toString() : null })}
                                 minDownloads={minDownloads}
                                 setMinDownloads={(v) => updateParams({ minDl: v > 0 ? v.toString() : null })}
+                                openSourceOnly={openSourceOnly}
+                                setOpenSourceOnly={(v) => updateParams({ openSource: v ? 'true' : null })}
                                 filterDate={filterDate}
                                 setFilterDate={(v) => updateParams({ date: v })}
                                 setPage={handlePageChange}

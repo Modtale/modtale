@@ -4,6 +4,7 @@ import java.util.List;
 import net.modtale.model.dto.user.UserDTO;
 import net.modtale.model.dto.user.UserSummaryDTO;
 import net.modtale.model.user.ApiKey;
+import net.modtale.model.user.AdminPermission;
 import net.modtale.model.user.OAuthProvider;
 import net.modtale.model.user.User;
 import org.junit.jupiter.api.Test;
@@ -28,6 +29,8 @@ class UserMapperTest {
         assertEquals("Always lock in", dto.bio());
         assertEquals(ApiKey.Tier.ENTERPRISE, dto.tier());
         assertEquals(User.AccountType.ORGANIZATION, dto.accountType());
+        assertEquals("founder", dto.badges().get(0));
+        assertEquals("community-team", ((User.ProfileBadge) dto.badges().get(1)).getId());
     }
 
     @Test
@@ -40,6 +43,8 @@ class UserMapperTest {
         assertEquals("ItsNeil17", dto.getUsername());
         assertEquals("Always lock in", dto.getBio());
         assertNull(dto.getEmail());
+        assertNull(dto.getHasPassword());
+        assertNull(dto.getAdminPermissions());
         assertNull(dto.getPendingOrgInvites());
         assertNull(dto.getLikedModIds());
         assertNull(dto.getNotificationPreferences());
@@ -59,7 +64,9 @@ class UserMapperTest {
         assertEquals("ItsNeil17", dto.getUsername());
         assertEquals("Always lock in", dto.getBio());
         assertTrue(dto.getEmailVerified());
+        assertTrue(dto.getHasPassword());
         assertTrue(dto.getMfaEnabled());
+        assertTrue(dto.getAdminPermissions().contains(AdminPermission.USER_READ));
         assertNotNull(dto.getPendingOrgInvites());
         assertNotNull(dto.getLikedModIds());
         assertNotNull(dto.getNotificationPreferences());
@@ -71,6 +78,7 @@ class UserMapperTest {
         user.setId("user-1");
         user.setUsername("ItsNeil17");
         user.setEmail("itsneil17@example.com");
+        user.setPassword("encoded-password");
         user.setEmailVerified(true);
         user.setMfaEnabled(true);
         user.setAvatarUrl("https://example.com/avatar.png");
@@ -78,7 +86,8 @@ class UserMapperTest {
         user.setBio("Always lock in");
         user.setCreatedAt("2026-01-01");
         user.setTier(ApiKey.Tier.ENTERPRISE);
-        user.setRoles(List.of("USER", "ADMIN"));
+        user.setRoles(List.of("USER"));
+        user.setAdminPermissions(java.util.Set.of(AdminPermission.USER_READ));
         user.setAccountType(User.AccountType.ORGANIZATION);
         user.setOrganizationRoles(List.of(new User.OrganizationRole()));
         user.setOrganizationMembers(List.of(new User.OrganizationMember("user-2", "role-1")));
@@ -87,6 +96,13 @@ class UserMapperTest {
         user.setFollowingIds(List.of("user-2"));
         user.setFollowerIds(List.of("user-4"));
         user.setBadges(List.of("founder"));
+        user.setProfileBadges(List.of(new User.ProfileBadge(
+                "community-team",
+                "Community Team",
+                "Community Team Member",
+                "https://cdn.example.com/community-team-dark.svg",
+                "https://cdn.example.com/community-team-light.svg"
+        )));
         user.setConnectedAccounts(List.of(
                 new User.ConnectedAccount(OAuthProvider.GITHUB, "gh-1", "ada", "https://github.com/ada", true),
                 new User.ConnectedAccount(OAuthProvider.GITLAB, "gl-1", "ada", "https://gitlab.com/ada", false)

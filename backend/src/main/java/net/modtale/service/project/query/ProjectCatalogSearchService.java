@@ -33,7 +33,7 @@ public class ProjectCatalogSearchService {
 
     @Cacheable(
             value = "projectSearch",
-            key = "T(java.util.Arrays).asList(#tags, #search, #page, #size, #sortBy, #gameVersion, #contentType, #minDownloads, #minFavorites, #viewCategory, #dateRange, #authorId)",
+            key = "T(java.util.Arrays).asList(#tags, #search, #page, #size, #sortBy, #gameVersion, #contentType, #minDownloads, #minFavorites, #viewCategory, #dateRange, #authorId, #openSource)",
             condition = "#currentUser == null && (#viewCategory == null || !#viewCategory.personalView)",
             sync = true
     )
@@ -50,6 +50,7 @@ public class ProjectCatalogSearchService {
             ProjectViewCategory viewCategory,
             String dateRange,
             String authorId,
+            Boolean openSource,
             User currentUser
     ) {
         if (viewCategory == ProjectViewCategory.FAVORITES) {
@@ -63,7 +64,8 @@ public class ProjectCatalogSearchService {
             return projectRepository.findFavorites(
                     likedIds,
                     search != null ? search : "",
-                    favoritesPageable
+                    favoritesPageable,
+                    openSource
             );
         }
 
@@ -81,7 +83,8 @@ public class ProjectCatalogSearchService {
                 sortBy,
                 viewCategory,
                 dateCutoff,
-                authorId
+                authorId,
+                openSource
         );
 
         return projectSearchResultDecorator.decorateCatalogResults(results);
@@ -89,7 +92,7 @@ public class ProjectCatalogSearchService {
 
     @Cacheable(
             value = "projectMarqueeSearch",
-            key = "T(java.util.Arrays).asList(#tags, #search, #page, #size, #sortBy, #gameVersion, #contentType, #minDownloads, #minFavorites, #viewCategory, #dateRange, #authorId)",
+            key = "T(java.util.Arrays).asList(#tags, #search, #page, #size, #sortBy, #gameVersion, #contentType, #minDownloads, #minFavorites, #viewCategory, #dateRange, #authorId, #openSource)",
             condition = "#viewCategory == null || !#viewCategory.personalView",
             sync = true
     )
@@ -105,7 +108,8 @@ public class ProjectCatalogSearchService {
             Integer minFavorites,
             ProjectViewCategory viewCategory,
             String dateRange,
-            String authorId
+            String authorId,
+            Boolean openSource
     ) {
         LocalDate dateCutoff = resolveDateCutoff(dateRange);
 
@@ -120,7 +124,8 @@ public class ProjectCatalogSearchService {
                 sortBy,
                 viewCategory,
                 dateCutoff,
-                authorId
+                authorId,
+                openSource
         );
 
         return projectSearchResultDecorator.decorateCatalogResults(results);

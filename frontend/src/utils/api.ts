@@ -8,6 +8,14 @@ export const API_BASE_URL = RAW_URL.endsWith('/')
     : RAW_URL;
 
 export const BACKEND_URL = new URL(API_BASE_URL).origin;
+
+// Astro's server-rendered requests can stay on Google Cloud's internal service
+// path while browser requests continue to use the public Cloudflare endpoint.
+// The fallback keeps local development and older deployments working unchanged.
+const RAW_SERVER_URL = import.meta.env.SSR_API_URL?.trim();
+export const SERVER_BACKEND_URL = RAW_SERVER_URL
+    ? new URL(RAW_SERVER_URL).origin
+    : BACKEND_URL;
 const WRITE_METHODS = new Set(['post', 'put', 'delete', 'patch']);
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN';
 

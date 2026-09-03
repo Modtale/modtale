@@ -1,8 +1,9 @@
 // @vitest-environment node
 import path from 'node:path';
 import net from 'node:net';
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
+import type { Readable } from 'node:stream';
 import * as ts from 'typescript';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -160,7 +161,39 @@ const reservePort = async () => {
     return port;
 };
 
-const waitForServerReady = async (origin: string, child: ChildProcessWithoutNullStreams, getLogs: () => string) => {
+type DevServerProcess = ChildProcessByStdio<null, Readable, Readable>;
+
+const stopRegisteredAstroDevServer = async () => {
+    await new Promise<void>((resolve, reject) => {
+        let stdout = '';
+        let stderr = '';
+        const child = spawn('npm', ['run', 'dev', '--', 'stop'], {
+            cwd: process.cwd(),
+            env: { ...process.env, ASTRO_DEV_BACKGROUND: '0' },
+            stdio: ['ignore', 'pipe', 'pipe'],
+        });
+
+        child.stdout.on('data', (chunk) => {
+            stdout += chunk.toString();
+        });
+
+        child.stderr.on('data', (chunk) => {
+            stderr += chunk.toString();
+        });
+
+        child.once('error', reject);
+        child.once('exit', (code) => {
+            if (code === 0) {
+                resolve();
+                return;
+            }
+
+            reject(new Error(`Failed to stop registered Astro dev server.\nstdout:\n${stdout}\n\nstderr:\n${stderr}`));
+        });
+    });
+};
+
+const waitForServerReady = async (origin: string, child: DevServerProcess, getLogs: () => string) => {
     const start = Date.now();
 
     while (Date.now() - start < startupTimeoutMs) {
@@ -171,7 +204,7 @@ const waitForServerReady = async (origin: string, child: ChildProcessWithoutNull
         try {
             const response = await fetch(origin);
             if (response.ok) {
-                return;
+                return origin;
             }
         } catch {
             // Keep polling until the server comes up.
@@ -183,7 +216,7 @@ const waitForServerReady = async (origin: string, child: ChildProcessWithoutNull
     throw new Error(`Timed out waiting for Astro dev server at ${origin}.\n${getLogs()}`);
 };
 
-const stopServer = async (child: ChildProcessWithoutNullStreams | null) => {
+const stopServer = async (child: DevServerProcess | null) => {
     if (!child || child.exitCode !== null) {
         return;
     }
@@ -229,18 +262,20 @@ const fetchText = async (url: string, label: string) => {
 };
 
 describe('lazy-loaded module integrity', () => {
-    let devServer: ChildProcessWithoutNullStreams | null = null;
+    let devServer: DevServerProcess | null = null;
     let origin = '';
     let stdout = '';
     let stderr = '';
 
     beforeAll(async () => {
+        await stopRegisteredAstroDevServer();
+
         const port = await reservePort();
         origin = `http://127.0.0.1:${port}`;
 
         devServer = spawn('npm', ['run', 'dev', '--', '--host', '127.0.0.1', '--port', String(port)], {
             cwd: process.cwd(),
-            env: process.env,
+            env: { ...process.env, ASTRO_DEV_BACKGROUND: '0' },
             stdio: ['ignore', 'pipe', 'pipe'],
         });
 
@@ -252,7 +287,7 @@ describe('lazy-loaded module integrity', () => {
             stderr += chunk.toString();
         });
 
-        await waitForServerReady(origin, devServer, () => `stdout:\n${stdout}\n\nstderr:\n${stderr}`);
+        origin = await waitForServerReady(origin, devServer, () => `stdout:\n${stdout}\n\nstderr:\n${stderr}`);
     }, startupTimeoutMs);
 
     afterAll(async () => {

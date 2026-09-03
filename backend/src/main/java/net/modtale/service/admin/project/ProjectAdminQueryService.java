@@ -58,7 +58,7 @@ public class ProjectAdminQueryService {
                     .map(project -> ProjectMapper.toSummaryDTO(project, true))
                     .toList();
         }
-        return searchService.searchProjects(null, query, 0, 10, ProjectSort.RELEVANCE, null, null, null, null, ProjectViewCategory.ALL, null, null, null)
+        return searchService.searchProjects(null, query, 0, 10, ProjectSort.RELEVANCE, null, null, null, null, ProjectViewCategory.ALL, null, null, null, null)
                 .getContent().stream()
                 .map(project -> ProjectMapper.toSummaryDTO(project, true))
                 .toList();

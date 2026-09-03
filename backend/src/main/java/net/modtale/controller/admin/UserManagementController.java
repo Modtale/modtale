@@ -2,11 +2,14 @@ package net.modtale.controller.admin;
 
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Set;
 import net.modtale.model.dto.admin.BannedEmailDTO;
 import net.modtale.model.dto.request.admin.BanEmailRequest;
+import net.modtale.model.dto.request.admin.UpdateAdminPermissionsRequest;
 import net.modtale.model.dto.response.admin.UserTierUpdateResponse;
 import net.modtale.model.dto.user.UserDTO;
 import net.modtale.model.user.ApiKey;
+import net.modtale.model.user.AdminPermission;
 import net.modtale.model.user.User;
 import net.modtale.service.admin.user.UserManagementService;
 import net.modtale.service.user.account.AccountService;
@@ -35,13 +38,13 @@ public class UserManagementController {
     }
 
     @GetMapping("/users/bans")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('EMAIL_BAN_READ', authentication)")
     public ResponseEntity<List<BannedEmailDTO>> getBannedEmails() {
         return ResponseEntity.ok(userManagementService.getBannedEmailViews());
     }
 
     @PostMapping("/users/bans")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('EMAIL_BAN_MANAGE', authentication)")
     public ResponseEntity<Void> banEmail(@Valid @RequestBody BanEmailRequest requestPayload) {
         User currentUser = accountService.requireCurrentUser("banning email addresses");
         userManagementService.banEmail(currentUser, requestPayload.getEmail(), requestPayload.getReason());
@@ -49,7 +52,7 @@ public class UserManagementController {
     }
 
     @DeleteMapping("/users/bans")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('EMAIL_BAN_MANAGE', authentication)")
     public ResponseEntity<Void> unbanEmail(@RequestParam String email) {
         User currentUser = accountService.requireCurrentUser("unbanning email addresses");
         userManagementService.unbanEmail(currentUser.getId(), email);
@@ -57,19 +60,19 @@ public class UserManagementController {
     }
 
     @GetMapping("/users/{userId}")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('USER_READ', authentication)")
     public ResponseEntity<UserDTO> getUserDetails(@PathVariable String userId) {
         return ResponseEntity.ok(userManagementService.getUserDetails(userId));
     }
 
     @GetMapping("/users/{userId}/raw")
-    @PreAuthorize("@apiSecurity.isSuperAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('USER_RAW_READ', authentication)")
     public ResponseEntity<User> getRawUser(@PathVariable String userId) {
         return ResponseEntity.ok(userManagementService.getRawUser(userId));
     }
 
     @PutMapping("/users/{userId}/raw")
-    @PreAuthorize("@apiSecurity.isSuperAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('USER_RAW_EDIT', authentication)")
     public ResponseEntity<Void> updateRawUser(@PathVariable String userId, @RequestBody User updatedData) {
         User currentUser = accountService.requireCurrentUser("editing raw user data");
         userManagementService.updateRawUser(currentUser.getId(), userId, updatedData);
@@ -77,7 +80,7 @@ public class UserManagementController {
     }
 
     @DeleteMapping("/users/{userId}")
-    @PreAuthorize("@apiSecurity.isAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('USER_DELETE', authentication)")
     public ResponseEntity<Void> deleteUser(
             @PathVariable String userId,
             @RequestParam(required = false, defaultValue = "Administrative enforcement action.") String reason
@@ -88,25 +91,24 @@ public class UserManagementController {
     }
 
     @PostMapping("/users/{userId}/tier")
-    @PreAuthorize("@apiSecurity.isSuperAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('USER_TIER_MANAGE', authentication)")
     public ResponseEntity<UserTierUpdateResponse> setUserTier(@PathVariable String userId, @RequestParam ApiKey.Tier tier) {
         User currentUser = accountService.requireCurrentUser("managing user tiers");
         return ResponseEntity.ok(userManagementService.setUserTier(currentUser.getId(), userId, tier));
     }
 
-    @PostMapping("/users/{userId}/role")
-    @PreAuthorize("@apiSecurity.isSuperAdmin(authentication)")
-    public ResponseEntity<Void> addUserRole(@PathVariable String userId, @RequestParam String role) {
-        User currentUser = accountService.requireCurrentUser("managing user roles");
-        userManagementService.addUserRole(currentUser.getId(), userId, role);
-        return ResponseEntity.ok().build();
+    @PutMapping("/users/{userId}/admin-permissions")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('USER_PERMISSION_MANAGE', authentication)")
+    public ResponseEntity<Set<AdminPermission>> setAdminPermissions(
+            @PathVariable String userId,
+            @RequestBody UpdateAdminPermissionsRequest requestPayload
+    ) {
+        User currentUser = accountService.requireCurrentUser("managing admin permissions");
+        return ResponseEntity.ok(userManagementService.setAdminPermissions(
+                currentUser.getId(),
+                userId,
+                requestPayload != null ? requestPayload.getPermissions() : Set.of()
+        ));
     }
 
-    @DeleteMapping("/users/{userId}/role")
-    @PreAuthorize("@apiSecurity.isSuperAdmin(authentication)")
-    public ResponseEntity<Void> removeUserRole(@PathVariable String userId, @RequestParam String role) {
-        User currentUser = accountService.requireCurrentUser("managing user roles");
-        userManagementService.removeUserRole(currentUser.getId(), userId, role);
-        return ResponseEntity.ok().build();
-    }
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Suspense, lazy, useRef } from 'react';
 import { Route, Routes, useNavigate, useLocation, Navigate, BrowserRouter } from 'react-router-dom';
-import { StaticRouter } from 'react-router-dom/server';
+import { StaticRouter } from 'react-router';
 import { HelmetProvider } from 'react-helmet-async';
 import { api } from '@/utils/api';
 
@@ -8,6 +8,8 @@ import { Navbar } from '@/modules/core/components/Navbar';
 import { Footer } from '@/modules/core/components/Footer';
 import { SEOHead } from '@/modules/core/components/SEOHead';
 import { Home } from '@/modules/home/views/Home';
+import { Browse } from '@/modules/discovery/views/Browse';
+import { ProjectDetails } from '@/modules/project/views/ProjectDetails';
 
 import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBoundary } from '@/components/ui/error/ErrorBoundary';
@@ -20,6 +22,7 @@ import { ToastProvider } from '@/components/ui/Toast';
 import { MobileProvider } from '@/context/MobileContext';
 import type { User } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
+import { STATUS_PAGE_URL } from '@/utils/status';
 import type { Classification } from '@/data/categories';
 import { normalizeUser } from '@/utils/users';
 import { clearPendingSignInMethod, completeSignInMethod } from '@/modules/auth/api/authClient';
@@ -28,9 +31,6 @@ const StatusModal = lazy(() => import('@/components/ui/StatusModal').then((modul
 const Onboarding = lazy(() => import('@/modules/user/components/Onboarding').then((module) => ({ default: module.Onboarding })));
 const TermsOfService = lazy(() => import('@/modules/core/views/TermsOfService').then((module) => ({ default: module.TermsOfService })));
 const PrivacyPolicy = lazy(() => import('@/modules/core/views/PrivacyPolicy').then((module) => ({ default: module.PrivacyPolicy })));
-const Status = lazy(() => import('@/modules/core/views/Status').then((module) => ({ default: module.Status })));
-const Browse = lazy(() => import('@/modules/discovery/views/Browse').then((module) => ({ default: module.Browse })));
-const ProjectDetails = lazy(() => import('@/modules/project/views/ProjectDetails').then((module) => ({ default: module.ProjectDetails })));
 const UserProfile = lazy(() => import('@/modules/user/views/UserProfile').then((module) => ({ default: module.UserProfile })));
 const Dashboard = lazy(() => import('@/modules/user/views/Dashboard').then((module) => ({ default: module.Dashboard })));
 const VerifyEmail = lazy(() => import('@/modules/auth/views/VerifyEmail').then((module) => ({ default: module.VerifyEmail })));
@@ -45,6 +45,31 @@ const NewsIndex = lazy(() => import('@/modules/news/views/NewsIndex').then((modu
 const NewsArticle = lazy(() => import('@/modules/news/views/NewsArticle').then((module) => ({ default: module.NewsArticle })));
 
 const RouteLoading = () => <div className="p-20 flex justify-center"><Spinner /></div>;
+
+const StatusRedirect = () => {
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            window.location.replace(STATUS_PAGE_URL);
+        }
+    }, []);
+
+    return (
+        <main className="min-h-[60vh] flex items-center justify-center bg-slate-50 px-6 dark:bg-modtale-dark">
+            <div className="max-w-md rounded-lg border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-white/10 dark:bg-slate-900">
+                <h1 className="text-xl font-black text-slate-950 dark:text-white">Opening Modtale Status</h1>
+                <p className="mt-2 text-sm font-medium leading-6 text-slate-500 dark:text-slate-400">
+                    Redirecting to {STATUS_PAGE_URL}.
+                </p>
+                <a
+                    href={STATUS_PAGE_URL}
+                    className="mt-5 inline-flex h-10 items-center justify-center rounded-lg bg-modtale-accent px-4 text-sm font-bold text-white transition hover:bg-blue-600"
+                >
+                    Open Status
+                </a>
+            </div>
+        </main>
+    );
+};
 
 const hasLikelyAuthCookie = () => {
     if (typeof document === 'undefined') return false;
@@ -214,7 +239,7 @@ const AppContent: React.FC = () => {
 
     return (
         <NotificationProvider userId={user?.id}>
-            <div className={`min-h-screen bg-white dark:bg-modtale-dark text-slate-900 dark:text-slate-300 font-sans flex flex-col`}>
+            <div className={`min-h-screen bg-slate-50 dark:bg-modtale-dark text-slate-900 dark:text-slate-300 font-sans flex flex-col`}>
                 <ScrollToTop /> <SEOHead />
 
                 <Suspense fallback={null}>
@@ -291,11 +316,12 @@ const AppContent: React.FC = () => {
 
                                     {['/project/:id', '/mod/:id', '/modpack/:id', '/world/:id'].map(path => (
                                         <React.Fragment key={path}>
-                                            <Route path={path} element={renderProjectDetail()} />
-                                            <Route path={`${path}/download`} element={renderProjectDetail()} />
-                                            <Route path={`${path}/changelog`} element={renderProjectDetail()} />
-                                            <Route path={`${path}/gallery`} element={renderProjectDetail()} />
-                                            <Route path={`${path}/wiki/*`} element={renderProjectDetail()} />
+                                            <Route path={path} element={renderProjectDetail()}>
+                                                <Route path="download" element={null} />
+                                                <Route path="changelog" element={null} />
+                                                <Route path="gallery" element={null} />
+                                                <Route path="wiki/*" element={null} />
+                                            </Route>
                                             <Route path={`${path}/edit`} element={
                                                 loadingAuth ? <RouteLoading /> :
                                                     user ? <ProjectEditorView currentUser={user} onShowStatus={onShowStatus} /> :
@@ -319,7 +345,7 @@ const AppContent: React.FC = () => {
 
                                     <Route path="/terms" element={<TermsOfService />} />
                                     <Route path="/privacy" element={<PrivacyPolicy />} />
-                                    <Route path="/status" element={<Status />} />
+                                    <Route path="/status" element={<StatusRedirect />} />
 
                                     <Route path="/api-docs" element={<ApiDocs />} />
                                     <Route path="/api-docs/swagger" element={<SwaggerDocs />} />

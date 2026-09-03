@@ -4,6 +4,7 @@ import {
     Filter,
     Tag,
     ChevronDown,
+    ChevronRight,
     Check,
     X,
     Search,
@@ -11,75 +12,18 @@ import {
     RotateCcw,
     Calendar as CalendarIcon,
     Download,
+    Scale,
     LayoutGrid,
     List,
-    AlignJustify,
-    ChevronLeft,
-    ChevronRight
+    AlignJustify
 } from 'lucide-react';
 import { GLOBAL_TAGS } from '@/data/categories';
 import { projectClient } from '@/modules/project/api/projectClient';
-import { compareSemVer } from '@/utils/modHelpers';
+import { buildVersionGroups, parseSelectedVersions, type VersionGroup } from '@/utils/modHelpers';
 import { DropdownSelect } from '@/components/ui/DropdownSelect';
+import { CalendarWidget } from '@/components/ui/CalendarWidget';
 import { SortDropdown } from './SortDropdown';
 import { BROWSE_ITEMS_PER_PAGE_OPTIONS, type BrowseViewStyle } from '../preferences';
-
-const CalendarWidget = ({ selectedDate, onSelect }: { selectedDate: Date | null, onSelect: (date: Date) => void }) => {
-    const [viewDate, setViewDate] = useState(selectedDate || new Date());
-    const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
-    const getFirstDay = (year: number, month: number) => new Date(year, month, 1).getDay();
-    const year = viewDate.getFullYear();
-    const month = viewDate.getMonth();
-    const daysInMonth = getDaysInMonth(year, month);
-    const startDay = getFirstDay(year, month);
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    const days = [];
-    for (let i = 0; i < startDay; i++) days.push(null);
-    for (let i = 1; i <= daysInMonth; i++) days.push(i);
-    const changeMonth = (delta: number) => { setViewDate(new Date(year, month + delta, 1)); };
-    const isSelected = (d: number) => { return selectedDate && selectedDate.getDate() === d && selectedDate.getMonth() === month && selectedDate.getFullYear() === year; };
-    const isDisabled = (d: number) => { const checkDate = new Date(year, month, d); return checkDate > today; };
-
-    return (
-        <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-white/10 animate-in fade-in zoom-in-95 duration-200 shadow-sm">
-            <div className="flex justify-between items-center mb-3">
-                <button type="button" onClick={() => changeMonth(-1)} aria-label="Previous month" className="p-1 hover:bg-slate-200 dark:hover:bg-white/[0.05] rounded-full transition-colors flex items-center justify-center"><ChevronLeft className="w-4 h-4 text-slate-500" /></button>
-                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{viewDate.toLocaleString('default', { month: 'long', year: 'numeric' })}</span>
-                <button type="button" onClick={() => changeMonth(1)} disabled={viewDate.getMonth() === today.getMonth() && viewDate.getFullYear() === today.getFullYear()} aria-label="Next month" className="p-1 hover:bg-slate-200 dark:hover:bg-white/[0.05] rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center"><ChevronRight className="w-4 h-4 text-slate-500" /></button>
-            </div>
-            <div className="grid grid-cols-7 gap-1 text-center mb-2">{['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (<div key={d} className="text-[10px] font-bold text-slate-400 uppercase">{d}</div>))}</div>
-            <div className="grid grid-cols-7 gap-1">{days.map((d, i) => (d ? (<button type="button" key={i} disabled={isDisabled(d)} onClick={() => !isDisabled(d) && onSelect(new Date(year, month, d))} aria-label={new Date(year, month, d).toDateString()} className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-medium transition-all ${isDisabled(d) ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40' : isSelected(d) ? 'bg-modtale-accent text-white shadow-md shadow-modtale-accent/30' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/[0.05]'}`}>{d}</button>) : <div key={i} />))}</div>
-        </div>
-    );
-};
-
-const parseSelectedVersions = (value: string) => {
-    if (!value || value === 'Any') return [];
-    return value.split(',').map(v => v.trim()).filter(v => v && v !== 'Any');
-};
-
-const getVersionRangeLabel = (version: string) => {
-    const [baseVersion] = version.split('-');
-    const parts = baseVersion.split('.');
-    if (parts.length < 2 || !parts[0] || !parts[1]) return null;
-    if (!/^\d+$/.test(parts[0]) || !/^\d+$/.test(parts[1])) return null;
-    return `${parts[0]}.${parts[1]}.x`;
-};
-
-const buildVersionGroups = (versions: string[]) => {
-    const groups = new Map<string, string[]>();
-    for (const version of versions) {
-        const label = getVersionRangeLabel(version);
-        const key = label || version;
-        groups.set(key, [...(groups.get(key) || []), version]);
-    }
-    return Array.from(groups, ([label, groupVersions]) => ({
-        label,
-        versions: groupVersions,
-        grouped: groupVersions.length > 1
-    }));
-};
 
 const VersionFilterDropdown = ({
     selectedVersions,
@@ -89,7 +33,7 @@ const VersionFilterDropdown = ({
 }: {
     selectedVersions: string[],
     versions: string[],
-    groups: { label: string, versions: string[], grouped: boolean }[],
+    groups: VersionGroup[],
     onChange: (val: string) => void
 }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -221,6 +165,8 @@ export interface BrowseFiltersProps {
     setMinFavorites: (v: number) => void;
     minDownloads: number;
     setMinDownloads: (v: number) => void;
+    openSourceOnly: boolean;
+    setOpenSourceOnly: (v: boolean) => void;
     filterDate: string | null;
     setFilterDate: (d: string | null) => void;
     setPage: (p: number) => void;
@@ -236,7 +182,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                                                                            categoryPills, pageTitle, totalItems, loading, sortBy, onSortChange,
                                                                            selectedTags, onToggleTag, onClearTags, onResetFilters,
                                                                            isFilterOpen, onToggleFilterMenu, searchTerm, onSearchChange,
-                                                                           selectedVersion, setSelectedVersion, minFavorites, setMinFavorites, minDownloads, setMinDownloads, filterDate, setFilterDate,
+                                                                           selectedVersion, setSelectedVersion, minFavorites, setMinFavorites, minDownloads, setMinDownloads, openSourceOnly, setOpenSourceOnly, filterDate, setFilterDate,
                                                                            isMobile, viewStyle, onViewStyleChange, itemsPerPage, onItemsPerPageChange, isScrolled
                                                                        }) => {
     const [isTagsOpen, setIsTagsOpen] = useState(false);
@@ -295,8 +241,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
         }).catch(async () => {
             try {
                 const versions = await projectClient.getProjectGameVersions();
-                const sorted = versions.sort((a: string, b: string) => compareSemVer(b, a));
-                setAllGameVersions(sorted);
+                setAllGameVersions(versions);
                 setPreReleaseVersionSet(new Set());
                 setHasLoadedGameVersions(true);
             } catch {
@@ -368,7 +313,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
         setSelectedDateObj(null);
         setShowCalendar(false);
     };
-    const displayFilterCount = [selectedVersions.length > 0, minFavorites > 0, minDownloads > 0, (filterDate !== null && !isDownloadSort)].filter(Boolean).length;
+    const displayFilterCount = [selectedVersions.length > 0, openSourceOnly, minFavorites > 0, minDownloads > 0, (filterDate !== null && !isDownloadSort)].filter(Boolean).length;
     const resultCountLabel = totalItems === 1 ? '1 result' : `${totalItems.toLocaleString()} results`;
 
     const filterMenuBody = (
@@ -393,6 +338,23 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                     )}
                 </div>
                 <VersionFilterDropdown selectedVersions={selectedVersions} versions={visibleGameVersions} groups={gameVersionGroups} onChange={setSelectedVersion} />
+            </div>
+            <div>
+                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">License</label>
+                <button
+                    type="button"
+                    aria-pressed={openSourceOnly}
+                    onClick={() => setOpenSourceOnly(!openSourceOnly)}
+                    className={`w-full flex items-center justify-between rounded-xl border px-3 py-2 text-xs font-bold transition-colors shadow-sm ${openSourceOnly ? 'bg-modtale-accent text-white border-transparent' : 'bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10'}`}
+                >
+                    <span className="flex items-center gap-2">
+                        <span className={`w-4 h-4 rounded-[4px] border flex items-center justify-center ${openSourceOnly ? 'border-white/70 bg-white/20 text-white' : 'border-slate-300 dark:border-white/20 text-transparent'}`}>
+                            <Check className="w-3 h-3" />
+                        </span>
+                        <span>Open Source</span>
+                    </span>
+                    <Scale className="w-3.5 h-3.5 opacity-75" />
+                </button>
             </div>
             <div>
                 <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 block">Minimum Favorites</label>
@@ -449,12 +411,12 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 z-10 pointer-events-none group-focus-within:text-modtale-accent transition-colors" />
                     <input type="text" className="block w-full pl-9 pr-9 h-full rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-sm shadow-sm focus:ring-2 focus:ring-modtale-accent outline-none text-slate-900 dark:text-white relative z-0 transition-all duration-300" placeholder="Search projects..." value={searchTerm} onChange={(e) => onSearchChange(e.target.value)} />
                     {searchTerm && (
-                        <button type="button" onClick={() => onSearchChange('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 z-20"><X className="w-4 h-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors" /></button>
+                        <button type="button" aria-label="Clear search" onClick={() => onSearchChange('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 z-20"><X className="w-4 h-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors" /></button>
                     )}
                 </div>
                 <div className={`flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl items-center shadow-sm shrink-0 transition-all duration-300 overflow-hidden ${isScrolled && isMobile ? 'max-w-0 opacity-0 border-transparent p-0 m-0 h-10' : 'max-w-[200px] opacity-100 p-1 h-10'}`}>
                     {(['grid', 'list', 'compact'] as const).map(style => (
-                        <button key={style} type="button" onClick={() => onViewStyleChange(style)} className={`p-1.5 rounded-lg transition-colors ${viewStyle === style ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
+                        <button key={style} type="button" aria-label={`${style} view`} onClick={() => onViewStyleChange(style)} className={`p-1.5 rounded-lg transition-colors ${viewStyle === style ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
                             {style === 'grid' && <LayoutGrid className="w-4 h-4" />}
                             {style === 'list' && <List className="w-4 h-4" />}
                             {style === 'compact' && <AlignJustify className="w-4 h-4" />}
@@ -473,7 +435,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                     <div className="flex flex-wrap lg:flex-nowrap items-center justify-start lg:justify-end gap-2 w-full lg:w-auto shrink-0 mt-1 lg:mt-0">
                         <div className="hidden lg:flex bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-1 h-10 items-center shadow-sm shrink-0">
                             {(['grid', 'list', 'compact'] as const).map(style => (
-                                <button key={style} type="button" onClick={() => onViewStyleChange(style)} className={`p-1.5 rounded-lg transition-colors ${viewStyle === style ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
+                                <button key={style} type="button" aria-label={`${style} view`} onClick={() => onViewStyleChange(style)} className={`p-1.5 rounded-lg transition-colors ${viewStyle === style ? 'bg-modtale-accent text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5'}`}>
                                     {style === 'grid' && <LayoutGrid className="w-4 h-4" />}
                                     {style === 'list' && <List className="w-4 h-4" />}
                                     {style === 'compact' && <AlignJustify className="w-4 h-4" />}
