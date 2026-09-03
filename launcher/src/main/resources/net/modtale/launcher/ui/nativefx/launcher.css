@@ -7567,7 +7567,7 @@
 }
 
 .play-shell {
-    -fx-padding: 0 76 0 76;
+    -fx-padding: 0;
     -fx-alignment: center-left;
     -fx-spacing: 38px;
 }
@@ -7728,23 +7728,14 @@
 .play-sidebar-scroll {
     -fx-background: transparent;
     -fx-background-insets: 0;
-    -fx-background-radius: 18px;
-    -fx-border-radius: 18px;
-    -fx-border-width: 1px;
-    -fx-border-color: rgba(96, 165, 250, 0.18);
-    -fx-background-color: linear-gradient(to bottom right, rgba(15, 23, 42, 0.70), rgba(8, 13, 25, 0.90));
+    -fx-border-width: 0;
+    -fx-background-color: transparent;
     -fx-effect: none;
     -fx-padding: 0;
 }
 
-.play-sidebar-scroll:hover {
-    -fx-border-color: rgba(96, 165, 250, 0.34);
-    -fx-effect: none;
-}
-
 .play-sidebar-scroll > .viewport {
     -fx-background-color: transparent;
-    -fx-background-radius: 18px;
 }
 
 .play-sidebar-scroll .scroll-bar:vertical {
@@ -7793,7 +7784,16 @@
 .play-sidebar {
     -fx-padding: 16px 16px 18px 16px;
     -fx-spacing: 14px;
-    -fx-background-color: transparent;
+    -fx-background-radius: 18px;
+    -fx-border-radius: 18px;
+    -fx-border-width: 1px;
+    -fx-border-color: rgba(96, 165, 250, 0.18);
+    -fx-background-color: linear-gradient(to bottom right, rgba(15, 23, 42, 0.70), rgba(8, 13, 25, 0.90));
+    -fx-effect: none;
+}
+
+.play-sidebar:hover {
+    -fx-border-color: rgba(96, 165, 250, 0.34);
 }
 
 .play-sidebar-section {
