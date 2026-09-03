@@ -83,6 +83,8 @@ import net.modtale.launcher.model.project.ProjectPage;
 import net.modtale.launcher.model.project.ProjectSummary;
 import net.modtale.launcher.model.project.ProjectVersion;
 import net.modtale.launcher.model.project.ProjectVersionChangelog;
+import net.modtale.launcher.model.project.WikiBundle;
+import net.modtale.launcher.model.project.WikiBundle.WikiPage;
 import net.modtale.launcher.model.user.CreatorProfile;
 import net.modtale.launcher.model.user.CurrentUser;
 import net.modtale.launcher.model.user.UserSummary;
@@ -133,6 +135,7 @@ public final class ProjectPageController {
     private final Function<String, Boolean> favoriteResolver;
     private final Consumer<ProjectSummary> toggleFavorite;
     private final NativeMarkdownRenderer markdownRenderer;
+    private final NativeWikiView wikiView;
     private final NativeGalleryCarousel galleryCarousel;
     private final NativeCommentSection commentSection;
     private final NativeCreatorProfileView creatorProfileView;
@@ -163,6 +166,14 @@ public final class ProjectPageController {
     private ProjectPage currentCreatorProjects;
     private List<CreatorProfile> currentCreatorRelations = List.of();
     private String currentUrl;
+    private WikiBundle currentWikiBundle;
+    private final Map<String, WikiPage> wikiPageCache = new ConcurrentHashMap<>();
+    private final Set<String> pendingWikiPrefetches = ConcurrentHashMap.newKeySet();
+    private String currentWikiSlug;
+    private long wikiRequestId;
+    private boolean wikiMode;
+    private boolean wikiLoading;
+    private boolean wikiError;
     private long detailRequestId;
     private long changelogRequestId;
     private long creatorRequestId;
@@ -220,6 +231,7 @@ public final class ProjectPageController {
         this.toggleFavorite = toggleFavorite;
         this.galleryCarousel = new NativeGalleryCarousel(imageLoader, this::openUrlInBrowser);
         this.markdownRenderer = new NativeMarkdownRenderer(imageLoader, this::openUrlInBrowser);
+        this.wikiView = new NativeWikiView(markdownRenderer, this::openUrlInBrowser);
         this.shareModal = new NativeShareModal(this::overlayHost, message -> showBrowserError(message));
         this.reportModal = new NativeReportModal(this::overlayHost, apiClient, executor, toast);
         this.commentSection = new NativeCommentSection(
@@ -308,6 +320,7 @@ public final class ProjectPageController {
         showExperimentalChangelogs = false;
         resetCommentsState();
         resetGalleryState();
+        resetWikiState();
         clearCreatorState();
         currentProject = project;
         currentDetail = null;
@@ -333,6 +346,7 @@ public final class ProjectPageController {
         showExperimentalChangelogs = false;
         resetCommentsState();
         resetGalleryState();
+        resetWikiState();
         clearCreatorState();
         currentProject = summaryFromDetail(detail);
         currentDetail = detail;
@@ -356,6 +370,7 @@ public final class ProjectPageController {
         showExperimentalChangelogs = false;
         resetCommentsState();
         resetGalleryState();
+        resetWikiState();
         currentProject = null;
         currentDetail = null;
         currentGameVersionCatalog = null;
@@ -566,6 +581,7 @@ public final class ProjectPageController {
                     teamUserProfiles = payload.teamProfiles();
                     fetchCommentsForCurrentProject();
                     renderProject(false);
+                    prefetchWikiRoot();
                 }));
     }
 
@@ -593,6 +609,115 @@ public final class ProjectPageController {
         galleryLoading = false;
         currentGalleryImages = List.of();
         currentGalleryCaptions = Map.of();
+    }
+
+    private void resetWikiState() {
+        ++wikiRequestId;
+        wikiMode = false;
+        wikiLoading = false;
+        wikiError = false;
+        currentWikiBundle = null;
+        currentWikiSlug = null;
+        wikiPageCache.clear();
+        pendingWikiPrefetches.clear();
+    }
+
+    private void openWiki() {
+        if (!hasWiki(currentDetail)) return;
+        wikiMode = true;
+        wikiError = false;
+        if (currentWikiBundle != null) {
+            wikiLoading = false;
+            renderProject(false);
+            if (attachedScrollPane != null) attachedScrollPane.setVvalue(0);
+            return;
+        }
+        wikiLoading = true;
+        renderProject(false);
+        loadWikiPage(null);
+    }
+
+    private void closeWiki() {
+        ++wikiRequestId;
+        wikiMode = false;
+        wikiLoading = false;
+        wikiError = false;
+        renderProject(false);
+        if (attachedScrollPane != null) attachedScrollPane.setVvalue(0);
+    }
+
+    private void loadWikiPage(String requestedSlug) {
+        String projectKey = currentDetail == null ? null : currentDetail.routeKey();
+        if (isBlank(projectKey)) return;
+        String normalizedSlug = isBlank(requestedSlug) ? null : requestedSlug.trim();
+        if (normalizedSlug != null && wikiPageCache.containsKey(normalizedSlug) && currentWikiBundle != null) {
+            WikiPage page = wikiPageCache.get(normalizedSlug);
+            currentWikiBundle = new WikiBundle(
+                    currentWikiBundle.project(), currentWikiBundle.metadata(), pageNode(page), normalizedSlug);
+            currentWikiSlug = normalizedSlug;
+            wikiLoading = false;
+            wikiError = false;
+            renderProject(false);
+            return;
+        }
+        long requestId = ++wikiRequestId;
+        wikiLoading = true;
+        wikiError = false;
+        renderProject(false);
+        CompletableFuture.supplyAsync(() -> apiClient.getWikiBundle(projectKey, normalizedSlug), executor)
+                .whenComplete((bundle, error) -> Platform.runLater(() -> {
+                    if (requestId != wikiRequestId || !wikiMode) return;
+                    wikiLoading = false;
+                    if (error != null || bundle == null) {
+                        wikiError = true;
+                        renderProject(false);
+                        return;
+                    }
+                    wikiError = false;
+                    currentWikiBundle = bundle;
+                    currentWikiSlug = first(bundle.pageSlug(), normalizedSlug, bundle.indexSlug());
+                    if (!isBlank(currentWikiSlug)) wikiPageCache.put(currentWikiSlug, bundle.content());
+                    renderProject(false);
+                    if (attachedScrollPane != null) attachedScrollPane.setVvalue(0);
+                }));
+    }
+
+    private void prefetchWikiPage(String slug) {
+        String projectKey = currentDetail == null ? null : currentDetail.routeKey();
+        if (isBlank(projectKey) || isBlank(slug) || wikiPageCache.containsKey(slug)
+                || !pendingWikiPrefetches.add(slug)) return;
+        CompletableFuture.supplyAsync(() -> apiClient.getWikiBundle(projectKey, slug), executor)
+                .whenComplete((bundle, error) -> Platform.runLater(() -> {
+                    pendingWikiPrefetches.remove(slug);
+                    if (wikiMode && currentDetail != null && projectKey.equals(currentDetail.routeKey())
+                            && error == null && bundle != null && !isBlank(bundle.pageSlug())) {
+                        wikiPageCache.put(bundle.pageSlug(), bundle.content());
+                        renderProject(false);
+                    }
+                }));
+    }
+
+    private void prefetchWikiRoot() {
+        String projectKey = currentDetail == null ? null : currentDetail.routeKey();
+        String pendingKey = "<root>";
+        if (!hasWiki(currentDetail) || isBlank(projectKey) || currentWikiBundle != null
+                || !pendingWikiPrefetches.add(pendingKey)) return;
+        CompletableFuture.supplyAsync(() -> apiClient.getWikiBundle(projectKey, null), executor)
+                .whenComplete((bundle, error) -> Platform.runLater(() -> {
+                    pendingWikiPrefetches.remove(pendingKey);
+                    if (currentDetail == null || !projectKey.equals(currentDetail.routeKey())
+                            || error != null || bundle == null) return;
+                    currentWikiBundle = bundle;
+                    currentWikiSlug = first(bundle.pageSlug(), bundle.indexSlug());
+                    if (!isBlank(currentWikiSlug)) wikiPageCache.put(currentWikiSlug, bundle.content());
+                }));
+    }
+
+    private static com.fasterxml.jackson.databind.JsonNode pageNode(WikiPage page) {
+        com.fasterxml.jackson.databind.node.ObjectNode node = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
+        if (page != null && page.title() != null) node.put("title", page.title());
+        if (page != null && page.content() != null) node.put("content", page.content());
+        return node;
     }
 
     private void fetchGalleryForCurrentProject() {
@@ -1320,6 +1445,7 @@ public final class ProjectPageController {
     }
 
     private Node body(ProjectSummary summary, ProjectDetail detail) {
+        if (wikiMode) return wikiBody(detail);
         if (compactLayout) {
             VBox body = new VBox(0);
             body.getStyleClass().addAll("project-detail-body", "project-detail-body-compact");
@@ -1350,6 +1476,34 @@ public final class ProjectPageController {
                 main.layoutBoundsProperty(),
                 sidebar.layoutBoundsProperty()
         ));
+        body.prefHeightProperty().bind(body.minHeightProperty());
+        return body;
+    }
+
+    private Node wikiBody(ProjectDetail detail) {
+        VBox main = wikiView.main(currentWikiBundle, wikiLoading, wikiError, detail, currentWikiSlug);
+        VBox sidebar = wikiView.sidebar(
+                currentWikiBundle,
+                currentWikiSlug,
+                wikiPageCache,
+                this::loadWikiPage,
+                this::prefetchWikiPage,
+                this::closeWiki,
+                compactLayout
+        );
+        if (compactLayout) {
+            VBox body = new VBox(0, sidebar, main);
+            body.getStyleClass().addAll("project-detail-body", "project-detail-body-compact", "project-wiki-body");
+            main.getStyleClass().add("project-detail-main-compact");
+            return body;
+        }
+        HBox body = new HBox(0, main, sidebar);
+        body.getStyleClass().addAll("project-detail-body", "project-wiki-body");
+        HBox.setHgrow(main, Priority.ALWAYS);
+        body.setFillHeight(false);
+        body.minHeightProperty().bind(Bindings.createDoubleBinding(
+                () -> Math.max(500, Math.max(main.getLayoutBounds().getHeight(), sidebar.getLayoutBounds().getHeight())),
+                main.layoutBoundsProperty(), sidebar.layoutBoundsProperty()));
         body.prefHeightProperty().bind(body.minHeightProperty());
         return body;
     }
@@ -2129,7 +2283,9 @@ public final class ProjectPageController {
     private List<Button> compactActionButtons(ProjectDetail detail) {
         List<Button> buttons = new ArrayList<>();
         if (hasWiki(detail)) {
-            buttons.add(actionButton("Wiki", LauncherIcons.Glyph.BOOK_OPEN, projectUrl() + "/wiki", true));
+            Button wiki = actionButton("Wiki", LauncherIcons.Glyph.BOOK_OPEN, this::openWiki, true);
+            if (wikiMode) wiki.getStyleClass().add("active");
+            buttons.add(wiki);
         }
         if (hasGallery() && !hasInlineGalleryCarousel(detail)) {
             buttons.add(actionButton("Gallery", LauncherIcons.Glyph.IMAGE, () -> showGalleryModal(0), true));

@@ -3,6 +3,7 @@ package net.modtale.launcher.ui.project;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.lang.reflect.Method;
 import java.lang.reflect.Field;
 import java.awt.image.BufferedImage;
@@ -36,6 +37,7 @@ import net.modtale.launcher.model.project.ProjectDetail;
 import net.modtale.launcher.model.project.ProjectPage;
 import net.modtale.launcher.model.project.ProjectSummary;
 import net.modtale.launcher.model.project.ProjectVersion;
+import net.modtale.launcher.model.project.WikiBundle;
 import net.modtale.launcher.model.user.CreatorProfile;
 import net.modtale.launcher.model.user.ProfileBadge;
 import net.modtale.launcher.ui.browse.card.ProjectCardFactory;
@@ -82,6 +84,8 @@ class LauncherUiPerformanceProfileTest {
         callOnFx(() -> {
             snapshot(buildProjectPageNode(1440, 1400, false), 1440, 1400, directory.resolve("launcher-project-desktop.png"));
             snapshot(buildProjectPageNode(760, 1800, true), 760, 1800, directory.resolve("launcher-project-compact.png"));
+            snapshot(buildProjectPageNode(1440, 1400, false, true), 1440, 1400, directory.resolve("launcher-wiki-desktop.png"));
+            snapshot(buildProjectPageNode(760, 1800, true, true), 760, 1800, directory.resolve("launcher-wiki-compact.png"));
             snapshot(buildBrowsePageNode(1440, 900, ProjectCardViewStyle.GRID), 1440, 900,
                     directory.resolve("launcher-browse-grid.png"));
             snapshot(buildBrowsePageNode(980, 900, ProjectCardViewStyle.COMPACT), 980, 900,
@@ -191,6 +195,10 @@ class LauncherUiPerformanceProfileTest {
     }
 
     private Node buildProjectPageNode(double width, double height, boolean compact) throws Exception {
+        return buildProjectPageNode(width, height, compact, false);
+    }
+
+    private Node buildProjectPageNode(double width, double height, boolean compact, boolean wiki) throws Exception {
         ProjectPageController controller = new ProjectPageController(
                 new ModtaleApiClient("http://localhost:1"),
                 DIRECT_EXECUTOR,
@@ -221,6 +229,41 @@ class LauncherUiPerformanceProfileTest {
         Field compactLayout = ProjectPageController.class.getDeclaredField("compactLayout");
         compactLayout.setAccessible(true);
         compactLayout.setBoolean(controller, compact);
+        if (wiki) {
+            WikiBundle bundle = new ObjectMapper().readValue("""
+                    {
+                      "metadata": {"mod": {
+                        "id": "levelingcore",
+                        "name": "LevelingCore",
+                        "index": {"slug": "home-1"},
+                        "pages": [
+                          {"id":"home", "slug":"home-1", "title":"Home"},
+                          {"id":"guides", "slug":"guides", "title":"Guides", "children":[
+                            {"id":"install", "slug":"guides/install", "title":"Installation"},
+                            {"id":"configuration", "slug":"guides/configuration", "title":"Configuration"}
+                          ]},
+                          {"id":"reference", "slug":"reference", "title":"Reference", "children":[
+                            {"id":"commands", "slug":"reference/commands", "title":"Commands"},
+                            {"id":"permissions", "slug":"reference/permissions", "title":"Permissions"}
+                          ]}
+                        ]
+                      }},
+                      "page": {
+                        "title":"Getting Started",
+                        "content":"Welcome to **LevelingCore**. This wiki covers installation, configuration, and commands.\\n\\n## Quick start\\n\\n1. Download the latest release.\\n2. Place it in your `mods` folder.\\n3. Restart Hytale.\\n\\n```json\\n{ \\"enabled\\": true, \\"maxLevel\\": 100 }\\n```\\n\\n> Changes are applied when the server restarts."
+                      },
+                      "pageSlug":"home-1"
+                    }
+                    """, WikiBundle.class);
+            setField(controller, "currentWikiBundle", bundle);
+            setField(controller, "currentWikiSlug", "home-1");
+            setField(controller, "wikiMode", true);
+            Field cache = ProjectPageController.class.getDeclaredField("wikiPageCache");
+            cache.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Map<String, WikiBundle.WikiPage> pages = (Map<String, WikiBundle.WikiPage>) cache.get(controller);
+            pages.put("home-1", bundle.content());
+        }
         Method projectPage = ProjectPageController.class.getDeclaredMethod(
                 "projectPage",
                 ProjectSummary.class,
@@ -233,6 +276,12 @@ class LauncherUiPerformanceProfileTest {
             region.resize(width, Math.max(height, region.prefHeight(width)));
         }
         return page;
+    }
+
+    private static void setField(Object target, String name, Object value) throws Exception {
+        Field field = target.getClass().getDeclaredField(name);
+        field.setAccessible(true);
+        field.set(target, value);
     }
 
     private Node buildBrowsePageNode(double width, double height, ProjectCardViewStyle style) {
@@ -460,8 +509,8 @@ class LauncherUiPerformanceProfileTest {
                 List.of(),
                 Map.of(),
                 true,
-                false,
-                "",
+                true,
+                "levelingcore",
                 List.of(
                         version(1),
                         new ProjectVersion("version-2", "1.2.0", List.of("0.6.1", "0.6.0", "0.5.4", "0.5.3"),

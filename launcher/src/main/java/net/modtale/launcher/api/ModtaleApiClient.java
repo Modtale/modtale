@@ -24,6 +24,7 @@ import net.modtale.launcher.model.project.ProjectPage;
 import net.modtale.launcher.model.project.ProjectVersion;
 import net.modtale.launcher.model.project.ProjectVersionChangelog;
 import net.modtale.launcher.model.project.VersionDependenciesView;
+import net.modtale.launcher.model.project.WikiBundle;
 import net.modtale.launcher.model.sync.LauncherSettingsSnapshot;
 import net.modtale.launcher.model.user.CreatorProfile;
 import net.modtale.launcher.model.user.CurrentUser;
@@ -178,6 +179,11 @@ public class ModtaleApiClient {
 
     public ProjectDetail getProject(String idOrSlug) {
         return get("/projects/" + encodePath(idOrSlug), ProjectDetail.class);
+    }
+
+    public WikiBundle getWikiBundle(String idOrSlug, String pageSlug) {
+        String suffix = wikiPath(pageSlug);
+        return get("/wiki/" + encodePath(idOrSlug) + "/_bundle" + suffix, WikiBundle.class);
     }
 
     public ProjectGallery getProjectGallery(String idOrSlug) {
@@ -452,6 +458,17 @@ public class ModtaleApiClient {
 
     private <T> T get(String pathAndQuery, Class<T> type) {
         return transport.get(apiUri(pathAndQuery), type, ApiCachePolicy.ttlFor(pathAndQuery));
+    }
+
+    static String wikiPath(String pageSlug) {
+        if (pageSlug == null || pageSlug.isBlank()) return "";
+        String normalized = pageSlug.trim().replace('\\', '/');
+        if (normalized.startsWith("/") || normalized.contains("..") || normalized.contains("//")) {
+            throw new IllegalArgumentException("Invalid wiki page path.");
+        }
+        return "/" + java.util.Arrays.stream(normalized.split("/"))
+                .map(ModtaleApiClient::encodePath)
+                .collect(java.util.stream.Collectors.joining("/"));
     }
 
     private <T> T get(String pathAndQuery, TypeReference<T> type) {
