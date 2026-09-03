@@ -1073,11 +1073,31 @@
     -fx-background-insets: 0;
 }
 
-.content-scroll .scroll-bar:vertical,
+.content-scroll .scroll-bar:vertical {
+    -fx-pref-width: 10px;
+    -fx-min-width: 10px;
+    -fx-max-width: 10px;
+    -fx-opacity: 1;
+    -fx-padding: 0;
+}
+
+.content-scroll .scroll-bar:vertical .track {
+    -fx-background-color: transparent;
+}
+
+.content-scroll .scroll-bar:vertical .thumb {
+    -fx-background-color: linear-gradient(to bottom, rgba(125, 211, 252, 0.40), rgba(71, 85, 105, 0.95));
+    -fx-background-insets: 2px;
+    -fx-background-radius: 999px;
+    -fx-min-height: 32px;
+}
+
+.content-scroll .scroll-bar:vertical .thumb:hover {
+    -fx-background-color: linear-gradient(to bottom, rgba(186, 230, 253, 0.42), rgba(100, 116, 139, 0.98));
+}
+
 .content-scroll .scroll-bar:horizontal {
-    -fx-pref-width: 0;
     -fx-pref-height: 0;
-    -fx-max-width: 0;
     -fx-max-height: 0;
     -fx-opacity: 0;
     -fx-padding: 0;
@@ -6767,20 +6787,6 @@
     -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.28), 18, 0.12, 0, 7);
 }
 
-.app-root:scrolling .project-card,
-.app-root:scrolling .project-card:hover {
-    -fx-effect: dropshadow(one-pass-box, rgba(2, 6, 23, 0.18), 8, 0.08, 0, 3);
-}
-
-.app-root:scrolling .project-hover-outline {
-    -fx-opacity: 0;
-}
-
-.app-root:scrolling .project-icon,
-.app-root:scrolling .classification-badge {
-    -fx-effect: none;
-}
-
 .project-card-shell {
     -fx-cursor: hand;
 }
@@ -6955,20 +6961,6 @@
 .project-card:hover .compact-title .text {
     -fx-fill: #60a5fa;
     -fx-stroke: #60a5fa;
-}
-
-.app-root:scrolling .project-card:hover .project-title,
-.app-root:scrolling .project-card-shell:hover .project-title,
-.app-root:scrolling .project-card:hover .compact-title {
-    -fx-text-fill: #ffffff;
-    -fx-effect: dropshadow(one-pass-box, rgba(255, 255, 255, 0.72), 1, 1, 0.5, 0);
-}
-
-.app-root:scrolling .project-card:hover .project-title .text,
-.app-root:scrolling .project-card-shell:hover .project-title .text,
-.app-root:scrolling .project-card:hover .compact-title .text {
-    -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
 }
 
 .byline {

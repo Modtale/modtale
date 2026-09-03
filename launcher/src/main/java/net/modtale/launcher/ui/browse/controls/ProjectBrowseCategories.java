@@ -122,7 +122,7 @@ public final class ProjectBrowseCategories {
         categoryScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         categoryScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         categoryScroll.setFitToHeight(true);
-        categoryScroll.setPannable(true);
+        categoryScroll.setPannable(false);
         categoryScroll.setMinWidth(0);
         categoryScroll.setPrefHeight(48);
         scrollSupport.configure(categoryScroll, true);

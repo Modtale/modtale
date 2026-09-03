@@ -32,7 +32,7 @@ import net.modtale.launcher.cache.LauncherCachePaths;
 public final class CachedImageLoader {
 
     private static final String IMAGE_KEY_PROPERTY = CachedImageLoader.class.getName() + ".imageKey";
-    private static final int MAX_MEMORY_IMAGES = 384;
+    private static final int MAX_MEMORY_IMAGES = 160;
 
     private final Function<String, String> assetResolver;
     private final Executor executor;

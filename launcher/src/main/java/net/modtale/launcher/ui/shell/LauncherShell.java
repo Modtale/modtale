@@ -881,7 +881,7 @@ public final class LauncherShell {
         scrollPane.setFitToWidth(true);
         scrollPane.setFitToHeight(true);
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        scrollPane.setPannable(true);
+        scrollPane.setPannable(false);
         scrollSupport.configure(scrollPane, false);
         contentBody = new VBox(viewDeck);
         contentBody.getStyleClass().add("body");

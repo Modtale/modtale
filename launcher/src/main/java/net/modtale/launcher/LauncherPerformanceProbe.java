@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import javafx.animation.AnimationTimer;
@@ -59,8 +60,15 @@ public final class LauncherPerformanceProbe {
     }
 
     private static double targetFrameMillis() {
-        String configured = System.getProperty(PERF_REFRESH_RATE_PROPERTY,
-                System.getProperty(LauncherRenderSettings.REFRESH_RATE_OVERRIDE_PROPERTY));
+        return targetFrameMillis(System.getProperties());
+    }
+
+    static double targetFrameMillis(Properties properties) {
+        String configured = firstNonBlank(
+                properties.getProperty(PERF_REFRESH_RATE_PROPERTY),
+                properties.getProperty(LauncherRenderSettings.REFRESH_RATE_OVERRIDE_PROPERTY),
+                properties.getProperty(LauncherRenderSettings.JAVAFX_PULSE_PROPERTY)
+        );
         if (configured != null && !configured.isBlank()) {
             try {
                 double refreshRate = Double.parseDouble(configured.trim());
@@ -72,6 +80,15 @@ public final class LauncherPerformanceProbe {
             }
         }
         return 1000.0 / DEFAULT_REFRESH_RATE;
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private static final class FrameTimer extends AnimationTimer {

@@ -25,7 +25,7 @@ import net.modtale.launcher.ui.browse.card.ProjectCardViewStyle;
 
 public final class ProjectBrowserRenderer {
 
-    private static final int MAX_CACHED_PROJECT_CARDS = 256;
+    private static final int MAX_CACHED_PROJECT_CARDS = 96;
     private static final int LIST_PAGE_SIZE = 12;
     private static final int CARD_PAGE_SIZE = 12;
     private static final int COMPACT_PAGE_SIZE = 45;
