@@ -8268,7 +8268,7 @@
 
 .library-header {
     -fx-alignment: center-left;
-    -fx-padding: 0 0 18px 0;
+    -fx-padding: 0 0 12px 0;
     -fx-border-width: 0 0 1px 0;
     -fx-border-color: rgba(255, 255, 255, 0.10);
 }
@@ -8488,7 +8488,12 @@
 }
 
 .library-world-detail-hero {
-    -fx-padding: 12px 13px;
+    -fx-padding: 0 0 12px 0;
+    -fx-background-color: transparent;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
+    -fx-border-width: 0 0 1px 0;
+    -fx-border-color: rgba(255, 255, 255, 0.07);
 }
 
 .library-actions {
@@ -8496,7 +8501,30 @@
 }
 
 .library-actions .btn {
-    -fx-min-width: 86px;
+    -fx-min-height: 34px;
+    -fx-pref-height: 34px;
+    -fx-min-width: 0;
+    -fx-padding: 0 12px;
+    -fx-font-size: 12px;
+    -fx-background-radius: 9px;
+    -fx-border-radius: 9px;
+    -fx-effect: null;
+}
+
+.library-header-actions {
+    -fx-alignment: center-right;
+}
+
+.library-compact-icon-action {
+    -fx-min-width: 34px;
+    -fx-pref-width: 34px;
+    -fx-max-width: 34px;
+    -fx-padding: 0;
+    -fx-content-display: graphic-only;
+}
+
+.library-compact-primary-action {
+    -fx-effect: null;
 }
 
 .library-world-project-actions {

@@ -5,7 +5,9 @@ import static net.modtale.launcher.ui.common.LauncherUi.secondaryButton;
 
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -41,7 +43,7 @@ final class LibraryShellView {
     }
 
     private Node header() {
-        HBox header = new HBox(16);
+        HBox header = new HBox(12);
         header.getStyleClass().add("library-header");
         VBox copy = new VBox(5);
         Label title = new Label("World Libraries");
@@ -51,12 +53,19 @@ final class LibraryShellView {
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         Button refreshButton = secondaryButton("Refresh");
+        refreshButton.getStyleClass().addAll("small", "library-compact-icon-action");
         refreshButton.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.REFRESH_CW, 15));
+        refreshButton.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+        refreshButton.setAccessibleText("Refresh library");
+        refreshButton.setTooltip(new Tooltip("Refresh library"));
         refreshButton.setOnAction(event -> refresh.run());
         Button updatesButton = primaryButton("Check Updates");
-        updatesButton.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.REFRESH_CW, 15));
+        updatesButton.getStyleClass().addAll("small", "library-compact-primary-action");
+        updatesButton.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 15));
         updatesButton.setOnAction(event -> checkUpdates.run());
-        header.getChildren().addAll(copy, spacer, refreshButton, updatesButton);
+        HBox actions = new HBox(8, refreshButton, updatesButton);
+        actions.getStyleClass().add("library-header-actions");
+        header.getChildren().addAll(copy, spacer, actions);
         return header;
     }
 
