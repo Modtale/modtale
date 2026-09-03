@@ -255,6 +255,19 @@ public interface ProjectRepository extends MongoRepository<Project, String>, Pro
     @Query(value = "{ 'status': { $in: ['PUBLISHED', 'ARCHIVED'] }, 'deletedAt': null }")
     List<Project> findAllPublished();
 
+    @Query(value = "{ 'status': 'PUBLISHED', 'deletedAt': null, 'versions.hash': { $in: ?0 } }")
+    List<Project> findPublishedByVersionHashes(List<String> hashes);
+
+    @Query(value = "{ 'status': 'PUBLISHED', 'deletedAt': null, 'versions.manifestId': { $in: ?0 } }")
+    List<Project> findPublishedByManifestIds(List<String> manifestIds);
+
+    @Query(value = "{ 'status': 'PUBLISHED', 'deletedAt': null, 'versions.curseForgeFingerprint': { $in: ?0 } }")
+    List<Project> findPublishedByCurseForgeFingerprints(List<Long> fingerprints);
+
+    @Query(value = "{ 'status': 'PUBLISHED', 'deletedAt': null }",
+            fields = "{ '_id': 1, 'slug': 1, 'title': 1, 'classification': 1, 'links': 1, 'repositoryUrl': 1, 'versions._id': 1, 'versions.versionNumber': 1, 'versions.curseForgeFingerprint': 1 }")
+    List<Project> findPublishedIdentityIndex();
+
     @Query(value = "{ 'status': 'PUBLISHED', 'deletedAt': null }", fields = "{ 'id': 1, 'title': 1, 'slug': 1, 'updatedAt': 1, 'classification': 1, 'author': 1, 'authorId': 1 }")
     List<Project> findAllForSitemap();
 

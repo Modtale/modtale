@@ -9,6 +9,9 @@ public class ProjectVersion {
     private String fileUrl;
     private String overrideFileUrl;
     private String hash;
+    private String manifestId;
+    private String manifestVersion;
+    private Long curseForgeFingerprint;
     private int downloadCount;
     private String releaseDate;
     private String changelog;
@@ -89,6 +92,15 @@ public class ProjectVersion {
 
     public String getHash() { return hash; }
     public void setHash(String hash) { this.hash = hash; }
+
+    public String getManifestId() { return manifestId; }
+    public void setManifestId(String manifestId) { this.manifestId = manifestId; }
+
+    public String getManifestVersion() { return manifestVersion; }
+    public void setManifestVersion(String manifestVersion) { this.manifestVersion = manifestVersion; }
+
+    public Long getCurseForgeFingerprint() { return curseForgeFingerprint; }
+    public void setCurseForgeFingerprint(Long curseForgeFingerprint) { this.curseForgeFingerprint = curseForgeFingerprint; }
 
     public int getDownloadCount() { return downloadCount; }
     public void setDownloadCount(int downloadCount) { this.downloadCount = downloadCount; }

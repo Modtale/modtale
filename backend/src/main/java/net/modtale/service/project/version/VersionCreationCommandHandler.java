@@ -129,6 +129,9 @@ public class VersionCreationCommandHandler {
         version.setChangelog(versionMutationOrchestrationService.sanitizeChangelog(changelog));
         version.setChannel(channel);
         version.setHash(preparedArtifact.fileHash());
+        version.setManifestId(preparedArtifact.manifestId());
+        version.setManifestVersion(preparedArtifact.manifestVersion());
+        version.setCurseForgeFingerprint(preparedArtifact.curseForgeFingerprint());
         version.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
         version.setDependencies(new ArrayList<>());
         version.setIncompatibleProjectIds(new ArrayList<>());
