@@ -55,9 +55,10 @@ class ArchiveInstallerTest {
     }
 
     @Test
-    void installsModpackArchiveByFlatteningExtractedFolderIntoModsDirectory() throws IOException {
+    void installsOnlyHytaleModFilesFromLegacyModpackArchive() throws IOException {
         Path archive = tempDir.resolve("modpack.zip");
         try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(archive))) {
+            add(zip, "Example Pack/modpack.json", "{\"formatVersion\":1,\"game\":\"hytale\",\"files\":[]}");
             add(zip, "Example Pack/mods/first.jar", "first");
             add(zip, "Example Pack/mods/nested/second.hymod", "second");
             add(zip, "Example Pack/readme.txt", "readme");
@@ -66,10 +67,10 @@ class ArchiveInstallerTest {
 
         List<Path> installed = new ArchiveInstaller().installModpackArchive(archive, mods);
 
-        assertEquals(3, installed.size());
+        assertEquals(2, installed.size());
         assertEquals("first", Files.readString(mods.resolve("first.jar")));
         assertEquals("second", Files.readString(mods.resolve("second.hymod")));
-        assertEquals("readme", Files.readString(mods.resolve("readme.txt")));
+        assertTrue(Files.notExists(mods.resolve("readme.txt")));
         assertTrue(Files.notExists(mods.resolve("Example Pack")));
         assertTrue(Files.notExists(mods.resolve("mods")));
     }
@@ -88,48 +89,50 @@ class ArchiveInstallerTest {
     }
 
     @Test
-    void installsVerifiedLockedPackAndAppliesClientOverrides() throws IOException {
+    void installsVerifiedLockedPackAndAppliesAllOverrides() throws IOException {
         Path archive = tempDir.resolve("locked-modpack.zip");
         String bundled = "bundled mod";
-        String common = "common settings";
-        String client = "client settings";
-        String server = "server settings";
+        String settings = "settings";
+        String preferences = "preferences";
+        String world = "world settings";
         String lock = """
                 {
                   "format":"modtale-lock",
                   "lockVersion":1,
+                  "game":"hytale",
                   "entries":[
                     {"distribution":"BUNDLED","path":"mods/bundled.jar","size":%d,"hashes":{"sha256":"%s"}},
                     {"distribution":"REFERENCE_ONLY","url":"https://example.com/provider-file"}
                   ],
                   "overrides":[
-                    {"path":"overrides/common/config/settings.json","environment":"COMMON","size":%d,"hashes":{"sha256":"%s"}},
-                    {"path":"overrides/client/config/settings.json","environment":"CLIENT","size":%d,"hashes":{"sha256":"%s"}},
-                    {"path":"overrides/server/server.properties","environment":"SERVER","size":%d,"hashes":{"sha256":"%s"}}
+                    {"path":"overrides/Mods/example/settings.json","size":%d,"hashes":{"sha256":"%s"}},
+                    {"path":"overrides/Mods/example/ui.toml","size":%d,"hashes":{"sha256":"%s"}},
+                    {"path":"overrides/Saves/example/config.json","size":%d,"hashes":{"sha256":"%s"}}
                   ]
                 }
                 """.formatted(
                 bundled.length(), sha256(bundled),
-                common.length(), sha256(common),
-                client.length(), sha256(client),
-                server.length(), sha256(server)
+                settings.length(), sha256(settings),
+                preferences.length(), sha256(preferences),
+                world.length(), sha256(world)
         );
         try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(archive))) {
             add(zip, "modtale.lock.json", lock);
             add(zip, "mods/bundled.jar", bundled);
-            add(zip, "overrides/common/config/settings.json", common);
-            add(zip, "overrides/client/config/settings.json", client);
-            add(zip, "overrides/server/server.properties", server);
+            add(zip, "overrides/Mods/example/settings.json", settings);
+            add(zip, "overrides/Mods/example/ui.toml", preferences);
+            add(zip, "overrides/Saves/example/config.json", world);
         }
         Path instance = tempDir.resolve("instance");
         Path mods = instance.resolve("mods");
 
-        List<Path> installed = new ArchiveInstaller().installModpackArchive(archive, mods, instance, "CLIENT");
+        List<Path> installed = new ArchiveInstaller().installModpackArchive(archive, mods, instance);
 
-        assertEquals(3, installed.size());
+        assertEquals(4, installed.size());
         assertEquals(bundled, Files.readString(mods.resolve("bundled.jar")));
-        assertEquals(client, Files.readString(instance.resolve("config/settings.json")));
-        assertTrue(Files.notExists(instance.resolve("server.properties")));
+        assertEquals(settings, Files.readString(instance.resolve("Mods/example/settings.json")));
+        assertEquals(preferences, Files.readString(instance.resolve("Mods/example/ui.toml")));
+        assertEquals(world, Files.readString(instance.resolve("Saves/example/config.json")));
         assertTrue(Files.notExists(mods.resolve("modtale.lock.json")));
     }
 
@@ -137,7 +140,7 @@ class ArchiveInstallerTest {
     void rejectsLockedPackWithInvalidChecksumBeforeInstallingAnything() throws IOException {
         Path archive = tempDir.resolve("tampered-modpack.zip");
         String lock = """
-                {"format":"modtale-lock","lockVersion":1,"entries":[
+                {"format":"modtale-lock","lockVersion":1,"game":"hytale","entries":[
                   {"distribution":"BUNDLED","path":"mods/bundled.jar","size":8,"hashes":{"sha256":"bad"}}
                 ],"overrides":[]}
                 """;
@@ -148,8 +151,29 @@ class ArchiveInstallerTest {
         Path mods = tempDir.resolve("instance/mods");
 
         assertThrows(IOException.class,
-                () -> new ArchiveInstaller().installModpackArchive(archive, mods, tempDir.resolve("instance"), "CLIENT"));
+                () -> new ArchiveInstaller().installModpackArchive(archive, mods, tempDir.resolve("instance")));
         assertTrue(Files.notExists(mods.resolve("bundled.jar")));
+    }
+
+    @Test
+    void rejectsNonHytaleLockedAndLegacyArchives() throws IOException {
+        Path locked = tempDir.resolve("foreign-locked.zip");
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(locked))) {
+            add(zip, "modtale.lock.json",
+                    "{\"format\":\"modtale-lock\",\"lockVersion\":1,\"game\":\"minecraft\",\"entries\":[]}");
+        }
+        Path legacy = tempDir.resolve("foreign-legacy.zip");
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(legacy))) {
+            add(zip, "modpack.json", "{\"formatVersion\":1,\"game\":\"minecraft\",\"files\":[]}");
+            add(zip, "mod.jar", "foreign");
+        }
+        Path mods = tempDir.resolve("instance/mods");
+
+        assertThrows(IOException.class,
+                () -> new ArchiveInstaller().installModpackArchive(locked, mods, tempDir.resolve("instance")));
+        assertThrows(IOException.class,
+                () -> new ArchiveInstaller().installModpackArchive(legacy, mods, tempDir.resolve("instance")));
+        assertTrue(Files.notExists(mods.resolve("mod.jar")));
     }
 
     @Test

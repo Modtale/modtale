@@ -17,12 +17,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
 import net.modtale.launcher.logging.LogSanitizer;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.modtale.launcher.logging.LauncherLog;
+import net.modtale.launcher.logging.LauncherLogger;
 
 final class ModtaleApiTransport {
 
-    private static final Logger LOG = LogManager.getLogger(ModtaleApiTransport.class);
+    private static final LauncherLogger LOG = LauncherLog.getLogger(ModtaleApiTransport.class);
     private static final String CSRF_HEADER_NAME = "X-XSRF-TOKEN";
 
     private final HttpClient httpClient;

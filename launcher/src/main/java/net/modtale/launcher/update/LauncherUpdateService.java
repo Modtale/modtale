@@ -24,12 +24,12 @@ import java.util.Optional;
 import net.modtale.launcher.api.ModtaleApiException;
 import net.modtale.launcher.logging.LogSanitizer;
 import net.modtale.launcher.settings.LauncherConfig;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.modtale.launcher.logging.LauncherLog;
+import net.modtale.launcher.logging.LauncherLogger;
 
 public class LauncherUpdateService {
 
-    private static final Logger LOG = LogManager.getLogger(LauncherUpdateService.class);
+    private static final LauncherLogger LOG = LauncherLog.getLogger(LauncherUpdateService.class);
     private static final String GITHUB_API_BASE_URL = "https://api.github.com";
 
     private final HttpClient httpClient;

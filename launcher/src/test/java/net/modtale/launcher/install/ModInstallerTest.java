@@ -1,7 +1,10 @@
 package net.modtale.launcher.install;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -13,6 +16,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.HexFormat;
+import java.security.MessageDigest;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.ZipEntry;
@@ -104,9 +109,9 @@ class ModInstallerTest {
         assertTrue(bundleQuery.get().contains("deps=dependency-project"));
         assertEquals("main", Files.readString(mods.resolve("main.jar")));
         assertEquals("dependency", Files.readString(mods.resolve("dependency.jar")));
-        assertEquals("readme", Files.readString(mods.resolve("readme.txt")));
+        assertTrue(Files.notExists(mods.resolve("readme.txt")));
         assertTrue(Files.notExists(mods.resolve("Generated Bundle")));
-        assertTrue(result.installedFiles().stream().anyMatch(path -> path.getFileName().toString().equals("readme.txt")));
+        assertEquals(2, result.installedFiles().size());
         assertEquals(InstalledProject.INSTALL_BUNDLE, result.installedProject().installType());
         assertEquals(List.of("dependency-project"), result.installedProject().dependencyProjectIds());
         assertEquals(1, result.installedProject().bundledProjects().size());
@@ -165,7 +170,7 @@ class ModInstallerTest {
     }
 
     @Test
-    void modpackInstallRequestsClientTargetAndDoesNotDirectDownloadCurseForgeFiles() throws IOException {
+    void modpackInstallInstallsExactCurseForgeFiles() throws IOException {
         AtomicReference<String> downloadQuery = new AtomicReference<>("");
         AtomicInteger curseForgeDownloads = new AtomicInteger();
         byte[] pack = zip(entry("mods/main.jar", "main"));
@@ -177,16 +182,21 @@ class ModInstallerTest {
                     """.formatted(serverBaseUrl()));
         });
         server.createContext("/files/pack.zip", exchange -> respondBytes(exchange, pack, "application/zip"));
+        server.createContext("/api/v1/projects/external/curseforge/1450386/files/8227810/download-url", exchange ->
+                respondJson(exchange, """
+                        {"downloadUrl":"%s/curseforge/file/123","fileName":"example.jar","fileSize":17,"hashes":{},"source":"CURSEFORGE"}
+                        """.formatted(serverBaseUrl())));
         server.createContext("/curseforge/file/123", exchange -> {
             curseForgeDownloads.incrementAndGet();
-            respond(exchange, 500, "Must not be fetched directly");
+            respondBytes(exchange, "curseforge-binary".getBytes(StandardCharsets.UTF_8), "application/java-archive");
         });
 
         ProjectDependency curseForge = new ProjectDependency(
-                "cf-reference", null, null, null, "REQUIRED", "CURSEFORGE", "example-mod",
-                serverBaseUrl() + "/curseforge/file/123", serverBaseUrl() + "/curseforge/file/123",
+                "cf-reference", null, null, null, "REQUIRED", "CURSEFORGE", "1450386",
+                "https://www.curseforge.com/hytale/mods/example-mod/files/8227810",
+                "https://www.curseforge.com/hytale/mods/example-mod/files/8227810",
                 "example.jar", null, true, null, "Example Mod", "PLUGIN", "example-mod",
-                false, false, "COMMON"
+                false, false
         );
         ProjectVersion version = version("pack-version", "1.0.0", curseForge);
         ProjectDetail project = new ProjectDetail(
@@ -205,10 +215,106 @@ class ModInstallerTest {
         ).installAndRecord(project, version, settings, "2026.1", List.of(curseForge));
 
         assertTrue(downloadQuery.get().contains("gameVersion=2026.1"));
-        assertTrue(downloadQuery.get().contains("target=CLIENT"));
-        assertEquals(0, curseForgeDownloads.get());
-        assertTrue(result.warnings().stream().anyMatch(warning -> warning.contains("CurseForge")));
+        assertFalse(downloadQuery.get().contains("target="));
+        assertEquals(1, curseForgeDownloads.get());
+        assertTrue(result.warnings().isEmpty());
         assertEquals("main", Files.readString(instance.resolve("mods/main.jar")));
+        assertEquals("curseforge-binary", Files.readString(instance.resolve("mods/example.jar")));
+    }
+
+    @Test
+    void curseForgeProjectDownloadsThroughProviderEndpointAndVerifiesArtifact() throws Exception {
+        byte[] artifact = "verified-curseforge-mod".getBytes(StandardCharsets.UTF_8);
+        String artifactSha1 = sha1(artifact);
+        startServer();
+        server.createContext("/api/v1/projects/external/curseforge/1450386/files/8227810/download-url", exchange ->
+                respondJson(exchange, """
+                        {"downloadUrl":"%s/files/SimpleCompost.jar","expiresIn":0,"fileName":"SimpleCompost.jar","fileSize":%d,"hashes":{"sha1":"%s"},"source":"CURSEFORGE"}
+                        """.formatted(serverBaseUrl(), artifact.length, artifactSha1)));
+        server.createContext("/files/SimpleCompost.jar", exchange ->
+                respondBytes(exchange, artifact, "application/java-archive"));
+        ProjectVersion version = new ProjectVersion("8227810", "1.2.0", List.of("2026.09"),
+                "https://www.curseforge.com/hytale/mods/simple-compost/files/8227810", 12,
+                "2026-09-01T00:00:00Z", null, List.of(), "RELEASE");
+        ProjectDetail project = new ProjectDetail("curseforge:1450386", "curseforge:1450386", "Simple Compost",
+                "Compost things", "Builder", "MOD", "2026-09-01T00:00:00Z", null, null,
+                List.of("Gameplay"), List.of(version));
+        LauncherSettings settings = new LauncherSettings();
+        Path mods = tempDir.resolve("mods");
+        settings.setHytaleModsPath(mods.toString());
+        settings.setGameVersion("2026.09");
+
+        InstallResult result = new ModInstaller(new ModtaleApiClient(apiBaseUrl()),
+                new SettingsStore(tempDir.resolve("settings.json")))
+                .installAndRecord(project, version, settings, "2026.09");
+
+        assertEquals("verified-curseforge-mod", Files.readString(mods.resolve("SimpleCompost.jar")));
+        assertEquals(InstalledProject.SOURCE_CURSEFORGE, result.installedProject().source());
+        assertEquals("8227810", result.installedProject().installedVersionId());
+    }
+
+    @Test
+    void curseForgeProjectRejectsTamperedArtifactBeforeInstallation() throws Exception {
+        byte[] artifact = "tampered".getBytes(StandardCharsets.UTF_8);
+        startServer();
+        server.createContext("/api/v1/projects/external/curseforge/1450386/files/8227810/download-url", exchange ->
+                respondJson(exchange, """
+                        {"downloadUrl":"%s/files/mod.jar","fileSize":%d,"hashes":{"sha1":"%s"},"source":"CURSEFORGE"}
+                        """.formatted(serverBaseUrl(), artifact.length, "0".repeat(40))));
+        server.createContext("/files/mod.jar", exchange -> respondBytes(exchange, artifact, "application/java-archive"));
+        ProjectVersion version = new ProjectVersion("8227810", "1.2.0", List.of("2026.09"), null, 0,
+                null, null, List.of(), "RELEASE");
+        ProjectDetail project = new ProjectDetail("curseforge:1450386", "curseforge:1450386", "Simple Compost",
+                "Compost things", "Builder", "MOD", null, null, null, List.of(), List.of(version));
+        LauncherSettings settings = new LauncherSettings();
+        Path mods = tempDir.resolve("mods-tampered");
+        settings.setHytaleModsPath(mods.toString());
+
+        assertThrows(RuntimeException.class, () -> new ModInstaller(new ModtaleApiClient(apiBaseUrl()),
+                new SettingsStore(tempDir.resolve("settings-tampered.json")))
+                .installAndRecord(project, version, settings, "2026.09"));
+        assertTrue(Files.notExists(mods.resolve("mod.jar")));
+    }
+
+    @Test
+    void liveNyoCfModpackDependencyDownloadsAndInstallsThroughTheLauncher() throws Exception {
+        assumeTrue("true".equalsIgnoreCase(System.getenv("NYOCF_LIVE_TESTS")),
+                "Set NYOCF_LIVE_TESTS=true to run the nyoCF launcher install contract.");
+        byte[] pack = zip(entry("mods/main.jar", "main"));
+        startServer();
+        server.createContext("/api/v1/projects/pack/versions/1.0.0/download-url", exchange ->
+                respondJson(exchange, """
+                        {"downloadUrl":"%s/files/pack.zip","expiresIn":60}
+                        """.formatted(serverBaseUrl())));
+        server.createContext("/files/pack.zip", exchange -> respondBytes(exchange, pack, "application/zip"));
+        server.createContext("/api/v1/projects/external/curseforge/1450386/files/8747324/download-url", exchange ->
+                respondJson(exchange, """
+                        {"downloadUrl":"https://www.curseforge.com/api/v1/mods/1450386/files/8747324/download","fileName":"SimpleCompost-1.0.0.jar","fileSize":100897,"hashes":{"sha1":"298f05d4294ad6573f1860239b667f76ab510716"},"source":"CURSEFORGE"}
+                        """));
+        ProjectDependency curseForge = new ProjectDependency(
+                "cf-reference", null, null, null, "REQUIRED", "CURSEFORGE", "1450386",
+                "https://www.curseforge.com/hytale/mods/simple-compost/files/8747324",
+                "https://www.curseforge.com/hytale/mods/simple-compost/files/8747324",
+                "SimpleCompost-1.0.0.jar", null, true, null, "Simple Compost", "MOD", "simple-compost",
+                false, false);
+        ProjectVersion version = version("pack-version", "1.0.0", curseForge);
+        ProjectDetail project = new ProjectDetail("pack", "pack", "Pack", "Pack description", "Creator", "MODPACK",
+                "2026-01-01T00:00:00Z", "MIT", "", List.of(), List.of(version));
+        LauncherSettings settings = new LauncherSettings();
+        Path instance = tempDir.resolve("live-instance");
+        settings.setHytaleUserDataPath(instance.toString());
+        settings.setHytaleModsPath(instance.resolve("mods").toString());
+
+        InstallResult result = new ModInstaller(new ModtaleApiClient(apiBaseUrl()),
+                new SettingsStore(tempDir.resolve("live-settings.json")))
+                .installAndRecord(project, version, settings, "Early Access", List.of(curseForge));
+
+        Path installed = instance.resolve("mods/SimpleCompost-1.0.0.jar");
+        assertTrue(result.warnings().isEmpty());
+        assertEquals(100897L, Files.size(installed));
+        byte[] signature = Files.readAllBytes(installed);
+        assertEquals('P', signature[0]);
+        assertEquals('K', signature[1]);
     }
 
     private ProjectDependency dependency() {
@@ -285,6 +391,10 @@ class ModInstallerTest {
             }
         }
         return bytes.toByteArray();
+    }
+
+    private static String sha1(byte[] bytes) throws Exception {
+        return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-1").digest(bytes));
     }
 
     private static void respondJson(HttpExchange exchange, String body) throws IOException {

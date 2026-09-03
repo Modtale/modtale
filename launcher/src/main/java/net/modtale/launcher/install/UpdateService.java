@@ -27,7 +27,7 @@ public class UpdateService {
     }
 
     public Optional<UpdateCandidate> checkForUpdate(LauncherSettings settings, InstalledProject installed) {
-        if (installed == null || !isModtaleProject(installed)) {
+        if (installed == null || !isManagedProject(installed)) {
             return Optional.empty();
         }
         ProjectDetail project = projectWithVersions(routeKey(installed));
@@ -47,12 +47,14 @@ public class UpdateService {
     }
 
     private static String routeKey(InstalledProject installed) {
+        if (InstalledProject.SOURCE_CURSEFORGE.equalsIgnoreCase(installed.source())) return installed.projectId();
         return installed.slug() != null && !installed.slug().isBlank() ? installed.slug() : installed.projectId();
     }
 
-    private static boolean isModtaleProject(InstalledProject installed) {
+    private static boolean isManagedProject(InstalledProject installed) {
         String source = installed.source() == null ? "" : installed.source().trim();
-        return source.isBlank() || InstalledProject.SOURCE_MODTALE.equalsIgnoreCase(source);
+        return source.isBlank() || InstalledProject.SOURCE_MODTALE.equalsIgnoreCase(source)
+                || InstalledProject.SOURCE_CURSEFORGE.equalsIgnoreCase(source);
     }
 
     private static String effectiveGameVersion(LauncherSettings settings, InstalledProject installed) {

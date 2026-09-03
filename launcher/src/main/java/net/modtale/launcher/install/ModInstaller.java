@@ -9,6 +9,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import net.modtale.launcher.api.ModtaleApiClient.DownloadedFile;
 import net.modtale.launcher.api.ModtaleApiClient;
 import net.modtale.launcher.api.ModtaleApiException;
@@ -25,12 +27,13 @@ import net.modtale.launcher.model.project.ProjectVersion;
 import net.modtale.launcher.model.project.VersionDependenciesView;
 import net.modtale.launcher.settings.LauncherSettings;
 import net.modtale.launcher.settings.SettingsStore;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.modtale.launcher.logging.LauncherLog;
+import net.modtale.launcher.logging.LauncherLogger;
 
 public class ModInstaller {
 
-    private static final Logger LOG = LogManager.getLogger(ModInstaller.class);
+    private static final LauncherLogger LOG = LauncherLog.getLogger(ModInstaller.class);
+    private static final Pattern CURSEFORGE_FILE_ID = Pattern.compile("/files/(\\d+)(?:/|$)", Pattern.CASE_INSENSITIVE);
 
     private final ModtaleApiClient apiClient;
     private final SettingsStore settingsStore;
@@ -94,19 +97,26 @@ public class ModInstaller {
         List<String> warnings = new ArrayList<>();
         List<String> externalNames = new ArrayList<>();
 
-        DownloadUrlResponse downloadUrl = isBundle
-                ? apiClient.getBundleDownloadUrl(project.id(), version.versionNumber(), selectedModtaleDependencies, options.gameVersion())
-                : apiClient.getDownloadUrl(
-                        project.id(),
-                        version.versionNumber(),
-                        options.gameVersion(),
-                        isModpack ? options.modpackTarget() : null
-                );
+        Long curseForgeProjectId = ModtaleApiClient.curseForgeId(project.id());
+        DownloadUrlResponse downloadUrl;
+        if (curseForgeProjectId != null) {
+            long fileId;
+            try {
+                fileId = Long.parseLong(version.id());
+            } catch (NumberFormatException ex) {
+                throw new ModtaleApiException("CurseForge returned an invalid file id.", ex);
+            }
+            downloadUrl = apiClient.getCurseForgeDownloadUrl(curseForgeProjectId, fileId);
+        } else {
+            downloadUrl = isBundle
+                    ? apiClient.getBundleDownloadUrl(project.id(), version.versionNumber(), selectedModtaleDependencies, options.gameVersion())
+                    : apiClient.getDownloadUrl(project.id(), version.versionNumber(), options.gameVersion());
+        }
         LOG.info("Resolved download URL projectId=" + project.id()
                 + " mode=" + (isBundle ? "BUNDLE" : "DIRECT")
                 + " url=" + LogSanitizer.url(downloadUrl == null ? "" : downloadUrl.downloadUrl()));
 
-        DownloadedFile mainDownload = apiClient.download(downloadUrl.downloadUrl());
+        DownloadedFile mainDownload = apiClient.download(downloadUrl);
         boolean unpackMainDownload = isBundle || looksLikeGeneratedArchive(mainDownload);
         LOG.info("Installing main download projectId=" + project.id()
                 + " filename=" + mainDownload.filename()
@@ -118,8 +128,7 @@ public class ModInstaller {
                 installedFiles.addAll(archiveInstaller.installModpackArchive(
                         mainDownload.path(),
                         options.modsDirectory(),
-                        options.instanceDirectory(),
-                        options.modpackTarget()
+                        options.instanceDirectory()
                 ));
             } else {
                 installedFiles.addAll(archiveInstaller.installDownloadedFile(
@@ -142,10 +151,7 @@ public class ModInstaller {
 
         for (ProjectDependency dependency : selectedExternalDependencies) {
             if (dependency.isCurseForge()) {
-                warnings.add("CurseForge dependency requires installation through its provider page: "
-                        + displayName(dependency));
-                LOG.info("Skipping direct CurseForge download for " + displayName(dependency)
-                        + "; use the provider-sanctioned install flow instead");
+                installCurseForgeDependency(dependency, options.modsDirectory(), installedFiles, externalNames, warnings);
                 continue;
             }
             if (dependency.externalFileUrl() == null || dependency.externalFileUrl().isBlank()) {
@@ -191,7 +197,7 @@ public class ModInstaller {
                 installedFiles.stream().map(Path::toString).toList(),
                 selectedModtaleDependencies,
                 externalNames,
-                InstalledProject.SOURCE_MODTALE,
+                curseForgeProjectId == null ? InstalledProject.SOURCE_MODTALE : InstalledProject.SOURCE_CURSEFORGE,
                 isModpack ? InstalledProject.INSTALL_MODPACK : isBundle ? InstalledProject.INSTALL_BUNDLE : InstalledProject.INSTALL_DIRECT,
                 false,
                 selectedReferences
@@ -201,6 +207,58 @@ public class ModInstaller {
                 + " fileCount=" + installedFiles.size()
                 + " warnings=" + warnings.size());
         return new InstallResult(installedProject, installedFiles, warnings);
+    }
+
+    private void installCurseForgeDependency(
+            ProjectDependency dependency,
+            Path modsDirectory,
+            List<Path> installedFiles,
+            List<String> externalNames,
+            List<String> warnings
+    ) {
+        Long projectId = numericId(dependency.externalId());
+        if (projectId == null) projectId = ModtaleApiClient.curseForgeId(dependency.projectId());
+        Long fileId = curseForgeFileId(dependency.externalFileUrl());
+        if (fileId == null) fileId = curseForgeFileId(dependency.externalUrl());
+        if (projectId == null || fileId == null) {
+            warnings.add("CurseForge dependency is missing an exact project/file reference: " + displayName(dependency));
+            LOG.warn("CurseForge dependency could not be resolved: " + displayName(dependency));
+            return;
+        }
+
+        LOG.info("Resolving CurseForge dependency " + displayName(dependency)
+                + " projectId=" + projectId + " fileId=" + fileId);
+        DownloadUrlResponse response = apiClient.getCurseForgeDownloadUrl(projectId, fileId);
+        DownloadedFile download = apiClient.download(response);
+        try {
+            String filename = response.fileName() == null || response.fileName().isBlank()
+                    ? dependency.externalFileName() : response.fileName();
+            if (filename == null || filename.isBlank()) filename = download.filename();
+            installedFiles.addAll(archiveInstaller.installDownloadedFile(
+                    download.path(), filename, modsDirectory, false));
+            externalNames.add(displayName(dependency));
+            LOG.info("Installed CurseForge dependency " + displayName(dependency) + " filename=" + filename);
+        } catch (IOException ex) {
+            warnings.add("CurseForge dependency failed: " + displayName(dependency) + " (" + ex.getMessage() + ")");
+            LOG.warn("CurseForge dependency failed: " + displayName(dependency), ex);
+        } finally {
+            deleteTemp(download.path());
+        }
+    }
+
+    private static Long numericId(String value) {
+        if (value == null || !value.matches("[1-9][0-9]*")) return null;
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private static Long curseForgeFileId(String value) {
+        if (value == null || value.isBlank()) return null;
+        Matcher matcher = CURSEFORGE_FILE_ID.matcher(value);
+        return matcher.find() ? numericId(matcher.group(1)) : null;
     }
 
     public InstallResult installAndRecord(ProjectDetail project, LauncherSettings settings) {
@@ -219,8 +277,7 @@ public class ModInstaller {
                 settings.isIncludeDependencies(),
                 settings.isIncludeOptionalDependencies(),
                 null,
-                settings.hytaleUserDataDirectory(),
-                "CLIENT"
+                settings.hytaleUserDataDirectory()
         ));
         return recordInstall(result, settings, previous);
     }
@@ -240,8 +297,7 @@ public class ModInstaller {
                 dependencies != null && !dependencies.isEmpty(),
                 true,
                 dependencies,
-                settings.hytaleUserDataDirectory(),
-                "CLIENT"
+                settings.hytaleUserDataDirectory()
         ));
         return recordInstall(result, settings, previous);
     }
@@ -356,8 +412,7 @@ public class ModInstaller {
                 settings.isIncludeDependencies(),
                 settings.isIncludeOptionalDependencies(),
                 null,
-                settings.hytaleUserDataDirectory(),
-                "CLIENT"
+                settings.hytaleUserDataDirectory()
         );
     }
 
@@ -381,8 +436,7 @@ public class ModInstaller {
                     installed.bundledProjects().stream()
                             .map(InstalledProjectReference::toDependency)
                             .toList(),
-                    settings.hytaleUserDataDirectory(),
-                    "CLIENT"
+                    settings.hytaleUserDataDirectory()
             );
         }
         return new InstallOptions(
@@ -391,16 +445,16 @@ public class ModInstaller {
                 settings.isIncludeDependencies(),
                 settings.isIncludeOptionalDependencies(),
                 null,
-                settings.hytaleUserDataDirectory(),
-                "CLIENT"
+                settings.hytaleUserDataDirectory()
         );
     }
 
     private List<ProjectDependency> dependencies(ProjectDetail project, ProjectVersion version, InstallOptions options) {
         if (options.hasSelectedDependencies()) {
-            return options.selectedDependencies().stream()
-                    .filter(ProjectDependency::appliesToClient)
-                    .toList();
+            return options.selectedDependencies();
+        }
+        if (ModtaleApiClient.curseForgeId(project.id()) != null) {
+            return version.dependencies();
         }
         VersionDependenciesView dependenciesView = options.includeDependencies()
                 ? apiClient.getDependencies(project.id(), version.versionNumber(), options.gameVersion())
@@ -408,9 +462,7 @@ public class ModInstaller {
         LOG.info("Loaded dependency view projectId=" + project.id()
                 + " version=" + version.versionNumber()
                 + " count=" + dependenciesView.dependencies().size());
-        return dependenciesView.dependencies().stream()
-                .filter(ProjectDependency::appliesToClient)
-                .toList();
+        return dependenciesView.dependencies();
     }
 
     private static List<InstalledProjectReference> selectedDependencyReferences(

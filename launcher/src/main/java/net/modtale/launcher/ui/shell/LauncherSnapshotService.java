@@ -11,12 +11,12 @@ import javafx.scene.image.PixelReader;
 import javafx.scene.image.WritableImage;
 import javafx.util.Duration;
 import javax.imageio.ImageIO;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.modtale.launcher.logging.LauncherLog;
+import net.modtale.launcher.logging.LauncherLogger;
 
 public final class LauncherSnapshotService {
 
-    private static final Logger LOG = LogManager.getLogger(LauncherSnapshotService.class);
+    private static final LauncherLogger LOG = LauncherLog.getLogger(LauncherSnapshotService.class);
 
     private LauncherSnapshotService() {
     }

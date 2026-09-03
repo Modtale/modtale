@@ -13,12 +13,12 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.function.Supplier;
 import net.modtale.launcher.logging.LogSanitizer;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.modtale.launcher.logging.LauncherLog;
+import net.modtale.launcher.logging.LauncherLogger;
 
 final class ModtaleDownloadClient {
 
-    private static final Logger LOG = LogManager.getLogger(ModtaleDownloadClient.class);
+    private static final LauncherLogger LOG = LauncherLog.getLogger(ModtaleDownloadClient.class);
 
     private final HttpClient httpClient;
     private final Supplier<URI> apiBaseUri;

@@ -82,8 +82,7 @@ public record InstalledProjectReference(
                 classification,
                 slug,
                 optional,
-                embedded,
-                "COMMON"
+                embedded
         );
     }
 

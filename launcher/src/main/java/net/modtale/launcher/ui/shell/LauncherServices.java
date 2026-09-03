@@ -21,12 +21,12 @@ import net.modtale.launcher.ui.common.CachedImageLoader;
 import net.modtale.launcher.ui.common.LauncherAssetResolver;
 import net.modtale.launcher.ui.common.LauncherScrollSupport;
 import net.modtale.launcher.update.LauncherUpdateService;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.modtale.launcher.logging.LauncherLog;
+import net.modtale.launcher.logging.LauncherLogger;
 
 public final class LauncherServices {
 
-    private static final Logger LOG = LogManager.getLogger(LauncherServices.class);
+    private static final LauncherLogger LOG = LauncherLog.getLogger(LauncherServices.class);
 
     private final ExecutorService executor = Executors.newFixedThreadPool(4);
     private final ExecutorService imageExecutor = Executors.newFixedThreadPool(4);

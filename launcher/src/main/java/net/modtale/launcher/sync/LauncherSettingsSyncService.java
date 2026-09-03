@@ -25,12 +25,12 @@ import net.modtale.launcher.settings.LauncherSettings;
 import net.modtale.launcher.settings.SettingsStore;
 import net.modtale.launcher.ui.feedback.LauncherFeedback;
 import net.modtale.launcher.ui.settings.LauncherSettingsController;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.modtale.launcher.logging.LauncherLog;
+import net.modtale.launcher.logging.LauncherLogger;
 
 public final class LauncherSettingsSyncService {
 
-    private static final Logger LOG = LogManager.getLogger(LauncherSettingsSyncService.class);
+    private static final LauncherLogger LOG = LauncherLog.getLogger(LauncherSettingsSyncService.class);
 
     private final ModtaleApiClient apiClient;
     private final SettingsStore settingsStore;
@@ -240,8 +240,7 @@ public final class LauncherSettingsSyncService {
                     installed.getBundledProjects().stream()
                             .map(net.modtale.launcher.model.install.InstalledProjectReference::toDependency)
                             .toList(),
-                    settings.hytaleUserDataDirectory(),
-                    "CLIENT"
+                    settings.hytaleUserDataDirectory()
             );
         }
         return new InstallOptions(
@@ -250,8 +249,7 @@ public final class LauncherSettingsSyncService {
                 settings.isIncludeDependencies(),
                 settings.isIncludeOptionalDependencies(),
                 null,
-                settings.hytaleUserDataDirectory(),
-                "CLIENT"
+                settings.hytaleUserDataDirectory()
         );
     }
 

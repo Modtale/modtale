@@ -10,12 +10,12 @@ import net.modtale.launcher.api.ModtaleApiException;
 import net.modtale.launcher.model.worldlist.WorldModList;
 import net.modtale.launcher.model.worldlist.WorldModListInstallResult;
 import net.modtale.launcher.settings.LauncherSettings;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.modtale.launcher.logging.LauncherLog;
+import net.modtale.launcher.logging.LauncherLogger;
 
 public final class WorldModListInstaller {
 
-    private static final Logger LOG = LogManager.getLogger(WorldModListInstaller.class);
+    private static final LauncherLogger LOG = LauncherLog.getLogger(WorldModListInstaller.class);
 
     private final ModtaleApiClient apiClient;
     private final ArchiveInstaller archiveInstaller;

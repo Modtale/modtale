@@ -33,6 +33,7 @@ import javafx.scene.layout.VBox;
 import net.modtale.launcher.api.ModtaleApiClient;
 import net.modtale.launcher.api.ModtaleApiException;
 import net.modtale.launcher.hytale.HytaleWorldManager;
+import net.modtale.launcher.hytale.ArtifactFingerprint;
 import net.modtale.launcher.hytale.HytaleWorldManager.HytaleInstalledMod;
 import net.modtale.launcher.hytale.HytaleWorldManager.HytaleWorld;
 import net.modtale.launcher.hytale.HytaleWorldManager.HytaleWorldConfig;
@@ -44,6 +45,7 @@ import net.modtale.launcher.model.install.InstalledProject;
 import net.modtale.launcher.model.install.InstalledProjectReference;
 import net.modtale.launcher.model.install.UpdateCandidate;
 import net.modtale.launcher.model.project.ProjectDependency;
+import net.modtale.launcher.model.project.ArtifactIdentity;
 import net.modtale.launcher.model.project.ProjectDetail;
 import net.modtale.launcher.model.project.ProjectMeta;
 import net.modtale.launcher.model.project.ProjectSummary;
@@ -97,6 +99,8 @@ public final class LauncherLibraryController {
     private StackPane installLoadingOverlay;
     private Label installLoadingTitle;
     private Label installLoadingSubtitle;
+    private String identityResolutionSignature = "";
+    private boolean identityResolutionInFlight;
 
     public LauncherLibraryController(
             ModtaleApiClient apiClient,
@@ -403,6 +407,7 @@ public final class LauncherLibraryController {
         }
         recoverLocalInstalls();
         normalizeBundledDependencyInstalls();
+        resolveInstalledArtifactIdentities();
         installedProjects = settingsController.settings().getInstalledProjects().stream()
                 .sorted(Comparator
                         .comparing(InstalledProject::updatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
@@ -449,6 +454,59 @@ public final class LauncherLibraryController {
         settingsController.saveCurrentSettings();
         feedback.log("Promoted " + result.addedChildren() + " bundled dependenc"
                 + (result.addedChildren() == 1 ? "y" : "ies") + " to installed mod records.");
+    }
+
+    private void resolveInstalledArtifactIdentities() {
+        if (executor == null || apiClient == null || identityResolutionInFlight) return;
+        if (installedMods.isEmpty() || settingsController.settings().getInstalledProjects().isEmpty()) return;
+        String signature = installedMods.stream().map(LauncherLibraryController::identitySignature).sorted()
+                .collect(java.util.stream.Collectors.joining("|"));
+        if (signature.equals(identityResolutionSignature)) return;
+        List<HytaleInstalledMod> mods = List.copyOf(installedMods);
+        identityResolutionInFlight = true;
+        CompletableFuture.supplyAsync(() -> apiClient.identifyArtifacts(
+                        mods.stream().map(LauncherLibraryController::identityArtifact).toList()), executor)
+                .whenComplete((response, error) -> Platform.runLater(() -> {
+                    identityResolutionInFlight = false;
+                    if (error != null || response == null) {
+                        feedback.log("Could not identify locally installed mods: " +
+                                (error == null ? "empty response" : error.getMessage()));
+                        return;
+                    }
+                    identityResolutionSignature = signature;
+                    LibraryArtifactIdentityReconciler.Result result = LibraryArtifactIdentityReconciler.reconcile(
+                            settingsController.settings().getInstalledProjects(), response.matches());
+                    if (result.resolvedCount() > 0) {
+                        settingsController.settings().setInstalledProjects(result.projects());
+                        settingsController.saveCurrentSettings();
+                        feedback.log("Linked " + result.resolvedCount() + " installed mod" +
+                                LibraryProjectSupport.plural(result.resolvedCount()) + " to a managed project.");
+                        renderLibrary();
+                    }
+                }));
+    }
+
+    private static ArtifactIdentity.Artifact identityArtifact(HytaleInstalledMod mod) {
+        String sha256 = null;
+        Long curseForgeFingerprint = null;
+        try {
+            ArtifactFingerprint.Result fingerprint = ArtifactFingerprint.calculate(mod.file());
+            sha256 = fingerprint.sha256();
+            curseForgeFingerprint = fingerprint.curseForgeFingerprint();
+        } catch (java.io.IOException ignored) {
+            // Manifest and explicit provider URLs still provide safe identity evidence.
+        }
+        return new ArtifactIdentity.Artifact(mod.file().toAbsolutePath().normalize().toString(), sha256,
+                curseForgeFingerprint, mod.id(), mod.version(), mod.website());
+    }
+
+    private static String identitySignature(HytaleInstalledMod mod) {
+        try {
+            return mod.file().toAbsolutePath().normalize() + ":" + java.nio.file.Files.size(mod.file()) + ":"
+                    + java.nio.file.Files.getLastModifiedTime(mod.file()).toMillis();
+        } catch (java.io.IOException ignored) {
+            return mod.file().toAbsolutePath().normalize().toString();
+        }
     }
 
     private void ensureProjectMetadataLoaded() {

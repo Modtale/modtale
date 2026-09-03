@@ -15,6 +15,7 @@ import java.util.Optional;
 import net.modtale.launcher.model.auth.SignInResponse;
 import net.modtale.launcher.model.notification.LauncherNotification;
 import net.modtale.launcher.model.project.DownloadUrlResponse;
+import net.modtale.launcher.model.project.ArtifactIdentity;
 import net.modtale.launcher.model.project.GameVersionCatalog;
 import net.modtale.launcher.model.project.ProjectComment;
 import net.modtale.launcher.model.project.ProjectDetail;
@@ -177,7 +178,34 @@ public class ModtaleApiClient {
         return get("/projects" + (params.isEmpty() ? "" : "?" + String.join("&", params)), ProjectPage.class);
     }
 
+    public ProjectPage searchCurseForgeMods(ProjectSearchQuery query) {
+        List<String> params = new ArrayList<>();
+        addParam(params, "page", Integer.toString(query.page()));
+        addParam(params, "size", Integer.toString(Math.min(50, query.size())));
+        addParam(params, "sort", query.sort());
+        addParam(params, "search", query.search());
+        addParam(params, "gameVersion", query.gameVersion());
+        String path = "/projects/external/curseforge" + (params.isEmpty() ? "" : "?" + String.join("&", params));
+        return transport.get(apiUri(path), ProjectPage.class, Duration.ZERO);
+    }
+
+    public ProjectDetail getCurseForgeProject(long projectId) {
+        String path = "/projects/external/curseforge/" + projectId;
+        return transport.get(apiUri(path), ProjectDetail.class, Duration.ZERO);
+    }
+
+    public DownloadUrlResponse getCurseForgeDownloadUrl(long projectId, long fileId) {
+        String path = "/projects/external/curseforge/" + projectId + "/files/" + fileId + "/download-url";
+        return transport.get(apiUri(path), DownloadUrlResponse.class, Duration.ZERO);
+    }
+
+    public ArtifactIdentity.Response identifyArtifacts(List<ArtifactIdentity.Artifact> artifacts) {
+        return post("/projects/external/identify", new ArtifactIdentity.Request(artifacts), ArtifactIdentity.Response.class);
+    }
+
     public ProjectDetail getProject(String idOrSlug) {
+        Long curseForgeId = curseForgeId(idOrSlug);
+        if (curseForgeId != null) return getCurseForgeProject(curseForgeId);
         return get("/projects/" + encodePath(idOrSlug), ProjectDetail.class);
     }
 
@@ -187,6 +215,7 @@ public class ModtaleApiClient {
     }
 
     public ProjectGallery getProjectGallery(String idOrSlug) {
+        if (curseForgeId(idOrSlug) != null) return new ProjectGallery(List.of(), java.util.Map.of());
         ProjectGallery gallery = get("/projects/" + encodePath(idOrSlug) + "/gallery", ProjectGallery.class);
         return gallery == null ? new ProjectGallery(List.of(), java.util.Map.of()) : gallery;
     }
@@ -287,10 +316,13 @@ public class ModtaleApiClient {
     }
 
     public List<ProjectVersionChangelog> getProjectVersionChangelogs(String idOrSlug) {
+        if (curseForgeId(idOrSlug) != null) return List.of();
         return get("/projects/" + encodePath(idOrSlug) + "/versions/changelogs", new TypeReference<>() {});
     }
 
     public List<ProjectVersion> getProjectVersions(String idOrSlug) {
+        Long curseForgeId = curseForgeId(idOrSlug);
+        if (curseForgeId != null) return getCurseForgeProject(curseForgeId).versions();
         ProjectVersionsResponse response = get("/projects/" + encodePath(idOrSlug) + "/versions", ProjectVersionsResponse.class);
         return response == null ? List.of() : response.versions();
     }
@@ -395,6 +427,16 @@ public class ModtaleApiClient {
         return value == null || value.isBlank() ? metadata.get(fallback) : value;
     }
 
+    public static Long curseForgeId(String value) {
+        if (value == null || !value.startsWith("curseforge:")) return null;
+        try {
+            long id = Long.parseLong(value.substring("curseforge:".length()));
+            return id > 0 ? id : null;
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
     public List<String> getGameVersions() {
         return get("/meta/game-versions", new TypeReference<>() {});
     }
@@ -420,13 +462,8 @@ public class ModtaleApiClient {
     }
 
     public DownloadUrlResponse getDownloadUrl(String projectId, String versionNumber, String gameVersion) {
-        return getDownloadUrl(projectId, versionNumber, gameVersion, null);
-    }
-
-    public DownloadUrlResponse getDownloadUrl(String projectId, String versionNumber, String gameVersion, String target) {
         List<String> params = new ArrayList<>();
         addParam(params, "gameVersion", gameVersion);
-        addParam(params, "target", target);
         String query = params.isEmpty() ? "" : "?" + String.join("&", params);
         return get("/projects/" + encodePath(projectId) + "/versions/" + encodePath(versionNumber) + "/download-url" + query,
                 DownloadUrlResponse.class);
@@ -450,6 +487,25 @@ public class ModtaleApiClient {
 
     public DownloadedFile download(String rawUrl) {
         return downloadClient.download(rawUrl);
+    }
+
+    public DownloadedFile download(DownloadUrlResponse response) {
+        if (response == null) throw new ModtaleApiException("The API returned no download information.");
+        DownloadedFile downloaded = download(response.downloadUrl());
+        if (!"CURSEFORGE".equalsIgnoreCase(response.source())) return downloaded;
+        try {
+            ProviderDownloadVerifier.verify(downloaded.path(), response.fileSize(), response.hashes());
+            String providerName = response.fileName() == null || response.fileName().isBlank()
+                    ? downloaded.filename() : response.fileName().trim();
+            return new DownloadedFile(downloaded.path(), providerName, downloaded.contentType());
+        } catch (java.io.IOException ex) {
+            try {
+                java.nio.file.Files.deleteIfExists(downloaded.path());
+            } catch (java.io.IOException ignored) {
+                // The validation error is more useful than temporary-file cleanup failure.
+            }
+            throw new ModtaleApiException(ex.getMessage(), ex);
+        }
     }
 
     URI resolveDownloadUri(String rawUrl) {

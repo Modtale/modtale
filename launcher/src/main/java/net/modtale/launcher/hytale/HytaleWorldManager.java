@@ -283,24 +283,31 @@ public final class HytaleWorldManager {
         try (ZipFile zip = new ZipFile(jar.toFile())) {
             ZipEntry manifest = zip.getEntry("manifest.json");
             if (manifest == null) {
-                return new HytaleInstalledMod(baseName, baseName, "", "", jar.toAbsolutePath().normalize());
+                return installedMod(baseName, baseName, "", "", "", jar);
             }
             try (InputStream input = zip.getInputStream(manifest)) {
                 JsonNode root = MAPPER.readTree(input);
                 String group = root.path("Group").asText("");
                 String name = root.path("Name").asText(baseName);
                 String id = group.isBlank() || name.isBlank() ? baseName : group + ":" + name;
-                return new HytaleInstalledMod(
+                return installedMod(
                         id,
                         name.isBlank() ? baseName : name,
                         root.path("Version").asText(""),
                         root.path("Description").asText(""),
-                        jar.toAbsolutePath().normalize()
+                        root.path("Website").asText(""),
+                        jar
                 );
             }
         } catch (IOException ex) {
-            return new HytaleInstalledMod(baseName, baseName, "", "", jar.toAbsolutePath().normalize());
+            return installedMod(baseName, baseName, "", "", "", jar);
         }
+    }
+
+    private HytaleInstalledMod installedMod(String id, String name, String version, String description,
+                                             String website, Path jar) {
+        Path file = jar.toAbsolutePath().normalize();
+        return new HytaleInstalledMod(id, name, version, description, file, website, "", null);
     }
 
     private ObjectNode readConfigRoot(Path configPath) {
@@ -372,7 +379,13 @@ public final class HytaleWorldManager {
             String name,
             String version,
             String description,
-            Path file
+            Path file,
+            String website,
+            String sha256,
+            Long curseForgeFingerprint
     ) {
+        public HytaleInstalledMod(String id, String name, String version, String description, Path file) {
+            this(id, name, version, description, file, "", "", null);
+        }
     }
 }

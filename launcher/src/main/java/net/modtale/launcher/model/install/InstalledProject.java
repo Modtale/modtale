@@ -25,6 +25,7 @@ public record InstalledProject(
         List<InstalledProjectReference> bundledProjects
 ) {
     public static final String SOURCE_MODTALE = "MODTALE";
+    public static final String SOURCE_CURSEFORGE = "CURSEFORGE";
     public static final String SOURCE_LOCAL = "LOCAL";
     public static final String INSTALL_DIRECT = "DIRECT";
     public static final String INSTALL_BUNDLE = "BUNDLE";

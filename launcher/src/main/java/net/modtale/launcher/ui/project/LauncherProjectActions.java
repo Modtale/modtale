@@ -20,12 +20,13 @@ import net.modtale.launcher.ui.browse.ProjectBrowseController;
 import net.modtale.launcher.ui.common.CachedImageLoader;
 import net.modtale.launcher.ui.feedback.LauncherFeedback;
 import net.modtale.launcher.ui.library.LauncherLibraryController;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.modtale.launcher.ui.common.LauncherExternalLinks;
+import net.modtale.launcher.logging.LauncherLog;
+import net.modtale.launcher.logging.LauncherLogger;
 
 public final class LauncherProjectActions {
 
-    private static final Logger LOG = LogManager.getLogger(LauncherProjectActions.class);
+    private static final LauncherLogger LOG = LauncherLog.getLogger(LauncherProjectActions.class);
 
     private final ModtaleApiClient apiClient;
     private final LauncherAccountController accountController;
@@ -86,6 +87,12 @@ public final class LauncherProjectActions {
 
     public void installSelectedProject(ProjectSummary summary) {
         if (summary == null) {
+            return;
+        }
+        if (summary.isCurseForge() && !Boolean.TRUE.equals(summary.distributionAllowed())) {
+            feedback.showToast("Install on CurseForge",
+                    "The author has disabled third-party distribution, so this file must be installed through CurseForge.");
+            LauncherExternalLinks.open(summary.websiteUrl(), feedback::showToast);
             return;
         }
         if (downloadModal == null) {
@@ -183,6 +190,9 @@ public final class LauncherProjectActions {
     }
 
     private GameVersionCatalog loadGameVersions(ProjectDetail project) {
+        if (project != null && ModtaleApiClient.curseForgeId(project.id()) != null) {
+            return catalogFromProject(project);
+        }
         try {
             return apiClient.getGameVersionCatalog();
         } catch (RuntimeException ex) {
@@ -192,7 +202,9 @@ public final class LauncherProjectActions {
     }
 
     private ProjectDetail loadProjectWithVersions(ProjectSummary summary) {
-        ProjectDetail project = apiClient.getProject(summary.routeKey());
+        ProjectDetail project = summary.isCurseForge()
+                ? apiClient.getCurseForgeProject(summary.curseForgeProjectId())
+                : apiClient.getProject(summary.routeKey());
         return ProjectVersionHydrator.hydrateOrThrow(project, summary, apiClient::getProjectVersions);
     }
 

@@ -24,6 +24,7 @@ public class ArchiveInstaller {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String LOCKFILE = "modtale.lock.json";
+    private static final String LEGACY_MANIFEST = "modpack.json";
 
     public List<Path> installDownloadedFile(Path downloadedFile, String filename, Path modsDirectory, boolean unpackArchive)
             throws IOException {
@@ -38,14 +39,13 @@ public class ArchiveInstaller {
 
     public List<Path> installModpackArchive(Path archive, Path modsDirectory) throws IOException {
         Path instanceDirectory = modsDirectory.toAbsolutePath().normalize().getParent();
-        return installModpackArchive(archive, modsDirectory, instanceDirectory, "CLIENT");
+        return installModpackArchive(archive, modsDirectory, instanceDirectory);
     }
 
     public List<Path> installModpackArchive(
             Path archive,
             Path modsDirectory,
-            Path instanceDirectory,
-            String target
+            Path instanceDirectory
     ) throws IOException {
         Files.createDirectories(modsDirectory);
         Files.createDirectories(instanceDirectory);
@@ -58,12 +58,14 @@ public class ArchiveInstaller {
             Path contentRoot = modpackContentRoot(extractedDirectory);
             Path lockfile = contentRoot.resolve(LOCKFILE);
             if (Files.isRegularFile(lockfile)) {
-                return installLockedArchive(contentRoot, lockfile, modsDirectory, instanceDirectory, target);
+                return installLockedArchive(contentRoot, lockfile, modsDirectory, instanceDirectory);
             }
+            validateLegacyHytaleArchiveIfPresent(contentRoot.resolve(LEGACY_MANIFEST));
             List<Path> installed = new ArrayList<>();
             try (Stream<Path> files = Files.walk(contentRoot)) {
                 for (Path source : files
                         .filter(Files::isRegularFile)
+                        .filter(path -> isInstallable(path.getFileName().toString()))
                         .sorted(Comparator.comparing(Path::toString))
                         .toList()) {
                     Path destination = uniqueDestination(modsDirectory, safeFilename(source.getFileName().toString()));
@@ -81,11 +83,11 @@ public class ArchiveInstaller {
             Path contentRoot,
             Path lockfile,
             Path modsDirectory,
-            Path instanceDirectory,
-            String target
+            Path instanceDirectory
     ) throws IOException {
         JsonNode lock = OBJECT_MAPPER.readTree(lockfile.toFile());
-        if (!"modtale-lock".equals(lock.path("format").asText()) || lock.path("lockVersion").asInt(-1) != 1) {
+        if (!"modtale-lock".equals(lock.path("format").asText()) || lock.path("lockVersion").asInt(-1) != 1
+                || !"hytale".equalsIgnoreCase(lock.path("game").asText())) {
             throw new IOException("Unsupported Modtale modpack lockfile format or version.");
         }
 
@@ -106,23 +108,22 @@ public class ArchiveInstaller {
             pending.add(new PendingInstall(source, destination));
         }
 
-        String normalizedTarget = target == null ? "CLIENT" : target.trim().toUpperCase(Locale.ROOT);
         List<JsonNode> overrides = new ArrayList<>();
         lock.path("overrides").forEach(overrides::add);
-        overrides.sort(Comparator.comparingInt(entry -> overridePriority(entry.path("environment").asText())));
+        overrides.sort(Comparator.comparing(entry -> entry.path("path").asText()));
         for (JsonNode entry : overrides) {
-            String environment = entry.path("environment").asText();
-            if (!includedInTarget(environment, normalizedTarget)) {
-                continue;
-            }
             String archivePath = requiredText(entry, "path");
             Path source = resolveLockedSource(contentRoot, archivePath, archivePaths);
             verifyIntegrity(source, entry);
-            String prefix = "overrides/" + environment.toLowerCase(Locale.ROOT) + "/";
+            String prefix = "overrides/";
             if (!archivePath.startsWith(prefix) || archivePath.length() == prefix.length()) {
-                throw new IOException("Override path does not match its environment: " + archivePath);
+                throw new IOException("Override path must be inside overrides/: " + archivePath);
             }
-            Path destination = resolveInstanceDestination(instanceDirectory, archivePath.substring(prefix.length()));
+            String hytalePath = archivePath.substring(prefix.length());
+            if (!(hytalePath.startsWith("Mods/") || hytalePath.startsWith("Saves/"))) {
+                throw new IOException("Override destination must be inside Hytale Mods/ or Saves/: " + archivePath);
+            }
+            Path destination = resolveInstanceDestination(instanceDirectory, hytalePath);
             pending.add(new PendingInstall(source, destination));
         }
 
@@ -133,6 +134,19 @@ public class ArchiveInstaller {
             installed.add(install.destination());
         }
         return installed;
+    }
+
+    private static void validateLegacyHytaleArchiveIfPresent(Path manifestFile) throws IOException {
+        if (!Files.isRegularFile(manifestFile)) {
+            // Ordinary dependency bundles predate modpack manifests and contain only installable Hytale files.
+            return;
+        }
+        JsonNode manifest = OBJECT_MAPPER.readTree(manifestFile.toFile());
+        if (!manifest.isObject() || manifest.path("formatVersion").asInt(-1) != 1
+                || !"hytale".equalsIgnoreCase(manifest.path("game").asText())
+                || !manifest.path("files").isArray()) {
+            throw new IOException("Unsupported legacy Modtale modpack format or game.");
+        }
     }
 
     private static String requiredText(JsonNode entry, String field) throws IOException {
@@ -196,17 +210,6 @@ public class ArchiveInstaller {
         } catch (NoSuchAlgorithmException ex) {
             throw new IOException("SHA-256 is unavailable.", ex);
         }
-    }
-
-    private static boolean includedInTarget(String environment, String target) {
-        if (environment == null || environment.isBlank() || "COMMON".equalsIgnoreCase(environment)) {
-            return true;
-        }
-        return "UNIVERSAL".equalsIgnoreCase(target) || environment.equalsIgnoreCase(target);
-    }
-
-    private static int overridePriority(String environment) {
-        return "COMMON".equalsIgnoreCase(environment) ? 0 : 1;
     }
 
     public List<Path> extractInstallableEntries(Path archive, Path modsDirectory) throws IOException {
