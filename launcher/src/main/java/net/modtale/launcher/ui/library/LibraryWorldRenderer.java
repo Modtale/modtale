@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
 import javafx.collections.FXCollections;
+import javafx.css.PseudoClass;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -39,6 +40,7 @@ final class LibraryWorldRenderer {
 
     private static final double PROJECT_ICON_SIZE = 46;
     private static final double CONTENT_ICON_SIZE = 34;
+    private static final PseudoClass CONTENTS_HOVERED = PseudoClass.getPseudoClass("contents-hovered");
 
     private final CachedImageLoader imageLoader;
     private final Consumer<UpdateCandidate> updateProject;
@@ -218,6 +220,8 @@ final class LibraryWorldRenderer {
 
         Node contentsCard = contentsCard(model);
         if (contentsCard != null) {
+            contentsCard.hoverProperty().addListener((observable, previous, hovered) ->
+                    shell.pseudoClassStateChanged(CONTENTS_HOVERED, hovered));
             shell.getChildren().add(contentsCard);
         }
         return shell;
