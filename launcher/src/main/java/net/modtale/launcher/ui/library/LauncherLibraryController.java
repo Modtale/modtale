@@ -141,7 +141,9 @@ public final class LauncherLibraryController {
                 this::toggleModpackContents,
                 this::setModsEnabled,
                 this::shareWorldSnapshot,
-                this::createModpackFromWorld
+                this::createModpackFromWorld,
+                this::renderLibrary,
+                this::checkUpdates
         );
     }
 

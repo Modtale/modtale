@@ -8516,9 +8516,21 @@
     -fx-border-color: rgba(255, 255, 255, 0.08);
 }
 
-.library-action-emphasis {
-    -fx-min-width: 142px;
-    -fx-pref-width: 142px;
+.library-actions .library-world-utility-action {
+    -fx-padding: 0 13px;
+}
+
+.library-action-divider {
+    -fx-min-width: 1px;
+    -fx-pref-width: 1px;
+    -fx-max-width: 1px;
+    -fx-min-height: 20px;
+    -fx-pref-height: 20px;
+    -fx-max-height: 20px;
+    -fx-background-color: rgba(255, 255, 255, 0.10);
+}
+
+.library-actions .library-action-emphasis {
     -fx-effect: null;
 }
 

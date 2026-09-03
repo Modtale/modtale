@@ -40,4 +40,5 @@ final class LibraryShellView {
         content.getChildren().addAll(projectsPane, projectDetail);
         return content;
     }
+
 }
