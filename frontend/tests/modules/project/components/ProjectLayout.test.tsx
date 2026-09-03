@@ -28,12 +28,13 @@ describe('ProjectLayout banner rendering', () => {
         container.remove();
     });
 
-    it('does not render a public banner area when the project has no banner', async () => {
+    it('keeps the public banner area when the project has no banner', async () => {
         await act(async () => {
             root.render(<ProjectLayout {...layoutProps} bannerUrl={null} />);
         });
 
-        expect(container.querySelector('.modtale-project-banner-parallax')).toBeNull();
+        expect(container.querySelector('.modtale-project-banner-parallax')).not.toBeNull();
+        expect(container.querySelector('img[alt="Project Banner"]')).toBeNull();
         expect(container.textContent).not.toContain('Upload Banner');
     });
 

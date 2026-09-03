@@ -1154,10 +1154,10 @@ public final class ProjectPageController {
         panel.setMinWidth(0);
         panel.setMaxWidth(Double.MAX_VALUE);
         panel.setMaxHeight(Double.MAX_VALUE);
-        double panelTopMargin = hasBanner ? compactLayout ? -8 : -128 : 12;
+        double panelTopMargin = compactLayout ? -8 : -128;
         VBox.setMargin(panel, LauncherLayout.launcherPageInsets(panelTopMargin, 56));
 
-        Node header = header(summary, detail, loading, hasBanner);
+        Node header = header(summary, detail, loading);
         Node body = body(summary, detail);
         panel.getChildren().addAll(header, body);
         if (!compactLayout && body instanceof Region bodyRegion) {
@@ -1186,10 +1186,10 @@ public final class ProjectPageController {
         banner.getStyleClass().add("project-detail-banner");
         banner.setMinWidth(0);
         banner.setMaxWidth(Double.MAX_VALUE);
-        banner.setPrefHeight(hasBanner ? BANNER_FALLBACK_HEIGHT : 72);
-        banner.setMaxHeight(hasBanner ? Double.MAX_VALUE : 72);
+        banner.setPrefHeight(BANNER_FALLBACK_HEIGHT);
+        banner.setMaxHeight(Double.MAX_VALUE);
         banner.prefHeightProperty().bind(Bindings.createDoubleBinding(
-                () -> hasBanner ? bannerHeight(content.getWidth()) : 72,
+                () -> bannerHeight(content.getWidth()),
                 content.widthProperty()
         ));
         banner.minHeightProperty().bind(banner.prefHeightProperty());
@@ -1209,18 +1209,19 @@ public final class ProjectPageController {
             image.fitHeightProperty().bind(banner.heightProperty());
             imageLoader.loadInto(image, bannerUrl, 1920, 640, true);
             media.getChildren().add(image);
-            banner.getChildren().add(media);
         } else {
-            banner.getStyleClass().add("project-detail-banner-empty");
+            Region fallback = new Region();
+            fallback.getStyleClass().add("project-detail-banner-fallback");
+            fallback.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+            media.getChildren().add(fallback);
         }
+        banner.getChildren().add(media);
 
-        if (hasBanner) {
-            Region fade = new Region();
-            fade.getStyleClass().add("project-detail-banner-fade");
-            fade.setMouseTransparent(true);
-            NativeBannerScrollEffect.bind(media, fade, scrollPixels, banner.widthProperty());
-            banner.getChildren().add(fade);
-        }
+        Region fade = new Region();
+        fade.getStyleClass().add("project-detail-banner-fade");
+        fade.setMouseTransparent(true);
+        NativeBannerScrollEffect.bind(media, fade, scrollPixels, banner.widthProperty());
+        banner.getChildren().add(fade);
 
         HBox backLayer = new HBox();
         backLayer.setAlignment(Pos.TOP_LEFT);
@@ -1240,7 +1241,7 @@ public final class ProjectPageController {
         return Double.isFinite(width) && width > 0 ? width / 3.0 : BANNER_FALLBACK_HEIGHT;
     }
 
-    private Node header(ProjectSummary summary, ProjectDetail detail, boolean loading, boolean hasBanner) {
+    private Node header(ProjectSummary summary, ProjectDetail detail, boolean loading) {
         VBox header = new VBox(0);
         header.getStyleClass().add("project-detail-header");
         if (compactLayout) {
@@ -1250,7 +1251,7 @@ public final class ProjectPageController {
         if (compactLayout) {
             HBox mobileTop = new HBox(16);
             mobileTop.setAlignment(Pos.BOTTOM_LEFT);
-            VBox.setMargin(mobileTop, new Insets(hasBanner ? -64 : 0, 0, 24, 0));
+            VBox.setMargin(mobileTop, new Insets(-64, 0, 24, 0));
             mobileTop.getChildren().add(projectIcon(summary, detail, 128, 4));
             Region spacer = new Region();
             HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -1269,7 +1270,7 @@ public final class ProjectPageController {
         HBox row = new HBox(32);
         row.setAlignment(Pos.TOP_LEFT);
         StackPane icon = projectIcon(summary, detail, HEADER_ICON_SIZE, HEADER_ICON_BORDER);
-        HBox.setMargin(icon, new Insets(hasBanner ? -96 : 0, 0, 0, 8));
+        HBox.setMargin(icon, new Insets(-96, 0, 0, 8));
         row.getChildren().add(icon);
 
         VBox copy = new VBox(0);

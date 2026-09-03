@@ -101,10 +101,8 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
 
     const finalBanner = resolveUrl(bannerUrl);
     const finalIcon = resolveUrl(iconUrl);
-    const hasBannerArea = Boolean(finalBanner || isEditing);
-
     useEffect(() => {
-        if (!hasBannerArea || supportsNativeScrollLinkedBanner()) return;
+        if (supportsNativeScrollLinkedBanner()) return;
 
         let rafId: number | null = null;
         const applyParallax = () => {
@@ -145,7 +143,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                 window.cancelAnimationFrame(rafId);
             }
         };
-    }, [hasBannerArea]);
+    }, []);
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'icon' | 'banner') => {
         if (!isEditing || !e.target.files?.[0]) return;
@@ -193,11 +191,10 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                 />
             )}
 
-            {hasBannerArea && (
-                <div
-                    ref={bannerParallaxRef}
-                    className={`modtale-project-banner-parallax absolute top-0 left-0 right-0 w-full aspect-[3/1] z-0 will-change-transform ${finalBanner ? 'bg-transparent' : 'bg-slate-200 dark:bg-slate-800'}`}
-                >
+            <div
+                ref={bannerParallaxRef}
+                className={`modtale-project-banner-parallax absolute top-0 left-0 right-0 w-full aspect-[3/1] z-0 will-change-transform ${finalBanner ? 'bg-transparent' : 'bg-slate-200 dark:bg-slate-800'}`}
+            >
                     <div className="absolute inset-0 z-0">
                         {finalBanner ? (
                             <OptimizedImage
@@ -238,29 +235,24 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                             )}
                         </label>
                     )}
-                </div>
-            )}
+            </div>
 
-            {hasBannerArea && <div className="w-full aspect-[3/1] pointer-events-none relative z-0" />}
+            <div className="w-full aspect-[3/1] pointer-events-none relative z-0" />
 
             {onBack && (
-                <div className={`${hasBannerArea ? 'absolute top-0 left-0 right-0 h-full' : 'relative'} z-40 ${containerClasses} pointer-events-none transition-[max-width,padding] duration-300`}>
-                    <div className={`${hasBannerArea ? 'pt-6' : 'pt-6 pb-4'} pointer-events-auto w-fit`}>
-                        <button type="button" aria-label="Go back" onClick={onBack} className={`flex items-center font-bold transition-all backdrop-blur-md p-2 md:px-4 md:py-2 rounded-full md:rounded-xl shadow-lg group/back ${
-                            hasBannerArea
-                                ? 'text-white/90 bg-black/30 hover:bg-black/50 border border-white/10'
-                                : 'text-slate-700 dark:text-white/90 bg-white/70 dark:bg-white/10 hover:bg-white dark:hover:bg-white/15 border border-slate-200 dark:border-white/10'
-                        }`}>
+                <div className={`absolute top-0 left-0 right-0 h-full z-40 ${containerClasses} pointer-events-none transition-[max-width,padding] duration-300`}>
+                    <div className="pt-6 pointer-events-auto w-fit">
+                        <button type="button" aria-label="Go back" onClick={onBack} className="flex items-center font-bold transition-all backdrop-blur-md p-2 md:px-4 md:py-2 rounded-full md:rounded-xl shadow-lg group/back text-white/90 bg-black/30 hover:bg-black/50 border border-white/10">
                             <ChevronLeft className="w-5 h-5 md:w-4 md:h-4 md:mr-1 group-hover/back:-translate-x-1 transition-transform" aria-hidden="true" /> <span className="hidden md:inline">Back</span>
                         </button>
                     </div>
                 </div>
             )}
 
-            <div className={`${containerClasses} relative z-50 ${hasBannerArea ? '-mt-2 md:-mt-32' : 'mt-6'} transition-[max-width,padding] duration-300`}>
+            <div className={`${containerClasses} relative z-50 -mt-2 md:-mt-32 transition-[max-width,padding] duration-300`}>
                 <div className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-3xl shadow-2xl min-h-[80vh]">
-                    <div className={`relative md:p-12 md:pb-6 border-b border-slate-200 dark:border-white/10 p-4 ${hasBannerArea ? 'pt-0' : 'pt-4'}`}>
-                        <div className={`md:hidden flex justify-between items-end ${hasBannerArea ? '-mt-16' : 'mt-0'} mb-6 relative z-50`}>
+                    <div className="relative md:p-12 md:pb-6 border-b border-slate-200 dark:border-white/10 p-4 pt-0">
+                        <div className="md:hidden flex justify-between items-end -mt-16 mb-6 relative z-50">
                             <div className="flex-shrink-0">
                                 <label className={`block w-32 h-32 rounded-3xl bg-transparent backdrop-blur-md shadow-md border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden relative group ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <div className="absolute inset-0 bg-white/40 dark:bg-slate-900/40 z-0 backdrop-blur-md" />
@@ -287,7 +279,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                         </div>
 
                         <div className="flex flex-col md:flex-row gap-8 items-start relative z-10">
-                            <div className={`hidden md:block flex-shrink-0 relative z-50 ${hasBannerArea ? '-mt-24' : 'mt-0'} ml-2`}>
+                            <div className="hidden md:block flex-shrink-0 relative z-50 -mt-24 ml-2">
                                 <label className={`block w-56 h-56 rounded-3xl bg-transparent backdrop-blur-md shadow-xl border-[8px] border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden group relative ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <div className="absolute inset-0 bg-white/40 dark:bg-slate-900/40 z-0 backdrop-blur-md" />
                                     <input type="file" disabled={!isEditing} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
