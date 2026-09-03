@@ -22,7 +22,9 @@ public final class LauncherFeedbackView {
 
     public LauncherFeedbackView() {
         toast.getStyleClass().add("toast");
-        toast.setMaxWidth(360);
+        toast.setMinWidth(Region.USE_PREF_SIZE);
+        toast.setPrefWidth(Region.USE_COMPUTED_SIZE);
+        toast.setMaxWidth(Region.USE_PREF_SIZE);
         toast.setMaxHeight(Region.USE_PREF_SIZE);
         toast.setVisible(false);
         toast.setManaged(false);

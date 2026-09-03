@@ -26,6 +26,10 @@ public final class LauncherFeedback {
     private static final String TOAST_SUCCESS = "toast-success";
     private static final String TOAST_ERROR = "toast-error";
     private static final String TOAST_NEUTRAL = "toast-neutral";
+    private static final double TOAST_MIN_WIDTH = 224;
+    private static final double TOAST_MAX_WIDTH = 392;
+    private static final double TOAST_HORIZONTAL_CHROME = 58;
+    private static final double TOAST_COPY_MAX_WIDTH = TOAST_MAX_WIDTH - TOAST_HORIZONTAL_CHROME;
 
     private final Executor executor;
     private final Label statusText;
@@ -97,6 +101,11 @@ public final class LauncherFeedback {
     public void showToast(String title, String message) {
         toastTitle.setText(title == null ? "Modtale" : title);
         toastMessage.setText(message == null ? "" : message);
+        double toastWidth = preferredToastWidth(toastTitle.getText(), toastMessage.getText());
+        double copyWidth = toastWidth - TOAST_HORIZONTAL_CHROME;
+        toast.setMinWidth(toastWidth);
+        toast.setPrefWidth(toastWidth);
+        toast.setMaxWidth(toastWidth);
         ToastTone tone = toneFor(title);
         if (tone == ToastTone.ERROR) {
             LOG.warn("Error toast: {} - {}", toastTitle.getText(), toastMessage.getText());
@@ -107,7 +116,7 @@ public final class LauncherFeedback {
 
             VBox copy = new VBox(1, toastTitle, toastMessage);
             copy.getStyleClass().add("toast-copy");
-            copy.setMaxWidth(292);
+            copy.setMaxWidth(TOAST_COPY_MAX_WIDTH);
             HBox.setHgrow(copy, Priority.ALWAYS);
 
             HBox box = new HBox(10, toastIcon, copy);
@@ -115,12 +124,15 @@ public final class LauncherFeedback {
             box.setAlignment(Pos.TOP_LEFT);
             toastTitle.getStyleClass().add("toast-title");
             toastTitle.setWrapText(true);
-            toastTitle.setMaxWidth(292);
             toastMessage.getStyleClass().add("toast-message");
             toastMessage.setWrapText(true);
-            toastMessage.setMaxWidth(292);
             toast.getChildren().add(box);
         }
+        toastTitle.setMaxWidth(copyWidth);
+        toastMessage.setMaxWidth(copyWidth);
+        boolean hasMessage = !toastMessage.getText().isBlank();
+        toastMessage.setVisible(hasMessage);
+        toastMessage.setManaged(hasMessage);
         toast.getStyleClass().removeAll(TOAST_SUCCESS, TOAST_ERROR, TOAST_NEUTRAL);
         toast.getStyleClass().add(tone.styleClass);
         if (toastIcon != null) {
@@ -134,6 +146,20 @@ public final class LauncherFeedback {
                     toast.setVisible(false);
                     toast.setManaged(false);
                 }));
+    }
+
+    static double preferredToastWidth(String title, String message) {
+        double titleWidth = longestLineLength(title) * 7.4;
+        double messageWidth = longestLineLength(message) * 6.15;
+        double contentWidth = Math.max(titleWidth, messageWidth) + TOAST_HORIZONTAL_CHROME;
+        return Math.max(TOAST_MIN_WIDTH, Math.min(TOAST_MAX_WIDTH, Math.ceil(contentWidth)));
+    }
+
+    private static int longestLineLength(String value) {
+        if (value == null || value.isBlank()) return 0;
+        int longest = 0;
+        for (String line : value.split("\\R", -1)) longest = Math.max(longest, line.length());
+        return longest;
     }
 
     private static ToastTone toneFor(String title) {

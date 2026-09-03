@@ -8891,10 +8891,7 @@
 }
 
 .toast {
-    -fx-padding: 8px 10px;
-    -fx-pref-width: 360px;
-    -fx-max-width: 360px;
-    -fx-max-height: 72px;
+    -fx-padding: 9px 11px;
     -fx-background-radius: 10px;
     -fx-border-radius: 10px;
     -fx-border-width: 1px;
