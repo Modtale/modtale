@@ -33,7 +33,7 @@ import { StatusModal } from '@/components/ui/StatusModal';
 import { api, extractApiErrorMessage } from '@/utils/api';
 import { projectClient } from '../api/projectClient';
 import { mergeProjectVersionChangelogs, projectNeedsChangelogHydration } from '../utils/changelogHydration';
-import { isEmbeddedDependency, isExternalDependency } from '../utils/dependencyEntries';
+import { getSelectableBundleDependencies } from '../utils/dependencyEntries';
 import { resolveGalleryImages } from '../utils/galleryImages';
 import { countGalleryCarouselMarkers } from '../utils/galleryCarouselMarker';
 import { useScrollLock } from '@/hooks/useScrollLock';
@@ -378,13 +378,6 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         }
     }, [project, id, location.pathname, location.search, location.hash, navigate]);
 
-    const getDependencyId = (dep: any) => {
-        if (typeof dep === 'string') return dep;
-        if (dep && typeof dep === 'object') {
-            return dep.modId || dep.projectId || dep.id || '';
-        }
-        return '';
-    };
     const showDownloadError = useCallback((error: unknown, fallback: string) => {
         setStatusModal({
             type: 'error',
@@ -518,7 +511,10 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 return;
             }
 
-            const selectableDeps = (deps || []).filter(dep => getDependencyId(dep) && !isEmbeddedDependency(dep) && !isExternalDependency(dep));
+            // A modpack download is already a complete, validated pack plan. Routing it
+            // through the generic project bundle endpoint nests the generated pack ZIP
+            // inside another ZIP and loses reference-only metadata.
+            const selectableDeps = getSelectableBundleDependencies(project?.classification, deps);
             if (selectableDeps.length > 0) {
                 setPendingDownload({ versionNumber, gameVersion, dependencies: selectableDeps, channel: downloadChannel });
                 setIsDepModalOpen(true);

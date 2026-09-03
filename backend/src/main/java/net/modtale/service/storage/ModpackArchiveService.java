@@ -277,6 +277,7 @@ final class ModpackArchiveService {
         item.put("version", nullToEmpty(dependency.getVersionNumber()));
         item.put("source", dependency.getSource().name());
         item.put("dependencyType", dependency.getDependencyType().name());
+        item.put("environment", dependency.getEnvironment().name());
         return item;
     }
 

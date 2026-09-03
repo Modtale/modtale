@@ -128,6 +128,22 @@ class ModpackArchiveValidatorTest {
                 () -> ModpackArchiveValidator.validate(invalid)).getMessage().contains("invalid file-page URL"));
     }
 
+    @Test
+    void rejectsUnknownDependencyEnvironments() throws Exception {
+        byte[] content = bytes("trusted");
+        String invalidLock = lockEntry("MODTALE", "BUNDLED", "plugin.jar", content, false)
+                .replace("\"environment\":\"COMMON\"", "\"environment\":\"BROWSER\"");
+        byte[] archive = archive(List.of(
+                entry("modpack.json", legacyManifest()),
+                entry("manifest.json", manifest()),
+                entry("modtale.lock.json", invalidLock),
+                new ArchiveEntry("plugin.jar", content)
+        ));
+
+        assertTrue(assertThrows(IOException.class,
+                () -> ModpackArchiveValidator.validate(archive)).getMessage().contains("unknown environment"));
+    }
+
     private static String emptyLock() {
         return """
                 {
@@ -153,6 +169,7 @@ class ModpackArchiveValidatorTest {
                     "version": "1.0.0",
                     "source": "CURSEFORGE",
                     "dependencyType": "REQUIRED",
+                    "environment": "COMMON",
                     "distribution": "REFERENCE_ONLY",
                     "url": "%s",
                     "fileUrl": "%s",
@@ -181,7 +198,7 @@ class ModpackArchiveValidatorTest {
                   "pack": {},
                   "gameVersions": [],
                   "entries": [
-                    {"source":"%s","distribution":"%s"%s}
+                    {"source":"%s","environment":"COMMON","distribution":"%s"%s}
                   ]
                 }
                 """.formatted(source, distribution, integrity);

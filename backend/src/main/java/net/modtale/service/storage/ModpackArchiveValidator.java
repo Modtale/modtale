@@ -107,6 +107,9 @@ final class ModpackArchiveValidator {
                 || !manifest.path("game").isObject() || !manifest.path("dependencies").isArray()) {
             throw new IOException("Modpack manifest has an unsupported format.");
         }
+        for (JsonNode item : manifest.path("dependencies")) {
+            validateEnvironment(item);
+        }
         JsonNode lock = readJson(metadata.get("modtale.lock.json"), "Modpack lockfile");
         if (lock == null || !"modtale-lock".equals(lock.path("format").asText())
                 || lock.path("lockVersion").asInt(-1) != 1 || !lock.path("pack").isObject()
@@ -118,6 +121,7 @@ final class ModpackArchiveValidator {
         for (JsonNode item : lock.path("entries")) {
             String distribution = item.path("distribution").asText();
             String source = item.path("source").asText();
+            validateEnvironment(item);
             if ("REFERENCE_ONLY".equals(distribution)) {
                 if (item.has("path") || item.has("size") || item.has("hashes")) {
                     throw new IOException("Reference-only lock entries must not claim bundled bytes.");
@@ -154,6 +158,12 @@ final class ModpackArchiveValidator {
 
         if (!archiveEntries.keySet().equals(expectedFiles)) {
             throw new IOException("Modpack archive contains files that are not declared in the lockfile.");
+        }
+    }
+
+    private static void validateEnvironment(JsonNode item) throws IOException {
+        if (!Set.of("COMMON", "CLIENT", "SERVER").contains(item.path("environment").asText())) {
+            throw new IOException("Modpack entry has an unknown environment.");
         }
     }
 

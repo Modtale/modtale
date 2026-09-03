@@ -9,6 +9,7 @@ public class DependencyReferenceRequest {
     private String projectTitle;
     private String versionNumber;
     private ProjectDependency.DependencyType dependencyType = ProjectDependency.DependencyType.REQUIRED;
+    private ProjectDependency.Environment environment = ProjectDependency.Environment.COMMON;
     private ProjectDependency.Source source = ProjectDependency.Source.MODTALE;
     private String externalId;
     private String externalUrl;
@@ -35,6 +36,14 @@ public class DependencyReferenceRequest {
 
     public void setDependencyType(ProjectDependency.DependencyType dependencyType) {
         this.dependencyType = dependencyType == null ? ProjectDependency.DependencyType.REQUIRED : dependencyType;
+    }
+
+    public ProjectDependency.Environment getEnvironment() {
+        return environment == null ? ProjectDependency.Environment.COMMON : environment;
+    }
+
+    public void setEnvironment(ProjectDependency.Environment environment) {
+        this.environment = environment == null ? ProjectDependency.Environment.COMMON : environment;
     }
 
     public ProjectDependency.Source getSource() {

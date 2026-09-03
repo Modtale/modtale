@@ -49,8 +49,8 @@ public class VersionDependencyService {
 
             ProjectDependency.Source source = reference.getSource();
             ProjectDependency dependency = source == ProjectDependency.Source.MODTALE
-                    ? resolveModtaleDependency(reference, isModpack, allowDraftDependencies)
-                    : resolveExternalDependency(reference, source, isModpack);
+                    ? resolveModtaleDependency(reference, allowDraftDependencies)
+                    : resolveExternalDependency(reference, source);
             String dependencyKey = dependency.getSource().name() + ":" + dependency.getProjectId().toLowerCase(Locale.ROOT);
             if (!dependencyKeys.add(dependencyKey)) {
                 throw new InvalidVersionRequestException("Each dependency can only be included once.");
@@ -95,7 +95,6 @@ public class VersionDependencyService {
 
     private ProjectDependency resolveModtaleDependency(
             DependencyReferenceRequest reference,
-            boolean isModpack,
             boolean allowDraftDependencies
     ) {
         String projectId = trimToNull(reference.getProjectId());
@@ -113,9 +112,7 @@ public class VersionDependencyService {
             throw new InvalidVersionRequestException("One or more selected dependencies could not be found.");
         }
 
-        ProjectDependency.DependencyType dependencyType = isModpack
-                ? ProjectDependency.DependencyType.REQUIRED
-                : reference.getDependencyType();
+        ProjectDependency.DependencyType dependencyType = reference.getDependencyType();
         ProjectDependency dependency = ProjectDependency.modtale(
                 dependencyProject.getId(),
                 dependencyProject.getTitle(),
@@ -123,13 +120,13 @@ public class VersionDependencyService {
                 dependencyType
         );
         dependency.setId(reference.getId());
+        dependency.setEnvironment(reference.getEnvironment());
         return dependency;
     }
 
     private ProjectDependency resolveExternalDependency(
             DependencyReferenceRequest reference,
-            ProjectDependency.Source source,
-            boolean isModpack
+            ProjectDependency.Source source
     ) {
         String externalUrl = trimToNull(reference.getExternalUrl());
         String title = trimToNull(reference.getProjectTitle());
@@ -152,11 +149,10 @@ public class VersionDependencyService {
             throw new InvalidVersionRequestException("External dependencies must be confirmed as Hytale-compatible projects.");
         }
 
-        ProjectDependency.DependencyType dependencyType = isModpack
-                ? ProjectDependency.DependencyType.REQUIRED
-                : reference.getDependencyType();
+        ProjectDependency.DependencyType dependencyType = reference.getDependencyType();
         ProjectDependency dependency = ProjectDependency.external(source, externalId, title, versionNumber, externalUrl, dependencyType);
         dependency.setId(reference.getId());
+        dependency.setEnvironment(reference.getEnvironment());
         dependency.setExternalFileUrl(trimToNull(reference.getExternalFileUrl()));
         dependency.setExternalFileName(trimToNull(reference.getExternalFileName()));
         dependency.setHytaleProjectConfirmed(hytaleProjectConfirmed);

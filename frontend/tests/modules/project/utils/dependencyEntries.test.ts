@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
     dependencyProjectKey,
+    getDependencyEnvironment,
     getDependencyType,
+    getSelectableBundleDependencies,
     isEmbeddedDependency,
     isExternalDependency,
     isOptionalDependency,
@@ -18,7 +20,13 @@ describe('dependencyEntries', () => {
         });
 
         expect(dependency.dependencyType).toBe('REQUIRED');
+        expect(dependency.environment).toBe('COMMON');
         expect(dependency.source).toBe('MODTALE');
+    });
+
+    it('defaults environment to common and preserves explicit sides', () => {
+        expect(getDependencyEnvironment(dependency('REQUIRED'))).toBe('COMMON');
+        expect(getDependencyEnvironment({ ...dependency('REQUIRED'), environment: 'SERVER' })).toBe('SERVER');
     });
 
     it('classifies dependency types from structured fields', () => {
@@ -35,6 +43,16 @@ describe('dependencyEntries', () => {
         expect(dependencyProjectKey(dependency('REQUIRED', 'MODTALE'))).toBe('MODTALE:dep-1');
         expect(dependencyProjectKey(dependency('REQUIRED', 'GITHUB'))).toBe('GITHUB:dep-1');
         expect(isExternalDependency(dependency('REQUIRED', 'GITHUB'))).toBe(true);
+    });
+
+    it('never routes a modpack through the generic nested bundle flow', () => {
+        const dependencies = [
+            dependency('REQUIRED'),
+            dependency('OPTIONAL', 'GITHUB')
+        ];
+
+        expect(getSelectableBundleDependencies('MODPACK', dependencies)).toEqual([]);
+        expect(getSelectableBundleDependencies('PLUGIN', dependencies)).toEqual([dependencies[0]]);
     });
 });
 

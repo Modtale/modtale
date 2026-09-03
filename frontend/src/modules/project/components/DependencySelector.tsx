@@ -4,10 +4,10 @@ import { projectClient } from '@/modules/project/api/projectClient';
 import { compareSemVer } from '@/utils/modHelpers';
 import { theme } from '@/styles/theme';
 import { BACKEND_URL } from '@/utils/api';
-import type { DependencySource, DependencyType, ExternalProjectFile, ExternalProjectReference, Project, ProjectDependency, ProjectVersion } from '@/types';
+import type { DependencyEnvironment, DependencySource, DependencyType, ExternalProjectFile, ExternalProjectReference, Project, ProjectDependency, ProjectVersion } from '@/types';
 import { VersionRelationKind } from '@/types';
 import { useScrollLock } from '@/hooks/useScrollLock';
-import { dependencyProjectKey, getDependencyType, isExternalDependency, isOptionalDependency, normalizeDependencyReference } from '../utils/dependencyEntries';
+import { dependencyProjectKey, getDependencyEnvironment, getDependencyType, isExternalDependency, isOptionalDependency, normalizeDependencyReference } from '../utils/dependencyEntries';
 import { useToast } from '@/components/ui/Toast';
 import { ModalPortal } from '@/components/ui/ModalPortal';
 
@@ -78,6 +78,17 @@ const DEPENDENCY_TYPE_OPTIONS: DropdownOption<DependencyType>[] = [
     { value: 'REQUIRED', label: 'Required' },
     { value: 'OPTIONAL', label: 'Optional' },
     { value: 'EMBEDDED', label: 'Embedded' }
+];
+
+const MODPACK_ENTRY_TYPE_OPTIONS: DropdownOption<DependencyType>[] = [
+    { value: 'REQUIRED', label: 'Required' },
+    { value: 'OPTIONAL', label: 'Optional' }
+];
+
+const ENVIRONMENT_OPTIONS: DropdownOption<DependencyEnvironment>[] = [
+    { value: 'COMMON', label: 'Client + server' },
+    { value: 'CLIENT', label: 'Client only' },
+    { value: 'SERVER', label: 'Server only' }
 ];
 
 const CustomDropdown = <T extends string>({
@@ -154,15 +165,17 @@ const buildModtaleDependency = (project: Project, versionNumber: string, depende
     projectTitle: project.title,
     versionNumber,
     dependencyType,
+    environment: 'COMMON',
     source: 'MODTALE'
 });
 
-const cloneDependencyForForm = (dependency: ProjectDependency, forceRequired = false): ProjectDependency => ({
+const cloneDependencyForForm = (dependency: ProjectDependency): ProjectDependency => ({
     id: dependency.id || createUuid(),
     projectId: dependency.projectId,
     projectTitle: dependency.projectTitle,
     versionNumber: dependency.versionNumber,
-    dependencyType: forceRequired ? 'REQUIRED' : getDependencyType(dependency),
+    dependencyType: getDependencyType(dependency),
+    environment: getDependencyEnvironment(dependency),
     source: dependency.source || 'MODTALE',
     externalId: dependency.externalId,
     externalUrl: dependency.externalUrl,
@@ -432,7 +445,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
 
         const missingDependencies = !isIncompatibilityMode && sourceVersion?.dependencies
             ? sourceVersion.dependencies
-                .map(dep => cloneDependencyForForm(dep, isModpack))
+                .map(cloneDependencyForForm)
                 .filter(dep => !nextDeps.some(existing => dependencyProjectKey(existing) === dependencyProjectKey(dep)))
                 .filter(dep => dep.projectId !== currentProjectId)
             : [];
@@ -487,9 +500,16 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
     };
 
     const cycleDependencyType = (index: number, nextType: DependencyType) => {
-        if (disabled || isModpack || isIncompatibilityMode) return;
+        if (disabled || isIncompatibilityMode) return;
         const next = [...dependencies];
         next[index] = { ...next[index], dependencyType: nextType };
+        onChange(next);
+    };
+
+    const changeEnvironment = (index: number, environment: DependencyEnvironment) => {
+        if (disabled || !isModpack || isIncompatibilityMode) return;
+        const next = [...dependencies];
+        next[index] = { ...next[index], environment };
         onChange(next);
     };
 
@@ -572,7 +592,8 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
             projectId,
             projectTitle: title,
             versionNumber: version,
-            dependencyType: isModpack ? 'REQUIRED' : dependencyType,
+            dependencyType,
+            environment: 'COMMON',
             source,
             externalId: resolved.externalId,
             externalUrl: referenceUrl,
@@ -630,9 +651,10 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                                     {showAlphaBeta ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
                                 </button>
                             </div>
-                            {!isModpack && (
-                                <div className="grid grid-cols-3 gap-2">
-                                    {(['REQUIRED', 'OPTIONAL', 'EMBEDDED'] as DependencyType[]).map(type => (
+                            <div className={`grid ${isModpack ? 'grid-cols-2' : 'grid-cols-3'} gap-2`}>
+                                    {(isModpack
+                                        ? ['REQUIRED', 'OPTIONAL'] as DependencyType[]
+                                        : ['REQUIRED', 'OPTIONAL', 'EMBEDDED'] as DependencyType[]).map(type => (
                                         <button
                                             key={type}
                                             type="button"
@@ -642,8 +664,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                                             {type}
                                         </button>
                                     ))}
-                                </div>
-                            )}
+                            </div>
                         </div>
 
                         <div className="p-4 overflow-y-auto flex-1 bg-slate-50/50 dark:bg-slate-900/50 space-y-2">
@@ -657,7 +678,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                                     <button
                                         key={version.id}
                                         type="button"
-                                        onClick={() => addDependency(buildModtaleDependency(selectedProject, version.versionNumber, isModpack ? 'REQUIRED' : dependencyType), selectedProject, version)}
+                                        onClick={() => addDependency(buildModtaleDependency(selectedProject, version.versionNumber, dependencyType), selectedProject, version)}
                                         className={`w-full text-left px-4 py-3 flex justify-between items-center rounded-xl transition-all shadow-sm border ${!isCompatible ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-white/10 hover:border-modtale-accent/40 dark:hover:border-modtale-accent/50'}`}
                                     >
                                         <div>
@@ -737,9 +758,10 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                                 />
                             )}
 
-                            {!isModpack && (
-                                <div className="grid grid-cols-3 gap-2">
-                                    {(['REQUIRED', 'OPTIONAL', 'EMBEDDED'] as DependencyType[]).map(type => (
+                            <div className={`grid ${isModpack ? 'grid-cols-2' : 'grid-cols-3'} gap-2`}>
+                                    {(isModpack
+                                        ? ['REQUIRED', 'OPTIONAL'] as DependencyType[]
+                                        : ['REQUIRED', 'OPTIONAL', 'EMBEDDED'] as DependencyType[]).map(type => (
                                         <button
                                             key={type}
                                             type="button"
@@ -749,8 +771,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                                             {type}
                                         </button>
                                     ))}
-                                </div>
-                            )}
+                            </div>
 
                             <input value={externalTitle} onChange={event => setExternalTitle(event.target.value)} className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-modtale-accent ${theme.colors.textPrimary}`} placeholder="Project title" />
                             <input value={externalVersion} onChange={event => setExternalVersion(event.target.value)} className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-modtale-accent ${theme.colors.textPrimary}`} placeholder="Version" />
@@ -828,7 +849,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                                     <div className={`text-xs ${theme.colors.textMuted} font-mono`}>v{dep.versionNumber}</div>
                                 </div>
                                 <button type="button" onClick={() => {
-                                    const dependency = cloneDependencyForForm(dep, isModpack);
+                                    const dependency = cloneDependencyForForm(dep);
                                     if (!dependencies.some(existing => dependencyProjectKey(existing) === dependencyProjectKey(dependency))) {
                                         onChange([...dependencies, dependency]);
                                     }
@@ -934,13 +955,23 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0">
-                                        {dependency && !isModpack && !isIncompatibilityMode && (
+                                        {dependency && !isIncompatibilityMode && (
                                             <CustomDropdown
                                                 value={depType}
-                                                options={DEPENDENCY_TYPE_OPTIONS}
+                                                options={isModpack ? MODPACK_ENTRY_TYPE_OPTIONS : DEPENDENCY_TYPE_OPTIONS}
                                                 onChange={nextType => cycleDependencyType(index, nextType)}
                                                 disabled={disabled}
                                                 className="w-32"
+                                                buttonClassName="rounded-lg px-2 py-1.5 text-xs"
+                                            />
+                                        )}
+                                        {dependency && isModpack && !isIncompatibilityMode && (
+                                            <CustomDropdown
+                                                value={getDependencyEnvironment(dependency)}
+                                                options={ENVIRONMENT_OPTIONS}
+                                                onChange={environment => changeEnvironment(index, environment)}
+                                                disabled={disabled}
+                                                className="w-36"
                                                 buttonClassName="rounded-lg px-2 py-1.5 text-xs"
                                             />
                                         )}

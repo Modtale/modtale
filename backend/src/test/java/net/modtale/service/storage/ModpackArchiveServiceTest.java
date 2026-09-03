@@ -138,6 +138,7 @@ class ModpackArchiveServiceTest {
                 ProjectDependency.DependencyType.OPTIONAL
         );
         curseForge.setExternalFileUrl("https://www.curseforge.com/hytale/mods/external-mod/files/8227810");
+        curseForge.setEnvironment(ProjectDependency.Environment.CLIENT);
         version.setDependencies(List.of(hosted, curseForge));
 
         Project hostedProject = dependencyProject("plugin", ProjectClassification.PLUGIN);
@@ -167,6 +168,7 @@ class ModpackArchiveServiceTest {
         assertEquals("1450386", lock.at("/entries/1/provider/projectId").asText());
         assertEquals("8227810", lock.at("/entries/1/provider/fileId").asText());
         assertEquals("OPTIONAL", lock.at("/entries/1/dependencyType").asText());
+        assertEquals("CLIENT", lock.at("/entries/1/environment").asText());
         assertFalse(entries.containsKey("External-Mod-1.0.0.jar"));
     }
 
