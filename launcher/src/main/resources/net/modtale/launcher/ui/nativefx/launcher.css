@@ -8622,6 +8622,17 @@
     -fx-effect: null;
 }
 
+.library-action-divider {
+    -fx-min-width: 1px;
+    -fx-pref-width: 1px;
+    -fx-max-width: 1px;
+    -fx-min-height: 22px;
+    -fx-pref-height: 22px;
+    -fx-max-height: 22px;
+    -fx-background-color: rgba(148, 163, 184, 0.30);
+    -fx-background-radius: 999px;
+}
+
 .library-compact-icon-action {
     -fx-min-width: 34px;
     -fx-pref-width: 34px;

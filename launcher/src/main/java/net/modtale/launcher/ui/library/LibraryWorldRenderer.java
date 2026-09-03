@@ -133,10 +133,9 @@ final class LibraryWorldRenderer {
         updates.setAccessibleText("Check for updates");
         updates.setTooltip(new Tooltip("Check for updates"));
         updates.setOnAction(event -> checkUpdates.run());
-        Region actionGap = new Region();
-        actionGap.setMinWidth(6);
-        actionGap.setPrefWidth(6);
-        actionGap.setMaxWidth(6);
+        Region actionDivider = new Region();
+        actionDivider.getStyleClass().add("library-action-divider");
+        actionDivider.setMouseTransparent(true);
         Button share = secondaryButton("Share");
         share.getStyleClass().addAll("small", "library-compact-icon-action");
         share.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.SHARE_2, 14));
@@ -150,7 +149,7 @@ final class LibraryWorldRenderer {
         pack.setMinWidth(Region.USE_PREF_SIZE);
         pack.setTooltip(new Tooltip("Start a Modtale modpack from this world's enabled mods"));
         pack.setOnAction(event -> createModpackFromWorld.accept(model.world()));
-        actions.getChildren().addAll(refresh, updates, actionGap, share, pack);
+        actions.getChildren().addAll(refresh, updates, actionDivider, share, pack);
 
         row.getChildren().addAll(icon, copy, actions);
         section.getChildren().add(row);
