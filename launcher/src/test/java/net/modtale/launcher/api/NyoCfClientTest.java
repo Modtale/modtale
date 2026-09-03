@@ -64,9 +64,9 @@ class NyoCfClientTest {
                 """);
         });
 
-        ProjectPage browse = client.search(new ProjectSearchQuery("compost", null, "Early Access", "downloads",
+        ProjectPage browse = client.search(new ProjectSearchQuery("compost", "mods", "Early Access", "downloads",
                 0, 20, null, null, null, null, null, null));
-        client.search(new ProjectSearchQuery("compost", null, "Early Access", "downloads",
+        client.search(new ProjectSearchQuery("compost", "mods", "Early Access", "downloads",
                 0, 20, null, null, null, null, null, null));
         ProjectDetail detail = client.project(1450386);
         DownloadUrlResponse download = client.download(1450386, 8747324);
@@ -83,6 +83,41 @@ class NyoCfClientTest {
                 download.downloadUrl());
         assertEquals(100897L, download.fileSize());
         assertEquals("298f05d4294ad6573f1860239b667f76ab510716", download.hashes().get("sha1"));
+    }
+
+    @Test
+    void routesCurseForgePillSelectionsToTheirProjectClass() {
+        AtomicInteger requests = new AtomicInteger();
+        server.createContext("/api/v1/hytale/prefabs/search", exchange -> {
+            requests.incrementAndGet();
+            assertTrue(exchange.getRequestURI().getRawQuery().contains("q=castle"));
+            respond(exchange, "{\"data\":[],\"pagination\":{\"total\":0}}");
+        });
+
+        ProjectPage result = client.search(new ProjectSearchQuery(
+                "castle", "prefabs", null, "downloads", 0, 12,
+                null, null, null, null, null, null));
+
+        assertEquals(1, requests.get());
+        assertEquals(0, result.totalElements());
+    }
+
+    @Test
+    void allSelectionCombinesEveryCurseForgeProjectClass() {
+        AtomicInteger requests = new AtomicInteger();
+        for (String projectClass : java.util.List.of("mods", "prefabs", "worlds", "bootstrap", "translations")) {
+            server.createContext("/api/v1/hytale/" + projectClass + "/search", exchange -> {
+                requests.incrementAndGet();
+                respond(exchange, "{\"data\":[],\"pagination\":{\"total\":2}}");
+            });
+        }
+
+        ProjectPage result = client.search(new ProjectSearchQuery(
+                "", "", null, "downloads", 0, 12,
+                null, null, null, null, null, null));
+
+        assertEquals(5, requests.get());
+        assertEquals(10, result.totalElements());
     }
 
     private void respond(HttpExchange exchange, String body) throws IOException {

@@ -18,6 +18,15 @@ public final class BrowseOptions {
             ClassificationOption.DATA
     );
 
+    public static final List<ClassificationOption> CURSEFORGE_PROJECT_TYPES = List.of(
+            ClassificationOption.CURSEFORGE_ALL,
+            ClassificationOption.CURSEFORGE_MODS,
+            ClassificationOption.CURSEFORGE_PREFABS,
+            ClassificationOption.CURSEFORGE_WORLDS,
+            ClassificationOption.CURSEFORGE_BOOTSTRAP,
+            ClassificationOption.CURSEFORGE_TRANSLATIONS
+    );
+
     public static final List<Integer> BROWSE_ITEMS_PER_PAGE_OPTIONS = List.of(6, 12, 24, 48, 96);
 
     public static final int DEFAULT_ITEMS_PER_PAGE = 12;
@@ -99,15 +108,22 @@ public final class BrowseOptions {
     }
 
     public enum ClassificationOption {
-        ALL("All Projects", null, "All Projects", LauncherIcons.Glyph.LAYOUT),
+        ALL("All Projects", "", "All Projects", LauncherIcons.Glyph.LAYOUT),
         PLUGINS("Plugins", ProjectClassification.PLUGIN, "Plugins", LauncherIcons.Glyph.FILE_CODE),
         DATA("Data", ProjectClassification.DATA, "Data Assets", LauncherIcons.Glyph.DATABASE),
         ART("Art", ProjectClassification.ART, "Art Assets", LauncherIcons.Glyph.PALETTE),
         WORLDS("Worlds", ProjectClassification.SAVE, "Worlds", LauncherIcons.Glyph.SAVE),
-        MODPACKS("Modpacks", ProjectClassification.MODPACK, "Modpacks", LauncherIcons.Glyph.LAYERS);
+        MODPACKS("Modpacks", ProjectClassification.MODPACK, "Modpacks", LauncherIcons.Glyph.LAYERS),
+        CURSEFORGE_ALL("All", "", "All", LauncherIcons.Glyph.LAYOUT),
+        CURSEFORGE_MODS("Mods", "mods", "Mods", LauncherIcons.Glyph.FILE_CODE),
+        CURSEFORGE_PREFABS("Prefabs", "prefabs", "Prefabs", LauncherIcons.Glyph.IMAGE),
+        CURSEFORGE_WORLDS("Worlds", "worlds", "Worlds", LauncherIcons.Glyph.SAVE),
+        CURSEFORGE_BOOTSTRAP("Bootstrap", "bootstrap", "Bootstrap", LauncherIcons.Glyph.ZAP),
+        CURSEFORGE_TRANSLATIONS("Translations", "translations", "Translations", LauncherIcons.Glyph.GLOBE);
 
         private final String label;
         private final ProjectClassification projectClassification;
+        private final String apiValue;
         private final String browseMenuLabel;
         private final LauncherIcons.Glyph icon;
 
@@ -119,6 +135,15 @@ public final class BrowseOptions {
         ) {
             this.label = label;
             this.projectClassification = projectClassification;
+            this.apiValue = projectClassification == null ? "" : projectClassification.apiValue();
+            this.browseMenuLabel = browseMenuLabel;
+            this.icon = icon;
+        }
+
+        ClassificationOption(String label, String apiValue, String browseMenuLabel, LauncherIcons.Glyph icon) {
+            this.label = label;
+            this.projectClassification = null;
+            this.apiValue = apiValue;
             this.browseMenuLabel = browseMenuLabel;
             this.icon = icon;
         }
@@ -132,7 +157,7 @@ public final class BrowseOptions {
         }
 
         public String apiValue() {
-            return projectClassification == null ? "" : projectClassification.apiValue();
+            return apiValue;
         }
 
         public String browseMenuLabel() {
@@ -144,7 +169,7 @@ public final class BrowseOptions {
         }
 
         public boolean isDefault() {
-            return this == ALL;
+            return this == ALL || this == CURSEFORGE_ALL;
         }
 
         public static ClassificationOption defaultOption() {

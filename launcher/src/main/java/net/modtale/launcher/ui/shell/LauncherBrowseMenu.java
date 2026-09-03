@@ -242,6 +242,7 @@ public final class LauncherBrowseMenu {
             case WORLDS -> "browse.worlds";
             case ART -> "browse.art";
             case DATA -> "browse.data";
+            default -> "browse.all";
         };
     }
 }

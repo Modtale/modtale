@@ -43,10 +43,12 @@ public final class ProjectBrowseCategories {
     private final Region rightFade = new Region();
     private final ReadOnlyDoubleWrapper contentWidth = new ReadOnlyDoubleWrapper();
     private final ReadOnlyBooleanWrapper overflowing = new ReadOnlyBooleanWrapper();
+    private List<BrowseOptions.ClassificationOption> options = BrowseOptions.PROJECT_TYPES;
 
     private Timeline pillTimeline;
     private BrowseOptions.ClassificationOption selectedClassification = BrowseOptions.ClassificationOption.defaultOption();
     private Node view;
+    private HBox pillButtons;
 
     public ProjectBrowseCategories(LauncherScrollSupport scrollSupport, Runnable onSearch) {
         this.scrollSupport = scrollSupport;
@@ -82,7 +84,7 @@ public final class ProjectBrowseCategories {
 
     public void selectClassification(BrowseOptions.ClassificationOption classification) {
         selectedClassification = classification == null
-                ? BrowseOptions.ClassificationOption.defaultOption()
+                ? options.getFirst()
                 : classification;
         refresh();
         onSearch.run();
@@ -93,12 +95,20 @@ public final class ProjectBrowseCategories {
         animatePill();
     }
 
+    public void showCurseForgeOptions(boolean curseForge) {
+        List<BrowseOptions.ClassificationOption> next = curseForge
+                ? BrowseOptions.CURSEFORGE_PROJECT_TYPES
+                : BrowseOptions.PROJECT_TYPES;
+        if (options.equals(next)) return;
+        options = next;
+        selectedClassification = options.getFirst();
+        if (pillButtons != null) rebuildCategories();
+    }
+
     private Node buildView() {
-        HBox pills = new HBox(4);
-        pills.getStyleClass().add("category-pill-buttons");
-        for (BrowseOptions.ClassificationOption option : BrowseOptions.PROJECT_TYPES) {
-            addCategory(pills, option);
-        }
+        pillButtons = new HBox(4);
+        pillButtons.getStyleClass().add("category-pill-buttons");
+        rebuildCategories();
         pillIndicator.getStyleClass().add("category-pill-indicator");
         pillIndicator.setMouseTransparent(true);
         pillIndicator.setVisible(false);
@@ -108,13 +118,13 @@ public final class ProjectBrowseCategories {
         pillIndicator.setMaxWidth(0);
         pillIndicator.setMaxHeight(36);
         pillIndicator.setScaleX(1);
-        StackPane pillShell = new StackPane(pillIndicator, pills);
+        StackPane pillShell = new StackPane(pillIndicator, pillButtons);
         pillShell.getStyleClass().add("category-pills");
         pillShell.setMinHeight(46);
         pillShell.setPrefHeight(46);
         pillShell.setAlignment(Pos.CENTER_LEFT);
         StackPane.setAlignment(pillIndicator, Pos.CENTER_LEFT);
-        StackPane.setAlignment(pills, Pos.CENTER_LEFT);
+        StackPane.setAlignment(pillButtons, Pos.CENTER_LEFT);
 
         ScrollPane categoryScroll = new ScrollPane(pillShell);
         categoryScroll.getStyleClass().add("category-scroll");
@@ -140,6 +150,18 @@ public final class ProjectBrowseCategories {
         Platform.runLater(() -> updateContentWidth(frame, pillShell.getLayoutBounds().getWidth()));
         Platform.runLater(this::refresh);
         return frame;
+    }
+
+    private void rebuildCategories() {
+        if (pillTimeline != null) pillTimeline.stop();
+        categoryButtons.clear();
+        pillButtons.getChildren().clear();
+        for (BrowseOptions.ClassificationOption option : options) addCategory(pillButtons, option);
+        pillIndicator.setVisible(false);
+        pillIndicator.setMinWidth(0);
+        pillIndicator.setPrefWidth(0);
+        pillIndicator.setMaxWidth(0);
+        Platform.runLater(this::refresh);
     }
 
     private void addCategory(HBox pane, BrowseOptions.ClassificationOption option) {
@@ -214,7 +236,7 @@ public final class ProjectBrowseCategories {
     private void animatePill() {
         Button selected = categoryButtons.getOrDefault(
                 selectedClassification,
-                categoryButtons.get(BrowseOptions.ClassificationOption.defaultOption())
+                categoryButtons.get(options.getFirst())
         );
         if (selected == null) {
             return;

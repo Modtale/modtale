@@ -32,6 +32,8 @@ final class NyoCfClient {
     private static final String CURSEFORGE_SITE = "https://www.curseforge.com";
     private static final long HYTALE_GAME_ID = 70216;
     private static final int BANNER_LOOKUP_BATCH_SIZE = 4;
+    private static final List<String> PROJECT_CLASSES = List.of(
+            "mods", "prefabs", "worlds", "bootstrap", "translations");
     private final HttpClient httpClient;
     private final URI baseUri;
     private final ObjectMapper mapper = new ObjectMapper();
@@ -49,12 +51,18 @@ final class NyoCfClient {
     ProjectPage search(ProjectSearchQuery query) {
         int page = Math.max(0, query.page());
         int size = Math.max(1, Math.min(50, query.size()));
-        String path = "/api/v1/hytale/mods/search?q=" + encode(value(query.search()))
+        String projectClass = projectClass(query.classification());
+        if (projectClass == null) return searchAll(query, page, size);
+        return searchClass(query, projectClass, page, size);
+    }
+
+    private ProjectPage searchClass(ProjectSearchQuery query, String projectClass, int page, int size) {
+        String path = "/api/v1/hytale/" + projectClass + "/search?q=" + encode(value(query.search()))
                 + "&limit=" + size + "&offset=" + (page * size) + "&include_files=true";
         JsonNode envelope = get(path);
         List<ProjectSummary> projects = new ArrayList<>();
         for (JsonNode item : envelope.path("data")) {
-            ProjectSummary project = summary(item, query.gameVersion());
+            ProjectSummary project = summary(item, query.gameVersion(), projectClass);
             if (project != null) projects.add(project);
         }
         projects = withGalleryBanners(projects);
@@ -62,6 +70,30 @@ final class NyoCfClient {
         long total = Math.max(projects.size(), envelope.path("pagination").path("total").asLong(projects.size()));
         int pages = total == 0 ? 0 : (int) Math.ceil(total / (double) size);
         return new ProjectPage(List.copyOf(projects), pages, total, page, page + 1 >= pages);
+    }
+
+    private ProjectPage searchAll(ProjectSearchQuery query, int page, int size) {
+        List<CompletableFuture<ProjectPage>> searches = PROJECT_CLASSES.stream()
+                .map(projectClass -> CompletableFuture.supplyAsync(
+                        () -> searchClass(query, projectClass, page, size)))
+                .toList();
+        List<ProjectSummary> projects = new ArrayList<>();
+        long total = 0;
+        for (CompletableFuture<ProjectPage> search : searches) {
+            ProjectPage result = search.join();
+            projects.addAll(result.content());
+            total += result.totalElements();
+        }
+        sort(projects, query.sort());
+        List<ProjectSummary> pageContent = projects.stream().limit(size).toList();
+        int pages = total == 0 ? 0 : (int) Math.ceil(total / (double) size);
+        return new ProjectPage(pageContent, pages, total, page, page + 1 >= pages);
+    }
+
+    private String projectClass(String classification) {
+        String normalized = value(classification).toLowerCase(Locale.ROOT);
+        if (normalized.isBlank()) return null;
+        return PROJECT_CLASSES.contains(normalized) ? normalized : "mods";
     }
 
     ProjectDetail project(long projectId) {
@@ -100,11 +132,11 @@ final class NyoCfClient {
                 hashes(file.path("hashes")), "CURSEFORGE");
     }
 
-    private ProjectSummary summary(JsonNode item, String gameVersion) {
+    private ProjectSummary summary(JsonNode item, String gameVersion, String projectClass) {
         long id = item.path("id").asLong(0);
         String slug = text(item, "slug");
         if (id <= 0 || slug == null || !slug.matches("[a-z0-9-]+")) return null;
-        String website = CURSEFORGE_SITE + "/hytale/mods/" + slug;
+        String website = CURSEFORGE_SITE + "/hytale/" + projectClass + "/" + slug;
         List<ProjectVersion> versions = versions(item.path("recent_files"), website, gameVersion);
         if (!value(gameVersion).isBlank() && versions.isEmpty()) return null;
         String providerId = "curseforge:" + id;
@@ -256,7 +288,7 @@ final class NyoCfClient {
             URI uri = URI.create(value);
             return "https".equalsIgnoreCase(uri.getScheme()) && uri.getUserInfo() == null && uri.getPort() == -1
                     && "www.curseforge.com".equalsIgnoreCase(uri.getHost()) && uri.getPath() != null
-                    && uri.getPath().matches("/hytale/mods/[a-z0-9-]+/?");
+                    && uri.getPath().matches("/hytale/(mods|prefabs|worlds|bootstrap|translations)/[a-z0-9-]+/?");
         } catch (IllegalArgumentException ignored) {
             return false;
         }
