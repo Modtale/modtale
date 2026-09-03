@@ -7,7 +7,6 @@ import static net.modtale.launcher.ui.common.LauncherUi.secondaryButton;
 import static net.modtale.launcher.ui.common.LauncherUi.setVisibleManaged;
 import static net.modtale.launcher.ui.common.LauncherUi.value;
 
-import java.awt.Desktop;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -72,6 +71,7 @@ import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import net.modtale.launcher.api.ModtaleApiClient;
+import net.modtale.launcher.platform.SystemBrowser;
 import net.modtale.launcher.model.project.ProjectClassification;
 import net.modtale.launcher.model.project.GameVersionCatalog;
 import net.modtale.launcher.model.project.ProjectComment;
@@ -3113,12 +3113,8 @@ public final class ProjectPageController {
             showBrowserError("Invalid page URL.");
             return;
         }
-        if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-            showBrowserError("Desktop browser integration is not available.");
-            return;
-        }
         try {
-            Desktop.getDesktop().browse(uri);
+            SystemBrowser.open(uri);
         } catch (IOException | SecurityException | UnsupportedOperationException ex) {
             LOG.warn("Could not open browser URL {}", uri, ex);
             showBrowserError(value(ex.getMessage(), "Could not open your browser."));

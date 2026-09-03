@@ -23,6 +23,7 @@ import java.util.Locale;
 import java.util.Optional;
 import net.modtale.launcher.api.ModtaleApiException;
 import net.modtale.launcher.logging.LogSanitizer;
+import net.modtale.launcher.platform.SystemBrowser;
 import net.modtale.launcher.settings.LauncherConfig;
 import net.modtale.launcher.logging.LauncherLog;
 import net.modtale.launcher.logging.LauncherLogger;
@@ -135,11 +136,8 @@ public class LauncherUpdateService {
         if (releaseUrl == null || releaseUrl.isBlank()) {
             releaseUrl = "https://github.com/" + repository + "/releases";
         }
-        if (!Desktop.isDesktopSupported()) {
-            throw new ModtaleApiException("This desktop environment cannot open the launcher release page automatically.");
-        }
         try {
-            Desktop.getDesktop().browse(URI.create(releaseUrl));
+            SystemBrowser.open(URI.create(releaseUrl));
         } catch (IOException ex) {
             LOG.warn("Could not open launcher release page " + LogSanitizer.url(releaseUrl), ex);
             throw new ModtaleApiException("Could not open launcher release page " + releaseUrl, ex);
