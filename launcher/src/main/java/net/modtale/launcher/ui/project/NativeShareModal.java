@@ -2,7 +2,6 @@ package net.modtale.launcher.ui.project;
 
 import static net.modtale.launcher.ui.common.LauncherUi.value;
 
-import java.awt.Desktop;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -10,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import net.modtale.launcher.platform.SystemBrowser;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
@@ -229,15 +229,10 @@ final class NativeShareModal {
 
     private void openUrl(String rawUrl) {
         try {
-            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                Desktop.getDesktop().browse(URI.create(rawUrl));
-                return;
-            }
+            SystemBrowser.open(URI.create(rawUrl));
         } catch (IOException | IllegalArgumentException | SecurityException | UnsupportedOperationException ex) {
             error.accept(value(ex.getMessage(), "Could not open your browser."));
-            return;
         }
-        error.accept("Desktop browser integration is not available.");
     }
 
 }

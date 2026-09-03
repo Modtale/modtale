@@ -1,12 +1,12 @@
 package net.modtale.launcher.ui.common;
 
-import java.awt.Desktop;
 import java.net.URI;
 import java.util.function.BiConsumer;
 import net.modtale.launcher.logging.LogSanitizer;
 import net.modtale.launcher.settings.LauncherConfig;
 import net.modtale.launcher.logging.LauncherLog;
 import net.modtale.launcher.logging.LauncherLogger;
+import net.modtale.launcher.platform.SystemBrowser;
 
 public final class LauncherExternalLinks {
 
@@ -17,12 +17,8 @@ public final class LauncherExternalLinks {
 
     public static void open(String rawLink, BiConsumer<String, String> toast) {
         URI uri = resolve(rawLink);
-        if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-            showError(toast, "Desktop browser integration is not available.");
-            return;
-        }
         try {
-            Desktop.getDesktop().browse(uri);
+            SystemBrowser.open(uri);
         } catch (Exception ex) {
             LOG.warn("Could not open {}", LogSanitizer.uri(uri), ex);
             showError(toast, "Could not open " + uri + ".");

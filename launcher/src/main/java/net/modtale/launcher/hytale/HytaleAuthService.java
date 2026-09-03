@@ -2,7 +2,6 @@ package net.modtale.launcher.hytale;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
-import java.awt.Desktop;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -25,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.modtale.launcher.platform.SystemBrowser;
 import net.modtale.launcher.settings.LauncherSettings;
 import net.modtale.launcher.settings.SettingsStore;
 
@@ -481,11 +481,8 @@ public class HytaleAuthService {
     }
 
     private static void openBrowser(URI uri) {
-        if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-            throw new HytaleApiException("Desktop browser integration is not available. Could not open Hytale sign-in.");
-        }
         try {
-            Desktop.getDesktop().browse(uri);
+            SystemBrowser.open(uri);
         } catch (IOException ex) {
             throw new HytaleApiException("Could not open Hytale sign-in in your browser.", ex);
         }

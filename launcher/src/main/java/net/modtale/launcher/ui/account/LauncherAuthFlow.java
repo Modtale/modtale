@@ -2,7 +2,6 @@ package net.modtale.launcher.ui.account;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
-import java.awt.Desktop;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetAddress;
@@ -23,6 +22,7 @@ import java.util.concurrent.TimeoutException;
 import net.modtale.launcher.api.ModtaleApiClient;
 import net.modtale.launcher.logging.LogSanitizer;
 import net.modtale.launcher.model.user.CurrentUser;
+import net.modtale.launcher.platform.SystemBrowser;
 import net.modtale.launcher.settings.LauncherConfig;
 import net.modtale.launcher.logging.LauncherLog;
 import net.modtale.launcher.logging.LauncherLogger;
@@ -145,12 +145,9 @@ public final class LauncherAuthFlow {
     }
 
     private static void openBrowser(URI uri) {
-        if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-            throw new RuntimeException("Desktop browser integration is not available. Could not open Modtale sign-in.");
-        }
         try {
             LOG.info("Opening sign-in URL " + LogSanitizer.uri(uri));
-            Desktop.getDesktop().browse(uri);
+            SystemBrowser.open(uri);
         } catch (IOException ex) {
             LOG.warn("Could not open sign-in URL " + LogSanitizer.uri(uri), ex);
             throw new RuntimeException("Could not open Modtale sign-in in your browser.", ex);
