@@ -186,15 +186,16 @@
             font-weight: 650;
         }
 
-        .grid {
+        .service-list {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 12px;
-            margin-bottom: 18px;
         }
 
         .service-card {
             padding: 16px;
+            border: 1px solid var(--line);
+            background: var(--panel-soft);
+            border-radius: 8px;
         }
 
         .service-top {
@@ -358,8 +359,7 @@
         }
 
         @media (max-width: 980px) {
-            .overview,
-            .grid {
+            .overview {
                 grid-template-columns: 1fr 1fr;
             }
         }
@@ -376,7 +376,6 @@
             }
 
             .overview,
-            .grid,
             .metrics {
                 grid-template-columns: 1fr;
             }
@@ -421,8 +420,6 @@
         </aside>
     </section>
 
-    <section id="services" class="grid"></section>
-
     <section class="panel section">
         <div class="section-head">
             <div>
@@ -433,7 +430,7 @@
                 <button type="button" data-range="30d" aria-pressed="false">30d</button>
             </div>
         </div>
-        <div id="history"></div>
+        <div id="services" class="service-list"></div>
     </section>
 
     <section class="panel section">
@@ -583,7 +580,7 @@
                 .join('');
 
             return `
-                <article class="panel service-card">
+                <article class="service-card">
                     <div class="service-top">
                         <div>
                             <h2 class="service-name">${escapeHtml(service.name)}</h2>
@@ -593,24 +590,6 @@
                     </div>
                     <div class="heatmap">${heat}</div>
                 </article>
-            `;
-        }).join('');
-    };
-
-    const renderHistory = (data) => {
-        const history = data.history || [];
-        $('history').innerHTML = (data.services || []).map((service) => {
-            const heat = bucketsFor(history, service.id)
-                .map((bucket, index) => `<span class="heat ${bucket === 'none' ? '' : bucket}" title="${bucket}" aria-label="${bucket || 'no data'} ${index + 1}"></span>`)
-                .join('');
-            return `
-                <div style="margin-bottom: 16px">
-                    <div class="service-top" style="margin-bottom: 8px">
-                        <h2 class="service-name">${escapeHtml(service.name)}</h2>
-                        <span class="small muted">${currentRange}</span>
-                    </div>
-                    <div class="heatmap">${heat}</div>
-                </div>
             `;
         }).join('');
     };
@@ -644,7 +623,6 @@
         lastData = data;
         renderSummary(data);
         renderServices(data);
-        renderHistory(data);
         $('activeCount').textContent = String((data.activeIncidents || []).length);
         renderIncidents('activeIncidents', data.activeIncidents || [], 'No active incidents.', 4);
         renderIncidents('scheduled', data.scheduledMaintenances || [], 'No scheduled maintenance.', 10);
