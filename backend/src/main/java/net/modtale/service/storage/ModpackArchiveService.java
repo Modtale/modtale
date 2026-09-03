@@ -3,6 +3,7 @@ package net.modtale.service.storage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import java.io.ByteArrayOutputStream;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -96,20 +97,38 @@ final class ModpackArchiveService {
 
     private byte[] buildArchive(Project pack, ProjectVersion version, ModpackTarget target) throws IOException {
         List<PreparedDependency> preparedDependencies = prepareDependencies(version, target);
+        List<ModpackOverrideArchive.OverrideFile> overrides = prepareOverrides(version, target);
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(output)) {
             writeJsonEntry(zip, LEGACY_MANIFEST, legacyManifest(pack, version, target));
             writeJsonEntry(zip, MANIFEST, authorManifest(pack, version, target));
-            writeJsonEntry(zip, LOCKFILE, lockfile(pack, version, preparedDependencies, target));
+            writeJsonEntry(zip, LOCKFILE, lockfile(pack, version, preparedDependencies, overrides, target));
             for (PreparedDependency prepared : preparedDependencies) {
                 if (prepared.bytes() != null) {
                     writeBinaryEntry(zip, prepared.path(), prepared.bytes());
                 }
             }
+            for (ModpackOverrideArchive.OverrideFile override : overrides) {
+                writeBinaryEntry(zip, override.path(), override.bytes());
+            }
         }
         byte[] archive = output.toByteArray();
         ModpackArchiveValidator.validate(archive);
         return archive;
+    }
+
+    private List<ModpackOverrideArchive.OverrideFile> prepareOverrides(ProjectVersion version, ModpackTarget target) throws IOException {
+        String overrideFileUrl = trimToNull(version.getOverrideFileUrl());
+        if (overrideFileUrl == null) return List.of();
+        byte[] archive;
+        try {
+            archive = archiveSupport.download(overrideFileUrl);
+        } catch (StorageDownloadException ex) {
+            throw new IOException("Cannot download the modpack override bundle.", ex);
+        }
+        return ModpackOverrideArchive.read(new ByteArrayInputStream(archive)).stream()
+                .filter(file -> target.includes(file.environment()))
+                .toList();
     }
 
     private List<PreparedDependency> prepareDependencies(ProjectVersion version, ModpackTarget target) throws IOException {
@@ -234,6 +253,7 @@ final class ModpackArchiveService {
             Project pack,
             ProjectVersion version,
             List<PreparedDependency> preparedDependencies,
+            List<ModpackOverrideArchive.OverrideFile> overrides,
             ModpackTarget target
     ) {
         Map<String, Object> lock = new LinkedHashMap<>();
@@ -276,6 +296,16 @@ final class ModpackArchiveService {
             entries.add(item);
         }
         lock.put("entries", entries);
+        List<Map<String, Object>> overrideEntries = new ArrayList<>();
+        for (ModpackOverrideArchive.OverrideFile override : overrides) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("path", override.path());
+            item.put("environment", override.environment().name());
+            item.put("size", override.bytes().length);
+            item.put("hashes", Map.of("sha256", sha256(override.bytes())));
+            overrideEntries.add(item);
+        }
+        lock.put("overrides", overrideEntries);
         return lock;
     }
 

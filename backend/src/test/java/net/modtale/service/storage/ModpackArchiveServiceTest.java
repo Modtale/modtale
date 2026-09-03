@@ -208,6 +208,12 @@ class ModpackArchiveServiceTest {
         ProjectDependency server = new ProjectDependency("server", "Server", "1.0.0");
         server.setEnvironment(ProjectDependency.Environment.SERVER);
         version.setDependencies(List.of(common, client, server));
+        version.setOverrideFileUrl("modpack-overrides/source.zip");
+        when(archiveSupport.download("modpack-overrides/source.zip")).thenReturn(zip(Map.of(
+                "overrides/common/config.json", "common",
+                "overrides/client/ui.toml", "client",
+                "overrides/server/server.properties", "server"
+        )));
 
         for (ProjectDependency dependency : version.getDependencies()) {
             ProjectVersion dependencyVersion = version("1.0.0", "files/" + dependency.getProjectId() + ".jar");
@@ -227,10 +233,17 @@ class ModpackArchiveServiceTest {
         assertTrue(clientEntries.containsKey("common.jar"));
         assertTrue(clientEntries.containsKey("client.jar"));
         assertFalse(clientEntries.containsKey("server.jar"));
+        assertTrue(clientEntries.containsKey("overrides/common/config.json"));
+        assertTrue(clientEntries.containsKey("overrides/client/ui.toml"));
+        assertFalse(clientEntries.containsKey("overrides/server/server.properties"));
+        assertEquals(2, clientLock.path("overrides").size());
         assertEquals("SERVER", serverLock.get("target").asText());
         assertTrue(serverEntries.containsKey("common.jar"));
         assertFalse(serverEntries.containsKey("client.jar"));
         assertTrue(serverEntries.containsKey("server.jar"));
+        assertTrue(serverEntries.containsKey("overrides/common/config.json"));
+        assertFalse(serverEntries.containsKey("overrides/client/ui.toml"));
+        assertTrue(serverEntries.containsKey("overrides/server/server.properties"));
         assertEquals("modpacks/universal.zip", version.getFileUrl());
         verify(projectRepository, never()).save(pack);
     }

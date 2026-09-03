@@ -122,7 +122,8 @@ public class VersionCreationCommandHandler {
         version.setId(UUID.randomUUID().toString());
         version.setVersionNumber(versionNumber);
         version.setGameVersions(gameVersions);
-        version.setFileUrl(preparedArtifact.filePath());
+        version.setFileUrl(modpack ? null : preparedArtifact.filePath());
+        version.setOverrideFileUrl(modpack ? preparedArtifact.filePath() : null);
         version.setReleaseDate(LocalDateTime.now().toString());
         version.setDownloadCount(0);
         version.setChangelog(versionMutationOrchestrationService.sanitizeChangelog(changelog));

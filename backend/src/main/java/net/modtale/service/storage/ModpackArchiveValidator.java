@@ -156,6 +156,24 @@ final class ModpackArchiveValidator {
                 throw new IOException("Bundled file hash does not match the lockfile: " + path);
             }
         }
+        if (lock.has("overrides") && !lock.path("overrides").isArray()) {
+            throw new IOException("Modpack lockfile overrides must be an array.");
+        }
+        for (JsonNode item : lock.path("overrides")) {
+            validateEnvironment(item);
+            String path = validatePath(item.path("path").asText(null));
+            String expectedPrefix = "overrides/" + item.path("environment").asText().toLowerCase(Locale.ROOT) + "/";
+            if (!path.toLowerCase(Locale.ROOT).startsWith(expectedPrefix) || !expectedFiles.add(path)) {
+                throw new IOException("Modpack override has an invalid or duplicate path: " + path);
+            }
+            EntryFingerprint actual = archiveEntries.get(path);
+            long expectedSize = item.path("size").asLong(-1);
+            String expectedHash = item.path("hashes").path("sha256").asText();
+            if (actual == null || expectedSize < 0 || expectedSize != actual.size()
+                    || !expectedHash.matches("[a-f0-9]{64}") || !expectedHash.equals(actual.sha256())) {
+                throw new IOException("Override file does not match the lockfile: " + path);
+            }
+        }
 
         if (!archiveEntries.keySet().equals(expectedFiles)) {
             throw new IOException("Modpack archive contains files that are not declared in the lockfile.");

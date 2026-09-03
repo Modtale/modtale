@@ -7,6 +7,7 @@ public class ProjectVersion {
     private String versionNumber;
     private List<String> gameVersions;
     private String fileUrl;
+    private String overrideFileUrl;
     private String hash;
     private int downloadCount;
     private String releaseDate;
@@ -82,6 +83,9 @@ public class ProjectVersion {
 
     public String getFileUrl() { return fileUrl; }
     public void setFileUrl(String fileUrl) { this.fileUrl = fileUrl; }
+
+    public String getOverrideFileUrl() { return overrideFileUrl; }
+    public void setOverrideFileUrl(String overrideFileUrl) { this.overrideFileUrl = overrideFileUrl; }
 
     public String getHash() { return hash; }
     public void setHash(String hash) { this.hash = hash; }

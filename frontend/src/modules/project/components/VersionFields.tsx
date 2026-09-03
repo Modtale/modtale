@@ -203,9 +203,10 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
 
     return (
         <div className={`space-y-8 ${disabled ? 'opacity-60 pointer-events-none' : ''}`}>
-            {!isModpack && !hideFilePicker && (
+            {!hideFilePicker && (
                 <div>
-                    <Label required>Project File <span className={`${theme.colors.textSecondary} font-normal normal-case ml-1`}>{allowsAutoSwitch ? '(.jar or .zip)' : '(.zip)'}</span></Label>
+                    <Label required={!isModpack}>{isModpack ? 'Override Bundle' : 'Project File'} <span className={`${theme.colors.textSecondary} font-normal normal-case ml-1`}>{allowsAutoSwitch ? '(.jar or .zip)' : '(.zip)'}</span></Label>
+                    {isModpack && <p className={`mb-2 text-xs ${theme.colors.textSecondary}`}>Optional ZIP containing only overrides/common, overrides/client, and overrides/server files.</p>}
                     <div
                         {...getRootProps()}
                         className={`border-2 border-dashed rounded-2xl p-10 text-center transition-all group shadow-sm ${
@@ -237,7 +238,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                             <div>
                                 <div className={`font-bold ${theme.colors.textPrimary}`}>Click or drag file here</div>
                                 <div className={`text-xs ${theme.colors.textSecondary} mt-1`}>
-                                    {allowsAutoSwitch ? 'Supports .jar and .zip (type auto-switches when needed)' : 'Supports .zip archives'}
+                                    {isModpack ? 'Optional layered configuration and resource overrides' : allowsAutoSwitch ? 'Supports .jar and .zip (type auto-switches when needed)' : 'Supports .zip archives'}
                                 </div>
                                 <div className={`text-xs ${theme.colors.textSecondary} mt-1`}>Maximum file size: 100MB</div>
                             </div>
