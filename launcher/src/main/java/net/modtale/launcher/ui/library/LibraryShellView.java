@@ -1,72 +1,30 @@
 package net.modtale.launcher.ui.library;
 
-import static net.modtale.launcher.ui.common.LauncherUi.primaryButton;
-import static net.modtale.launcher.ui.common.LauncherUi.secondaryButton;
-
 import javafx.scene.Node;
-import javafx.scene.control.Button;
-import javafx.scene.control.ContentDisplay;
-import javafx.scene.control.Label;
-import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import net.modtale.launcher.ui.common.LauncherIcons;
 import net.modtale.launcher.ui.common.LauncherView;
 
 final class LibraryShellView {
 
     private final VBox projectList;
     private final VBox projectDetail;
-    private final Runnable refresh;
-    private final Runnable checkUpdates;
 
     LibraryShellView(
             VBox projectList,
-            VBox projectDetail,
-            Runnable refresh,
-            Runnable checkUpdates
+            VBox projectDetail
     ) {
         this.projectList = projectList;
         this.projectDetail = projectDetail;
-        this.refresh = refresh;
-        this.checkUpdates = checkUpdates;
     }
 
     Node build() {
-        VBox root = new VBox(18);
+        VBox root = new VBox();
         root.setUserData(LauncherView.LIBRARY);
         root.getStyleClass().addAll("view", "library-view");
-        root.getChildren().addAll(header(), content());
+        root.getChildren().add(content());
         return root;
-    }
-
-    private Node header() {
-        HBox header = new HBox(12);
-        header.getStyleClass().add("library-header");
-        VBox copy = new VBox(5);
-        Label title = new Label("World Libraries");
-        title.getStyleClass().add("library-title");
-        copy.getChildren().add(title);
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
-        Button refreshButton = secondaryButton("Refresh");
-        refreshButton.getStyleClass().addAll("small", "library-compact-icon-action");
-        refreshButton.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.REFRESH_CW, 15));
-        refreshButton.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-        refreshButton.setAccessibleText("Refresh library");
-        refreshButton.setTooltip(new Tooltip("Refresh library"));
-        refreshButton.setOnAction(event -> refresh.run());
-        Button updatesButton = primaryButton("Check Updates");
-        updatesButton.getStyleClass().addAll("small", "library-compact-primary-action");
-        updatesButton.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 15));
-        updatesButton.setOnAction(event -> checkUpdates.run());
-        HBox actions = new HBox(8, refreshButton, updatesButton);
-        actions.getStyleClass().add("library-header-actions");
-        header.getChildren().addAll(copy, spacer, actions);
-        return header;
     }
 
     private Node content() {

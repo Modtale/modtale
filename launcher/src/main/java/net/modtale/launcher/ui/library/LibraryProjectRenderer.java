@@ -370,7 +370,7 @@ final class LibraryProjectRenderer {
         share.setTooltip(new Tooltip("Copy a share link for this world's enabled mods"));
         share.setOnAction(event -> shareWorldSnapshot.accept(worldToggle.world()));
 
-        Button pack = secondaryButton("Make Pack");
+        Button pack = secondaryButton("Create pack");
         pack.getStyleClass().addAll("small", "library-world-pack");
         pack.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.PACKAGE_PLUS, 13));
         pack.setTooltip(new Tooltip("Start a Modtale modpack from this world's enabled mods"));

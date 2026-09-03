@@ -3,7 +3,6 @@ package net.modtale.launcher.ui.library;
 import static net.modtale.launcher.ui.common.LauncherUi.pseudo;
 
 import java.util.function.Consumer;
-import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
@@ -55,13 +54,8 @@ final class LibraryWorldListRenderer {
         copy.getChildren().addAll(title, meta);
         HBox.setHgrow(copy, Priority.ALWAYS);
 
-        VBox status = new VBox(5);
-        status.setAlignment(Pos.CENTER_RIGHT);
-        Label enabled = new Label(item.enabledProjectCount() + "/" + item.totalProjectCount());
-        enabled.getStyleClass().add("library-version-pill");
-        Label label = new Label("Enabled");
-        label.getStyleClass().add("library-world-tab-caption");
-        status.getChildren().addAll(enabled, label);
+        Label status = new Label(item.enabledProjectCount() + " of " + item.totalProjectCount() + " enabled");
+        status.getStyleClass().add("library-world-tab-status");
 
         row.getChildren().addAll(icon, copy, status);
         return row;

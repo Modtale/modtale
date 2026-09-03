@@ -271,7 +271,7 @@ public final class LauncherLibraryController {
     }
 
     private Node buildLibraryView() {
-        return new LibraryShellView(projectList, projectDetail, this::renderLibrary, this::checkUpdates)
+        return new LibraryShellView(projectList, projectDetail)
                 .build();
     }
 

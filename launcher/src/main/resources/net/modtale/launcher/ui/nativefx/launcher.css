@@ -8266,19 +8266,6 @@
     -fx-padding: 12px 0 38px 0;
 }
 
-.library-header {
-    -fx-alignment: center-left;
-    -fx-padding: 0 0 12px 0;
-    -fx-border-width: 0 0 1px 0;
-    -fx-border-color: rgba(255, 255, 255, 0.10);
-}
-
-.library-title {
-    -fx-text-fill: #ffffff;
-    -fx-font-size: 28px;
-    -fx-font-weight: 900;
-}
-
 .library-content {
     -fx-alignment: top-left;
 }
@@ -8511,10 +8498,6 @@
     -fx-effect: null;
 }
 
-.library-header-actions {
-    -fx-alignment: center-right;
-}
-
 .library-compact-icon-action {
     -fx-min-width: 34px;
     -fx-pref-width: 34px;
@@ -8523,8 +8506,42 @@
     -fx-content-display: graphic-only;
 }
 
-.library-compact-primary-action {
+.library-compact-icon-action.btn.secondary {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.library-compact-icon-action.btn.secondary:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.055);
+    -fx-border-color: rgba(255, 255, 255, 0.08);
+}
+
+.library-action-emphasis {
+    -fx-min-width: 142px;
+    -fx-pref-width: 142px;
     -fx-effect: null;
+}
+
+.library-action-emphasis.btn.secondary {
+    -fx-text-fill: #dbeafe;
+    -fx-background-color: rgba(255, 255, 255, 0.035);
+    -fx-border-color: rgba(255, 255, 255, 0.10);
+}
+
+.library-action-emphasis.btn.secondary .svg-icon {
+    -fx-stroke: #93c5fd;
+}
+
+.library-action-emphasis.btn.secondary:hover {
+    -fx-text-fill: #ffffff;
+    -fx-background-color: rgba(37, 99, 235, 0.12);
+    -fx-border-color: rgba(96, 165, 250, 0.28);
+}
+
+.library-world-tab-status {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 11px;
+    -fx-font-weight: 800;
 }
 
 .library-world-project-actions {
@@ -8678,6 +8695,16 @@
 .library-file-row:hover {
     -fx-border-color: rgba(96, 165, 250, 0.20);
     -fx-background-color: rgba(30, 41, 59, 0.54);
+}
+
+.library-world-project-row {
+    -fx-background-color: rgba(30, 41, 59, 0.72);
+    -fx-border-color: rgba(148, 163, 184, 0.15);
+}
+
+.library-world-project-row:hover {
+    -fx-background-color: rgba(37, 52, 75, 0.82);
+    -fx-border-color: rgba(96, 165, 250, 0.28);
 }
 
 .library-bundled-row-locked {
