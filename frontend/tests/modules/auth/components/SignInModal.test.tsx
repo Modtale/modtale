@@ -57,7 +57,10 @@ describe('SignInModal last sign-in method hint', () => {
             );
         });
 
-        expect(document.body.querySelector('button[aria-label="Sign in with Hytale"]')).not.toBeNull();
+        const hytaleButton = document.body.querySelector('button[aria-label="Sign in with Hytale"]');
+        expect(hytaleButton).not.toBeNull();
+        expect(hytaleButton?.classList.contains('bg-slate-500')).toBe(true);
+        expect(hytaleButton?.classList.contains('hover:bg-slate-600')).toBe(true);
         expect(document.body.querySelector('button[aria-label="Sign in with GitLab"]')).toBeNull();
     });
 });
