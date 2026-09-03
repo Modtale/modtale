@@ -347,9 +347,8 @@ final class NativeDownloadModal {
         Label text = new Label("Download Latest");
         text.getStyleClass().add("download-modal-latest-title");
         headline.getChildren().addAll(LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 24), text);
-        HBox badge = versionBadge(version);
-        badge.setMaxWidth(Region.USE_PREF_SIZE);
-        box.getChildren().addAll(headline, badge);
+        Label versionLabel = latestVersionLabel(version);
+        box.getChildren().addAll(headline, versionLabel);
         if (shouldShowEntryGameVersion()) {
             Label forVersion = new Label("For " + entry.gameVersion());
             forVersion.getStyleClass().add("download-modal-file-date");
@@ -364,19 +363,15 @@ final class NativeDownloadModal {
         return box;
     }
 
-    private HBox versionBadge(ProjectVersion version) {
-        HBox badge = new HBox(8);
-        badge.getStyleClass().addAll("download-modal-version-badge", channelStyle(version.channel()));
-        badge.setAlignment(Pos.CENTER);
-        Label number = new Label("v" + value(version.versionNumber(), "unknown"));
-        number.getStyleClass().add("download-modal-version-number");
-        badge.getChildren().add(number);
+    private Label latestVersionLabel(ProjectVersion version) {
+        String text = "Version " + value(version.versionNumber(), "unknown");
         if (!isRelease(version.channel())) {
-            Label channel = new Label(value(version.channel(), "RELEASE").toUpperCase(Locale.ROOT));
-            channel.getStyleClass().add("download-modal-version-channel");
-            badge.getChildren().add(channel);
+            String channel = value(version.channel(), "RELEASE").toLowerCase(Locale.ROOT);
+            text += " · " + Character.toUpperCase(channel.charAt(0)) + channel.substring(1);
         }
-        return badge;
+        Label label = new Label(text);
+        label.getStyleClass().add("download-modal-latest-version");
+        return label;
     }
 
     private Node otherVersionsDivider() {

@@ -505,9 +505,9 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                             className={`w-full p-5 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-1.5 transition-all ${projectId ? 'mb-3' : 'mb-6'} group relative overflow-hidden ${latestRequiresLauncher ? 'cursor-not-allowed bg-slate-200 text-slate-500 shadow-none dark:bg-slate-800 dark:text-slate-400' : `active:scale-95 ${themeClass}`}`}
                         >
                             <div className="font-black text-xl flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-6 h-6" /> {latestRequiresLauncher ? 'Modtale Launcher Required' : 'Download Latest'}</div>
-                            <div className={`text-xs font-bold font-mono px-3 py-1 rounded-full border flex items-center gap-2 z-10 ${getVersionBadgeColor(latestVer.channel || 'RELEASE')}`}>
-                                v{latestVer.versionNumber}
-                                {latestVer.channel !== 'RELEASE' && <span className="uppercase tracking-wider opacity-90">{latestVer.channel}</span>}
+                            <div className="text-xs font-semibold opacity-80 z-10">
+                                Version {latestVer.versionNumber}
+                                {latestVer.channel !== 'RELEASE' && <span className="capitalize"> · {latestVer.channel.toLowerCase()}</span>}
                             </div>
                             {shouldShowEntryGameVersion && (
                                 <div className="text-[11px] font-semibold text-blue-50/95 z-10">
