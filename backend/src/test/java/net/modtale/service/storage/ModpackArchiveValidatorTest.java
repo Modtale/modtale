@@ -143,31 +143,22 @@ class ModpackArchiveValidatorTest {
     }
 
     @Test
-    void rejectsUnknownDependencyEnvironments() throws Exception {
-        byte[] content = bytes("trusted");
-        String invalidLock = lockEntry("MODTALE", "BUNDLED", "plugin.jar", content, false)
-                .replace("\"environment\":\"COMMON\"", "\"environment\":\"BROWSER\"");
-        byte[] archive = archive(List.of(
+    void rejectsNonHytaleManifestsAndLockfiles() throws Exception {
+        byte[] foreignManifest = archive(List.of(
+                entry("modpack.json", legacyManifest()),
+                entry("manifest.json", manifest().replace("\"hytale\"", "\"minecraft\"")),
+                entry("modtale.lock.json", emptyLock())
+        ));
+        byte[] foreignLock = archive(List.of(
                 entry("modpack.json", legacyManifest()),
                 entry("manifest.json", manifest()),
-                entry("modtale.lock.json", invalidLock),
-                new ArchiveEntry("plugin.jar", content)
+                entry("modtale.lock.json", emptyLock().replace("\"hytale\"", "\"minecraft\""))
         ));
 
         assertTrue(assertThrows(IOException.class,
-                () -> ModpackArchiveValidator.validate(archive)).getMessage().contains("unknown environment"));
-    }
-
-    @Test
-    void rejectsInconsistentArchiveTargets() throws Exception {
-        byte[] archive = archive(List.of(
-                entry("modpack.json", legacyManifest().replace("\"files\"", "\"target\":\"CLIENT\",\"files\"")),
-                entry("manifest.json", manifest().replace("\"pack\"", "\"target\":\"CLIENT\",\"pack\"")),
-                entry("modtale.lock.json", emptyLock().replace("\"pack\"", "\"target\":\"SERVER\",\"pack\""))
-        ));
-
+                () -> ModpackArchiveValidator.validate(foreignManifest)).getMessage().contains("manifest"));
         assertTrue(assertThrows(IOException.class,
-                () -> ModpackArchiveValidator.validate(archive)).getMessage().contains("inconsistent target"));
+                () -> ModpackArchiveValidator.validate(foreignLock)).getMessage().contains("lockfile"));
     }
 
     private static String emptyLock() {
@@ -175,6 +166,7 @@ class ModpackArchiveValidatorTest {
                 {
                   "format": "modtale-lock",
                   "lockVersion": 1,
+                  "game": "hytale",
                   "pack": {},
                   "gameVersions": [],
                   "entries": []
@@ -187,6 +179,7 @@ class ModpackArchiveValidatorTest {
                 {
                   "format": "modtale-lock",
                   "lockVersion": 1,
+                  "game": "hytale",
                   "pack": {},
                   "gameVersions": [],
                   "entries": [{
@@ -195,7 +188,6 @@ class ModpackArchiveValidatorTest {
                     "version": "1.0.0",
                     "source": "CURSEFORGE",
                     "dependencyType": "REQUIRED",
-                    "environment": "COMMON",
                     "distribution": "REFERENCE_ONLY",
                     "url": "%s",
                     "fileUrl": "%s",
@@ -230,10 +222,11 @@ class ModpackArchiveValidatorTest {
                 {
                   "format": "modtale-lock",
                   "lockVersion": 1,
+                  "game": "hytale",
                   "pack": {},
                   "gameVersions": [],
                   "entries": [
-                    {"source":"%s","environment":"COMMON","distribution":"%s"%s}
+                    {"source":"%s","distribution":"%s"%s}
                   ]
                 }
                 """.formatted(source, distribution, integrity);
@@ -251,7 +244,7 @@ class ModpackArchiveValidatorTest {
                   "format": "modtale-pack",
                   "schemaVersion": 1,
                   "pack": {},
-                  "game": {},
+                  "game": {"id":"hytale","versions":[]},
                   "dependencies": []
                 }
                 """;

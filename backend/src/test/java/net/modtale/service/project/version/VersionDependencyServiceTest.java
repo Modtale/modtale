@@ -63,36 +63,32 @@ class VersionDependencyServiceTest {
     }
 
     @Test
-    void resolveRequestedDependenciesPreservesOptionalAndEnvironmentForModpacks() {
-        when(projectService.getRawProjectById("client-mod"))
-                .thenReturn(project("client-mod", "Client Mod", ProjectStatus.PUBLISHED, "1.0.0"));
-        when(projectService.getRawProjectById("server-mod"))
-                .thenReturn(project("server-mod", "Server Mod", ProjectStatus.PUBLISHED, "2.0.0"));
-        DependencyReferenceRequest client = dependency(
-                "client-mod",
+    void resolveRequestedDependenciesPreservesOptionalTypesForModpacks() {
+        when(projectService.getRawProjectById("first-mod"))
+                .thenReturn(project("first-mod", "First Mod", ProjectStatus.PUBLISHED, "1.0.0"));
+        when(projectService.getRawProjectById("second-mod"))
+                .thenReturn(project("second-mod", "Second Mod", ProjectStatus.PUBLISHED, "2.0.0"));
+        DependencyReferenceRequest first = dependency(
+                "first-mod",
                 "1.0.0",
                 ProjectDependency.DependencyType.OPTIONAL
         );
-        client.setEnvironment(ProjectDependency.Environment.CLIENT);
-        DependencyReferenceRequest server = dependency(
-                "server-mod",
+        DependencyReferenceRequest second = dependency(
+                "second-mod",
                 "2.0.0",
                 ProjectDependency.DependencyType.REQUIRED
         );
-        server.setEnvironment(ProjectDependency.Environment.SERVER);
 
         VersionDependencyService.ResolvedDependencies resolved = service.resolveRequestedDependencies(
-                List.of(client, server),
+                List.of(first, second),
                 true,
                 false
         );
 
         assertEquals(ProjectDependency.DependencyType.OPTIONAL,
                 resolved.dependencies().getFirst().getDependencyType());
-        assertEquals(ProjectDependency.Environment.CLIENT,
-                resolved.dependencies().getFirst().getEnvironment());
-        assertEquals(ProjectDependency.Environment.SERVER,
-                resolved.dependencies().get(1).getEnvironment());
+        assertEquals(ProjectDependency.DependencyType.REQUIRED,
+                resolved.dependencies().get(1).getDependencyType());
     }
 
     @Test

@@ -13,7 +13,6 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
-import net.modtale.model.project.ModpackTarget;
 import net.modtale.model.user.User;
 import net.modtale.service.analytics.AnalyticsEligibilityService;
 import net.modtale.service.analytics.TrackingService;
@@ -61,17 +60,12 @@ public class VersionDownloadOrchestrationService {
     }
 
     public DownloadUrlResponse createDownloadUrl(String projectId, String versionNumber, String gameVersion, User currentUser) {
-        return createDownloadUrl(projectId, versionNumber, gameVersion, ModpackTarget.UNIVERSAL, currentUser);
-    }
-
-    public DownloadUrlResponse createDownloadUrl(String projectId, String versionNumber, String gameVersion, ModpackTarget target, User currentUser) {
         Project project = getProjectOrThrow(projectId, currentUser,
                 "We couldn't find that project, so no download link could be generated.");
         getVersionOrThrow(project, versionNumber, gameVersion,
                 "We couldn't find the requested version for that project.");
-        ModpackTarget effectiveTarget = target == null ? ModpackTarget.UNIVERSAL : target;
         String token = downloadTokenService.generateToken(
-                projectId, versionNumber, gameVersion, null, currentUserId(currentUser), effectiveTarget);
+                projectId, versionNumber, gameVersion, null, currentUserId(currentUser));
         return new DownloadUrlResponse("/download/" + token, downloadTokenService.getTokenValiditySeconds());
     }
 
@@ -110,18 +104,12 @@ public class VersionDownloadOrchestrationService {
         trackDownload(project, targetVersion.getId(), context);
 
         if (project.getClassification() == ProjectClassification.MODPACK) {
-            ModpackTarget target = downloadToken.getModpackTarget() == null
-                    ? ModpackTarget.UNIVERSAL
-                    : downloadToken.getModpackTarget();
             if (targetVersion.getDependencies() != null) {
                 targetVersion.getDependencies().stream()
-                        .filter(dependency -> includedInTarget(dependency, target))
                         .forEach(dep -> trackDependencyDownload(dep, context));
             }
-            byte[] zipData = target == ModpackTarget.UNIVERSAL
-                    ? downloadService.generateModpackZip(project, targetVersion, context.currentUser())
-                    : downloadService.generateModpackZip(project, targetVersion, context.currentUser(), target);
-            return new VersionDownloadPayload(buildModpackFilename(project, targetVersion, target), zipData);
+            byte[] zipData = downloadService.generateModpackZip(project, targetVersion, context.currentUser());
+            return new VersionDownloadPayload(buildModpackFilename(project, targetVersion), zipData);
         }
 
         byte[] data = storageService.download(targetVersion.getFileUrl());
@@ -254,13 +242,8 @@ public class VersionDownloadOrchestrationService {
         }
     }
 
-    private boolean includedInTarget(ProjectDependency dependency, ModpackTarget target) {
-        return target.includes(dependency.getEnvironment());
-    }
-
-    private String buildModpackFilename(Project project, ProjectVersion version, ModpackTarget target) {
-        String suffix = target == ModpackTarget.UNIVERSAL ? "" : "-" + target.name().toLowerCase();
-        return sanitizeProjectName(project.getTitle()) + "-" + version.getVersionNumber() + suffix + ".zip";
+    private String buildModpackFilename(Project project, ProjectVersion version) {
+        return sanitizeProjectName(project.getTitle()) + "-" + version.getVersionNumber() + ".zip";
     }
 
     private String sanitizeProjectName(String title) {

@@ -6,7 +6,6 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import net.modtale.model.project.ModpackTarget;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -25,28 +24,18 @@ public class DownloadTokenService {
         private final String userId;
         private final Instant expiresAt;
         private final List<String> selectedDependencies;
-        private final ModpackTarget modpackTarget;
         private boolean used;
 
         public DownloadToken(String projectId, String version, String gameVersion, List<String> selectedDependencies, Instant expiresAt) {
-            this(projectId, version, gameVersion, selectedDependencies, null, null, expiresAt);
+            this(projectId, version, gameVersion, selectedDependencies, null, expiresAt);
         }
 
         public DownloadToken(String projectId, String version, String gameVersion, List<String> selectedDependencies, String userId, Instant expiresAt) {
-            this(projectId, version, gameVersion, selectedDependencies, userId, null, expiresAt);
-        }
-
-        public DownloadToken(String projectId, String version, String gameVersion, List<String> selectedDependencies, ModpackTarget modpackTarget, Instant expiresAt) {
-            this(projectId, version, gameVersion, selectedDependencies, null, modpackTarget, expiresAt);
-        }
-
-        public DownloadToken(String projectId, String version, String gameVersion, List<String> selectedDependencies, String userId, ModpackTarget modpackTarget, Instant expiresAt) {
             this.projectId = projectId;
             this.version = version;
             this.gameVersion = gameVersion;
             this.selectedDependencies = selectedDependencies;
             this.userId = userId;
-            this.modpackTarget = modpackTarget;
             this.expiresAt = expiresAt;
             this.used = false;
         }
@@ -56,7 +45,6 @@ public class DownloadTokenService {
         public String getGameVersion() { return gameVersion; }
         public String getUserId() { return userId; }
         public List<String> getSelectedDependencies() { return selectedDependencies; }
-        public ModpackTarget getModpackTarget() { return modpackTarget; }
         public Instant getExpiresAt() { return expiresAt; }
         public boolean isUsed() { return used; }
         public void markAsUsed() { this.used = true; }
@@ -71,10 +59,6 @@ public class DownloadTokenService {
     }
 
     public String generateToken(String projectId, String version, String gameVersion, List<String> selectedDependencies, String userId) {
-        return generateToken(projectId, version, gameVersion, selectedDependencies, userId, null);
-    }
-
-    public String generateToken(String projectId, String version, String gameVersion, List<String> selectedDependencies, String userId, ModpackTarget modpackTarget) {
         cleanExpiredTokens();
 
         byte[] randomBytes = new byte[TOKEN_LENGTH];
@@ -82,7 +66,7 @@ public class DownloadTokenService {
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
 
         Instant expiresAt = Instant.now().plusSeconds(TOKEN_VALIDITY_MINUTES * 60);
-        tokens.put(token, new DownloadToken(projectId, version, gameVersion, selectedDependencies, userId, modpackTarget, expiresAt));
+        tokens.put(token, new DownloadToken(projectId, version, gameVersion, selectedDependencies, userId, expiresAt));
 
         return token;
     }

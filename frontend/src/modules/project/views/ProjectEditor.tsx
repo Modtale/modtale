@@ -43,7 +43,6 @@ const appendDependenciesToFormData = (formData: FormData, dependencies: ProjectD
         formData.append(`dependencies[${index}].projectTitle`, dependency.projectTitle || '');
         formData.append(`dependencies[${index}].versionNumber`, dependency.versionNumber);
         formData.append(`dependencies[${index}].dependencyType`, dependency.dependencyType || 'REQUIRED');
-        formData.append(`dependencies[${index}].environment`, dependency.environment || 'COMMON');
         formData.append(`dependencies[${index}].source`, dependency.source || 'MODTALE');
         if (dependency.externalId) formData.append(`dependencies[${index}].externalId`, dependency.externalId);
         if (dependency.externalUrl) formData.append(`dependencies[${index}].externalUrl`, dependency.externalUrl);

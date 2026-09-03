@@ -88,7 +88,7 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
             {
                 href: '/plugins',
                 label: 'Hytale Plugins',
-                description: 'Find server-side Hytale plugins and gameplay scripts.',
+                description: 'Find Hytale plugins and gameplay scripts.',
             },
             {
                 href: '/modpacks',
@@ -263,7 +263,7 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
         h1: 'Hytale Plugins',
         description: 'Browse Hytale plugins for servers and communities. Find admin tools, gameplay extensions, economy systems, minigames, moderation helpers, and reusable plugin libraries.',
         keywords: 'hytale plugins, hytale plugin, hytale server plugins, java plugins, hytale admin tools, hytale modding plugins, server automation',
-        intro: 'Browse Hytale plugins built for server operators, creators, and communities. Discover gameplay extensions, admin tooling, utility libraries, and server-side Java plugin projects from the Modtale ecosystem.',
+        intro: 'Browse Hytale plugins built for players, creators, and communities. Discover gameplay extensions, admin tooling, utility libraries, and Java plugin projects from the Modtale ecosystem.',
         contentBlocks: [
             {
                 title: 'Hytale Plugins for Real Server Needs',
@@ -298,11 +298,11 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
         faq: [
             {
                 question: 'What is a Hytale plugin?',
-                answer: 'A Hytale plugin is a server-focused extension, typically packaged as a Java plugin, that adds new multiplayer features, moderation tools, game systems, or automation to a Hytale server environment.',
+                answer: 'A Hytale plugin is an extension, typically packaged as a Java plugin, that adds gameplay features, moderation tools, game systems, or automation to Hytale.',
             },
             {
                 question: 'How are Hytale plugins different from general Hytale mods?',
-                answer: 'Plugins usually focus on server behavior, administration, and shared gameplay systems, while broader Hytale mods can also include asset packs, worlds, standalone content releases, or client-facing gameplay changes.',
+                answer: 'Plugins are code extensions for gameplay, administration, and shared systems, while the broader mod label also includes asset packs, worlds, data assets, and standalone content releases.',
             },
             {
                 question: 'Can I use Modtale to publish Hytale plugins?',
@@ -339,7 +339,7 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
             {
                 href: '/plugins',
                 label: 'Hytale Plugins',
-                description: 'Find server-side releases that can appear inside curated packs.',
+                description: 'Find plugin releases that can appear inside curated packs.',
             },
         ],
         faq: [
@@ -475,7 +475,7 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
             {
                 href: '/plugins',
                 label: 'Hytale Plugins',
-                description: 'Pair data assets with server-side gameplay systems.',
+                description: 'Pair data assets with Hytale gameplay systems.',
             },
             {
                 href: '/mods',

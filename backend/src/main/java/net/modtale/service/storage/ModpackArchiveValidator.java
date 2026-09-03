@@ -104,25 +104,23 @@ final class ModpackArchiveValidator {
         JsonNode manifest = readJson(metadata.get("manifest.json"), "Modpack manifest");
         if (!manifest.isObject() || !"modtale-pack".equals(manifest.path("format").asText())
                 || manifest.path("schemaVersion").asInt(-1) != 1 || !manifest.path("pack").isObject()
-                || !manifest.path("game").isObject() || !manifest.path("dependencies").isArray()) {
+                || !manifest.path("game").isObject()
+                || !"hytale".equals(manifest.path("game").path("id").asText())
+                || !manifest.path("game").path("versions").isArray()
+                || !manifest.path("dependencies").isArray()) {
             throw new IOException("Modpack manifest has an unsupported format.");
-        }
-        for (JsonNode item : manifest.path("dependencies")) {
-            validateEnvironment(item);
         }
         JsonNode lock = readJson(metadata.get("modtale.lock.json"), "Modpack lockfile");
         if (lock == null || !"modtale-lock".equals(lock.path("format").asText())
-                || lock.path("lockVersion").asInt(-1) != 1 || !lock.path("pack").isObject()
+                || lock.path("lockVersion").asInt(-1) != 1 || !"hytale".equals(lock.path("game").asText())
+                || !lock.path("pack").isObject()
                 || !lock.path("gameVersions").isArray() || !lock.path("entries").isArray()) {
             throw new IOException("Modpack lockfile has an unsupported format.");
         }
-        validateTargets(legacy, manifest, lock);
-
         Set<String> expectedFiles = new HashSet<>(METADATA_FILES);
         for (JsonNode item : lock.path("entries")) {
             String distribution = item.path("distribution").asText();
             String source = item.path("source").asText();
-            validateEnvironment(item);
             if ("REFERENCE_ONLY".equals(distribution)) {
                 if (item.has("path") || item.has("size") || item.has("hashes")) {
                     throw new IOException("Reference-only lock entries must not claim bundled bytes.");
@@ -160,10 +158,9 @@ final class ModpackArchiveValidator {
             throw new IOException("Modpack lockfile overrides must be an array.");
         }
         for (JsonNode item : lock.path("overrides")) {
-            validateEnvironment(item);
             String path = validatePath(item.path("path").asText(null));
-            String expectedPrefix = "overrides/" + item.path("environment").asText().toLowerCase(Locale.ROOT) + "/";
-            if (!path.toLowerCase(Locale.ROOT).startsWith(expectedPrefix) || !expectedFiles.add(path)) {
+            if (!(path.startsWith("overrides/Mods/") || path.startsWith("overrides/Saves/"))
+                    || !expectedFiles.add(path)) {
                 throw new IOException("Modpack override has an invalid or duplicate path: " + path);
             }
             EntryFingerprint actual = archiveEntries.get(path);
@@ -177,26 +174,6 @@ final class ModpackArchiveValidator {
 
         if (!archiveEntries.keySet().equals(expectedFiles)) {
             throw new IOException("Modpack archive contains files that are not declared in the lockfile.");
-        }
-    }
-
-    private static void validateEnvironment(JsonNode item) throws IOException {
-        if (!Set.of("COMMON", "CLIENT", "SERVER").contains(item.path("environment").asText())) {
-            throw new IOException("Modpack entry has an unknown environment.");
-        }
-    }
-
-    private static void validateTargets(JsonNode legacy, JsonNode manifest, JsonNode lock) throws IOException {
-        String manifestTarget = manifest.path("target").asText("");
-        String lockTarget = lock.path("target").asText("");
-        String legacyTarget = legacy.path("target").asText("");
-        if (manifestTarget.isBlank() && lockTarget.isBlank() && legacyTarget.isBlank()) {
-            return;
-        }
-        if (!Set.of("UNIVERSAL", "CLIENT", "SERVER").contains(manifestTarget)
-                || !manifestTarget.equals(lockTarget)
-                || !manifestTarget.equals(legacyTarget)) {
-            throw new IOException("Modpack metadata has an unknown or inconsistent target.");
         }
     }
 

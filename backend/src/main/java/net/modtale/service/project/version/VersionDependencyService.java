@@ -120,7 +120,6 @@ public class VersionDependencyService {
                 dependencyType
         );
         dependency.setId(reference.getId());
-        dependency.setEnvironment(reference.getEnvironment());
         return dependency;
     }
 
@@ -152,7 +151,6 @@ public class VersionDependencyService {
         ProjectDependency.DependencyType dependencyType = reference.getDependencyType();
         ProjectDependency dependency = ProjectDependency.external(source, externalId, title, versionNumber, externalUrl, dependencyType);
         dependency.setId(reference.getId());
-        dependency.setEnvironment(reference.getEnvironment());
         dependency.setExternalFileUrl(trimToNull(reference.getExternalFileUrl()));
         dependency.setExternalFileName(trimToNull(reference.getExternalFileName()));
         dependency.setExternalFileSize(reference.getExternalFileSize());

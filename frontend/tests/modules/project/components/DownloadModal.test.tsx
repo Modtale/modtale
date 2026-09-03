@@ -203,7 +203,7 @@ describe('DownloadModal Toggle Visibility', () => {
         expect(onDownload).toHaveBeenCalledWith('/files/skyforge.jar', '1.0.0', '0.5.4', [], 'RELEASE');
     });
 
-    it('lets modpack downloads target client or server environments', async () => {
+    it('downloads a modpack without an environment target', async () => {
         const onDownload = vi.fn();
         const version = {
             id: 'pack-v1', versionNumber: '1.0.0', channel: 'RELEASE',
@@ -229,16 +229,11 @@ describe('DownloadModal Toggle Visibility', () => {
             );
         });
 
-        const serverButton = Array.from(document.body.querySelectorAll('button'))
-            .find(button => button.textContent?.trim() === 'Server') as HTMLButtonElement;
-        await act(async () => serverButton.click());
-        expect(pageText()).toContain('Excludes client-only entries.');
-
         const latestButton = Array.from(document.body.querySelectorAll('button'))
             .find(button => button.textContent?.includes('Download Latest')) as HTMLButtonElement;
         await act(async () => latestButton.click());
 
-        expect(onDownload).toHaveBeenCalledWith('/packs/sky.zip', '1.0.0', '0.5.4', [], 'RELEASE', 'SERVER');
+        expect(onDownload).toHaveBeenCalledWith('/packs/sky.zip', '1.0.0', '0.5.4', [], 'RELEASE');
     });
 
     it('defaults to the latest backend-ordered game version in the download modal', async () => {

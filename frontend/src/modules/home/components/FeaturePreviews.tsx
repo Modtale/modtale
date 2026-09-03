@@ -582,7 +582,7 @@ const InlineCommentThreadUI = ({ project, currentUser }: { project?: Project; cu
                     </div>
 
                     <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                        The latest release fixed the dedicated server crash and made setup much smoother.
+                        The latest release fixed the world startup crash and made setup much smoother.
                     </p>
 
                     <div className="mt-3 flex gap-3 relative">

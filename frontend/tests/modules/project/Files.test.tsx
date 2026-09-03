@@ -117,7 +117,7 @@ describe('Files tab loadability', () => {
         });
 
         await waitForText(container, 'Override Bundle');
-        expect(container.textContent).toContain('Optional ZIP containing only overrides/common, overrides/client, and overrides/server files.');
+        expect(container.textContent).toContain('Optional ZIP containing Hytale files beneath overrides/Mods/ or overrides/Saves/.');
         expect(container.textContent).toContain('Optional layered configuration and resource overrides');
     });
 

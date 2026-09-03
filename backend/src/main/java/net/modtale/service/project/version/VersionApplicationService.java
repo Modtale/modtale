@@ -15,7 +15,6 @@ import net.modtale.model.dto.response.project.BundleDownloadUrlResponse;
 import net.modtale.model.dto.response.project.DownloadUrlResponse;
 import net.modtale.model.dto.response.project.VersionDependenciesView;
 import net.modtale.model.project.Project;
-import net.modtale.model.project.ModpackTarget;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
@@ -92,10 +91,6 @@ public class VersionApplicationService {
 
     public DownloadUrlResponse createDownloadUrl(String projectId, String versionNumber, String gameVersion, User currentUser) {
         return versionDownloadOrchestrationService.createDownloadUrl(projectId, versionNumber, gameVersion, currentUser);
-    }
-
-    public DownloadUrlResponse createDownloadUrl(String projectId, String versionNumber, String gameVersion, ModpackTarget target, User currentUser) {
-        return versionDownloadOrchestrationService.createDownloadUrl(projectId, versionNumber, gameVersion, target, currentUser);
     }
 
     public BundleDownloadUrlResponse createBundleDownloadUrl(

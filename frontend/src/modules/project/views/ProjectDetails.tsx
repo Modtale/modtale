@@ -56,7 +56,6 @@ interface ProjectDetailViewProps {
 }
 
 type DownloadChannel = 'RELEASE' | 'BETA' | 'ALPHA';
-type ModpackTarget = 'UNIVERSAL' | 'CLIENT' | 'SERVER';
 
 const normalizeDownloadChannel = (channel?: string): DownloadChannel => (
     channel === 'BETA' || channel === 'ALPHA' ? channel : 'RELEASE'
@@ -429,12 +428,11 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         return decoded.length > 37 && decoded.charAt(36) === '-' ? decoded.substring(37) : decoded;
     };
 
-    const resolveDownloadedFileName = (projectData: any, versionNumber: string, gameVersion: string, isBundle: boolean, target: ModpackTarget = 'UNIVERSAL') => {
+    const resolveDownloadedFileName = (projectData: any, versionNumber: string, gameVersion: string, isBundle: boolean) => {
         if (!projectData) return '';
         if (isBundle) return `${sanitizeDownloadName(projectData.title)}-UNZIP-ME.zip`;
         if (projectData.classification === 'MODPACK') {
-            const suffix = target === 'UNIVERSAL' ? '' : `-${target.toLowerCase()}`;
-            return `${sanitizeDownloadName(projectData.title)}-${versionNumber}${suffix}.zip`;
+            return `${sanitizeDownloadName(projectData.title)}-${versionNumber}.zip`;
         }
 
         const matchedVersion = (projectData.versions || []).find((v: any) => {
@@ -447,14 +445,13 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         return extractFileNameFromUrl(matchedVersion?.fileUrl);
     };
 
-    const finishVersionDownload = async (versionNumber: string, gameVersion: string, selectedDeps: string[], channel: DownloadChannel = 'RELEASE', target: ModpackTarget = 'UNIVERSAL') => {
+    const finishVersionDownload = async (versionNumber: string, gameVersion: string, selectedDeps: string[], channel: DownloadChannel = 'RELEASE') => {
         if (!project) return;
         const currentProject = project;
         const isBundle = selectedDeps.length > 0;
         const depsQuery = isBundle ? `?deps=${selectedDeps.map(encodeURIComponent).join(',')}` : '';
         const params = new URLSearchParams();
         if (gameVersion) params.set('gameVersion', gameVersion);
-        if (currentProject.classification === 'MODPACK' && target !== 'UNIVERSAL') params.set('target', target);
         const queryPrefix = isBundle ? '&' : '?';
         const resolverQuery = params.toString() ? `${queryPrefix}${params.toString()}` : '';
 
@@ -470,7 +467,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 const baseUrl = (api.defaults.baseURL || '').replace(/\/$/, '');
                 downloadUrl = baseUrl + downloadUrl;
             }
-            setLastDownloadedFileName(resolveDownloadedFileName(currentProject, versionNumber, gameVersion, isBundle, target));
+            setLastDownloadedFileName(resolveDownloadedFileName(currentProject, versionNumber, gameVersion, isBundle));
 
             window.open(downloadUrl, '_blank');
             setShowDownloadFx(true);
@@ -500,7 +497,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         throw new Error('The server did not return a usable download link for this file.');
     };
 
-    const handleDownloadClick = async (url: string, versionNumber: string, gameVersion: string, deps: any[], channel: string, target: ModpackTarget = 'UNIVERSAL') => {
+    const handleDownloadClick = async (url: string, versionNumber: string, gameVersion: string, deps: any[], channel: string) => {
         try {
             const downloadChannel = normalizeDownloadChannel(channel);
 
@@ -539,7 +536,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 return;
             }
 
-            await finishVersionDownload(versionNumber, gameVersion, [], downloadChannel, target);
+            await finishVersionDownload(versionNumber, gameVersion, [], downloadChannel);
         } catch (e: unknown) {
             showDownloadError(e, 'We could not prepare this download.');
         }

@@ -214,8 +214,8 @@ class DownloadServiceTest {
         try (ByteArrayOutputStream output = new ByteArrayOutputStream();
              java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(output)) {
             writeEntry(zip, "modpack.json", "{\"formatVersion\":1,\"game\":\"hytale\",\"files\":[]}");
-            writeEntry(zip, "manifest.json", "{\"format\":\"modtale-pack\",\"schemaVersion\":1,\"pack\":{},\"game\":{},\"dependencies\":[]}");
-            writeEntry(zip, "modtale.lock.json", "{\"format\":\"modtale-lock\",\"lockVersion\":1,\"pack\":{},\"gameVersions\":[],\"entries\":[]}");
+            writeEntry(zip, "manifest.json", "{\"format\":\"modtale-pack\",\"schemaVersion\":1,\"pack\":{},\"game\":{\"id\":\"hytale\",\"versions\":[]},\"dependencies\":[]}");
+            writeEntry(zip, "modtale.lock.json", "{\"format\":\"modtale-lock\",\"lockVersion\":1,\"game\":\"hytale\",\"pack\":{},\"gameVersions\":[],\"entries\":[]}");
             zip.finish();
             return output.toByteArray();
         }

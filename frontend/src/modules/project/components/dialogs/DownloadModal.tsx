@@ -184,7 +184,7 @@ interface DownloadModalProps {
     versionsByGame: Record<string, any[]>;
     preReleaseGameVersions?: string[];
     orderedGameVersions: string[];
-    onDownload: (url: string, number: string, gameVersion: string, deps: any[], channel: string, target?: ModpackTarget) => void;
+    onDownload: (url: string, number: string, gameVersion: string, deps: any[], channel: string) => void;
     showExperimental: boolean;
     onToggleExperimental: () => void;
     onViewHistory: () => void;
@@ -196,12 +196,9 @@ interface DownloadModalProps {
     onLauncherFallback?: () => void;
 }
 
-type ModpackTarget = 'UNIVERSAL' | 'CLIENT' | 'SERVER';
-
 export const DownloadModal: React.FC<DownloadModalProps> = ({
                                                                  show, onClose, versionsByGame, preReleaseGameVersions = [], orderedGameVersions = [], onDownload, showExperimental, onToggleExperimental, onViewHistory, isModpack = false, isInline = false, containerRef, projectId, projectHandle, onLauncherFallback
 }) => {
-    const [modpackTarget, setModpackTarget] = useState<ModpackTarget>('UNIVERSAL');
     useScrollLock(show && !isInline);
     const [selectedGameVersions, setSelectedGameVersions] = useState<string[]>([]);
     const [isListExpanded, setIsListExpanded] = useState(false);
@@ -455,10 +452,6 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
     };
 
     const download = (ver: any, gameVersion: string) => {
-        if (isModpack) {
-            onDownload(ver.fileUrl, ver.versionNumber, gameVersion, ver.dependencies, ver.channel, modpackTarget);
-            return;
-        }
         onDownload(ver.fileUrl, ver.versionNumber, gameVersion, ver.dependencies, ver.channel);
     };
 
@@ -499,29 +492,6 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                         onChange={setSelectedGameVersions}
                     />
                 </div>
-
-                {isModpack && (
-                    <div className="mb-6">
-                        <label className={`block text-xs font-bold ${theme.colors.textSecondary} uppercase mb-2 tracking-wider`}>Pack target</label>
-                        <div className={`grid grid-cols-3 gap-2 rounded-xl border ${theme.colors.border} ${theme.colors.bgSurfaceAlt} p-1.5`}>
-                            {(['UNIVERSAL', 'CLIENT', 'SERVER'] as ModpackTarget[]).map(target => (
-                                <button
-                                    type="button"
-                                    key={target}
-                                    onClick={() => setModpackTarget(target)}
-                                    className={`rounded-lg px-2 py-2 text-xs font-black transition-colors ${modpackTarget === target ? 'bg-modtale-accent text-white shadow-sm' : `${theme.colors.textSecondary} hover:${theme.colors.textPrimary}`}`}
-                                >
-                                    {target === 'UNIVERSAL' ? 'All sides' : target === 'CLIENT' ? 'Client' : 'Server'}
-                                </button>
-                            ))}
-                        </div>
-                        <p className={`mt-2 text-xs ${theme.colors.textMuted}`}>
-                            {modpackTarget === 'UNIVERSAL'
-                                ? 'Includes common, client-only, and server-only entries.'
-                                : `Excludes ${modpackTarget === 'CLIENT' ? 'server' : 'client'}-only entries.`}
-                        </p>
-                    </div>
-                )}
 
                 {latestVer ? (
                     <>

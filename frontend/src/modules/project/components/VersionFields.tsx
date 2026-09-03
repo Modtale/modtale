@@ -206,7 +206,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
             {!hideFilePicker && (
                 <div>
                     <Label required={!isModpack}>{isModpack ? 'Override Bundle' : 'Project File'} <span className={`${theme.colors.textSecondary} font-normal normal-case ml-1`}>{allowsAutoSwitch ? '(.jar or .zip)' : '(.zip)'}</span></Label>
-                    {isModpack && <p className={`mb-2 text-xs ${theme.colors.textSecondary}`}>Optional ZIP containing only overrides/common, overrides/client, and overrides/server files.</p>}
+                    {isModpack && <p className={`mb-2 text-xs ${theme.colors.textSecondary}`}>Optional ZIP containing Hytale files beneath overrides/Mods/ or overrides/Saves/.</p>}
                     <div
                         {...getRootProps()}
                         className={`border-2 border-dashed rounded-2xl p-10 text-center transition-all group shadow-sm ${

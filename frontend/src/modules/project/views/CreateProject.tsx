@@ -218,7 +218,7 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
                     {type.label}
                 </h3>
                 <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors relative z-10">
-                    {type.id === 'MODPACK' ? 'Bundle multiple mods into a pack.' : type.id === 'SAVE' ? 'Share worlds, schematics, or lobbies.' : type.id === 'PLUGIN' ? 'Server-side logic, tools, and scripts.' : 'Custom models, textures, and art.'}
+                    {type.id === 'MODPACK' ? 'Bundle multiple mods into a pack.' : type.id === 'SAVE' ? 'Share worlds, schematics, or lobbies.' : type.id === 'PLUGIN' ? 'Hytale logic, tools, and scripts.' : 'Custom models, textures, and art.'}
                 </p>
             </button>
         );
