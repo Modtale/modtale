@@ -129,7 +129,8 @@ public final class LauncherRuntime {
                 accountController::setCurrentUser,
                 accountController::signIn,
                 accountController::isProjectLiked,
-                projectActions::toggleFavorite
+                projectActions::toggleFavorite,
+                services.scrollSupport()
         );
         projectActions.attachOverlay(() -> sceneRoot() instanceof StackPane stack ? stack : null);
         projectActions.setViewHistoryAction(projectPageController::openProjectChangelog);

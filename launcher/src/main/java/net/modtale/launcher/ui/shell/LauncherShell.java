@@ -221,6 +221,7 @@ public final class LauncherShell {
         }
         StackPane root = new StackPane();
         sceneLayer = root;
+        scrollSupport.install(root);
         root.getStyleClass().add("app-root");
         appRoot = new BorderPane();
         navbarNode = navbar();

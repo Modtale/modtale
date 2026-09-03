@@ -96,6 +96,7 @@ import net.modtale.launcher.ui.common.CachedImageLoader;
 import net.modtale.launcher.ui.common.GameVersionGroups;
 import net.modtale.launcher.ui.common.GameVersionOrdering;
 import net.modtale.launcher.ui.common.LauncherIcons;
+import net.modtale.launcher.ui.common.LauncherScrollSupport;
 import net.modtale.launcher.ui.common.LauncherLayout;
 import net.modtale.launcher.ui.common.LauncherView;
 import net.modtale.launcher.logging.LauncherLog;
@@ -132,6 +133,7 @@ public final class ProjectPageController {
     private final Runnable signIn;
     private final Function<String, Boolean> favoriteResolver;
     private final Consumer<ProjectSummary> toggleFavorite;
+    private final LauncherScrollSupport scrollSupport;
     private final NativeMarkdownRenderer markdownRenderer;
     private final NativeWikiView wikiView;
     private final NativeGalleryCarousel galleryCarousel;
@@ -203,7 +205,8 @@ public final class ProjectPageController {
             Consumer<CurrentUser> currentUserUpdater,
             Runnable signIn,
             Function<String, Boolean> favoriteResolver,
-            Consumer<ProjectSummary> toggleFavorite
+            Consumer<ProjectSummary> toggleFavorite,
+            LauncherScrollSupport scrollSupport
     ) {
         this.apiClient = apiClient;
         this.executor = executor;
@@ -227,6 +230,7 @@ public final class ProjectPageController {
         } : signIn;
         this.favoriteResolver = favoriteResolver;
         this.toggleFavorite = toggleFavorite;
+        this.scrollSupport = scrollSupport;
         this.galleryCarousel = new NativeGalleryCarousel(imageLoader, this::openUrlInBrowser);
         this.markdownRenderer = new NativeMarkdownRenderer(imageLoader, this::openUrlInBrowser);
         this.wikiView = new NativeWikiView(markdownRenderer, this::openUrlInBrowser);
@@ -2491,7 +2495,12 @@ public final class ProjectPageController {
             double normalized = Math.max(0, Math.min(1, targetY / scrollable));
             double min = attachedScrollPane.getVmin();
             double max = attachedScrollPane.getVmax();
-            attachedScrollPane.setVvalue(min + normalized * (max - min));
+            double targetValue = min + normalized * (max - min);
+            if (scrollSupport == null) {
+                attachedScrollPane.setVvalue(targetValue);
+            } else {
+                scrollSupport.smoothScrollTo(attachedScrollPane, Double.NaN, targetValue);
+            }
         });
     }
 
