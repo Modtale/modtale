@@ -400,6 +400,8 @@ public final class ProjectBrowseController {
         sourceCombo.setValue(ProjectBrowseSource.MODTALE);
         sourceCombo.setOnAction(event -> {
             searchState.reset();
+            activeBrowseView = BrowseOptions.BrowseViewOption.defaultOption();
+            categories.showCurseForgeOptions(sourceCombo.getValue() == ProjectBrowseSource.CURSEFORGE);
             updateSortOptions();
             refreshBrowseControls();
             searchProjects();
@@ -730,7 +732,7 @@ public final class ProjectBrowseController {
         downloadTimeframes.refresh();
         updateBrowseControlBadges();
         refreshSortDropdown();
-        if (categoryPills != null) setVisibleManaged(categoryPills, !curseForge);
+        if (categoryPills != null) setVisibleManaged(categoryPills, true);
         if (tagToggleButton != null) setVisibleManaged(tagToggleButton, !curseForge);
         if (filterToggleButton != null) setVisibleManaged(filterToggleButton, !curseForge);
         if (sortButton != null) setVisibleManaged(sortButton, !curseForge);

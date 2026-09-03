@@ -25,4 +25,16 @@ class BrowseOptionsTest {
                 "Prefab", "Structure", "Dungeon", "Adventure Map", "Server Hub", "Template"
         )));
     }
+
+    @Test
+    void mirrorsCurseForgeProjectClassesInTheBrowsePill() {
+        assertEquals(List.of(
+                BrowseOptions.ClassificationOption.CURSEFORGE_ALL,
+                BrowseOptions.ClassificationOption.CURSEFORGE_MODS,
+                BrowseOptions.ClassificationOption.CURSEFORGE_PREFABS,
+                BrowseOptions.ClassificationOption.CURSEFORGE_WORLDS,
+                BrowseOptions.ClassificationOption.CURSEFORGE_BOOTSTRAP,
+                BrowseOptions.ClassificationOption.CURSEFORGE_TRANSLATIONS
+        ), BrowseOptions.CURSEFORGE_PROJECT_TYPES);
+    }
 }
