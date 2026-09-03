@@ -108,7 +108,7 @@ final class LibraryWorldRenderer {
         copy.getChildren().add(title);
         HBox.setHgrow(copy, Priority.ALWAYS);
 
-        HBox actions = new HBox(6);
+        HBox actions = new HBox(8);
         actions.getStyleClass().add("library-actions");
         actions.setAlignment(Pos.CENTER_RIGHT);
         Button share = secondaryButton("Share");
@@ -118,8 +118,8 @@ final class LibraryWorldRenderer {
         share.setAccessibleText("Share world mod list");
         share.setTooltip(new Tooltip("Copy a share link for this world's enabled mods"));
         share.setOnAction(event -> shareWorldSnapshot.accept(model.world()));
-        Button pack = primaryButton("Make Pack");
-        pack.getStyleClass().addAll("small", "library-compact-primary-action");
+        Button pack = secondaryButton("Create pack");
+        pack.getStyleClass().addAll("small", "library-action-emphasis");
         pack.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.PACKAGE_PLUS, 14));
         pack.setTooltip(new Tooltip("Start a Modtale modpack from this world's enabled mods"));
         pack.setOnAction(event -> createModpackFromWorld.accept(model.world()));
@@ -145,18 +145,15 @@ final class LibraryWorldRenderer {
             String emptyTitle,
             String emptySubtitle
     ) {
-        VBox section = detailSection("Installed Mods and Modpacks");
         if (projects.isEmpty()) {
-            section.getChildren().add(emptyState(emptyTitle, emptySubtitle));
-            return section;
+            return emptyState(emptyTitle, emptySubtitle);
         }
         VBox rows = new VBox(10);
         rows.getStyleClass().add("library-world-project-list");
         for (LibraryWorldProjectModel project : projects) {
             rows.getChildren().add(projectRow(world, project));
         }
-        section.getChildren().add(rows);
-        return section;
+        return rows;
     }
 
     private Node projectRow(HytaleWorld world, LibraryWorldProjectModel model) {
@@ -472,15 +469,6 @@ final class LibraryWorldRenderer {
                 || !installed.bundledProjects().isEmpty()
                 || !installed.dependencyProjectIds().isEmpty()
                 || !installed.externalDependencies().isEmpty();
-    }
-
-    private VBox detailSection(String title) {
-        VBox section = new VBox(10);
-        section.getStyleClass().add("library-detail-section");
-        Label label = new Label(title);
-        label.getStyleClass().add("library-section-title");
-        section.getChildren().add(label);
-        return section;
     }
 
     private Node badge(String text, String tone) {
