@@ -18,6 +18,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -326,6 +327,20 @@ public final class ProjectCardFactory {
             Consumer<ProjectSummary> onToggleFavorite,
             boolean fullSize
     ) {
+        if (project.isCurseForge()) {
+            Button provider = new Button("CurseForge");
+            provider.getStyleClass().addAll(fullSize ? "project-stat-large" : "project-stat", "favorite-stat");
+            provider.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.GLOBE,
+                    fullSize ? CARD_STAT_ICON_SIZE : COMPACT_STAT_ICON_SIZE));
+            provider.setMouseTransparent(true);
+            provider.setFocusTraversable(false);
+            provider.setAccessibleText("Provided by CurseForge");
+            if (fullSize) {
+                provider.setMinHeight(CARD_STAT_HEIGHT);
+                provider.setPrefHeight(CARD_STAT_HEIGHT);
+            }
+            return provider;
+        }
         Button button = new Button(number(project.favoriteCount()));
         button.getStyleClass().addAll(fullSize ? "project-stat-large" : "project-stat", "favorite-stat");
         if (fullSize) {
@@ -374,9 +389,14 @@ public final class ProjectCardFactory {
     }
 
     private Button installButton(ProjectSummary project, Consumer<ProjectSummary> onInstall) {
-        Button install = new Button("Install");
+        boolean providerHandoff = project.isCurseForge() && !Boolean.TRUE.equals(project.distributionAllowed());
+        Button install = new Button(providerHandoff ? "Get on CurseForge" : "Install");
         install.getStyleClass().addAll("btn", "primary", "small", "project-install-button");
-        install.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 16));
+        install.setGraphic(LauncherIcons.icon(
+                providerHandoff ? LauncherIcons.Glyph.EXTERNAL_LINK : LauncherIcons.Glyph.DOWNLOAD, 16));
+        install.setTooltip(new Tooltip(providerHandoff
+                ? "The author requires downloads through CurseForge"
+                : project.isCurseForge() ? "Install this verified CurseForge file" : "Install this project"));
         install.setOnAction(event -> {
             event.consume();
             onInstall.accept(project);

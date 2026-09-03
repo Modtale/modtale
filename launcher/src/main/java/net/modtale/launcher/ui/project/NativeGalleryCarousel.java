@@ -1,6 +1,7 @@
 package net.modtale.launcher.ui.project;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
@@ -75,15 +76,17 @@ final class NativeGalleryCarousel {
         private final ScrollPane thumbnailScroller = new ScrollPane(thumbnails);
         private final Region progressFill = new Region();
         private final Scale progressScale = new Scale(0, 1, 0, 0);
-        private final List<ImageView> thumbnailViews = new ArrayList<>();
+        private final List<ImageView> thumbnailViews;
         private final List<Button> thumbnailButtons;
         private Timeline progressTimeline;
         private int index;
+        private int selectedThumbnail = -1;
 
         private CarouselView(List<ImageItem> images, int initialIndex, Variant variant) {
             this.images = images == null ? List.of() : List.copyOf(images);
             this.variant = variant;
             this.index = normalizedIndex(initialIndex);
+            this.thumbnailViews = new ArrayList<>(Collections.nCopies(this.images.size(), null));
             this.thumbnailButtons = buildThumbnailButtons();
             build();
             update();
@@ -202,6 +205,8 @@ final class NativeGalleryCarousel {
             thumbnails.getStyleClass().add("project-gallery-carousel-thumbnail-row");
             thumbnails.setAlignment(Pos.CENTER_LEFT);
             thumbnails.getChildren().setAll(thumbnailButtons);
+            thumbnailScroller.hvalueProperty().addListener((observable, previousValue, currentValue) ->
+                    loadVisibleThumbnails(currentValue.doubleValue()));
         }
 
         private List<Button> buildThumbnailButtons() {
@@ -219,9 +224,12 @@ final class NativeGalleryCarousel {
             button.setMinSize(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT);
             button.setPrefSize(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT);
             button.setMaxSize(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT);
-            button.setGraphic(thumbnailGraphic(item, itemIndex));
+            if (shouldLoadThumbnail(itemIndex)) {
+                button.setGraphic(thumbnailGraphic(item, itemIndex));
+                loadThumbnailImage(itemIndex);
+            }
             button.setAccessibleText(item.alt().isBlank() ? "Gallery thumbnail" : item.alt());
-            button.setOnAction(event -> show(thumbnailButtons.indexOf(button)));
+            button.setOnAction(event -> show(itemIndex));
             return button;
         }
 
@@ -241,10 +249,7 @@ final class NativeGalleryCarousel {
             thumbnail.setPreserveRatio(true);
             thumbnail.setFitWidth(THUMBNAIL_WIDTH);
             thumbnail.setFitHeight(THUMBNAIL_HEIGHT);
-            thumbnailViews.add(thumbnail);
-            if (shouldLoadThumbnail(itemIndex)) {
-                loadThumbnail(itemIndex);
-            }
+            thumbnailViews.set(itemIndex, thumbnail);
             frame.getChildren().add(thumbnail);
             if (item.youtube()) {
                 frame.getChildren().add(playBadge(28));
@@ -283,9 +288,14 @@ final class NativeGalleryCarousel {
             String captionText = item.caption();
             caption.setText(captionText);
             setCaptionVisible(!captionText.isBlank());
-            for (int i = 0; i < thumbnailButtons.size(); i++) {
-                thumbnailButtons.get(i).pseudoClassStateChanged(SELECTED, i == index);
+            if (selectedThumbnail >= 0 && selectedThumbnail < thumbnailButtons.size()
+                    && selectedThumbnail != index) {
+                thumbnailButtons.get(selectedThumbnail).pseudoClassStateChanged(SELECTED, false);
             }
+            if (index < thumbnailButtons.size()) {
+                thumbnailButtons.get(index).pseudoClassStateChanged(SELECTED, true);
+            }
+            selectedThumbnail = index;
             if (item.hasOpenTarget()) {
                 image.setCursor(Cursor.HAND);
                 image.setOnMouseClicked(event -> openUrl.accept(item.openTarget()));
@@ -302,11 +312,26 @@ final class NativeGalleryCarousel {
         }
 
         private void loadNearbyThumbnails() {
-            for (int i = 0; i < thumbnailViews.size(); i++) {
-                if (shouldLoadThumbnail(i)) {
-                    loadThumbnail(i);
-                }
+            int initialCount = Math.min(5, thumbnailViews.size());
+            for (int i = 0; i < initialCount; i++) {
+                loadThumbnail(i);
             }
+            int from = Math.max(0, index - 2);
+            int to = Math.min(thumbnailViews.size() - 1, index + 2);
+            for (int i = from; i <= to; i++) {
+                loadThumbnail(i);
+            }
+        }
+
+        private void loadVisibleThumbnails(double horizontalValue) {
+            if (thumbnailButtons.isEmpty()) return;
+            double viewportWidth = thumbnailScroller.getViewportBounds().getWidth();
+            int visibleCount = Math.max(1, (int) Math.ceil(viewportWidth / (THUMBNAIL_WIDTH + thumbnails.getSpacing())));
+            int first = (int) Math.round(Math.max(0, Math.min(1, horizontalValue))
+                    * Math.max(0, thumbnailButtons.size() - visibleCount));
+            int from = Math.max(0, first - 1);
+            int to = Math.min(thumbnailButtons.size() - 1, first + visibleCount + 1);
+            for (int itemIndex = from; itemIndex <= to; itemIndex++) loadThumbnail(itemIndex);
         }
 
         private boolean shouldLoadThumbnail(int itemIndex) {
@@ -318,6 +343,15 @@ final class NativeGalleryCarousel {
                 return;
             }
             ImageView thumbnail = thumbnailViews.get(itemIndex);
+            if (thumbnail == null) {
+                thumbnailButtons.get(itemIndex).setGraphic(thumbnailGraphic(images.get(itemIndex), itemIndex));
+                thumbnail = thumbnailViews.get(itemIndex);
+            }
+            loadThumbnailImage(itemIndex);
+        }
+
+        private void loadThumbnailImage(int itemIndex) {
+            ImageView thumbnail = thumbnailViews.get(itemIndex);
             if (Boolean.TRUE.equals(thumbnail.getProperties().get(THUMBNAIL_LOADED_PROPERTY))) {
                 return;
             }
@@ -326,25 +360,24 @@ final class NativeGalleryCarousel {
         }
 
         private void restartProgressTimeline() {
-            stopProgressTimeline();
             if (images.size() <= 1 || root.getScene() == null) {
+                if (progressTimeline != null) progressTimeline.stop();
                 progressScale.setX(0);
                 return;
             }
-            progressScale.setX(0);
-            progressTimeline = new Timeline(
-                    new KeyFrame(Duration.ZERO, new KeyValue(progressScale.xProperty(), 0)),
-                    new KeyFrame(AUTO_ADVANCE_DURATION, event -> {
-                        show(index + 1);
-                    }, new KeyValue(progressScale.xProperty(), 1, Interpolator.LINEAR))
-            );
-            progressTimeline.play();
+            if (progressTimeline == null) {
+                progressTimeline = new Timeline(
+                        new KeyFrame(Duration.ZERO, new KeyValue(progressScale.xProperty(), 0)),
+                        new KeyFrame(AUTO_ADVANCE_DURATION, event -> show(index + 1),
+                                new KeyValue(progressScale.xProperty(), 1, Interpolator.LINEAR))
+                );
+            }
+            progressTimeline.playFromStart();
         }
 
         private void stopProgressTimeline() {
             if (progressTimeline != null) {
                 progressTimeline.stop();
-                progressTimeline = null;
             }
         }
 

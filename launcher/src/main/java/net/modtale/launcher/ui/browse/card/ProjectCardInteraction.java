@@ -39,6 +39,9 @@ public final class ProjectCardInteraction {
     }
 
     public static void addHoverAnimation(Region card, Node floatingIcon, Node zoomMedia) {
+        cacheAnimatedNode(card);
+        cacheAnimatedNode(floatingIcon);
+        cacheAnimatedNode(zoomMedia);
         TranslateTransition cardTransition = hoverTransition(card);
         TranslateTransition iconTransition = hoverTransition(floatingIcon);
         ScaleTransition mediaTransition = zoomMedia == null ? null : scaleTransition(zoomMedia);
@@ -187,6 +190,12 @@ public final class ProjectCardInteraction {
         node.setCacheHint(CacheHint.SPEED);
     }
 
+    private static void cacheAnimatedNode(Node node) {
+        if (node == null) return;
+        node.setCache(true);
+        node.setCacheHint(CacheHint.SPEED);
+    }
+
     private static void releaseAnimationCache(Node node) {
         Object cached = node.getProperties().remove(ANIMATION_CACHE_ENABLED_PROPERTY);
         Object hint = node.getProperties().remove(ANIMATION_CACHE_HINT_PROPERTY);
@@ -205,4 +214,5 @@ public final class ProjectCardInteraction {
         return node.getScene() != null
                 && Boolean.TRUE.equals(node.getScene().getRoot().getProperties().get(ProjectCardFactory.SCROLL_ACTIVE_PROPERTY));
     }
+
 }

@@ -97,12 +97,12 @@ import net.modtale.launcher.ui.common.GameVersionOrdering;
 import net.modtale.launcher.ui.common.LauncherIcons;
 import net.modtale.launcher.ui.common.LauncherLayout;
 import net.modtale.launcher.ui.common.LauncherView;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.modtale.launcher.logging.LauncherLog;
+import net.modtale.launcher.logging.LauncherLogger;
 
 public final class ProjectPageController {
 
-    private static final Logger LOG = LogManager.getLogger(ProjectPageController.class);
+    private static final LauncherLogger LOG = LauncherLog.getLogger(ProjectPageController.class);
 
     private static final double CONTENT_MAX_WIDTH = 1568;
     private static final double HEADER_ICON_SIZE = 224;
@@ -362,6 +362,10 @@ public final class ProjectPageController {
     }
 
     public void openCreator(ProjectSummary project) {
+        if (project != null && project.isCurseForge()) {
+            openUrlInBrowser(project.websiteUrl());
+            return;
+        }
         hideChangelogOverlay();
         hideGalleryOverlay();
         hideCommentDeleteOverlay();
@@ -1275,10 +1279,13 @@ public final class ProjectPageController {
     private HBox headerActions(ProjectSummary summary, ProjectDetail detail) {
         HBox actions = new HBox(8);
         actions.getStyleClass().add("project-detail-header-actions");
-        actions.getChildren().addAll(
-                headerIconButton(LauncherIcons.Glyph.HEART, "Favorite", this::toggleFavorite, isFavorite(summary)),
-                headerIconButton(LauncherIcons.Glyph.SHARE_2, "Share", this::showShareModal, false)
-        );
+        if (summary != null && summary.isCurseForge()) {
+            actions.getChildren().add(headerIconButton(
+                    LauncherIcons.Glyph.SHARE_2, "Open on CurseForge", this::openCurrentInBrowser, false));
+            return actions;
+        }
+        actions.getChildren().addAll(headerIconButton(LauncherIcons.Glyph.HEART, "Favorite", this::toggleFavorite,
+                isFavorite(summary)), headerIconButton(LauncherIcons.Glyph.SHARE_2, "Share", this::showShareModal, false));
         if (!isCurrentProjectCreator(summary, detail)) {
             actions.getChildren().add(headerIconButton(
                     LauncherIcons.Glyph.FLAG, "Report", this::showProjectReportModal, false));
@@ -3410,6 +3417,9 @@ public final class ProjectPageController {
     }
 
     private static String projectPageUrl(ProjectSummary project) {
+        if (project != null && project.isCurseForge() && project.websiteUrl() != null && !project.websiteUrl().isBlank()) {
+            return project.websiteUrl();
+        }
         return LauncherConfig.siteBaseUrl().replaceAll("/+$", "") + projectPath(project);
     }
 

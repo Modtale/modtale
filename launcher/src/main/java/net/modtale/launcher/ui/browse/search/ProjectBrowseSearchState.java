@@ -13,6 +13,12 @@ public final class ProjectBrowseSearchState {
     private ProjectSearchQuery inFlightSearch;
     private ProjectSearchQuery lastCompletedSearch;
 
+    public void reset() {
+        inFlightSearch = null;
+        lastCompletedSearch = null;
+        sequence++;
+    }
+
     public long start(ProjectSearchQuery query) {
         if (query.equals(inFlightSearch)) {
             return DUPLICATE_SEARCH;

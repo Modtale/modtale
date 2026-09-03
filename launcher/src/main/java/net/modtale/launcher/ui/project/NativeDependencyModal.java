@@ -451,7 +451,6 @@ final class NativeDependencyModal {
         return version.dependencies().stream()
                 .filter(dependency -> dependency != null
                         && !dependency.isEmbedded()
-                        && dependency.appliesToClient()
                         && !dependency.isExternal()
                         && !isBlank(dependency.projectId()))
                 .toList();

@@ -7012,12 +7012,12 @@
     -fx-border-color: rgba(255, 255, 255, 0.20);
     -fx-background-color: #0f172a;
     -fx-cursor: hand;
-    -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.20), 14, 0.10, 0, 5);
+    -fx-effect: dropshadow(one-pass-box, rgba(2, 6, 23, 0.20), 14, 0.10, 0, 5);
 }
 
 .project-card:hover {
     -fx-border-color: #3b82f6;
-    -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.28), 18, 0.12, 0, 7);
+    -fx-effect: dropshadow(one-pass-box, rgba(2, 6, 23, 0.28), 18, 0.12, 0, 7);
 }
 
 .project-card-shell {
@@ -7031,16 +7031,20 @@
 }
 
 .project-card-list {
-    -fx-padding: 18px;
+    -fx-padding: 16px;
     -fx-min-height: 160px;
-    -fx-border-color: rgba(255, 255, 255, 0.10);
+    -fx-border-color: rgba(255, 255, 255, 0.10), transparent;
+    -fx-border-width: 1px, 3px;
+    -fx-border-insets: 0, 0;
 }
 
 .project-card-compact {
-    -fx-padding: 12px;
+    -fx-padding: 10px;
     -fx-background-radius: 12px;
     -fx-border-radius: 12px;
-    -fx-border-color: rgba(255, 255, 255, 0.10);
+    -fx-border-color: rgba(255, 255, 255, 0.10), transparent;
+    -fx-border-width: 1px, 3px;
+    -fx-border-insets: 0, 0;
 }
 
 .project-card-grid:hover,
@@ -7052,7 +7056,33 @@
 
 .project-card-list:hover,
 .project-card-compact:hover {
-    -fx-border-width: 3px;
+    -fx-border-color: transparent, #3b82f6;
+}
+
+/* A moving pointer target must not invalidate card caches on every scroll pulse. */
+.root:scrolling .project-card:hover,
+.root:scrolling .project-card-shell:hover .project-card-grid {
+    -fx-border-color: rgba(255, 255, 255, 0.20);
+    -fx-effect: dropshadow(one-pass-box, rgba(2, 6, 23, 0.20), 14, 0.10, 0, 5);
+}
+
+.root:scrolling .project-card-list:hover,
+.root:scrolling .project-card-compact:hover {
+    -fx-border-color: rgba(255, 255, 255, 0.10), transparent;
+}
+
+.root:scrolling .project-card:hover .project-title,
+.root:scrolling .project-card-shell:hover .project-title,
+.root:scrolling .project-card:hover .compact-title {
+    -fx-text-fill: #ffffff;
+    -fx-effect: dropshadow(one-pass-box, rgba(255, 255, 255, 0.62), 1, 1, 0.35, 0);
+}
+
+.root:scrolling .project-card:hover .project-title .text,
+.root:scrolling .project-card-shell:hover .project-title .text,
+.root:scrolling .project-card:hover .compact-title .text {
+    -fx-fill: #ffffff;
+    -fx-stroke: #ffffff;
 }
 
 .project-banner {
@@ -7084,7 +7114,7 @@
     -fx-border-radius: 8px;
     -fx-border-color: rgba(255, 255, 255, 0.10);
     -fx-background-color: rgba(15, 23, 42, 0.94);
-    -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.18), 14, 0.14, 0, 4);
+    -fx-effect: dropshadow(one-pass-box, rgba(2, 6, 23, 0.18), 14, 0.14, 0, 4);
 }
 
 .classification-label {
@@ -7124,7 +7154,7 @@
     -fx-border-width: 4px;
     -fx-border-color: #1e293b;
     -fx-background-color: transparent;
-    -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.24), 12, 0.12, 0, 5);
+    -fx-effect: dropshadow(one-pass-box, rgba(2, 6, 23, 0.24), 12, 0.12, 0, 5);
 }
 
 .project-icon-compact {

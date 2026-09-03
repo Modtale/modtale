@@ -511,7 +511,6 @@ final class NativeDownloadModal {
         }
         return version.dependencies().stream()
                 .filter(dependency -> dependency != null
-                        && dependency.appliesToClient()
                         && dependency.isExternal()
                         && !dependency.isEmbedded())
                 .toList();
