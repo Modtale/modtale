@@ -82,7 +82,7 @@ public final class LauncherHytaleAuthGate {
         signInButton.setMaxWidth(Double.MAX_VALUE);
         signInButton.setOnAction(event -> signInHytale());
 
-        Label note = new Label("Modtale sign-in is optional for local play, but Hytale launch uses official Hytale authentication.");
+        Label note = new Label("A Modtale account is optional. It is only needed for account-backed features such as notifications, favorites, shared lists, and creating modpacks.");
         note.getStyleClass().add("auth-status");
         note.setWrapText(true);
         note.setMaxWidth(360);

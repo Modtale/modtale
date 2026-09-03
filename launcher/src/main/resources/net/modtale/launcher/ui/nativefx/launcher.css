@@ -8963,57 +8963,11 @@
     -fx-min-width: 0;
 }
 
-.auth-form {
-    -fx-max-width: 360px;
-}
-
-.auth-form .btn {
-    -fx-min-width: 0;
-}
-
-.auth-oauth-list,
-.auth-oauth-row {
-    -fx-max-width: 360px;
-}
-
-.auth-oauth-button {
-    -fx-min-height: 38px;
-    -fx-pref-height: 38px;
-    -fx-padding: 0 12px;
-    -fx-font-size: 12px;
-}
-
-.auth-separator {
-    -fx-padding: 2px 0;
-}
-
-.auth-separator-label {
-    -fx-text-fill: #64748b;
-    -fx-font-size: 11px;
-    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
-    -fx-font-weight: 900;
-}
-
 .auth-title {
     -fx-text-fill: white;
     -fx-font-size: 24px;
     -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
-}
-
-.auth-step-title {
-    -fx-text-fill: #e2e8f0;
-    -fx-font-size: 14px;
-    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
-    -fx-font-weight: 900;
-}
-
-.auth-subtitle {
-    -fx-text-fill: #cbd5e1;
-    -fx-font-size: 14px;
-    -fx-font-family: "Inter SemiBold", "Inter", "SF Pro Text", "Segoe UI", "System";
-    -fx-font-weight: 600;
-    -fx-text-alignment: center;
 }
 
 .auth-status {
@@ -9022,13 +8976,6 @@
     -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
     -fx-text-alignment: center;
-}
-
-.auth-mfa-input {
-    -fx-alignment: center;
-    -fx-font-family: "JetBrains Mono", "Cascadia Mono", "SF Mono", monospace;
-    -fx-font-size: 20px;
-    -fx-font-weight: 900;
 }
 
 .empty-state {
