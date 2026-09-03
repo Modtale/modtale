@@ -8832,6 +8832,12 @@
     -fx-border-color: rgba(96, 165, 250, 0.28);
 }
 
+.library-world-project-row:contents-hovered,
+.library-world-project-row:contents-hovered:hover {
+    -fx-background-color: rgba(30, 41, 59, 0.72);
+    -fx-border-color: rgba(148, 163, 184, 0.15);
+}
+
 .library-bundled-row-locked {
     -fx-opacity: 0.78;
 }
