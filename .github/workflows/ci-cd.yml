@@ -176,6 +176,8 @@ jobs:
 
       - name: 'Set up Cloud SDK'
         uses: 'google-github-actions/setup-gcloud@v2'
+        with:
+          install_components: 'beta'
 
       - name: Ensure Branch R2 Bucket
         if: env.ENV_TYPE == 'preview'
@@ -394,6 +396,12 @@ jobs:
             echo "Frontend service does not exist."
           fi
 
+          if [ "${{ env.ENV_TYPE }}" = "prod" ] && gcloud run services describe modtale-status --region ${{ env.REGION }} >/dev/null 2>&1; then
+            echo "STATUS_EXISTS=true" >> $GITHUB_ENV
+          else
+            echo "STATUS_EXISTS=false" >> $GITHUB_ENV
+          fi
+
       - name: Build and Deploy Backend
         id: deploy_backend
         if: steps.filter.outputs.backend == 'true' || env.BACKEND_EXISTS == 'false' || env.R2_RUNTIME_CREDENTIALS_REPLACED == 'true'
@@ -541,6 +549,61 @@ jobs:
           if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
             BACKEND_REVISION=$(gcloud run services describe "$BACKEND_SERVICE" --region "$REGION" --format="value(status.latestReadyRevisionName)")
             echo "revision=$BACKEND_REVISION" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and Deploy Detached Status Service
+        if: env.ENV_TYPE == 'prod' && (steps.filter.outputs.backend == 'true' || env.STATUS_EXISTS == 'false')
+        run: |
+          set -euo pipefail
+          cd backend
+
+          : "${BUILD_SERVICE_ACCOUNT:?Set GitHub environment variable GCP_BUILD_SERVICE_ACCOUNT.}"
+          : "${RUNTIME_SERVICE_ACCOUNT:?Set GCP_PROD_RUNTIME_SERVICE_ACCOUNT in the production environment.}"
+
+          gcloud builds submit \
+            --config=cloudbuild-status.yml \
+            --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
+            --substitutions="_TAG=$GITHUB_SHA" .
+
+          gcloud run deploy modtale-status \
+            --image="gcr.io/$PROJECT_ID/modtale-status:$GITHUB_SHA" \
+            --region="$REGION" \
+            --service-account="$RUNTIME_SERVICE_ACCOUNT" \
+            --allow-unauthenticated \
+            --execution-environment=gen2 \
+            --cpu=1 \
+            --memory=512Mi \
+            --concurrency=20 \
+            --min-instances=1 \
+            --max-instances=1 \
+            --no-cpu-throttling \
+            --startup-probe="httpGet.path=/api/v1/status/live,httpGet.port=8080,periodSeconds=5,timeoutSeconds=5,failureThreshold=24" \
+            --liveness-probe="httpGet.path=/api/v1/status/live,httpGet.port=8080,periodSeconds=30,timeoutSeconds=5,failureThreshold=3" \
+            --set-env-vars="STATUS_TARGET_SITE_URL=https://modtale.net,STATUS_TARGET_API_URL=https://api.modtale.net/actuator/health/readiness,STATUS_MONGODB_DATABASE_NAME=modtale,STATUS_R2_BUCKET_NAME=modtale-binaries,STATUS_REFRESH_INTERVAL_MS=60000,STATUS_STALE_AFTER=3m" \
+            --update-secrets="STATUS_MONGODB_URI=MONGODB_URI:latest,STATUS_R2_ACCESS_KEY=R2_ACCESS_KEY:latest,STATUS_R2_SECRET_KEY=R2_SECRET_KEY:latest,STATUS_R2_ENDPOINT=R2_ENDPOINT:latest,STATUS_DISCORD_WEBHOOK_URL=STATUS_DISCORD_WEBHOOK_URL:latest" \
+            --labels="app=modtale,environment=production,component=status" \
+            --quiet
+
+          STATUS_URL=$(gcloud run services describe modtale-status --region "$REGION" --format="value(status.url)")
+          for attempt in $(seq 1 18); do
+            if curl --fail --silent --show-error "$STATUS_URL/api/v1/status/ready" >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 18 ]; then
+              echo "::error::Detached status service did not become ready."
+              exit 1
+            fi
+            sleep 10
+          done
+
+          if ! gcloud beta run domain-mappings describe \
+            --domain=status.modtale.net \
+            --region="$REGION" >/dev/null 2>&1; then
+            gcloud beta run domain-mappings create \
+              --service=modtale-status \
+              --domain=status.modtale.net \
+              --region="$REGION" \
+              --quiet
           fi
 
       - name: Determine API URL
