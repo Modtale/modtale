@@ -50,6 +50,11 @@ class CurseForgeModpackFlowTest {
         assertEquals(ProjectDependency.Source.CURSEFORGE, curseForge.getSource());
         assertEquals("https://www.curseforge.com/hytale/mods/simple-compost/files/8227810", curseForge.getExternalFileUrl());
         assertNull(curseForge.getCachedFileUrl());
+        curseForge.setExternalFileSize(4096L);
+        curseForge.setExternalFileHashes(Map.of("sha1", "a".repeat(40), "md5", "b".repeat(32)));
+        curseForge.setExternalGameVersions(List.of("2026.09"));
+        curseForge.setExternalFileStatus(4);
+        curseForge.setExternalDistributionAllowed(false);
 
         ProjectRepository projectRepository = mock(ProjectRepository.class);
         DownloadArchiveSupport archiveSupport = mock(DownloadArchiveSupport.class);
@@ -89,6 +94,10 @@ class CurseForgeModpackFlowTest {
         assertEquals("REFERENCE_ONLY", lock.at("/entries/1/distribution").asText());
         assertEquals("1450386", lock.at("/entries/1/provider/projectId").asText());
         assertEquals("8227810", lock.at("/entries/1/provider/fileId").asText());
+        assertEquals(4096L, lock.at("/entries/1/provider/fileSize").asLong());
+        assertEquals("a".repeat(40), lock.at("/entries/1/provider/hashes/sha1").asText());
+        assertEquals("2026.09", lock.at("/entries/1/provider/gameVersions/0").asText());
+        assertFalse(lock.at("/entries/1/provider/distributionAllowed").asBoolean());
     }
 
     private static DependencyReferenceRequest hostedReference() {

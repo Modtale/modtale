@@ -2,8 +2,8 @@ package net.modtale.service.storage;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import net.modtale.exception.StorageDownloadException;
@@ -290,6 +291,22 @@ final class ModpackArchiveService {
                         putIfPresent(provider, "projectSlug", externalId);
                     }
                     putIfPresent(provider, "fileId", curseForgeFileId(dependency));
+                    putIfPresent(provider, "fileName", dependency.getExternalFileName());
+                    if (dependency.getExternalFileSize() != null && dependency.getExternalFileSize() > 0) {
+                        provider.put("fileSize", dependency.getExternalFileSize());
+                    }
+                    if (dependency.getExternalFileHashes() != null && !dependency.getExternalFileHashes().isEmpty()) {
+                        provider.put("hashes", new TreeMap<>(dependency.getExternalFileHashes()));
+                    }
+                    if (dependency.getExternalGameVersions() != null && !dependency.getExternalGameVersions().isEmpty()) {
+                        provider.put("gameVersions", dependency.getExternalGameVersions());
+                    }
+                    if (dependency.getExternalFileStatus() != null) {
+                        provider.put("fileStatus", dependency.getExternalFileStatus());
+                    }
+                    if (dependency.getExternalDistributionAllowed() != null) {
+                        provider.put("distributionAllowed", dependency.getExternalDistributionAllowed());
+                    }
                     item.put("provider", provider);
                 }
             }

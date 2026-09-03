@@ -102,9 +102,10 @@ class ExternalProjectReferenceServiceTest {
         CurseForgeApiClient apiClient = mock(CurseForgeApiClient.class);
         when(apiClient.resolveProject("simple-compost", "8227810")).thenReturn(java.util.Optional.of(
                 new CurseForgeApiClient.CurseForgeProject(
-                        "1450386", "simple-compost", "SimpleCompost", "Compost all the things", "https://example.test/icon.png",
+                        "1450386", "simple-compost", "SimpleCompost", "Compost all the things", "https://example.test/icon.png", true,
                         List.of(new CurseForgeApiClient.CurseForgeFile(
-                                "8227810", "SimpleCompost 1.0.0", "SimpleCompost-1.0.0.jar", "1.0.0", "RELEASE", "2026-08-01T00:00:00Z"
+                                "8227810", "SimpleCompost 1.0.0", "SimpleCompost-1.0.0.jar", "1.0.0", "RELEASE", "2026-08-01T00:00:00Z",
+                                2048L, java.util.Map.of("sha1", "a".repeat(40)), List.of("2026.08"), 4, true
                         ))
                 )
         ));
@@ -118,6 +119,9 @@ class ExternalProjectReferenceServiceTest {
         assertEquals("SimpleCompost", result.title());
         assertEquals("1.0.0", result.versionNumber());
         assertEquals("SimpleCompost-1.0.0.jar", result.files().getFirst().fileName());
+        assertEquals(2048L, result.files().getFirst().fileSize());
+        assertEquals("a".repeat(40), result.files().getFirst().hashes().get("sha1"));
+        assertEquals(true, result.distributionAllowed());
         assertNull(result.files().getFirst().downloadUrl());
     }
 }

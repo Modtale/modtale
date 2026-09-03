@@ -84,6 +84,11 @@ export interface ProjectDependency {
     externalUrl?: string;
     externalFileUrl?: string;
     externalFileName?: string;
+    externalFileSize?: number;
+    externalFileHashes?: Record<string, string>;
+    externalGameVersions?: string[];
+    externalFileStatus?: number;
+    externalDistributionAllowed?: boolean;
     cachedFileUrl?: string;
     hytaleProjectConfirmed?: boolean;
     icon?: string;
@@ -101,6 +106,11 @@ export interface ExternalProjectFile {
     versionNumber?: string;
     releaseType?: string;
     downloadUrl?: string;
+    fileSize?: number;
+    hashes?: Record<string, string>;
+    gameVersions?: string[];
+    fileStatus?: number;
+    available?: boolean;
 }
 
 export interface ExternalProjectReference {
@@ -112,6 +122,7 @@ export interface ExternalProjectReference {
     iconUrl?: string;
     summary?: string;
     hytaleProjectConfirmed: boolean;
+    distributionAllowed?: boolean;
     files?: ExternalProjectFile[];
 }
 

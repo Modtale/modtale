@@ -129,6 +129,20 @@ class ModpackArchiveValidatorTest {
     }
 
     @Test
+    void rejectsMalformedCurseForgeProviderIntegrityMetadata() throws Exception {
+        String invalidLock = curseForgeLock("https://www.curseforge.com/hytale/mods/simple-compost/files/8227810")
+                .replace("\"a" + "a".repeat(39) + "\"", "\"not-a-sha1\"");
+        byte[] archive = archive(List.of(
+                entry("modpack.json", legacyManifest()),
+                entry("manifest.json", manifest()),
+                entry("modtale.lock.json", invalidLock)
+        ));
+
+        assertTrue(assertThrows(IOException.class,
+                () -> ModpackArchiveValidator.validate(archive)).getMessage().contains("invalid provider hashes"));
+    }
+
+    @Test
     void rejectsUnknownDependencyEnvironments() throws Exception {
         byte[] content = bytes("trusted");
         String invalidLock = lockEntry("MODTALE", "BUNDLED", "plugin.jar", content, false)
@@ -185,10 +199,19 @@ class ModpackArchiveValidatorTest {
                     "distribution": "REFERENCE_ONLY",
                     "url": "%s",
                     "fileUrl": "%s",
-                    "provider": {"projectId": "1450386", "fileId": "8227810"}
+                    "provider": {
+                      "projectId": "1450386",
+                      "fileId": "8227810",
+                      "fileName": "SimpleCompost-1.0.0.jar",
+                      "fileSize": 4096,
+                      "hashes": {"sha1": "%s"},
+                      "gameVersions": ["2026.09"],
+                      "fileStatus": 4,
+                      "distributionAllowed": false
+                    }
                   }]
                 }
-                """.formatted(fileUrl, fileUrl);
+                """.formatted(fileUrl, fileUrl, "a".repeat(40));
     }
 
     private static String lockEntry(

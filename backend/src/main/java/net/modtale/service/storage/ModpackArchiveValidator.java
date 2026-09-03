@@ -210,6 +210,40 @@ final class ModpackArchiveValidator {
                 || !fileId.matches("[0-9]+")) {
             throw new IOException("CurseForge lock entry is missing a valid project and file identity.");
         }
+        if (provider.has("fileSize") && provider.path("fileSize").asLong(-1) <= 0) {
+            throw new IOException("CurseForge lock entry has an invalid provider file size.");
+        }
+        JsonNode hashes = provider.path("hashes");
+        Set<String> providerHashNames = new HashSet<>();
+        if (hashes.isObject()) hashes.fieldNames().forEachRemaining(providerHashNames::add);
+        if (provider.has("hashes") && (!hashes.isObject()
+                || !Set.of("sha1", "md5").containsAll(providerHashNames)
+                || (hashes.has("sha1") && !hashes.path("sha1").asText().matches("[a-f0-9]{40}"))
+                || (hashes.has("md5") && !hashes.path("md5").asText().matches("[a-f0-9]{32}"))
+                || (!hashes.has("sha1") && !hashes.has("md5")))) {
+            throw new IOException("CurseForge lock entry has invalid provider hashes.");
+        }
+        if (provider.has("gameVersions")) {
+            JsonNode gameVersions = provider.path("gameVersions");
+            Set<String> seenVersions = new HashSet<>();
+            if (!gameVersions.isArray() || gameVersions.isEmpty()) {
+                throw new IOException("CurseForge lock entry has invalid provider game versions.");
+            }
+            for (JsonNode version : gameVersions) {
+                if (!version.isTextual() || version.asText().isBlank() || !seenVersions.add(version.asText())) {
+                    throw new IOException("CurseForge lock entry has invalid provider game versions.");
+                }
+            }
+        }
+        if (provider.has("fileStatus") && provider.path("fileStatus").asInt(0) <= 0) {
+            throw new IOException("CurseForge lock entry has an invalid provider file status.");
+        }
+        if (provider.has("fileName") && provider.path("fileName").asText().isBlank()) {
+            throw new IOException("CurseForge lock entry has an invalid provider file name.");
+        }
+        if (provider.has("distributionAllowed") && !provider.path("distributionAllowed").isBoolean()) {
+            throw new IOException("CurseForge lock entry has an invalid provider distribution flag.");
+        }
         validateCurseForgeFileUrl(item.path("url").asText(), fileId);
         validateCurseForgeFileUrl(item.path("fileUrl").asText(), fileId);
     }

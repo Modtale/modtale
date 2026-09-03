@@ -5,7 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import net.modtale.config.properties.AppCurseForgeProperties;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +37,10 @@ public class CurseForgeApiClient {
     CurseForgeApiClient(AppCurseForgeProperties properties, RestTemplate restTemplate) {
         this.properties = properties;
         this.restTemplate = restTemplate;
+    }
+
+    public boolean isConfigured() {
+        return properties.isConfigured();
     }
 
     public Optional<CurseForgeProject> resolveProject(String slug, String requestedFileId) {
@@ -83,6 +90,7 @@ public class CurseForgeApiClient {
                     text(project, "name"),
                     text(project, "summary"),
                     project.path("logo").path("thumbnailUrl").textValue(),
+                    project.has("allowModDistribution") ? project.path("allowModDistribution").booleanValue() : null,
                     files
             ));
         } catch (RestClientException | IllegalArgumentException | java.io.IOException ex) {
@@ -119,11 +127,46 @@ public class CurseForgeApiClient {
                     text(file, "fileName"),
                     inferVersion(file),
                     releaseType(file.path("releaseType").asInt(0)),
-                    text(file, "fileDate")
+                    text(file, "fileDate"),
+                    file.path("fileLength").canConvertToLong() && file.path("fileLength").asLong() > 0
+                            ? file.path("fileLength").asLong() : null,
+                    parseHashes(file.path("hashes")),
+                    parseGameVersions(file.path("gameVersions")),
+                    file.path("fileStatus").canConvertToInt() && file.path("fileStatus").asInt() > 0
+                            ? file.path("fileStatus").asInt() : null,
+                    true
             ));
         }
         files.sort(Comparator.comparing(CurseForgeFile::fileDate, Comparator.nullsLast(String::compareTo)).reversed());
         return files.stream().limit(MAX_FILES).toList();
+    }
+
+    private Map<String, String> parseHashes(JsonNode hashes) {
+        if (!hashes.isArray()) return Map.of();
+        Map<String, String> result = new LinkedHashMap<>();
+        for (JsonNode hash : hashes) {
+            String algorithm = switch (hash.path("algo").asInt(0)) {
+                case 1 -> "sha1";
+                case 2 -> "md5";
+                default -> null;
+            };
+            String value = text(hash, "value");
+            if (algorithm != null && value != null && value.matches("(?i)[a-f0-9]+")) {
+                int expectedLength = "sha1".equals(algorithm) ? 40 : 32;
+                if (value.length() == expectedLength) result.put(algorithm, value.toLowerCase(Locale.ROOT));
+            }
+        }
+        return Map.copyOf(result);
+    }
+
+    private List<String> parseGameVersions(JsonNode versions) {
+        if (!versions.isArray()) return List.of();
+        List<String> result = new ArrayList<>();
+        for (JsonNode version : versions) {
+            String value = version.textValue();
+            if (value != null && !value.isBlank() && !result.contains(value.trim())) result.add(value.trim());
+        }
+        return List.copyOf(result);
     }
 
     private String inferVersion(JsonNode file) {
@@ -151,6 +194,7 @@ public class CurseForgeApiClient {
             String title,
             String summary,
             String iconUrl,
+            Boolean distributionAllowed,
             List<CurseForgeFile> files
     ) {}
 
@@ -160,6 +204,11 @@ public class CurseForgeApiClient {
             String fileName,
             String versionNumber,
             String releaseType,
-            String fileDate
+            String fileDate,
+            Long fileSize,
+            Map<String, String> hashes,
+            List<String> gameVersions,
+            Integer fileStatus,
+            boolean available
     ) {}
 }

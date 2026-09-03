@@ -1,5 +1,7 @@
 package net.modtale.model.dto.request.project;
 
+import java.util.List;
+import java.util.Map;
 import net.modtale.model.project.ProjectDependency;
 
 public class DependencyReferenceRequest {
@@ -15,6 +17,11 @@ public class DependencyReferenceRequest {
     private String externalUrl;
     private String externalFileUrl;
     private String externalFileName;
+    private Long externalFileSize;
+    private Map<String, String> externalFileHashes;
+    private List<String> externalGameVersions;
+    private Integer externalFileStatus;
+    private Boolean externalDistributionAllowed;
     private String cachedFileUrl;
     private boolean hytaleProjectConfirmed;
 
@@ -65,6 +72,21 @@ public class DependencyReferenceRequest {
 
     public String getExternalFileName() { return externalFileName; }
     public void setExternalFileName(String externalFileName) { this.externalFileName = externalFileName; }
+
+    public Long getExternalFileSize() { return externalFileSize; }
+    public void setExternalFileSize(Long externalFileSize) { this.externalFileSize = externalFileSize; }
+
+    public Map<String, String> getExternalFileHashes() { return externalFileHashes; }
+    public void setExternalFileHashes(Map<String, String> externalFileHashes) { this.externalFileHashes = externalFileHashes; }
+
+    public List<String> getExternalGameVersions() { return externalGameVersions; }
+    public void setExternalGameVersions(List<String> externalGameVersions) { this.externalGameVersions = externalGameVersions; }
+
+    public Integer getExternalFileStatus() { return externalFileStatus; }
+    public void setExternalFileStatus(Integer externalFileStatus) { this.externalFileStatus = externalFileStatus; }
+
+    public Boolean getExternalDistributionAllowed() { return externalDistributionAllowed; }
+    public void setExternalDistributionAllowed(Boolean externalDistributionAllowed) { this.externalDistributionAllowed = externalDistributionAllowed; }
 
     public String getCachedFileUrl() { return cachedFileUrl; }
     public void setCachedFileUrl(String cachedFileUrl) { this.cachedFileUrl = cachedFileUrl; }

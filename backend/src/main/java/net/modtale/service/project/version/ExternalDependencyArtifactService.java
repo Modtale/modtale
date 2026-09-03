@@ -19,6 +19,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import net.modtale.exception.InvalidVersionRequestException;
 import net.modtale.model.project.ProjectDependency;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -35,9 +36,20 @@ public class ExternalDependencyArtifactService {
             Pattern.compile(".*/files/(\\d+)/(\\d+)/[^/]+", Pattern.CASE_INSENSITIVE);
 
     private final HttpClient httpClient;
+    private final CurseForgeApiClient curseForgeApiClient;
 
     public ExternalDependencyArtifactService() {
-        this(
+        this(null,
+                HttpClient.newBuilder()
+                        .connectTimeout(Duration.ofSeconds(10))
+                        .followRedirects(HttpClient.Redirect.NEVER)
+                        .build()
+        );
+    }
+
+    @Autowired
+    public ExternalDependencyArtifactService(CurseForgeApiClient curseForgeApiClient) {
+        this(curseForgeApiClient,
                 HttpClient.newBuilder()
                         .connectTimeout(Duration.ofSeconds(10))
                         .followRedirects(HttpClient.Redirect.NEVER)
@@ -46,6 +58,11 @@ public class ExternalDependencyArtifactService {
     }
 
     ExternalDependencyArtifactService(HttpClient httpClient) {
+        this(null, httpClient);
+    }
+
+    ExternalDependencyArtifactService(CurseForgeApiClient curseForgeApiClient, HttpClient httpClient) {
+        this.curseForgeApiClient = curseForgeApiClient;
         this.httpClient = httpClient;
     }
 
@@ -96,6 +113,50 @@ public class ExternalDependencyArtifactService {
         dependency.setExternalFileUrl(reference.filePageUrl());
         dependency.setExternalFileName(filename == null ? "curseforge-" + reference.fileId() + ".jar" : sanitizeArchiveFilename(filename));
         dependency.setCachedFileUrl(null);
+        applyVerifiedCurseForgeMetadata(dependency, reference);
+    }
+
+    private void applyVerifiedCurseForgeMetadata(ProjectDependency dependency, CurseForgeFileReference reference) {
+        clearCurseForgeMetadata(dependency);
+        if (curseForgeApiClient == null || !curseForgeApiClient.isConfigured()) return;
+
+        String slug = curseForgeSlug(reference.filePageUrl());
+        CurseForgeApiClient.CurseForgeProject project = slug == null ? null
+                : curseForgeApiClient.resolveProject(slug, reference.fileId()).orElse(null);
+        CurseForgeApiClient.CurseForgeFile file = project == null ? null : project.files().stream()
+                .filter(candidate -> reference.fileId().equals(candidate.id()))
+                .findFirst()
+                .orElse(null);
+        if (project == null || file == null || !file.available()) return;
+
+        dependency.setExternalId(project.id());
+        dependency.setVersionNumber(trimToNull(file.versionNumber()) == null ? dependency.getVersionNumber() : file.versionNumber());
+        if (trimToNull(file.fileName()) != null) dependency.setExternalFileName(sanitizeArchiveFilename(file.fileName()));
+        dependency.setExternalFileSize(file.fileSize());
+        dependency.setExternalFileHashes(file.hashes().isEmpty() ? null : file.hashes());
+        dependency.setExternalGameVersions(file.gameVersions().isEmpty() ? null : file.gameVersions());
+        dependency.setExternalFileStatus(file.fileStatus());
+        dependency.setExternalDistributionAllowed(project.distributionAllowed());
+    }
+
+    private void clearCurseForgeMetadata(ProjectDependency dependency) {
+        dependency.setExternalFileSize(null);
+        dependency.setExternalFileHashes(null);
+        dependency.setExternalGameVersions(null);
+        dependency.setExternalFileStatus(null);
+        dependency.setExternalDistributionAllowed(null);
+    }
+
+    private String curseForgeSlug(String value) {
+        URI uri = parseUri(value);
+        if (uri == null || uri.getPath() == null) return null;
+        String[] segments = uri.getPath().split("/");
+        for (int i = 0; i < segments.length - 1; i++) {
+            if ("mods".equalsIgnoreCase(segments[i]) && segments[i + 1].matches("[A-Za-z0-9][A-Za-z0-9_-]*")) {
+                return segments[i + 1];
+            }
+        }
+        return null;
     }
 
     private void validateExternalFileLink(ProjectDependency.Source source, String fileUrl) {

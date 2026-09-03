@@ -58,11 +58,17 @@ public class ExternalProjectReferenceService {
                 null,
                 null,
                 true,
+                null,
                 path.fileId() == null ? List.of() : List.of(new ExternalProjectReferenceDTO.ExternalFileDTO(
                         path.fileId(),
                         path.fileId(),
                         null,
                         path.fileId(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        List.of(),
                         null,
                         null
                 ))
@@ -77,8 +83,10 @@ public class ExternalProjectReferenceService {
                         project.iconUrl(),
                         project.summary(),
                         true,
+                        project.distributionAllowed(),
                         project.files().stream().map(file -> new ExternalProjectReferenceDTO.ExternalFileDTO(
-                                file.id(), file.displayName(), file.fileName(), file.versionNumber(), file.releaseType(), null
+                                file.id(), file.displayName(), file.fileName(), file.versionNumber(), file.releaseType(), null,
+                                file.fileSize(), file.hashes(), file.gameVersions(), file.fileStatus(), file.available()
                         )).toList()
                 ))
                 .orElse(fallback);
@@ -115,6 +123,7 @@ public class ExternalProjectReferenceService {
                 null,
                 null,
                 hytaleProjectConfirmed,
+                null,
                 externalFilesForUrl(externalUrl)
         );
     }
@@ -258,7 +267,12 @@ public class ExternalProjectReferenceService {
                 fileName,
                 "latest",
                 null,
-                externalUrl
+                externalUrl,
+                null,
+                null,
+                List.of(),
+                null,
+                null
         ));
     }
 

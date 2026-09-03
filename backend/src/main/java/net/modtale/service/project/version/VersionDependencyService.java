@@ -155,6 +155,11 @@ public class VersionDependencyService {
         dependency.setEnvironment(reference.getEnvironment());
         dependency.setExternalFileUrl(trimToNull(reference.getExternalFileUrl()));
         dependency.setExternalFileName(trimToNull(reference.getExternalFileName()));
+        dependency.setExternalFileSize(reference.getExternalFileSize());
+        dependency.setExternalFileHashes(reference.getExternalFileHashes());
+        dependency.setExternalGameVersions(reference.getExternalGameVersions());
+        dependency.setExternalFileStatus(reference.getExternalFileStatus());
+        dependency.setExternalDistributionAllowed(reference.getExternalDistributionAllowed());
         dependency.setHytaleProjectConfirmed(hytaleProjectConfirmed);
         return dependency;
     }

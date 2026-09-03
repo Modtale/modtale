@@ -181,6 +181,11 @@ const cloneDependencyForForm = (dependency: ProjectDependency): ProjectDependenc
     externalUrl: dependency.externalUrl,
     externalFileUrl: dependency.externalFileUrl,
     externalFileName: dependency.externalFileName,
+    externalFileSize: dependency.externalFileSize,
+    externalFileHashes: dependency.externalFileHashes,
+    externalGameVersions: dependency.externalGameVersions,
+    externalFileStatus: dependency.externalFileStatus,
+    externalDistributionAllowed: dependency.externalDistributionAllowed,
     cachedFileUrl: dependency.cachedFileUrl,
     hytaleProjectConfirmed: dependency.hytaleProjectConfirmed
 });
@@ -599,6 +604,11 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
             externalUrl: referenceUrl,
             externalFileUrl: source === 'CURSEFORGE' ? referenceUrl : selectedExternalFile?.downloadUrl,
             externalFileName: selectedExternalFile?.fileName || selectedExternalFile?.displayName,
+            externalFileSize: selectedExternalFile?.fileSize,
+            externalFileHashes: selectedExternalFile?.hashes,
+            externalGameVersions: selectedExternalFile?.gameVersions,
+            externalFileStatus: selectedExternalFile?.fileStatus,
+            externalDistributionAllowed: resolved.distributionAllowed,
             hytaleProjectConfirmed
         };
         onChange([...dependencies, dependency]);

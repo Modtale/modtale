@@ -1,5 +1,6 @@
 package net.modtale.service.project.version;
 
+import java.util.List;
 import java.util.Optional;
 import net.modtale.config.properties.AppCurseForgeProperties;
 import org.junit.jupiter.api.Test;
@@ -32,14 +33,14 @@ class CurseForgeApiClientTest {
                 .andExpect(header("x-api-key", "approved-test-key"))
                 .andExpect(header("User-Agent", "Modtale/1.0 (+https://modtale.net)"))
                 .andRespond(withSuccess("""
-                        {"data":[{"id":1450386,"gameId":1234,"name":"Simple Compost","slug":"simple-compost","summary":"Compost things","isAvailable":true,"logo":{"thumbnailUrl":"https://example.test/icon.png"}}]}
+                        {"data":[{"id":1450386,"gameId":1234,"name":"Simple Compost","slug":"simple-compost","summary":"Compost things","isAvailable":true,"allowModDistribution":false,"logo":{"thumbnailUrl":"https://example.test/icon.png"}}]}
                         """, MediaType.APPLICATION_JSON));
         server.expect(once(), requestTo("https://api.curseforge.com/v1/mods/1450386/files?pageSize=50"))
                 .andExpect(method(HttpMethod.GET))
                 .andExpect(header("x-api-key", "approved-test-key"))
                 .andRespond(withSuccess("""
                         {"data":[
-                          {"id":8227810,"modId":1450386,"isAvailable":true,"displayName":"1.0.0","fileName":"SimpleCompost-1.0.0.jar","releaseType":1,"fileDate":"2026-08-01T00:00:00Z"},
+                          {"id":8227810,"modId":1450386,"isAvailable":true,"displayName":"1.0.0","fileName":"SimpleCompost-1.0.0.jar","releaseType":1,"fileStatus":4,"fileDate":"2026-08-01T00:00:00Z","fileLength":2048,"gameVersions":["2026.08"],"hashes":[{"algo":1,"value":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},{"algo":2,"value":"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"}]},
                           {"id":8227809,"modId":1450386,"isAvailable":false,"displayName":"withdrawn","fileName":"withdrawn.jar","releaseType":1,"fileDate":"2026-08-02T00:00:00Z"},
                           {"id":8227808,"modId":999,"isAvailable":true,"displayName":"wrong project","fileName":"wrong.jar","releaseType":2,"fileDate":"2026-08-03T00:00:00Z"}
                         ]}
@@ -52,6 +53,11 @@ class CurseForgeApiClientTest {
         assertEquals(1, project.files().size());
         assertEquals("8227810", project.files().getFirst().id());
         assertEquals("RELEASE", project.files().getFirst().releaseType());
+        assertEquals(2048L, project.files().getFirst().fileSize());
+        assertEquals("a".repeat(40), project.files().getFirst().hashes().get("sha1"));
+        assertEquals("b".repeat(32), project.files().getFirst().hashes().get("md5"));
+        assertEquals(List.of("2026.08"), project.files().getFirst().gameVersions());
+        assertEquals(false, project.distributionAllowed());
         server.verify();
     }
 
