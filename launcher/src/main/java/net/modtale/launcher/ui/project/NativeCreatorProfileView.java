@@ -42,12 +42,11 @@ import net.modtale.launcher.ui.common.LauncherLayout;
 final class NativeCreatorProfileView {
 
     private static final double CONTENT_MAX_WIDTH = 1568;
-    private static final double DESKTOP_NAV_OVERLAP = 91;
+    private static final double BANNER_FALLBACK_HEIGHT = 360;
     private static final double PROFILE_CARD_HEIGHT = 316;
     private static final double PROFILE_CARD_LIFT = -32;
     private static final double AVATAR_SIZE = 224;
     private static final double PROJECT_GRID_GAP = 24;
-    private static final double BANNER_FADE_BASE_HEIGHT = 128;
     private static final int DESKTOP_PROJECT_COLUMNS = 4;
 
     private final CachedImageLoader imageLoader;
@@ -111,7 +110,7 @@ final class NativeCreatorProfileView {
 
         StackPane hero = hero(profile);
         hero.prefHeightProperty().bind(Bindings.createDoubleBinding(
-                () -> Math.max(compact ? 280 : 360, page.getWidth() / 3.0 - (compact ? 0 : DESKTOP_NAV_OVERLAP)),
+                () -> bannerHeight(page.getWidth()),
                 page.widthProperty()
         ));
         hero.minHeightProperty().bind(hero.prefHeightProperty());
@@ -149,7 +148,7 @@ final class NativeCreatorProfileView {
         } else {
             media.getStyleClass().add("letterboxed");
             media.setClip(rectangleClip(media));
-            ImageView image = containedImage(bannerUrl, media, 2400, 800);
+            ImageView image = coverImage(bannerUrl, media, 2400, 800);
             image.getStyleClass().add("creator-profile-banner-image");
             media.getChildren().add(image);
         }
@@ -157,7 +156,7 @@ final class NativeCreatorProfileView {
         Region fade = new Region();
         fade.getStyleClass().add("creator-profile-banner-fade");
         fade.setMouseTransparent(true);
-        NativeBannerScrollEffect.bind(media, fade, scrollPixels, BANNER_FADE_BASE_HEIGHT);
+        NativeBannerScrollEffect.bind(media, fade, scrollPixels, hero.widthProperty());
 
         HBox backLayer = new HBox();
         backLayer.setAlignment(Pos.TOP_LEFT);
@@ -172,6 +171,10 @@ final class NativeCreatorProfileView {
 
         hero.getChildren().addAll(media, fade, backLayer);
         return hero;
+    }
+
+    static double bannerHeight(double width) {
+        return Double.isFinite(width) && width > 0 ? width / 3.0 : BANNER_FALLBACK_HEIGHT;
     }
 
     private Region fallbackBanner() {
@@ -629,16 +632,6 @@ final class NativeCreatorProfileView {
         box.widthProperty().addListener((observable, previous, current) -> update.run());
         box.heightProperty().addListener((observable, previous, current) -> update.run());
         image.imageProperty().addListener((observable, previous, current) -> update.run());
-        return image;
-    }
-
-    private ImageView containedImage(String url, Region box, double requestedWidth, double requestedHeight) {
-        ImageView image = new ImageView();
-        image.setSmooth(true);
-        image.setPreserveRatio(true);
-        image.fitWidthProperty().bind(box.widthProperty());
-        image.fitHeightProperty().bind(box.heightProperty());
-        imageLoader.loadInto(image, url, requestedWidth, requestedHeight, true);
         return image;
     }
 
