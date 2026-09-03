@@ -1,14 +1,15 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { ChevronLeft, Github, Globe, X } from 'lucide-react';
+import { ChevronLeft, Globe, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { GitHubBrandIcon } from '@/components/ui/icons/BrandIcons';
 
 import type { Project, User } from '@/types';
 import { theme } from '@/styles/theme';
 import { SiteRoutes } from '@/utils/routes';
 import { generateProjectMeta } from '@/utils/meta';
-import { generateBreadcrumbSchema, getBreadcrumbsForClassification } from '@/utils/schema';
+import { generateProjectSchemas } from '@/utils/schema';
 import { DiscordIcon } from '@/utils/modHelpers';
 
 import { useSSRData } from '@/context/SSRContext';
@@ -20,7 +21,9 @@ import { HeaderActions, HeaderContent } from '../components/Header';
 import { ActionBar } from '../components/ActionBar';
 
 import { ViewDetails } from '../tabs/ViewDetails';
-import { prefetchInitialWikiPage, useHMWiki } from '../hooks/useHMWiki';
+import { prefetchInitialWikiPage, prefetchWikiPage, useHMWiki } from '../hooks/useHMWiki';
+import { Wiki } from '../tabs/Wiki';
+import { WikiMobileNavigation, WikiSidebar } from '../components/HMWiki';
 
 import { ProjectLayout } from '../components/ProjectLayout';
 import { GalleryCarouselViewer } from '../components/GalleryCarouselViewer';
@@ -43,9 +46,6 @@ const PostDownloadModal = lazy(() => import('../components/dialogs/PostDownloadM
 const HistoryModal = lazy(() => import('../components/dialogs/HistoryModal').then((module) => ({ default: module.HistoryModal })));
 const DownloadModal = lazy(() => import('../components/dialogs/DownloadModal').then((module) => ({ default: module.DownloadModal })));
 const DependencyModal = lazy(() => import('../components/dialogs/DependencyModal').then((module) => ({ default: module.DependencyModal })));
-const Wiki = lazy(() => import('../tabs/Wiki').then((module) => ({ default: module.Wiki })));
-const WikiSidebar = lazy(() => import('../components/HMWiki').then((module) => ({ default: module.WikiSidebar })));
-const WikiMobileNavigation = lazy(() => import('../components/HMWiki').then((module) => ({ default: module.WikiMobileNavigation })));
 
 interface ProjectDetailViewProps {
     currentUser: User | null;
@@ -91,6 +91,9 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const [showDownloadFx, setShowDownloadFx] = useState(false);
     const [preReleaseGameVersions, setPreReleaseGameVersions] = useState<string[]>([]);
     const [orderedGameVersions, setOrderedGameVersions] = useState<string[]>([]);
+    const [gameVersionCatalogPending, setGameVersionCatalogPending] = useState(false);
+    const [gameVersionCatalogReady, setGameVersionCatalogReady] = useState(false);
+    const [gameVersionCatalogError, setGameVersionCatalogError] = useState(false);
 
     const [isDepModalOpen, setIsDepModalOpen] = useState(false);
     const [pendingDownload, setPendingDownload] = useState<{ versionNumber: string; gameVersion: string; dependencies: any[]; channel: DownloadChannel } | null>(null);
@@ -133,6 +136,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const scrollPosRef = useRef(0);
     const downloadFxTimeoutRef = useRef<number | null>(null);
     const changelogFetchKeyRef = useRef('');
+    const gameVersionCatalogProjectRef = useRef<string | null>(null);
     const [galleryIndex, setGalleryIndex] = useState(0);
     const galleryItems = useMemo(
         () => resolveGalleryImages(project?.galleryImages || [], project?.galleryImageCaptions || {}),
@@ -177,28 +181,58 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         prefetchInitialWikiPage(projectRouteKey || project.id);
     }, [project?.id, project?.hmWikiEnabled, projectRouteKey]);
 
+    const prefetchWikiNavigationPage = useCallback((slug: string) => {
+        prefetchWikiPage(wikiLookupKey, slug);
+    }, [wikiLookupKey]);
+
     useEffect(() => {
-        if (!isDownloadOpen) return;
-        if (orderedGameVersions.length > 0 || preReleaseGameVersions.length > 0) return;
+        if (!isDownloadOpen || !project?.id || !project.versions?.length) return;
+        if (gameVersionCatalogProjectRef.current === project.id) return;
 
         let isCancelled = false;
+        gameVersionCatalogProjectRef.current = project.id;
+        setGameVersionCatalogPending(true);
+        setGameVersionCatalogReady(false);
+        setGameVersionCatalogError(false);
 
         projectClient.getMetaGameVersionCatalog()
             .then((catalog) => {
                 if (isCancelled) return;
+                const orderedVersions = catalog?.orderedVersions || catalog?.allVersions || [];
+                if (orderedVersions.length === 0) {
+                    throw new Error('The game version catalog was empty.');
+                }
                 setPreReleaseGameVersions(catalog?.preReleaseVersions || []);
-                setOrderedGameVersions(catalog?.orderedVersions || catalog?.allVersions || []);
+                setOrderedGameVersions(orderedVersions);
             })
-            .catch(() => {
-                if (isCancelled) return;
-                setPreReleaseGameVersions([]);
-                setOrderedGameVersions([]);
+            .catch(async () => {
+                try {
+                    const versions = await projectClient.getMetaGameVersions();
+                    if (isCancelled) return;
+                    if (versions.length === 0) {
+                        throw new Error('The game version list was empty.');
+                    }
+                    setPreReleaseGameVersions([]);
+                    setOrderedGameVersions(versions);
+                } catch {
+                    if (isCancelled) return;
+                    gameVersionCatalogProjectRef.current = null;
+                    setPreReleaseGameVersions([]);
+                    setOrderedGameVersions([]);
+                    setGameVersionCatalogError(true);
+                }
+            })
+            .finally(() => {
+                if (!isCancelled) {
+                    setGameVersionCatalogPending(false);
+                    setGameVersionCatalogReady(true);
+                }
             });
 
         return () => {
             isCancelled = true;
         };
-    }, [isDownloadOpen, orderedGameVersions.length, preReleaseGameVersions.length]);
+    }, [isDownloadOpen, project?.id, project?.versions?.length]);
 
     useEffect(() => {
         if (!isDownloadOpen) return;
@@ -604,7 +638,11 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const versionsByGame = useMemo(() => {
         return (project?.versions || []).reduce((acc: any, v: any) => {
-            const keys = Array.isArray(v.gameVersions) && v.gameVersions.length > 0 ? v.gameVersions : ['Any'];
+            const keys = Array.isArray(v.gameVersions) && v.gameVersions.length > 0
+                ? v.gameVersions
+                : v.gameVersion
+                    ? [v.gameVersion]
+                    : [];
             keys.forEach((key: string) => {
                 if (!acc[key]) acc[key] = [];
                 acc[key].push(v);
@@ -618,6 +656,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     }, [project?.versions]);
 
     const versionPayloadPending = Boolean((isHistoryOpen || isDownloadOpen) && !project?.versions);
+    const downloadModalPending = versionPayloadPending || (isDownloadOpen && (!gameVersionCatalogReady || gameVersionCatalogPending));
     const galleryPayloadPending = Boolean(isGalleryRoute && !project?.galleryImages);
     const navigationWikiData = wikiData?.mod?.pages?.length > 0 ? wikiData : displayWikiData;
     const navigationWikiSlug = wikiPageSlug || displaySlug;
@@ -637,10 +676,11 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     );
 
     const meta = generateProjectMeta(project);
-    const breadcrumbSchema = generateBreadcrumbSchema([...getBreadcrumbsForClassification(project.classification || 'PLUGIN'), { name: project.title, url: projectUrl }]);
+    const projectCanonicalUrl = `https://modtale.net${projectUrl}`;
+    const projectSchemas = generateProjectSchemas(project);
 
     const links = [
-        project.repositoryUrl && { type: 'SOURCE', url: project.repositoryUrl, icon: Github, label: 'Source Code', colorClass: `${theme.colors.textSecondary} ${theme.colors.bgSurfaceHover} ${theme.colors.border}` },
+        project.repositoryUrl && { type: 'SOURCE', url: project.repositoryUrl, icon: GitHubBrandIcon, label: 'Source Code', colorClass: `${theme.colors.textSecondary} ${theme.colors.bgSurfaceHover} ${theme.colors.border}` },
         project.links?.DISCORD && { type: 'DISCORD', url: project.links.DISCORD, icon: DiscordIcon, label: 'Discord', colorClass: 'text-[#5865F2] hover:bg-[#5865F2]/20 border-[#5865F2]/20' },
         project.links?.WEBSITE && { type: 'WEBSITE', url: project.links.WEBSITE, icon: Globe, label: 'Website', colorClass: 'text-blue-500 dark:text-blue-400 hover:bg-blue-500/20 border-blue-500/20' }
     ].filter(Boolean) as any[];
@@ -669,14 +709,27 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             <Helmet>
                 <title>{meta?.title}</title>
                 <meta name="description" content={meta?.description} />
-                <script type="application/ld+json">{JSON.stringify(breadcrumbSchema)}</script>
+                <link rel="canonical" href={projectCanonicalUrl} />
+
+                <meta property="og:type" content="website" />
+                <meta property="og:url" content={projectCanonicalUrl} />
+                <meta property="og:title" content={meta?.title} />
+                <meta property="og:description" content={meta?.description} />
+
+                <meta name="twitter:card" content="summary_large_image" />
+                <meta name="twitter:title" content={meta?.title} />
+                <meta name="twitter:description" content={meta?.description} />
+
+                {projectSchemas.length > 0 && (
+                    <script type="application/ld+json">{JSON.stringify(projectSchemas)}</script>
+                )}
             </Helmet>
 
             {statusModal && <StatusModal {...statusModal} onClose={() => setStatusModal(null)} />}
             <Suspense fallback={null}>
                 {isShareOpen && <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={window.location.href} title={project.title} author={project.author} />}
                 {isReportOpen && <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetId={project.id} targetType="PROJECT" targetTitle={project.title} />}
-                {showPostDownloadModal && <PostDownloadModal isOpen={showPostDownloadModal} onClose={() => setShowPostDownloadModal(false)} classification={project.classification!} title={project.title} channel={lastDownloadChannel} isBundle={lastDownloadWasBundle} fileName={lastDownloadedFileName} />}
+                {showPostDownloadModal && <PostDownloadModal isOpen={showPostDownloadModal} onClose={() => setShowPostDownloadModal(false)} classification={project.classification!} title={project.title} channel={lastDownloadChannel} isBundle={lastDownloadWasBundle} fileName={lastDownloadedFileName} tags={project.tags} />}
                 <DonationPromptModal
                     show={showDonationPrompt}
                     currency={(donationConfig?.currency || 'USD').toUpperCase()}
@@ -692,7 +745,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                     isProcessing={processingDonation}
                 />
 
-                {(isHistoryOpen || isDownloadOpen) && versionPayloadPending && (
+                {(isHistoryOpen || isDownloadOpen) && downloadModalPending && (
                     <div className={theme.components.modalOverlay}>
                         <div className={`${theme.components.modalContent} max-w-md`}>
                             <div className="flex items-center justify-center p-12">
@@ -712,7 +765,15 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                         hasStableVersions={hasStableBuilds}
                     />
                 )}
-                {isDownloadOpen && !versionPayloadPending && (
+                {isDownloadOpen && gameVersionCatalogError && !downloadModalPending && (
+                    <StatusModal
+                        type="error"
+                        title="Download Unavailable"
+                        message="We could not load the game version catalog. Please try again."
+                        onClose={() => navigate(projectUrl)}
+                    />
+                )}
+                {isDownloadOpen && !gameVersionCatalogError && !downloadModalPending && (
                     <DownloadModal
                         show={isDownloadOpen}
                         onClose={() => navigate(projectUrl)}
@@ -761,9 +822,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 sidebarContent={
                     isWikiRoute ? (
                         <>
-                            <Suspense fallback={null}>
-                                <WikiSidebar tree={navigationWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={navigationWikiSlug} indexSlug={navigationWikiData?.mod?.index?.slug} pageCache={navigationWikiData?.pageCache} />
-                            </Suspense>
+                            <WikiSidebar tree={navigationWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={navigationWikiSlug} indexSlug={navigationWikiData?.mod?.index?.slug} onPrefetch={prefetchWikiNavigationPage} pageCache={navigationWikiData?.pageCache} />
                             <div className="mt-4">
                                 <Link to={projectUrl} className={`block text-sm font-bold ${theme.colors.accent} hover:underline flex items-center gap-2`}>
                                     <ChevronLeft className="w-4 h-4" /> Back to Project
@@ -771,17 +830,17 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                             </div>
                         </>
                     ) : (
-                        <Sidebar project={project} dependencies={latestDependencies} incompatibleProjectIds={latestIncompatibleProjectIds} depMeta={depMeta} showMetaSections={!isMobile} contributors={contributors} orgMembers={orgMembers} author={authorProfile} />
+                        <Sidebar project={project} dependencies={latestDependencies} incompatibleProjectIds={latestIncompatibleProjectIds} depMeta={depMeta} orderedGameVersions={orderedGameVersions} showMetaSections={!isMobile} contributors={contributors} orgMembers={orgMembers} author={authorProfile} />
                     )
                 }
                 mainContent={
                     isWikiRoute ? (
-                        <Suspense fallback={<div className="flex justify-center p-12"><Spinner /></div>}>
-                            <WikiMobileNavigation tree={navigationWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={navigationWikiSlug} indexSlug={navigationWikiData?.mod?.index?.slug} onNavigate={handleMobileWikiNavigate} pageCache={navigationWikiData?.pageCache} />
+                        <>
+                            <WikiMobileNavigation tree={navigationWikiData?.mod?.pages || []} projectUrl={projectUrl} currentSlug={navigationWikiSlug} indexSlug={navigationWikiData?.mod?.index?.slug} onNavigate={handleMobileWikiNavigate} onPrefetch={prefetchWikiNavigationPage} pageCache={navigationWikiData?.pageCache} />
                             <Wiki wikiLoading={wikiLoading} wikiError={wikiError} displayWikiData={displayWikiData} displaySlug={displaySlug} project={project} wikiContentRef={wikiContentRef} lockedHeight={lockedHeight} />
-                        </Suspense>
+                        </>
                     ) : (
-                        <ViewDetails project={project} authorProfile={authorProfile} currentUser={currentUser} canEdit={Boolean(canEdit)} commentsRef={commentsRef} setProject={setProject} setStatusModal={setStatusModal} onRefresh={onRefresh} dependencies={latestDependencies} incompatibleProjectIds={latestIncompatibleProjectIds} depMeta={depMeta} showMetaSections={isMobile} />
+                        <ViewDetails project={project} authorProfile={authorProfile} currentUser={currentUser} canEdit={Boolean(canEdit)} commentsRef={commentsRef} setProject={setProject} setStatusModal={setStatusModal} onRefresh={onRefresh} dependencies={latestDependencies} incompatibleProjectIds={latestIncompatibleProjectIds} depMeta={depMeta} orderedGameVersions={orderedGameVersions} showMetaSections={isMobile} />
                     )
                 }
             />

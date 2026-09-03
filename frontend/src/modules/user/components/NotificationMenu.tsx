@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { SiteRoutes } from '@/utils/routes';
 import { useToast } from '@/components/ui/Toast';
 import { theme } from '@/styles/theme';
+import { resolveNotificationAction } from '@/modules/user/utils/notificationActions';
 
 export function NotificationMenu() {
     const [isOpen, setIsOpen] = useState(false);
@@ -53,16 +54,16 @@ export function NotificationMenu() {
         e.stopPropagation();
         setActionLoading(n.id);
         try {
-            if (n.type === 'TRANSFER_REQUEST' && n.metadata?.modId) {
-                await api.post(`/projects/${n.metadata.modId}/transfer/resolve`, { accept });
-            } else if (n.type === 'ORG_INVITE' && n.metadata?.orgId) {
-                const endpoint = accept ? `/orgs/${n.metadata.orgId}/invite/accept` : `/orgs/${n.metadata.orgId}/invite/decline`;
-                await api.post(endpoint);
-            } else if (n.type === 'CONTRIBUTOR_INVITE' && n.metadata?.modId) {
-                const endpoint = accept ? `/projects/${n.metadata.modId}/invite/accept` : `/projects/${n.metadata.modId}/invite/decline`;
-                await api.post(endpoint);
+            const action = resolveNotificationAction(n, accept);
+            if (!action) {
+                throw new Error(`Notification ${n.id} is missing actionable metadata.`);
             }
-            dismiss(n.id);
+            if (action.body) {
+                await api.post(action.endpoint, action.body);
+            } else {
+                await api.post(action.endpoint);
+            }
+            await dismiss(n.id);
         } catch (err) {
             console.error("Action failed", err);
             showToast("Action failed. The request may have expired.", 'error');

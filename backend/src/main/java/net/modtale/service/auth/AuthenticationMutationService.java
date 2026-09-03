@@ -52,6 +52,9 @@ public class AuthenticationMutationService {
 
     public void enableMfa(String userId) {
         User user = requireUser(userId);
+        if (user.getMfaSecret() == null || user.getMfaSecret().isBlank()) {
+            throw new InvalidAuthenticationRequestException("Cannot enable two-factor authentication because no secret has been set.");
+        }
         user.setMfaEnabled(true);
         userRepository.save(user);
     }
@@ -103,6 +106,21 @@ public class AuthenticationMutationService {
 
         validatePassword(newPassword, "New passwords must be at least 6 characters long.");
         user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
+
+    public void removePassword(String userId) {
+        User user = requireUser(userId);
+        boolean hasLinkedOAuthProvider = !Optional.ofNullable(user.getConnectedAccounts())
+                .orElse(Collections.emptyList())
+                .isEmpty();
+        if (!hasLinkedOAuthProvider) {
+            throw new InvalidAuthenticationRequestException("Link an OAuth provider before removing your password.");
+        }
+
+        user.setPassword(null);
+        user.setPasswordResetToken(null);
+        user.setPasswordResetTokenExpiry(null);
         userRepository.save(user);
     }
 

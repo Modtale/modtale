@@ -36,6 +36,7 @@ interface StatusIncident {
 
 interface StatusIncidentsProps {
     setStatus: (status: any) => void;
+    canManage?: boolean;
 }
 
 const serviceOptions = ['api', 'database', 'storage'];
@@ -198,7 +199,7 @@ const StatusDateTimePicker = ({
     );
 };
 
-export const StatusIncidents: React.FC<StatusIncidentsProps> = ({ setStatus }) => {
+export const StatusIncidents: React.FC<StatusIncidentsProps> = ({ setStatus, canManage = false }) => {
     const [incidents, setIncidents] = useState<StatusIncident[]>([]);
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -248,6 +249,7 @@ export const StatusIncidents: React.FC<StatusIncidentsProps> = ({ setStatus }) =
 
     const handleCreate = async (event: React.FormEvent) => {
         event.preventDefault();
+        if (!canManage) return;
         setSubmitting(true);
         try {
             await adminClient.createStatusIncident({
@@ -268,6 +270,7 @@ export const StatusIncidents: React.FC<StatusIncidentsProps> = ({ setStatus }) =
 
     const handleUpdate = async (event: React.FormEvent) => {
         event.preventDefault();
+        if (!canManage) return;
         if (!updateForm.incidentId) return;
         setSubmitting(true);
         try {
@@ -335,6 +338,7 @@ export const StatusIncidents: React.FC<StatusIncidentsProps> = ({ setStatus }) =
                 </button>
             </div>
 
+            {canManage && (
             <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
                 <form onSubmit={handleCreate} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-950/30">
                     <div className="mb-5 flex items-center gap-3">
@@ -472,6 +476,7 @@ export const StatusIncidents: React.FC<StatusIncidentsProps> = ({ setStatus }) =
                     </button>
                 </form>
             </div>
+            )}
 
             <section className="grid gap-6 xl:grid-cols-3">
                 <div className="space-y-3">

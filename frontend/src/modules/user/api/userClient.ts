@@ -1,10 +1,10 @@
 import { api } from '@/utils/api';
-import type { User } from '@/types';
 
 export const userClient = {
     updateProfile: async (data: { bio?: string; username?: string }) => (await api.put('/user/profile', data)).data,
     updateCredentials: async (data: any) => (await api.put('/auth/credentials', data)).data,
     changePassword: async (data: any) => (await api.post('/auth/change-password', data)).data,
+    removePassword: async () => (await api.delete('/auth/password')).data,
     uploadBanner: async (file: File) => {
         const formData = new FormData();
         formData.append('file', file);

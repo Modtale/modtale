@@ -33,20 +33,20 @@ public class StatusIncidentAdminController {
     }
 
     @GetMapping
-    @PreAuthorize("@apiSecurity.isSuperAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('STATUS_INCIDENT_READ', authentication)")
     public ResponseEntity<List<StatusIncidentView>> getIncidents() {
         return ResponseEntity.ok(statusIncidentService.getAdminIncidents());
     }
 
     @PostMapping
-    @PreAuthorize("@apiSecurity.isSuperAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('STATUS_INCIDENT_MANAGE', authentication)")
     public ResponseEntity<StatusIncidentView> createIncident(@Valid @RequestBody CreateStatusIncidentRequest request) {
         User currentUser = accountService.requireCurrentUser("creating status incidents");
         return ResponseEntity.ok(statusIncidentService.createIncident(currentUser, request));
     }
 
     @PostMapping("/{id}/updates")
-    @PreAuthorize("@apiSecurity.isSuperAdmin(authentication)")
+    @PreAuthorize("@apiSecurity.hasAdminPermission('STATUS_INCIDENT_MANAGE', authentication)")
     public ResponseEntity<StatusIncidentView> appendUpdate(
             @PathVariable String id,
             @Valid @RequestBody UpdateStatusIncidentRequest request

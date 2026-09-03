@@ -23,6 +23,7 @@ import net.modtale.config.properties.AppSeedingProperties;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.user.ApiKey;
+import net.modtale.model.user.AdminPermission;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.auth.ReservedAccountGuardService;
@@ -74,8 +75,15 @@ public class DataSeeder implements CommandLineRunner {
     private static final String TEMPLATE_SEED_MANIFEST_ID = "template";
     private static final Set<String> VERSION_ARTIFACT_FIELDS = Set.of("fileUrl", "cachedFileUrl", "artifactUrl");
     private static final Set<String> DEPENDENCY_ARTIFACT_FIELDS = Set.of("cachedFileUrl", "externalFileUrl", "fileUrl");
-    private static final String SUPER_ADMIN_ID = "692620f7c2f3266e23ac0ded";
+    private static final String FULL_ADMIN_ID = "692620f7c2f3266e23ac0ded";
     private static final String ADMIN_ID = "692620f7c2f3266e23ac0dee";
+    private static final Set<AdminPermission> SEEDED_ADMIN_PERMISSIONS = Set.of(
+            AdminPermission.PROJECT_REVIEW_READ,
+            AdminPermission.PROJECT_REVIEW_DECIDE,
+            AdminPermission.PROJECT_VERSION_RESCAN,
+            AdminPermission.REPORT_READ,
+            AdminPermission.REPORT_RESOLVE
+    );
     private static final List<String> MOCK_COLLECTIONS = List.of(
             "users",
             "projects",
@@ -142,7 +150,7 @@ public class DataSeeder implements CommandLineRunner {
             return;
         }
 
-        ensureSuperAdmin();
+        ensureFullAdmin();
         ensureAdmin();
         ensureNormalUser();
 
@@ -463,12 +471,12 @@ public class DataSeeder implements CommandLineRunner {
             case "notifications" -> List.of(
                     doc("_id", "mock-notification-1", "userId", "mock-user-1", "title", "Preview project updated",
                             "message", "Waystones published a synthetic preview update.",
-                            "link", "/projects/waystones", "iconUrl", "https://placehold.co/128x128/2563eb/f8fafc?text=W",
+                            "link", "/projects/waystones",
                             "isRead", false, "type", "PROJECT_UPDATE", "metadata", doc("projectId", "mock-plugin-waystones"),
                             "createdAt", date("2026-06-18T12:00:00Z")),
                     doc("_id", "mock-notification-2", "userId", "mock-creator-1", "title", "New mock comment",
                             "message", "A synthetic user commented on Waystones.",
-                            "link", "/projects/waystones?tab=comments", "iconUrl", "https://placehold.co/128x128/0f766e/f8fafc?text=U",
+                            "link", "/projects/waystones?tab=comments",
                             "isRead", true, "type", "COMMENT", "metadata", doc("projectId", "mock-plugin-waystones"),
                             "createdAt", date("2026-06-18T12:30:00Z"))
             );
@@ -484,24 +492,7 @@ public class DataSeeder implements CommandLineRunner {
                             "reason", "Synthetic banned email for admin UI testing.",
                             "bannedBy", ADMIN_ID, "bannedAt", date("2026-06-15T10:00:00Z"))
             );
-            case "status_incidents" -> List.of(
-                    doc("_id", "mock-status-incident-1", "kind", "INCIDENT", "state", "RESOLVED",
-                            "impact", "DEGRADED", "title", "Synthetic preview incident",
-                            "affectedServices", List.of("Backend API"), "startedAt", date("2026-06-12T14:00:00Z"),
-                            "resolvedAt", date("2026-06-12T14:35:00Z"), "createdAt", date("2026-06-12T14:00:00Z"),
-                            "updatedAt", date("2026-06-12T14:35:00Z"), "createdBy", ADMIN_ID,
-                            "createdByUsername", "admin",
-                            "updates", List.of(doc("id", "mock-status-update-1", "state", "RESOLVED",
-                                    "impact", "OPERATIONAL", "message", "Synthetic incident resolved.",
-                                    "createdAt", date("2026-06-12T14:35:00Z"), "createdBy", ADMIN_ID,
-                                    "createdByUsername", "admin"))),
-                    doc("_id", "mock-maintenance-1", "kind", "MAINTENANCE", "state", "SCHEDULED",
-                            "impact", "DEGRADED", "title", "Synthetic scheduled maintenance",
-                            "affectedServices", List.of("Frontend"), "scheduledStart", date("2026-06-25T04:00:00Z"),
-                            "scheduledEnd", date("2026-06-25T05:00:00Z"), "createdAt", date("2026-06-18T09:00:00Z"),
-                            "updatedAt", date("2026-06-18T09:00:00Z"), "createdBy", ADMIN_ID,
-                            "createdByUsername", "admin", "updates", List.of())
-            );
+            case "status_incidents" -> List.of();
             case "status_history" -> List.of(
                     doc("_id", "mock-status-history-1", "timestamp", date("2026-06-18T12:00:00Z"),
                             "apiLatency", 42, "dbLatency", 18, "storageLatency", 95,
@@ -509,8 +500,8 @@ public class DataSeeder implements CommandLineRunner {
                             "dbStatus", "OPERATIONAL", "storageStatus", "OPERATIONAL"),
                     doc("_id", "mock-status-history-2", "timestamp", date("2026-06-18T12:05:00Z"),
                             "apiLatency", 61, "dbLatency", 24, "storageLatency", 140,
-                            "overallStatus", "DEGRADED", "apiStatus", "OPERATIONAL",
-                            "dbStatus", "OPERATIONAL", "storageStatus", "DEGRADED")
+                            "overallStatus", "OPERATIONAL", "apiStatus", "OPERATIONAL",
+                            "dbStatus", "OPERATIONAL", "storageStatus", "OPERATIONAL")
             );
             default -> List.of();
         };
@@ -519,11 +510,13 @@ public class DataSeeder implements CommandLineRunner {
     private List<Document> syntheticUsers() {
         String password = passwordEncoder.encode("password");
         return List.of(
-                doc("_id", SUPER_ADMIN_ID, "username", "super_admin", "email", "super_admin@example.test",
-                        "emailVerified", true, "password", password, "roles", List.of("USER", "ADMIN"),
-                        "tier", "ENTERPRISE", "accountType", "USER", "bio", "Synthetic super admin account."),
+                doc("_id", FULL_ADMIN_ID, "username", "super_admin", "email", "super_admin@example.test",
+                        "emailVerified", true, "password", password, "roles", List.of("USER"),
+                        "adminPermissions", adminPermissionNames(AdminPermission.allPermissions()),
+                        "tier", "ENTERPRISE", "accountType", "USER", "bio", "Synthetic full-permission admin account."),
                 doc("_id", ADMIN_ID, "username", "admin", "email", "admin@example.test",
-                        "emailVerified", true, "password", password, "roles", List.of("USER", "ADMIN"),
+                        "emailVerified", true, "password", password, "roles", List.of("USER"),
+                        "adminPermissions", adminPermissionNames(SEEDED_ADMIN_PERMISSIONS),
                         "tier", "ENTERPRISE", "accountType", "USER", "bio", "Synthetic admin account."),
                 doc("_id", "mock-user-1", "username", "user", "email", "user@example.test",
                         "emailVerified", true, "password", password, "roles", List.of("USER"),
@@ -564,8 +557,6 @@ public class DataSeeder implements CommandLineRunner {
                 "description", "Synthetic mock project used for public PR previews and local testing.",
                 "authorId", authorId,
                 "author", author,
-                "imageUrl", "https://placehold.co/512x512/334155/f8fafc?text=" + title.replace(" ", "+"),
-                "bannerUrl", "https://placehold.co/1600x420/1f2937/f8fafc?text=" + title.replace(" ", "+"),
                 "classification", classification,
                 "categories", List.of("Utilities"),
                 "tags", List.of("Utilities", "Preview"),
@@ -1892,6 +1883,12 @@ public class DataSeeder implements CommandLineRunner {
         return stringValue.length() > limit ? stringValue.substring(0, limit) : stringValue;
     }
 
+    private List<String> adminPermissionNames(Set<AdminPermission> permissions) {
+        return permissions.stream()
+                .map(AdminPermission::name)
+                .toList();
+    }
+
     private ObjectId getSafeObjectId(Object id) {
         if (id == null) return null;
         if (id instanceof ObjectId) return (ObjectId) id;
@@ -1905,22 +1902,23 @@ public class DataSeeder implements CommandLineRunner {
         return null;
     }
 
-    private void ensureSuperAdmin() {
-        if (userRepository.existsById(SUPER_ADMIN_ID)) return;
+    private void ensureFullAdmin() {
+        if (userRepository.existsById(FULL_ADMIN_ID)) return;
 
         userRepository.findByUsername("super_admin").ifPresent(userRepository::delete);
 
         User user = new User();
-        user.setId(SUPER_ADMIN_ID);
+        user.setId(FULL_ADMIN_ID);
         user.setUsername("super_admin");
         user.setEmail("super_admin@example.test");
         user.setEmailVerified(true);
         user.setPassword(passwordEncoder.encode("password"));
-        user.setRoles(List.of("USER", "ADMIN"));
-        user.setBio("I am the Super Admin for this preview environment.");
+        user.setRoles(List.of("USER"));
+        user.setAdminPermissions(AdminPermission.allPermissions());
+        user.setBio("I am the full-permission admin for this preview environment.");
         user.setTier(ApiKey.Tier.ENTERPRISE);
         userRepository.save(user);
-        logger.info("Created Super Admin: super_admin / password (ID: {})", SUPER_ADMIN_ID);
+        logger.info("Created full-permission admin: super_admin / password (ID: {})", FULL_ADMIN_ID);
     }
 
     private void ensureAdmin() {
@@ -1934,7 +1932,8 @@ public class DataSeeder implements CommandLineRunner {
         user.setEmail("admin@example.test");
         user.setEmailVerified(true);
         user.setPassword(passwordEncoder.encode("password"));
-        user.setRoles(List.of("USER", "ADMIN"));
+        user.setRoles(List.of("USER"));
+        user.setAdminPermissions(SEEDED_ADMIN_PERMISSIONS);
         user.setBio("I am the Admin for this preview environment.");
         user.setTier(ApiKey.Tier.ENTERPRISE);
         userRepository.save(user);
@@ -2044,7 +2043,7 @@ public class DataSeeder implements CommandLineRunner {
         String id = rawId.toString();
         String username = boundedString(user.get("username"), "", 80);
         if (
-                id.equals(SUPER_ADMIN_ID)
+                id.equals(FULL_ADMIN_ID)
                         || id.equals(ADMIN_ID)
                         || "user".equals(username)
                         || "super_admin".equals(username)
@@ -2082,6 +2081,25 @@ public class DataSeeder implements CommandLineRunner {
                     badgeList.stream()
                             .filter(Objects::nonNull)
                             .map(Object::toString)
+                            .limit(20)
+                            .collect(Collectors.toList())
+            );
+        }
+
+        Object profileBadges = user.get("profileBadges");
+        if (profileBadges instanceof List<?> profileBadgeList) {
+            safeUser.put(
+                    "profileBadges",
+                    profileBadgeList.stream()
+                            .filter(Document.class::isInstance)
+                            .map(Document.class::cast)
+                            .map(badge -> doc(
+                                    "id", boundedString(badge.get("id"), "", 80),
+                                    "label", boundedString(badge.get("label"), "", 80),
+                                    "tooltip", boundedString(badge.get("tooltip"), "", 160),
+                                    "imageUrl", boundedString(badge.get("imageUrl"), "", 1000),
+                                    "darkImageUrl", boundedString(badge.get("darkImageUrl"), "", 1000)
+                            ))
                             .limit(20)
                             .collect(Collectors.toList())
             );

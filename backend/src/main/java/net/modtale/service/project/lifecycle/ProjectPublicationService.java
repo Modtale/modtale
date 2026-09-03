@@ -109,7 +109,7 @@ public class ProjectPublicationService {
 
     public void publishProject(String id, User user) {
         Project project = projectAccessService.requireProject(id);
-        boolean isAdmin = accessControlService.isAdmin(user);
+        boolean canApproveReviews = accessControlService.canApproveProjectReviews(user);
         boolean isRestoration = project.getStatus() == ProjectStatus.ARCHIVED
                 || project.getStatus() == ProjectStatus.UNLISTED
                 || project.getStatus() == ProjectStatus.PRIVATE;
@@ -119,8 +119,8 @@ public class ProjectPublicationService {
             if (!accessControlService.hasProjectPermission(project, user, "PROJECT_STATUS_PUBLISH")) {
                 throw new ProjectOperationForbiddenException("You do not have permission to republish this project.");
             }
-        } else if (!isAdmin) {
-            throw new ProjectOperationForbiddenException("Only administrators can publish a new project.");
+        } else if (!canApproveReviews) {
+            throw new ProjectOperationForbiddenException("Only administrators with review approval permission can publish a new project.");
         }
         project.setStatus(ProjectStatus.PUBLISHED);
         project.setExpiresAt(null);
@@ -141,7 +141,7 @@ public class ProjectPublicationService {
         if (isNew) {
             project.setCreatedAt(LocalDateTime.now().toString());
         }
-        if (!isRestoration && isAdmin && user != null) {
+        if (!isRestoration && canApproveReviews && user != null) {
             project.setApprovedBy(user.getUsername());
         }
         if (project.getImageUrl() == null || project.getImageUrl().isEmpty()) {

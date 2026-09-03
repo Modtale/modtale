@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Eye, Download, TrendingUp, TrendingDown, PackagePlus, Server, UserPlus, Activity } from 'lucide-react';
+import { Eye, Download, TrendingUp, TrendingDown, PackagePlus, UserPlus, Activity } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
 import { LineChart } from '@/components/ui/charts/LineChart';
 import { useChartVisibility } from '@/components/ui/charts/chartVisibility';
@@ -87,8 +87,11 @@ export function PlatformAnalytics() {
     }
 
     const calcTrend = (current: number, previous: number) => {
-        if (!previous) return current > 0 ? 100 : 0;
-        return ((current - previous) / previous) * 100;
+        if (!previous) {
+            if (!current) return 0;
+            return current > 0 ? 100 : -100;
+        }
+        return ((current - previous) / Math.abs(previous)) * 100;
     };
 
     const formatData = (chartData: any[]) => {
@@ -119,20 +122,19 @@ export function PlatformAnalytics() {
             { id: 'viewsAvg30', label: 'Views 30d Avg', color: '#f97316', data: sliceData(viewsAvg30), hidden: isHidden('views', 'viewsAvg30', true) }
         ],
         newProjects: [
-            { id: 'newProjects', label: 'New Projects', color: '#10b981', data: sliceData(newProjectsData), hidden: isHidden('newCreations', 'newProjects') },
-            { id: 'newUsers', label: 'New Users', color: '#f59e0b', data: sliceData(newUsersData), hidden: isHidden('newCreations', 'newUsers') },
-            { id: 'newOrgs', label: 'New Organizations', color: '#8b5cf6', data: sliceData(newOrgsData), hidden: isHidden('newCreations', 'newOrgs') }
+            { id: 'newProjects', label: 'Net New Projects', color: '#10b981', data: sliceData(newProjectsData), hidden: isHidden('newCreations', 'newProjects') },
+            { id: 'newUsers', label: 'Net New Users', color: '#f59e0b', data: sliceData(newUsersData), hidden: isHidden('newCreations', 'newUsers') },
+            { id: 'newOrgs', label: 'Net New Organizations', color: '#8b5cf6', data: sliceData(newOrgsData), hidden: isHidden('newCreations', 'newOrgs') }
         ],
         growth: [
             { id: 'downloadsGrowth', label: 'Downloads Momentum', color: '#3b82f6', data: sliceData(calculateWoW(downloadsData)), hidden: isHidden('momentum', 'downloadsGrowth') },
             { id: 'viewsGrowth', label: 'Views Momentum', color: '#a855f7', data: sliceData(calculateWoW(viewsData)), hidden: isHidden('momentum', 'viewsGrowth') },
-            { id: 'usersGrowth', label: 'Users Momentum', color: '#f59e0b', data: sliceData(calculateWoW(newUsersData)), hidden: isHidden('momentum', 'usersGrowth') }
+            { id: 'usersGrowth', label: 'Net Users Momentum', color: '#f59e0b', data: sliceData(calculateWoW(newUsersData)), hidden: isHidden('momentum', 'usersGrowth') }
         ]
     };
 
     const ranges = ['7d', '30d', '90d'];
     const activeRangeIndex = ranges.indexOf(range);
-    const apiPercentage = data.totalDownloads > 0 ? ((data.apiDownloads / data.totalDownloads) * 100).toFixed(1) : '0';
 
     return (
         <div className="relative animate-in fade-in duration-500">
@@ -180,16 +182,16 @@ export function PlatformAnalytics() {
                         icon={Eye} color="text-purple-500"
                     />
                     <SummaryCard
-                        title="New Signups"
+                        title="Net New Users"
                         value={data.totalNewUsers.toLocaleString()}
                         trend={calcTrend(data.totalNewUsers, data.previousTotalNewUsers)}
                         icon={UserPlus} color="text-orange-500"
                     />
                     <SummaryCard
-                        title="API Traffic"
-                        value={apiPercentage} isPercent
-                        trend={calcTrend(data.apiDownloads, data.previousApiDownloads)}
-                        icon={Server} color="text-emerald-500"
+                        title="Net New Projects"
+                        value={data.totalNewProjects.toLocaleString()}
+                        trend={calcTrend(data.totalNewProjects, data.previousTotalNewProjects)}
+                        icon={PackagePlus} color="text-emerald-500"
                     />
                 </div>
 
@@ -225,7 +227,7 @@ export function PlatformAnalytics() {
                             <div className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm text-emerald-500"><PackagePlus className="w-5 h-5" /></div>
                             <div>
                                 <h3 className="font-bold text-lg text-slate-900 dark:text-white leading-tight">New Creations</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Daily new users, orgs, and projects.</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Daily net users, orgs, and projects.</p>
                             </div>
                         </div>
                         <div className="flex-1 min-h-0 px-6 pb-6">

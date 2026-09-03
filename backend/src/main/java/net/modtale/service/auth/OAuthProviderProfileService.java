@@ -28,7 +28,7 @@ public class OAuthProviderProfileService {
                 avatarUrl,
                 email,
                 profileUrl,
-                provider != OAuthProvider.GOOGLE
+                provider != OAuthProvider.GOOGLE && provider != OAuthProvider.HYTALE
         );
     }
 
@@ -43,6 +43,9 @@ public class OAuthProviderProfileService {
             return user.getAttribute("did");
         }
         if ("google".equals(provider)) {
+            return user.getAttribute("sub");
+        }
+        if ("hytale".equals(provider)) {
             return user.getAttribute("sub");
         }
 
@@ -75,6 +78,11 @@ public class OAuthProviderProfileService {
             }
             return name.split("@")[0].replaceAll("[^a-zA-Z0-9_]", "");
         }
+        if ("hytale".equals(provider)) {
+            Map<String, Object> profile = user.getAttribute("profile");
+            Object username = profile != null ? profile.get("username") : null;
+            return username != null ? String.valueOf(username) : "hytale_player";
+        }
 
         String login = user.getAttribute("login");
         String username = user.getAttribute("username");
@@ -89,7 +97,7 @@ public class OAuthProviderProfileService {
             return user.getAttribute("web_url");
         }
         if ("twitter".equals(provider)) {
-            return "https://twitter.com/" + username;
+            return "https://x.com/" + username;
         }
         if ("github".equals(provider)) {
             return "https://github.com/" + username;

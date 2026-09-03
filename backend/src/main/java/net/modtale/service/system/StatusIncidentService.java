@@ -43,7 +43,7 @@ public class StatusIncidentService {
                 .filter(incident -> !incident.isClosed())
                 .filter(incident -> incident.getKind() == StatusIncidentKind.INCIDENT
                         || incident.getState() != StatusIncidentState.SCHEDULED
-                        || !startsInFuture(incident, now))
+                        || isScheduledMaintenanceActive(incident, now))
                 .sorted(Comparator.comparing(StatusIncident::getUpdatedAt, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
                 .map(this::toView)
                 .toList();
@@ -168,6 +168,14 @@ public class StatusIncidentService {
 
     private boolean startsInFuture(StatusIncident incident, LocalDateTime now) {
         return incident.getScheduledStart() != null && incident.getScheduledStart().isAfter(now);
+    }
+
+    private boolean isScheduledMaintenanceActive(StatusIncident incident, LocalDateTime now) {
+        return incident.getKind() == StatusIncidentKind.MAINTENANCE
+                && incident.getState() == StatusIncidentState.SCHEDULED
+                && incident.getScheduledStart() != null
+                && !incident.getScheduledStart().isAfter(now)
+                && (incident.getScheduledEnd() == null || incident.getScheduledEnd().isAfter(now));
     }
 
     private StatusIncidentView toView(StatusIncident incident) {

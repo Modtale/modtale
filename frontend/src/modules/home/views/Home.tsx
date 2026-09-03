@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Search, Upload, Github, Code } from 'lucide-react';
-import '@fontsource-variable/inter';
+import { Search, Upload, Code } from 'lucide-react';
+import { GitHubBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { api } from '@/utils/api';
 import { ROUTE_SEO } from '@/data/seo-constants';
 import type { Project, User } from '@/types';
@@ -1213,7 +1213,7 @@ export const Home: React.FC<{
                                     rel="noreferrer"
                                     className="inline-flex items-center justify-center px-8 h-14 sm:h-16 text-base sm:text-lg font-bold rounded-2xl transition-all gap-3 w-full sm:w-auto text-slate-900 dark:text-white bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.3)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.1)] dark:hover:shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:-translate-y-0.5 transform-gpu backdrop-blur-sm"
                                 >
-                                    <Github className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" /> View Source Code
+                                    <GitHubBrandIcon className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" /> View Source Code
                                 </a>
                                 <Link
                                     to={SiteRoutes.apiDocs()}

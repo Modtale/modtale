@@ -28,7 +28,7 @@ export const Settings: React.FC<SettingsProps> = ({
                                                       projectData, metaData, setMetaData, setProjectData, readOnly, hasProjectPermission,
                                                       handleRestore, handlePrivate, handleUnlist, handleArchive, handleDelete, slugError, handleSlugChange, getUrlPrefix, markDirty, isLoading
 }) => {
-    const canManageVisibility = projectData?.status !== 'PENDING';
+    const canManageVisibility = projectData?.status !== 'DRAFT' && projectData?.status !== 'PENDING';
     const canShowPublishedToggle = projectData?.status === 'PUBLISHED'
         || projectData?.status === 'UNLISTED'
         || projectData?.status === 'ARCHIVED'

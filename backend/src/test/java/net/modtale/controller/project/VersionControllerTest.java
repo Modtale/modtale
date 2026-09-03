@@ -2,8 +2,10 @@ package net.modtale.controller.project;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.model.dto.request.project.CreateVersionRequest;
+import net.modtale.model.dto.project.ProjectVersionDTO;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
@@ -87,6 +89,7 @@ class VersionControllerTest {
         VersionApplicationService versionApplicationService = new VersionApplicationService(
                 versionMutationApplicationService,
                 versionDownloadOrchestrationService,
+                versionService,
                 projectVersionAccessService,
                 projectService
         );
@@ -130,6 +133,43 @@ class VersionControllerTest {
                 eq(true),
                 eq(currentUser)
         );
+    }
+
+    @Test
+    void getVersionByHashReturnsTheMatchingVersionFromTheRequestedProject() {
+        User currentUser = user("user-1");
+        Authentication authentication = mock(Authentication.class);
+        Project project = project("project-1", "Sky Tools", ProjectClassification.DATA);
+        ProjectVersion matchingVersion = version("version-2", "2.0.0");
+        matchingVersion.setHash("abcdef1234");
+        project.setVersions(List.of(version("version-1", "1.0.0"), matchingVersion));
+
+        when(accountService.getCurrentUser(authentication)).thenReturn(currentUser);
+        when(projectService.getProjectVersionsByRouteKey("project-1", currentUser)).thenReturn(project);
+        when(projectVersionAccessService.requireByHash(eq(project), eq("ABCDEF1234"), any())).thenReturn(matchingVersion);
+
+        var response = controller.getVersionByHash("project-1", "ABCDEF1234", authentication);
+
+        assertEquals(200, response.getStatusCode().value());
+        ProjectVersionDTO body = assertInstanceOf(ProjectVersionDTO.class, response.getBody());
+        assertEquals("version-2", body.getId());
+        assertEquals("2.0.0", body.getVersionNumber());
+        verify(projectService).getProjectVersionsByRouteKey("project-1", currentUser);
+    }
+
+    @Test
+    void getVersionByHashSearchesGlobally() {
+        ProjectVersion matchingVersion = version("version-2", "2.0.0");
+        matchingVersion.setHash("abcdef1234");
+        when(versionService.getVersionByHash("abcdef1234")).thenReturn(Optional.of(matchingVersion));
+
+        var response = controller.getVersionByHash("abcdef1234");
+
+        assertEquals(200, response.getStatusCode().value());
+        ProjectVersionDTO body = assertInstanceOf(ProjectVersionDTO.class, response.getBody());
+        assertEquals("version-2", body.getId());
+        assertEquals("2.0.0", body.getVersionNumber());
+        verify(versionService).getVersionByHash("abcdef1234");
     }
 
     @Test

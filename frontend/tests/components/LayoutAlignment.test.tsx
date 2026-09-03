@@ -30,4 +30,13 @@ describe('Layout Alignment Verification', () => {
             expect(content).toContain(EXPECTED_PADDING_CLASSES);
         });
     });
+
+    it('keeps navbar profile avatars from stretching or shrinking at narrow desktop widths', () => {
+        const navbarPath = path.resolve(__dirname, '../../src/modules/core/components/Navbar.tsx');
+        const content = fs.readFileSync(navbarPath, 'utf8');
+
+        expect(content).toContain('flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full');
+        expect(content).toContain('h-full w-full shrink-0 rounded-full object-cover');
+        expect(content).toContain('h-6 w-6 shrink-0 rounded-full object-cover');
+    });
 });

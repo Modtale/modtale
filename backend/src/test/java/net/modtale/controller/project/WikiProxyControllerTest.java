@@ -5,9 +5,10 @@ import net.modtale.service.project.media.WikiService;
 import net.modtale.service.user.account.AccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
-import tools.jackson.databind.ObjectMapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -33,15 +34,34 @@ class WikiProxyControllerTest {
     void getWikiPageExtractsTheTrailingPagePath() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRequestURI("/api/v1/wiki/project-1/guides/getting-started");
-        var payload = new ObjectMapper().readTree("{\"title\":\"Getting Started\"}");
+        var payload = "{\"title\":\"Getting Started\"}";
 
         when(wikiService.getWikiPage("project-1", "guides/getting-started", null)).thenReturn(payload);
 
         var response = controller.getWikiPage("project-1", request, null);
 
         assertEquals(200, response.getStatusCode().value());
-        assertEquals("Getting Started", response.getBody().get("title").asText());
+        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
+        assertTrue(response.getHeaders().getFirst(HttpHeaders.CACHE_CONTROL).contains("max-age=300"));
+        assertEquals(payload, response.getBody());
         verify(wikiService).getWikiPage("project-1", "guides/getting-started", null);
+    }
+
+    @Test
+    void getWikiPageBundleExtractsTheTrailingPagePath() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRequestURI("/api/v1/wiki/project-1/_bundle/guides/getting-started");
+        var payload = "{\"metadata\":{\"pages\":[]},\"page\":{\"title\":\"Getting Started\"},\"pageSlug\":\"guides/getting-started\"}";
+
+        when(wikiService.getWikiPageBundle("project-1", "guides/getting-started", null)).thenReturn(payload);
+
+        var response = controller.getWikiPageBundle("project-1", request, null);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(MediaType.APPLICATION_JSON, response.getHeaders().getContentType());
+        assertTrue(response.getHeaders().getFirst(HttpHeaders.CACHE_CONTROL).contains("max-age=300"));
+        assertEquals(payload, response.getBody());
+        verify(wikiService).getWikiPageBundle("project-1", "guides/getting-started", null);
     }
 
     @Test

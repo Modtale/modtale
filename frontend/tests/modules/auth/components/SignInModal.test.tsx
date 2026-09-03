@@ -45,4 +45,19 @@ describe('SignInModal last sign-in method hint', () => {
         expect(document.body.textContent).toContain('Last used: Google');
         expect(document.body.querySelector('button[aria-label="Last used: Sign in with Google"]')).not.toBeNull();
     });
+
+    it('offers Hytale sign-in without a GitLab sign-in option', async () => {
+        await act(async () => {
+            root.render(
+                <ToastProvider>
+                    <MemoryRouter initialEntries={['/login']}>
+                        <SignInModal isOpen onClose={vi.fn()} />
+                    </MemoryRouter>
+                </ToastProvider>
+            );
+        });
+
+        expect(document.body.querySelector('button[aria-label="Sign in with Hytale"]')).not.toBeNull();
+        expect(document.body.querySelector('button[aria-label="Sign in with GitLab"]')).toBeNull();
+    });
 });

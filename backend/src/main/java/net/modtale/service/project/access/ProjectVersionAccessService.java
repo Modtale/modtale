@@ -39,6 +39,28 @@ public class ProjectVersionAccessService {
         return version;
     }
 
+    public ProjectVersion findByHash(Project project, String hash) {
+        if (project == null || project.getVersions() == null || hash == null || hash.isBlank()) {
+            return null;
+        }
+        return project.getVersions().stream()
+                .filter(version -> version.getHash() != null && version.getHash().equalsIgnoreCase(hash.trim()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    public ProjectVersion requireByHash(
+            Project project,
+            String hash,
+            Supplier<? extends RuntimeException> exceptionSupplier
+    ) {
+        ProjectVersion version = findByHash(project, hash);
+        if (version == null) {
+            throw exceptionSupplier.get();
+        }
+        return version;
+    }
+
     public ProjectVersion findByVersionNumber(Project project, String versionNumber, String gameVersion) {
         if (project == null || project.getVersions() == null || project.getVersions().isEmpty()) {
             return null;

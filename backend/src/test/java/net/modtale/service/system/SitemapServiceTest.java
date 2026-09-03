@@ -39,7 +39,7 @@ class SitemapServiceTest {
     @Test
     void generateSitemapIncludesStaticRoutesProjectsAndDeduplicatedAuthorUrls() {
         Project first = project("project-1", "author-id", "willow", "2026-06-01");
-        Project second = project("project-2", "author-id", "willow", "not-a-date");
+        Project second = project("project-2", "author-id", "willow", "2026-06-18T15:30:00");
 
         when(projectRepository.findAllForSitemap()).thenReturn(List.of(first, second));
         when(projectService.getProjectLink(first)).thenReturn("/plugin/first");
@@ -53,6 +53,7 @@ class SitemapServiceTest {
         assertTrue(xml.contains("<loc>https://modtale.test/plugin/first</loc>"));
         assertTrue(xml.contains("<lastmod>2026-06-01</lastmod>"));
         assertTrue(xml.contains("<loc>https://modtale.test/plugin/second</loc>"));
+        assertTrue(xml.contains("<lastmod>2026-06-18</lastmod>"));
         assertEquals(1, countOccurrences(xml, "<loc>https://modtale.test/creator/willow</loc>"));
     }
 
