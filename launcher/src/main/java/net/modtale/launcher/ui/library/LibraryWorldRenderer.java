@@ -50,6 +50,8 @@ final class LibraryWorldRenderer {
     private final LibraryProjectRenderer.WorldToggleHandler toggleWorldMods;
     private final Consumer<HytaleWorld> shareWorldSnapshot;
     private final Consumer<HytaleWorld> createModpackFromWorld;
+    private final Runnable refreshLibrary;
+    private final Runnable checkUpdates;
 
     LibraryWorldRenderer(
             CachedImageLoader imageLoader,
@@ -61,7 +63,9 @@ final class LibraryWorldRenderer {
             Consumer<InstalledProject> toggleModpackContents,
             LibraryProjectRenderer.WorldToggleHandler toggleWorldMods,
             Consumer<HytaleWorld> shareWorldSnapshot,
-            Consumer<HytaleWorld> createModpackFromWorld
+            Consumer<HytaleWorld> createModpackFromWorld,
+            Runnable refreshLibrary,
+            Runnable checkUpdates
     ) {
         this.imageLoader = imageLoader;
         this.updateProject = updateProject;
@@ -73,6 +77,8 @@ final class LibraryWorldRenderer {
         this.toggleWorldMods = toggleWorldMods;
         this.shareWorldSnapshot = shareWorldSnapshot;
         this.createModpackFromWorld = createModpackFromWorld;
+        this.refreshLibrary = refreshLibrary;
+        this.checkUpdates = checkUpdates;
     }
 
     List<Node> worldDetail(LibraryWorldModel model) {
@@ -111,6 +117,21 @@ final class LibraryWorldRenderer {
         HBox actions = new HBox(8);
         actions.getStyleClass().add("library-actions");
         actions.setAlignment(Pos.CENTER_RIGHT);
+        Button refresh = secondaryButton("Refresh");
+        refresh.getStyleClass().addAll("small", "library-compact-icon-action");
+        refresh.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.REFRESH_CW, 14));
+        refresh.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+        refresh.setAccessibleText("Refresh library");
+        refresh.setTooltip(new Tooltip("Rescan installed projects and worlds"));
+        refresh.setOnAction(event -> refreshLibrary.run());
+        Button updates = secondaryButton("Updates");
+        updates.getStyleClass().addAll("small", "library-world-utility-action");
+        updates.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 14));
+        updates.setMinWidth(Region.USE_PREF_SIZE);
+        updates.setTooltip(new Tooltip("Check installed projects for updates"));
+        updates.setOnAction(event -> checkUpdates.run());
+        Region actionDivider = new Region();
+        actionDivider.getStyleClass().add("library-action-divider");
         Button share = secondaryButton("Share");
         share.getStyleClass().addAll("small", "library-compact-icon-action");
         share.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.SHARE_2, 14));
@@ -121,9 +142,10 @@ final class LibraryWorldRenderer {
         Button pack = secondaryButton("Create pack");
         pack.getStyleClass().addAll("small", "library-action-emphasis");
         pack.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.PACKAGE_PLUS, 14));
+        pack.setMinWidth(Region.USE_PREF_SIZE);
         pack.setTooltip(new Tooltip("Start a Modtale modpack from this world's enabled mods"));
         pack.setOnAction(event -> createModpackFromWorld.accept(model.world()));
-        actions.getChildren().addAll(share, pack);
+        actions.getChildren().addAll(refresh, updates, actionDivider, share, pack);
 
         row.getChildren().addAll(icon, copy, actions);
         section.getChildren().add(row);
