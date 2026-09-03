@@ -23,8 +23,11 @@ import net.modtale.launcher.ui.browse.controls.BrowseOptions;
 import net.modtale.launcher.ui.common.LauncherIcons;
 import net.modtale.launcher.ui.common.LauncherOverlaySupport;
 import net.modtale.launcher.ui.common.LauncherView;
+import net.modtale.launcher.i18n.LauncherI18n;
 
 public final class LauncherBrowseMenu {
+
+    private static final LauncherI18n I18N = LauncherI18n.get();
 
     private static final double BROWSE_NAV_BUTTON_HEIGHT = 38;
     private static final double BROWSE_NAV_BUTTON_HORIZONTAL_PADDING = 12;
@@ -108,7 +111,8 @@ public final class LauncherBrowseMenu {
 
         Node leadingIcon = LauncherIcons.icon(LauncherIcons.Glyph.GRID, 16);
         leadingIcon.getStyleClass().add("browse-nav-leading-icon");
-        Label label = new Label("Browse");
+        Label label = new Label();
+        I18N.bind(label, "nav.browse");
         label.getStyleClass().add("browse-nav-button-label");
         applyNavbarTitleFont(label);
         Node chevron = LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_DOWN, 14);
@@ -157,7 +161,8 @@ public final class LauncherBrowseMenu {
     }
 
     private Button menuItem(BrowseOptions.ClassificationOption option) {
-        Button item = new Button(navBrowseLabel(option));
+        Button item = new Button();
+        I18N.bind(item, navBrowseKey(option));
         item.getStyleClass().add("browse-dropdown-item");
         item.setGraphic(LauncherIcons.icon(option.icon(), 16));
         item.setAlignment(Pos.CENTER_LEFT);
@@ -229,7 +234,14 @@ public final class LauncherBrowseMenu {
         text.setFont(Font.font("Inter", FontWeight.BOLD, NAVBAR_TEXT_FONT_SIZE));
     }
 
-    private static String navBrowseLabel(BrowseOptions.ClassificationOption option) {
-        return option.browseMenuLabel();
+    private static String navBrowseKey(BrowseOptions.ClassificationOption option) {
+        return switch (option) {
+            case ALL -> "browse.all";
+            case PLUGINS -> "browse.plugins";
+            case MODPACKS -> "browse.modpacks";
+            case WORLDS -> "browse.worlds";
+            case ART -> "browse.art";
+            case DATA -> "browse.data";
+        };
     }
 }

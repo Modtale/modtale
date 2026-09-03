@@ -15,6 +15,8 @@ import net.modtale.launcher.api.ModtaleApiClient;
 import net.modtale.launcher.hytale.HytaleApiClient;
 import net.modtale.launcher.hytale.HytaleAuthSession;
 import net.modtale.launcher.hytale.HytaleVersion;
+import net.modtale.launcher.i18n.LauncherI18n;
+import net.modtale.launcher.i18n.LauncherI18n.LocaleOption;
 import net.modtale.launcher.settings.LauncherConfig;
 import net.modtale.launcher.settings.LauncherSettings;
 import net.modtale.launcher.ui.common.LauncherView;
@@ -31,12 +33,19 @@ public final class LauncherSettingsForm {
     private final TextField playHytaleJavaPathField = new TextField();
     private final ComboBox<String> hytaleBranchCombo = new ComboBox<>();
     private final ComboBox<HytaleVersion> hytaleVersionCombo = new ComboBox<>();
-    private final CheckBox includeDependenciesCheck = new CheckBox("Required dependencies");
-    private final CheckBox includeOptionalCheck = new CheckBox("Optional dependencies");
-    private final CheckBox autoUpdatesCheck = new CheckBox("Auto-check project updates");
-    private final CheckBox launcherAutoUpdatesCheck = new CheckBox("Launcher auto-updates");
+    private final ComboBox<LocaleOption> localeCombo = new ComboBox<>();
+    private final CheckBox includeDependenciesCheck = new CheckBox();
+    private final CheckBox includeOptionalCheck = new CheckBox();
+    private final CheckBox autoUpdatesCheck = new CheckBox();
+    private final CheckBox launcherAutoUpdatesCheck = new CheckBox();
 
     public LauncherSettingsForm() {
+        LauncherI18n i18n = LauncherI18n.get();
+        localeCombo.setItems(FXCollections.observableArrayList(i18n.supportedLocales()));
+        i18n.bind(includeDependenciesCheck, "settings.dependencies.required");
+        i18n.bind(includeOptionalCheck, "settings.dependencies.optional");
+        i18n.bind(autoUpdatesCheck, "settings.updates.autoCheck");
+        i18n.bind(launcherAutoUpdatesCheck, "settings.launcherUpdates.auto");
         hytaleBranchCombo.setItems(FXCollections.observableArrayList("release", "pre-release"));
         hytaleBranchCombo.setConverter(new StringConverter<>() {
             @Override
@@ -52,7 +61,7 @@ public final class LauncherSettingsForm {
         hytaleBranchCombo.setOnAction(event -> hytaleVersionCombo.getItems().clear());
         styleInput(modsPathField, gameVersionField, hytaleGamePathField, hytaleUserDataPathField, hytaleJavaPathField,
                 playHytaleGamePathField, playHytaleUserDataPathField, playHytaleJavaPathField);
-        styleCombo(hytaleBranchCombo, hytaleVersionCombo);
+        styleCombo(localeCombo, hytaleBranchCombo, hytaleVersionCombo);
         includeDependenciesCheck.getStyleClass().add("native-check");
         includeOptionalCheck.getStyleClass().add("native-check");
         autoUpdatesCheck.getStyleClass().add("native-check");
@@ -99,6 +108,10 @@ public final class LauncherSettingsForm {
         return hytaleVersionCombo;
     }
 
+    public ComboBox<LocaleOption> localeCombo() {
+        return localeCombo;
+    }
+
     public void setHytalePatchlines(List<String> patchlines, String selectedPatchline) {
         List<String> normalizedPatchlines = normalizePatchlines(patchlines);
         String selected = HytaleApiClient.normalizeBranch(selectedPatchline);
@@ -138,6 +151,11 @@ public final class LauncherSettingsForm {
         settings.setIncludeOptionalDependencies(includeOptionalCheck.isSelected());
         settings.setAutoCheckUpdates(autoUpdatesCheck.isSelected());
         settings.setLauncherAutoUpdates(launcherAutoUpdatesCheck.isSelected());
+        LocaleOption selectedLocale = localeCombo.getValue();
+        if (selectedLocale != null) {
+            settings.setLocale(selectedLocale.locale().toLanguageTag());
+            LauncherI18n.get().setLocale(selectedLocale.locale());
+        }
         apiClient.configure(LauncherConfig.apiBaseUrl());
     }
 
@@ -155,14 +173,19 @@ public final class LauncherSettingsForm {
         includeOptionalCheck.setSelected(settings.isIncludeOptionalDependencies());
         autoUpdatesCheck.setSelected(settings.isAutoCheckUpdates());
         launcherAutoUpdatesCheck.setSelected(settings.isLauncherAutoUpdates());
+        localeCombo.getItems().stream()
+                .filter(option -> option.locale().getLanguage().equals(LauncherI18n.normalize(settings.getLocale()).getLanguage()))
+                .findFirst()
+                .ifPresentOrElse(localeCombo::setValue, () -> localeCombo.getSelectionModel().selectFirst());
         selectConfiguredHytaleBuild(settings);
     }
 
     public static String hytalePatchlineLabel(String patchline) {
+        LauncherI18n i18n = LauncherI18n.get();
         return switch (HytaleApiClient.normalizeBranch(patchline)) {
-            case "pre-release" -> "Pre-release";
-            case "release" -> "Latest release";
-            default -> "Previous patchline (" + HytaleApiClient.normalizeBranch(patchline) + ")";
+            case "pre-release" -> i18n.text("patchline.preRelease");
+            case "release" -> i18n.text("patchline.release");
+            default -> i18n.text("patchline.previous", HytaleApiClient.normalizeBranch(patchline));
         };
     }
 
@@ -203,11 +226,12 @@ public final class LauncherSettingsForm {
             Label gameMetric,
             Label modsMetric
     ) {
-        gameMetric.setText(value(settings.getGameVersion(), "Unset"));
-        modsMetric.setText(settings.getInstalledProjects().size() + " installed");
+        LauncherI18n i18n = LauncherI18n.get();
+        gameMetric.setText(value(settings.getGameVersion(), i18n.text("value.unset")));
+        modsMetric.setText(i18n.plural("library.installed", settings.getInstalledProjects().size()));
         HytaleAuthSession session = settings.getHytaleAuthSession();
-        hytaleStatus.setText(session == null ? "Hytale signed out" : "Hytale: " + session);
-        hytaleMetric.setText(session == null ? "Signed out" : value(session.getUsername(), "Connected"));
-        buildMetric.setText(settings.getHytaleBuild() > 0 ? "#" + settings.getHytaleBuild() : "Unset");
+        hytaleStatus.setText(session == null ? i18n.text("hytale.signedOut") : i18n.text("hytale.connected", session));
+        hytaleMetric.setText(session == null ? i18n.text("value.signedOut") : value(session.getUsername(), i18n.text("value.connected")));
+        buildMetric.setText(settings.getHytaleBuild() > 0 ? "#" + settings.getHytaleBuild() : i18n.text("value.unset"));
     }
 }

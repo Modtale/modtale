@@ -21,6 +21,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import net.modtale.launcher.api.ModtaleApiClient;
 import net.modtale.launcher.cache.LauncherCacheService;
+import net.modtale.launcher.i18n.LauncherI18n;
 import net.modtale.launcher.settings.LauncherSettings;
 import net.modtale.launcher.settings.SettingsStore;
 import net.modtale.launcher.ui.common.LauncherIcons;
@@ -28,6 +29,8 @@ import net.modtale.launcher.ui.common.LauncherView;
 import net.modtale.launcher.ui.feedback.LauncherFeedback;
 
 public final class LauncherSettingsController {
+
+    private static final LauncherI18n I18N = LauncherI18n.get();
 
     private final SettingsStore settingsStore;
     private final ModtaleApiClient apiClient;
@@ -54,6 +57,7 @@ public final class LauncherSettingsController {
         this.stage = stage;
         this.currentView = currentView;
         settings = settingsStore.load();
+        I18N.setLocale(settings.getLocale());
     }
 
     public void attachFeedback(LauncherFeedback feedback) {
@@ -106,8 +110,8 @@ public final class LauncherSettingsController {
         settingsStore.save(settings);
         notifySaveListeners();
         if (announce && feedback != null) {
-            feedback.log("Settings saved.");
-            feedback.showToast("Settings saved", "Launcher preferences were updated.");
+            feedback.log(I18N.text("toast.settingsSaved.title") + '.');
+            feedback.showToast(I18N.text("toast.settingsSaved.title"), I18N.text("toast.settingsSaved.message"));
         }
         if (announce) {
             notifyRefreshListeners();
@@ -141,7 +145,7 @@ public final class LauncherSettingsController {
         VBox root = new VBox(18);
         root.setUserData(LauncherView.SETTINGS);
         root.getStyleClass().addAll("view", "settings-view");
-        root.getChildren().addAll(runtimePathsSection(), libraryDefaultsSection(), maintenanceSection(), saveActions());
+        root.getChildren().addAll(languageSection(), runtimePathsSection(), libraryDefaultsSection(), maintenanceSection(), saveActions());
         return root;
     }
 
@@ -149,55 +153,66 @@ public final class LauncherSettingsController {
         HBox actions = new HBox();
         actions.getStyleClass().add("settings-save-actions");
         actions.setAlignment(Pos.CENTER_RIGHT);
-        Button save = primaryButton("Save Settings");
+        Button save = primaryButton("");
+        I18N.bind(save, "action.saveSettings");
         save.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.SAVE, 14));
         save.setOnAction(event -> saveFromFields(true));
         actions.getChildren().add(save);
         return actions;
     }
 
+    private Node languageSection() {
+        VBox language = settingsSection("settings.language.section", "settings.language.description",
+                LauncherIcons.Glyph.GLOBE);
+        GridPane grid = settingsGrid();
+        addField(grid, 0, I18N.binding("settings.language.label"), form.localeCombo());
+        language.getChildren().add(grid);
+        return language;
+    }
+
     private Node runtimePathsSection() {
-        VBox runtime = settingsSection("Runtime & Mod Paths", "Folders used by Play, Library, and mod installs.",
+        VBox runtime = settingsSection("settings.paths.section", "settings.paths.description",
                 LauncherIcons.Glyph.GEAR);
         GridPane runtimeGrid = settingsGrid();
-        addField(runtimeGrid, 0, "Installed mods",
+        addField(runtimeGrid, 0, I18N.binding("settings.paths.mods"),
                 LauncherPathControls.pathRow(stage, form.modsPathField(), "hytaleModsPath", true, true));
-        addField(runtimeGrid, 1, "Game install",
+        addField(runtimeGrid, 1, I18N.binding("settings.paths.game"),
                 LauncherPathControls.pathRow(stage, form.hytaleGamePathField(), "hytaleGamePath", true, false));
-        addField(runtimeGrid, 2, "User data",
+        addField(runtimeGrid, 2, I18N.binding("settings.paths.userData"),
                 LauncherPathControls.pathRow(stage, form.hytaleUserDataPathField(), "hytaleUserDataPath", true, false));
-        addField(runtimeGrid, 3, "Java executable",
+        addField(runtimeGrid, 3, I18N.binding("settings.paths.java"),
                 LauncherPathControls.pathRow(stage, form.hytaleJavaPathField(), "hytaleJavaPath", false, false));
         runtime.getChildren().add(runtimeGrid);
         return runtime;
     }
 
     private Node libraryDefaultsSection() {
-        VBox defaults = settingsSection("Library Defaults", "Version target and dependency behavior for new downloads.",
+        VBox defaults = settingsSection("settings.library.section", "settings.library.description",
                 LauncherIcons.Glyph.BOX);
         GridPane grid = settingsGrid();
-        addField(grid, 0, "Game version", form.gameVersionField());
+        addField(grid, 0, I18N.binding("settings.library.gameVersion"), form.gameVersionField());
         HBox toggles = new HBox(12,
                 toggleCard(form.includeDependenciesCheck()),
                 toggleCard(form.includeOptionalCheck()),
                 toggleCard(form.autoUpdatesCheck()));
         toggles.getStyleClass().add("settings-toggle-row");
-        addField(grid, 1, "Project defaults", toggles);
+        addField(grid, 1, I18N.binding("settings.library.projectDefaults"), toggles);
         defaults.getChildren().add(grid);
         return defaults;
     }
 
     private Node maintenanceSection() {
-        VBox maintenance = settingsSection("Launcher Maintenance", "Updates, cached artwork, and local launcher data.",
+        VBox maintenance = settingsSection("settings.maintenance.section", "settings.maintenance.description",
                 LauncherIcons.Glyph.DATABASE);
         HBox cards = new HBox(12);
         cards.getStyleClass().add("settings-card-row");
 
-        VBox launcherUpdates = settingsActionCard("Launcher updates", "Native launcher version checks.",
+        VBox launcherUpdates = settingsActionCard("settings.launcherUpdates.title", "settings.launcherUpdates.description",
                 LauncherIcons.Glyph.DOWNLOAD);
         HBox launcherToggles = new HBox(12, toggleCard(form.launcherAutoUpdatesCheck()));
         launcherToggles.getStyleClass().add("settings-toggle-row");
-        Button checkLauncher = secondaryButton("Check Now");
+        Button checkLauncher = secondaryButton("");
+        I18N.bind(checkLauncher, "action.checkNow");
         checkLauncher.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.REFRESH_CW, 14));
         checkLauncher.setOnAction(event -> {
             saveFromFields(false);
@@ -207,9 +222,10 @@ public final class LauncherSettingsController {
         });
         launcherUpdates.getChildren().addAll(launcherToggles, checkLauncher);
 
-        VBox cache = settingsActionCard("Cache", "API responses and project artwork.",
+        VBox cache = settingsActionCard("settings.cache.title", "settings.cache.description",
                 LauncherIcons.Glyph.DATABASE);
-        Button clearCache = secondaryButton("Clear Cache");
+        Button clearCache = secondaryButton("");
+        I18N.bind(clearCache, "action.clearCache");
         clearCache.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.DATABASE, 14));
         clearCache.setOnAction(event -> clearCache(clearCache));
         cache.getChildren().add(clearCache);
@@ -221,7 +237,7 @@ public final class LauncherSettingsController {
         return maintenance;
     }
 
-    private VBox settingsSection(String title, String subtitle, LauncherIcons.Glyph glyph) {
+    private VBox settingsSection(String titleKey, String subtitleKey, LauncherIcons.Glyph glyph) {
         VBox section = new VBox(16);
         section.getStyleClass().add("settings-section");
         HBox header = new HBox(12);
@@ -229,9 +245,11 @@ public final class LauncherSettingsController {
         header.setAlignment(Pos.CENTER_LEFT);
         StackPane icon = settingsIcon(glyph);
         VBox copy = new VBox(4);
-        Label titleLabel = new Label(title);
+        Label titleLabel = new Label();
+        I18N.bind(titleLabel, titleKey);
         titleLabel.getStyleClass().add("settings-section-title");
-        Label subtitleLabel = new Label(subtitle);
+        Label subtitleLabel = new Label();
+        I18N.bind(subtitleLabel, subtitleKey);
         subtitleLabel.getStyleClass().add("settings-section-subtitle");
         copy.getChildren().addAll(titleLabel, subtitleLabel);
         header.getChildren().addAll(icon, copy);
@@ -239,16 +257,18 @@ public final class LauncherSettingsController {
         return section;
     }
 
-    private VBox settingsActionCard(String title, String subtitle, LauncherIcons.Glyph glyph) {
+    private VBox settingsActionCard(String titleKey, String subtitleKey, LauncherIcons.Glyph glyph) {
         VBox card = new VBox(12);
         card.getStyleClass().add("settings-action-card");
         HBox heading = new HBox(10);
         heading.setAlignment(Pos.CENTER_LEFT);
         StackPane icon = settingsIcon(glyph);
         VBox copy = new VBox(3);
-        Label titleLabel = new Label(title);
+        Label titleLabel = new Label();
+        I18N.bind(titleLabel, titleKey);
         titleLabel.getStyleClass().add("settings-card-title");
-        Label subtitleLabel = new Label(subtitle);
+        Label subtitleLabel = new Label();
+        I18N.bind(subtitleLabel, subtitleKey);
         subtitleLabel.getStyleClass().add("settings-card-subtitle");
         copy.getChildren().addAll(titleLabel, subtitleLabel);
         heading.getChildren().addAll(icon, copy);
@@ -294,9 +314,9 @@ public final class LauncherSettingsController {
     private String cacheClearedMessage(LauncherCacheService.ClearResult result) {
         int count = result == null ? 0 : result.deletedEntries();
         if (count == 0) {
-            return "Launcher cache is clear.";
+            return I18N.text("cache.clear");
         }
-        return "Cleared " + count + " cached launcher item" + (count == 1 ? "" : "s") + ".";
+        return I18N.plural("cache.cleared", count);
     }
 
     private void notifyRefreshListeners() {

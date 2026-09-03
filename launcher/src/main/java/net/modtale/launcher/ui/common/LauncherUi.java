@@ -1,6 +1,7 @@
 package net.modtale.launcher.ui.common;
 
 import javafx.scene.Node;
+import javafx.beans.value.ObservableValue;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
@@ -48,6 +49,16 @@ public final class LauncherUi {
 
     public static void addField(GridPane grid, int row, String label, Node field) {
         Label labelNode = new Label(label);
+        addField(grid, row, labelNode, field);
+    }
+
+    public static void addField(GridPane grid, int row, ObservableValue<String> label, Node field) {
+        Label labelNode = new Label();
+        labelNode.textProperty().bind(label);
+        addField(grid, row, labelNode, field);
+    }
+
+    private static void addField(GridPane grid, int row, Label labelNode, Node field) {
         labelNode.getStyleClass().add("field-label");
         grid.add(labelNode, 0, row);
         if (field instanceof Region region) {

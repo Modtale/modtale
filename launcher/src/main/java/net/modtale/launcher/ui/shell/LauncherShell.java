@@ -44,6 +44,7 @@ import javafx.stage.StageStyle;
 import javafx.util.Duration;
 import net.modtale.launcher.LauncherPerformanceProbe;
 import net.modtale.launcher.hytale.HytaleAuthService;
+import net.modtale.launcher.i18n.LauncherI18n;
 import net.modtale.launcher.protocol.LauncherProtocolRequest;
 import net.modtale.launcher.ui.account.LauncherAccountController;
 import net.modtale.launcher.ui.account.LauncherAccountMenu;
@@ -67,6 +68,8 @@ import net.modtale.launcher.ui.project.ProjectPageController;
 import net.modtale.launcher.ui.settings.LauncherSettingsController;
 
 public final class LauncherShell {
+
+    private static final LauncherI18n I18N = LauncherI18n.get();
 
     private static final double DEFAULT_STAGE_WIDTH = 1320;
     private static final double DEFAULT_STAGE_HEIGHT = 880;
@@ -220,6 +223,7 @@ public final class LauncherShell {
             primaryStage.initStyle(StageStyle.UNDECORATED);
         }
         StackPane root = new StackPane();
+        I18N.applyDirection(root);
         sceneLayer = root;
         scrollSupport.install(root);
         root.getStyleClass().add("app-root");
@@ -263,7 +267,8 @@ public final class LauncherShell {
             configureWindowResize(scene);
         }
         configureNativeCursor(scene);
-        primaryStage.setTitle("Modtale Launcher");
+        primaryStage.titleProperty().bind(I18N.binding("app.title"));
+        I18N.localeProperty().addListener((ignored, previous, current) -> refreshLocalizedShellText());
         primaryStage.setResizable(true);
         primaryStage.setMinWidth(boundedStageMinimum(MIN_STAGE_WIDTH, visualBounds.getWidth()));
         primaryStage.setMinHeight(boundedStageMinimum(MIN_STAGE_HEIGHT, visualBounds.getHeight()));
@@ -479,16 +484,16 @@ public final class LauncherShell {
         brand.setMinWidth(142);
         brand.setAlignment(Pos.CENTER_LEFT);
         brand.setMnemonicParsing(false);
-        brand.setAccessibleText("Go to Play");
-        brand.setTooltip(new Tooltip("Go to Play"));
+        brand.accessibleTextProperty().bind(I18N.binding("nav.goToPlay"));
+        brand.setTooltip(I18N.tooltip("nav.goToPlay"));
         brand.setOnAction(event -> showView(LauncherView.PLAY));
         configureBrandLogoHoverAnimation(brand, logo);
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         bar.getChildren().addAll(brand, spacer);
-        addNav(bar, LauncherView.PLAY, "Play", LauncherIcons.Glyph.ZAP);
-        addNav(bar, LauncherView.LIBRARY, "Library", LauncherIcons.Glyph.SAVE);
+        addLocalizedNav(bar, LauncherView.PLAY, "nav.play", LauncherIcons.Glyph.ZAP);
+        addLocalizedNav(bar, LauncherView.LIBRARY, "nav.library", LauncherIcons.Glyph.SAVE);
         Button browseButton = browseMenu.button();
         navButtons.put(LauncherView.DISCOVER, browseButton);
         bar.getChildren().add(browseButton);
@@ -508,31 +513,31 @@ public final class LauncherShell {
         controls.getStyleClass().add("window-controls");
         controls.setAlignment(Pos.CENTER);
         controls.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
-        Button minimize = windowControl("Minimize", LauncherIcons.Glyph.MINUS);
+        Button minimize = windowControl("window.minimize", LauncherIcons.Glyph.MINUS);
         minimize.setOnAction(event -> stage.setIconified(true));
-        Button maximize = windowControl("Maximize", LauncherIcons.Glyph.MAXIMIZE);
+        Button maximize = windowControl("window.maximize", LauncherIcons.Glyph.MAXIMIZE);
         maximize.setOnAction(event -> stage.setMaximized(!stage.isMaximized()));
         stage.maximizedProperty().addListener((observable, wasMaximized, isMaximized) ->
                 updateMaximizeControl(maximize, isMaximized));
         updateMaximizeControl(maximize, stage.isMaximized());
-        Button close = windowControl("Close", LauncherIcons.Glyph.X);
+        Button close = windowControl("window.close", LauncherIcons.Glyph.X);
         close.getStyleClass().add("close");
         close.setOnAction(event -> stage.close());
         controls.getChildren().addAll(minimize, maximize, close);
         return controls;
     }
 
-    private Button windowControl(String tooltip, LauncherIcons.Glyph glyph) {
+    private Button windowControl(String tooltipKey, LauncherIcons.Glyph glyph) {
         Button button = new Button(null, LauncherIcons.icon(glyph, 12));
         button.getStyleClass().add("window-control");
         button.setMnemonicParsing(false);
-        button.setTooltip(new Tooltip(tooltip));
+        button.setTooltip(I18N.tooltip(tooltipKey));
         return button;
     }
 
     private void updateMaximizeControl(Button button, boolean maximized) {
         button.setGraphic(LauncherIcons.icon(maximized ? LauncherIcons.Glyph.RESTORE : LauncherIcons.Glyph.MAXIMIZE, 12));
-        button.setTooltip(new Tooltip(maximized ? "Restore" : "Maximize"));
+        button.setTooltip(I18N.tooltip(maximized ? "window.restore" : "window.maximize"));
     }
 
     private void bringWindowControlsToFront() {
@@ -864,7 +869,7 @@ public final class LauncherShell {
 
         TextField browseSearch = browseController.searchField();
         browseSearch.getStyleClass().add("quick-search");
-        browseSearch.setPromptText("Search projects...");
+        browseSearch.promptTextProperty().bind(I18N.binding("browse.search"));
         browseSearch.setOnAction(event -> browseController.searchProjects());
         browseSearch.setMaxWidth(Double.MAX_VALUE);
         StackPane browseSearchShell = new StackPane(browseSearch);
@@ -879,8 +884,8 @@ public final class LauncherShell {
         Button clearSearch = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.X, 12));
         clearSearch.getStyleClass().add("search-clear-button");
         clearSearch.setMnemonicParsing(false);
-        clearSearch.setAccessibleText("Clear search");
-        clearSearch.setTooltip(new Tooltip("Clear search"));
+        clearSearch.accessibleTextProperty().bind(I18N.binding("browse.clearSearch"));
+        clearSearch.setTooltip(I18N.tooltip("browse.clearSearch"));
         clearSearch.setOnAction(event -> {
             browseController.resetSearchQuery();
             browseSearch.requestFocus();
@@ -999,6 +1004,30 @@ public final class LauncherShell {
         button.setOnAction(event -> showView(view));
         navButtons.put(view, button);
         bar.getChildren().add(button);
+    }
+
+    private void addLocalizedNav(HBox bar, LauncherView view, String key, LauncherIcons.Glyph icon) {
+        Button button = new Button();
+        I18N.bind(button, key);
+        button.getStyleClass().add("nav-btn");
+        applyNavbarTitleFont(button);
+        button.setGraphic(LauncherIcons.icon(icon, 16));
+        button.setOnAction(event -> showView(view));
+        navButtons.put(view, button);
+        bar.getChildren().add(button);
+    }
+
+    private void refreshLocalizedShellText() {
+        LauncherView current = navigation.currentView();
+        if (current == null) {
+            return;
+        }
+        pageTitle.setText(LauncherShellTitles.titleFor(current, browseController));
+        pageSubtitle.setText(LauncherShellTitles.subtitleFor(current, browseController));
+        if (stage != null && stage.isMaximized() && windowControlsNode instanceof HBox controls
+                && controls.getChildren().size() > 1 && controls.getChildren().get(1) instanceof Button maximize) {
+            updateMaximizeControl(maximize, true);
+        }
     }
 
     private void hideDropdownsOnOutsidePress(MouseEvent event) {
