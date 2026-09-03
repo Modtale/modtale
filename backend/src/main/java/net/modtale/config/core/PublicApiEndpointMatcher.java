@@ -47,7 +47,8 @@ public final class PublicApiEndpointMatcher {
         String normalizedPath = path.trim();
         String normalizedMethod = method.toUpperCase(Locale.ROOT);
 
-        if (normalizedMethod.equals("POST") && normalizedPath.equals("/api/v1/users/batch")) {
+        if (normalizedMethod.equals("POST") && (normalizedPath.equals("/api/v1/users/batch")
+                || normalizedPath.equals("/api/v1/projects/external/identify"))) {
             return true;
         }
 

@@ -184,7 +184,6 @@ public final class LauncherLibraryController {
         }
         String status = "Installing " + summary + "...";
         runInstallWithOverlay(status, () -> {
-            accountController.ensureSignedIn();
             ProjectDetail project = detailWithVersions(summary.routeKey());
             return installer.installAndRecord(project, settings);
         }, this::finishInstall);
@@ -203,10 +202,9 @@ public final class LauncherLibraryController {
             return;
         }
         String status = "Installing " + project.title() + " " + version.versionNumber() + "...";
-        runInstallWithOverlay(status, () -> {
-            accountController.ensureSignedIn();
-            return installer.installAndRecord(project, version, settings, gameVersion);
-        }, this::finishInstall);
+        runInstallWithOverlay(status,
+                () -> installer.installAndRecord(project, version, settings, gameVersion),
+                this::finishInstall);
     }
 
     public void installSelectedProjectVersion(
@@ -228,10 +226,9 @@ public final class LauncherLibraryController {
             return;
         }
         String status = "Installing " + project.title() + " " + version.versionNumber() + "...";
-        runInstallWithOverlay(status, () -> {
-            accountController.ensureSignedIn();
-            return installer.installAndRecord(project, version, settings, gameVersion, dependencies);
-        }, this::finishInstall);
+        runInstallWithOverlay(status,
+                () -> installer.installAndRecord(project, version, settings, gameVersion, dependencies),
+                this::finishInstall);
     }
 
     public void installWorldModList(String listId) {
@@ -259,10 +256,8 @@ public final class LauncherLibraryController {
 
     public void checkUpdates() {
         settingsController.saveFromFields(false);
-        feedback.runAsync("Checking updates...", () -> {
-            accountController.ensureSignedIn();
-            return updateService.checkForUpdates(settingsController.settings());
-        }, updates -> {
+        feedback.runAsync("Checking updates...",
+                () -> updateService.checkForUpdates(settingsController.settings()), updates -> {
             currentUpdates = List.copyOf(updates);
             availableUpdates.clear();
             updates.forEach(update -> availableUpdates.put(update.installedProject().projectId(), update));
@@ -875,15 +870,12 @@ public final class LauncherLibraryController {
         ))) {
             return;
         }
-        runInstallWithOverlay("Updating " + update.title() + "...", () -> {
-            accountController.ensureSignedIn();
-            return installer.switchVersionAndRecord(
+        runInstallWithOverlay("Updating " + update.title() + "...", () -> installer.switchVersionAndRecord(
                     update.installedProject(),
                     update.project(),
                     update.newestVersion(),
                     settings
-            );
-        }, result -> {
+            ), result -> {
             availableUpdates.remove(update.installedProject().projectId());
             currentUpdates = List.copyOf(availableUpdates.values());
             finishInstall(result);
@@ -903,10 +895,8 @@ public final class LauncherLibraryController {
         ))) {
             return;
         }
-        runInstallWithOverlay("Switching " + installed.title() + " to " + version.versionNumber() + "...", () -> {
-            accountController.ensureSignedIn();
-            return installer.switchVersionAndRecord(installed, detail, version, settings, gameVersion);
-        }, result -> {
+        runInstallWithOverlay("Switching " + installed.title() + " to " + version.versionNumber() + "...",
+                () -> installer.switchVersionAndRecord(installed, detail, version, settings, gameVersion), result -> {
             availableUpdates.remove(installed.projectId());
             currentUpdates = List.copyOf(availableUpdates.values());
             finishInstall(result);
@@ -1149,10 +1139,8 @@ public final class LauncherLibraryController {
         }
         loadingProjectIds.add(installed.projectId());
         renderWorldDetail();
-        feedback.runAsync("Loading " + installed.title() + " releases...", () -> {
-            accountController.ensureSignedIn();
-            return detailWithVersions(LibraryProjectSupport.routeKey(installed));
-        }, detail -> {
+        feedback.runAsync("Loading " + installed.title() + " releases...",
+                () -> detailWithVersions(LibraryProjectSupport.routeKey(installed)), detail -> {
             loadingProjectIds.remove(installed.projectId());
             projectDetails.put(installed.projectId(), detail);
             renderWorldDetail();

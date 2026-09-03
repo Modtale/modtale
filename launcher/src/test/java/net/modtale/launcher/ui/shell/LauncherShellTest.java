@@ -18,10 +18,13 @@ class LauncherShellTest {
     }
 
     @Test
-    void publicCatalogViewsDoNotRequireAModtaleSession() {
+    void onlyAccountBackedViewsRequireAModtaleSession() {
         assertFalse(LauncherShell.requiresModtaleSession(LauncherView.DISCOVER));
         assertFalse(LauncherShell.requiresModtaleSession(LauncherView.PROJECT));
-        assertTrue(LauncherShell.requiresModtaleSession(LauncherView.UPDATES));
+        assertFalse(LauncherShell.requiresModtaleSession(LauncherView.PLAY));
+        assertFalse(LauncherShell.requiresModtaleSession(LauncherView.LIBRARY));
+        assertFalse(LauncherShell.requiresModtaleSession(LauncherView.UPDATES));
+        assertFalse(LauncherShell.requiresModtaleSession(LauncherView.SETTINGS));
         assertTrue(LauncherShell.requiresModtaleSession(LauncherView.NOTIFICATIONS));
     }
 }

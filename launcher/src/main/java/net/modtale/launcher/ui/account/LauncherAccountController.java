@@ -129,7 +129,7 @@ public final class LauncherAccountController {
                     apiClient.clearStoredSession();
                     refreshStatus();
                     onSignedOut.run();
-                    feedback.log("Please sign in with Modtale to continue.");
+                    feedback.log("Continuing without a Modtale account. Account-backed features remain unavailable.");
                 });
     }
 
@@ -149,7 +149,7 @@ public final class LauncherAccountController {
                         return;
                     }
                     completeSignIn(result.user(), true);
-                    feedback.log("Signed in as " + result.user() + ". Downloads and updates will use your Modtale session.");
+                    feedback.log("Signed in as " + result.user() + ". Account-backed features are now available.");
                     feedback.showToast("Signed in", "You're connected as " + result.user() + ".");
                     if (onResult != null) {
                         onResult.accept(result);
@@ -170,7 +170,7 @@ public final class LauncherAccountController {
                 () -> completeMfaSignIn(preAuthToken, code),
                 result -> {
                     completeSignIn(result.user(), true);
-                    feedback.log("Signed in as " + result.user() + ". Downloads and updates will use your Modtale session.");
+                    feedback.log("Signed in as " + result.user() + ". Account-backed features are now available.");
                     feedback.showToast("Signed in", "You're connected as " + result.user() + ".");
                     if (onResult != null) {
                         onResult.accept(result);
@@ -188,7 +188,7 @@ public final class LauncherAccountController {
                 () -> new LauncherAuthFlow(apiClient).authenticate(),
                 user -> {
                     completeSignIn(user, true);
-                    feedback.log("Signed in as " + user + ". Downloads and updates will use your Modtale session.");
+                    feedback.log("Signed in as " + user + ". Account-backed features are now available.");
                     feedback.showToast("Signed in", "You're connected as " + user + ".");
                 },
                 error -> {

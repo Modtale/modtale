@@ -364,7 +364,7 @@ public final class LauncherShell {
         followingController.hideModal();
         LauncherView nextView = view == null ? LauncherView.defaultView() : view;
         if (requiresModtaleSession(nextView) && !accountController.isSignedIn()) {
-            feedback.showToast("Modtale sign-in required", "Sign in with Modtale to update mods or view account activity.");
+            feedback.showToast("Modtale sign-in required", "Sign in with Modtale to view account activity.");
             LauncherView fallback = requiresModtaleSession(navigation.currentView())
                     ? LauncherView.PLAY
                     : navigation.currentView();
@@ -1079,8 +1079,7 @@ public final class LauncherShell {
     }
 
     static boolean requiresModtaleSession(LauncherView view) {
-        return view == LauncherView.UPDATES
-                || view == LauncherView.NOTIFICATIONS;
+        return view == LauncherView.NOTIFICATIONS;
     }
 
 }
