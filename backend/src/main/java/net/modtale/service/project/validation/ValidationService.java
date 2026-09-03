@@ -22,6 +22,7 @@ public class ValidationService {
             "Economy", "Protection", "Admin Tools", "Chat", "Anti-Cheat", "Performance", "NPCs",
             "Library", "API", "Mechanics", "World Gen", "Recipes", "Loot Tables", "Functions",
             "Decoration", "Vanilla+", "Kitchen Sink", "City", "Landscape", "Spawn", "Lobby",
+            "Prefab", "Structure", "Dungeon", "Adventure Map", "Server Hub", "Template",
             "Medieval", "Modern", "Futuristic", "Models", "Textures", "Animations", "Particles"
     );
 

@@ -1,9 +1,11 @@
 package net.modtale.mapper;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Collectors;
 import net.modtale.model.dto.user.UserDTO;
 import net.modtale.model.dto.user.UserSummaryDTO;
+import net.modtale.model.user.AdminPermission;
 import net.modtale.model.user.User;
 
 public class UserMapper {
@@ -20,7 +22,7 @@ public class UserMapper {
                 user.getTier(),
                 user.getRoles(),
                 user.getAccountType(),
-                user.getBadges()
+                badgesFor(user)
         );
     }
 
@@ -37,7 +39,7 @@ public class UserMapper {
         dto.setTier(user.getTier());
         dto.setRoles(user.getRoles());
         dto.setAccountType(user.getAccountType());
-        dto.setBadges(user.getBadges());
+        dto.setBadges(badgesFor(user));
 
         dto.setOrganizationRoles(user.getOrganizationRoles());
         dto.setOrganizationMembers(user.getOrganizationMembers());
@@ -59,17 +61,28 @@ public class UserMapper {
         if (includePrivate) {
             dto.setEmail(user.getEmail());
             dto.setEmailVerified(user.isEmailVerified());
+            dto.setHasPassword(user.getHasPassword());
             dto.setMfaEnabled(user.isMfaEnabled());
+            dto.setAdminPermissions(AdminPermission.effectivePermissions(user));
             dto.setPendingOrgInvites(user.getPendingOrgInvites());
             dto.setLikedModIds(user.getLikedModIds());
             dto.setNotificationPreferences(user.getNotificationPreferences());
         } else {
             dto.setEmail(null);
+            dto.setHasPassword(null);
+            dto.setAdminPermissions(null);
             dto.setPendingOrgInvites(null);
             dto.setNotificationPreferences(null);
             dto.setLikedModIds(null);
         }
 
         return dto;
+    }
+
+    private static List<Object> badgesFor(User user) {
+        List<Object> badges = new ArrayList<>();
+        if (user.getBadges() != null) badges.addAll(user.getBadges());
+        if (user.getProfileBadges() != null) badges.addAll(user.getProfileBadges());
+        return badges;
     }
 }

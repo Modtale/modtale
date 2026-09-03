@@ -1,21 +1,32 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, Upload, Plus, Image as ImageIcon, Github, Twitter, Gitlab, Globe, Check, Copy, ExternalLink, UserPlus, UserCheck, Building2, Settings, Flag, LogIn } from 'lucide-react';
+import { ChevronLeft, Upload, Plus, Image as ImageIcon, Globe, Check, Copy, ExternalLink, UserPlus, UserCheck, Building2, Settings, Flag, LogIn } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { Spinner } from '@/components/ui/Spinner';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { DiscordBrandIcon } from '@/components/ui/icons/BrandIcons';
-import type { User } from '@/types';
+import { BlueskyBrandIcon, DiscordBrandIcon, GitHubBrandIcon, GitLabBrandIcon, HytaleBrandIcon, XBrandIcon } from '@/components/ui/icons/BrandIcons';
+import type { ProfileBadge, User } from '@/types';
 import { BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
 import { Link } from 'react-router-dom';
+import { getConnectedAccountProfileUrl } from '@/modules/user/utils/connectedAccountLinks';
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
 const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
 
-const Badge = ({ type }: { type: string }) => {
+export const Badge = ({ type }: { type: string | ProfileBadge }) => {
+    if (typeof type !== 'string') {
+        const tooltip = type.tooltip || type.label;
+        if (type.imageUrl) return (
+            <span className="inline-flex size-4 md:size-6 cursor-help align-middle" title={tooltip}>
+                <img src={type.imageUrl} alt={type.label} className={`size-full object-contain ${type.darkImageUrl ? 'dark:hidden' : ''}`} loading="lazy" decoding="async" />
+                {type.darkImageUrl && <img src={type.darkImageUrl} alt={type.label} className="hidden size-full object-contain dark:block" loading="lazy" decoding="async" />}
+            </span>
+        );
+        return <span className="bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 text-[10px] font-bold px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-md tracking-tight cursor-help align-middle" title={tooltip}>{type.label}</span>;
+    }
     if (type === 'OG') return <span className="bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-md uppercase tracking-tighter cursor-help align-middle" title="Early Adopter">OG</span>;
     if (type === 'VERIFIED') return <span className="bg-blue-500 text-white text-[10px] font-bold px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-md uppercase tracking-tight cursor-help align-middle" title="Verified Creator">Verified</span>;
     return null;
@@ -172,10 +183,12 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
 
     const getProviderDetails = (provider: string) => {
         switch (provider?.toLowerCase()) {
-            case 'github': return { icon: Github, label: 'GitHub', activeClass: 'group-hover/social:text-slate-900 dark:group-hover/social:text-white group-hover/social:border-slate-300 dark:group-hover/social:border-white/20', iconBg: 'bg-slate-900/10 dark:bg-white/10 text-slate-900 dark:text-white', profileBtnBg: 'bg-[#24292e]' };
-            case 'gitlab': return { icon: Gitlab, label: 'GitLab', activeClass: 'group-hover/social:text-[#FC6D26] group-hover/social:border-[#FC6D26]/30', iconBg: 'bg-[#FC6D26]/10 text-[#FC6D26]', profileBtnBg: 'bg-[#FC6D26]' };
-            case 'twitter': return { icon: Twitter, label: 'Twitter', activeClass: 'group-hover/social:text-[#1DA1F2] group-hover/social:border-[#1DA1F2]/30', iconBg: 'bg-[#1DA1F2]/10 text-[#1DA1F2]', profileBtnBg: 'bg-[#1DA1F2]' };
+            case 'github': return { icon: GitHubBrandIcon, label: 'GitHub', activeClass: 'group-hover/social:text-slate-900 dark:group-hover/social:text-white group-hover/social:border-slate-300 dark:group-hover/social:border-white/20', iconBg: 'bg-slate-900/10 dark:bg-white/10 text-slate-900 dark:text-white', profileBtnBg: 'bg-[#24292e]' };
+            case 'gitlab': return { icon: GitLabBrandIcon, label: 'GitLab', activeClass: 'group-hover/social:text-[#FC6D26] group-hover/social:border-[#FC6D26]/30', iconBg: 'bg-[#FC6D26]/10 text-[#FC6D26]', profileBtnBg: 'bg-[#FC6D26]' };
+            case 'twitter': return { icon: XBrandIcon, label: 'X / Twitter', activeClass: 'group-hover/social:text-slate-900 dark:group-hover/social:text-white group-hover/social:border-slate-400 dark:group-hover/social:border-white/30', iconBg: 'bg-slate-900/10 dark:bg-white/10 text-slate-900 dark:text-white', profileBtnBg: 'bg-black' };
+            case 'bluesky': return { icon: BlueskyBrandIcon, label: 'Bluesky', activeClass: 'group-hover/social:text-[#1185FE] group-hover/social:border-[#1185FE]/30', iconBg: 'bg-[#1185FE]/10 text-[#1185FE]', profileBtnBg: 'bg-[#1185FE]' };
             case 'discord': return { icon: DiscordBrandIcon, label: 'Discord', activeClass: 'group-hover/social:text-[#5865F2] group-hover/social:border-[#5865F2]/30', iconBg: 'bg-[#5865F2]/10 text-[#5865F2]', profileBtnBg: 'bg-[#5865F2]' };
+            case 'hytale': return { icon: HytaleBrandIcon, label: 'Hytale', activeClass: 'group-hover/social:text-cyan-400 group-hover/social:border-cyan-400/30', iconBg: 'bg-cyan-500/10 text-cyan-400', profileBtnBg: 'bg-slate-900' };
             default: return { icon: Globe, label: 'Website', activeClass: 'group-hover/social:text-blue-500 group-hover/social:border-blue-500/30', iconBg: 'bg-blue-500/10 text-blue-500', profileBtnBg: 'bg-blue-500' };
         }
     };
@@ -191,9 +204,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
 
     const SocialButton = ({ account, compact = false, isRightMost = false }: { account: any, compact?: boolean, isRightMost?: boolean }) => {
         const { icon: Icon, label, activeClass, iconBg, profileBtnBg } = getProviderDetails(account.provider);
-        const displayUrl = account.profileUrl || '#';
-        const isDiscord = account.provider?.toLowerCase() === 'discord';
-        const finalUrl = isDiscord ? `https://discord.com/users/${account.providerId}` : displayUrl;
+        const finalUrl = getConnectedAccountProfileUrl(account);
 
         const popupPositionClasses = isRightMost ? "right-0 left-auto translate-x-0" : "left-1/2 -translate-x-1/2";
         const trianglePositionClasses = isRightMost ? "right-3 left-auto translate-x-0" : "left-1/2 -translate-x-1/2";
@@ -376,7 +387,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                             {!isEditing && (
                                                 <div className="flex gap-1.5 flex-wrap items-center mt-1 md:mt-0">
                                                     {isOrg && <span className="bg-purple-500 text-white text-[10px] md:text-xs font-bold px-1.5 py-0.5 md:px-3 md:py-1 rounded-md shadow-md uppercase tracking-wide flex items-center gap-1"><Building2 className="w-3 h-3" /> <span className="hidden md:inline">Organization</span><span className="md:hidden">Org</span></span>}
-                                                    {user.badges && user.badges.map(b => <Badge key={b} type={b} />)}
+                                                    {user.badges && user.badges.map((badge, index) => <Badge key={typeof badge === 'string' ? badge : badge.id || `${badge.label}-${index}`} type={badge} />)}
 
                                                     <div className="md:hidden flex items-center gap-1.5">
                                                         {linkedAccounts.map(acc => <SocialButton key={acc.provider} account={acc} compact={true} />)}

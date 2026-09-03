@@ -5,6 +5,7 @@ import java.io.Serializable;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -56,6 +57,7 @@ public class User implements Serializable {
 
     private ApiKey.Tier tier;
     private List<String> roles;
+    private Set<AdminPermission> adminPermissions = new LinkedHashSet<>();
 
     private AccountType accountType = AccountType.USER;
 
@@ -71,6 +73,7 @@ public class User implements Serializable {
     private List<ConnectedAccount> connectedAccounts = new ArrayList<>();
 
     private List<String> badges = new ArrayList<>();
+    private List<ProfileBadge> profileBadges = new ArrayList<>();
 
     private NotificationPreferences notificationPreferences = new NotificationPreferences();
 
@@ -234,6 +237,37 @@ public class User implements Serializable {
         public void setPercent(int percent) { this.percent = percent; }
     }
 
+    public static class ProfileBadge implements Serializable {
+        private static final long serialVersionUID = 1L;
+
+        private String id;
+        private String label;
+        private String tooltip;
+        private String imageUrl;
+        private String darkImageUrl;
+
+        public ProfileBadge() {}
+
+        public ProfileBadge(String id, String label, String tooltip, String imageUrl, String darkImageUrl) {
+            this.id = id;
+            this.label = label;
+            this.tooltip = tooltip;
+            this.imageUrl = imageUrl;
+            this.darkImageUrl = darkImageUrl;
+        }
+
+        public String getId() { return id; }
+        public void setId(String id) { this.id = id; }
+        public String getLabel() { return label; }
+        public void setLabel(String label) { this.label = label; }
+        public String getTooltip() { return tooltip; }
+        public void setTooltip(String tooltip) { this.tooltip = tooltip; }
+        public String getImageUrl() { return imageUrl; }
+        public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+        public String getDarkImageUrl() { return darkImageUrl; }
+        public void setDarkImageUrl(String darkImageUrl) { this.darkImageUrl = darkImageUrl; }
+    }
+
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
 
@@ -283,6 +317,10 @@ public class User implements Serializable {
     public void setTier(ApiKey.Tier tier) { this.tier = tier; }
     public List<String> getRoles() { return roles; }
     public void setRoles(List<String> roles) { this.roles = roles; }
+    public Set<AdminPermission> getAdminPermissions() { return adminPermissions; }
+    public void setAdminPermissions(Set<AdminPermission> adminPermissions) {
+        this.adminPermissions = adminPermissions != null ? new LinkedHashSet<>(adminPermissions) : new LinkedHashSet<>();
+    }
 
     public AccountType getAccountType() { return accountType; }
     public void setAccountType(AccountType accountType) { this.accountType = accountType; }
@@ -310,6 +348,8 @@ public class User implements Serializable {
 
     public List<String> getBadges() { return badges; }
     public void setBadges(List<String> badges) { this.badges = badges; }
+    public List<ProfileBadge> getProfileBadges() { return profileBadges; }
+    public void setProfileBadges(List<ProfileBadge> profileBadges) { this.profileBadges = profileBadges; }
 
     public NotificationPreferences getNotificationPreferences() { return notificationPreferences; }
     public void setNotificationPreferences(NotificationPreferences notificationPreferences) { this.notificationPreferences = notificationPreferences; }

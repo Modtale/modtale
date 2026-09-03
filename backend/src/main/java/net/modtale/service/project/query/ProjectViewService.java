@@ -65,7 +65,8 @@ public class ProjectViewService {
         Project project = projectRepository.findViewerDetailById(id).orElse(null);
         if (project == null || project.getDeletedAt() != null) return null;
 
-        boolean privileged = accessControlService.hasEditPermission(project, viewer) || accessControlService.isAdmin(viewer);
+        boolean privileged = accessControlService.hasEditPermission(project, viewer)
+                || accessControlService.canViewPrivilegedProjectData(viewer);
         if (!privileged && !accessControlService.canReadProject(project, viewer)) {
             return null;
         }
@@ -81,7 +82,8 @@ public class ProjectViewService {
         Project project = resolveViewerProjectByRouteKey(routeKey);
         if (project == null || project.getDeletedAt() != null) return null;
 
-        boolean privileged = accessControlService.hasEditPermission(project, viewer) || accessControlService.isAdmin(viewer);
+        boolean privileged = accessControlService.hasEditPermission(project, viewer)
+                || accessControlService.canViewPrivilegedProjectData(viewer);
         if (!privileged && !accessControlService.canReadProject(project, viewer)) {
             return null;
         }
@@ -97,7 +99,8 @@ public class ProjectViewService {
         Project project = resolveViewerProjectDetailsByRouteKey(routeKey);
         if (project == null || project.getDeletedAt() != null) return null;
 
-        boolean privileged = accessControlService.hasEditPermission(project, viewer) || accessControlService.isAdmin(viewer);
+        boolean privileged = accessControlService.hasEditPermission(project, viewer)
+                || accessControlService.canViewPrivilegedProjectData(viewer);
         if (!privileged && !accessControlService.canReadProject(project, viewer)) {
             return null;
         }
@@ -113,7 +116,8 @@ public class ProjectViewService {
         Project project = resolveViewerProjectPageShellByRouteKey(routeKey);
         if (project == null || project.getDeletedAt() != null) return null;
 
-        boolean privileged = accessControlService.hasEditPermission(project, viewer) || accessControlService.isAdmin(viewer);
+        boolean privileged = accessControlService.hasEditPermission(project, viewer)
+                || accessControlService.canViewPrivilegedProjectData(viewer);
         if (!privileged && !accessControlService.canReadProject(project, viewer)) {
             return null;
         }
@@ -254,7 +258,8 @@ public class ProjectViewService {
         Project project = resolveChangelogProjectByRouteKey(routeKey);
         if (project == null || project.getDeletedAt() != null) return null;
 
-        boolean privileged = viewer != null && (accessControlService.hasEditPermission(project, viewer) || accessControlService.isAdmin(viewer));
+        boolean privileged = viewer != null && (accessControlService.hasEditPermission(project, viewer)
+                || accessControlService.canViewPrivilegedProjectData(viewer));
         if (!privileged && !accessControlService.canReadProject(project, viewer)) {
             return null;
         }
@@ -514,7 +519,8 @@ public class ProjectViewService {
             return new ProjectAccess(false, false);
         }
 
-        boolean privileged = viewer != null && (accessControlService.hasEditPermission(project, viewer) || accessControlService.isAdmin(viewer));
+        boolean privileged = viewer != null && (accessControlService.hasEditPermission(project, viewer)
+                || accessControlService.canViewPrivilegedProjectData(viewer));
         boolean canRead = privileged || accessControlService.canReadProject(project, viewer);
         return new ProjectAccess(privileged, canRead);
     }

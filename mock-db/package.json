@@ -9,6 +9,6 @@
     "validate": "node scripts/validate-fixtures.mjs"
   },
   "dependencies": {
-    "mongodb": "^6.12.0"
+    "mongodb": "^7.4.0"
   }
 }

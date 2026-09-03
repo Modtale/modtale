@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText, Wallet, CalendarClock } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
 import { StatusModal } from '@/components/ui/StatusModal';
@@ -12,8 +12,8 @@ import { PlatformAnalytics } from '../components/PlatformAnalytics';
 import { AuditLogs } from '../components/AuditLogs';
 import { FinanceAdmin } from '../components/FinanceAdmin';
 import { StatusIncidents } from '../components/StatusIncidents';
-import { isAdminUser, isSuperAdminUser } from '../utils/access';
-import type { Project } from '@/types';
+import { AdminPermission, hasAdminPermission, hasAnyAdminPermission, isAdminUser, isSuperAdminUser } from '../utils/access';
+import type { AdminVerificationQueueItem } from '@/types';
 
 interface AdminPanelProps {
     currentUser: any;
@@ -25,48 +25,118 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     const [activeTab, setActiveTab] = useState<AdminTab>('verification');
     const [status, setStatus] = useState<any>(null);
 
-    const [pendingProjects, setPendingProjects] = useState<Project[]>([]);
+    const [pendingProjects, setPendingProjects] = useState<AdminVerificationQueueItem[]>([]);
     const [loadingQueue, setLoadingQueue] = useState(false);
     const [queueError, setQueueError] = useState<string | null>(null);
+    const queueRequestInFlight = useRef(false);
 
     const [reviewingProject, setReviewingProject] = useState<any>(null);
     const [loadingReview, setLoadingReview] = useState(false);
+    const [loadingReviewId, setLoadingReviewId] = useState<string>();
 
     const [reports, setReports] = useState<any[]>([]);
     const [reportsError, setReportsError] = useState<string | null>(null);
 
     const isAdmin = isAdminUser(currentUser);
     const isSuperAdmin = isSuperAdminUser(currentUser);
+    const canReadReviewQueue = hasAdminPermission(currentUser, AdminPermission.PROJECT_REVIEW_READ);
+    const canDecideReviews = hasAdminPermission(currentUser, AdminPermission.PROJECT_REVIEW_DECIDE);
+    const canRescanVersions = hasAdminPermission(currentUser, AdminPermission.PROJECT_VERSION_RESCAN);
+    const canReadReports = hasAdminPermission(currentUser, AdminPermission.REPORT_READ);
+    const canResolveReports = hasAdminPermission(currentUser, AdminPermission.REPORT_RESOLVE);
+    const canReadStatus = hasAnyAdminPermission(currentUser, [AdminPermission.STATUS_INCIDENT_READ, AdminPermission.STATUS_INCIDENT_MANAGE]);
+    const canManageStatus = hasAdminPermission(currentUser, AdminPermission.STATUS_INCIDENT_MANAGE);
+    const canReadAnalytics = hasAdminPermission(currentUser, AdminPermission.PLATFORM_ANALYTICS_READ);
+    const canReadLogs = hasAdminPermission(currentUser, AdminPermission.AUDIT_LOG_READ);
+    const canUseProjectManagement = hasAnyAdminPermission(currentUser, [
+        AdminPermission.PROJECT_MANAGE_READ,
+        AdminPermission.PROJECT_MODERATE,
+        AdminPermission.PROJECT_DELETE,
+        AdminPermission.PROJECT_RESTORE,
+        AdminPermission.PROJECT_VERSION_DELETE,
+        AdminPermission.PROJECT_RAW_EDIT
+    ]);
+    const canUseUserManagement = hasAnyAdminPermission(currentUser, [
+        AdminPermission.USER_READ,
+        AdminPermission.USER_DELETE,
+        AdminPermission.EMAIL_BAN_READ,
+        AdminPermission.EMAIL_BAN_MANAGE,
+        AdminPermission.USER_TIER_MANAGE,
+        AdminPermission.USER_PERMISSION_MANAGE,
+        AdminPermission.USER_RAW_READ,
+        AdminPermission.USER_RAW_EDIT
+    ]);
+
+    const tabAccess: Record<AdminTab, boolean> = useMemo(() => ({
+        verification: canReadReviewQueue,
+        reports: canReadReports,
+        status: canReadStatus,
+        analytics: canReadAnalytics,
+        finance: isSuperAdmin,
+        projects: canUseProjectManagement,
+        users: canUseUserManagement,
+        logs: canReadLogs
+    }), [
+        canReadAnalytics,
+        canReadLogs,
+        canReadReports,
+        canReadReviewQueue,
+        canReadStatus,
+        canUseProjectManagement,
+        canUseUserManagement,
+        isSuperAdmin
+    ]);
+    const firstAllowedTab = (Object.keys(tabAccess) as AdminTab[]).find(tab => tabAccess[tab]);
 
     useEffect(() => {
-        if (isAdmin) {
+        if (canReadReviewQueue) {
             fetchQueue();
-            fetchReports();
+        } else {
+            setPendingProjects([]);
+            setQueueError(null);
         }
-    }, [isAdmin]);
+
+        if (canReadReports) {
+            fetchReports();
+        } else {
+            setReports([]);
+            setReportsError(null);
+        }
+    }, [canReadReviewQueue, canReadReports]);
 
     useEffect(() => {
-        if (!isAdmin) return;
+        if (!canReadReviewQueue) return;
         const interval = setInterval(() => {
-            fetchQueue();
+            fetchQueue(true);
         }, 30_000);
         return () => clearInterval(interval);
-    }, [isAdmin]);
+    }, [canReadReviewQueue]);
 
-    const fetchQueue = async () => {
-        setLoadingQueue(true);
+    useEffect(() => {
+        if (isAdmin && firstAllowedTab && !tabAccess[activeTab]) {
+            setActiveTab(firstAllowedTab);
+        }
+    }, [activeTab, firstAllowedTab, isAdmin, tabAccess]);
+
+    const fetchQueue = async (background = false) => {
+        if (!canReadReviewQueue || queueRequestInFlight.current) return;
+        queueRequestInFlight.current = true;
+        if (!background) setLoadingQueue(true);
         try {
             const data = await adminClient.getVerificationQueue();
+            if (!Array.isArray(data)) throw new Error('The verification queue returned an invalid response.');
             setPendingProjects(data);
             setQueueError(null);
         } catch (e) {
             setQueueError(extractApiErrorMessage(e, 'We could not load the verification queue.'));
         } finally {
-            setLoadingQueue(false);
+            queueRequestInFlight.current = false;
+            if (!background) setLoadingQueue(false);
         }
     };
 
     const fetchReports = async () => {
+        if (!canReadReports) return;
         try {
             const data = await adminClient.getReportQueue('OPEN');
             setReports(data);
@@ -77,7 +147,9 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     };
 
     const fetchProjectDetails = async (id: string) => {
+        if (loadingReview) return;
         setLoadingReview(true);
+        setLoadingReviewId(id);
         try {
             const data = await adminClient.getReviewDetails(id);
             setReviewingProject(data);
@@ -85,19 +157,20 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
             setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, "We could not load this project's review details.") });
         } finally {
             setLoadingReview(false);
+            setLoadingReviewId(undefined);
         }
     };
 
     const handleApprove = async () => {
         setStatus({ type: 'success', title: 'Approved', msg: 'Project published successfully.' });
         setReviewingProject(null);
-        fetchQueue();
+        fetchQueue(true);
     };
 
     const handleReject = async (reason: string) => {
         setStatus({ type: 'info', title: 'Rejected', msg: 'Project returned to drafts.' });
         setReviewingProject(null);
-        fetchQueue();
+        fetchQueue(true);
     };
 
     if (!currentUser || !isAdmin) {
@@ -144,6 +217,8 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                     onApprove={handleApprove}
                     onReject={handleReject}
                     setStatus={setStatus}
+                    canDecide={canDecideReviews}
+                    canRescan={canRescanVersions}
                 />
             )}
 
@@ -160,53 +235,63 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                             </div>
 
                             <nav className="space-y-1">
-                                <SidebarButton
-                                    tab="verification"
-                                    icon={LayoutDashboard}
-                                    label="Verification Queue"
-                                    badge={pendingProjects.length}
-                                />
-                                <SidebarButton
-                                    tab="reports"
-                                    icon={ShieldAlert}
-                                    label="Reports"
-                                    badge={reports.length}
-                                />
-                                <SidebarButton
-                                    tab="analytics"
-                                    icon={Activity}
-                                    label="Platform Analytics"
-                                />
-                                <SidebarButton
-                                    tab="finance"
-                                    icon={Wallet}
-                                    label="Platform Finance"
-                                />
-                                {isSuperAdmin && (
+                                {canReadReviewQueue && (
+                                    <SidebarButton
+                                        tab="verification"
+                                        icon={LayoutDashboard}
+                                        label="Verification Queue"
+                                        badge={pendingProjects.length}
+                                    />
+                                )}
+                                {canReadReports && (
+                                    <SidebarButton
+                                        tab="reports"
+                                        icon={ShieldAlert}
+                                        label="Reports"
+                                        badge={reports.length}
+                                    />
+                                )}
+                                {canReadStatus && (
                                     <SidebarButton
                                         tab="status"
                                         icon={CalendarClock}
                                         label="Status"
                                     />
                                 )}
+                                {canReadAnalytics && (
+                                    <SidebarButton
+                                        tab="analytics"
+                                        icon={Activity}
+                                        label="Platform Analytics"
+                                    />
+                                )}
                                 {isSuperAdmin && (
-                                    <>
-                                        <SidebarButton
-                                            tab="projects"
-                                            icon={Package}
-                                            label="Project Management"
-                                        />
-                                        <SidebarButton
-                                            tab="users"
-                                            icon={Users}
-                                            label="User Management"
-                                        />
-                                        <SidebarButton
-                                            tab="logs"
-                                            icon={FileText}
-                                            label="Audit Logs"
-                                        />
-                                    </>
+                                    <SidebarButton
+                                        tab="finance"
+                                        icon={Wallet}
+                                        label="Platform Finance"
+                                    />
+                                )}
+                                {canUseProjectManagement && (
+                                    <SidebarButton
+                                        tab="projects"
+                                        icon={Package}
+                                        label="Project Management"
+                                    />
+                                )}
+                                {canUseUserManagement && (
+                                    <SidebarButton
+                                        tab="users"
+                                        icon={Users}
+                                        label="User Management"
+                                    />
+                                )}
+                                {canReadLogs && (
+                                    <SidebarButton
+                                        tab="logs"
+                                        icon={FileText}
+                                        label="Audit Logs"
+                                    />
                                 )}
                             </nav>
                         </div>
@@ -214,28 +299,32 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
 
                     <div className="flex-1 min-w-0">
                         <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-8 shadow-2xl">
-                            {activeTab === 'verification' && (
+                            {activeTab === 'verification' && canReadReviewQueue && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="mb-8">
                                         <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Verification Queue</h1>
                                         <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Review pending projects and updates.</p>
                                     </div>
                                     {queueError && (
-                                        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
-                                            {queueError}
+                                        <div className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                                            <span>{queueError}</span>
+                                            <button type="button" onClick={() => fetchQueue()} className="shrink-0 rounded-lg border border-current px-3 py-1.5 font-bold hover:bg-red-100 dark:hover:bg-red-500/10">
+                                                Retry
+                                            </button>
                                         </div>
                                     )}
                                     <VerificationQueue
                                         pendingProjects={pendingProjects}
                                         loadingQueue={loadingQueue}
+                                        loadFailed={queueError !== null}
                                         loadingReview={loadingReview}
-                                        reviewingId={reviewingProject?.mod?.id}
+                                        reviewingId={loadingReviewId}
                                         onReview={fetchProjectDetails}
                                     />
                                 </div>
                             )}
 
-                            {activeTab === 'reports' && (
+                            {activeTab === 'reports' && canReadReports && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="mb-8">
                                         <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Report Queue</h1>
@@ -246,49 +335,49 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                             {reportsError}
                                         </div>
                                     )}
-                                    <ReportQueue reports={reports} onRefresh={fetchReports} />
+                                    <ReportQueue reports={reports} onRefresh={fetchReports} canResolve={canResolveReports} />
                                 </div>
                             )}
 
-                            {activeTab === 'analytics' && (
+                            {activeTab === 'analytics' && canReadAnalytics && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <PlatformAnalytics />
                                 </div>
                             )}
 
-                            {activeTab === 'finance' && (
+                            {activeTab === 'finance' && isSuperAdmin && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <FinanceAdmin isSuperAdmin={isSuperAdmin} />
                                 </div>
                             )}
 
-                            {activeTab === 'status' && isSuperAdmin && (
+                            {activeTab === 'status' && canReadStatus && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    <StatusIncidents setStatus={setStatus} />
+                                    <StatusIncidents setStatus={setStatus} canManage={canManageStatus} />
                                 </div>
                             )}
 
-                            {activeTab === 'projects' && isSuperAdmin && (
+                            {activeTab === 'projects' && canUseProjectManagement && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="mb-8">
                                         <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Project Management</h1>
                                         <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Manage, unlist, or delete any project.</p>
                                     </div>
-                                    <ProjectManagement setStatus={setStatus} />
+                                    <ProjectManagement setStatus={setStatus} currentAdmin={currentUser} />
                                 </div>
                             )}
 
-                            {activeTab === 'users' && isSuperAdmin && (
+                            {activeTab === 'users' && canUseUserManagement && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="mb-8">
                                         <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">User Management</h1>
                                         <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Manage roles, tiers, and user statuses.</p>
                                     </div>
-                                    <UserManagement setStatus={setStatus} />
+                                    <UserManagement setStatus={setStatus} currentAdmin={currentUser} />
                                 </div>
                             )}
 
-                            {activeTab === 'logs' && isSuperAdmin && (
+                            {activeTab === 'logs' && canReadLogs && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="mb-8">
                                         <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Audit Logs</h1>

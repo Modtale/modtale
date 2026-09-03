@@ -1,6 +1,6 @@
 import { api } from '@/utils/api';
 
-export type SignInMethod = 'email' | 'github' | 'gitlab' | 'discord' | 'google';
+export type SignInMethod = 'email' | 'github' | 'discord' | 'google' | 'hytale';
 
 export type SignInResponsePayload = {
     status?: string;
@@ -16,17 +16,17 @@ export const PENDING_SIGN_IN_METHOD_STORAGE_KEY = 'modtale.pendingSignInMethod';
 export const SIGN_IN_METHOD_LABELS: Record<SignInMethod, string> = {
     email: 'Email',
     github: 'GitHub',
-    gitlab: 'GitLab',
     discord: 'Discord',
-    google: 'Google'
+    google: 'Google',
+    hytale: 'Hytale'
 };
 
 const isSignInMethod = (value: string | null): value is SignInMethod => (
     value === 'email' ||
     value === 'github' ||
-    value === 'gitlab' ||
     value === 'discord' ||
-    value === 'google'
+    value === 'google' ||
+    value === 'hytale'
 );
 
 const readStoredSignInMethod = (storage: Storage, key: string): SignInMethod | null => {

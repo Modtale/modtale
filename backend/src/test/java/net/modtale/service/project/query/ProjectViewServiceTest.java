@@ -62,7 +62,7 @@ class ProjectViewServiceTest {
         when(projectRepository.findViewerDetailById("project-1")).thenReturn(Optional.of(project));
         when(userRepository.findById("author-1")).thenReturn(Optional.of(user("author-1", "author")));
         when(accessControlService.hasEditPermission(project, admin)).thenReturn(false);
-        when(accessControlService.isAdmin(admin)).thenReturn(true);
+        when(accessControlService.canReadProject(project, admin)).thenReturn(true);
 
         Project result = service.getProjectById("project-1", admin);
 

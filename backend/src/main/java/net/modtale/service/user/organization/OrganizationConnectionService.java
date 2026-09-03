@@ -46,8 +46,8 @@ public class OrganizationConnectionService {
 
     public void toggleOrgConnectionVisibility(String orgId, String provider, User requester) {
         OAuthProvider targetProvider = OAuthProvider.fromString(provider);
-        if (targetProvider == OAuthProvider.GOOGLE) {
-            throw new InvalidOrganizationRequestException("Google accounts cannot be made visible.");
+        if (targetProvider == OAuthProvider.GOOGLE || targetProvider == OAuthProvider.HYTALE) {
+            throw new InvalidOrganizationRequestException(provider + " accounts cannot be made visible.");
         }
 
         User org = requireConnectionManagedOrganization(orgId, requester);
