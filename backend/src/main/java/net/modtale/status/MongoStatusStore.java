@@ -161,12 +161,48 @@ public class MongoStatusStore implements AutoCloseable {
                 return;
             }
             long retentionSeconds = Math.max(60, properties.getHistoryRetention().toSeconds());
-            history(database).createIndex(
-                    Indexes.ascending("timestamp"),
-                    new IndexOptions().name("status_history_ttl").expireAfter(retentionSeconds, TimeUnit.SECONDS)
-            );
+            MongoCollection<Document> collection = history(database);
+            try {
+                for (Document index : collection.listIndexes()) {
+                    if (!isTimestampIndex(index)) {
+                        continue;
+                    }
+                    if (isMatchingTimestampTtlIndex(index, retentionSeconds)) {
+                        historyIndexEnsured = true;
+                        return;
+                    }
+                    String indexName = index.getString("name");
+                    if (hasText(indexName) && !"_id_".equals(indexName)) {
+                        logger.info("Replacing non-TTL status history index {} with {} day retention", indexName,
+                                TimeUnit.SECONDS.toDays(retentionSeconds));
+                        collection.dropIndex(indexName);
+                    }
+                    break;
+                }
+                collection.createIndex(
+                        Indexes.ascending("timestamp"),
+                        new IndexOptions().name("timestamp").expireAfter(retentionSeconds, TimeUnit.SECONDS)
+                );
+            } catch (MongoException | IllegalArgumentException e) {
+                // Index maintenance must never prevent samples from being read or persisted.
+                logger.warn("Status history retention index could not be reconciled; continuing without TTL enforcement: {}",
+                        e.toString());
+            }
             historyIndexEnsured = true;
         }
+    }
+
+    static boolean isTimestampIndex(Document index) {
+        Document keys = index == null ? null : index.get("key", Document.class);
+        Object direction = keys == null ? null : keys.get("timestamp");
+        return keys != null && keys.size() == 1 && direction instanceof Number number && number.intValue() == 1;
+    }
+
+    static boolean isMatchingTimestampTtlIndex(Document index, long retentionSeconds) {
+        Object expiry = index == null ? null : index.get("expireAfterSeconds");
+        return isTimestampIndex(index)
+                && expiry instanceof Number number
+                && number.longValue() == retentionSeconds;
     }
 
     private <T> Optional<T> withDatabase(DatabaseOperation<T> operation) {
