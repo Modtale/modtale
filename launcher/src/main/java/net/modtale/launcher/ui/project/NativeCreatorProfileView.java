@@ -3,6 +3,8 @@ package net.modtale.launcher.ui.project;
 import static net.modtale.launcher.ui.browse.card.ProjectCardFormatter.number;
 import static net.modtale.launcher.ui.common.LauncherUi.value;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
@@ -17,6 +19,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
@@ -29,6 +32,7 @@ import net.modtale.launcher.model.project.ProjectPage;
 import net.modtale.launcher.model.project.ProjectSummary;
 import net.modtale.launcher.model.user.CreatorProfile;
 import net.modtale.launcher.model.user.CurrentUser;
+import net.modtale.launcher.model.user.ProfileBadge;
 import net.modtale.launcher.ui.browse.card.ProjectCardFactory;
 import net.modtale.launcher.ui.browse.card.ProjectCardViewStyle;
 import net.modtale.launcher.ui.common.CachedImageLoader;
@@ -256,13 +260,41 @@ final class NativeCreatorProfileView {
         if (profile.organization()) {
             row.getChildren().add(badge("Organization", "organization", LauncherIcons.Glyph.BOX));
         }
-        for (String badge : profile.badges()) {
-            String normalized = value(badge, "").toUpperCase(Locale.ROOT);
-            if (normalized.equals("OG") || normalized.equals("VERIFIED")) {
-                row.getChildren().add(badge(normalized.equals("OG") ? "OG" : "Verified", normalized.toLowerCase(Locale.ROOT), null));
-            }
+        for (ProfileBadge profileBadge : profile.badges()) {
+            Node rendered = profileBadge(profileBadge);
+            if (rendered != null) row.getChildren().add(rendered);
         }
         return row;
+    }
+
+    private Node profileBadge(ProfileBadge profileBadge) {
+        if (profileBadge == null) return null;
+        if (profileBadge.legacy()) {
+            String normalized = value(profileBadge.legacyType(), "").toUpperCase(Locale.ROOT);
+            if (!normalized.equals("OG") && !normalized.equals("VERIFIED")) return null;
+            Node badge = badge(normalized.equals("OG") ? "OG" : "Verified", normalized.toLowerCase(Locale.ROOT), null);
+            Tooltip.install(badge, new Tooltip(normalized.equals("OG") ? "Early Adopter" : "Verified Creator"));
+            return badge;
+        }
+        String label = profileBadge.displayLabel();
+        if (label.isBlank()) return null;
+        String imageUrl = value(profileBadge.darkImageUrl(), "");
+        if (imageUrl.isBlank()) imageUrl = value(profileBadge.imageUrl(), "");
+        Node badge;
+        if (!imageUrl.isBlank()) {
+            ImageView image = new ImageView();
+            image.getStyleClass().add("creator-profile-badge-image");
+            image.setPreserveRatio(true);
+            image.setFitWidth(24);
+            image.setFitHeight(24);
+            image.setAccessibleText(label);
+            imageLoader.loadInto(image, imageUrl, 24, 24, true);
+            badge = image;
+        } else {
+            badge = badge(label, "custom", null);
+        }
+        Tooltip.install(badge, new Tooltip(profileBadge.displayTooltip()));
+        return badge;
     }
 
     private Node badge(String text, String style, LauncherIcons.Glyph glyph) {
@@ -409,16 +441,28 @@ final class NativeCreatorProfileView {
             case "discord" -> LauncherIcons.brandIcon(LauncherIcons.BrandGlyph.DISCORD, 18);
             case "github" -> LauncherIcons.brandIcon(LauncherIcons.BrandGlyph.GITHUB, 18);
             case "gitlab" -> LauncherIcons.brandIcon(LauncherIcons.BrandGlyph.GITLAB, 18);
+            case "twitter", "x" -> LauncherIcons.brandIcon(LauncherIcons.BrandGlyph.TWITTER, 18);
             default -> LauncherIcons.icon(LauncherIcons.Glyph.GLOBE, 18);
         };
     }
 
-    private String socialUrl(CreatorProfile.ConnectedAccount account) {
+    static String socialUrl(CreatorProfile.ConnectedAccount account) {
         String provider = value(account.provider(), "").toLowerCase(Locale.ROOT);
         if (provider.equals("discord") && !value(account.providerId(), "").isBlank()) {
             return "https://discord.com/users/" + account.providerId();
         }
+        String username = value(account.username(), "").replaceFirst("^@", "");
+        if ((provider.equals("twitter") || provider.equals("x")) && !username.isBlank()) {
+            return "https://x.com/" + encodeUrlPath(username);
+        }
+        if (provider.equals("bluesky") && !username.isBlank()) {
+            return "https://bsky.app/profile/" + encodeUrlPath(username);
+        }
         return value(account.profileUrl(), "");
+    }
+
+    private static String encodeUrlPath(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
     }
 
     private VBox profileBody(

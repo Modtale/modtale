@@ -4,6 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Field;
+import java.awt.image.BufferedImage;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -19,7 +22,10 @@ import javafx.application.Platform;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.SnapshotParameters;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.image.PixelReader;
+import javafx.scene.image.WritableImage;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
@@ -31,6 +37,7 @@ import net.modtale.launcher.model.project.ProjectPage;
 import net.modtale.launcher.model.project.ProjectSummary;
 import net.modtale.launcher.model.project.ProjectVersion;
 import net.modtale.launcher.model.user.CreatorProfile;
+import net.modtale.launcher.model.user.ProfileBadge;
 import net.modtale.launcher.ui.browse.card.ProjectCardFactory;
 import net.modtale.launcher.ui.browse.card.ProjectCardViewStyle;
 import net.modtale.launcher.ui.browse.render.ProjectBrowserRenderer;
@@ -38,10 +45,13 @@ import net.modtale.launcher.ui.common.CachedImageLoader;
 import net.modtale.launcher.ui.common.LauncherScrollSupport;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import javax.imageio.ImageIO;
 
 class LauncherUiPerformanceProfileTest {
 
     private static final String RUN_PROPERTY = "modtale.launcher.perfTests";
+    private static final String SNAPSHOT_PROPERTY = "modtale.launcher.snapshotDirectory";
+    private static final String SNAPSHOT_ENVIRONMENT = "MODTALE_LAUNCHER_SNAPSHOT_DIRECTORY";
     private static final int WARMUPS = 80;
     private static final int SAMPLES = 400;
     private static final Executor DIRECT_EXECUTOR = Runnable::run;
@@ -51,7 +61,7 @@ class LauncherUiPerformanceProfileTest {
 
     @BeforeAll
     static void startJavaFx() throws Exception {
-        if (!Boolean.getBoolean(RUN_PROPERTY)) {
+        if (!Boolean.getBoolean(RUN_PROPERTY) && snapshotDirectory().isBlank()) {
             return;
         }
         CountDownLatch latch = new CountDownLatch(1);
@@ -61,6 +71,28 @@ class LauncherUiPerformanceProfileTest {
             latch.countDown();
         }
         assertTrue(latch.await(5, TimeUnit.SECONDS), "JavaFX did not start");
+    }
+
+    @Test
+    void projectAndBrowseVisualParitySnapshots() throws Exception {
+        String snapshotDirectory = snapshotDirectory();
+        assumeTrue(!snapshotDirectory.isBlank(), "Enable with -D" + SNAPSHOT_PROPERTY + "=/path");
+        Path directory = Path.of(snapshotDirectory);
+        Files.createDirectories(directory);
+        callOnFx(() -> {
+            snapshot(buildProjectPageNode(1440, 1400, false), 1440, 1400, directory.resolve("launcher-project-desktop.png"));
+            snapshot(buildProjectPageNode(760, 1800, true), 760, 1800, directory.resolve("launcher-project-compact.png"));
+            snapshot(buildBrowsePageNode(1440, 900, ProjectCardViewStyle.GRID), 1440, 900,
+                    directory.resolve("launcher-browse-grid.png"));
+            snapshot(buildBrowsePageNode(980, 900, ProjectCardViewStyle.COMPACT), 980, 900,
+                    directory.resolve("launcher-browse-compact.png"));
+            return null;
+        });
+    }
+
+    private static String snapshotDirectory() {
+        String property = System.getProperty(SNAPSHOT_PROPERTY, "");
+        return property.isBlank() ? System.getenv().getOrDefault(SNAPSHOT_ENVIRONMENT, "") : property;
     }
 
     @Test
@@ -155,6 +187,10 @@ class LauncherUiPerformanceProfileTest {
     }
 
     private void buildProjectPage() throws Exception {
+        buildProjectPageNode(1320, 880, false);
+    }
+
+    private Node buildProjectPageNode(double width, double height, boolean compact) throws Exception {
         ProjectPageController controller = new ProjectPageController(
                 new ModtaleApiClient("http://localhost:1"),
                 DIRECT_EXECUTOR,
@@ -181,7 +217,10 @@ class LauncherUiPerformanceProfileTest {
                 }
         );
         Node content = controller.view();
-        content.resize(1320, 880);
+        content.resize(width, height);
+        Field compactLayout = ProjectPageController.class.getDeclaredField("compactLayout");
+        compactLayout.setAccessible(true);
+        compactLayout.setBoolean(controller, compact);
         Method projectPage = ProjectPageController.class.getDeclaredMethod(
                 "projectPage",
                 ProjectSummary.class,
@@ -191,8 +230,39 @@ class LauncherUiPerformanceProfileTest {
         projectPage.setAccessible(true);
         Node page = (Node) projectPage.invoke(controller, project(1), detail(), false);
         if (page instanceof Region region) {
-            region.resize(1320, Math.max(880, region.prefHeight(1320)));
+            region.resize(width, Math.max(height, region.prefHeight(width)));
         }
+        return page;
+    }
+
+    private Node buildBrowsePageNode(double width, double height, ProjectCardViewStyle style) {
+        StackPane results = new StackPane();
+        StackPane deck = new StackPane();
+        VBox body = new VBox(results);
+        ProjectBrowserRenderer renderer = new ProjectBrowserRenderer(
+                results, deck, () -> body, new ProjectCardFactory(url -> url, DIRECT_EXECUTOR), id -> false,
+                () -> "2026.1", project -> {}, project -> {}, project -> {}, project -> {}
+        );
+        renderer.render(projects(style == ProjectCardViewStyle.COMPACT ? 12 : 8), style);
+        body.resize(width, height);
+        return body;
+    }
+
+    private void snapshot(Node node, int width, int height, Path destination) throws Exception {
+        StackPane root = new StackPane(node);
+        Scene scene = new Scene(root, width, height, javafx.scene.paint.Color.web("#0B1120"));
+        scene.getStylesheets().add(getClass().getResource(
+                "/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
+        root.resize(width, height);
+        root.applyCss();
+        root.layout();
+        WritableImage image = root.snapshot(new SnapshotParameters(), new WritableImage(width, height));
+        PixelReader pixels = image.getPixelReader();
+        BufferedImage output = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) output.setRGB(x, y, pixels.getArgb(x, y));
+        }
+        ImageIO.write(output, "png", destination.toFile());
     }
 
     private void buildCreatorPage() {
@@ -392,7 +462,13 @@ class LauncherUiPerformanceProfileTest {
                 true,
                 false,
                 "",
-                List.of(version(1))
+                List.of(
+                        version(1),
+                        new ProjectVersion("version-2", "1.2.0", List.of("0.6.1", "0.6.0", "0.5.4", "0.5.3"),
+                                "https://example.invalid/file-2.zip", 200, "2026-08-01T12:00:00Z", "Grouped release.", List.of(), "RELEASE")
+                ),
+                List.of(new ProjectDetail.ProjectRole("maintainer", "Maintainer", "#3b82f6", java.util.Set.of())),
+                List.of(new ProjectDetail.ProjectMember("team-1", "maintainer", "Teammate", ""))
         );
     }
 
@@ -420,7 +496,7 @@ class LauncherUiPerformanceProfileTest {
                 "CREATOR",
                 List.of(),
                 "USER",
-                List.of("VERIFIED"),
+                List.of(ProfileBadge.legacy("VERIFIED")),
                 List.of("fan-1", "fan-2", "fan-3"),
                 List.of(),
                 List.of(new CreatorProfile.ConnectedAccount("github", "creator", "creator",

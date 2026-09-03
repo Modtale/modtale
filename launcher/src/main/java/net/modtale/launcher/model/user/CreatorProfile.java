@@ -15,7 +15,7 @@ public record CreatorProfile(
         String tier,
         List<String> roles,
         String accountType,
-        List<String> badges,
+        List<ProfileBadge> badges,
         List<String> followerIds,
         List<String> followingIds,
         List<ConnectedAccount> connectedAccounts,

@@ -358,7 +358,7 @@ public class ModtaleApiClient {
         java.util.Map<String, String> metadata = notification.metadata();
         switch (actionType) {
             case TRANSFER_REQUEST -> {
-                String projectId = metadata.get("modId");
+                String projectId = firstMetadata(metadata, "projectId", "modId");
                 if (projectId == null || projectId.isBlank()) {
                     throw new ModtaleApiException("Transfer request is missing its project id.");
                 }
@@ -374,7 +374,7 @@ public class ModtaleApiClient {
                         java.util.Map.of(), Object.class);
             }
             case CONTRIBUTOR_INVITE -> {
-                String projectId = metadata.get("modId");
+                String projectId = firstMetadata(metadata, "projectId", "modId");
                 if (projectId == null || projectId.isBlank()) {
                     throw new ModtaleApiException("Contributor invite is missing its project id.");
                 }
@@ -382,6 +382,11 @@ public class ModtaleApiClient {
                         java.util.Map.of(), Object.class);
             }
         }
+    }
+
+    private static String firstMetadata(java.util.Map<String, String> metadata, String primary, String fallback) {
+        String value = metadata.get(primary);
+        return value == null || value.isBlank() ? metadata.get(fallback) : value;
     }
 
     public List<String> getGameVersions() {

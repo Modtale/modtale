@@ -18,4 +18,11 @@ class BrowseOptionsTest {
                 BrowseOptions.ClassificationOption.DATA
         ), BrowseOptions.PROJECT_TYPES);
     }
+
+    @Test
+    void includesPrefabAndWorldAssetTagsSupportedByTheWebEditor() {
+        assertEquals(true, BrowseOptions.GLOBAL_TAGS.containsAll(List.of(
+                "Prefab", "Structure", "Dungeon", "Adventure Map", "Server Hub", "Template"
+        )));
+    }
 }

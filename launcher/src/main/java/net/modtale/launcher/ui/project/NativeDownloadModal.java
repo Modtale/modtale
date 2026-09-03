@@ -39,6 +39,7 @@ import net.modtale.launcher.model.project.ProjectDependency;
 import net.modtale.launcher.model.project.ProjectVersion;
 import net.modtale.launcher.ui.common.GameVersionDropdown;
 import net.modtale.launcher.ui.common.GameVersionGroups;
+import net.modtale.launcher.ui.common.GameVersionOrdering;
 import net.modtale.launcher.ui.common.LauncherIcons;
 
 final class NativeDownloadModal {
@@ -690,7 +691,7 @@ final class NativeDownloadModal {
         project.versions().stream()
                 .flatMap(version -> version.gameVersions().stream())
                 .filter(version -> version != null && !version.isBlank())
-                .sorted((left, right) -> compareSemver(right, left))
+                .sorted(GameVersionOrdering::compare)
                 .forEach(ordered::add);
         return List.copyOf(ordered);
     }

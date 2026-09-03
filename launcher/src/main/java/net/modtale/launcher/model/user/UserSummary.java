@@ -14,7 +14,7 @@ public record UserSummary(
         String tier,
         List<String> roles,
         String accountType,
-        List<String> badges
+        List<ProfileBadge> badges
 ) {
     public UserSummary {
         roles = roles == null ? List.of() : List.copyOf(roles);

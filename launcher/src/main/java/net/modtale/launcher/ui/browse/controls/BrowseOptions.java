@@ -27,6 +27,7 @@ public final class BrowseOptions {
             "Minigame", "PvP", "Parkour", "Hardcore", "Skyblock", "Puzzle", "Quests", "Mobs",
             "Economy", "Protection", "Admin Tools", "Chat", "Anti-Cheat", "Performance", "NPCs",
             "Library", "API", "Mechanics", "World Gen", "Recipes", "Loot Tables", "Functions",
+            "Prefab", "Structure", "Dungeon", "Adventure Map", "Server Hub", "Template",
             "Decoration", "Vanilla+", "Kitchen Sink", "City", "Landscape", "Spawn", "Lobby",
             "Medieval", "Modern", "Futuristic", "Models", "Textures", "Animations", "Particles"
     );

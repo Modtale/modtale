@@ -51,6 +51,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TitledPane;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.effect.Effect;
@@ -72,6 +73,7 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import net.modtale.launcher.api.ModtaleApiClient;
 import net.modtale.launcher.model.project.ProjectClassification;
+import net.modtale.launcher.model.project.GameVersionCatalog;
 import net.modtale.launcher.model.project.ProjectComment;
 import net.modtale.launcher.model.project.ProjectDetail;
 import net.modtale.launcher.model.project.ProjectDependency;
@@ -88,6 +90,8 @@ import net.modtale.launcher.settings.LauncherConfig;
 import net.modtale.launcher.ui.browse.card.ProjectCardFactory;
 import net.modtale.launcher.ui.browse.controls.BrowseOptions;
 import net.modtale.launcher.ui.common.CachedImageLoader;
+import net.modtale.launcher.ui.common.GameVersionGroups;
+import net.modtale.launcher.ui.common.GameVersionOrdering;
 import net.modtale.launcher.ui.common.LauncherIcons;
 import net.modtale.launcher.ui.common.LauncherLayout;
 import net.modtale.launcher.ui.common.LauncherView;
@@ -146,10 +150,12 @@ public final class ProjectPageController {
     private Node observedScrollContent;
     private ProjectSummary currentProject;
     private ProjectDetail currentDetail;
+    private GameVersionCatalog currentGameVersionCatalog;
     private List<String> currentGalleryImages = List.of();
     private Map<String, String> currentGalleryCaptions = Map.of();
     private List<ProjectComment> currentComments = List.of();
     private Map<String, UserSummary> commentUserProfiles = Map.of();
+    private Map<String, UserSummary> teamUserProfiles = Map.of();
     private final Map<String, ProjectMeta> dependencyMetaCache = new ConcurrentHashMap<>();
     private final Set<String> requestedDependencyMetaIds = ConcurrentHashMap.newKeySet();
     private String currentCreatorHandle;
@@ -305,6 +311,8 @@ public final class ProjectPageController {
         clearCreatorState();
         currentProject = project;
         currentDetail = null;
+        currentGameVersionCatalog = null;
+        teamUserProfiles = Map.of();
         currentUrl = projectPageUrl(project);
         long requestId = ++detailRequestId;
         fetchGalleryForCurrentProject();
@@ -328,6 +336,8 @@ public final class ProjectPageController {
         clearCreatorState();
         currentProject = summaryFromDetail(detail);
         currentDetail = detail;
+        currentGameVersionCatalog = null;
+        teamUserProfiles = Map.of();
         currentUrl = projectPageUrl(currentProject);
         ++detailRequestId;
         fetchGalleryForCurrentProject();
@@ -348,6 +358,8 @@ public final class ProjectPageController {
         resetGalleryState();
         currentProject = null;
         currentDetail = null;
+        currentGameVersionCatalog = null;
+        teamUserProfiles = Map.of();
         currentCreatorHandle = creatorHandle(project);
         currentCreator = null;
         currentCreatorProjects = null;
@@ -513,9 +525,30 @@ public final class ProjectPageController {
     private void fetchProjectDetail(ProjectSummary project, long requestId) {
         CompletableFuture.supplyAsync(() -> {
                     ProjectDetail detail = apiClient.getProject(project.routeKey());
-                    return ProjectVersionHydrator.hydrate(detail, project, apiClient::getProjectVersions);
+                    ProjectDetail hydrated = ProjectVersionHydrator.hydrate(detail, project, apiClient::getProjectVersions);
+                    GameVersionCatalog catalog = null;
+                    try {
+                        catalog = apiClient.getGameVersionCatalog();
+                    } catch (RuntimeException ex) {
+                        LOG.warn("Could not load the game version catalog for project {}", project.routeKey(), ex);
+                    }
+                    Map<String, UserSummary> teamProfiles = Map.of();
+                    List<String> teamUserIds = hydrated.teamMembers().stream()
+                            .map(ProjectDetail.ProjectMember::userId)
+                            .filter(id -> !isBlank(id))
+                            .distinct()
+                            .toList();
+                    if (!teamUserIds.isEmpty()) {
+                        try {
+                            teamProfiles = apiClient.getUsersBatch(teamUserIds).stream()
+                                    .collect(java.util.stream.Collectors.toMap(UserSummary::id, Function.identity()));
+                        } catch (RuntimeException ex) {
+                            LOG.warn("Could not load project team profiles for {}", project.routeKey(), ex);
+                        }
+                    }
+                    return new ProjectDetailPayload(hydrated, catalog, teamProfiles);
                 }, executor)
-                .whenComplete((detail, error) -> Platform.runLater(() -> {
+                .whenComplete((payload, error) -> Platform.runLater(() -> {
                     if (requestId != detailRequestId || currentProject == null
                             || !sameProject(currentProject, project)) {
                         return;
@@ -528,10 +561,22 @@ public final class ProjectPageController {
                         renderProject(false);
                         return;
                     }
-                    currentDetail = detail;
+                    currentDetail = payload.detail();
+                    currentGameVersionCatalog = payload.catalog();
+                    teamUserProfiles = payload.teamProfiles();
                     fetchCommentsForCurrentProject();
                     renderProject(false);
                 }));
+    }
+
+    private record ProjectDetailPayload(
+            ProjectDetail detail,
+            GameVersionCatalog catalog,
+            Map<String, UserSummary> teamProfiles
+    ) {
+        private ProjectDetailPayload {
+            teamProfiles = teamProfiles == null ? Map.of() : Map.copyOf(teamProfiles);
+        }
     }
 
     private void resetCommentsState() {
@@ -956,17 +1001,17 @@ public final class ProjectPageController {
         page.setMaxWidth(Double.MAX_VALUE);
         page.setMaxHeight(Double.MAX_VALUE);
 
-        StackPane banner = banner(summary, detail);
+        boolean hasBanner = !isBlank(first(detail == null ? null : detail.bannerUrl(), summary.bannerUrl()));
+        StackPane banner = banner(summary, detail, hasBanner);
         VBox panel = new VBox(0);
         panel.getStyleClass().add("project-detail-shell");
         panel.setMinWidth(0);
         panel.setMaxWidth(Double.MAX_VALUE);
         panel.setMaxHeight(Double.MAX_VALUE);
-        VBox.setMargin(panel, compactLayout
-                ? LauncherLayout.launcherPageInsets(-8, 56)
-                : LauncherLayout.launcherPageInsets(-128, 56));
+        double panelTopMargin = hasBanner ? compactLayout ? -8 : -128 : 12;
+        VBox.setMargin(panel, LauncherLayout.launcherPageInsets(panelTopMargin, 56));
 
-        Node header = header(summary, detail, loading);
+        Node header = header(summary, detail, loading, hasBanner);
         Node body = body(summary, detail);
         panel.getChildren().addAll(header, body);
         if (!compactLayout && body instanceof Region bodyRegion) {
@@ -979,7 +1024,6 @@ public final class ProjectPageController {
             panel.prefHeightProperty().bind(panel.minHeightProperty());
         }
         page.getChildren().addAll(banner, panel);
-        double panelTopMargin = compactLayout ? -8 : -128;
         double panelBottomMargin = 56;
         double pageBottomPadding = 20;
         page.minHeightProperty().bind(Bindings.createDoubleBinding(
@@ -991,15 +1035,15 @@ public final class ProjectPageController {
         return page;
     }
 
-    private StackPane banner(ProjectSummary summary, ProjectDetail detail) {
+    private StackPane banner(ProjectSummary summary, ProjectDetail detail, boolean hasBanner) {
         StackPane banner = new StackPane();
         banner.getStyleClass().add("project-detail-banner");
         banner.setMinWidth(0);
         banner.setMaxWidth(Double.MAX_VALUE);
-        banner.setPrefHeight(BANNER_FALLBACK_HEIGHT);
-        banner.setMaxHeight(BANNER_MAX_HEIGHT);
+        banner.setPrefHeight(hasBanner ? BANNER_FALLBACK_HEIGHT : 72);
+        banner.setMaxHeight(hasBanner ? BANNER_MAX_HEIGHT : 72);
         banner.prefHeightProperty().bind(Bindings.createDoubleBinding(
-                () -> bannerHeight(content.getWidth()),
+                () -> hasBanner ? bannerHeight(content.getWidth()) : 72,
                 content.widthProperty()
         ));
         banner.minHeightProperty().bind(banner.prefHeightProperty());
@@ -1009,12 +1053,7 @@ public final class ProjectPageController {
         media.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
         String bannerUrl = first(detail == null ? null : detail.bannerUrl(), summary.bannerUrl());
-        if (isBlank(bannerUrl)) {
-            Region fallback = new Region();
-            fallback.getStyleClass().add("project-detail-banner-fallback");
-            fallback.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-            media.getChildren().add(fallback);
-        } else {
+        if (hasBanner) {
             media.getStyleClass().add("letterboxed");
             ImageView image = new ImageView();
             image.getStyleClass().add("project-detail-banner-image");
@@ -1024,14 +1063,18 @@ public final class ProjectPageController {
             image.fitHeightProperty().bind(banner.heightProperty());
             imageLoader.loadInto(image, bannerUrl, 1920, 640, true);
             media.getChildren().add(image);
+            banner.getChildren().add(media);
+        } else {
+            banner.getStyleClass().add("project-detail-banner-empty");
         }
-        banner.getChildren().add(media);
 
-        Region fade = new Region();
-        fade.getStyleClass().add("project-detail-banner-fade");
-        fade.setMouseTransparent(true);
-        NativeBannerScrollEffect.bind(media, fade, scrollPixels, BANNER_FADE_BASE_HEIGHT);
-        banner.getChildren().add(fade);
+        if (hasBanner) {
+            Region fade = new Region();
+            fade.getStyleClass().add("project-detail-banner-fade");
+            fade.setMouseTransparent(true);
+            NativeBannerScrollEffect.bind(media, fade, scrollPixels, BANNER_FADE_BASE_HEIGHT);
+            banner.getChildren().add(fade);
+        }
 
         HBox backLayer = new HBox();
         backLayer.setAlignment(Pos.TOP_LEFT);
@@ -1052,7 +1095,7 @@ public final class ProjectPageController {
         return Math.max(BANNER_MIN_HEIGHT, Math.min(BANNER_MAX_HEIGHT, measured));
     }
 
-    private Node header(ProjectSummary summary, ProjectDetail detail, boolean loading) {
+    private Node header(ProjectSummary summary, ProjectDetail detail, boolean loading, boolean hasBanner) {
         VBox header = new VBox(0);
         header.getStyleClass().add("project-detail-header");
         if (compactLayout) {
@@ -1062,11 +1105,11 @@ public final class ProjectPageController {
         if (compactLayout) {
             HBox mobileTop = new HBox(16);
             mobileTop.setAlignment(Pos.BOTTOM_LEFT);
-            VBox.setMargin(mobileTop, new Insets(-64, 0, 24, 0));
+            VBox.setMargin(mobileTop, new Insets(hasBanner ? -64 : 0, 0, 24, 0));
             mobileTop.getChildren().add(projectIcon(summary, detail, 128, 4));
             Region spacer = new Region();
             HBox.setHgrow(spacer, Priority.ALWAYS);
-            HBox actions = headerActions(summary);
+            HBox actions = headerActions(summary, detail);
             actions.setAlignment(Pos.BOTTOM_RIGHT);
             mobileTop.getChildren().addAll(spacer, actions);
 
@@ -1081,7 +1124,7 @@ public final class ProjectPageController {
         HBox row = new HBox(32);
         row.setAlignment(Pos.TOP_LEFT);
         StackPane icon = projectIcon(summary, detail, HEADER_ICON_SIZE, HEADER_ICON_BORDER);
-        HBox.setMargin(icon, new Insets(-96, 0, 0, 8));
+        HBox.setMargin(icon, new Insets(hasBanner ? -96 : 0, 0, 0, 8));
         row.getChildren().add(icon);
 
         VBox copy = new VBox(0);
@@ -1095,7 +1138,7 @@ public final class ProjectPageController {
         HBox.setHgrow(titleBlock, Priority.ALWAYS);
         titleBlock.getChildren().addAll(titleRow(summary, detail), byline(summary, detail, loading), description(summary, detail));
 
-        HBox actions = headerActions(summary);
+        HBox actions = headerActions(summary, detail);
         actions.setAlignment(Pos.TOP_RIGHT);
         top.getChildren().addAll(titleBlock, actions);
         copy.getChildren().addAll(top, actionBar(summary, detail));
@@ -1104,14 +1147,17 @@ public final class ProjectPageController {
         return header;
     }
 
-    private HBox headerActions(ProjectSummary summary) {
+    private HBox headerActions(ProjectSummary summary, ProjectDetail detail) {
         HBox actions = new HBox(8);
         actions.getStyleClass().add("project-detail-header-actions");
         actions.getChildren().addAll(
                 headerIconButton(LauncherIcons.Glyph.HEART, "Favorite", this::toggleFavorite, isFavorite(summary)),
-                headerIconButton(LauncherIcons.Glyph.SHARE_2, "Share", this::showShareModal, false),
-                headerIconButton(LauncherIcons.Glyph.FLAG, "Report", this::showProjectReportModal, false)
+                headerIconButton(LauncherIcons.Glyph.SHARE_2, "Share", this::showShareModal, false)
         );
+        if (!isCurrentProjectCreator(summary, detail)) {
+            actions.getChildren().add(headerIconButton(
+                    LauncherIcons.Glyph.FLAG, "Report", this::showProjectReportModal, false));
+        }
         return actions;
     }
 
@@ -1133,16 +1179,48 @@ public final class ProjectPageController {
         row.setAlignment(Pos.CENTER_LEFT);
 
         Button author = authorLink(summary, detail);
+        Button follow = projectAuthorFollowButton(summary, detail);
         Label dot = new Label("•");
         dot.getStyleClass().add("project-detail-muted");
         Label updated = new Label(("Updated " + timeAgo(textUpdatedAt(summary, detail))).toUpperCase(Locale.ROOT));
         updated.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.CALENDAR, 13));
         updated.getStyleClass().add("project-detail-updated");
-        row.getChildren().addAll(author, dot, updated);
+        row.getChildren().add(author);
+        if (follow != null) row.getChildren().add(follow);
+        row.getChildren().addAll(dot, updated);
         if (loading) {
             row.getChildren().add(NativeSpinner.inline(16));
         }
         return row;
+    }
+
+    private Button projectAuthorFollowButton(ProjectSummary summary, ProjectDetail detail) {
+        CurrentUser user = currentUserSupplier.get();
+        String authorId = first(detail == null ? null : detail.authorId(), summary.authorId());
+        if (user == null || isBlank(authorId) || value(user.id(), "").equals(authorId)) return null;
+        boolean following = user.followsUser(authorId);
+        Button button = new Button(following ? "Unfollow" : "Follow");
+        button.getStyleClass().addAll("project-detail-author-follow", following ? "following" : "primary");
+        button.setOnAction(event -> toggleProjectAuthorFollow(authorId, following));
+        return button;
+    }
+
+    private void toggleProjectAuthorFollow(String authorId, boolean wasFollowing) {
+        CompletableFuture.supplyAsync(() -> {
+            if (wasFollowing) apiClient.unfollowUser(authorId);
+            else apiClient.followUser(authorId);
+            return apiClient.currentUser();
+        }, executor).whenComplete((updatedUser, error) -> Platform.runLater(() -> {
+            if (error != null) {
+                if (toast != null) {
+                    Throwable cause = error.getCause() == null ? error : error.getCause();
+                    toast.accept("Follow failed", value(cause.getMessage(), "Could not update this creator."));
+                }
+                return;
+            }
+            currentUserUpdater.accept(updatedUser);
+            renderProject(false);
+        }));
     }
 
     private Button authorLink(ProjectSummary summary, ProjectDetail detail) {
@@ -1281,6 +1359,13 @@ public final class ProjectPageController {
         main.getStyleClass().add("project-detail-main");
         main.setMinWidth(0);
         addDescriptionParts(main, textAbout(summary, detail));
+        if (compactLayout) {
+            Node mobileMeta = mobileMetaSections(summary, detail);
+            if (mobileMeta != null) {
+                VBox.setMargin(mobileMeta, new Insets(18, 0, 0, 0));
+                main.getChildren().add(mobileMeta);
+            }
+        }
         Node comments = commentSection.render(
                 summary,
                 detail,
@@ -1423,11 +1508,28 @@ public final class ProjectPageController {
         if (incompatible != null) {
             sidebar.getChildren().add(incompatible);
         }
-        if (!isBlank(textLicense(detail))) {
-            sidebar.getChildren().add(simpleSection("License", LauncherIcons.Glyph.SCALE, textLicense(detail)));
+        Node team = teamSection(detail);
+        if (team != null) {
+            sidebar.getChildren().add(team);
         }
-        sidebar.getChildren().add(simpleSection("Project ID", LauncherIcons.Glyph.HASH, value(textId(summary, detail), "Unknown")));
+        if (!isBlank(textLicense(detail))) {
+            sidebar.getChildren().add(licenseSection(detail));
+        }
+        sidebar.getChildren().add(projectIdSection(summary, detail));
         return sidebar;
+    }
+
+    private Node mobileMetaSections(ProjectSummary summary, ProjectDetail detail) {
+        VBox sections = new VBox(24);
+        sections.getStyleClass().add("project-detail-mobile-meta");
+        Node versions = supportedVersions(summary, detail);
+        if (versions != null) sections.getChildren().add(versions);
+        sections.getChildren().add(tagsSection(detail));
+        Node dependencies = dependenciesSection(summary, detail);
+        if (dependencies != null) sections.getChildren().add(dependencies);
+        Node incompatible = incompatibleSection(summary, detail);
+        if (incompatible != null) sections.getChildren().add(incompatible);
+        return sections.getChildren().isEmpty() ? null : sections;
     }
 
     private VBox mobileSidebar(ProjectSummary summary, ProjectDetail detail) {
@@ -1477,13 +1579,39 @@ public final class ProjectPageController {
         if (versions.isEmpty()) {
             return null;
         }
-        List<String> sorted = versions.stream()
-                .sorted(Comparator.reverseOrder())
-                .toList();
-        FlowPane chips = new FlowPane(8, 8);
-        chips.getStyleClass().add("project-detail-chip-flow");
-        sorted.forEach(version -> chips.getChildren().add(chip(version, "project-detail-version-chip")));
-        return section("Supported Versions", LauncherIcons.Glyph.ZAP, chips);
+        List<String> sorted = orderedSupportedVersions(versions);
+        VBox groups = new VBox(8);
+        groups.getStyleClass().add("project-detail-version-groups");
+        for (GameVersionGroups.Group group : GameVersionGroups.build(sorted)) {
+            if (!group.grouped()) {
+                groups.getChildren().add(chip(group.versions().getFirst(), "project-detail-version-chip"));
+                continue;
+            }
+            FlowPane children = new FlowPane(6, 6);
+            children.getStyleClass().add("project-detail-version-group-children");
+            group.versions().forEach(version -> children.getChildren().add(chip(version, "project-detail-version-chip")));
+            TitledPane dropdown = new TitledPane(group.label() + "  ·  " + group.versions().size(), children);
+            dropdown.getStyleClass().add("project-detail-version-group");
+            dropdown.setExpanded(false);
+            dropdown.setAnimated(false);
+            groups.getChildren().add(dropdown);
+        }
+        return section("Supported Versions", LauncherIcons.Glyph.ZAP, groups);
+    }
+
+    private List<String> orderedSupportedVersions(Set<String> supported) {
+        LinkedHashSet<String> ordered = new LinkedHashSet<>();
+        if (currentGameVersionCatalog != null) {
+            currentGameVersionCatalog.allVersions().stream().filter(supported::contains).forEach(ordered::add);
+            if (ordered.isEmpty()) {
+                currentGameVersionCatalog.versions().stream()
+                        .map(GameVersionCatalog.GameVersionEntry::version)
+                        .filter(supported::contains)
+                        .forEach(ordered::add);
+            }
+        }
+        GameVersionOrdering.descendingDistinct(List.copyOf(supported)).forEach(ordered::add);
+        return List.copyOf(ordered);
     }
 
     private Node tagsSection(ProjectDetail detail) {
@@ -1741,13 +1869,99 @@ public final class ProjectPageController {
         return section(title, icon, label);
     }
 
+    private Node licenseSection(ProjectDetail detail) {
+        String license = textLicense(detail);
+        String url = detail == null ? "" : value(detail.links().get("LICENSE"), "");
+        if (url.isBlank()) return simpleSection("License", LauncherIcons.Glyph.SCALE, license);
+        Button link = new Button(license, LauncherIcons.icon(LauncherIcons.Glyph.EXTERNAL_LINK, 13));
+        link.getStyleClass().add("project-detail-simple-link");
+        link.setMaxWidth(Double.MAX_VALUE);
+        link.setOnAction(event -> openUrlInBrowser(url));
+        return section("License", LauncherIcons.Glyph.SCALE, link);
+    }
+
+    private Node projectIdSection(ProjectSummary summary, ProjectDetail detail) {
+        String id = value(textId(summary, detail), "Unknown");
+        HBox row = new HBox(8);
+        row.getStyleClass().add("project-detail-id-row");
+        row.setAlignment(Pos.CENTER_LEFT);
+        Label value = new Label(id);
+        value.getStyleClass().add("project-detail-id-value");
+        value.setTextOverrun(OverrunStyle.ELLIPSIS);
+        value.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(value, Priority.ALWAYS);
+        Button copy = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.COPY, 14));
+        copy.getStyleClass().add("project-detail-id-copy");
+        copy.setAccessibleText("Copy Project ID");
+        copy.setOnAction(event -> {
+            ClipboardContent clipboard = new ClipboardContent();
+            clipboard.putString(id);
+            Clipboard.getSystemClipboard().setContent(clipboard);
+            if (toast != null) toast.accept("Copied", "Project ID copied.");
+        });
+        row.getChildren().addAll(value, copy);
+        return section("Project ID", LauncherIcons.Glyph.HASH, row);
+    }
+
+    private Node teamSection(ProjectDetail detail) {
+        if (detail == null || detail.teamMembers().isEmpty()) return null;
+        VBox members = new VBox(6);
+        members.getStyleClass().add("project-detail-team-list");
+        for (ProjectDetail.ProjectMember member : detail.teamMembers()) {
+            UserSummary profile = teamUserProfiles.get(member.userId());
+            String username = first(profile == null ? null : profile.username(), member.username(), member.userId(), "Contributor");
+            String avatarUrl = first(profile == null ? null : profile.avatarUrl(), member.avatarUrl());
+            ProjectDetail.ProjectRole role = detail.projectRoles().stream()
+                    .filter(candidate -> value(candidate.id(), "").equals(value(member.roleId(), "")))
+                    .findFirst().orElse(null);
+
+            HBox card = new HBox(10);
+            card.getStyleClass().add("project-detail-team-card");
+            card.setAlignment(Pos.CENTER_LEFT);
+            card.setCursor(Cursor.HAND);
+            StackPane avatar = new StackPane();
+            avatar.getStyleClass().add("project-detail-team-avatar");
+            avatar.setMinSize(32, 32);
+            avatar.setPrefSize(32, 32);
+            avatar.setMaxSize(32, 32);
+            if (!isBlank(avatarUrl)) {
+                ImageView image = new ImageView();
+                image.setFitWidth(32);
+                image.setFitHeight(32);
+                image.setPreserveRatio(false);
+                imageLoader.loadInto(image, avatarUrl, 32, 32);
+                avatar.getChildren().add(image);
+            } else {
+                avatar.getChildren().add(new Label(initialFor(username)));
+            }
+            VBox copy = new VBox(1);
+            Label name = new Label(username);
+            name.getStyleClass().add("project-detail-team-name");
+            Label roleLabel = new Label(role == null ? "Contributor" : value(role.name(), "Contributor"));
+            roleLabel.getStyleClass().add("project-detail-team-role");
+            copy.getChildren().addAll(name, roleLabel);
+            card.getChildren().addAll(avatar, copy);
+            if (!isBlank(member.userId())) {
+                card.setOnMouseClicked(event -> openCreator(new ProjectSummary(
+                        member.userId(), "", username, "", member.userId(), username, avatarUrl, "", "PLUGIN",
+                        0, 0, "", List.of()
+                )));
+            }
+            members.getChildren().add(card);
+        }
+        return section("Team Members", LauncherIcons.Glyph.USER, members);
+    }
+
     private Node section(String title, LauncherIcons.Glyph icon, Node content) {
-        VBox section = new VBox(10);
-        section.getStyleClass().add("project-detail-sidebar-section");
         HBox header = new HBox(8, LauncherIcons.icon(icon, 13), new Label(title.toUpperCase(Locale.ROOT)));
         header.getStyleClass().add("project-detail-sidebar-heading");
         header.setAlignment(Pos.CENTER_LEFT);
-        section.getChildren().addAll(header, content);
+        TitledPane section = new TitledPane();
+        section.getStyleClass().add("project-detail-sidebar-section");
+        section.setGraphic(header);
+        section.setContent(content);
+        section.setExpanded(true);
+        section.setAnimated(false);
         return section;
     }
 
