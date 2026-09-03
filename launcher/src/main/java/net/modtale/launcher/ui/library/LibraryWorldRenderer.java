@@ -14,6 +14,7 @@ import javafx.collections.FXCollections;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
@@ -107,14 +108,18 @@ final class LibraryWorldRenderer {
         copy.getChildren().add(title);
         HBox.setHgrow(copy, Priority.ALWAYS);
 
-        HBox actions = new HBox(8);
+        HBox actions = new HBox(6);
         actions.getStyleClass().add("library-actions");
         actions.setAlignment(Pos.CENTER_RIGHT);
         Button share = secondaryButton("Share");
+        share.getStyleClass().addAll("small", "library-compact-icon-action");
         share.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.SHARE_2, 14));
+        share.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+        share.setAccessibleText("Share world mod list");
         share.setTooltip(new Tooltip("Copy a share link for this world's enabled mods"));
         share.setOnAction(event -> shareWorldSnapshot.accept(model.world()));
         Button pack = primaryButton("Make Pack");
+        pack.getStyleClass().addAll("small", "library-compact-primary-action");
         pack.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.PACKAGE_PLUS, 14));
         pack.setTooltip(new Tooltip("Start a Modtale modpack from this world's enabled mods"));
         pack.setOnAction(event -> createModpackFromWorld.accept(model.world()));

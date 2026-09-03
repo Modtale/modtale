@@ -365,13 +365,13 @@ final class LibraryProjectRenderer {
         HBox.setHgrow(copy, Priority.ALWAYS);
 
         Button share = secondaryButton("Share");
-        share.getStyleClass().add("library-world-share");
+        share.getStyleClass().addAll("small", "library-world-share");
         share.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.SHARE_2, 13));
         share.setTooltip(new Tooltip("Copy a share link for this world's enabled mods"));
         share.setOnAction(event -> shareWorldSnapshot.accept(worldToggle.world()));
 
         Button pack = secondaryButton("Make Pack");
-        pack.getStyleClass().add("library-world-pack");
+        pack.getStyleClass().addAll("small", "library-world-pack");
         pack.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.PACKAGE_PLUS, 13));
         pack.setTooltip(new Tooltip("Start a Modtale modpack from this world's enabled mods"));
         pack.setOnAction(event -> createModpackFromWorld.accept(worldToggle.world()));
