@@ -16,6 +16,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import net.modtale.launcher.model.project.DownloadUrlResponse;
 import net.modtale.launcher.model.project.ProjectDetail;
 import net.modtale.launcher.model.project.ProjectPage;
@@ -28,9 +31,11 @@ final class NyoCfClient {
     private static final URI DEFAULT_BASE_URI = URI.create("https://nyocf.junyo.dev");
     private static final String CURSEFORGE_SITE = "https://www.curseforge.com";
     private static final long HYTALE_GAME_ID = 70216;
+    private static final int BANNER_LOOKUP_BATCH_SIZE = 4;
     private final HttpClient httpClient;
     private final URI baseUri;
     private final ObjectMapper mapper = new ObjectMapper();
+    private final ConcurrentMap<Long, JsonNode> projectMetadata = new ConcurrentHashMap<>();
 
     NyoCfClient(HttpClient httpClient) {
         this(httpClient, DEFAULT_BASE_URI);
@@ -52,6 +57,7 @@ final class NyoCfClient {
             ProjectSummary project = summary(item, query.gameVersion());
             if (project != null) projects.add(project);
         }
+        projects = withGalleryBanners(projects);
         sort(projects, query.sort());
         long total = Math.max(projects.size(), envelope.path("pagination").path("total").asLong(projects.size()));
         int pages = total == 0 ? 0 : (int) Math.ceil(total / (double) size);
@@ -59,7 +65,7 @@ final class NyoCfClient {
     }
 
     ProjectDetail project(long projectId) {
-        JsonNode project = get("/api/v1/hytale/mods/" + positive(projectId));
+        JsonNode project = metadata(projectId);
         validateProject(project, projectId);
         JsonNode files = get("/api/v1/hytale/mods/" + projectId + "/files");
         String richDescription = null;
@@ -73,7 +79,7 @@ final class NyoCfClient {
         Map<String, String> links = website == null ? Map.of() : Map.of("CurseForge", website);
         return new ProjectDetail(providerId, providerId, text(project, "name"), richDescription,
                 text(project, "summary"), null, join(project.path("authors"), "name"),
-                project.path("logo").path("thumbnail_url").textValue(), null, "MOD",
+                project.path("logo").path("thumbnail_url").textValue(), firstScreenshot(project, "url"), "MOD",
                 boundedInt(project.path("download_count").asLong()), 0,
                 project.path("dates").path("modified").textValue(), null, null, links,
                 strings(project.path("categories"), "name"), strings(project.path("screenshots"), "url"),
@@ -103,10 +109,68 @@ final class NyoCfClient {
         if (!value(gameVersion).isBlank() && versions.isEmpty()) return null;
         String providerId = "curseforge:" + id;
         String updated = versions.isEmpty() ? null : versions.getFirst().releaseDate();
+        String bannerUrl = firstScreenshot(item, "thumbnail_url");
         return new ProjectSummary(providerId, providerId, text(item, "name"), text(item, "summary"), null,
-                text(item, "primary_author"), text(item, "logo_thumbnail_url"), null, "MOD",
+                text(item, "primary_author"), text(item, "logo_thumbnail_url"), bannerUrl, "MOD",
                 boundedInt(item.path("download_count").asLong()), 0, updated, versions,
                 "CURSEFORGE", website, true);
+    }
+
+    private List<ProjectSummary> withGalleryBanners(List<ProjectSummary> projects) {
+        List<ProjectSummary> enriched = new ArrayList<>(projects.size());
+        for (int start = 0; start < projects.size(); start += BANNER_LOOKUP_BATCH_SIZE) {
+            int end = Math.min(start + BANNER_LOOKUP_BATCH_SIZE, projects.size());
+            List<CompletableFuture<ProjectSummary>> batch = projects.subList(start, end).stream()
+                    .map(project -> CompletableFuture.supplyAsync(() -> withGalleryBanner(project)))
+                    .toList();
+            batch.stream().map(CompletableFuture::join).forEach(enriched::add);
+        }
+        return enriched;
+    }
+
+    private ProjectSummary withGalleryBanner(ProjectSummary summary) {
+        if (summary.bannerUrl() != null && !summary.bannerUrl().isBlank()) return summary;
+        try {
+            long projectId = summary.curseForgeProjectId();
+            JsonNode metadata = metadata(projectId);
+            validateProject(metadata, projectId);
+            String bannerUrl = firstScreenshot(metadata, "thumbnail_url");
+            if (bannerUrl == null) return summary;
+            return new ProjectSummary(
+                    summary.id(), summary.slug(), summary.title(), summary.description(), summary.authorId(),
+                    summary.author(), summary.imageUrl(), bannerUrl, summary.classification(), summary.downloadCount(),
+                    summary.favoriteCount(), summary.updatedAt(), summary.versions(), summary.source(),
+                    summary.websiteUrl(), summary.distributionAllowed()
+            );
+        } catch (RuntimeException ignored) {
+            return summary;
+        }
+    }
+
+    private JsonNode metadata(long projectId) {
+        return projectMetadata.computeIfAbsent(positive(projectId),
+                id -> get("/api/v1/hytale/mods/" + id));
+    }
+
+    private String firstScreenshot(JsonNode project, String preferredField) {
+        JsonNode first = project.path("screenshots").path(0);
+        String preferred = text(first, preferredField);
+        if (approvedMediaUrl(preferred)) return preferred;
+        String original = text(first, "url");
+        return approvedMediaUrl(original) ? original : null;
+    }
+
+    private boolean approvedMediaUrl(String value) {
+        if (value == null) return false;
+        try {
+            URI uri = URI.create(value);
+            String host = uri.getHost();
+            return "https".equalsIgnoreCase(uri.getScheme()) && uri.getUserInfo() == null && uri.getPort() == -1
+                    && host != null && (host.equalsIgnoreCase("forgecdn.net")
+                    || host.toLowerCase(Locale.ROOT).endsWith(".forgecdn.net"));
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
     }
 
     private List<ProjectVersion> versions(JsonNode files, String website, String gameVersion) {
@@ -183,16 +247,7 @@ final class NyoCfClient {
     }
 
     private boolean approvedDownloadUrl(String value) {
-        if (value == null) return false;
-        try {
-            URI uri = URI.create(value);
-            String host = uri.getHost();
-            return "https".equalsIgnoreCase(uri.getScheme()) && uri.getUserInfo() == null && uri.getPort() == -1
-                    && host != null && (host.equalsIgnoreCase("forgecdn.net")
-                    || host.toLowerCase(Locale.ROOT).endsWith(".forgecdn.net"));
-        } catch (IllegalArgumentException ignored) {
-            return false;
-        }
+        return approvedMediaUrl(value);
     }
 
     private boolean hytaleProjectUrl(String value) {
