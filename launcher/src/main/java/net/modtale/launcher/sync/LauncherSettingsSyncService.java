@@ -239,14 +239,19 @@ public final class LauncherSettingsSyncService {
                     true,
                     installed.getBundledProjects().stream()
                             .map(net.modtale.launcher.model.install.InstalledProjectReference::toDependency)
-                            .toList()
+                            .toList(),
+                    settings.hytaleUserDataDirectory(),
+                    "CLIENT"
             );
         }
         return new InstallOptions(
                 settings.hytaleModsDirectory(),
                 effectiveGameVersion(settings, installed),
                 settings.isIncludeDependencies(),
-                settings.isIncludeOptionalDependencies()
+                settings.isIncludeOptionalDependencies(),
+                null,
+                settings.hytaleUserDataDirectory(),
+                "CLIENT"
         );
     }
 

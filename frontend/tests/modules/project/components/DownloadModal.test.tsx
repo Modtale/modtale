@@ -203,6 +203,44 @@ describe('DownloadModal Toggle Visibility', () => {
         expect(onDownload).toHaveBeenCalledWith('/files/skyforge.jar', '1.0.0', '0.5.4', [], 'RELEASE');
     });
 
+    it('lets modpack downloads target client or server environments', async () => {
+        const onDownload = vi.fn();
+        const version = {
+            id: 'pack-v1', versionNumber: '1.0.0', channel: 'RELEASE',
+            gameVersions: ['0.5.4'], fileUrl: '/packs/sky.zip', dependencies: [],
+            releaseDate: new Date().toISOString()
+        };
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <DownloadModal
+                        show={true}
+                        onClose={vi.fn()}
+                        versionsByGame={{ '0.5.4': [version] }}
+                        orderedGameVersions={['0.5.4']}
+                        onDownload={onDownload}
+                        showExperimental={false}
+                        onToggleExperimental={vi.fn()}
+                        onViewHistory={vi.fn()}
+                        isModpack={true}
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        const serverButton = Array.from(document.body.querySelectorAll('button'))
+            .find(button => button.textContent?.trim() === 'Server') as HTMLButtonElement;
+        await act(async () => serverButton.click());
+        expect(pageText()).toContain('Excludes client-only entries.');
+
+        const latestButton = Array.from(document.body.querySelectorAll('button'))
+            .find(button => button.textContent?.includes('Download Latest')) as HTMLButtonElement;
+        await act(async () => latestButton.click());
+
+        expect(onDownload).toHaveBeenCalledWith('/packs/sky.zip', '1.0.0', '0.5.4', [], 'RELEASE', 'SERVER');
+    });
+
     it('defaults to the latest backend-ordered game version in the download modal', async () => {
         const versionsByGame = {
             '0.5.3': [
@@ -479,7 +517,8 @@ describe('DownloadModal Toggle Visibility', () => {
                             projectId: 'external-shader',
                             projectTitle: 'External Shader',
                             versionNumber: '2.0.0',
-                            source: 'CURSEFORGE'
+                            source: 'CURSEFORGE',
+                            externalUrl: 'https://www.curseforge.com/hytale/mods/external-shader/files/1234'
                         }
                     ]
                 }
@@ -507,6 +546,11 @@ describe('DownloadModal Toggle Visibility', () => {
 
         expect(pageText()).toContain('This modpack uses external mods');
         expect(pageText()).toContain('External Shader');
+        expect(pageText()).toContain('is not redistributed in this archive');
+        expect(pageText()).toContain("authors' chosen platform");
+        const sourceLink = document.body.querySelector('a[href="https://www.curseforge.com/hytale/mods/external-shader/files/1234"]');
+        expect(sourceLink?.getAttribute('target')).toBe('_blank');
+        expect(sourceLink?.getAttribute('rel')).toBe('noopener noreferrer');
     });
 
     it('does not show the external mod warning for non-modpack projects', async () => {

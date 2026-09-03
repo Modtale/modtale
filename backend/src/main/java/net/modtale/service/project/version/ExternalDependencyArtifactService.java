@@ -18,10 +18,7 @@ import java.util.OptionalLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import net.modtale.exception.InvalidVersionRequestException;
-import net.modtale.exception.StorageDownloadException;
-import net.modtale.exception.StorageUploadException;
 import net.modtale.model.project.ProjectDependency;
-import net.modtale.service.storage.StorageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -31,7 +28,6 @@ public class ExternalDependencyArtifactService {
     private static final long MAX_EXTERNAL_FILE_BYTES = 100L * 1024 * 1024;
     private static final int MAX_REDIRECTS = 6;
     private static final String USER_AGENT = "Modtale/1.0";
-    private static final String CURSEFORGE_DOWNLOAD_BASE = "https://www.curseforge.com/api/v1/mods/%s/files/%s/download";
     private static final Pattern CURSEFORGE_DOWNLOAD_PATH =
             Pattern.compile(".*/api/v1/mods/(\\d+)/files/(\\d+)/download/?", Pattern.CASE_INSENSITIVE);
     private static final Pattern CURSEFORGE_FILE_PAGE_PATH =
@@ -39,13 +35,11 @@ public class ExternalDependencyArtifactService {
     private static final Pattern FORGECDN_FILE_PATH =
             Pattern.compile(".*/files/(\\d+)/(\\d+)/[^/]+", Pattern.CASE_INSENSITIVE);
 
-    private final StorageService storageService;
     private final HttpClient httpClient;
+    private final CurseForgeApiClient curseForgeApiClient;
 
-    @Autowired
-    public ExternalDependencyArtifactService(StorageService storageService) {
-        this(
-                storageService,
+    public ExternalDependencyArtifactService() {
+        this(null,
                 HttpClient.newBuilder()
                         .connectTimeout(Duration.ofSeconds(10))
                         .followRedirects(HttpClient.Redirect.NEVER)
@@ -53,8 +47,22 @@ public class ExternalDependencyArtifactService {
         );
     }
 
-    ExternalDependencyArtifactService(StorageService storageService, HttpClient httpClient) {
-        this.storageService = storageService;
+    @Autowired
+    public ExternalDependencyArtifactService(CurseForgeApiClient curseForgeApiClient) {
+        this(curseForgeApiClient,
+                HttpClient.newBuilder()
+                        .connectTimeout(Duration.ofSeconds(10))
+                        .followRedirects(HttpClient.Redirect.NEVER)
+                        .build()
+        );
+    }
+
+    ExternalDependencyArtifactService(HttpClient httpClient) {
+        this(null, httpClient);
+    }
+
+    ExternalDependencyArtifactService(CurseForgeApiClient curseForgeApiClient, HttpClient httpClient) {
+        this.curseForgeApiClient = curseForgeApiClient;
         this.httpClient = httpClient;
     }
 
@@ -79,7 +87,7 @@ public class ExternalDependencyArtifactService {
         }
 
         if (dependency.getSource() == ProjectDependency.Source.CURSEFORGE) {
-            cacheCurseForgeDependency(dependency, fileUrl);
+            prepareCurseForgeReference(dependency, fileUrl);
             return;
         }
 
@@ -92,41 +100,63 @@ public class ExternalDependencyArtifactService {
         }
     }
 
-    private void cacheCurseForgeDependency(ProjectDependency dependency, String fileUrl) {
+    private void prepareCurseForgeReference(ProjectDependency dependency, String fileUrl) {
         CurseForgeFileReference reference = resolveCurseForgeFileReference(dependency, fileUrl);
         if (reference == null) {
-            throw new InvalidVersionRequestException("CurseForge dependencies must include a downloadable file so Modtale can cache it.");
+            throw new InvalidVersionRequestException("CurseForge dependencies must link to a specific Hytale file page.");
         }
-
-        validateInitialSourceUrl(ProjectDependency.Source.CURSEFORGE, reference.downloadUrl());
         String filename = trimToNull(dependency.getExternalFileName());
         if (filename == null) {
             filename = reference.fileName();
         }
-        filename = sanitizeArchiveFilename(filename == null ? "curseforge-" + reference.modId() + "-" + reference.fileId() + ".jar" : filename);
-        String storageKey = "external-dependencies/curseforge/%s/%s/%s".formatted(reference.modId(), reference.fileId(), filename);
+        dependency.setExternalUrl(reference.filePageUrl());
+        dependency.setExternalFileUrl(reference.filePageUrl());
+        dependency.setExternalFileName(filename == null ? "curseforge-" + reference.fileId() + ".jar" : sanitizeArchiveFilename(filename));
+        dependency.setCachedFileUrl(null);
+        applyVerifiedCurseForgeMetadata(dependency, reference);
+    }
 
-        if (isAlreadyCached(storageKey)) {
-            dependency.setExternalFileUrl(reference.downloadUrl());
-            dependency.setExternalFileName(filename);
-            dependency.setCachedFileUrl(storageKey);
-            return;
-        }
+    private void applyVerifiedCurseForgeMetadata(ProjectDependency dependency, CurseForgeFileReference reference) {
+        clearCurseForgeMetadata(dependency);
+        if (curseForgeApiClient == null || !curseForgeApiClient.isConfigured()) return;
 
-        DownloadedFile downloaded = downloadFile(reference.downloadUrl(), true);
-        validateArchiveSignature(downloaded.bytes(), "CurseForge dependency");
-        if (downloaded.bytes().length > MAX_EXTERNAL_FILE_BYTES) {
-            throw new InvalidVersionRequestException("CurseForge dependency files must be 100MB or smaller.");
-        }
+        String slug = curseForgeSlug(reference.filePageUrl());
+        CurseForgeApiClient.CurseForgeProject project = slug == null ? null
+                : curseForgeApiClient.resolveProject(slug, reference.fileId()).orElse(null);
+        CurseForgeApiClient.CurseForgeFile file = project == null ? null : project.files().stream()
+                .filter(candidate -> reference.fileId().equals(candidate.id()))
+                .findFirst()
+                .orElse(null);
+        if (project == null || file == null || !file.available()) return;
 
-        try {
-            storageService.uploadDirect(storageKey, downloaded.bytes(), contentTypeForFilename(filename));
-            dependency.setExternalFileUrl(reference.downloadUrl());
-            dependency.setExternalFileName(filename);
-            dependency.setCachedFileUrl(storageKey);
-        } catch (StorageUploadException ex) {
-            throw new InvalidVersionRequestException("Could not cache the CurseForge dependency file. Try again later.");
+        dependency.setExternalId(project.id());
+        dependency.setVersionNumber(trimToNull(file.versionNumber()) == null ? dependency.getVersionNumber() : file.versionNumber());
+        if (trimToNull(file.fileName()) != null) dependency.setExternalFileName(sanitizeArchiveFilename(file.fileName()));
+        dependency.setExternalFileSize(file.fileSize());
+        dependency.setExternalFileHashes(file.hashes().isEmpty() ? null : file.hashes());
+        dependency.setExternalGameVersions(file.gameVersions().isEmpty() ? null : file.gameVersions());
+        dependency.setExternalFileStatus(file.fileStatus());
+        dependency.setExternalDistributionAllowed(project.distributionAllowed());
+    }
+
+    private void clearCurseForgeMetadata(ProjectDependency dependency) {
+        dependency.setExternalFileSize(null);
+        dependency.setExternalFileHashes(null);
+        dependency.setExternalGameVersions(null);
+        dependency.setExternalFileStatus(null);
+        dependency.setExternalDistributionAllowed(null);
+    }
+
+    private String curseForgeSlug(String value) {
+        URI uri = parseUri(value);
+        if (uri == null || uri.getPath() == null) return null;
+        String[] segments = uri.getPath().split("/");
+        for (int i = 0; i < segments.length - 1; i++) {
+            if ("mods".equalsIgnoreCase(segments[i]) && segments[i + 1].matches("[A-Za-z0-9][A-Za-z0-9_-]*")) {
+                return segments[i + 1];
+            }
         }
+        return null;
     }
 
     private void validateExternalFileLink(ProjectDependency.Source source, String fileUrl) {
@@ -223,10 +253,18 @@ public class ExternalDependencyArtifactService {
             filename = fileNameFromUrl(fileUrl, null);
         }
 
-        if (modId == null || fileId == null) {
+        if (fileId == null) {
             return null;
         }
-        return new CurseForgeFileReference(modId, fileId, String.format(CURSEFORGE_DOWNLOAD_BASE, modId, fileId), filename);
+        URI projectUri = parseUri(dependency.getExternalUrl());
+        if (projectUri == null || !"https".equalsIgnoreCase(projectUri.getScheme())
+                || projectUri.getRawUserInfo() != null || (projectUri.getPort() != -1 && projectUri.getPort() != 443)
+                || !isHost(projectUri.getHost(), "curseforge.com")
+                || projectUri.getPath() == null || !projectUri.getPath().toLowerCase(Locale.ROOT).startsWith("/hytale/mods/")) {
+            return null;
+        }
+        String filePageUrl = projectUri.resolve(projectUri.getPath().replaceFirst("(?i)/files/.*$", "") + "/files/" + fileId).toString();
+        return new CurseForgeFileReference(modId, fileId, filePageUrl, filename);
     }
 
     private CurseForgeDownloadPath parseCurseForgeDownloadPath(String value) {
@@ -260,14 +298,6 @@ public class ExternalDependencyArtifactService {
             return null;
         }
         return numericOrNull(matcher.group(1) + matcher.group(2));
-    }
-
-    private boolean isAlreadyCached(String storageKey) {
-        try {
-            return storageService.exists(storageKey);
-        } catch (StorageDownloadException ex) {
-            return false;
-        }
     }
 
     private URI requirePublicHttpsUri(String value) {
@@ -386,10 +416,6 @@ public class ExternalDependencyArtifactService {
         return lower.endsWith(".jar") || lower.endsWith(".zip") ? sanitized : sanitized + ".jar";
     }
 
-    private String contentTypeForFilename(String filename) {
-        return filename.toLowerCase(Locale.ROOT).endsWith(".zip") ? "application/zip" : "application/java-archive";
-    }
-
     private URI parseUri(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -434,6 +460,6 @@ public class ExternalDependencyArtifactService {
     }
 
     private record CurseForgeDownloadPath(String modId, String fileId) {}
-    private record CurseForgeFileReference(String modId, String fileId, String downloadUrl, String fileName) {}
+    private record CurseForgeFileReference(String modId, String fileId, String filePageUrl, String fileName) {}
     private record DownloadedFile(byte[] bytes, String contentType, URI finalUri) {}
 }

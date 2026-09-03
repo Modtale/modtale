@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Download, X, ChevronDown, FileText, AlertCircle, ChevronRight, MonitorDown, Check } from 'lucide-react';
+import { Download, X, ChevronDown, FileText, AlertCircle, ChevronRight, MonitorDown, Check, ExternalLink } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { buildVersionGroups, compareSemVer, formatTimeAgo, type VersionGroup } from '@/utils/modHelpers';
 import { useScrollLock } from '@/hooks/useScrollLock';
@@ -184,7 +184,7 @@ interface DownloadModalProps {
     versionsByGame: Record<string, any[]>;
     preReleaseGameVersions?: string[];
     orderedGameVersions: string[];
-    onDownload: (url: string, number: string, gameVersion: string, deps: any[], channel: string) => void;
+    onDownload: (url: string, number: string, gameVersion: string, deps: any[], channel: string, target?: ModpackTarget) => void;
     showExperimental: boolean;
     onToggleExperimental: () => void;
     onViewHistory: () => void;
@@ -196,9 +196,12 @@ interface DownloadModalProps {
     onLauncherFallback?: () => void;
 }
 
+type ModpackTarget = 'UNIVERSAL' | 'CLIENT' | 'SERVER';
+
 export const DownloadModal: React.FC<DownloadModalProps> = ({
-                                                                show, onClose, versionsByGame, preReleaseGameVersions = [], orderedGameVersions = [], onDownload, showExperimental, onToggleExperimental, onViewHistory, isModpack = false, isInline = false, containerRef, projectId, projectHandle, onLauncherFallback
-                                                            }) => {
+                                                                 show, onClose, versionsByGame, preReleaseGameVersions = [], orderedGameVersions = [], onDownload, showExperimental, onToggleExperimental, onViewHistory, isModpack = false, isInline = false, containerRef, projectId, projectHandle, onLauncherFallback
+}) => {
+    const [modpackTarget, setModpackTarget] = useState<ModpackTarget>('UNIVERSAL');
     useScrollLock(show && !isInline);
     const [selectedGameVersions, setSelectedGameVersions] = useState<string[]>([]);
     const [isListExpanded, setIsListExpanded] = useState(false);
@@ -424,12 +427,39 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                     <div>
                         <p className="text-sm font-black">This modpack uses external mods</p>
                         <p className="mt-1 text-xs font-medium leading-relaxed">
-                            {formatExternalDependencyNames(externalDependencies)} {externalDependencies.length === 1 ? 'comes' : 'come'} from outside Modtale. Check the linked source pages if the download or install flow asks for them separately.
+                            {formatExternalDependencyNames(externalDependencies)} {externalDependencies.length === 1 ? 'comes' : 'come'} from outside Modtale and is not redistributed in this archive. Use the linked source pages to obtain those files from their authors' chosen platform.
                         </p>
+                        <ul className="mt-2 space-y-1" aria-label="External mod source pages">
+                            {externalDependencies.map((dependency, index) => (
+                                <li key={dependency.id || `${dependency.source}-${dependency.externalId || dependency.projectId}-${index}`}>
+                                    {dependency.externalUrl ? (
+                                        <a
+                                            href={dependency.externalUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-xs font-bold underline decoration-amber-500/50 underline-offset-2 hover:decoration-current"
+                                        >
+                                            {dependency.projectTitle || dependency.externalId || dependency.projectId}
+                                            <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                                        </a>
+                                    ) : (
+                                        <span className="text-xs font-bold">{dependency.projectTitle || dependency.externalId || dependency.projectId}</span>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
                     </div>
                 </div>
             </div>
         );
+    };
+
+    const download = (ver: any, gameVersion: string) => {
+        if (isModpack) {
+            onDownload(ver.fileUrl, ver.versionNumber, gameVersion, ver.dependencies, ver.channel, modpackTarget);
+            return;
+        }
+        onDownload(ver.fileUrl, ver.versionNumber, gameVersion, ver.dependencies, ver.channel);
     };
 
     const content = (
@@ -470,11 +500,34 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                     />
                 </div>
 
+                {isModpack && (
+                    <div className="mb-6">
+                        <label className={`block text-xs font-bold ${theme.colors.textSecondary} uppercase mb-2 tracking-wider`}>Pack target</label>
+                        <div className={`grid grid-cols-3 gap-2 rounded-xl border ${theme.colors.border} ${theme.colors.bgSurfaceAlt} p-1.5`}>
+                            {(['UNIVERSAL', 'CLIENT', 'SERVER'] as ModpackTarget[]).map(target => (
+                                <button
+                                    type="button"
+                                    key={target}
+                                    onClick={() => setModpackTarget(target)}
+                                    className={`rounded-lg px-2 py-2 text-xs font-black transition-colors ${modpackTarget === target ? 'bg-modtale-accent text-white shadow-sm' : `${theme.colors.textSecondary} hover:${theme.colors.textPrimary}`}`}
+                                >
+                                    {target === 'UNIVERSAL' ? 'All sides' : target === 'CLIENT' ? 'Client' : 'Server'}
+                                </button>
+                            ))}
+                        </div>
+                        <p className={`mt-2 text-xs ${theme.colors.textMuted}`}>
+                            {modpackTarget === 'UNIVERSAL'
+                                ? 'Includes common, client-only, and server-only entries.'
+                                : `Excludes ${modpackTarget === 'CLIENT' ? 'server' : 'client'}-only entries.`}
+                        </p>
+                    </div>
+                )}
+
                 {latestVer ? (
                     <>
                         <button
                             type="button"
-                            onClick={() => onDownload(latestVer.fileUrl, latestVer.versionNumber, latestGameVersion, latestVer.dependencies, latestVer.channel)}
+                            onClick={() => download(latestVer, latestGameVersion)}
                             className={`w-full p-5 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 ${projectId ? 'mb-3' : 'mb-6'} group relative overflow-hidden ${themeClass}`}
                         >
                             <div className="font-black text-xl flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-6 h-6" /> Download Latest</div>
@@ -549,7 +602,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                                         </div>
                                         <button
                                             type="button"
-                                            onClick={() => onDownload(ver.fileUrl, ver.versionNumber, gameVersion, ver.dependencies, ver.channel)}
+                                            onClick={() => download(ver, gameVersion)}
                                             className={`p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-modtale-accent hover:text-white transition-colors`}
                                             aria-label={`Download version ${ver.versionNumber}`}
                                         >

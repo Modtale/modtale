@@ -2,6 +2,8 @@ package net.modtale.model.project;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.data.annotation.Transient;
 
@@ -22,6 +24,12 @@ public class ProjectDependency {
         EMBEDDED
     }
 
+    public enum Environment {
+        COMMON,
+        CLIENT,
+        SERVER
+    }
+
     private String id = UUID.randomUUID().toString();
     private String projectId;
     private String projectTitle;
@@ -35,11 +43,17 @@ public class ProjectDependency {
     @Transient
     private String slug;
     private DependencyType dependencyType = DependencyType.REQUIRED;
+    private Environment environment = Environment.COMMON;
     private Source source = Source.MODTALE;
     private String externalId;
     private String externalUrl;
     private String externalFileUrl;
     private String externalFileName;
+    private Long externalFileSize;
+    private Map<String, String> externalFileHashes;
+    private List<String> externalGameVersions;
+    private Integer externalFileStatus;
+    private Boolean externalDistributionAllowed;
     private String cachedFileUrl;
     private boolean hytaleProjectConfirmed;
 
@@ -117,6 +131,11 @@ public class ProjectDependency {
         this.dependencyType = dependencyType == null ? DependencyType.REQUIRED : dependencyType;
     }
 
+    public Environment getEnvironment() { return environment == null ? Environment.COMMON : environment; }
+    public void setEnvironment(Environment environment) {
+        this.environment = environment == null ? Environment.COMMON : environment;
+    }
+
     public Source getSource() { return source == null ? Source.MODTALE : source; }
     public void setSource(Source source) { this.source = source == null ? Source.MODTALE : source; }
 
@@ -131,6 +150,21 @@ public class ProjectDependency {
 
     public String getExternalFileName() { return externalFileName; }
     public void setExternalFileName(String externalFileName) { this.externalFileName = externalFileName; }
+
+    public Long getExternalFileSize() { return externalFileSize; }
+    public void setExternalFileSize(Long externalFileSize) { this.externalFileSize = externalFileSize; }
+
+    public Map<String, String> getExternalFileHashes() { return externalFileHashes; }
+    public void setExternalFileHashes(Map<String, String> externalFileHashes) { this.externalFileHashes = externalFileHashes; }
+
+    public List<String> getExternalGameVersions() { return externalGameVersions; }
+    public void setExternalGameVersions(List<String> externalGameVersions) { this.externalGameVersions = externalGameVersions; }
+
+    public Integer getExternalFileStatus() { return externalFileStatus; }
+    public void setExternalFileStatus(Integer externalFileStatus) { this.externalFileStatus = externalFileStatus; }
+
+    public Boolean getExternalDistributionAllowed() { return externalDistributionAllowed; }
+    public void setExternalDistributionAllowed(Boolean externalDistributionAllowed) { this.externalDistributionAllowed = externalDistributionAllowed; }
 
     public String getCachedFileUrl() { return cachedFileUrl; }
     public void setCachedFileUrl(String cachedFileUrl) { this.cachedFileUrl = cachedFileUrl; }

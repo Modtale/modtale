@@ -22,7 +22,8 @@ public record ProjectDependency(
         String classification,
         String slug,
         @JsonProperty("isOptional") Boolean optional,
-        @JsonProperty("isEmbedded") Boolean embedded
+        @JsonProperty("isEmbedded") Boolean embedded,
+        String environment
 ) {
     public ProjectDependency(
             String id,
@@ -40,7 +41,32 @@ public record ProjectDependency(
     ) {
         this(id, projectId, projectTitle, versionNumber, dependencyType, source, externalId, externalUrl,
                 externalFileUrl, externalFileName, cachedFileUrl, hytaleProjectConfirmed,
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, "COMMON");
+    }
+
+    public ProjectDependency(
+            String id,
+            String projectId,
+            String projectTitle,
+            String versionNumber,
+            String dependencyType,
+            String source,
+            String externalId,
+            String externalUrl,
+            String externalFileUrl,
+            String externalFileName,
+            String cachedFileUrl,
+            boolean hytaleProjectConfirmed,
+            String icon,
+            String title,
+            String classification,
+            String slug,
+            Boolean optional,
+            Boolean embedded
+    ) {
+        this(id, projectId, projectTitle, versionNumber, dependencyType, source, externalId, externalUrl,
+                externalFileUrl, externalFileName, cachedFileUrl, hytaleProjectConfirmed,
+                icon, title, classification, slug, optional, embedded, "COMMON");
     }
 
     public boolean isOptional() {
@@ -53,6 +79,16 @@ public record ProjectDependency(
 
     public boolean isExternal() {
         return source != null && !DependencySource.MODTALE.matches(source);
+    }
+
+    public boolean appliesToClient() {
+        return environment == null || environment.isBlank()
+                || "COMMON".equalsIgnoreCase(environment)
+                || "CLIENT".equalsIgnoreCase(environment);
+    }
+
+    public boolean isCurseForge() {
+        return "CURSEFORGE".equalsIgnoreCase(source);
     }
 
     private enum DependencyType {

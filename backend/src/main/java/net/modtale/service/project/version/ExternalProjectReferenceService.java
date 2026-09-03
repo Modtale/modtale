@@ -3,19 +3,12 @@ package net.modtale.service.project.version;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import net.modtale.exception.InvalidVersionRequestException;
 import net.modtale.model.dto.project.ExternalProjectReferenceDTO;
 import net.modtale.model.project.ProjectDependency;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.RequestEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @Service
@@ -25,17 +18,11 @@ public class ExternalProjectReferenceService {
     private static final String GITHUB_HOST = "github.com";
     private static final String GITHUB_RAW_HOST = "raw.githubusercontent.com";
     private static final String GITHUB_CONTENT_HOST = "githubusercontent.com";
-    private static final String CF_WIDGET_BASE = "https://api.cfwidget.com/";
-    private static final String CURSEFORGE_DOWNLOAD_BASE = "https://www.curseforge.com/api/v1/mods/%s/files/%s/download";
 
-    private final RestTemplate restTemplate;
+    private final CurseForgeApiClient curseForgeApiClient;
 
-    public ExternalProjectReferenceService() {
-        this(new RestTemplate());
-    }
-
-    ExternalProjectReferenceService(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
+    public ExternalProjectReferenceService(CurseForgeApiClient curseForgeApiClient) {
+        this.curseForgeApiClient = curseForgeApiClient;
     }
 
     public ExternalProjectReferenceDTO resolve(String rawUrl, ProjectDependency.Source requestedSource) {
@@ -56,13 +43,6 @@ public class ExternalProjectReferenceService {
         };
     }
 
-    public String curseForgeDownloadUrl(String projectId, String fileId) {
-        if (trimToNull(projectId) == null || trimToNull(fileId) == null) {
-            return null;
-        }
-        return String.format(CURSEFORGE_DOWNLOAD_BASE, projectId.trim(), fileId.trim());
-    }
-
     private ExternalProjectReferenceDTO resolveCurseForge(String externalUrl) {
         CurseForgePath path = parseCurseForgePath(externalUrl);
         if (path == null) {
@@ -71,54 +51,57 @@ public class ExternalProjectReferenceService {
 
         ExternalProjectReferenceDTO fallback = new ExternalProjectReferenceDTO(
                 ProjectDependency.Source.CURSEFORGE,
-                path.slug(),
+                path.projectId() == null ? path.slug() : path.projectId(),
                 titleFromSlug(path.slug()),
                 path.fileId() == null ? "latest" : path.fileId(),
-                path.projectUrl(),
+                path.fileId() == null ? path.projectUrl() : path.fileUrl(),
                 null,
                 null,
                 true,
+                null,
                 path.fileId() == null ? List.of() : List.of(new ExternalProjectReferenceDTO.ExternalFileDTO(
                         path.fileId(),
                         path.fileId(),
                         null,
                         path.fileId(),
                         null,
-                        curseForgeDownloadUrl(path.projectId(), path.fileId())
+                        null,
+                        null,
+                        null,
+                        List.of(),
+                        null,
+                        null
                 ))
         );
+        return curseForgeApiClient.resolveProject(path.slug(), path.fileId())
+                .map(project -> new ExternalProjectReferenceDTO(
+                        ProjectDependency.Source.CURSEFORGE,
+                        project.id(),
+                        project.title() == null ? fallback.title() : project.title(),
+                        selectedVersion(project.files(), path.fileId(), fallback.versionNumber()),
+                        fallback.externalUrl(),
+                        project.iconUrl(),
+                        project.summary(),
+                        true,
+                        project.distributionAllowed(),
+                        project.files().stream().map(file -> new ExternalProjectReferenceDTO.ExternalFileDTO(
+                                file.id(), file.displayName(), file.fileName(), file.versionNumber(), file.releaseType(), null,
+                                file.fileSize(), file.hashes(), file.gameVersions(), file.fileStatus(), file.available()
+                        )).toList()
+                ))
+                .orElse(fallback);
+    }
 
-        try {
-            Map<String, Object> data = getJson(CF_WIDGET_BASE + "hytale/mods/" + path.slug());
-            if (data == null || data.isEmpty()) {
-                return fallback;
-            }
-
-            String projectId = stringValue(data.get("id"));
-            List<ExternalProjectReferenceDTO.ExternalFileDTO> files = parseCurseForgeFiles(projectId, data.get("files"));
-            ExternalProjectReferenceDTO.ExternalFileDTO selectedFile = files.stream()
-                    .filter(file -> path.fileId() == null || path.fileId().equals(file.id()))
-                    .findFirst()
-                    .orElseGet(() -> parseCurseForgeFile(projectId, data.get("download")));
-            String versionNumber = selectedFile != null && trimToNull(selectedFile.versionNumber()) != null
-                    ? selectedFile.versionNumber()
-                    : "latest";
-            String externalId = trimToNull(projectId) != null ? projectId : path.slug();
-
-            return new ExternalProjectReferenceDTO(
-                    ProjectDependency.Source.CURSEFORGE,
-                    externalId,
-                    stringValue(data.get("title"), fallback.title()),
-                    versionNumber,
-                    path.fileId() == null ? path.projectUrl() : path.fileUrl(),
-                    stringValue(data.get("thumbnail")),
-                    stringValue(data.get("summary")),
-                    true,
-                    files
-            );
-        } catch (RestClientException ex) {
-            return fallback;
+    private String selectedVersion(List<CurseForgeApiClient.CurseForgeFile> files, String fileId, String fallback) {
+        if (fileId == null) {
+            return files.isEmpty() ? fallback : files.getFirst().versionNumber();
         }
+        return files.stream()
+                .filter(file -> fileId.equals(file.id()))
+                .map(CurseForgeApiClient.CurseForgeFile::versionNumber)
+                .filter(value -> value != null && !value.isBlank())
+                .findFirst()
+                .orElse(fallback);
     }
 
     private ExternalProjectReferenceDTO resolveSimple(
@@ -140,48 +123,11 @@ public class ExternalProjectReferenceService {
                 null,
                 null,
                 hytaleProjectConfirmed,
+                null,
                 externalFilesForUrl(externalUrl)
         );
     }
 
-    private Map<String, Object> getJson(String url) {
-        RequestEntity<Void> request = RequestEntity
-                .get(URI.create(url))
-                .header(HttpHeaders.USER_AGENT, "Modtale/1.0")
-                .build();
-        return restTemplate.exchange(request, new ParameterizedTypeReference<Map<String, Object>>() {}).getBody();
-    }
-
-    private List<ExternalProjectReferenceDTO.ExternalFileDTO> parseCurseForgeFiles(String projectId, Object rawFiles) {
-        if (!(rawFiles instanceof List<?> files)) {
-            return List.of();
-        }
-        List<ExternalProjectReferenceDTO.ExternalFileDTO> parsed = new ArrayList<>();
-        for (Object rawFile : files) {
-            ExternalProjectReferenceDTO.ExternalFileDTO file = parseCurseForgeFile(projectId, rawFile);
-            if (file != null) {
-                parsed.add(file);
-            }
-        }
-        parsed.sort(Comparator.comparing(ExternalProjectReferenceDTO.ExternalFileDTO::id, Comparator.nullsLast(String::compareTo)).reversed());
-        return parsed.stream().limit(20).toList();
-    }
-
-    @SuppressWarnings("unchecked")
-    private ExternalProjectReferenceDTO.ExternalFileDTO parseCurseForgeFile(String projectId, Object rawFile) {
-        if (!(rawFile instanceof Map<?, ?> file)) {
-            return null;
-        }
-        String id = stringValue(file.get("id"));
-        String fileName = stringValue(file.get("name"));
-        String displayName = stringValue(file.get("display"), fileName);
-        String version = stringValue(file.get("version"), "latest");
-        String type = stringValue(file.get("type"));
-        String downloadUrl = trimToNull(projectId) != null && trimToNull(id) != null
-                ? curseForgeDownloadUrl(projectId, id)
-                : stringValue(file.get("url"));
-        return new ExternalProjectReferenceDTO.ExternalFileDTO(id, displayName, fileName, version, type, downloadUrl);
-    }
 
     private ProjectDependency.Source detectSource(String externalUrl) {
         try {
@@ -203,19 +149,25 @@ public class ExternalProjectReferenceService {
             URI uri = new URI(value);
             String host = uri.getHost();
             String[] segments = pathSegments(uri);
-            if (host == null || !isHost(host, CURSEFORGE_HOST) || segments.length < 3) {
+            if (!isSafeCurseForgeUri(uri) || segments.length < 3) {
                 return null;
             }
             if (!"hytale".equalsIgnoreCase(segments[0]) || !"mods".equalsIgnoreCase(segments[1])) {
                 return null;
             }
             String slug = segments[2];
+            if (!slug.matches("[A-Za-z0-9][A-Za-z0-9_-]*")) {
+                return null;
+            }
             String fileId = null;
             for (int i = 0; i < segments.length - 1; i++) {
                 if ("files".equalsIgnoreCase(segments[i]) && !segments[i + 1].isBlank()) {
                     fileId = segments[i + 1];
                     break;
                 }
+            }
+            if (fileId != null && !fileId.matches("\\d+")) {
+                return null;
             }
             String projectId = trimToNull(uri.getQuery()) == null ? null : extractQueryParam(uri.getQuery(), "projectId");
             String projectUrl = UriComponentsBuilder.fromUri(uri)
@@ -224,7 +176,13 @@ public class ExternalProjectReferenceService {
                     .fragment(null)
                     .build()
                     .toUriString();
-            return new CurseForgePath(slug, projectId, fileId, projectUrl, value);
+            String fileUrl = fileId == null ? projectUrl : UriComponentsBuilder.fromUri(uri)
+                    .replacePath("/hytale/mods/" + slug + "/files/" + fileId)
+                    .replaceQuery(null)
+                    .fragment(null)
+                    .build()
+                    .toUriString();
+            return new CurseForgePath(slug, projectId, fileId, projectUrl, fileUrl);
         } catch (URISyntaxException ex) {
             return null;
         }
@@ -286,6 +244,13 @@ public class ExternalProjectReferenceService {
         return normalizedHost.equals(expectedHost) || normalizedHost.endsWith("." + expectedHost);
     }
 
+    private boolean isSafeCurseForgeUri(URI uri) {
+        return "https".equalsIgnoreCase(uri.getScheme())
+                && uri.getRawUserInfo() == null
+                && (uri.getPort() == -1 || uri.getPort() == 443)
+                && isHost(uri.getHost(), CURSEFORGE_HOST);
+    }
+
     private boolean isGitHubHost(String host) {
         return isHost(host, GITHUB_HOST) || isHost(host, GITHUB_RAW_HOST) || isHost(host, GITHUB_CONTENT_HOST);
     }
@@ -302,7 +267,12 @@ public class ExternalProjectReferenceService {
                 fileName,
                 "latest",
                 null,
-                externalUrl
+                externalUrl,
+                null,
+                null,
+                List.of(),
+                null,
+                null
         ));
     }
 

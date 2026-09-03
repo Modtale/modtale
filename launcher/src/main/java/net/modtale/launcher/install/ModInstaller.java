@@ -96,7 +96,12 @@ public class ModInstaller {
 
         DownloadUrlResponse downloadUrl = isBundle
                 ? apiClient.getBundleDownloadUrl(project.id(), version.versionNumber(), selectedModtaleDependencies, options.gameVersion())
-                : apiClient.getDownloadUrl(project.id(), version.versionNumber(), options.gameVersion());
+                : apiClient.getDownloadUrl(
+                        project.id(),
+                        version.versionNumber(),
+                        options.gameVersion(),
+                        isModpack ? options.modpackTarget() : null
+                );
         LOG.info("Resolved download URL projectId=" + project.id()
                 + " mode=" + (isBundle ? "BUNDLE" : "DIRECT")
                 + " url=" + LogSanitizer.url(downloadUrl == null ? "" : downloadUrl.downloadUrl()));
@@ -110,7 +115,12 @@ public class ModInstaller {
                 + " temp=" + mainDownload.path());
         try {
             if (isModpack || isBundle) {
-                installedFiles.addAll(archiveInstaller.installModpackArchive(mainDownload.path(), options.modsDirectory()));
+                installedFiles.addAll(archiveInstaller.installModpackArchive(
+                        mainDownload.path(),
+                        options.modsDirectory(),
+                        options.instanceDirectory(),
+                        options.modpackTarget()
+                ));
             } else {
                 installedFiles.addAll(archiveInstaller.installDownloadedFile(
                         mainDownload.path(),
@@ -131,6 +141,13 @@ public class ModInstaller {
         }
 
         for (ProjectDependency dependency : selectedExternalDependencies) {
+            if (dependency.isCurseForge()) {
+                warnings.add("CurseForge dependency requires installation through its provider page: "
+                        + displayName(dependency));
+                LOG.info("Skipping direct CurseForge download for " + displayName(dependency)
+                        + "; use the provider-sanctioned install flow instead");
+                continue;
+            }
             if (dependency.externalFileUrl() == null || dependency.externalFileUrl().isBlank()) {
                 warnings.add("External dependency needs manual install: " + displayName(dependency));
                 LOG.warn("External dependency missing file URL: " + displayName(dependency));
@@ -200,7 +217,10 @@ public class ModInstaller {
                 settings.hytaleModsDirectory(),
                 gameVersion == null || gameVersion.isBlank() ? settings.getGameVersion() : gameVersion,
                 settings.isIncludeDependencies(),
-                settings.isIncludeOptionalDependencies()
+                settings.isIncludeOptionalDependencies(),
+                null,
+                settings.hytaleUserDataDirectory(),
+                "CLIENT"
         ));
         return recordInstall(result, settings, previous);
     }
@@ -219,7 +239,9 @@ public class ModInstaller {
                 gameVersion == null || gameVersion.isBlank() ? settings.getGameVersion() : gameVersion,
                 dependencies != null && !dependencies.isEmpty(),
                 true,
-                dependencies
+                dependencies,
+                settings.hytaleUserDataDirectory(),
+                "CLIENT"
         ));
         return recordInstall(result, settings, previous);
     }
@@ -332,7 +354,10 @@ public class ModInstaller {
                 settings.hytaleModsDirectory(),
                 settings.getGameVersion(),
                 settings.isIncludeDependencies(),
-                settings.isIncludeOptionalDependencies()
+                settings.isIncludeOptionalDependencies(),
+                null,
+                settings.hytaleUserDataDirectory(),
+                "CLIENT"
         );
     }
 
@@ -355,20 +380,27 @@ public class ModInstaller {
                     true,
                     installed.bundledProjects().stream()
                             .map(InstalledProjectReference::toDependency)
-                            .toList()
+                            .toList(),
+                    settings.hytaleUserDataDirectory(),
+                    "CLIENT"
             );
         }
         return new InstallOptions(
                 settings.hytaleModsDirectory(),
                 gameVersion,
                 settings.isIncludeDependencies(),
-                settings.isIncludeOptionalDependencies()
+                settings.isIncludeOptionalDependencies(),
+                null,
+                settings.hytaleUserDataDirectory(),
+                "CLIENT"
         );
     }
 
     private List<ProjectDependency> dependencies(ProjectDetail project, ProjectVersion version, InstallOptions options) {
         if (options.hasSelectedDependencies()) {
-            return options.selectedDependencies();
+            return options.selectedDependencies().stream()
+                    .filter(ProjectDependency::appliesToClient)
+                    .toList();
         }
         VersionDependenciesView dependenciesView = options.includeDependencies()
                 ? apiClient.getDependencies(project.id(), version.versionNumber(), options.gameVersion())
@@ -376,7 +408,9 @@ public class ModInstaller {
         LOG.info("Loaded dependency view projectId=" + project.id()
                 + " version=" + version.versionNumber()
                 + " count=" + dependenciesView.dependencies().size());
-        return dependenciesView.dependencies();
+        return dependenciesView.dependencies().stream()
+                .filter(ProjectDependency::appliesToClient)
+                .toList();
     }
 
     private static List<InstalledProjectReference> selectedDependencyReferences(

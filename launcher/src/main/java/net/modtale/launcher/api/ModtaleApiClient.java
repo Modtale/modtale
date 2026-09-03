@@ -414,9 +414,14 @@ public class ModtaleApiClient {
     }
 
     public DownloadUrlResponse getDownloadUrl(String projectId, String versionNumber, String gameVersion) {
-        String query = gameVersion == null || gameVersion.isBlank()
-                ? ""
-                : "?gameVersion=" + encodeQuery(gameVersion);
+        return getDownloadUrl(projectId, versionNumber, gameVersion, null);
+    }
+
+    public DownloadUrlResponse getDownloadUrl(String projectId, String versionNumber, String gameVersion, String target) {
+        List<String> params = new ArrayList<>();
+        addParam(params, "gameVersion", gameVersion);
+        addParam(params, "target", target);
+        String query = params.isEmpty() ? "" : "?" + String.join("&", params);
         return get("/projects/" + encodePath(projectId) + "/versions/" + encodePath(versionNumber) + "/download-url" + query,
                 DownloadUrlResponse.class);
     }

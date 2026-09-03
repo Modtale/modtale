@@ -7,6 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -85,6 +88,71 @@ class ArchiveInstallerTest {
     }
 
     @Test
+    void installsVerifiedLockedPackAndAppliesClientOverrides() throws IOException {
+        Path archive = tempDir.resolve("locked-modpack.zip");
+        String bundled = "bundled mod";
+        String common = "common settings";
+        String client = "client settings";
+        String server = "server settings";
+        String lock = """
+                {
+                  "format":"modtale-lock",
+                  "lockVersion":1,
+                  "entries":[
+                    {"distribution":"BUNDLED","path":"mods/bundled.jar","size":%d,"hashes":{"sha256":"%s"}},
+                    {"distribution":"REFERENCE_ONLY","url":"https://example.com/provider-file"}
+                  ],
+                  "overrides":[
+                    {"path":"overrides/common/config/settings.json","environment":"COMMON","size":%d,"hashes":{"sha256":"%s"}},
+                    {"path":"overrides/client/config/settings.json","environment":"CLIENT","size":%d,"hashes":{"sha256":"%s"}},
+                    {"path":"overrides/server/server.properties","environment":"SERVER","size":%d,"hashes":{"sha256":"%s"}}
+                  ]
+                }
+                """.formatted(
+                bundled.length(), sha256(bundled),
+                common.length(), sha256(common),
+                client.length(), sha256(client),
+                server.length(), sha256(server)
+        );
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(archive))) {
+            add(zip, "modtale.lock.json", lock);
+            add(zip, "mods/bundled.jar", bundled);
+            add(zip, "overrides/common/config/settings.json", common);
+            add(zip, "overrides/client/config/settings.json", client);
+            add(zip, "overrides/server/server.properties", server);
+        }
+        Path instance = tempDir.resolve("instance");
+        Path mods = instance.resolve("mods");
+
+        List<Path> installed = new ArchiveInstaller().installModpackArchive(archive, mods, instance, "CLIENT");
+
+        assertEquals(3, installed.size());
+        assertEquals(bundled, Files.readString(mods.resolve("bundled.jar")));
+        assertEquals(client, Files.readString(instance.resolve("config/settings.json")));
+        assertTrue(Files.notExists(instance.resolve("server.properties")));
+        assertTrue(Files.notExists(mods.resolve("modtale.lock.json")));
+    }
+
+    @Test
+    void rejectsLockedPackWithInvalidChecksumBeforeInstallingAnything() throws IOException {
+        Path archive = tempDir.resolve("tampered-modpack.zip");
+        String lock = """
+                {"format":"modtale-lock","lockVersion":1,"entries":[
+                  {"distribution":"BUNDLED","path":"mods/bundled.jar","size":8,"hashes":{"sha256":"bad"}}
+                ],"overrides":[]}
+                """;
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(archive))) {
+            add(zip, "modtale.lock.json", lock);
+            add(zip, "mods/bundled.jar", "tampered");
+        }
+        Path mods = tempDir.resolve("instance/mods");
+
+        assertThrows(IOException.class,
+                () -> new ArchiveInstaller().installModpackArchive(archive, mods, tempDir.resolve("instance"), "CLIENT"));
+        assertTrue(Files.notExists(mods.resolve("bundled.jar")));
+    }
+
+    @Test
     void avoidsOverwritingExistingFile() throws IOException {
         Path download = tempDir.resolve("download.tmp");
         Files.writeString(download, "new");
@@ -103,5 +171,14 @@ class ArchiveInstallerTest {
         zip.putNextEntry(new ZipEntry(name));
         zip.write(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
         zip.closeEntry();
+    }
+
+    private static String sha256(String value) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException(ex);
+        }
     }
 }

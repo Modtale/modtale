@@ -1,4 +1,4 @@
-import type { DependencyType, ProjectDependency } from '@/types';
+import type { DependencyEnvironment, DependencyType, ProjectDependency } from '@/types';
 
 export const getDependencyType = (dependency?: Pick<ProjectDependency, 'dependencyType'>): DependencyType =>
     dependency?.dependencyType || 'REQUIRED';
@@ -12,12 +12,25 @@ export const isEmbeddedDependency = (dependency?: Pick<ProjectDependency, 'depen
 export const isExternalDependency = (dependency?: Pick<ProjectDependency, 'source'>): boolean =>
     (dependency?.source || 'MODTALE') !== 'MODTALE';
 
+export const getDependencyEnvironment = (
+    dependency?: Pick<ProjectDependency, 'environment'>
+): DependencyEnvironment => dependency?.environment || 'COMMON';
+
 export const getExternalDependencies = (dependencies?: ProjectDependency[] | null): ProjectDependency[] =>
     (dependencies || []).filter(dependency => isExternalDependency(dependency) && !isEmbeddedDependency(dependency));
+
+export const getSelectableBundleDependencies = (
+    classification: string | null | undefined,
+    dependencies?: ProjectDependency[] | null
+): ProjectDependency[] => classification === 'MODPACK'
+    ? []
+    : (dependencies || []).filter(dependency =>
+        Boolean(dependency.projectId) && !isEmbeddedDependency(dependency) && !isExternalDependency(dependency));
 
 export const normalizeDependencyReference = (dependency: ProjectDependency): ProjectDependency => ({
     ...dependency,
     dependencyType: dependency.dependencyType || 'REQUIRED',
+    environment: dependency.environment || 'COMMON',
     source: dependency.source || 'MODTALE'
 });
 

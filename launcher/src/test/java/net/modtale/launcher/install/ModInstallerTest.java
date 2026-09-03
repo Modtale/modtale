@@ -164,6 +164,53 @@ class ModInstallerTest {
         assertEquals(1, settings.getInstalledProjects().size());
     }
 
+    @Test
+    void modpackInstallRequestsClientTargetAndDoesNotDirectDownloadCurseForgeFiles() throws IOException {
+        AtomicReference<String> downloadQuery = new AtomicReference<>("");
+        AtomicInteger curseForgeDownloads = new AtomicInteger();
+        byte[] pack = zip(entry("mods/main.jar", "main"));
+        startServer();
+        server.createContext("/api/v1/projects/pack/versions/1.0.0/download-url", exchange -> {
+            downloadQuery.set(exchange.getRequestURI().getRawQuery());
+            respondJson(exchange, """
+                    {"downloadUrl":"%s/files/pack.zip","expiresIn":60}
+                    """.formatted(serverBaseUrl()));
+        });
+        server.createContext("/files/pack.zip", exchange -> respondBytes(exchange, pack, "application/zip"));
+        server.createContext("/curseforge/file/123", exchange -> {
+            curseForgeDownloads.incrementAndGet();
+            respond(exchange, 500, "Must not be fetched directly");
+        });
+
+        ProjectDependency curseForge = new ProjectDependency(
+                "cf-reference", null, null, null, "REQUIRED", "CURSEFORGE", "example-mod",
+                serverBaseUrl() + "/curseforge/file/123", serverBaseUrl() + "/curseforge/file/123",
+                "example.jar", null, true, null, "Example Mod", "PLUGIN", "example-mod",
+                false, false, "COMMON"
+        );
+        ProjectVersion version = version("pack-version", "1.0.0", curseForge);
+        ProjectDetail project = new ProjectDetail(
+                "pack", "pack", "Pack", "Pack description", "Creator", "MODPACK",
+                "2026-01-01T00:00:00Z", "MIT", "", List.of(), List.of(version)
+        );
+        LauncherSettings settings = new LauncherSettings();
+        Path instance = tempDir.resolve("instance");
+        settings.setHytaleUserDataPath(instance.toString());
+        settings.setHytaleModsPath(instance.resolve("mods").toString());
+        settings.setGameVersion("2026.1");
+
+        InstallResult result = new ModInstaller(
+                new ModtaleApiClient(apiBaseUrl()),
+                new SettingsStore(tempDir.resolve("settings.json"))
+        ).installAndRecord(project, version, settings, "2026.1", List.of(curseForge));
+
+        assertTrue(downloadQuery.get().contains("gameVersion=2026.1"));
+        assertTrue(downloadQuery.get().contains("target=CLIENT"));
+        assertEquals(0, curseForgeDownloads.get());
+        assertTrue(result.warnings().stream().anyMatch(warning -> warning.contains("CurseForge")));
+        assertEquals("main", Files.readString(instance.resolve("mods/main.jar")));
+    }
+
     private ProjectDependency dependency() {
         return new ProjectDependency(
                 "dependency-reference",

@@ -11,6 +11,7 @@ public record ProjectDependencyDTO(
         String projectTitle,
         String versionNumber,
         ProjectDependency.DependencyType dependencyType,
+        ProjectDependency.Environment environment,
         ProjectDependency.Source source,
         String externalId,
         String externalUrl,

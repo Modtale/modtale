@@ -485,7 +485,7 @@ final class NativeDownloadModal {
         HBox title = new HBox(7, LauncherIcons.icon(LauncherIcons.Glyph.ALERT_CIRCLE, 14), new Label("This modpack uses external mods"));
         title.getStyleClass().add("download-modal-external-dependency-title");
         title.setAlignment(Pos.CENTER_LEFT);
-        Label copy = new Label("%s %s from outside Modtale. Check the linked source pages if the download or install flow asks for them separately.".formatted(
+        Label copy = new Label("%s %s from outside Modtale. Provider-restricted files, including CurseForge files, must be installed through their linked source pages.".formatted(
                 externalDependencyNames(external),
                 external.size() == 1 ? "comes" : "come"
         ));
@@ -510,7 +510,10 @@ final class NativeDownloadModal {
             return List.of();
         }
         return version.dependencies().stream()
-                .filter(dependency -> dependency != null && dependency.isExternal() && !dependency.isEmbedded())
+                .filter(dependency -> dependency != null
+                        && dependency.appliesToClient()
+                        && dependency.isExternal()
+                        && !dependency.isEmbedded())
                 .toList();
     }
 

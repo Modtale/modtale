@@ -1,19 +1,29 @@
 package net.modtale.launcher.install;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 public class ArchiveInstaller {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final String LOCKFILE = "modtale.lock.json";
 
     public List<Path> installDownloadedFile(Path downloadedFile, String filename, Path modsDirectory, boolean unpackArchive)
             throws IOException {
@@ -27,7 +37,18 @@ public class ArchiveInstaller {
     }
 
     public List<Path> installModpackArchive(Path archive, Path modsDirectory) throws IOException {
+        Path instanceDirectory = modsDirectory.toAbsolutePath().normalize().getParent();
+        return installModpackArchive(archive, modsDirectory, instanceDirectory, "CLIENT");
+    }
+
+    public List<Path> installModpackArchive(
+            Path archive,
+            Path modsDirectory,
+            Path instanceDirectory,
+            String target
+    ) throws IOException {
         Files.createDirectories(modsDirectory);
+        Files.createDirectories(instanceDirectory);
         Path stagingDirectory = Files.createTempDirectory("modtale-modpack-");
         try {
             Path extractedDirectory = stagingDirectory.resolve("extracted");
@@ -35,6 +56,10 @@ public class ArchiveInstaller {
             extractArchive(archive, extractedDirectory);
 
             Path contentRoot = modpackContentRoot(extractedDirectory);
+            Path lockfile = contentRoot.resolve(LOCKFILE);
+            if (Files.isRegularFile(lockfile)) {
+                return installLockedArchive(contentRoot, lockfile, modsDirectory, instanceDirectory, target);
+            }
             List<Path> installed = new ArrayList<>();
             try (Stream<Path> files = Files.walk(contentRoot)) {
                 for (Path source : files
@@ -50,6 +75,138 @@ public class ArchiveInstaller {
         } finally {
             deleteRecursively(stagingDirectory);
         }
+    }
+
+    private static List<Path> installLockedArchive(
+            Path contentRoot,
+            Path lockfile,
+            Path modsDirectory,
+            Path instanceDirectory,
+            String target
+    ) throws IOException {
+        JsonNode lock = OBJECT_MAPPER.readTree(lockfile.toFile());
+        if (!"modtale-lock".equals(lock.path("format").asText()) || lock.path("lockVersion").asInt(-1) != 1) {
+            throw new IOException("Unsupported Modtale modpack lockfile format or version.");
+        }
+
+        Set<String> archivePaths = new HashSet<>();
+        Set<String> destinationPaths = new HashSet<>();
+        List<PendingInstall> pending = new ArrayList<>();
+        for (JsonNode entry : lock.path("entries")) {
+            if (!"BUNDLED".equalsIgnoreCase(entry.path("distribution").asText())) {
+                continue;
+            }
+            Path source = resolveLockedSource(contentRoot, requiredText(entry, "path"), archivePaths);
+            verifyIntegrity(source, entry);
+            Path destination = reservedUniqueDestination(
+                    modsDirectory,
+                    safeFilename(source.getFileName().toString()),
+                    destinationPaths
+            );
+            pending.add(new PendingInstall(source, destination));
+        }
+
+        String normalizedTarget = target == null ? "CLIENT" : target.trim().toUpperCase(Locale.ROOT);
+        List<JsonNode> overrides = new ArrayList<>();
+        lock.path("overrides").forEach(overrides::add);
+        overrides.sort(Comparator.comparingInt(entry -> overridePriority(entry.path("environment").asText())));
+        for (JsonNode entry : overrides) {
+            String environment = entry.path("environment").asText();
+            if (!includedInTarget(environment, normalizedTarget)) {
+                continue;
+            }
+            String archivePath = requiredText(entry, "path");
+            Path source = resolveLockedSource(contentRoot, archivePath, archivePaths);
+            verifyIntegrity(source, entry);
+            String prefix = "overrides/" + environment.toLowerCase(Locale.ROOT) + "/";
+            if (!archivePath.startsWith(prefix) || archivePath.length() == prefix.length()) {
+                throw new IOException("Override path does not match its environment: " + archivePath);
+            }
+            Path destination = resolveInstanceDestination(instanceDirectory, archivePath.substring(prefix.length()));
+            pending.add(new PendingInstall(source, destination));
+        }
+
+        List<Path> installed = new ArrayList<>();
+        for (PendingInstall install : pending) {
+            Files.createDirectories(install.destination().getParent());
+            Files.copy(install.source(), install.destination(), StandardCopyOption.REPLACE_EXISTING);
+            installed.add(install.destination());
+        }
+        return installed;
+    }
+
+    private static String requiredText(JsonNode entry, String field) throws IOException {
+        String value = entry.path(field).asText("");
+        if (value.isBlank()) {
+            throw new IOException("Modpack lockfile entry is missing " + field + ".");
+        }
+        return value;
+    }
+
+    private static Path resolveLockedSource(Path contentRoot, String entryName, Set<String> archivePaths) throws IOException {
+        if (entryName.contains("\\") || entryName.matches("^[A-Za-z]:.*") || Path.of(entryName).isAbsolute()) {
+            throw new IOException("Unsafe modpack path: " + entryName);
+        }
+        String folded = entryName.toLowerCase(Locale.ROOT);
+        if (!archivePaths.add(folded)) {
+            throw new IOException("Duplicate or case-colliding modpack path: " + entryName);
+        }
+        Path normalizedRoot = contentRoot.toAbsolutePath().normalize();
+        Path source = normalizedRoot.resolve(entryName).normalize();
+        if (!source.startsWith(normalizedRoot) || !Files.isRegularFile(source)) {
+            throw new IOException("Modpack file is missing or outside the archive root: " + entryName);
+        }
+        return source;
+    }
+
+    private static Path resolveInstanceDestination(Path instanceDirectory, String relativePath) throws IOException {
+        if (relativePath.contains("\\") || relativePath.matches("^[A-Za-z]:.*") || Path.of(relativePath).isAbsolute()) {
+            throw new IOException("Unsafe override destination: " + relativePath);
+        }
+        Path normalizedRoot = instanceDirectory.toAbsolutePath().normalize();
+        Path destination = normalizedRoot.resolve(relativePath).normalize();
+        if (!destination.startsWith(normalizedRoot)) {
+            throw new IOException("Override escapes the Hytale instance: " + relativePath);
+        }
+        return destination;
+    }
+
+    private static void verifyIntegrity(Path source, JsonNode entry) throws IOException {
+        long expectedSize = entry.path("size").asLong(-1);
+        if (expectedSize < 0 || Files.size(source) != expectedSize) {
+            throw new IOException("Modpack file size mismatch: " + source.getFileName());
+        }
+        String expectedHash = entry.path("hashes").path("sha256").asText("");
+        if (expectedHash.isBlank() || !expectedHash.equalsIgnoreCase(sha256(source))) {
+            throw new IOException("Modpack file checksum mismatch: " + source.getFileName());
+        }
+    }
+
+    private static String sha256(Path source) throws IOException {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (InputStream input = Files.newInputStream(source)) {
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = input.read(buffer)) >= 0) {
+                    digest.update(buffer, 0, read);
+                }
+            }
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IOException("SHA-256 is unavailable.", ex);
+        }
+    }
+
+    private static boolean includedInTarget(String environment, String target) {
+        if (environment == null || environment.isBlank() || "COMMON".equalsIgnoreCase(environment)) {
+            return true;
+        }
+        return "UNIVERSAL".equalsIgnoreCase(target) || environment.equalsIgnoreCase(target);
+    }
+
+    private static int overridePriority(String environment) {
+        return "COMMON".equalsIgnoreCase(environment) ? 0 : 1;
     }
 
     public List<Path> extractInstallableEntries(Path archive, Path modsDirectory) throws IOException {
@@ -143,6 +300,22 @@ public class ArchiveInstaller {
         }
     }
 
+    private static Path reservedUniqueDestination(Path directory, String filename, Set<String> reserved) {
+        int extensionStart = filename.lastIndexOf('.');
+        String base = extensionStart > 0 ? filename.substring(0, extensionStart) : filename;
+        String extension = extensionStart > 0 ? filename.substring(extensionStart) : "";
+        int counter = 1;
+        while (true) {
+            String candidateName = counter == 1 ? filename : base + "-" + counter + extension;
+            Path candidate = directory.resolve(candidateName);
+            String folded = candidate.toAbsolutePath().normalize().toString().toLowerCase(Locale.ROOT);
+            if (!Files.exists(candidate) && reserved.add(folded)) {
+                return candidate;
+            }
+            counter++;
+        }
+    }
+
     private static boolean isArchiveMetadataDirectory(Path path) {
         return Files.isDirectory(path) && "__MACOSX".equals(path.getFileName().toString());
     }
@@ -168,5 +341,8 @@ public class ArchiveInstaller {
                 .replaceAll("-+\\.", ".")
                 .replaceAll("(^-|-$)", "");
         return sanitized.isBlank() ? "modtale-download.jar" : sanitized;
+    }
+
+    private record PendingInstall(Path source, Path destination) {
     }
 }

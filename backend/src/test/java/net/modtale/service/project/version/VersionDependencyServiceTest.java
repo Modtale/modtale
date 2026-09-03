@@ -63,6 +63,39 @@ class VersionDependencyServiceTest {
     }
 
     @Test
+    void resolveRequestedDependenciesPreservesOptionalAndEnvironmentForModpacks() {
+        when(projectService.getRawProjectById("client-mod"))
+                .thenReturn(project("client-mod", "Client Mod", ProjectStatus.PUBLISHED, "1.0.0"));
+        when(projectService.getRawProjectById("server-mod"))
+                .thenReturn(project("server-mod", "Server Mod", ProjectStatus.PUBLISHED, "2.0.0"));
+        DependencyReferenceRequest client = dependency(
+                "client-mod",
+                "1.0.0",
+                ProjectDependency.DependencyType.OPTIONAL
+        );
+        client.setEnvironment(ProjectDependency.Environment.CLIENT);
+        DependencyReferenceRequest server = dependency(
+                "server-mod",
+                "2.0.0",
+                ProjectDependency.DependencyType.REQUIRED
+        );
+        server.setEnvironment(ProjectDependency.Environment.SERVER);
+
+        VersionDependencyService.ResolvedDependencies resolved = service.resolveRequestedDependencies(
+                List.of(client, server),
+                true,
+                false
+        );
+
+        assertEquals(ProjectDependency.DependencyType.OPTIONAL,
+                resolved.dependencies().getFirst().getDependencyType());
+        assertEquals(ProjectDependency.Environment.CLIENT,
+                resolved.dependencies().getFirst().getEnvironment());
+        assertEquals(ProjectDependency.Environment.SERVER,
+                resolved.dependencies().get(1).getEnvironment());
+    }
+
+    @Test
     void resolveRequestedDependenciesRejectsDuplicateProjects() {
         when(projectService.getRawProjectById("dep-1")).thenReturn(project("dep-1", "Dependency One", ProjectStatus.PUBLISHED, "1.0.0", "2.0.0"));
 
@@ -121,6 +154,27 @@ class VersionDependencyServiceTest {
     }
 
     @Test
+    void resolveRequestedDependenciesRequiresSecureCanonicalCurseForgeUrls() {
+        DependencyReferenceRequest valid = curseForgeDependency(
+                "https://www.curseforge.com/hytale/mods/simple-compost/files/8227810"
+        );
+
+        ProjectDependency resolved = service.resolveRequestedDependencies(List.of(valid), false, false)
+                .dependencies().getFirst();
+        assertTrue(resolved.isHytaleProjectConfirmed());
+
+        for (String invalidUrl : List.of(
+                "http://www.curseforge.com/hytale/mods/simple-compost/files/8227810",
+                "https://attacker@www.curseforge.com/hytale/mods/simple-compost/files/8227810",
+                "https://curseforge.com.evil.example/hytale/mods/simple-compost/files/8227810",
+                "https://www.curseforge.com/minecraft/mc-mods/simple-compost/files/8227810"
+        )) {
+            assertThrows(InvalidVersionRequestException.class, () ->
+                    service.resolveRequestedDependencies(List.of(curseForgeDependency(invalidUrl)), false, false));
+        }
+    }
+
+    @Test
     void resolveRequestedProjectIdsTrimsBlanksAndCanRejectDrafts() {
         when(projectService.getRawProjectById("dep-1")).thenReturn(project("dep-1", "Dependency One", ProjectStatus.PUBLISHED, "1.0.0"));
         when(projectService.getRawProjectById("draft")).thenReturn(project("draft", "Draft", ProjectStatus.DRAFT, "1.0.0"));
@@ -159,6 +213,16 @@ class VersionDependencyServiceTest {
         request.setProjectId(projectId);
         request.setVersionNumber(versionNumber);
         request.setDependencyType(dependencyType);
+        return request;
+    }
+
+    private static DependencyReferenceRequest curseForgeDependency(String url) {
+        DependencyReferenceRequest request = new DependencyReferenceRequest();
+        request.setSource(ProjectDependency.Source.CURSEFORGE);
+        request.setProjectTitle("Simple Compost");
+        request.setVersionNumber("1.0.0");
+        request.setExternalUrl(url);
+        request.setExternalFileUrl(url);
         return request;
     }
 }

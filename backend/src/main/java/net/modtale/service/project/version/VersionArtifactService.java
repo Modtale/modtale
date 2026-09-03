@@ -44,7 +44,7 @@ public class VersionArtifactService {
         boolean isModpack = effectiveClassification == ProjectClassification.MODPACK;
 
         storageService.validateUploadSize(file);
-        if (file != null && !isModpack) {
+        if (file != null && !file.isEmpty()) {
             fileValidationService.validateProjectFile(file, effectiveClassification.name());
         }
 
@@ -58,7 +58,8 @@ public class VersionArtifactService {
                     throw new InvalidVersionRequestException("This file has already been uploaded to Modtale.");
                 }
             }
-            filePath = storageService.upload(file, "files/" + effectiveClassification.name().toLowerCase());
+            String folder = isModpack ? "modpack-overrides" : "files/" + effectiveClassification.name().toLowerCase();
+            filePath = storageService.upload(file, folder);
         }
 
         return new PreparedVersionArtifact(effectiveClassification, filePath, fileHash);

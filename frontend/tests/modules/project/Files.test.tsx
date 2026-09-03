@@ -101,6 +101,26 @@ describe('Files tab loadability', () => {
         expect(mockedProjectClient.getMetaGameVersions).not.toHaveBeenCalled();
     });
 
+    it('renders the optional layered override bundle picker for modpacks', async () => {
+        await act(async () => {
+            root.render(
+                <ToastProvider>
+                    <VersionFields
+                        data={versionData}
+                        onChange={vi.fn()}
+                        isModpack={true}
+                        projectType="MODPACK"
+                        currentProjectId="project-1"
+                    />
+                </ToastProvider>
+            );
+        });
+
+        await waitForText(container, 'Override Bundle');
+        expect(container.textContent).toContain('Optional ZIP containing only overrides/common, overrides/client, and overrides/server files.');
+        expect(container.textContent).toContain('Optional layered configuration and resource overrides');
+    });
+
     it('defaults to the latest release game version when prereleases are newer', async () => {
         const onChange = vi.fn();
         mockedProjectClient.getMetaGameVersionCatalog.mockResolvedValue({
