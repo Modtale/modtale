@@ -51,6 +51,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TitledPane;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
 import javafx.scene.effect.Effect;
@@ -2054,6 +2055,7 @@ public final class ProjectPageController {
         Button copy = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.COPY, 14));
         copy.getStyleClass().add("project-detail-id-copy");
         copy.setAccessibleText("Copy Project ID");
+        copy.setTooltip(new Tooltip("Copy project ID"));
         copy.setOnAction(event -> {
             ClipboardContent clipboard = new ClipboardContent();
             clipboard.putString(id);
@@ -2269,6 +2271,7 @@ public final class ProjectPageController {
         Button button = new Button(null, LauncherIcons.icon(glyph, 18));
         button.getStyleClass().add("project-detail-icon-button");
         button.setAccessibleText(accessibleText);
+        button.setTooltip(new Tooltip(accessibleText));
         button.pseudoClassStateChanged(SELECTED, selected);
         button.setOnAction(event -> action.run());
         return button;
@@ -3015,14 +3018,14 @@ public final class ProjectPageController {
             return links;
         }
         if (!isBlank(detail.repositoryUrl())) {
-            links.getChildren().add(externalIcon(LauncherIcons.Glyph.CODE, detail.repositoryUrl()));
+            links.getChildren().add(externalIcon(LauncherIcons.Glyph.CODE, "Open source repository", detail.repositoryUrl()));
         }
         Map<String, String> detailLinks = detail.links();
         if (!isBlank(detailLinks.get("DISCORD"))) {
-            links.getChildren().add(externalBrandIcon(LauncherIcons.BrandGlyph.DISCORD, detailLinks.get("DISCORD")));
+            links.getChildren().add(externalBrandIcon(LauncherIcons.BrandGlyph.DISCORD, "Open Discord", detailLinks.get("DISCORD")));
         }
         if (!isBlank(detailLinks.get("WEBSITE"))) {
-            links.getChildren().add(externalIcon(LauncherIcons.Glyph.GLOBE, detailLinks.get("WEBSITE")));
+            links.getChildren().add(externalIcon(LauncherIcons.Glyph.GLOBE, "Open project website", detailLinks.get("WEBSITE")));
         }
         return links;
     }
@@ -3042,16 +3045,20 @@ public final class ProjectPageController {
         return button;
     }
 
-    private Button externalIcon(LauncherIcons.Glyph glyph, String url) {
+    private Button externalIcon(LauncherIcons.Glyph glyph, String tooltip, String url) {
         Button button = new Button(null, LauncherIcons.icon(glyph, 17));
         button.getStyleClass().add("project-detail-external-button");
+        button.setAccessibleText(tooltip);
+        button.setTooltip(new Tooltip(tooltip));
         button.setOnAction(event -> openUrlInBrowser(absoluteExternalUrl(url)));
         return button;
     }
 
-    private Button externalBrandIcon(LauncherIcons.BrandGlyph glyph, String url) {
+    private Button externalBrandIcon(LauncherIcons.BrandGlyph glyph, String tooltip, String url) {
         Button button = new Button(null, LauncherIcons.brandIcon(glyph, 17));
         button.getStyleClass().add("project-detail-external-button");
+        button.setAccessibleText(tooltip);
+        button.setTooltip(new Tooltip(tooltip));
         button.setOnAction(event -> openUrlInBrowser(absoluteExternalUrl(url)));
         return button;
     }

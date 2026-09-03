@@ -8516,10 +8516,6 @@
     -fx-border-color: rgba(255, 255, 255, 0.08);
 }
 
-.library-actions .library-world-utility-action {
-    -fx-padding: 0 13px;
-}
-
 .library-actions .library-action-emphasis {
     -fx-effect: null;
 }

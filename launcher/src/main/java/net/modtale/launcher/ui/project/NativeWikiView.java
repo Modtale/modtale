@@ -13,6 +13,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TitledPane;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -229,6 +230,7 @@ final class NativeWikiView {
                     initiallyOpen ? LauncherIcons.Glyph.CHEVRON_DOWN : LauncherIcons.Glyph.CHEVRON_RIGHT, 14));
             toggle.getStyleClass().add("project-wiki-tree-toggle");
             toggle.setAccessibleText((initiallyOpen ? "Collapse " : "Expand ") + node.title());
+            toggle.setTooltip(new Tooltip((initiallyOpen ? "Collapse " : "Expand ") + node.title()));
             toggle.setOnAction(event -> {
                 boolean show = !children.isManaged();
                 children.setManaged(show);
@@ -236,6 +238,7 @@ final class NativeWikiView {
                 toggle.setGraphic(LauncherIcons.icon(
                         show ? LauncherIcons.Glyph.CHEVRON_DOWN : LauncherIcons.Glyph.CHEVRON_RIGHT, 14));
                 toggle.setAccessibleText((show ? "Collapse " : "Expand ") + node.title());
+                toggle.getTooltip().setText((show ? "Collapse " : "Expand ") + node.title());
             });
             row.getChildren().add(toggle);
         }

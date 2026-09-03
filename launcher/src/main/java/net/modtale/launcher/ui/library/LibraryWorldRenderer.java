@@ -124,11 +124,12 @@ final class LibraryWorldRenderer {
         refresh.setAccessibleText("Refresh library");
         refresh.setTooltip(new Tooltip("Rescan installed projects and worlds"));
         refresh.setOnAction(event -> refreshLibrary.run());
-        Button updates = secondaryButton("Check updates");
-        updates.getStyleClass().addAll("small", "library-world-utility-action");
+        Button updates = secondaryButton("Check for updates");
+        updates.getStyleClass().addAll("small", "library-compact-icon-action");
         updates.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 14));
-        updates.setMinWidth(Region.USE_PREF_SIZE);
-        updates.setTooltip(new Tooltip("Check installed projects for updates"));
+        updates.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+        updates.setAccessibleText("Check for updates");
+        updates.setTooltip(new Tooltip("Check for updates"));
         updates.setOnAction(event -> checkUpdates.run());
         Region actionGap = new Region();
         actionGap.setMinWidth(6);

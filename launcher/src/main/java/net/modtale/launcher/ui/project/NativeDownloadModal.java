@@ -25,6 +25,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
@@ -459,6 +460,8 @@ final class NativeDownloadModal {
 
         Button download = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 16));
         download.getStyleClass().add("download-modal-file-download");
+        download.setAccessibleText("Install this version");
+        download.setTooltip(new Tooltip("Install this version"));
         download.setOnAction(event -> install(entry));
 
         main.getChildren().addAll(icon, copy, download);

@@ -14,6 +14,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -243,6 +244,8 @@ public final class GameVersionDropdown extends VBox {
         Button expand = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_RIGHT, 13));
         expand.getStyleClass().add("game-version-dropdown-expand");
         expand.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+        expand.setAccessibleText((expandedGroups.contains(group.label()) ? "Collapse " : "Expand ") + group.label());
+        expand.setTooltip(new Tooltip((expandedGroups.contains(group.label()) ? "Collapse " : "Expand ") + group.label()));
         expand.setOnAction(event -> toggleGroupExpanded(group.label()));
         expand.getGraphic().setRotate(expandedGroups.contains(group.label()) ? 90 : 0);
 

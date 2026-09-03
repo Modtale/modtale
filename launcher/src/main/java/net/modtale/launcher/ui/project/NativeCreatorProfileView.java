@@ -344,6 +344,7 @@ final class NativeCreatorProfileView {
         Button button = new Button(null, LauncherIcons.icon(glyph, 20));
         button.getStyleClass().add("creator-profile-icon-action");
         button.setAccessibleText(accessibleText);
+        button.setTooltip(new Tooltip(accessibleText));
         return button;
     }
 
@@ -431,6 +432,7 @@ final class NativeCreatorProfileView {
         Button button = new Button(null, socialIcon(provider));
         button.getStyleClass().addAll("creator-profile-social-button", provider);
         button.setAccessibleText(provider + " profile");
+        button.setTooltip(new Tooltip("Open " + provider + " profile"));
         String url = socialUrl(account);
         button.setOnAction(event -> openUrl.accept(url));
         return button;

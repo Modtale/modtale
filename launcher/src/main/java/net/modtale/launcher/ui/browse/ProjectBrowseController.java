@@ -502,7 +502,7 @@ public final class ProjectBrowseController {
         jumpPageField.getStyleClass().add("pagination-jump-input");
         jumpPageField.setOnAction(event -> submitJumpPage());
         jumpPageField.textProperty().addListener((observable, oldValue, newValue) -> updateJumpPageState());
-        jumpPageButton = paginationIconButton(LauncherIcons.Glyph.CORNER_DOWN_LEFT, "Go");
+        jumpPageButton = paginationIconButton(LauncherIcons.Glyph.CORNER_DOWN_LEFT, "Go to page");
         jumpPageButton.getStyleClass().add("pagination-jump-button");
         jumpPageButton.setOnAction(event -> submitJumpPage());
         paginationJumpShell.getChildren().setAll(jumpLabel, jumpPageField, jumpPageButton);
@@ -516,6 +516,7 @@ public final class ProjectBrowseController {
         button.getStyleClass().addAll("pagination-button", "pagination-icon-button");
         button.setGraphic(LauncherIcons.icon(glyph, 16));
         button.setAccessibleText(accessibleText);
+        button.setTooltip(new Tooltip(accessibleText));
         button.setMinSize(36, 36);
         button.setPrefSize(36, 36);
         button.setMaxSize(36, 36);
