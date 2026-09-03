@@ -108,6 +108,9 @@ public final class LauncherShell {
     private final Map<LauncherView, Node> navButtons = new LinkedHashMap<>();
     private final Map<BrowseOptions.BrowseViewOption, Button> railButtons = new LinkedHashMap<>();
     private final List<PauseTransition> stageVisibilityRetries = new ArrayList<>();
+    private Cursor pendingNativeCursor;
+    private Cursor appliedNativeCursor;
+    private boolean nativeCursorUpdateScheduled;
     private final StackPane viewDeck;
     private final Label pageTitle = new Label();
     private final Label pageSubtitle = new Label();
@@ -258,6 +261,7 @@ public final class LauncherShell {
         if (undecoratedWindow) {
             configureWindowResize(scene);
         }
+        configureNativeCursor(scene);
         primaryStage.setTitle("Modtale Launcher");
         primaryStage.setResizable(true);
         primaryStage.setMinWidth(boundedStageMinimum(MIN_STAGE_WIDTH, visualBounds.getWidth()));
@@ -573,6 +577,43 @@ public final class LauncherShell {
         scene.addEventFilter(MouseEvent.MOUSE_PRESSED, this::startWindowResize);
         scene.addEventFilter(MouseEvent.MOUSE_DRAGGED, this::dragFallbackResize);
         scene.addEventFilter(MouseEvent.MOUSE_RELEASED, event -> fallbackResizeDirection = null);
+    }
+
+    private void configureNativeCursor(Scene scene) {
+        scene.addEventFilter(MouseEvent.MOUSE_MOVED, event -> queueNativeCursor(scene, event));
+        scene.addEventFilter(MouseEvent.MOUSE_DRAGGED, event -> queueNativeCursor(scene, event));
+        scene.addEventFilter(MouseEvent.MOUSE_ENTERED_TARGET, event -> queueNativeCursor(scene, event));
+    }
+
+    private void queueNativeCursor(Scene scene, MouseEvent event) {
+        Cursor cursor = effectiveCursor(scene, event);
+        if (cursor == pendingNativeCursor || (pendingNativeCursor == null && cursor == appliedNativeCursor)) {
+            return;
+        }
+        pendingNativeCursor = cursor;
+        if (nativeCursorUpdateScheduled) {
+            return;
+        }
+        nativeCursorUpdateScheduled = true;
+        Platform.runLater(() -> {
+            nativeCursorUpdateScheduled = false;
+            Cursor next = pendingNativeCursor;
+            pendingNativeCursor = null;
+            if (next != appliedNativeCursor && LinuxWindowManagerSupport.applySystemCursor(stage, next)) {
+                appliedNativeCursor = next;
+            }
+        });
+    }
+
+    private static Cursor effectiveCursor(Scene scene, MouseEvent event) {
+        Node node = event.getTarget() instanceof Node target ? target : null;
+        while (node != null) {
+            if (node.getCursor() != null) {
+                return node.getCursor();
+            }
+            node = node.getParent();
+        }
+        return scene.getCursor() == null ? Cursor.DEFAULT : scene.getCursor();
     }
 
     private void startWindowResize(MouseEvent event) {
