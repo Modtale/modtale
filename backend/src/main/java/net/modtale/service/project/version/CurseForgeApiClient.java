@@ -3,6 +3,8 @@ package net.modtale.service.project.version;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -10,9 +12,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import net.modtale.config.properties.AppCurseForgeProperties;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.http.RequestEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
@@ -23,15 +28,25 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class CurseForgeApiClient {
 
     private static final int MAX_FILES = 20;
+    private static final int MAX_CACHE_ENTRIES = 500;
+    private static final Duration CACHE_TTL = Duration.ofMinutes(10);
     private static final String API_BASE = "https://api.curseforge.com";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final AppCurseForgeProperties properties;
     private final RestTemplate restTemplate;
+    private final ConcurrentMap<String, CachedProject> cache = new ConcurrentHashMap<>();
 
     @Autowired
     public CurseForgeApiClient(AppCurseForgeProperties properties) {
-        this(properties, new RestTemplate());
+        this(properties, createRestTemplate());
+    }
+
+    private static RestTemplate createRestTemplate() {
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(3));
+        requestFactory.setReadTimeout(Duration.ofSeconds(5));
+        return new RestTemplate(requestFactory);
     }
 
     CurseForgeApiClient(AppCurseForgeProperties properties, RestTemplate restTemplate) {
@@ -44,9 +59,17 @@ public class CurseForgeApiClient {
     }
 
     public Optional<CurseForgeProject> resolveProject(String slug, String requestedFileId) {
-        if (!properties.isConfigured() || slug == null || slug.isBlank()) {
+        if (!properties.isConfigured() || slug == null || slug.isBlank()
+                || (requestedFileId != null && !requestedFileId.matches("[0-9]+"))) {
             return Optional.empty();
         }
+
+        String cacheKey = slug.toLowerCase(Locale.ROOT) + ":" + (requestedFileId == null ? "latest" : requestedFileId);
+        CachedProject cached = cache.get(cacheKey);
+        if (cached != null && cached.expiresAt().isAfter(Instant.now())) {
+            return Optional.of(cached.project());
+        }
+        if (cached != null) cache.remove(cacheKey, cached);
 
         try {
             URI searchUri = UriComponentsBuilder.fromUriString(API_BASE)
@@ -68,23 +91,16 @@ public class CurseForgeApiClient {
             long projectId = project.path("id").asLong(0);
             if (projectId <= 0 || resolvedSlug == null || !resolvedSlug.equalsIgnoreCase(slug)
                     || project.path("gameId").asLong(0) != properties.hytaleGameId()
-                    || !project.path("isAvailable").asBoolean(true)) {
+                    || !project.path("isAvailable").asBoolean(false)) {
                 return Optional.empty();
             }
 
-            URI filesUri = UriComponentsBuilder.fromUriString(API_BASE)
-                    .path("/v1/mods/{projectId}/files")
-                    .queryParam("pageSize", 50)
-                    .buildAndExpand(projectId)
-                    .encode()
-                    .toUri();
-            JsonNode filesEnvelope = get(filesUri);
-            List<CurseForgeFile> files = parseFiles(filesEnvelope.path("data"), projectId);
-            if (requestedFileId != null && files.stream().noneMatch(file -> requestedFileId.equals(file.id()))) {
-                return Optional.empty();
-            }
+            List<CurseForgeFile> files = requestedFileId == null
+                    ? getRecentFiles(projectId)
+                    : getExactFile(projectId, requestedFileId);
+            if (requestedFileId != null && files.isEmpty()) return Optional.empty();
 
-            return Optional.of(new CurseForgeProject(
+            CurseForgeProject resolved = new CurseForgeProject(
                     Long.toString(projectId),
                     resolvedSlug,
                     text(project, "name"),
@@ -92,10 +108,33 @@ public class CurseForgeApiClient {
                     project.path("logo").path("thumbnailUrl").textValue(),
                     project.has("allowModDistribution") ? project.path("allowModDistribution").booleanValue() : null,
                     files
-            ));
+            );
+            if (cache.size() >= MAX_CACHE_ENTRIES) cache.clear();
+            cache.put(cacheKey, new CachedProject(resolved, Instant.now().plus(CACHE_TTL)));
+            return Optional.of(resolved);
         } catch (RestClientException | IllegalArgumentException | java.io.IOException ex) {
             return Optional.empty();
         }
+    }
+
+    private List<CurseForgeFile> getRecentFiles(long projectId) throws java.io.IOException {
+        URI filesUri = UriComponentsBuilder.fromUriString(API_BASE)
+                .path("/v1/mods/{projectId}/files")
+                .queryParam("pageSize", 50)
+                .buildAndExpand(projectId)
+                .encode()
+                .toUri();
+        return parseFiles(get(filesUri).path("data"), projectId);
+    }
+
+    private List<CurseForgeFile> getExactFile(long projectId, String fileId) throws java.io.IOException {
+        URI fileUri = UriComponentsBuilder.fromUriString(API_BASE)
+                .path("/v1/mods/{projectId}/files/{fileId}")
+                .buildAndExpand(projectId, fileId)
+                .encode()
+                .toUri();
+        CurseForgeFile file = parseFile(get(fileUri).path("data"), projectId);
+        return file == null ? List.of() : List.of(file);
     }
 
     private JsonNode get(URI uri) throws java.io.IOException {
@@ -117,11 +156,19 @@ public class CurseForgeApiClient {
         }
         List<CurseForgeFile> files = new ArrayList<>();
         for (JsonNode file : data) {
-            long fileId = file.path("id").asLong(0);
-            if (fileId <= 0 || file.path("modId").asLong(0) != projectId || !file.path("isAvailable").asBoolean(true)) {
-                continue;
-            }
-            files.add(new CurseForgeFile(
+            CurseForgeFile parsed = parseFile(file, projectId);
+            if (parsed != null) files.add(parsed);
+        }
+        files.sort(Comparator.comparing(CurseForgeFile::fileDate, Comparator.nullsLast(String::compareTo)).reversed());
+        return files.stream().limit(MAX_FILES).toList();
+    }
+
+    private CurseForgeFile parseFile(JsonNode file, long projectId) {
+        long fileId = file.path("id").asLong(0);
+        if (fileId <= 0 || file.path("modId").asLong(0) != projectId || !file.path("isAvailable").asBoolean(false)) {
+            return null;
+        }
+        return new CurseForgeFile(
                     Long.toString(fileId),
                     text(file, "displayName"),
                     text(file, "fileName"),
@@ -135,10 +182,7 @@ public class CurseForgeApiClient {
                     file.path("fileStatus").canConvertToInt() && file.path("fileStatus").asInt() > 0
                             ? file.path("fileStatus").asInt() : null,
                     true
-            ));
-        }
-        files.sort(Comparator.comparing(CurseForgeFile::fileDate, Comparator.nullsLast(String::compareTo)).reversed());
-        return files.stream().limit(MAX_FILES).toList();
+            );
     }
 
     private Map<String, String> parseHashes(JsonNode hashes) {
@@ -211,4 +255,6 @@ public class CurseForgeApiClient {
             Integer fileStatus,
             boolean available
     ) {}
+
+    private record CachedProject(CurseForgeProject project, Instant expiresAt) {}
 }

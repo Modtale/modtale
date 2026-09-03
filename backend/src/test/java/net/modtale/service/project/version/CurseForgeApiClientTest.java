@@ -23,7 +23,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 class CurseForgeApiClientTest {
 
     @Test
-    void usesDocumentedAuthenticatedEndpointsAndFiltersUnavailableOrMismatchedFiles() {
+    void usesTheDocumentedExactFileEndpointPersistsMetadataAndCachesSuccesses() {
         RestTemplate restTemplate = new RestTemplate();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
         CurseForgeApiClient client = new CurseForgeApiClient(properties(), restTemplate);
@@ -35,15 +35,11 @@ class CurseForgeApiClientTest {
                 .andRespond(withSuccess("""
                         {"data":[{"id":1450386,"gameId":1234,"name":"Simple Compost","slug":"simple-compost","summary":"Compost things","isAvailable":true,"allowModDistribution":false,"logo":{"thumbnailUrl":"https://example.test/icon.png"}}]}
                         """, MediaType.APPLICATION_JSON));
-        server.expect(once(), requestTo("https://api.curseforge.com/v1/mods/1450386/files?pageSize=50"))
+        server.expect(once(), requestTo("https://api.curseforge.com/v1/mods/1450386/files/8227810"))
                 .andExpect(method(HttpMethod.GET))
                 .andExpect(header("x-api-key", "approved-test-key"))
                 .andRespond(withSuccess("""
-                        {"data":[
-                          {"id":8227810,"modId":1450386,"isAvailable":true,"displayName":"1.0.0","fileName":"SimpleCompost-1.0.0.jar","releaseType":1,"fileStatus":4,"fileDate":"2026-08-01T00:00:00Z","fileLength":2048,"gameVersions":["2026.08"],"hashes":[{"algo":1,"value":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},{"algo":2,"value":"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"}]},
-                          {"id":8227809,"modId":1450386,"isAvailable":false,"displayName":"withdrawn","fileName":"withdrawn.jar","releaseType":1,"fileDate":"2026-08-02T00:00:00Z"},
-                          {"id":8227808,"modId":999,"isAvailable":true,"displayName":"wrong project","fileName":"wrong.jar","releaseType":2,"fileDate":"2026-08-03T00:00:00Z"}
-                        ]}
+                        {"data":{"id":8227810,"modId":1450386,"isAvailable":true,"displayName":"1.0.0","fileName":"SimpleCompost-1.0.0.jar","releaseType":1,"fileStatus":4,"fileDate":"2026-08-01T00:00:00Z","fileLength":2048,"gameVersions":["2026.08"],"hashes":[{"algo":1,"value":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},{"algo":2,"value":"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"}]}}
                         """, MediaType.APPLICATION_JSON));
 
         CurseForgeApiClient.CurseForgeProject project = client.resolveProject("simple-compost", "8227810").orElseThrow();
@@ -58,6 +54,34 @@ class CurseForgeApiClientTest {
         assertEquals("b".repeat(32), project.files().getFirst().hashes().get("md5"));
         assertEquals(List.of("2026.08"), project.files().getFirst().gameVersions());
         assertEquals(false, project.distributionAllowed());
+
+        CurseForgeApiClient.CurseForgeProject cached = client.resolveProject("simple-compost", "8227810").orElseThrow();
+        assertEquals(project, cached);
+        server.verify();
+    }
+
+    @Test
+    void listsRecentFilesAndFiltersUnavailableOrMismatchedResults() {
+        RestTemplate restTemplate = new RestTemplate();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        CurseForgeApiClient client = new CurseForgeApiClient(properties(), restTemplate);
+        server.expect(requestTo("https://api.curseforge.com/v1/mods/search?gameId=1234&slug=simple-compost&pageSize=1"))
+                .andRespond(withSuccess("""
+                        {"data":[{"id":1450386,"gameId":1234,"name":"Simple Compost","slug":"simple-compost","isAvailable":true}]}
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(requestTo("https://api.curseforge.com/v1/mods/1450386/files?pageSize=50"))
+                .andRespond(withSuccess("""
+                        {"data":[
+                          {"id":3,"modId":1450386,"isAvailable":true,"displayName":"older","fileDate":"2026-08-01T00:00:00Z"},
+                          {"id":4,"modId":1450386,"isAvailable":true,"displayName":"newer","fileDate":"2026-09-01T00:00:00Z"},
+                          {"id":5,"modId":1450386,"isAvailable":false,"displayName":"withdrawn"},
+                          {"id":6,"modId":999,"isAvailable":true,"displayName":"wrong project"}
+                        ]}
+                        """, MediaType.APPLICATION_JSON));
+
+        CurseForgeApiClient.CurseForgeProject project = client.resolveProject("simple-compost", null).orElseThrow();
+
+        assertEquals(List.of("4", "3"), project.files().stream().map(CurseForgeApiClient.CurseForgeFile::id).toList());
         server.verify();
     }
 
@@ -111,8 +135,8 @@ class CurseForgeApiClientTest {
                 .andRespond(withSuccess("""
                         {"data":[{"id":1450386,"gameId":1234,"name":"Simple Compost","slug":"simple-compost","isAvailable":true}]}
                         """, MediaType.APPLICATION_JSON));
-        server.expect(requestTo("https://api.curseforge.com/v1/mods/1450386/files?pageSize=50"))
-                .andRespond(withSuccess("{\"data\":[]}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo("https://api.curseforge.com/v1/mods/1450386/files/8227810"))
+                .andRespond(withSuccess("{\"data\":{\"id\":8227810,\"modId\":1450386,\"isAvailable\":false}}", MediaType.APPLICATION_JSON));
 
         assertTrue(client.resolveProject("simple-compost", "8227810").isEmpty());
         server.verify();
