@@ -12,6 +12,7 @@ import net.modtale.model.dto.response.project.BundleDownloadUrlResponse;
 import net.modtale.model.dto.response.project.DownloadUrlResponse;
 import net.modtale.model.dto.response.project.VersionDependenciesView;
 import net.modtale.model.user.User;
+import net.modtale.model.project.ModpackTarget;
 import net.modtale.service.project.version.VersionApplicationService;
 import net.modtale.service.project.version.VersionDownloadPayload;
 import net.modtale.service.user.account.AccountService;
@@ -136,12 +137,14 @@ public class VersionController {
             @PathVariable String id,
             @PathVariable String version,
             @RequestParam(value = "gameVersion", required = false) String gameVersion,
+            @RequestParam(value = "target", defaultValue = "UNIVERSAL") ModpackTarget target,
             Authentication authentication
     ) {
         return ResponseEntity.ok(versionApplicationService.createDownloadUrl(
                 id,
                 version,
                 gameVersion,
+                target,
                 accountService.getCurrentUser(authentication)
         ));
     }

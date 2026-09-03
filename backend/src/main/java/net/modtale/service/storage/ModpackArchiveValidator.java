@@ -116,6 +116,7 @@ final class ModpackArchiveValidator {
                 || !lock.path("gameVersions").isArray() || !lock.path("entries").isArray()) {
             throw new IOException("Modpack lockfile has an unsupported format.");
         }
+        validateTargets(legacy, manifest, lock);
 
         Set<String> expectedFiles = new HashSet<>(METADATA_FILES);
         for (JsonNode item : lock.path("entries")) {
@@ -164,6 +165,20 @@ final class ModpackArchiveValidator {
     private static void validateEnvironment(JsonNode item) throws IOException {
         if (!Set.of("COMMON", "CLIENT", "SERVER").contains(item.path("environment").asText())) {
             throw new IOException("Modpack entry has an unknown environment.");
+        }
+    }
+
+    private static void validateTargets(JsonNode legacy, JsonNode manifest, JsonNode lock) throws IOException {
+        String manifestTarget = manifest.path("target").asText("");
+        String lockTarget = lock.path("target").asText("");
+        String legacyTarget = legacy.path("target").asText("");
+        if (manifestTarget.isBlank() && lockTarget.isBlank() && legacyTarget.isBlank()) {
+            return;
+        }
+        if (!Set.of("UNIVERSAL", "CLIENT", "SERVER").contains(manifestTarget)
+                || !manifestTarget.equals(lockTarget)
+                || !manifestTarget.equals(legacyTarget)) {
+            throw new IOException("Modpack metadata has an unknown or inconsistent target.");
         }
     }
 

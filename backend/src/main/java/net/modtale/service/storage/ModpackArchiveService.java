@@ -21,6 +21,7 @@ import java.util.zip.ZipOutputStream;
 import net.modtale.exception.StorageDownloadException;
 import net.modtale.exception.StorageUploadException;
 import net.modtale.model.project.Project;
+import net.modtale.model.project.ModpackTarget;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.repository.project.ProjectRepository;
@@ -46,13 +47,20 @@ final class ModpackArchiveService {
     }
 
     byte[] generateModpackZip(Project pack, ProjectVersion version) throws IOException {
-        byte[] cachedArchive = downloadCachedArchive(pack, version);
+        return generateModpackZip(pack, version, ModpackTarget.UNIVERSAL);
+    }
+
+    byte[] generateModpackZip(Project pack, ProjectVersion version, ModpackTarget target) throws IOException {
+        ModpackTarget effectiveTarget = target == null ? ModpackTarget.UNIVERSAL : target;
+        byte[] cachedArchive = effectiveTarget == ModpackTarget.UNIVERSAL ? downloadCachedArchive(pack, version) : null;
         if (cachedArchive != null) {
             return cachedArchive;
         }
 
-        byte[] zipBytes = buildArchive(pack, version);
-        cacheArchive(pack, version, zipBytes);
+        byte[] zipBytes = buildArchive(pack, version, effectiveTarget);
+        if (effectiveTarget == ModpackTarget.UNIVERSAL) {
+            cacheArchive(pack, version, zipBytes);
+        }
         return zipBytes;
     }
 
@@ -86,13 +94,13 @@ final class ModpackArchiveService {
         }
     }
 
-    private byte[] buildArchive(Project pack, ProjectVersion version) throws IOException {
-        List<PreparedDependency> preparedDependencies = prepareDependencies(version);
+    private byte[] buildArchive(Project pack, ProjectVersion version, ModpackTarget target) throws IOException {
+        List<PreparedDependency> preparedDependencies = prepareDependencies(version, target);
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(output)) {
-            writeJsonEntry(zip, LEGACY_MANIFEST, legacyManifest(pack, version));
-            writeJsonEntry(zip, MANIFEST, authorManifest(pack, version));
-            writeJsonEntry(zip, LOCKFILE, lockfile(pack, version, preparedDependencies));
+            writeJsonEntry(zip, LEGACY_MANIFEST, legacyManifest(pack, version, target));
+            writeJsonEntry(zip, MANIFEST, authorManifest(pack, version, target));
+            writeJsonEntry(zip, LOCKFILE, lockfile(pack, version, preparedDependencies, target));
             for (PreparedDependency prepared : preparedDependencies) {
                 if (prepared.bytes() != null) {
                     writeBinaryEntry(zip, prepared.path(), prepared.bytes());
@@ -104,7 +112,7 @@ final class ModpackArchiveService {
         return archive;
     }
 
-    private List<PreparedDependency> prepareDependencies(ProjectVersion version) throws IOException {
+    private List<PreparedDependency> prepareDependencies(ProjectVersion version, ModpackTarget target) throws IOException {
         if (version.getDependencies() == null) {
             return List.of();
         }
@@ -115,6 +123,9 @@ final class ModpackArchiveService {
         archiveKeys.add(LOCKFILE.toLowerCase(Locale.ROOT));
         List<PreparedDependency> prepared = new ArrayList<>();
         for (ProjectDependency dependency : version.getDependencies()) {
+            if (!includedInTarget(dependency, target)) {
+                continue;
+            }
             prepared.add(dependency.isExternal()
                     ? prepareExternalDependency(dependency, archiveKeys)
                     : prepareModtaleDependency(dependency, archiveKeys));
@@ -173,34 +184,39 @@ final class ModpackArchiveService {
         }
     }
 
-    private Map<String, Object> legacyManifest(Project pack, ProjectVersion version) {
+    private Map<String, Object> legacyManifest(Project pack, ProjectVersion version, ModpackTarget target) {
         Map<String, Object> manifest = packIdentity(pack, version);
         manifest.put("name", pack.getTitle());
         manifest.put("formatVersion", 1);
         manifest.put("game", "hytale");
-        manifest.put("files", authorDependencies(version));
+        manifest.put("target", target.name());
+        manifest.put("files", authorDependencies(version, target));
         return manifest;
     }
 
-    private Map<String, Object> authorManifest(Project pack, ProjectVersion version) {
+    private Map<String, Object> authorManifest(Project pack, ProjectVersion version, ModpackTarget target) {
         Map<String, Object> manifest = new LinkedHashMap<>();
         manifest.put("format", "modtale-pack");
         manifest.put("schemaVersion", 1);
         manifest.put("pack", packIdentity(pack, version));
+        manifest.put("target", target.name());
         Map<String, Object> game = new LinkedHashMap<>();
         game.put("id", "hytale");
         game.put("versions", version.getGameVersions() == null ? List.of() : version.getGameVersions());
         manifest.put("game", game);
-        manifest.put("dependencies", authorDependencies(version));
+        manifest.put("dependencies", authorDependencies(version, target));
         return manifest;
     }
 
-    private List<Map<String, Object>> authorDependencies(ProjectVersion version) {
+    private List<Map<String, Object>> authorDependencies(ProjectVersion version, ModpackTarget target) {
         if (version.getDependencies() == null) {
             return List.of();
         }
         List<Map<String, Object>> dependencies = new ArrayList<>();
         for (ProjectDependency dependency : version.getDependencies()) {
+            if (!includedInTarget(dependency, target)) {
+                continue;
+            }
             Map<String, Object> item = baseDependency(dependency);
             if (dependency.isExternal()) {
                 putIfPresent(item, "externalId", dependency.getExternalId());
@@ -217,12 +233,14 @@ final class ModpackArchiveService {
     private Map<String, Object> lockfile(
             Project pack,
             ProjectVersion version,
-            List<PreparedDependency> preparedDependencies
+            List<PreparedDependency> preparedDependencies,
+            ModpackTarget target
     ) {
         Map<String, Object> lock = new LinkedHashMap<>();
         lock.put("format", "modtale-lock");
         lock.put("lockVersion", 1);
         lock.put("pack", packIdentity(pack, version));
+        lock.put("target", target.name());
         lock.put("gameVersions", version.getGameVersions() == null ? List.of() : version.getGameVersions());
 
         List<Map<String, Object>> entries = new ArrayList<>();
@@ -259,6 +277,10 @@ final class ModpackArchiveService {
         }
         lock.put("entries", entries);
         return lock;
+    }
+
+    private boolean includedInTarget(ProjectDependency dependency, ModpackTarget target) {
+        return target.includes(dependency.getEnvironment());
     }
 
     private Map<String, Object> packIdentity(Project pack, ProjectVersion version) {

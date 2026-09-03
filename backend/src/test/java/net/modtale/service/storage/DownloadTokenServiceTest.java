@@ -3,6 +3,7 @@ package net.modtale.service.storage;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import net.modtale.model.project.ModpackTarget;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -39,6 +40,18 @@ class DownloadTokenServiceTest {
         assertTrue(result.isUsed());
         assertNull(downloadTokenService.validateAndConsume(token));
         assertEquals(0, downloadTokenService.getActiveTokenCount());
+    }
+
+    @Test
+    void generateTokenPreservesModpackTarget() {
+        String token = downloadTokenService.generateToken(
+                "pack-1", "1.2.3", "2026.9", null, ModpackTarget.SERVER
+        );
+
+        DownloadTokenService.DownloadToken result = downloadTokenService.validateAndConsume(token);
+
+        assertNotNull(result);
+        assertEquals(ModpackTarget.SERVER, result.getModpackTarget());
     }
 
     @Test

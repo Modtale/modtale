@@ -17,6 +17,7 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
+import net.modtale.model.project.ModpackTarget;
 import net.modtale.repository.project.ProjectRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -195,6 +196,43 @@ class ModpackArchiveServiceTest {
         byte[] second = service.generateModpackZip(pack, version);
 
         assertArrayEquals(first, second);
+    }
+
+    @Test
+    void generateModpackZipFiltersClientAndServerVariantsWithoutCachingThem() throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", "modpacks/universal.zip");
+        ProjectDependency common = new ProjectDependency("common", "Common", "1.0.0");
+        ProjectDependency client = new ProjectDependency("client", "Client", "1.0.0");
+        client.setEnvironment(ProjectDependency.Environment.CLIENT);
+        ProjectDependency server = new ProjectDependency("server", "Server", "1.0.0");
+        server.setEnvironment(ProjectDependency.Environment.SERVER);
+        version.setDependencies(List.of(common, client, server));
+
+        for (ProjectDependency dependency : version.getDependencies()) {
+            ProjectVersion dependencyVersion = version("1.0.0", "files/" + dependency.getProjectId() + ".jar");
+            when(archiveSupport.resolveDependency(dependency)).thenReturn(new DownloadArchiveSupport.ResolvedDependency(
+                    dependencyProject(dependency.getProjectId(), ProjectClassification.PLUGIN), dependencyVersion
+            ));
+            when(archiveSupport.download(dependencyVersion.getFileUrl())).thenReturn(bytes(dependency.getProjectId()));
+            when(archiveSupport.extractOriginalFilename(dependencyVersion.getFileUrl())).thenReturn(dependency.getProjectId() + ".jar");
+        }
+
+        Map<String, String> clientEntries = unzip(service.generateModpackZip(pack, version, ModpackTarget.CLIENT));
+        JsonNode clientLock = new ObjectMapper().readTree(clientEntries.get("modtale.lock.json"));
+        Map<String, String> serverEntries = unzip(service.generateModpackZip(pack, version, ModpackTarget.SERVER));
+        JsonNode serverLock = new ObjectMapper().readTree(serverEntries.get("modtale.lock.json"));
+
+        assertEquals("CLIENT", clientLock.get("target").asText());
+        assertTrue(clientEntries.containsKey("common.jar"));
+        assertTrue(clientEntries.containsKey("client.jar"));
+        assertFalse(clientEntries.containsKey("server.jar"));
+        assertEquals("SERVER", serverLock.get("target").asText());
+        assertTrue(serverEntries.containsKey("common.jar"));
+        assertFalse(serverEntries.containsKey("client.jar"));
+        assertTrue(serverEntries.containsKey("server.jar"));
+        assertEquals("modpacks/universal.zip", version.getFileUrl());
+        verify(projectRepository, never()).save(pack);
     }
 
     @Test

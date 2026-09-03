@@ -182,7 +182,7 @@ interface DownloadModalProps {
     versionsByGame: Record<string, any[]>;
     preReleaseGameVersions?: string[];
     orderedGameVersions: string[];
-    onDownload: (url: string, number: string, gameVersion: string, deps: any[], channel: string) => void;
+    onDownload: (url: string, number: string, gameVersion: string, deps: any[], channel: string, target?: ModpackTarget) => void;
     showExperimental: boolean;
     onToggleExperimental: () => void;
     onViewHistory: () => void;
@@ -191,9 +191,12 @@ interface DownloadModalProps {
     containerRef?: React.Ref<HTMLDivElement>;
 }
 
+type ModpackTarget = 'UNIVERSAL' | 'CLIENT' | 'SERVER';
+
 export const DownloadModal: React.FC<DownloadModalProps> = ({
                                                                 show, onClose, versionsByGame, preReleaseGameVersions = [], orderedGameVersions = [], onDownload, showExperimental, onToggleExperimental, onViewHistory, isModpack = false, isInline = false, containerRef
-                                                            }) => {
+}) => {
+    const [modpackTarget, setModpackTarget] = useState<ModpackTarget>('UNIVERSAL');
     useScrollLock(show && !isInline);
     const [selectedGameVersions, setSelectedGameVersions] = useState<string[]>([]);
     const [isListExpanded, setIsListExpanded] = useState(false);
@@ -432,6 +435,14 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
         );
     };
 
+    const download = (ver: any, gameVersion: string) => {
+        if (isModpack) {
+            onDownload(ver.fileUrl, ver.versionNumber, gameVersion, ver.dependencies, ver.channel, modpackTarget);
+            return;
+        }
+        onDownload(ver.fileUrl, ver.versionNumber, gameVersion, ver.dependencies, ver.channel);
+    };
+
     const content = (
         <div ref={containerRef} className={`${isInline ? 'w-full overflow-hidden relative flex flex-col transform transition-transform duration-500' : 'fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-2xl max-h-[90dvh] flex flex-col z-[100]'} bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl rounded-2xl overflow-hidden`} onClick={e => e.stopPropagation()}>
             <div className={`p-6 flex justify-between items-center shrink-0 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-800/50`}>
@@ -470,11 +481,34 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                     />
                 </div>
 
+                {isModpack && (
+                    <div className="mb-6">
+                        <label className={`block text-xs font-bold ${theme.colors.textSecondary} uppercase mb-2 tracking-wider`}>Pack target</label>
+                        <div className={`grid grid-cols-3 gap-2 rounded-xl border ${theme.colors.border} ${theme.colors.bgSurfaceAlt} p-1.5`}>
+                            {(['UNIVERSAL', 'CLIENT', 'SERVER'] as ModpackTarget[]).map(target => (
+                                <button
+                                    type="button"
+                                    key={target}
+                                    onClick={() => setModpackTarget(target)}
+                                    className={`rounded-lg px-2 py-2 text-xs font-black transition-colors ${modpackTarget === target ? 'bg-modtale-accent text-white shadow-sm' : `${theme.colors.textSecondary} hover:${theme.colors.textPrimary}`}`}
+                                >
+                                    {target === 'UNIVERSAL' ? 'All sides' : target === 'CLIENT' ? 'Client' : 'Server'}
+                                </button>
+                            ))}
+                        </div>
+                        <p className={`mt-2 text-xs ${theme.colors.textMuted}`}>
+                            {modpackTarget === 'UNIVERSAL'
+                                ? 'Includes common, client-only, and server-only entries.'
+                                : `Excludes ${modpackTarget === 'CLIENT' ? 'server' : 'client'}-only entries.`}
+                        </p>
+                    </div>
+                )}
+
                 {latestVer ? (
                     <>
                         <button
                             type="button"
-                            onClick={() => onDownload(latestVer.fileUrl, latestVer.versionNumber, latestGameVersion, latestVer.dependencies, latestVer.channel)}
+                            onClick={() => download(latestVer, latestGameVersion)}
                             className={`w-full p-5 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 mb-6 group relative overflow-hidden ${themeClass}`}
                         >
                             <div className="font-black text-xl flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-6 h-6" /> Download Latest</div>
@@ -538,7 +572,7 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                                         </div>
                                         <button
                                             type="button"
-                                            onClick={() => onDownload(ver.fileUrl, ver.versionNumber, gameVersion, ver.dependencies, ver.channel)}
+                                            onClick={() => download(ver, gameVersion)}
                                             className={`p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-modtale-accent hover:text-white transition-colors`}
                                             aria-label={`Download version ${ver.versionNumber}`}
                                         >

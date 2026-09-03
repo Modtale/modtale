@@ -144,6 +144,18 @@ class ModpackArchiveValidatorTest {
                 () -> ModpackArchiveValidator.validate(archive)).getMessage().contains("unknown environment"));
     }
 
+    @Test
+    void rejectsInconsistentArchiveTargets() throws Exception {
+        byte[] archive = archive(List.of(
+                entry("modpack.json", legacyManifest().replace("\"files\"", "\"target\":\"CLIENT\",\"files\"")),
+                entry("manifest.json", manifest().replace("\"pack\"", "\"target\":\"CLIENT\",\"pack\"")),
+                entry("modtale.lock.json", emptyLock().replace("\"pack\"", "\"target\":\"SERVER\",\"pack\""))
+        ));
+
+        assertTrue(assertThrows(IOException.class,
+                () -> ModpackArchiveValidator.validate(archive)).getMessage().contains("inconsistent target"));
+    }
+
     private static String emptyLock() {
         return """
                 {
