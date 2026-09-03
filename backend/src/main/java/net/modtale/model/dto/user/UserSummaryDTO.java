@@ -16,5 +16,5 @@ public record UserSummaryDTO(
         ApiKey.Tier tier,
         List<String> roles,
         User.AccountType accountType,
-        List<String> badges
+        List<Object> badges
 ) {}
