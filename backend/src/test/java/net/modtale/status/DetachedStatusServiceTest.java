@@ -2,6 +2,7 @@ package net.modtale.status;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -34,9 +35,40 @@ class DetachedStatusServiceTest {
         assertEquals(SystemStatus.DEGRADED, status.overall());
         assertEquals(4, status.services().size());
         assertEquals(1, status.history().size());
+        assertEquals(1, status.observedSamples());
+        assertEquals(1_440, status.expectedSamples());
+        assertFalse(status.stale());
+        assertTrue(service.isReady());
         assertEquals("site", status.services().getFirst().id());
         verify(mongoStatusStore).saveHistory(entry);
         verify(snapshotFileStore).writeHistory(List.of(entry));
+    }
+
+    @Test
+    void staleHistoryCannotReportTheMonitorAsReadyOrFullyOperational() {
+        StatusServiceProperties properties = new StatusServiceProperties();
+        properties.setStaleAfter(java.time.Duration.ofMinutes(3));
+        StatusHistoryEntry stale = entry(Instant.now().minusSeconds(10 * 60), SystemStatus.OPERATIONAL);
+        when(snapshotFileStore.readHistory()).thenReturn(List.of(stale));
+        when(mongoStatusStore.findHistoryAfter(any())).thenReturn(List.of());
+        when(mongoStatusStore.findLatestHistory()).thenReturn(Optional.empty());
+        when(mongoStatusStore.findIncidentBuckets()).thenReturn(Optional.of(IncidentBuckets.empty()));
+        when(statusProbeService.performHealthCheck()).thenReturn(stale);
+
+        DetachedStatusService service = new DetachedStatusService(
+                properties,
+                statusProbeService,
+                mongoStatusStore,
+                snapshotFileStore,
+                statusDiscordNotifier
+        );
+
+        service.refreshSnapshots();
+
+        SystemStatusView status = service.getSystemStatus("24h");
+        assertTrue(status.stale());
+        assertEquals(SystemStatus.DEGRADED, status.overall());
+        assertFalse(service.isReady());
     }
 
     @Test
@@ -47,7 +79,7 @@ class DetachedStatusServiceTest {
         when(snapshotFileStore.readHistory()).thenReturn(List.of(previous));
         when(mongoStatusStore.findHistoryAfter(any())).thenReturn(List.of());
         when(mongoStatusStore.findLatestHistory()).thenReturn(Optional.empty());
-        when(mongoStatusStore.findIncidentBuckets()).thenReturn(IncidentBuckets.empty());
+        when(mongoStatusStore.findIncidentBuckets()).thenReturn(Optional.of(IncidentBuckets.empty()));
         when(statusProbeService.performHealthCheck()).thenReturn(current);
 
         DetachedStatusService service = new DetachedStatusService(
@@ -70,7 +102,7 @@ class DetachedStatusServiceTest {
         when(snapshotFileStore.readHistory()).thenReturn(List.of());
         when(mongoStatusStore.findHistoryAfter(any())).thenReturn(List.of());
         when(mongoStatusStore.findLatestHistory()).thenReturn(Optional.empty());
-        when(mongoStatusStore.findIncidentBuckets()).thenReturn(IncidentBuckets.empty());
+        when(mongoStatusStore.findIncidentBuckets()).thenReturn(Optional.of(IncidentBuckets.empty()));
         when(statusProbeService.performHealthCheck()).thenReturn(entry);
 
         return new DetachedStatusService(

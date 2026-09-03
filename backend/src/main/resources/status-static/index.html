@@ -227,7 +227,7 @@
 
         .metrics {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 10px;
             margin-top: 24px;
         }
@@ -525,6 +525,10 @@
                     <div id="availability" class="metric-value">--</div>
                 </div>
                 <div class="metric">
+                    <div class="metric-label">Sample Coverage</div>
+                    <div id="coverage" class="metric-value">--</div>
+                </div>
+                <div class="metric">
                     <div class="metric-label">P95 Latency</div>
                     <div id="p95" class="metric-value">--</div>
                 </div>
@@ -706,9 +710,16 @@
         $('overallDot').className = `status-dot ${status}`;
         $('overallPill').className = `pill ${status}`;
         $('overallPill').textContent = label(status);
-        $('headline').textContent = copy[status].title;
-        $('summary').textContent = copy[status].summary;
+        $('headline').textContent = data.stale ? 'Monitoring data delayed' : copy[status].title;
+        $('summary').textContent = data.stale
+            ? 'The latest collection is stale, so current service health cannot be confirmed.'
+            : copy[status].summary;
         $('availability').textContent = formatPercent(availability(data));
+        const observed = Number(data.observedSamples || 0);
+        const expected = Number(data.expectedSamples || 0);
+        $('coverage').textContent = expected > 0
+            ? formatPercent(Math.min(100, observed / expected * 100))
+            : 'No data';
 
         const latencyValues = (data.history || []).flatMap((point) =>
             (data.services || []).map((service) => serviceHistoryValue(point, service.id))
@@ -716,7 +727,7 @@
         $('p95').textContent = formatLatency(percentile(latencyValues, 0.95));
 
         const lastCheck = data.timestamp ? new Date(data.timestamp) : new Date();
-        $('lastCheck').textContent = lastCheck.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        $('lastCheck').textContent = formatDateTime(lastCheck);
         $('fetchedAt').textContent = `Fetched ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     };
 
