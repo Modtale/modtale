@@ -8103,30 +8103,6 @@
     -fx-effect: none;
 }
 
-.play-launch-meta {
-    -fx-alignment: center;
-    -fx-padding: 3px 0 0 0;
-}
-
-.play-launch-meta-item {
-    -fx-min-height: 24px;
-    -fx-padding: 0 8px;
-    -fx-background-radius: 999px;
-    -fx-background-color: rgba(255, 255, 255, 0.045);
-}
-
-.play-launch-meta-label {
-    -fx-text-fill: #94a3b8;
-    -fx-font-size: 11px;
-    -fx-font-weight: 800;
-}
-
-.play-launch-meta-value {
-    -fx-text-fill: #e2e8f0;
-    -fx-font-size: 11px;
-    -fx-font-weight: 900;
-}
-
 .play-launch-split {
     -fx-min-width: 310px;
     -fx-pref-width: 310px;
@@ -8142,16 +8118,16 @@
 }
 
 .play-launch-main {
-    -fx-min-width: 250px;
-    -fx-pref-width: 250px;
+    -fx-min-width: 308px;
+    -fx-pref-width: 308px;
     -fx-min-height: 58px;
     -fx-pref-height: 58px;
     -fx-padding: 0;
     -fx-cursor: hand;
     -fx-background-color: transparent;
     -fx-border-color: transparent;
-    -fx-background-radius: 0;
-    -fx-border-radius: 0;
+    -fx-background-radius: 14px;
+    -fx-border-radius: 14px;
     -fx-font-family: "Inter Black", "Inter ExtraBold", "Inter", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 22px;
@@ -8170,17 +8146,19 @@
 }
 
 .play-launch-arrow {
-    -fx-min-width: 58px;
-    -fx-pref-width: 58px;
-    -fx-min-height: 58px;
-    -fx-pref-height: 58px;
+    -fx-min-width: 46px;
+    -fx-pref-width: 46px;
+    -fx-max-width: 46px;
+    -fx-min-height: 46px;
+    -fx-pref-height: 46px;
+    -fx-max-height: 46px;
     -fx-padding: 0;
     -fx-cursor: hand;
-    -fx-background-color: rgba(255, 255, 255, 0.06);
-    -fx-border-width: 0 0 0 1px;
-    -fx-border-color: rgba(255, 255, 255, 0.16);
-    -fx-background-radius: 0;
-    -fx-border-radius: 0;
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+    -fx-border-color: transparent;
+    -fx-background-radius: 11px;
+    -fx-border-radius: 11px;
 }
 
 .play-launch-arrow:hover {
