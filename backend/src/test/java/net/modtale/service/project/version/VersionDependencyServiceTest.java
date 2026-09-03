@@ -175,6 +175,23 @@ class VersionDependencyServiceTest {
     }
 
     @Test
+    void rejectsCurseForgeProjectsInModpacks() {
+        DependencyReferenceRequest curseForge = curseForgeDependency(
+                "https://www.curseforge.com/hytale/mods/simple-compost/files/8227810"
+        );
+        when(projectService.getRawProjectById("dep-1"))
+                .thenReturn(project("dep-1", "Dependency One", ProjectStatus.PUBLISHED, "1.0.0"));
+
+        InvalidVersionRequestException error = assertThrows(
+                InvalidVersionRequestException.class,
+                () -> service.resolveRequestedDependencies(
+                        List.of(curseForge, dependency("dep-1", "1.0.0")), true, false)
+        );
+
+        assertTrue(error.getMessage().contains("CurseForge"));
+    }
+
+    @Test
     void resolveRequestedProjectIdsTrimsBlanksAndCanRejectDrafts() {
         when(projectService.getRawProjectById("dep-1")).thenReturn(project("dep-1", "Dependency One", ProjectStatus.PUBLISHED, "1.0.0"));
         when(projectService.getRawProjectById("draft")).thenReturn(project("draft", "Draft", ProjectStatus.DRAFT, "1.0.0"));

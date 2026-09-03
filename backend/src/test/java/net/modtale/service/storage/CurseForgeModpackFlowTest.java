@@ -33,7 +33,7 @@ import static org.mockito.Mockito.when;
 class CurseForgeModpackFlowTest {
 
     @Test
-    void resolvesSavesAndPackagesCurseForgeFileAsAnAttributableReference() throws Exception {
+    void legacyCurseForgePackDataCanOnlyBePackagedAsAnAttributableReference() throws Exception {
         ProjectService projectService = mock(ProjectService.class);
         Project hostedProject = hostedProject();
         when(projectService.getRawProjectById("hosted-mod")).thenReturn(hostedProject);
@@ -41,7 +41,7 @@ class CurseForgeModpackFlowTest {
         VersionDependencyService dependencyService = new VersionDependencyService(projectService);
         VersionDependencyService.ResolvedDependencies resolved = dependencyService.resolveRequestedDependencies(
                 List.of(hostedReference(), curseForgeReference()),
-                true,
+                false,
                 false
         );
         new ExternalDependencyArtifactService().prepareExternalArtifacts(resolved.dependencies());

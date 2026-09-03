@@ -528,6 +528,11 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
         setExternalError(null);
         try {
             const resolved = await projectClient.resolveExternalProject(externalUrl.trim(), externalSource || undefined);
+            if (isModpack && resolved.source === 'CURSEFORGE') {
+                setExternalResolved(null);
+                setExternalError('CurseForge projects cannot be added to modpacks until Modtale Launcher support is available.');
+                return null;
+            }
             setExternalResolved(resolved);
             setExternalSource(resolved.source);
             setExternalTitle(current => current.trim() || resolved.title || '');
@@ -625,6 +630,9 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
     };
 
     const selectedCount = selectedDeps.length;
+    const externalSourceOptions = isModpack
+        ? EXTERNAL_SOURCE_OPTIONS.filter(option => option.value !== 'CURSEFORGE')
+        : EXTERNAL_SOURCE_OPTIONS;
 
     return (
         <div className={`space-y-4 border ${theme.colors.border} rounded-2xl p-6 ${theme.colors.bgSurface} ${disabled ? 'opacity-70' : ''}`}>
@@ -725,7 +733,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                         <div className="p-5 flex items-start justify-between gap-4 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/95">
                             <div>
                                 <h3 className={`text-lg font-black ${theme.colors.textPrimary}`}>External Reference</h3>
-                                <p className={`text-sm ${theme.colors.textMuted} mt-1`}>CurseForge, GitHub, or another Hytale source.</p>
+                                <p className={`text-sm ${theme.colors.textMuted} mt-1`}>{isModpack ? 'GitHub or another Hytale source.' : 'CurseForge, GitHub, or another Hytale source.'}</p>
                             </div>
                             <button type="button" onClick={() => setShowExternalModal(false)} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
                         </div>
@@ -739,7 +747,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                             </div>
                             <CustomDropdown
                                 value={externalSource}
-                                options={EXTERNAL_SOURCE_OPTIONS}
+                                options={externalSourceOptions}
                                 onChange={setExternalSource}
                             />
 

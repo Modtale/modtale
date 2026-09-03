@@ -4,6 +4,7 @@ import {
     getDependencyEnvironment,
     getDependencyType,
     getSelectableBundleDependencies,
+    hasCurseForgeDependencies,
     isEmbeddedDependency,
     isExternalDependency,
     isOptionalDependency,
@@ -53,6 +54,11 @@ describe('dependencyEntries', () => {
 
         expect(getSelectableBundleDependencies('MODPACK', dependencies)).toEqual([]);
         expect(getSelectableBundleDependencies('PLUGIN', dependencies)).toEqual([dependencies[0]]);
+    });
+
+    it('detects CurseForge dependencies in a modpack plan', () => {
+        expect(hasCurseForgeDependencies([dependency('REQUIRED', 'CURSEFORGE')])).toBe(true);
+        expect(hasCurseForgeDependencies([dependency('REQUIRED', 'MODTALE')])).toBe(false);
     });
 });
 

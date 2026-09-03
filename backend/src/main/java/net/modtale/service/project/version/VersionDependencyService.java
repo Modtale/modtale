@@ -48,6 +48,11 @@ public class VersionDependencyService {
             }
 
             ProjectDependency.Source source = reference.getSource();
+            if (isModpack && source == ProjectDependency.Source.CURSEFORGE) {
+                throw new InvalidVersionRequestException(
+                        "CurseForge projects cannot be added to modpacks until Modtale Launcher support is available."
+                );
+            }
             ProjectDependency dependency = source == ProjectDependency.Source.MODTALE
                     ? resolveModtaleDependency(reference, allowDraftDependencies)
                     : resolveExternalDependency(reference, source);

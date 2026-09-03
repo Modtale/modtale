@@ -19,6 +19,9 @@ export const getDependencyEnvironment = (
 export const getExternalDependencies = (dependencies?: ProjectDependency[] | null): ProjectDependency[] =>
     (dependencies || []).filter(dependency => isExternalDependency(dependency) && !isEmbeddedDependency(dependency));
 
+export const hasCurseForgeDependencies = (dependencies?: ProjectDependency[] | null): boolean =>
+    (dependencies || []).some(dependency => dependency?.source === 'CURSEFORGE');
+
 export const getSelectableBundleDependencies = (
     classification: string | null | undefined,
     dependencies?: ProjectDependency[] | null
