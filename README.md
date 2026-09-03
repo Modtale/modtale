@@ -78,7 +78,7 @@ STATUS_TARGET_API_URL=http://localhost:8080/actuator/health/readiness \
 java -jar build/libs/modtale-backend-0.0.1-SNAPSHOT-status.jar
 ```
 
-The status image is built with `backend/Dockerfile.status` and `backend/cloudbuild-status.yml` as `modtale-status`. Deploy it to a separate Cloud Run service and map the status domain or route to that service. The main frontend `/status` path redirects to `PUBLIC_STATUS_URL` (`https://status.modtale.net` by default).
+The status image is built with `backend/Dockerfile.status` and `backend/cloudbuild-status.yml` as `modtale-status`. Production CI deploys it to an always-on, single-instance Cloud Run service and maintains the `status.modtale.net` domain mapping. The main frontend `/status` path redirects to `PUBLIC_STATUS_URL` (`https://status.modtale.net` by default).
 
 ---
 
@@ -124,6 +124,8 @@ Detached status service variables:
 | `STATUS_MONGODB_URI` | Optional status-service Mongo URI; falls back to `MONGODB_URI` | empty |
 | `STATUS_R2_BUCKET_NAME` / `STATUS_R2_ACCESS_KEY` / `STATUS_R2_SECRET_KEY` / `STATUS_R2_ENDPOINT` | Optional status-service R2 credentials; each falls back to the main R2 variable | empty |
 | `STATUS_SNAPSHOT_PATH` | Local fallback history cache file | `/tmp/modtale-status-snapshot.json` |
+| `STATUS_DEGRADED_LATENCY` | Probe latency above which a service is degraded | `2s` |
+| `STATUS_STALE_AFTER` | Maximum age of a sample before readiness fails | `3m` |
 | `STATUS_REQUEST_TIMEOUT` | Probe timeout for HTTP, Mongo, and R2 checks | `5s` |
 | `STATUS_REFRESH_INTERVAL_MS` | Probe interval | `60000` |
 | `STATUS_CORS_ALLOWED_ORIGINS` | Allowed origins for status API reads | `*` |
