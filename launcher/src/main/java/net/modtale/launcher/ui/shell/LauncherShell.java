@@ -1008,7 +1008,7 @@ public final class LauncherShell {
     }
 
     private static void applyNavbarTitleFont(Labeled text) {
-        text.setFont(Font.font("Inter", FontWeight.EXTRA_BOLD, NAVBAR_TEXT_FONT_SIZE));
+        text.setFont(Font.font("Inter", FontWeight.BOLD, NAVBAR_TEXT_FONT_SIZE));
     }
 
     private void addRailButton(

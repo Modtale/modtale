@@ -47,6 +47,7 @@ import net.modtale.launcher.ui.browse.card.ProjectCardFactory;
 import net.modtale.launcher.ui.browse.card.ProjectCardViewStyle;
 import net.modtale.launcher.ui.browse.render.ProjectBrowserRenderer;
 import net.modtale.launcher.ui.common.CachedImageLoader;
+import net.modtale.launcher.ui.common.LauncherFonts;
 import net.modtale.launcher.ui.common.LauncherScrollSupport;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -69,6 +70,7 @@ class LauncherUiPerformanceProfileTest {
         if (!Boolean.getBoolean(RUN_PROPERTY) && snapshotDirectory().isBlank()) {
             return;
         }
+        LauncherFonts.load();
         System.setProperty("javafx.animation.framerate", "165");
         System.setProperty("javafx.animation.pulse", "165");
         CountDownLatch latch = new CountDownLatch(1);
@@ -80,6 +82,7 @@ class LauncherUiPerformanceProfileTest {
         assertTrue(latch.await(5, TimeUnit.SECONDS), "JavaFX did not start");
     }
 
+    @Test
     void projectAndBrowseVisualParitySnapshots() throws Exception {
         String snapshotDirectory = snapshotDirectory();
         assumeTrue(!snapshotDirectory.isBlank(), "Enable with -D" + SNAPSHOT_PROPERTY + "=/path");

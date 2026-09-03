@@ -226,7 +226,7 @@ public final class LauncherBrowseMenu {
     }
 
     private static void applyNavbarTitleFont(Label text) {
-        text.setFont(Font.font("Inter", FontWeight.EXTRA_BOLD, NAVBAR_TEXT_FONT_SIZE));
+        text.setFont(Font.font("Inter", FontWeight.BOLD, NAVBAR_TEXT_FONT_SIZE));
     }
 
     private static String navBrowseLabel(BrowseOptions.ClassificationOption option) {

@@ -9,7 +9,10 @@ public final class LauncherFonts {
     private static final AtomicBoolean LOADED = new AtomicBoolean();
     private static final String[] INTER_FONTS = {
             "/net/modtale/launcher/ui/nativefx/fonts/Inter-Regular.ttf",
+            "/net/modtale/launcher/ui/nativefx/fonts/Inter-Medium.ttf",
+            "/net/modtale/launcher/ui/nativefx/fonts/Inter-SemiBold.ttf",
             "/net/modtale/launcher/ui/nativefx/fonts/Inter-Bold.ttf",
+            "/net/modtale/launcher/ui/nativefx/fonts/Inter-ExtraBold.ttf",
             "/net/modtale/launcher/ui/nativefx/fonts/Inter-Black.ttf"
     };
 

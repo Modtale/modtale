@@ -25,7 +25,6 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
 import net.modtale.launcher.install.VersionSelector;
 import net.modtale.launcher.model.project.ProjectSummary;
 import net.modtale.launcher.model.project.ProjectVersion;
@@ -416,7 +415,7 @@ public final class ProjectCardFactory {
 
     private Label titleText(String value, String styleClass, double fontSize) {
         Label label = text(value, styleClass);
-        label.setFont(Font.font("Arial Black", FontWeight.BLACK, fontSize));
+        label.setFont(Font.font("Inter Black", fontSize));
         return label;
     }
 }
