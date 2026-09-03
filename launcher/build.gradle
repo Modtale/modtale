@@ -20,6 +20,8 @@ repositories {
     mavenCentral()
 }
 
+def currentOs = org.gradle.internal.os.OperatingSystem.current()
+
 dependencies {
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.2'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.22.2'
@@ -28,9 +30,10 @@ dependencies {
     implementation 'com.vladsch.flexmark:flexmark-ext-gfm-strikethrough:0.64.8'
     implementation 'com.vladsch.flexmark:flexmark-ext-tables:0.64.8'
     implementation 'com.vladsch.flexmark:flexmark-ext-gfm-tasklist:0.64.8'
-    implementation 'net.java.dev.jna:jna:5.19.1'
-    implementation 'org.apache.logging.log4j:log4j-api:2.26.1'
-    implementation 'org.apache.logging.log4j:log4j-core:2.26.1'
+    compileOnly 'net.java.dev.jna:jna:5.19.1'
+    if (currentOs.isLinux()) {
+        runtimeOnly 'net.java.dev.jna:jna:5.19.1'
+    }
     implementation "org.openjfx:javafx-base:21.0.12:${javafxPlatform()}"
     implementation "org.openjfx:javafx-graphics:21.0.12:${javafxPlatform()}"
     implementation "org.openjfx:javafx-controls:21.0.12:${javafxPlatform()}"
@@ -100,7 +103,6 @@ def flatpakSdk = providers.gradleProperty('flatpakSdk').orElse('org.freedesktop.
 def flatpakBranch = providers.gradleProperty('flatpakBranch').orElse('stable').get()
 def flatpakBuildDirectory = layout.buildDirectory.dir('flatpak/build')
 def flatpakRepoDirectory = layout.buildDirectory.dir('flatpak/repo')
-def currentOs = org.gradle.internal.os.OperatingSystem.current()
 def javaRuntimeModules = [
         'java.base',
         'java.datatransfer',
@@ -108,7 +110,6 @@ def javaRuntimeModules = [
         'java.logging',
         'java.net.http',
         'java.prefs',
-        'java.sql',
         'java.xml',
         'jdk.crypto.ec',
         'jdk.httpserver',

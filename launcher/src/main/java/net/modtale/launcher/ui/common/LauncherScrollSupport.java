@@ -2,6 +2,7 @@ package net.modtale.launcher.ui.common;
 
 import java.util.function.Supplier;
 import javafx.animation.PauseTransition;
+import javafx.css.PseudoClass;
 import javafx.scene.Node;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.input.ScrollEvent;
@@ -20,6 +21,7 @@ import net.modtale.launcher.ui.browse.card.ProjectCardFactory;
 public final class LauncherScrollSupport {
 
     private static final String INSTALLED_PROPERTY = LauncherScrollSupport.class.getName() + ".installed";
+    private static final PseudoClass SCROLLING = PseudoClass.getPseudoClass("scrolling");
     private static final Duration INTERACTION_IDLE_DELAY = Duration.millis(140);
 
     private final Supplier<Node> rootSupplier;
@@ -77,6 +79,7 @@ public final class LauncherScrollSupport {
         Node root = rootSupplier.get();
         if (root != null) {
             root.getProperties().put(ProjectCardFactory.SCROLL_ACTIVE_PROPERTY, Boolean.TRUE);
+            root.pseudoClassStateChanged(SCROLLING, true);
         }
     }
 
@@ -84,6 +87,7 @@ public final class LauncherScrollSupport {
         Node root = rootSupplier.get();
         if (root != null) {
             root.getProperties().remove(ProjectCardFactory.SCROLL_ACTIVE_PROPERTY);
+            root.pseudoClassStateChanged(SCROLLING, false);
         }
     }
 

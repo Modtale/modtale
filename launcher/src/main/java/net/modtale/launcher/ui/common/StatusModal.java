@@ -25,12 +25,12 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.modtale.launcher.logging.LauncherLog;
+import net.modtale.launcher.logging.LauncherLogger;
 
 public final class StatusModal {
 
-    private static final Logger LOG = LogManager.getLogger(StatusModal.class);
+    private static final LauncherLogger LOG = LauncherLog.getLogger(StatusModal.class);
 
     public enum Type {
         SUCCESS("success", LauncherIcons.Glyph.CHECK),

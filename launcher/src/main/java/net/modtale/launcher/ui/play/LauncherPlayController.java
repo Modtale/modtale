@@ -81,12 +81,12 @@ import net.modtale.launcher.ui.common.LauncherView;
 import net.modtale.launcher.ui.feedback.LauncherFeedback;
 import net.modtale.launcher.ui.settings.LauncherSettingsController;
 import net.modtale.launcher.ui.settings.LauncherSettingsForm;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.modtale.launcher.logging.LauncherLog;
+import net.modtale.launcher.logging.LauncherLogger;
 
 public final class LauncherPlayController {
 
-    private static final Logger LOG = LogManager.getLogger(LauncherPlayController.class);
+    private static final LauncherLogger LOG = LauncherLog.getLogger(LauncherPlayController.class);
 
     private static final int BLOG_POST_PAGE_SIZE = 4;
     private static final int FRIEND_LIMIT = 6;

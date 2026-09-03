@@ -5,13 +5,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import javafx.animation.AnimationTimer;
 import javafx.scene.Scene;
 
@@ -23,6 +24,11 @@ public final class LauncherPerformanceProbe {
     private static final long REPORT_INTERVAL_NANOS = 1_000_000_000L;
     private static final double DEFAULT_REFRESH_RATE = 60.0;
     private static final ConcurrentMap<String, OperationStats> OPERATION_STATS = new ConcurrentHashMap<>();
+    private static final ExecutorService REPORTER = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "launcher-performance-reporter");
+        thread.setDaemon(true);
+        return thread;
+    });
     private static volatile boolean operationTimingEnabled;
 
     private LauncherPerformanceProbe() {
@@ -94,16 +100,18 @@ public final class LauncherPerformanceProbe {
     private static final class FrameTimer extends AnimationTimer {
 
         private final Path outputPath;
-        private final double targetFrameMillis;
-        private final List<Double> intervals = new ArrayList<>(256);
+        private final double targetPulseMillis;
+        private long[] intervals = new long[512];
+        private int intervalCount;
         private long previousFrame;
         private long windowStart;
         private boolean running;
 
-        private FrameTimer(Path outputPath, double targetFrameMillis) {
+        private FrameTimer(Path outputPath, double targetPulseMillis) {
             this.outputPath = outputPath;
-            this.targetFrameMillis = targetFrameMillis;
-            write("start targetFrameMillis=" + format(targetFrameMillis) + " at=" + Instant.now());
+            this.targetPulseMillis = targetPulseMillis;
+            write("start targetPulseCadenceMs=" + format(targetPulseMillis)
+                    + " note=interval-is-display-cadence-not-active-work at=" + Instant.now());
         }
 
         @Override
@@ -132,7 +140,8 @@ public final class LauncherPerformanceProbe {
         @Override
         public void handle(long now) {
             if (previousFrame != 0) {
-                intervals.add((now - previousFrame) / 1_000_000.0);
+                if (intervalCount == intervals.length) intervals = Arrays.copyOf(intervals, intervals.length * 2);
+                intervals[intervalCount++] = now - previousFrame;
             }
             previousFrame = now;
             if (windowStart == 0) {
@@ -145,34 +154,38 @@ public final class LauncherPerformanceProbe {
         }
 
         private void report(String reason) {
-            if (intervals.isEmpty()) {
+            long[] sample = Arrays.copyOf(intervals, intervalCount);
+            intervalCount = 0;
+            REPORTER.execute(() -> reportOffThread(reason, sample));
+        }
+
+        private void reportOffThread(String reason, long[] sample) {
+            if (sample.length == 0) {
                 reportOperations(reason);
                 return;
             }
-
-            List<Double> sorted = new ArrayList<>(intervals);
-            Collections.sort(sorted);
-            double avg = intervals.stream().mapToDouble(Double::doubleValue).average().orElse(0);
-            double p95 = percentile(sorted, 0.95);
-            double p99 = percentile(sorted, 0.99);
-            double max = sorted.get(sorted.size() - 1);
-            double missedFrameThreshold = targetFrameMillis * 1.35;
-            long missed = intervals.stream().filter(value -> value > missedFrameThreshold).count();
-            long overTwoFrames = intervals.stream().filter(value -> value > targetFrameMillis * 2.0).count();
-            write("%s frames=%d avgMs=%s p95Ms=%s p99Ms=%s maxMs=%s missed=%d overTwoFrames=%d thresholdMs=%s at=%s"
+            long[] sorted = sample.clone();
+            Arrays.sort(sorted);
+            double avg = Arrays.stream(sample).average().orElse(0) / 1_000_000.0;
+            double p95 = percentile(sorted, 0.95) / 1_000_000.0;
+            double p99 = percentile(sorted, 0.99) / 1_000_000.0;
+            double max = sorted[sorted.length - 1] / 1_000_000.0;
+            double latePulseThreshold = targetPulseMillis * 1.35;
+            long latePulses = Arrays.stream(sample).filter(value -> value / 1_000_000.0 > latePulseThreshold).count();
+            long overTwoPulses = Arrays.stream(sample).filter(value -> value / 1_000_000.0 > targetPulseMillis * 2.0).count();
+            write("%s pulses=%d cadenceAvgMs=%s cadenceP95Ms=%s cadenceP99Ms=%s cadenceMaxMs=%s latePulses=%d overTwoPulses=%d thresholdMs=%s at=%s"
                     .formatted(
                             reason,
-                            intervals.size(),
+                            sample.length,
                             format(avg),
                             format(p95),
                             format(p99),
                             format(max),
-                            missed,
-                            overTwoFrames,
-                            format(missedFrameThreshold),
+                            latePulses,
+                            overTwoPulses,
+                            format(latePulseThreshold),
                             Instant.now()
                     ));
-            intervals.clear();
             reportOperations(reason);
         }
 
@@ -198,13 +211,13 @@ public final class LauncherPerformanceProbe {
             }
         }
 
-        private double percentile(List<Double> sorted, double percentile) {
-            if (sorted.isEmpty()) {
+        private long percentile(long[] sorted, double percentile) {
+            if (sorted.length == 0) {
                 return 0;
             }
-            int index = Math.max(0, Math.min(sorted.size() - 1,
-                    (int) Math.ceil(sorted.size() * percentile) - 1));
-            return sorted.get(index);
+            int index = Math.max(0, Math.min(sorted.length - 1,
+                    (int) Math.ceil(sorted.length * percentile) - 1));
+            return sorted[index];
         }
 
         private void write(String line) {
@@ -227,18 +240,18 @@ public final class LauncherPerformanceProbe {
 
     private static final class OperationStats {
 
-        private final List<Long> samples = new ArrayList<>(1024);
+        private long[] samples = new long[1024];
+        private int size;
 
         private synchronized void add(long nanos) {
-            samples.add(Math.max(0, nanos));
+            if (size == samples.length) samples = Arrays.copyOf(samples, samples.length * 2);
+            samples[size++] = Math.max(0, nanos);
         }
 
-        private synchronized List<Long> drain() {
-            if (samples.isEmpty()) {
-                return List.of();
-            }
-            List<Long> drained = new ArrayList<>(samples);
-            samples.clear();
+        private synchronized long[] drain() {
+            if (size == 0) return new long[0];
+            long[] drained = Arrays.copyOf(samples, size);
+            size = 0;
             return drained;
         }
     }
@@ -257,25 +270,25 @@ public final class LauncherPerformanceProbe {
             return samples > 0;
         }
 
-        private static OperationReport from(String name, List<Long> samples) {
-            if (samples.isEmpty()) {
+        private static OperationReport from(String name, long[] samples) {
+            if (samples.length == 0) {
                 return new OperationReport(name, 0, 0, 0, 0, 0, 0);
             }
-            List<Long> sorted = new ArrayList<>(samples);
-            Collections.sort(sorted);
-            double avgMicros = samples.stream().mapToDouble(value -> value / 1_000.0).average().orElse(0);
+            long[] sorted = samples.clone();
+            Arrays.sort(sorted);
+            double avgMicros = Arrays.stream(samples).average().orElse(0) / 1_000.0;
             double p95Micros = percentile(sorted, 0.95) / 1_000.0;
             double p99Micros = percentile(sorted, 0.99) / 1_000.0;
-            double maxMicros = sorted.getLast() / 1_000.0;
-            long overOneMillisecond = samples.stream().filter(value -> value > 1_000_000).count();
-            return new OperationReport(name, samples.size(), avgMicros, p95Micros, p99Micros, maxMicros,
+            double maxMicros = sorted[sorted.length - 1] / 1_000.0;
+            long overOneMillisecond = Arrays.stream(samples).filter(value -> value > 1_000_000).count();
+            return new OperationReport(name, samples.length, avgMicros, p95Micros, p99Micros, maxMicros,
                     overOneMillisecond);
         }
 
-        private static long percentile(List<Long> sorted, double percentile) {
-            int index = Math.max(0, Math.min(sorted.size() - 1,
-                    (int) Math.ceil(sorted.size() * percentile) - 1));
-            return sorted.get(index);
+        private static long percentile(long[] sorted, double percentile) {
+            int index = Math.max(0, Math.min(sorted.length - 1,
+                    (int) Math.ceil(sorted.length * percentile) - 1));
+            return sorted[index];
         }
     }
 }

@@ -16,12 +16,12 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import net.modtale.launcher.ui.common.LauncherIcons;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.modtale.launcher.logging.LauncherLog;
+import net.modtale.launcher.logging.LauncherLogger;
 
 public final class LauncherFeedback {
 
-    private static final Logger LOG = LogManager.getLogger(LauncherFeedback.class);
+    private static final LauncherLogger LOG = LauncherLog.getLogger(LauncherFeedback.class);
     private static final DateTimeFormatter LOG_TIME = DateTimeFormatter.ofPattern("HH:mm");
     private static final String TOAST_SUCCESS = "toast-success";
     private static final String TOAST_ERROR = "toast-error";

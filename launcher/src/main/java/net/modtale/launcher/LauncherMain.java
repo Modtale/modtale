@@ -2,12 +2,12 @@ package net.modtale.launcher;
 
 import javafx.application.Application;
 import net.modtale.launcher.logging.LauncherLogging;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.modtale.launcher.logging.LauncherLog;
+import net.modtale.launcher.logging.LauncherLogger;
 
 public final class LauncherMain {
 
-    private static final Logger LOG = LogManager.getLogger(LauncherMain.class);
+    private static final LauncherLogger LOG = LauncherLog.getLogger(LauncherMain.class);
 
     private LauncherMain() {
     }

@@ -24,12 +24,12 @@ import net.modtale.launcher.api.ModtaleApiClient;
 import net.modtale.launcher.logging.LogSanitizer;
 import net.modtale.launcher.model.user.CurrentUser;
 import net.modtale.launcher.settings.LauncherConfig;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.modtale.launcher.logging.LauncherLog;
+import net.modtale.launcher.logging.LauncherLogger;
 
 public final class LauncherAuthFlow {
 
-    private static final Logger LOG = LogManager.getLogger(LauncherAuthFlow.class);
+    private static final LauncherLogger LOG = LauncherLog.getLogger(LauncherAuthFlow.class);
     private static final Duration AUTH_TIMEOUT = Duration.ofMinutes(5);
     private static final String APP_NAME = "Modtale Launcher";
     private static final SecureRandom RANDOM = new SecureRandom();

@@ -5,12 +5,12 @@ import java.net.URI;
 import java.util.function.BiConsumer;
 import net.modtale.launcher.logging.LogSanitizer;
 import net.modtale.launcher.settings.LauncherConfig;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.modtale.launcher.logging.LauncherLog;
+import net.modtale.launcher.logging.LauncherLogger;
 
 public final class LauncherExternalLinks {
 
-    private static final Logger LOG = LogManager.getLogger(LauncherExternalLinks.class);
+    private static final LauncherLogger LOG = LauncherLog.getLogger(LauncherExternalLinks.class);
 
     private LauncherExternalLinks() {
     }

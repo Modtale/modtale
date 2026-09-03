@@ -26,8 +26,8 @@ class LauncherScrollSupportTest {
 
         assertFalse(event.isConsumed(), "native scroll events must reach the JavaFX ScrollPane skin");
         assertTrue(Boolean.TRUE.equals(root.getProperties().get(ProjectCardFactory.SCROLL_ACTIVE_PROPERTY)));
-        assertFalse(root.getPseudoClassStates().contains(PseudoClass.getPseudoClass("scrolling")),
-                "scrolling must not trigger a scene-wide CSS invalidation");
+        assertTrue(root.getPseudoClassStates().contains(PseudoClass.getPseudoClass("scrolling")),
+                "scrolling must suppress transient hover repaints until input becomes idle");
         assertEquals(1, timer.restartCount);
     }
 
