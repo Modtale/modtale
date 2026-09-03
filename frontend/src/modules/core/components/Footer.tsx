@@ -4,29 +4,32 @@ import { Link, useLocation } from 'react-router-dom';
 import { BlueskyBrandIcon, DiscordBrandIcon, GitHubBrandIcon, XBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { SiteRoutes } from '@/utils/routes';
 import { STATUS_PAGE_URL } from '@/utils/status';
+import { LanguageSelector } from '@/i18n';
+import { useTranslation } from 'react-i18next';
 
 interface FooterProps {
     isDarkMode: boolean;
 }
 
 export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
+    const { t } = useTranslation(['footer', 'navigation']);
     const location = useLocation();
     const path = location.pathname;
 
     const getFooterDescription = () => {
         switch (path) {
             case SiteRoutes.browse('PLUGIN'):
-                return 'The premier community repository for Hytale plugins. Discover, download, and share server plugins, admin tools, gameplay extensions, and supporting libraries.';
+                return t('footer:description.plugins');
             case SiteRoutes.browse('MODPACK'):
-                return 'The premier community repository for Hytale modpacks. Discover, download, and share curated Hytale modpacks, collections, and bundled project setups.';
+                return t('footer:description.modpacks');
             case SiteRoutes.browse('SAVE'):
-                return 'The premier community repository for Hytale worlds. Discover, download, and share Hytale save files, maps, lobbies, schematics, and spawns.';
+                return t('footer:description.worlds');
             case SiteRoutes.browse('ART'):
-                return 'The premier community repository for Hytale art assets. Discover, download, and share Hytale models, textures, animations, and creator resources.';
+                return t('footer:description.art');
             case SiteRoutes.browse('DATA'):
-                return 'The premier community repository for Hytale data assets. Discover, download, and share Hytale configs, loot tables, recipes, and data-driven files.';
+                return t('footer:description.data');
             default:
-                return 'The premier community repository for Hytale. Discover, download, and share Hytale mods, server plugins, worlds, art assets, data assets, and modpacks.';
+                return t('footer:description.default');
         }
     };
 
@@ -42,55 +45,56 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
                             {getFooterDescription()}
                         </p>
                         <p className="text-xs text-slate-400 mt-4 font-mono">
-                            &copy; {new Date().getFullYear()} Modtale.
+                            {t('footer:copyright', { year: String(new Date().getFullYear()) })}
                         </p>
+                        <LanguageSelector className="mt-4 text-slate-500 dark:text-slate-400" />
                     </div>
 
                     <div className="col-span-1">
-                        <div className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Discover</div>
+                        <div className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">{t('footer:discover')}</div>
                         <div className="flex flex-col space-y-3">
                             <Link to={SiteRoutes.browse()} className={linkClass}>
-                                <Layout className="w-3.5 h-3.5 mr-2 opacity-70" /> Mods
+                                <Layout className="w-3.5 h-3.5 mr-2 opacity-70" /> {t('navigation:mods')}
                             </Link>
                             <Link to={SiteRoutes.browse('MODPACK')} className={linkClass}>
-                                <Layers className="w-3.5 h-3.5 mr-2 opacity-70" /> Modpacks
+                                <Layers className="w-3.5 h-3.5 mr-2 opacity-70" /> {t('navigation:modpacks')}
                             </Link>
                             <Link to={SiteRoutes.browse('PLUGIN')} className={linkClass}>
-                                <Box className="w-3.5 h-3.5 mr-2 opacity-70" /> Plugins
+                                <Box className="w-3.5 h-3.5 mr-2 opacity-70" /> {t('navigation:plugins')}
                             </Link>
                             <Link to={SiteRoutes.browse('SAVE')} className={linkClass}>
-                                <Save className="w-3.5 h-3.5 mr-2 opacity-70" /> Worlds
+                                <Save className="w-3.5 h-3.5 mr-2 opacity-70" /> {t('navigation:worlds')}
                             </Link>
                             <Link to={SiteRoutes.browse('ART')} className={linkClass}>
-                                <Palette className="w-3.5 h-3.5 mr-2 opacity-70" /> Art Assets
+                                <Palette className="w-3.5 h-3.5 mr-2 opacity-70" /> {t('navigation:artAssets')}
                             </Link>
                             <Link to={SiteRoutes.browse('DATA')} className={linkClass}>
-                                <Database className="w-3.5 h-3.5 mr-2 opacity-70" /> Data Assets
+                                <Database className="w-3.5 h-3.5 mr-2 opacity-70" /> {t('navigation:dataAssets')}
                             </Link>
                         </div>
                     </div>
 
                     <div className="col-span-1">
-                        <div className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Resources</div>
+                        <div className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">{t('footer:resources')}</div>
                         <div className="flex flex-col space-y-3">
                             <Link to={SiteRoutes.apiDocs()} className={linkClass}>
-                                <Code className="w-4 h-4 mr-2 opacity-70" /> API Docs
+                                <Code className="w-4 h-4 mr-2 opacity-70" /> {t('footer:apiDocs')}
                             </Link>
                             <a href={STATUS_PAGE_URL} className={linkClass}>
-                                <Activity className="w-4 h-4 mr-2 opacity-70" /> Status
+                                <Activity className="w-4 h-4 mr-2 opacity-70" /> {t('footer:status')}
                             </a>
                             <div className="h-px bg-slate-100 dark:bg-white/5 my-1"></div>
                             <Link to={SiteRoutes.terms()} className={linkClass}>
-                                <FileText className="w-4 h-4 mr-2 opacity-70" /> Terms of Service
+                                <FileText className="w-4 h-4 mr-2 opacity-70" /> {t('footer:terms')}
                             </Link>
                             <Link to={SiteRoutes.privacy()} className={linkClass}>
-                                <Shield className="w-4 h-4 mr-2 opacity-70" /> Privacy Policy
+                                <Shield className="w-4 h-4 mr-2 opacity-70" /> {t('footer:privacy')}
                             </Link>
                         </div>
                     </div>
 
                     <div className="col-span-1">
-                        <div className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">Community</div>
+                        <div className="text-xs font-bold uppercase text-slate-400 tracking-wider mb-4">{t('footer:community')}</div>
                         <div className="flex flex-col space-y-3">
                             <a href="https://discord.gg/PcFaDVYqVe" target="_blank" rel="noopener noreferrer" className={linkClass}>
                                 <DiscordBrandIcon className="w-4 h-4 mr-2" /> Discord

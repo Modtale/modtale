@@ -1,3 +1,6 @@
+import { setI18n } from 'react-i18next';
+import { createAppI18n } from '@/i18n/i18n';
+
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const createMemoryStorage = (): Storage => {
@@ -31,3 +34,5 @@ for (const name of ['localStorage', 'sessionStorage'] as const) {
     }
     Object.defineProperty(globalThis, name, { configurable: true, value: storage });
 }
+
+setI18n(createAppI18n());
