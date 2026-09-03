@@ -1,6 +1,7 @@
 package net.modtale.status;
 
 import java.time.Instant;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -9,6 +10,7 @@ import java.util.Map;
 import net.modtale.status.StatusModels.IncidentBuckets;
 import net.modtale.status.StatusModels.StatusHistoryEntry;
 import net.modtale.status.StatusModels.StatusHistoryPointView;
+import net.modtale.status.StatusModels.SystemStatus;
 import net.modtale.status.StatusModels.SystemStatusView;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,6 +89,11 @@ public class DetachedStatusService {
         }
     }
 
+    public synchronized boolean isReady() {
+        StatusHistoryEntry latest = latestHistory();
+        return latest != null && !isStale(latest);
+    }
+
     private void hydrate() {
         if (hydrated) {
             return;
@@ -109,12 +116,7 @@ public class DetachedStatusService {
     }
 
     private void refreshIncidents() {
-        IncidentBuckets buckets = mongoStatusStore.findIncidentBuckets();
-        if (!buckets.activeIncidents().isEmpty()
-                || !buckets.scheduledMaintenances().isEmpty()
-                || !buckets.incidentHistory().isEmpty()) {
-            lastKnownIncidents = buckets;
-        }
+        mongoStatusStore.findIncidentBuckets().ifPresent(buckets -> lastKnownIncidents = buckets);
     }
 
     private void rebuildSnapshots() {
@@ -135,6 +137,7 @@ public class DetachedStatusService {
                 .filter(entry -> !entry.timestamp().isBefore(since))
                 .sorted(Comparator.comparing(StatusHistoryEntry::timestamp))
                 .toList();
+        int observedSamples = entries.size();
 
         if ("30d".equals(range) && entries.size() > 500) {
             entries = downsample(entries, 250);
@@ -144,15 +147,32 @@ public class DetachedStatusService {
                 .map(StatusHistoryEntry::toPoint)
                 .toList();
 
+        boolean stale = isStale(latest);
+        long windowMillis = "30d".equals(range)
+                ? properties.getHistoryRetention().toMillis()
+                : Duration.ofHours(24).toMillis();
+        int expectedSamples = (int) Math.max(1, windowMillis / Math.max(1, properties.getRefreshIntervalMs()));
+        SystemStatus effectiveOverall = stale && latest.overallStatus() == SystemStatus.OPERATIONAL
+                ? SystemStatus.DEGRADED
+                : latest.overallStatus();
+
         return new SystemStatusView(
-                latest.overallStatus(),
+                effectiveOverall,
                 latest.toServices(),
                 latest.timestamp().toEpochMilli(),
+                stale,
+                observedSamples,
+                expectedSamples,
                 points,
                 lastKnownIncidents.activeIncidents(),
                 lastKnownIncidents.scheduledMaintenances(),
                 lastKnownIncidents.incidentHistory()
         );
+    }
+
+    private boolean isStale(StatusHistoryEntry latest) {
+        Duration staleAfter = properties.getStaleAfter();
+        return latest.timestamp().isBefore(Instant.now().minus(staleAfter));
     }
 
     private void addHistory(StatusHistoryEntry entry) {
