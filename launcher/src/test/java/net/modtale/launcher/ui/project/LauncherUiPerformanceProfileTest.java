@@ -189,7 +189,8 @@ class LauncherUiPerformanceProfileTest {
                         if (measuredPulse >= 0 && measuredPulse < 240) {
                             observedScrollRange[0] = Math.min(observedScrollRange[0], scroll.getVvalue());
                             observedScrollRange[1] = Math.max(observedScrollRange[1], scroll.getVvalue());
-                            double wheelDelta = measuredPulse % 24 < 12 ? -40 : 40;
+                            double outputScale = scroll.getScene().getWindow().getOutputScaleY();
+                            double wheelDelta = (measuredPulse % 24 < 12 ? -40 : 40) / outputScale;
                             scroll.fireEvent(scrollEvent(wheelDelta));
                         } else if (measuredPulse >= 240 && !cards.isEmpty() && measuredPulse % 12 == 0) {
                             int cardIndex = (pulse / 12) % cards.size();
@@ -272,7 +273,7 @@ class LauncherUiPerformanceProfileTest {
         LauncherScrollSupport support = new LauncherScrollSupport(() -> root);
         support.configure(scrollPane, false);
         return profile("browse/project/creator scroll input", WARMUPS, SAMPLES,
-                () -> scrollPane.fireEvent(scrollEvent(-72)));
+                () -> scrollPane.fireEvent(scrollEvent(-40)));
     }
 
     private ProfileResult profileBrowseRender(ProjectCardViewStyle style) throws Exception {

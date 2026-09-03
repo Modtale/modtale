@@ -37,6 +37,8 @@ class LauncherScrollSupportTest {
         assertTrue(LauncherScrollSupport.isPreciseScroll(pixelScroll(-24, true)));
         assertFalse(LauncherScrollSupport.isPreciseScroll(pixelScroll(-40, false)),
                 "JavaFX reports a physical Linux wheel notch as an indirect 40px event");
+        assertFalse(LauncherScrollSupport.isPreciseScroll(pixelScroll(-20, false), 2),
+                "JavaFX reports the same physical notch as 20 logical pixels on a 2x display");
         assertFalse(LauncherScrollSupport.isPreciseScroll(lineScroll(-120)));
     }
 
@@ -47,6 +49,7 @@ class LauncherScrollSupportTest {
 
         assertEquals(-120, LauncherScrollSupport.browserDelta(wheelNotch, wheelNotch.getDeltaY()));
         assertEquals(-24, LauncherScrollSupport.browserDelta(touchpadDelta, touchpadDelta.getDeltaY()));
+        assertEquals(-60, LauncherScrollSupport.browserDelta(pixelScroll(-20, false), -20, 2));
     }
 
     @Test

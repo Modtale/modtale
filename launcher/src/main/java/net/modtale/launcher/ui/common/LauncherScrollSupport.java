@@ -187,14 +187,22 @@ public final class LauncherScrollSupport {
     }
 
     static boolean isPreciseScroll(ScrollEvent event) {
+        return isPreciseScroll(event, eventOutputScale(event));
+    }
+
+    static boolean isPreciseScroll(ScrollEvent event, double outputScale) {
         return event.isInertia()
                 || event.getTouchCount() > 0
                 || event.isDirect()
-                || (hasPixelUnits(event) && !looksLikeJavaFxDiscreteWheel(event));
+                || (hasPixelUnits(event) && !looksLikeJavaFxDiscreteWheel(event, outputScale));
     }
 
     static double browserDelta(ScrollEvent event, double delta) {
-        if (!looksLikeJavaFxDiscreteWheel(event)) return delta;
+        return browserDelta(event, delta, eventOutputScale(event));
+    }
+
+    static double browserDelta(ScrollEvent event, double delta, double outputScale) {
+        if (!looksLikeJavaFxDiscreteWheel(event, outputScale)) return delta;
         return delta / JAVAFX_DISCRETE_WHEEL_UNIT * BROWSER_DISCRETE_WHEEL_UNIT;
     }
 
@@ -203,14 +211,31 @@ public final class LauncherScrollSupport {
                 && event.getTextDeltaYUnits() == ScrollEvent.VerticalTextScrollUnits.NONE;
     }
 
-    private static boolean looksLikeJavaFxDiscreteWheel(ScrollEvent event) {
+    private static boolean looksLikeJavaFxDiscreteWheel(ScrollEvent event, double outputScale) {
         if (!hasPixelUnits(event) || event.isDirect() || event.isInertia() || event.getTouchCount() > 0) {
             return false;
         }
         double dominantDelta = Math.max(Math.abs(event.getDeltaX()), Math.abs(event.getDeltaY()));
-        if (dominantDelta < JAVAFX_DISCRETE_WHEEL_UNIT - WHEEL_UNIT_TOLERANCE) return false;
-        double wheelSteps = dominantDelta / JAVAFX_DISCRETE_WHEEL_UNIT;
+        double logicalWheelUnit = JAVAFX_DISCRETE_WHEEL_UNIT / normalizedScale(outputScale);
+        if (dominantDelta < logicalWheelUnit - WHEEL_UNIT_TOLERANCE) return false;
+        double wheelSteps = dominantDelta / logicalWheelUnit;
         return Math.abs(wheelSteps - Math.rint(wheelSteps)) <= WHEEL_UNIT_TOLERANCE;
+    }
+
+    private static double eventOutputScale(ScrollEvent event) {
+        if (!(event.getTarget() instanceof Node target)
+                || target.getScene() == null
+                || target.getScene().getWindow() == null) {
+            return 1;
+        }
+        return normalizedScale(Math.max(
+                target.getScene().getWindow().getOutputScaleX(),
+                target.getScene().getWindow().getOutputScaleY()
+        ));
+    }
+
+    private static double normalizedScale(double scale) {
+        return Double.isFinite(scale) && scale > 0 ? scale : 1;
     }
 
     private void activateScrollInteraction() {
