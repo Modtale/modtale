@@ -2,12 +2,14 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const NotFound: React.FC = () => {
+    const { t } = useTranslation('errors');
     return (
         <div className="min-h-[60vh] flex flex-col items-center justify-center p-4 text-center">
             <Helmet>
-                <title>404 - Page Not Found | Modtale</title>
+                <title>{t('notFound.documentTitle')}</title>
                 <meta name="prerender-status-code" content="404" />
             </Helmet>
 
@@ -16,18 +18,18 @@ const NotFound: React.FC = () => {
             </div>
 
             <h1 className="text-4xl font-black text-slate-900 dark:text-white mb-4">
-                Page Not Found
+                {t('notFound.title')}
             </h1>
 
             <p className="text-lg text-slate-600 dark:text-slate-400 max-w-md mb-8">
-                The mod, modpack, or page you are looking for doesn't exist or has been removed.
+                {t('notFound.description')}
             </p>
 
             <Link
                 to="/"
                 className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-blue-600/20"
             >
-                Return Home
+                {t('notFound.returnHome')}
             </Link>
         </div>
     );
