@@ -247,7 +247,8 @@ class LauncherUiPerformanceProfileTest {
         Region media = new Region();
         Region fade = new Region();
         SimpleDoubleProperty scrollPixels = new SimpleDoubleProperty();
-        NativeBannerScrollEffect.bind(media, fade, scrollPixels, 128);
+        SimpleDoubleProperty bannerWidth = new SimpleDoubleProperty(1440);
+        NativeBannerScrollEffect.bind(media, fade, scrollPixels, bannerWidth);
         int[] index = {0};
         return profile("project+creator banner scroll effect", WARMUPS, SAMPLES,
                 () -> scrollPixels.set((index[0]++ * 37) % 1800));

@@ -2863,7 +2863,7 @@
 }
 
 .project-detail-banner-fade {
-    -fx-background-color: linear-gradient(to top, #0B1120, rgba(11, 17, 32, 0.72), transparent);
+    -fx-background-color: linear-gradient(to top, #0B1120, transparent);
 }
 
 .project-detail-back {
@@ -6638,7 +6638,7 @@
 }
 
 .creator-profile-banner-fade {
-    -fx-background-color: linear-gradient(to top, #0b1120, rgba(11, 17, 32, 0.55), rgba(11, 17, 32, 0.00));
+    -fx-background-color: linear-gradient(to top, #0b1120, transparent);
 }
 
 .creator-profile-back {

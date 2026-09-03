@@ -108,10 +108,7 @@ public final class ProjectPageController {
     private static final double CONTENT_MAX_WIDTH = 1568;
     private static final double HEADER_ICON_SIZE = 224;
     private static final double HEADER_ICON_BORDER = 8;
-    private static final double BANNER_MIN_HEIGHT = 180;
-    private static final double BANNER_MAX_HEIGHT = 640;
     private static final double BANNER_FALLBACK_HEIGHT = 360;
-    private static final double BANNER_FADE_BASE_HEIGHT = 128;
     private static final PseudoClass SELECTED = PseudoClass.getPseudoClass("selected");
     private static final Pattern GALLERY_CAROUSEL_MARKER = Pattern.compile("\\{\\{\\s*gallery-carousel\\s*}}", Pattern.CASE_INSENSITIVE);
 
@@ -313,6 +310,7 @@ public final class ProjectPageController {
     }
 
     public void openProject(ProjectSummary project) {
+        resetPageScroll();
         hideChangelogOverlay();
         hideGalleryOverlay();
         hideCommentDeleteOverlay();
@@ -339,6 +337,7 @@ public final class ProjectPageController {
         if (detail == null) {
             return;
         }
+        resetPageScroll();
         hideChangelogOverlay();
         hideGalleryOverlay();
         hideCommentDeleteOverlay();
@@ -367,6 +366,7 @@ public final class ProjectPageController {
             openUrlInBrowser(project.websiteUrl());
             return;
         }
+        resetPageScroll();
         hideChangelogOverlay();
         hideGalleryOverlay();
         hideCommentDeleteOverlay();
@@ -1099,6 +1099,18 @@ public final class ProjectPageController {
         scrollPixels.set(Math.max(0, Math.min(1, normalized)) * scrollable);
     }
 
+    private void resetPageScroll() {
+        scrollPixels.set(0);
+        if (attachedScrollPane == null) return;
+        attachedScrollPane.setVvalue(attachedScrollPane.getVmin());
+        Platform.runLater(() -> {
+            if (attachedScrollPane != null) {
+                attachedScrollPane.setVvalue(attachedScrollPane.getVmin());
+                updateScrollPixels();
+            }
+        });
+    }
+
     private void syncProjectDocumentHeight(Region page) {
         double height = page.getPrefHeight();
         if (!Double.isFinite(height) || height <= 0) {
@@ -1171,7 +1183,7 @@ public final class ProjectPageController {
         banner.setMinWidth(0);
         banner.setMaxWidth(Double.MAX_VALUE);
         banner.setPrefHeight(hasBanner ? BANNER_FALLBACK_HEIGHT : 72);
-        banner.setMaxHeight(hasBanner ? BANNER_MAX_HEIGHT : 72);
+        banner.setMaxHeight(hasBanner ? Double.MAX_VALUE : 72);
         banner.prefHeightProperty().bind(Bindings.createDoubleBinding(
                 () -> hasBanner ? bannerHeight(content.getWidth()) : 72,
                 content.widthProperty()
@@ -1202,7 +1214,7 @@ public final class ProjectPageController {
             Region fade = new Region();
             fade.getStyleClass().add("project-detail-banner-fade");
             fade.setMouseTransparent(true);
-            NativeBannerScrollEffect.bind(media, fade, scrollPixels, BANNER_FADE_BASE_HEIGHT);
+            NativeBannerScrollEffect.bind(media, fade, scrollPixels, banner.widthProperty());
             banner.getChildren().add(fade);
         }
 
@@ -1220,9 +1232,8 @@ public final class ProjectPageController {
         return banner;
     }
 
-    private static double bannerHeight(double width) {
-        double measured = Double.isFinite(width) && width > 0 ? width / 3.0 : BANNER_FALLBACK_HEIGHT;
-        return Math.max(BANNER_MIN_HEIGHT, Math.min(BANNER_MAX_HEIGHT, measured));
+    static double bannerHeight(double width) {
+        return Double.isFinite(width) && width > 0 ? width / 3.0 : BANNER_FALLBACK_HEIGHT;
     }
 
     private Node header(ProjectSummary summary, ProjectDetail detail, boolean loading, boolean hasBanner) {
