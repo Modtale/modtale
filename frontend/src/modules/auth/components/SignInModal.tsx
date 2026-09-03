@@ -188,7 +188,7 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                                     type="button"
                                     onClick={() => handleOAuthLogin('hytale')}
                                     disabled={loading}
-                                    className={`relative w-full bg-[#111827] text-white py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-[#1f2937] disabled:opacity-70 disabled:cursor-not-allowed transition-colors active:scale-95 duration-200 shadow-lg shadow-cyan-950/20 ${lastMethodHighlightClass('hytale')}`}
+                                    className={`relative w-full bg-slate-700 text-white py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-slate-600 disabled:opacity-70 disabled:cursor-not-allowed transition-colors active:scale-95 duration-200 shadow-lg shadow-cyan-950/20 ${lastMethodHighlightClass('hytale')}`}
                                     title={providerTitle('hytale')}
                                     aria-label={providerTitle('hytale')}
                                 >

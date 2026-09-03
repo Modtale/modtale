@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import net.modtale.exception.InvalidProjectRequestException;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -132,6 +134,38 @@ class TeamServiceTest {
     }
 
     @Test
+    void inviteContributorPersistsTheRoleAndSendsCanonicalProjectMetadata() {
+        Project project = project("project-1");
+        project.setProjectRoles(new ArrayList<>(List.of(new Project.ProjectRole(
+                "role-1",
+                "Writer",
+                "#112233",
+                Set.of(ApiKey.ApiPermission.PROJECT_EDIT_METADATA)
+        ))));
+        User requester = user("owner-1", "Owner");
+        User invitee = user("user-2", "Ada");
+
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.hasProjectPermission(project, requester, "PROJECT_TEAM_INVITE")).thenReturn(true);
+        when(userRepository.findById("user-2")).thenReturn(Optional.of(invitee));
+
+        service.inviteContributor("project-1", "user-2", "role-1", requester);
+
+        assertEquals(1, project.getTeamInvites().size());
+        assertEquals("role-1", project.getTeamInvites().getFirst().getRoleId());
+        verify(projectRepository).save(project);
+        verify(notificationService).sendNotifcation(
+                eq(List.of("user-2")),
+                eq("Contributor Invite"),
+                eq("You have been invited to Sky Tools"),
+                eq(java.net.URI.create("/dashboard/projects")),
+                eq(project.getImageUrl()),
+                eq(net.modtale.model.user.NotificationType.CONTRIBUTOR_INVITE),
+                eq(java.util.Map.of("projectId", "project-1", "action", "CONTRIBUTOR_INVITE"))
+        );
+    }
+
+    @Test
     void resolveTransferAcceptsOwnershipTransferAndRemovesTheNewOwnerFromTeamMembers() {
         Project project = project("project-1");
         project.setAuthorId("owner-1");
@@ -166,6 +200,12 @@ class TeamServiceTest {
         Project project = project("project-1");
         project.setAuthorId("owner-1");
         project.setTeamInvites(new ArrayList<>(List.of(new Project.ProjectMember("user-2", "role-1"))));
+        project.setProjectRoles(new ArrayList<>(List.of(new Project.ProjectRole(
+                "role-1",
+                "Writer",
+                "#112233",
+                Set.of(ApiKey.ApiPermission.PROJECT_EDIT_METADATA)
+        ))));
 
         User invitee = user("user-2", "Ada");
         invitee.setAvatarUrl("https://cdn.example/ada.png");
@@ -183,6 +223,11 @@ class TeamServiceTest {
         assertEquals("user-2", project.getTeamMembers().getFirst().getUserId());
         verify(projectRepository).save(project);
         verify(projectService).evictProjectCache(project);
+        verify(apiKeyService).syncUserProjectPermissions(
+                "user-2",
+                "project-1",
+                Set.of(ApiKey.ApiPermission.PROJECT_EDIT_METADATA)
+        );
         verify(notificationService).sendNotifcation(
                 eq(List.of("owner-1")),
                 eq("Invite Accepted"),
@@ -191,6 +236,20 @@ class TeamServiceTest {
                 eq("https://cdn.example/ada.png")
         );
         assertNull(project.getPendingTransferTo());
+    }
+
+    @Test
+    void acceptInviteRejectsMissingInvitesInsteadOfReportingFalseSuccess() {
+        Project project = project("project-1");
+        User invitee = user("user-2", "Ada");
+
+        when(userRepository.findById("user-2")).thenReturn(Optional.of(invitee));
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+
+        assertThrows(
+                InvalidProjectRequestException.class,
+                () -> service.acceptInvite("project-1", "user-2")
+        );
     }
 
     private static Project project(String id) {

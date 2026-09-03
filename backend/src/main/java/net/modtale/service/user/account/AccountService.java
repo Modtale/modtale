@@ -115,7 +115,7 @@ public class AccountService {
             return new ArrayList<>();
         }
         Query query = new Query(Criteria.where("_id").in(MongoIdUtils.expandIds(userIds)).and("deletedAt").is(null));
-        query.fields().include("username", "avatarUrl", "accountType", "badges", "id", "roles", "tier");
+        query.fields().include("username", "avatarUrl", "accountType", "badges", "profileBadges", "id", "roles", "tier");
         List<User> users = mongoTemplate.find(query, User.class);
         users.forEach(oauthAvatarHealingService::maybeHealOAuthAvatar);
         return users;

@@ -767,7 +767,7 @@ const endpointSpecificExample = (method: string, path: string, code: string): un
             expiresIn: 300,
         };
     }
-    if (path === '/api/v1/version/{hash}' && code === '200') {
+    if ((path === '/api/v1/projects/{id}/versions/hash/{hash}' || path === '/api/v1/version/{hash}') && code === '200') {
         return {
             id: sampleVersionSummary.id,
             versionNumber: sampleVersionSummary.versionNumber,

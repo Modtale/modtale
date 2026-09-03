@@ -73,6 +73,7 @@ public class User implements Serializable {
     private List<ConnectedAccount> connectedAccounts = new ArrayList<>();
 
     private List<String> badges = new ArrayList<>();
+    private List<ProfileBadge> profileBadges = new ArrayList<>();
 
     private NotificationPreferences notificationPreferences = new NotificationPreferences();
 
@@ -208,6 +209,37 @@ public class User implements Serializable {
         public void setVisible(boolean visible) { this.visible = visible; }
     }
 
+    public static class ProfileBadge implements Serializable {
+        private static final long serialVersionUID = 1L;
+
+        private String id;
+        private String label;
+        private String tooltip;
+        private String imageUrl;
+        private String darkImageUrl;
+
+        public ProfileBadge() {}
+
+        public ProfileBadge(String id, String label, String tooltip, String imageUrl, String darkImageUrl) {
+            this.id = id;
+            this.label = label;
+            this.tooltip = tooltip;
+            this.imageUrl = imageUrl;
+            this.darkImageUrl = darkImageUrl;
+        }
+
+        public String getId() { return id; }
+        public void setId(String id) { this.id = id; }
+        public String getLabel() { return label; }
+        public void setLabel(String label) { this.label = label; }
+        public String getTooltip() { return tooltip; }
+        public void setTooltip(String tooltip) { this.tooltip = tooltip; }
+        public String getImageUrl() { return imageUrl; }
+        public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+        public String getDarkImageUrl() { return darkImageUrl; }
+        public void setDarkImageUrl(String darkImageUrl) { this.darkImageUrl = darkImageUrl; }
+    }
+
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
 
@@ -288,6 +320,8 @@ public class User implements Serializable {
 
     public List<String> getBadges() { return badges; }
     public void setBadges(List<String> badges) { this.badges = badges; }
+    public List<ProfileBadge> getProfileBadges() { return profileBadges; }
+    public void setProfileBadges(List<ProfileBadge> profileBadges) { this.profileBadges = profileBadges; }
 
     public NotificationPreferences getNotificationPreferences() { return notificationPreferences; }
     public void setNotificationPreferences(NotificationPreferences notificationPreferences) { this.notificationPreferences = notificationPreferences; }

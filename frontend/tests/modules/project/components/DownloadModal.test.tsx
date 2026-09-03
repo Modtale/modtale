@@ -283,6 +283,58 @@ describe('DownloadModal Toggle Visibility', () => {
         expect(Array.from(document.body.querySelectorAll('button')).some((button) => button.textContent?.trim() === 'Any')).toBe(false);
     });
 
+    it('uses the backend catalog order when choosing the default over object insertion order', async () => {
+        const versionsByGame = {
+            '2026.3.26-89796e57b': [
+                {
+                    id: 'legacy',
+                    versionNumber: '0.4.0',
+                    channel: 'RELEASE',
+                    gameVersion: '2026.3.26-89796e57b',
+                    gameVersions: ['2026.3.26-89796e57b'],
+                    fileUrl: '/files/hexcode-legacy.jar',
+                    dependencies: [],
+                    releaseDate: '2026-03-26T00:00:00.000Z'
+                }
+            ],
+            '0.5.7': [
+                {
+                    id: 'current',
+                    versionNumber: '0.5.7',
+                    channel: 'RELEASE',
+                    gameVersion: '0.5.7',
+                    gameVersions: ['0.5.7'],
+                    fileUrl: '/files/hexcode-057.jar',
+                    dependencies: [],
+                    releaseDate: '2026-08-01T00:00:00.000Z'
+                }
+            ]
+        };
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <DownloadModal
+                        show={true}
+                        onClose={vi.fn()}
+                        versionsByGame={versionsByGame}
+                        preReleaseGameVersions={[]}
+                        orderedGameVersions={['0.5.7', '2026.3.26-89796e57b']}
+                        onDownload={vi.fn()}
+                        showExperimental={false}
+                        onToggleExperimental={vi.fn()}
+                        onViewHistory={vi.fn()}
+                    />
+                </MemoryRouter>
+            );
+        });
+        await settle();
+
+        expect(pageText()).toContain('View all files for 0.5.7');
+        expect(pageText()).toContain('v0.5.7');
+        expect(pageText()).not.toContain('v0.4.0');
+    });
+
     it('selects a version family as an OR-compatible set in the download modal', async () => {
         const versionsByGame = {
             '0.6.0': [

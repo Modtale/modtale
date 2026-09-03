@@ -6,7 +6,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { BlueskyBrandIcon, DiscordBrandIcon, GitHubBrandIcon, GitLabBrandIcon, HytaleBrandIcon, XBrandIcon } from '@/components/ui/icons/BrandIcons';
-import type { User } from '@/types';
+import type { ProfileBadge, User } from '@/types';
 import { BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
 import { Link } from 'react-router-dom';
@@ -16,9 +16,19 @@ const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
 const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
 
-const Badge = ({ type }: { type: string }) => {
-    if (type === 'OG') return <span className="bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-md uppercase tracking-normal cursor-help align-middle" title="Early Adopter">OG</span>;
-    if (type === 'VERIFIED') return <span className="bg-blue-500 text-white text-[10px] font-bold px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-md uppercase tracking-normal cursor-help align-middle" title="Verified Creator">Verified</span>;
+export const Badge = ({ type }: { type: string | ProfileBadge }) => {
+    if (typeof type !== 'string') {
+        const tooltip = type.tooltip || type.label;
+        if (type.imageUrl) return (
+            <span className="inline-flex size-4 md:size-6 cursor-help align-middle" title={tooltip}>
+                <img src={type.imageUrl} alt={type.label} className={`size-full object-contain ${type.darkImageUrl ? 'dark:hidden' : ''}`} loading="lazy" decoding="async" />
+                {type.darkImageUrl && <img src={type.darkImageUrl} alt={type.label} className="hidden size-full object-contain dark:block" loading="lazy" decoding="async" />}
+            </span>
+        );
+        return <span className="bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 text-[10px] font-bold px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-md tracking-tight cursor-help align-middle" title={tooltip}>{type.label}</span>;
+    }
+    if (type === 'OG') return <span className="bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-md uppercase tracking-tighter cursor-help align-middle" title="Early Adopter">OG</span>;
+    if (type === 'VERIFIED') return <span className="bg-blue-500 text-white text-[10px] font-bold px-1.5 py-0.5 md:px-2.5 md:py-1 rounded-md uppercase tracking-tight cursor-help align-middle" title="Verified Creator">Verified</span>;
     return null;
 }
 
@@ -377,7 +387,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                             {!isEditing && (
                                                 <div className="flex gap-1.5 flex-wrap items-center mt-1 md:mt-0">
                                                     {isOrg && <span className="bg-purple-500 text-white text-[10px] md:text-xs font-bold px-1.5 py-0.5 md:px-3 md:py-1 rounded-md shadow-md uppercase tracking-wide flex items-center gap-1"><Building2 className="w-3 h-3" /> <span className="hidden md:inline">Organization</span><span className="md:hidden">Org</span></span>}
-                                                    {user.badges && user.badges.map(b => <Badge key={b} type={b} />)}
+                                                    {user.badges && user.badges.map((badge, index) => <Badge key={typeof badge === 'string' ? badge : badge.id || `${badge.label}-${index}`} type={badge} />)}
 
                                                     <div className="md:hidden flex items-center gap-1.5">
                                                         {linkedAccounts.map(acc => <SocialButton key={acc.provider} account={acc} compact={true} />)}
