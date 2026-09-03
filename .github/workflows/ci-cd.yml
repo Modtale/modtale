@@ -170,6 +170,8 @@ jobs:
 
       - name: 'Set up Cloud SDK'
         uses: 'google-github-actions/setup-gcloud@v2'
+        with:
+          install_components: 'beta'
 
       - name: Ensure Branch R2 Bucket
         if: env.ENV_TYPE == 'preview'
@@ -830,6 +832,18 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "*View deployment details in [Google Cloud Console](https://console.cloud.google.com/run?project=${{ env.PROJECT_ID }}).* " >> $GITHUB_STEP_SUMMARY
+
+  ensure-status-dns:
+    if: github.ref_name == 'main' && github.event.deleted != true
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: branch-preview
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure status DNS record
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN_PROVISIONER }}
+        run: node .github/scripts/cloudflare-status-dns.mjs
 
   cleanup-branch-preview:
     name: Clean Up Deleted Branch Preview
