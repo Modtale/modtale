@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.List;
 import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.exception.InvalidDownloadTokenException;
+import net.modtale.exception.InvalidVersionRequestException;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.exception.VersionNotFoundException;
 import net.modtale.model.dto.response.project.BundleDownloadUrlResponse;
@@ -66,8 +67,9 @@ public class VersionDownloadOrchestrationService {
     public DownloadUrlResponse createDownloadUrl(String projectId, String versionNumber, String gameVersion, ModpackTarget target, User currentUser) {
         Project project = getProjectOrThrow(projectId, currentUser,
                 "We couldn't find that project, so no download link could be generated.");
-        getVersionOrThrow(project, versionNumber, gameVersion,
+        ProjectVersion version = getVersionOrThrow(project, versionNumber, gameVersion,
                 "We couldn't find the requested version for that project.");
+        ensureBrowserDownloadable(project, version);
         ModpackTarget effectiveTarget = target == null ? ModpackTarget.UNIVERSAL : target;
         String token = effectiveTarget == ModpackTarget.UNIVERSAL
                 ? downloadTokenService.generateToken(projectId, versionNumber, gameVersion)
@@ -106,6 +108,7 @@ public class VersionDownloadOrchestrationService {
         ensureReadable(project, currentUser);
         ProjectVersion targetVersion = getVersionOrThrow(project, downloadToken.getVersion(), downloadToken.getGameVersion(),
                 "We couldn't find the version requested by this download link.");
+        ensureBrowserDownloadable(project, targetVersion);
 
         trackDownload(project, targetVersion.getId(), context);
 
@@ -210,6 +213,21 @@ public class VersionDownloadOrchestrationService {
     private void ensureReadable(Project project, User currentUser) {
         if (!accessControlService.canReadProject(project, currentUser)) {
             throw new ResourceNotFoundException("We couldn't find the project for this download link.");
+        }
+    }
+
+    private void ensureBrowserDownloadable(Project project, ProjectVersion version) {
+        if (project.getClassification() != ProjectClassification.MODPACK
+                || version.getDependencies() == null) {
+            return;
+        }
+        boolean containsCurseForge = version.getDependencies().stream()
+                .anyMatch(dependency -> dependency != null
+                        && dependency.getSource() == ProjectDependency.Source.CURSEFORGE);
+        if (containsCurseForge) {
+            throw new InvalidVersionRequestException(
+                    "This modpack contains CurseForge projects and can only be installed with Modtale Launcher."
+            );
         }
     }
 
