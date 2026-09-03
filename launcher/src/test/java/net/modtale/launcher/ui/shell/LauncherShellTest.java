@@ -16,4 +16,12 @@ class LauncherShellTest {
         assertTrue(LauncherShell.usesDocumentHeight(LauncherView.UPDATES));
         assertFalse(LauncherShell.usesDocumentHeight(LauncherView.PLAY));
     }
+
+    @Test
+    void publicCatalogViewsDoNotRequireAModtaleSession() {
+        assertFalse(LauncherShell.requiresModtaleSession(LauncherView.DISCOVER));
+        assertFalse(LauncherShell.requiresModtaleSession(LauncherView.PROJECT));
+        assertTrue(LauncherShell.requiresModtaleSession(LauncherView.UPDATES));
+        assertTrue(LauncherShell.requiresModtaleSession(LauncherView.NOTIFICATIONS));
+    }
 }
