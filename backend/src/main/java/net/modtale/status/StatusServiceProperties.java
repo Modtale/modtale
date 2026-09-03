@@ -9,7 +9,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class StatusServiceProperties {
 
     private Duration requestTimeout = Duration.ofSeconds(5);
+    private Duration degradedLatency = Duration.ofSeconds(2);
+    private Duration staleAfter = Duration.ofMinutes(3);
     private Duration historyRetention = Duration.ofDays(30);
+    private long refreshIntervalMs = 60_000;
     private String snapshotPath = "/tmp/modtale-status-snapshot.json";
     private String targetSiteUrl = "https://modtale.net";
     private String targetApiUrl = "https://api.modtale.net/actuator/health/readiness";
@@ -26,6 +29,30 @@ public class StatusServiceProperties {
 
     public void setRequestTimeout(Duration requestTimeout) {
         this.requestTimeout = requestTimeout;
+    }
+
+    public Duration getDegradedLatency() {
+        return degradedLatency;
+    }
+
+    public void setDegradedLatency(Duration degradedLatency) {
+        this.degradedLatency = degradedLatency;
+    }
+
+    public Duration getStaleAfter() {
+        return staleAfter;
+    }
+
+    public void setStaleAfter(Duration staleAfter) {
+        this.staleAfter = staleAfter;
+    }
+
+    public long getRefreshIntervalMs() {
+        return refreshIntervalMs;
+    }
+
+    public void setRefreshIntervalMs(long refreshIntervalMs) {
+        this.refreshIntervalMs = refreshIntervalMs;
     }
 
     public Duration getHistoryRetention() {

@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Pattern;
 import java.util.Map;
 import net.modtale.status.StatusModels.SystemStatusView;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,5 +37,13 @@ public class StatusController {
     @GetMapping("/live")
     public ResponseEntity<Map<String, String>> live() {
         return ResponseEntity.ok(Map.of("status", "up"));
+    }
+
+    @GetMapping("/ready")
+    public ResponseEntity<Map<String, String>> ready() {
+        boolean ready = detachedStatusService.isReady();
+        return ResponseEntity.status(ready ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE)
+                .cacheControl(CacheControl.noStore())
+                .body(Map.of("status", ready ? "up" : "stale"));
     }
 }
