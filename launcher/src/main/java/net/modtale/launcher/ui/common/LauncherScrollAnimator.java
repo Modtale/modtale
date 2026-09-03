@@ -59,7 +59,7 @@ final class LauncherScrollAnimator {
             return;
         }
 
-        AnimationState retargeted = state.retarget(target, now);
+        AnimationState retargeted = state.retarget(target, now, outputScale(pane));
         states.put(pane, retargeted);
         apply(pane, metrics, retargeted.current);
         startTimer();
@@ -89,7 +89,7 @@ final class LauncherScrollAnimator {
             stopTimerIfIdle();
             return;
         }
-        double duration = programmaticDuration(delta);
+        double duration = programmaticDuration(delta * outputScale(pane));
         states.put(pane, AnimationState.programmatic(initial, target, now, duration));
         startTimer();
     }
@@ -194,12 +194,21 @@ final class LauncherScrollAnimator {
     ) {
         Point origin = new Point(0, 0);
         AnimationState first = AnimationState.stopped(origin)
-                .retarget(new Point(0, firstDelta), 0);
+                .retarget(new Point(0, firstDelta), 0, 1);
         long retargetNanos = Math.round(retargetAtMillis * 1_000_000.0);
         AnimationState atRetarget = first.at(retargetNanos);
         AnimationState second = atRetarget.retarget(
-                new Point(0, atRetarget.target.y + secondDelta), retargetNanos);
+                new Point(0, atRetarget.target.y + secondDelta), retargetNanos, 1);
         return second.at(Math.round(sampleAtMillis * 1_000_000.0)).current.y;
+    }
+
+    static double outputScale(ScrollPane pane) {
+        if (pane == null || pane.getScene() == null || pane.getScene().getWindow() == null) return 1;
+        double scale = Math.max(
+                pane.getScene().getWindow().getOutputScaleX(),
+                pane.getScene().getWindow().getOutputScaleY()
+        );
+        return Double.isFinite(scale) && scale > 0 ? scale : 1;
     }
 
     private static CurveSample cubicBezier(double x, double x1, double y1, double x2, double y2) {
@@ -296,10 +305,10 @@ final class LauncherScrollAnimator {
                     nextVelocityX, nextVelocityY);
         }
 
-        AnimationState retarget(Point newTarget, long now) {
+        AnimationState retarget(Point newTarget, long now, double outputScale) {
             Point delta = new Point(newTarget.x - current.x, newTarget.y - current.y);
             double maximumDelta = Math.abs(delta.x) >= Math.abs(delta.y) ? delta.x : delta.y;
-            double duration = inverseDeltaDuration(maximumDelta);
+            double duration = inverseDeltaDuration(maximumDelta * outputScale);
             double velocity = Math.abs(delta.x) >= Math.abs(delta.y) ? velocityX : velocityY;
             if (Math.abs(velocity) >= EPSILON && maximumDelta / velocity > 0) {
                 duration = Math.min(duration, maximumDelta / velocity * 2.5);

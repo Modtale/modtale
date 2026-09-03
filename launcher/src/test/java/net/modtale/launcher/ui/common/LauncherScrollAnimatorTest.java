@@ -28,6 +28,8 @@ class LauncherScrollAnimatorTest {
     @Test
     void programmaticDurationUsesTheBrowserDistanceCurveAndCap() {
         assertEquals(0.5, LauncherScrollAnimator.programmaticDuration(900), 0.000001);
+        assertEquals(Math.sqrt(1_800) / 60,
+                LauncherScrollAnimator.programmaticDuration(900 * 2), 0.000001);
         assertEquals(1.5, LauncherScrollAnimator.programmaticDuration(20_000), 0.000001);
     }
 
