@@ -41,6 +41,7 @@ public class ModtaleApiClient {
     private final CookieManager cookieManager;
     private final ModtaleApiTransport transport;
     private final ModtaleDownloadClient downloadClient;
+    private final NyoCfClient nyoCfClient;
     private final LauncherSessionStore sessionStore;
     private volatile URI apiBaseUri;
     private volatile boolean storedSessionLoaded;
@@ -85,6 +86,7 @@ public class ModtaleApiClient {
         this.cookieManager = cookieManager;
         this.transport = new ModtaleApiTransport(httpClient, responseCache, this::csrfToken);
         this.downloadClient = new ModtaleDownloadClient(httpClient, this::apiBaseUri);
+        this.nyoCfClient = new NyoCfClient(httpClient);
         this.sessionStore = sessionStore;
         configure(apiBaseUrl);
         if (this.sessionStore != null && this.cookieManager != null) {
@@ -179,24 +181,15 @@ public class ModtaleApiClient {
     }
 
     public ProjectPage searchCurseForgeMods(ProjectSearchQuery query) {
-        List<String> params = new ArrayList<>();
-        addParam(params, "page", Integer.toString(query.page()));
-        addParam(params, "size", Integer.toString(Math.min(50, query.size())));
-        addParam(params, "sort", query.sort());
-        addParam(params, "search", query.search());
-        addParam(params, "gameVersion", query.gameVersion());
-        String path = "/projects/external/curseforge" + (params.isEmpty() ? "" : "?" + String.join("&", params));
-        return transport.get(apiUri(path), ProjectPage.class, Duration.ZERO);
+        return nyoCfClient.search(query);
     }
 
     public ProjectDetail getCurseForgeProject(long projectId) {
-        String path = "/projects/external/curseforge/" + projectId;
-        return transport.get(apiUri(path), ProjectDetail.class, Duration.ZERO);
+        return nyoCfClient.project(projectId);
     }
 
     public DownloadUrlResponse getCurseForgeDownloadUrl(long projectId, long fileId) {
-        String path = "/projects/external/curseforge/" + projectId + "/files/" + fileId + "/download-url";
-        return transport.get(apiUri(path), DownloadUrlResponse.class, Duration.ZERO);
+        return nyoCfClient.download(projectId, fileId);
     }
 
     public ArtifactIdentity.Response identifyArtifacts(List<ArtifactIdentity.Artifact> artifacts) {
