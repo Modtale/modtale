@@ -8765,6 +8765,7 @@
 
 .library-world-content-header {
     -fx-alignment: center-left;
+    -fx-cursor: hand;
 }
 
 .library-world-content-list {
