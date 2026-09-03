@@ -26,6 +26,8 @@ import { STATUS_PAGE_URL } from '@/utils/status';
 import type { Classification } from '@/data/categories';
 import { normalizeUser } from '@/utils/users';
 import { clearPendingSignInMethod, completeSignInMethod } from '@/modules/auth/api/authClient';
+import { LocalizationProvider } from '@/i18n';
+import { useTranslation } from 'react-i18next';
 
 const StatusModal = lazy(() => import('@/components/ui/StatusModal').then((module) => ({ default: module.StatusModal })));
 const Onboarding = lazy(() => import('@/modules/user/components/Onboarding').then((module) => ({ default: module.Onboarding })));
@@ -45,6 +47,8 @@ const SwaggerDocs = lazy(() => import('@/modules/core/views/SwaggerDocs').then((
 const RouteLoading = () => <div className="p-20 flex justify-center"><Spinner /></div>;
 
 const StatusRedirect = () => {
+    const { t } = useTranslation('status');
+
     useEffect(() => {
         if (typeof window !== 'undefined') {
             window.location.replace(STATUS_PAGE_URL);
@@ -54,15 +58,15 @@ const StatusRedirect = () => {
     return (
         <main className="min-h-[60vh] flex items-center justify-center bg-slate-50 px-6 dark:bg-modtale-dark">
             <div className="max-w-md rounded-lg border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-white/10 dark:bg-slate-900">
-                <h1 className="text-xl font-black text-slate-950 dark:text-white">Opening Modtale Status</h1>
+                <h1 className="text-xl font-black text-slate-950 dark:text-white">{t('title')}</h1>
                 <p className="mt-2 text-sm font-medium leading-6 text-slate-500 dark:text-slate-400">
-                    Redirecting to {STATUS_PAGE_URL}.
+                    {t('redirecting', { url: STATUS_PAGE_URL })}
                 </p>
                 <a
                     href={STATUS_PAGE_URL}
                     className="mt-5 inline-flex h-10 items-center justify-center rounded-lg bg-modtale-accent px-4 text-sm font-bold text-white transition hover:bg-blue-600"
                 >
-                    Open Status
+                    {t('open')}
                 </a>
             </div>
         </main>
@@ -368,25 +372,27 @@ const AppContent: React.FC = () => {
 
 export const App: React.FC<any> = ({ initialPath, ssrData }) => {
     return (
-        <SSRProvider data={ssrData || null} initialPath={initialPath || '/'}>
-            <HelmetProvider>
-                <MobileProvider>
-                    <ExternalLinkProvider>
-                        <ToastProvider>
-                            {import.meta.env.SSR ? (
-                                <StaticRouter location={initialPath || "/"}>
-                                    <AppContent />
-                                </StaticRouter>
-                            ) : (
-                                <BrowserRouter>
-                                    <AppContent />
-                                </BrowserRouter>
-                            )}
-                        </ToastProvider>
-                    </ExternalLinkProvider>
-                </MobileProvider>
-            </HelmetProvider>
-        </SSRProvider>
+        <LocalizationProvider>
+            <SSRProvider data={ssrData || null} initialPath={initialPath || '/'}>
+                <HelmetProvider>
+                    <MobileProvider>
+                        <ExternalLinkProvider>
+                            <ToastProvider>
+                                {import.meta.env.SSR ? (
+                                    <StaticRouter location={initialPath || "/"}>
+                                        <AppContent />
+                                    </StaticRouter>
+                                ) : (
+                                    <BrowserRouter>
+                                        <AppContent />
+                                    </BrowserRouter>
+                                )}
+                            </ToastProvider>
+                        </ExternalLinkProvider>
+                    </MobileProvider>
+                </HelmetProvider>
+            </SSRProvider>
+        </LocalizationProvider>
     );
 };
 export default App;
