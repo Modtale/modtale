@@ -51,7 +51,6 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
 import javafx.util.StringConverter;
 import net.modtale.launcher.api.ModtaleApiClient;
 import net.modtale.launcher.api.ProjectSearchQuery;
@@ -662,7 +661,7 @@ public final class LauncherPlayController {
 
         Button play = new Button("Play");
         play.getStyleClass().add("play-launch-main");
-        play.setFont(Font.font("Inter", FontWeight.EXTRA_BOLD, PLAY_BUTTON_FONT_SIZE));
+        play.setFont(Font.font("Inter ExtraBold", PLAY_BUTTON_FONT_SIZE));
         play.setOnAction(event -> launchHytale());
 
         Button setup = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_DOWN, 18));

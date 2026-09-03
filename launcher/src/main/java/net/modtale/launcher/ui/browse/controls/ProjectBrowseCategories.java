@@ -24,7 +24,6 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
 import javafx.util.Duration;
 import net.modtale.launcher.ui.common.LauncherIcons;
 import net.modtale.launcher.ui.common.LauncherScrollSupport;
@@ -168,7 +167,7 @@ public final class ProjectBrowseCategories {
         text.setAlignment(Pos.CENTER);
         for (char letter : value.toCharArray()) {
             Label letterLabel = text(String.valueOf(letter), styleClass + "-letter");
-            letterLabel.setFont(Font.font("Arial Black", FontWeight.EXTRA_BOLD, fontSize));
+            letterLabel.setFont(Font.font("Inter Black", fontSize));
             text.getChildren().add(letterLabel);
         }
         return text;

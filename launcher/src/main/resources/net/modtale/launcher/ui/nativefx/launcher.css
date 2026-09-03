@@ -64,7 +64,7 @@
     -fx-background-insets: 0;
     -fx-border-insets: 0;
     -fx-font-size: 13px;
-    -fx-font-weight: 800;
+    -fx-font-weight: 700;
 }
 
 .icon-wrap {
@@ -123,6 +123,7 @@
 .native-spinner-label {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -135,11 +136,11 @@
     -fx-padding: 0 12px;
     -fx-background-radius: 8px;
     -fx-graphic-text-gap: 8px;
-    -fx-font-family: "Inter ExtraBold", "Inter", "Segoe UI", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #94a3b8;
     -fx-background-color: transparent;
     -fx-font-size: 14px;
-    -fx-font-weight: 800;
+    -fx-font-weight: 700;
 }
 
 .nav-btn:hover {
@@ -163,23 +164,19 @@
 .nav-btn .text,
 .browse-nav-button-label .text {
     -fx-fill: #94a3b8;
-    -fx-stroke: #94a3b8;
-    -fx-stroke-width: 0.65px;
-    -fx-effect: dropshadow(one-pass-box, rgba(148, 163, 184, 0.42), 1, 1, 0.28, 0);
+
 }
 
 .nav-btn:hover .text,
 .nav-btn:hover .browse-nav-button-label .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-effect: dropshadow(one-pass-box, rgba(255, 255, 255, 0.62), 1, 1, 0.36, 0);
+
 }
 
 .nav-btn:selected .text,
 .nav-btn:selected .browse-nav-button-label .text {
     -fx-fill: #60a5fa;
-    -fx-stroke: #60a5fa;
-    -fx-effect: dropshadow(one-pass-box, rgba(96, 165, 250, 0.62), 1, 1, 0.36, 0);
+
 }
 
 .nav-menu-button {
@@ -240,10 +237,10 @@
 }
 
 .browse-nav-button-label {
-    -fx-font-family: "Inter ExtraBold", "Inter", "Segoe UI", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #94a3b8;
     -fx-font-size: 14px;
-    -fx-font-weight: 800;
+    -fx-font-weight: 700;
 }
 
 .browse-nav-leading-icon .svg-icon,
@@ -400,6 +397,7 @@
     -fx-background-color: rgba(15, 23, 42, 0.78);
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
 }
 
@@ -428,6 +426,7 @@
 
 .avatar .label {
     -fx-text-fill: white;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -753,6 +752,7 @@
 .notification-menu-title {
     -fx-text-fill: #ffffff;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -776,6 +776,7 @@
     -fx-border-color: transparent;
     -fx-text-fill: #60a5fa;
     -fx-font-size: 11px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-graphic-text-gap: 5px;
 }
@@ -818,6 +819,7 @@
 .notification-menu-loading {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -882,12 +884,14 @@
 .profile-menu-name {
     -fx-text-fill: #ffffff;
     -fx-font-size: 16px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .profile-menu-indicator .label {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
 }
 
@@ -957,6 +961,7 @@
 .metric-label {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-letter-spacing: 1px;
 }
@@ -968,16 +973,16 @@
 }
 
 .browse-rail-title-letter {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #94a3b8;
     -fx-font-size: 11px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .browse-rail-title .text {
     -fx-fill: #94a3b8;
-    -fx-stroke: #94a3b8;
-    -fx-stroke-width: 1px;
+
 }
 
 .rail-link {
@@ -1005,29 +1010,24 @@
 .browse-rail-card .rail-link {
     -fx-padding: 12px 16px;
     -fx-graphic-text-gap: 0;
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-size: 14px;
-    -fx-font-weight: 800;
-    -fx-letter-spacing: 0.5px;
+    -fx-font-weight: 700;
+    -fx-letter-spacing: 0;
 }
 
 .browse-rail-card .rail-link .text {
     -fx-fill: #94a3b8;
-    -fx-stroke: #94a3b8;
-    -fx-stroke-width: 0.45px;
-    -fx-effect: dropshadow(one-pass-box, rgba(148, 163, 184, 0.24), 1, 1, 0.16, 0);
+
 }
 
 .browse-rail-card .rail-link:hover .text {
     -fx-fill: #e2e8f0;
-    -fx-stroke: #e2e8f0;
 }
 
 .browse-rail-card .rail-link:selected .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.45px;
-    -fx-effect: dropshadow(one-pass-box, rgba(255, 255, 255, 0.48), 1, 1, 0.28, 0);
+
 }
 
 .content {
@@ -1044,6 +1044,7 @@
 .page-title {
     -fx-text-fill: white;
     -fx-font-size: 22px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -1051,6 +1052,7 @@
 .panel-subtitle {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter SemiBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 600;
 }
 
@@ -1180,11 +1182,12 @@
     -fx-padding: 0 0 0 14px;
     -fx-border-width: 0 0 0 1px;
     -fx-border-color: rgba(255, 255, 255, 0.10);
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #94a3b8;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
-    -fx-effect: dropshadow(one-pass-box, rgba(148, 163, 184, 0.32), 1, 1, 0.18, 0);
+
     -fx-text-overrun: clip;
 }
 
@@ -1194,8 +1197,7 @@
 
 .browse-results-indicator .text {
     -fx-fill: #94a3b8;
-    -fx-stroke: #94a3b8;
-    -fx-stroke-width: 0.5px;
+
 }
 
 .category-scroll,
@@ -1262,14 +1264,13 @@
     -fx-background-radius: 12px;
     -fx-border-radius: 12px;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .toolbar-pill .text {
     -fx-fill: #cbd5e1;
-    -fx-stroke: #cbd5e1;
-    -fx-stroke-width: 0.7px;
-    -fx-effect: dropshadow(one-pass-box, rgba(203, 213, 225, 0.34), 1, 1, 0.18, 0);
+
 }
 
 .sort-select {
@@ -1278,6 +1279,7 @@
     -fx-background-radius: 12px;
     -fx-border-radius: 12px;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
 }
 
@@ -1291,6 +1293,7 @@
     -fx-background-radius: 12px;
     -fx-border-radius: 12px;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -1312,6 +1315,7 @@
     -fx-background-insets: 0;
     -fx-border-insets: 0;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
 }
 
@@ -1328,14 +1332,13 @@
 .sort-button-label {
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .sort-button-label .text {
     -fx-fill: #cbd5e1;
-    -fx-stroke: #cbd5e1;
-    -fx-stroke-width: 0.7px;
-    -fx-effect: dropshadow(one-pass-box, rgba(203, 213, 225, 0.34), 1, 1, 0.18, 0);
+
 }
 
 .sort-button:hover .sort-button-label,
@@ -1348,8 +1351,7 @@
 .toolbar-pill:hover .text,
 .toolbar-pill:selected .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-effect: dropshadow(one-pass-box, rgba(255, 255, 255, 0.56), 1, 1, 0.32, 0);
+
 }
 
 .sort-button-chevron .svg-icon {
@@ -1403,22 +1405,20 @@
 .sort-dropdown-item-label {
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .sort-dropdown-item-label .text {
     -fx-fill: #cbd5e1;
-    -fx-stroke: #cbd5e1;
-    -fx-stroke-width: 0.7px;
-    -fx-effect: dropshadow(one-pass-box, rgba(203, 213, 225, 0.34), 1, 1, 0.18, 0);
+
 }
 
 .sort-dropdown-item:hover .sort-dropdown-item-label .text,
 .sort-dropdown-item:focused .sort-dropdown-item-label .text,
 .sort-dropdown-item:selected .sort-dropdown-item-label .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-effect: dropshadow(one-pass-box, rgba(255, 255, 255, 0.56), 1, 1, 0.32, 0);
+
 }
 
 .sort-dropdown-check .svg-icon {
@@ -1462,6 +1462,7 @@
     -fx-background-color: transparent;
     -fx-text-fill: #94a3b8;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -1508,6 +1509,7 @@
 .filter-modal-title {
     -fx-text-fill: #ffffff;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -1569,17 +1571,17 @@
 }
 
 .popover-title {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
-    -fx-effect: dropshadow(one-pass-box, rgba(255, 255, 255, 0.62), 1, 1, 0.35, 0);
+
 }
 
 .popover-title .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.5px;
+
 }
 
 .tag-clear-button {
@@ -1590,6 +1592,7 @@
     -fx-border-color: transparent;
     -fx-text-fill: #f87171;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -1607,6 +1610,7 @@
     -fx-background-color: rgba(2, 6, 23, 0.52);
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -1633,6 +1637,7 @@
 .filter-label {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -1701,6 +1706,7 @@
     -fx-background-color: transparent;
     -fx-text-fill: #94a3b8;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -1746,6 +1752,7 @@
 .filter-toggle-label {
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -1791,6 +1798,7 @@
     -fx-pref-height: 36px;
     -fx-padding: 0 12px;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter SemiBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 600;
     -fx-background-radius: 12px;
     -fx-border-radius: 12px;
@@ -1815,12 +1823,14 @@
     -fx-min-height: 36px;
     -fx-pref-height: 36px;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
     -fx-background-color: rgba(2, 6, 23, 0.52);
 }
 
 .filter-select .list-cell {
     -fx-font-size: 12px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
     -fx-text-fill: #cbd5e1;
 }
@@ -1853,6 +1863,7 @@
 .game-version-dropdown-toggle-label {
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -1944,6 +1955,7 @@
 .game-version-dropdown-row-label {
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -1960,6 +1972,7 @@
 .game-version-dropdown-count {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -1984,6 +1997,7 @@
     -fx-padding: 12px;
     -fx-text-fill: #64748b;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
     -fx-alignment: center;
 }
@@ -2041,6 +2055,7 @@
 .filter-date-picker .text-field {
     -fx-padding: 0 30px 0 34px;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter SemiBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 600;
 }
 
@@ -2089,6 +2104,7 @@
 .panel-title {
     -fx-text-fill: white;
     -fx-font-size: 18px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -2141,6 +2157,7 @@
 .settings-section-title {
     -fx-text-fill: #ffffff;
     -fx-font-size: 17px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -2203,6 +2220,7 @@
 .settings-card-title {
     -fx-text-fill: #ffffff;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -2284,6 +2302,7 @@
 .account-section-title {
     -fx-text-fill: #ffffff;
     -fx-font-size: 22px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -2291,6 +2310,7 @@
 .account-section-meta {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter SemiBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 600;
 }
 
@@ -2311,12 +2331,14 @@
 .notification-toggle-title {
     -fx-text-fill: #ffffff;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .notification-toggle-description {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter SemiBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 600;
 }
 
@@ -2340,6 +2362,7 @@
     -fx-background-color: transparent;
     -fx-text-fill: #94a3b8;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -2389,6 +2412,7 @@
 .notification-title {
     -fx-text-fill: #e2e8f0;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -2399,12 +2423,14 @@
 .notification-message {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter SemiBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 600;
 }
 
 .notification-date {
     -fx-text-fill: #64748b;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
 }
 
@@ -2494,6 +2520,7 @@
 .following-modal-title {
     -fx-text-fill: #ffffff;
     -fx-font-size: 18px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -2516,6 +2543,7 @@
     -fx-padding: 12px 18px;
     -fx-text-fill: #94a3b8;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
 }
 
@@ -2548,6 +2576,7 @@
 .following-loading {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -2560,12 +2589,14 @@
 .following-empty-title {
     -fx-text-fill: #ffffff;
     -fx-font-size: 18px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .following-empty-subtitle {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter SemiBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 600;
 }
 
@@ -2595,12 +2626,14 @@
 .following-avatar .label {
     -fx-text-fill: #ffffff;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .following-name {
     -fx-text-fill: #ffffff;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -2611,6 +2644,7 @@
 .following-role {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -2631,17 +2665,17 @@
 }
 
 .pill-label-letter {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #94a3b8;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
-    -fx-effect: dropshadow(one-pass-box, rgba(148, 163, 184, 0.38), 1, 1, 0.24, 0);
+
 }
 
 .pill-label .text {
     -fx-fill: #94a3b8;
-    -fx-stroke: #94a3b8;
-    -fx-stroke-width: 0.7px;
+
 }
 
 .pill:selected {
@@ -2653,13 +2687,12 @@
 
 .pill:selected .pill-label-letter {
     -fx-text-fill: #ffffff;
-    -fx-effect: dropshadow(one-pass-box, rgba(255, 255, 255, 0.66), 1, 1, 0.40, 0);
+
 }
 
 .pill:selected .pill-label .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.7px;
+
 }
 
 .project-grid {
@@ -2712,6 +2745,7 @@
     -fx-background-color: transparent;
     -fx-text-fill: #94a3b8;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -2749,6 +2783,7 @@
     -fx-alignment: center;
     -fx-text-fill: #64748b;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -2766,6 +2801,7 @@
 .pagination-jump-label {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -2785,6 +2821,7 @@
     -fx-text-fill: #ffffff;
     -fx-prompt-text-fill: #64748b;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -2876,6 +2913,7 @@
     -fx-border-color: rgba(255, 255, 255, 0.10);
     -fx-text-fill: rgba(255, 255, 255, 0.92);
     -fx-font-size: 16px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-graphic-text-gap: 6px;
     -fx-cursor: hand;
@@ -2944,24 +2982,25 @@
 }
 
 .project-detail-icon-initial {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 68px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .project-detail-title {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 42px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-line-spacing: -1px;
 }
 
 .project-detail-title .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.5px;
+
 }
 
 .project-detail-classification-badge {
@@ -2975,6 +3014,7 @@
 .project-detail-classification-label {
     -fx-text-fill: #60a5fa;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-transform: uppercase;
 }
@@ -2990,6 +3030,7 @@
 .project-detail-author {
     -fx-text-fill: #ffffff;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -3017,6 +3058,7 @@
 .project-detail-loading {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
 }
 
@@ -3092,6 +3134,7 @@
     -fx-padding: 0 36px;
     -fx-background-radius: 12px;
     -fx-font-size: 15px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-fill: #ffffff;
     -fx-graphic-text-gap: 9px;
@@ -3113,6 +3156,7 @@
     -fx-background-radius: 12px;
     -fx-border-radius: 12px;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-fill: #ffffff;
     -fx-graphic-text-gap: 7px;
@@ -3120,13 +3164,13 @@
 
 .btn.secondary.project-detail-secondary-action {
     -fx-text-fill: #ffffff;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .btn.secondary.project-detail-secondary-action .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.18px;
+
 }
 
 .btn.secondary.project-detail-secondary-action .svg-icon {
@@ -3169,16 +3213,16 @@
 }
 
 .project-changelog-title {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 20px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .project-changelog-title .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.55px;
+
 }
 
 .project-changelog-header .svg-icon {
@@ -3247,6 +3291,7 @@
 .project-changelog-toggle-label {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-transform: uppercase;
 }
@@ -3295,16 +3340,16 @@
 }
 
 .project-changelog-version {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 20px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .project-changelog-version .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.45px;
+
 }
 
 .project-changelog-channel {
@@ -3313,6 +3358,7 @@
     -fx-border-radius: 4px;
     -fx-border-width: 1px;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-transform: uppercase;
 }
@@ -3333,6 +3379,7 @@
 .project-changelog-meta .label {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-transform: uppercase;
 }
@@ -3363,6 +3410,7 @@
 .project-changelog-external-badge .label {
     -fx-text-fill: #fde68a;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-transform: uppercase;
 }
@@ -3380,6 +3428,7 @@
     -fx-border-color: transparent;
     -fx-border-width: 0;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-graphic-text-gap: 8px;
 }
@@ -3423,6 +3472,7 @@
 .project-changelog-card .project-detail-markdown-text {
     -fx-fill: #cbd5e1;
     -fx-font-size: 16px;
+    -fx-font-family: "Inter Medium", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 500;
 }
 
@@ -3518,16 +3568,16 @@
 }
 
 .download-modal-title {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 20px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .download-modal-title .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.45px;
+
 }
 
 .download-modal-close {
@@ -3590,6 +3640,7 @@
 .download-modal-toggle-label {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-transform: uppercase;
 }
@@ -3702,16 +3753,16 @@
 }
 
 .download-modal-latest-title {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 20px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .download-modal-latest-title .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.45px;
+
 }
 
 .download-modal-version-badge {
@@ -3767,6 +3818,7 @@
 .download-modal-external-dependency-title .label {
     -fx-text-fill: #fde68a;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -3872,6 +3924,7 @@
 .download-modal-file-version {
     -fx-text-fill: #ffffff;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -3879,6 +3932,7 @@
 .download-modal-file-supports {
     -fx-text-fill: #64748b;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter SemiBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 600;
 }
 
@@ -3900,6 +3954,7 @@
 .download-modal-file-external-badge .label {
     -fx-text-fill: #fde68a;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-transform: uppercase;
     -fx-letter-spacing: 0.8px;
@@ -3915,6 +3970,7 @@
     -fx-border-radius: 4px;
     -fx-border-width: 1px;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -3975,6 +4031,7 @@
     -fx-border-width: 0;
     -fx-text-fill: #3b82f6;
     -fx-font-size: 11px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -4031,9 +4088,10 @@
 }
 
 .install-loading-title {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 22px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -4042,6 +4100,7 @@
     -fx-alignment: center;
     -fx-text-fill: #bfdbfe;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
     -fx-line-spacing: 2px;
 }
@@ -4069,16 +4128,16 @@
 }
 
 .post-download-modal-title .label {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 20px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .post-download-modal-title .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.45px;
+
 }
 
 .post-download-modal-title .svg-icon {
@@ -4138,6 +4197,7 @@
 .post-download-modal-description {
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter SemiBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 600;
 }
 
@@ -4157,6 +4217,7 @@
     -fx-border-width: 0;
     -fx-text-fill: #3b82f6;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-cursor: hand;
 }
@@ -4217,6 +4278,7 @@
 .post-download-modal-world-title {
     -fx-text-fill: #ffffff;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -4282,6 +4344,7 @@
     -fx-border-width: 0;
     -fx-text-fill: #94a3b8;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -4301,6 +4364,7 @@
 .post-download-modal-primary-title .label {
     -fx-text-fill: #ffffff;
     -fx-font-size: 15px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -4331,16 +4395,16 @@
 }
 
 .dependency-modal-title .label {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 20px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .dependency-modal-title .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.45px;
+
 }
 
 .dependency-modal-title .svg-icon {
@@ -4394,6 +4458,7 @@
 .dependency-modal-description {
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter SemiBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 600;
 }
 
@@ -4403,6 +4468,7 @@
     -fx-border-width: 0;
     -fx-text-fill: #3b82f6;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-cursor: hand;
 }
@@ -4476,6 +4542,7 @@
 .dependency-modal-state-warning {
     -fx-text-fill: #ef4444;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -4502,6 +4569,7 @@
 .dependency-modal-dependency-title {
     -fx-text-fill: #ffffff;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -4530,6 +4598,7 @@
     -fx-border-radius: 6px;
     -fx-border-width: 1px;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-transform: uppercase;
 }
@@ -4604,6 +4673,7 @@
 .dependency-modal-download-title .label {
     -fx-text-fill: #ffffff;
     -fx-font-size: 16px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -4614,6 +4684,7 @@
 .dependency-modal-download-subtitle {
     -fx-text-fill: #dbeafe;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Medium", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 500;
 }
 
@@ -4646,6 +4717,7 @@
 .report-modal-title .label {
     -fx-text-fill: #ffffff;
     -fx-font-size: 16px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -4700,6 +4772,7 @@
 .report-modal-field-label {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-transform: uppercase;
     -fx-letter-spacing: 0.8px;
@@ -4741,6 +4814,7 @@
     -fx-background-color: #2563eb;
     -fx-text-fill: #ffffff;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-cursor: hand;
     -fx-graphic-text-gap: 8px;
@@ -4768,6 +4842,7 @@
     -fx-border-width: 0;
     -fx-text-fill: #ffffff;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-cursor: hand;
     -fx-graphic-text-gap: 8px;
@@ -4802,12 +4877,14 @@
 .report-modal-target-copy {
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter SemiBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 600;
 }
 
 .report-modal-target-title {
     -fx-text-fill: #ffffff;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -4849,6 +4926,7 @@
 .report-modal-reason-selected-label {
     -fx-text-fill: #ffffff;
     -fx-font-size: 16px;
+    -fx-font-family: "Inter SemiBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 600;
 }
 
@@ -4895,6 +4973,7 @@
 
 .report-modal-reason-option-selected {
     -fx-text-fill: #ffffff;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -4914,6 +4993,7 @@
     -fx-text-fill: #ffffff;
     -fx-prompt-text-fill: #64748b;
     -fx-font-size: 16px;
+    -fx-font-family: "Inter Medium", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 500;
 }
 
@@ -4975,6 +5055,7 @@
     -fx-padding: 16px 0 0 0;
     -fx-text-fill: #ffffff;
     -fx-font-size: 20px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -4982,6 +5063,7 @@
     -fx-padding: 8px 0 0 0;
     -fx-text-fill: #94a3b8;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter SemiBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 600;
     -fx-text-alignment: center;
 }
@@ -4999,6 +5081,7 @@
 .report-modal-id-label {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-transform: uppercase;
     -fx-letter-spacing: 0.8px;
@@ -5019,6 +5102,7 @@
     -fx-background-color: rgba(255, 255, 255, 0.05);
     -fx-text-fill: #e2e8f0;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-cursor: hand;
 }
@@ -5034,6 +5118,7 @@
     -fx-background-color: transparent;
     -fx-text-fill: #60a5fa;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-graphic-text-gap: 4px;
     -fx-cursor: hand;
@@ -5056,6 +5141,7 @@
 .project-changelog-loading {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-transform: uppercase;
 }
@@ -5068,6 +5154,7 @@
 .project-changelog-empty-title {
     -fx-text-fill: #ffffff;
     -fx-font-size: 15px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -5095,16 +5182,16 @@
 }
 
 .project-gallery-title {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 18px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .project-gallery-title .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.85px;
+
 }
 
 .btn.secondary.project-gallery-close {
@@ -5116,6 +5203,7 @@
     -fx-background-color: transparent;
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -5126,13 +5214,11 @@
 
 .btn.secondary.project-gallery-close .text {
     -fx-fill: #cbd5e1;
-    -fx-stroke: #cbd5e1;
-    -fx-stroke-width: 0.45px;
+
 }
 
 .btn.secondary.project-gallery-close:hover .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
 }
 
 .project-gallery-body {
@@ -5244,6 +5330,7 @@
     -fx-border-color: rgba(96, 165, 250, 0.20);
     -fx-text-fill: #e2e8f0;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
 }
 
@@ -5316,16 +5403,16 @@
 }
 
 .project-comments-title {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 24px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .project-comments-title .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.28px;
+
 }
 
 .project-comments-disabled-notice {
@@ -5344,6 +5431,7 @@
 .project-comments-disabled-text {
     -fx-text-fill: #f97316;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -5365,6 +5453,7 @@
 .project-comments-composer-title {
     -fx-text-fill: #60a5fa;
     -fx-font-size: 11px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-transform: uppercase;
 }
@@ -5375,6 +5464,7 @@
     -fx-border-color: transparent;
     -fx-text-fill: #64748b;
     -fx-font-size: 11px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-transform: uppercase;
     -fx-cursor: hand;
@@ -5425,6 +5515,7 @@
     -fx-padding: 0 18px;
     -fx-background-radius: 8px;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-graphic-text-gap: 7px;
 }
@@ -5438,6 +5529,7 @@
     -fx-background-color: rgba(0, 0, 0, 0.20);
     -fx-text-fill: #64748b;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-effect: dropshadow(one-pass-box, rgba(2, 6, 23, 0.16), 6, 0.08, 0, 1);
     -fx-cursor: hand;
@@ -5467,6 +5559,7 @@
 .project-comments-state-label {
     -fx-text-fill: #64748b;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
 }
 
@@ -5524,6 +5617,7 @@
     -fx-text-alignment: center;
     -fx-text-fill: #64748b;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -5543,12 +5637,14 @@
 .project-comment-avatar-initial {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .project-comment-author {
     -fx-text-fill: #ffffff;
     -fx-font-size: 15px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -5568,6 +5664,7 @@
     -fx-border-radius: 4px;
     -fx-border-width: 1px;
     -fx-font-size: 9px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-transform: uppercase;
 }
@@ -5602,6 +5699,7 @@
     -fx-border-color: transparent;
     -fx-text-fill: #64748b;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-graphic-text-gap: 6px;
     -fx-cursor: hand;
@@ -5643,6 +5741,7 @@
     -fx-padding: 0 18px;
     -fx-background-radius: 8px;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -5704,6 +5803,7 @@
 .project-comment-delete-title {
     -fx-text-fill: #ffffff;
     -fx-font-size: 20px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -5728,6 +5828,7 @@
     -fx-background-radius: 12px;
     -fx-border-radius: 12px;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-graphic-text-gap: 9px;
 }
@@ -5778,11 +5879,13 @@
 .project-detail-markdown-text {
     -fx-fill: #d1d5db;
     -fx-font-size: 17px;
+    -fx-font-family: "Inter Medium", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 500;
 }
 
 .project-detail-markdown-text.strong {
     -fx-fill: #f8fafc;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -5798,7 +5901,7 @@
 .project-detail-prose-h1,
 .project-detail-prose-h2,
 .project-detail-prose-h3 {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -5824,29 +5927,26 @@
 .project-detail-prose-h2 .project-detail-markdown-text,
 .project-detail-prose-h3 .project-detail-markdown-text {
     -fx-fill: #ffffff;
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .project-detail-prose-h1 .text,
 .project-detail-prose-h1 .project-detail-markdown-text {
     -fx-font-size: 36px;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.5px;
+
 }
 
 .project-detail-prose-h2 .text,
 .project-detail-prose-h2 .project-detail-markdown-text {
     -fx-font-size: 24px;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.3px;
+
 }
 
 .project-detail-prose-h3 .text,
 .project-detail-prose-h3 .project-detail-markdown-text {
     -fx-font-size: 20px;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.25px;
+
 }
 
 .project-detail-prose-list {
@@ -5860,6 +5960,7 @@
 .project-detail-prose-bullet {
     -fx-text-fill: #60a5fa;
     -fx-font-size: 18px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-min-width: 18px;
     -fx-pref-width: 18px;
@@ -5919,6 +6020,7 @@
 .project-detail-markdown-code-copy {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
 }
 
@@ -6012,6 +6114,7 @@
 .project-detail-markdown-th .text {
     -fx-fill: #ffffff;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -6044,16 +6147,16 @@
 
 .project-wiki-title {
     -fx-padding: 0 0 24px 0;
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 36px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .project-wiki-title .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.5px;
+
 }
 
 .project-wiki-empty-page {
@@ -6088,6 +6191,7 @@
     -fx-border-radius: 8px;
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-graphic-text-gap: 7px;
     -fx-cursor: hand;
@@ -6116,6 +6220,7 @@
 .project-wiki-state-title {
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 18px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -6165,6 +6270,7 @@
 .project-wiki-search-title {
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -6237,6 +6343,7 @@
     -fx-border-width: 0;
     -fx-text-fill: #60a5fa;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-graphic-text-gap: 8px;
     -fx-cursor: hand;
@@ -6274,9 +6381,10 @@
 }
 
 .project-detail-stat-number {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 30px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -6284,7 +6392,8 @@
 .project-detail-stat-caption .label {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 10px;
-    -fx-font-weight: 900;
+    -fx-font-weight: 700;
+    -fx-letter-spacing: 1px;
     -fx-text-transform: uppercase;
 }
 
@@ -6318,6 +6427,7 @@
 .project-detail-sidebar-heading .label {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 11px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-transform: uppercase;
 }
@@ -6333,6 +6443,7 @@
     -fx-background-radius: 8px;
     -fx-border-radius: 8px;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-transform: uppercase;
 }
@@ -6360,6 +6471,7 @@
     -fx-background-color: rgba(255, 255, 255, 0.05);
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -6382,6 +6494,7 @@
 .project-detail-version-group > .title > .text {
     -fx-fill: #cbd5e1;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -6403,6 +6516,7 @@
     -fx-background-color: rgba(15, 23, 42, 0.50);
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -6414,6 +6528,7 @@
     -fx-background-color: rgba(15, 23, 42, 0.50);
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -6429,6 +6544,7 @@
 .project-detail-simple-link {
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -6466,12 +6582,14 @@
 .project-detail-team-name {
     -fx-text-fill: #e2e8f0;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .project-detail-team-role {
     -fx-text-fill: #64748b;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
     -fx-text-transform: uppercase;
 }
@@ -6499,6 +6617,7 @@
 .project-detail-dependency-notice-heading .label {
     -fx-text-fill: #fde68a;
     -fx-font-size: 11px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -6559,6 +6678,7 @@
 .project-detail-dependency-title {
     -fx-text-fill: #e2e8f0;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -6574,30 +6694,35 @@
 .project-detail-dependency-meta .label {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
 }
 
 .project-detail-dependency-type-required {
     -fx-text-fill: #f59e0b;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .project-detail-dependency-type {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .project-detail-dependency-source {
     -fx-text-fill: #fb923c;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .project-detail-dependency-bundled {
     -fx-text-fill: #34d399;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -6610,6 +6735,7 @@
 .project-detail-dependency-incompatible {
     -fx-text-fill: #f87171;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -6651,6 +6777,7 @@
     -fx-border-color: rgba(255, 255, 255, 0.10);
     -fx-text-fill: rgba(255, 255, 255, 0.92);
     -fx-font-size: 16px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-graphic-text-gap: 6px;
     -fx-cursor: hand;
@@ -6682,6 +6809,7 @@
 .creator-profile-muted {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
 }
 
@@ -6702,6 +6830,7 @@
 .creator-profile-avatar-initial {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 54px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -6714,16 +6843,15 @@
 }
 
 .creator-profile-title {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 50px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .creator-profile-title .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 1.25px;
 }
 
 .creator-profile-badge {
@@ -6732,6 +6860,7 @@
     -fx-border-radius: 6px;
     -fx-text-fill: #ffffff;
     -fx-font-size: 11px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.18), 8, 0.12, 0, 2);
 }
@@ -6739,6 +6868,7 @@
 .creator-profile-badge .label {
     -fx-text-fill: #ffffff;
     -fx-font-size: 11px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-transform: uppercase;
 }
@@ -6786,6 +6916,7 @@
     -fx-border-radius: 12px;
     -fx-border-width: 0;
     -fx-font-size: 16px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-graphic-text-gap: 8px;
     -fx-cursor: hand;
@@ -6815,8 +6946,7 @@
 
 .creator-profile-follow .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.75px;
+
 }
 
 .creator-profile-follow.following .svg-icon {
@@ -6825,7 +6955,6 @@
 
 .creator-profile-follow.following .text {
     -fx-fill: #cbd5e1;
-    -fx-stroke: #cbd5e1;
 }
 
 .creator-profile-icon-action {
@@ -6864,6 +6993,7 @@
 .creator-profile-bio {
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 18px;
+    -fx-font-family: "Inter Medium", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 500;
     -fx-line-spacing: 5px;
 }
@@ -6877,21 +7007,22 @@
 }
 
 .creator-profile-stat-number {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 24px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .creator-profile-stat-number .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.95px;
+
 }
 
 .creator-profile-stat-caption {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-transform: uppercase;
 }
@@ -6927,16 +7058,16 @@
 }
 
 .creator-profile-section-title {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 20px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .creator-profile-section-title .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.35px;
+
 }
 
 .creator-profile-related-chip {
@@ -6963,12 +7094,14 @@
 .creator-profile-related-initial,
 .creator-profile-related-name {
     -fx-text-fill: #cbd5e1;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .creator-profile-related-role {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-transform: uppercase;
 }
@@ -6998,6 +7131,7 @@
 .creator-profile-empty .label {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
 }
 
@@ -7075,14 +7209,13 @@
 .root:scrolling .project-card-shell:hover .project-title,
 .root:scrolling .project-card:hover .compact-title {
     -fx-text-fill: #ffffff;
-    -fx-effect: dropshadow(one-pass-box, rgba(255, 255, 255, 0.62), 1, 1, 0.35, 0);
+
 }
 
 .root:scrolling .project-card:hover .project-title .text,
 .root:scrolling .project-card-shell:hover .project-title .text,
 .root:scrolling .project-card:hover .compact-title .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
 }
 
 .project-banner {
@@ -7118,17 +7251,17 @@
 }
 
 .classification-label {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
-    -fx-effect: dropshadow(one-pass-box, rgba(255, 255, 255, 0.62), 1, 1, 0.35, 0);
+
 }
 
 .classification-label .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.5px;
+
 }
 
 .project-card-body {
@@ -7181,61 +7314,62 @@
 .project-icon-media .label {
     -fx-text-fill: white;
     -fx-font-size: 29px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .project-title {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 20px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
-    -fx-effect: dropshadow(one-pass-box, rgba(255, 255, 255, 0.72), 1, 1, 0.5, 0);
+
 }
 
 .compact-title {
-    -fx-font-family: "Arial Black", "Segoe UI Black", "Inter Black", "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: white;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
-    -fx-effect: dropshadow(one-pass-box, rgba(255, 255, 255, 0.62), 1, 1, 0.35, 0);
+
 }
 
 .project-title .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.8px;
+
 }
 
 .compact-title .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0.5px;
+
 }
 
 .project-card:hover .project-title,
 .project-card-shell:hover .project-title,
 .project-card:hover .compact-title {
     -fx-text-fill: #60a5fa;
-    -fx-effect: dropshadow(one-pass-box, rgba(96, 165, 250, 0.56), 1, 1, 0.5, 0);
+
 }
 
 .project-card:hover .project-title .text,
 .project-card-shell:hover .project-title .text,
 .project-card:hover .compact-title .text {
     -fx-fill: #60a5fa;
-    -fx-stroke: #60a5fa;
 }
 
 .byline {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 14px;
-    -fx-font-weight: 400;
+    -fx-font-weight: 700;
 }
 
 .compact-byline {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 13px;
-    -fx-font-weight: 400;
+    -fx-font-family: "Inter Medium", "Inter", "SF Pro Text", "Segoe UI", "System";
+    -fx-font-weight: 500;
 }
 
 .project-description {
@@ -7252,28 +7386,22 @@
 
 .project-stat-text,
 .project-stat {
-    -fx-font-family: "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "System";
     -fx-text-fill: #94a3b8;
     -fx-font-size: 11px;
-    -fx-font-weight: 900;
-    -fx-effect: dropshadow(one-pass-box, rgba(148, 163, 184, 0.32), 1, 1, 0.18, 0);
+    -fx-font-weight: 700;
+    -fx-letter-spacing: 1.1px;
+
 }
 
 .project-stat-text-large,
 .project-stat-large {
-    -fx-font-family: "Inter ExtraBold", "System";
+    -fx-font-family: "Inter", "System";
     -fx-text-fill: #94a3b8;
     -fx-font-size: 12px;
-    -fx-font-weight: 900;
-    -fx-effect: dropshadow(one-pass-box, rgba(148, 163, 184, 0.32), 1, 1, 0.18, 0);
-}
+    -fx-font-weight: 700;
+    -fx-letter-spacing: 1.1px;
 
-.project-stat-text .text,
-.project-stat .text,
-.project-stat-text-large .text,
-.project-stat-large .text {
-    -fx-stroke: #94a3b8;
-    -fx-stroke-width: 0.18px;
 }
 
 .favorite-stat {
@@ -7303,7 +7431,6 @@
 
 .favorite-stat:selected .text {
     -fx-fill: #ef4444;
-    -fx-stroke: #ef4444;
 }
 
 .byline-row {
@@ -7331,7 +7458,7 @@
 
 .compact-stats .label {
     -fx-text-fill: #94a3b8;
-    -fx-font-weight: 900;
+    -fx-font-weight: 700;
 }
 
 .icon-only-button {
@@ -7341,6 +7468,7 @@
 .latest-label {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -7349,6 +7477,7 @@
     -fx-pref-height: 38px;
     -fx-padding: 0 14px;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-graphic-text-gap: 8px;
 }
@@ -7368,6 +7497,7 @@
 .metric-value {
     -fx-text-fill: white;
     -fx-font-size: 18px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -7390,6 +7520,7 @@
 .native-check {
     -fx-text-fill: #e2e8f0;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
 }
 
@@ -7410,12 +7541,14 @@
 
 .row-icon .label {
     -fx-text-fill: white;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .row-title {
     -fx-text-fill: white;
     -fx-font-size: 15px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -7462,17 +7595,16 @@
 }
 
 .play-catalog-title {
-    -fx-font-family: "Inter Black", "Inter ExtraBold", "Inter", "Segoe UI", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 19px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.34), 12, 0.16, 0, 4);
 }
 
 .play-catalog-title .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0;
 }
 
 .play-catalog-browse-all {
@@ -7486,6 +7618,7 @@
     -fx-border-color: rgba(255, 255, 255, 0.08);
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
     -fx-graphic-text-gap: 5px;
 }
@@ -7682,17 +7815,16 @@
 }
 
 .play-sidebar-section-title {
-    -fx-font-family: "Inter Black", "Inter ExtraBold", "Inter", "Segoe UI", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #f8fafc;
     -fx-font-size: 15px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-effect: none;
 }
 
 .play-sidebar-section-title .text {
     -fx-fill: #f8fafc;
-    -fx-stroke: #f8fafc;
-    -fx-stroke-width: 0;
 }
 
 .play-identity-button {
@@ -7722,7 +7854,6 @@
 
 .play-identity-button:hover .play-identity-title .text {
     -fx-fill: #60a5fa;
-    -fx-stroke: #60a5fa;
 }
 
 .play-identity-button-content {
@@ -7747,6 +7878,7 @@
 .play-identity-avatar .play-avatar-initial {
     -fx-text-fill: #f8fafc;
     -fx-font-size: 15px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -7756,21 +7888,21 @@
 }
 
 .play-identity-title {
-    -fx-font-family: "Inter Black", "Inter ExtraBold", "Inter", "Segoe UI", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 17px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .play-identity-title .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0;
 }
 
 .play-identity-subtitle {
     -fx-text-fill: #b6c2d4;
     -fx-font-size: 11px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
 }
 
@@ -7864,6 +7996,7 @@
 .play-identity-menu-avatar .play-avatar-initial {
     -fx-text-fill: #dbeafe;
     -fx-font-size: 11px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -7918,6 +8051,7 @@
 .play-identity-menu-title {
     -fx-text-fill: #f8fafc;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -7991,6 +8125,7 @@
 .play-friend-avatar .label {
     -fx-text-fill: #ffffff;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -8018,12 +8153,14 @@
 .play-friend-name {
     -fx-text-fill: #f8fafc;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .play-friend-status {
     -fx-text-fill: #9fb0c6;
     -fx-font-size: 11px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
 }
 
@@ -8067,12 +8204,14 @@
 .play-news-initial {
     -fx-text-fill: #e5f4ff;
     -fx-font-size: 22px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .play-news-title {
     -fx-text-fill: #f8fafc;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -8083,6 +8222,7 @@
 .play-news-date {
     -fx-text-fill: #9fb0c6;
     -fx-font-size: 11px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
 }
 
@@ -8091,6 +8231,7 @@
 .mod-section-title {
     -fx-text-fill: #9ca3af;
     -fx-font-size: 11px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-letter-spacing: 0;
 }
@@ -8128,17 +8269,16 @@
     -fx-border-color: transparent;
     -fx-background-radius: 14px;
     -fx-border-radius: 14px;
-    -fx-font-family: "Inter Black", "Inter ExtraBold", "Inter", "Segoe UI", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 22px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-effect: none;
 }
 
 .play-launch-main .text {
     -fx-fill: #ffffff;
-    -fx-stroke: #ffffff;
-    -fx-stroke-width: 0;
 }
 
 .play-launch-main:hover {
@@ -8192,12 +8332,14 @@
 .play-panel-title {
     -fx-text-fill: #ffffff;
     -fx-font-size: 19px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .play-panel-status {
     -fx-text-fill: #93c5fd;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-padding: 5px 10px;
     -fx-background-radius: 999px;
@@ -8280,6 +8422,7 @@
 .library-status-unlocked,
 .library-badge {
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-letter-spacing: 0;
     -fx-padding: 4px 8px;
@@ -8397,17 +8540,20 @@
 .library-file-name {
     -fx-text-fill: #ffffff;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .library-detail-title {
     -fx-text-fill: #ffffff;
     -fx-font-size: 24px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .library-world-detail-title {
     -fx-font-size: 20px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -8517,6 +8663,7 @@
 .library-world-tab-status {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 11px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
 }
 
@@ -8637,12 +8784,14 @@
 .library-fact-label {
     -fx-text-fill: #64748b;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .library-fact-value {
     -fx-text-fill: #e2e8f0;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -8736,6 +8885,7 @@
 .library-world-tab-caption {
     -fx-text-fill: #64748b;
     -fx-font-size: 10px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
@@ -8789,6 +8939,7 @@
 .library-world-pack-note {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
     -fx-padding: 8px 10px 2px 58px;
 }
@@ -8839,24 +8990,28 @@
 .auth-separator-label {
     -fx-text-fill: #64748b;
     -fx-font-size: 11px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .auth-title {
     -fx-text-fill: white;
     -fx-font-size: 24px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .auth-step-title {
     -fx-text-fill: #e2e8f0;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .auth-subtitle {
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter SemiBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 600;
     -fx-text-alignment: center;
 }
@@ -8864,6 +9019,7 @@
 .auth-status {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
     -fx-text-alignment: center;
 }
@@ -8886,12 +9042,14 @@
 .empty-title {
     -fx-text-fill: white;
     -fx-font-size: 17px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .empty-subtitle {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter Medium", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 500;
 }
 
@@ -8982,12 +9140,14 @@
 .toast-title {
     -fx-text-fill: white;
     -fx-font-size: 13px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .toast-message {
     -fx-text-fill: #cbd5e1;
     -fx-font-size: 11px;
+    -fx-font-family: "Inter SemiBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 600;
 }
 
@@ -9085,9 +9245,10 @@
 }
 
 .status-modal-title {
-    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
     -fx-font-size: 24px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-alignment: center;
 }
@@ -9179,6 +9340,7 @@
 .preference-sync-summary-label {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
     -fx-text-alignment: center;
 }
@@ -9186,6 +9348,7 @@
 .preference-sync-summary-value {
     -fx-text-fill: #e2e8f0;
     -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-alignment: center;
 }
