@@ -2,32 +2,35 @@ package net.modtale.launcher.ui.shell;
 
 import net.modtale.launcher.ui.browse.ProjectBrowseController;
 import net.modtale.launcher.ui.common.LauncherView;
+import net.modtale.launcher.i18n.LauncherI18n;
 
 public final class LauncherShellTitles {
+
+    private static final LauncherI18n I18N = LauncherI18n.get();
 
     private LauncherShellTitles() {
     }
 
     public static String titleFor(LauncherView view, ProjectBrowseController browseController) {
         return switch (view) {
-            case PLAY -> "Play Hytale";
-            case LIBRARY -> "World Library";
-            case UPDATES -> "Updates";
-            case NOTIFICATIONS -> "Notifications";
-            case SETTINGS -> "Settings";
-            case PROJECT -> "Project Page";
+            case PLAY -> I18N.text("view.play.title");
+            case LIBRARY -> I18N.text("view.library.title");
+            case UPDATES -> I18N.text("view.updates.title");
+            case NOTIFICATIONS -> I18N.text("view.notifications.title");
+            case SETTINGS -> I18N.text("view.settings.title");
+            case PROJECT -> I18N.text("view.project.title");
             case DISCOVER -> browseController.title();
         };
     }
 
     public static String subtitleFor(LauncherView view, ProjectBrowseController browseController) {
         return switch (view) {
-            case PLAY -> "Launch with official Hytale auth and Modtale-managed mods.";
-            case LIBRARY -> "World saves with per-world mod and modpack controls.";
-            case UPDATES -> "Compare installed projects against the newest compatible releases.";
-            case NOTIFICATIONS -> "Notification preferences and recent Modtale activity.";
-            case SETTINGS -> "Local folders, game version targeting, and dependency preferences.";
-            case PROJECT -> "Native Modtale project details with launcher install actions.";
+            case PLAY -> I18N.text("view.play.subtitle");
+            case LIBRARY -> I18N.text("view.library.subtitle");
+            case UPDATES -> I18N.text("view.updates.subtitle");
+            case NOTIFICATIONS -> I18N.text("view.notifications.subtitle");
+            case SETTINGS -> I18N.text("view.settings.subtitle");
+            case PROJECT -> I18N.text("view.project.subtitle");
             case DISCOVER -> browseController.subtitle();
         };
     }

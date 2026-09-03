@@ -28,6 +28,7 @@ public class LauncherSettings {
     private boolean includeOptionalDependencies;
     private boolean autoCheckUpdates = true;
     private boolean launcherAutoUpdates;
+    private String locale = "en";
     private List<HytalePatchlineCacheEntry> hytalePatchlineCaches = new ArrayList<>();
     private List<HytaleVersionCacheEntry> hytaleVersionCaches = new ArrayList<>();
     private List<InstalledProject> installedProjects = new ArrayList<>();
@@ -387,6 +388,14 @@ public class LauncherSettings {
 
     public void setLauncherAutoUpdates(boolean launcherAutoUpdates) {
         this.launcherAutoUpdates = launcherAutoUpdates;
+    }
+
+    public String getLocale() {
+        return locale;
+    }
+
+    public void setLocale(String locale) {
+        this.locale = locale == null || locale.isBlank() ? "en" : locale.trim().replace('_', '-');
     }
 
     public List<InstalledProject> getInstalledProjects() {
