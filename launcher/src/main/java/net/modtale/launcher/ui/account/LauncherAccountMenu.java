@@ -13,6 +13,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
@@ -126,6 +127,8 @@ public final class LauncherAccountMenu {
         Button button = new Button(null, avatar);
         button.getStyleClass().add("profile-menu-button");
         button.setMnemonicParsing(false);
+        button.setAccessibleText("Account menu");
+        button.setTooltip(new Tooltip("Account menu"));
 
         dropdownPanel = buildPanel();
         accountController.addCurrentUserListener(user -> {

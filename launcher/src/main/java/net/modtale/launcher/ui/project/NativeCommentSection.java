@@ -18,6 +18,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -415,9 +416,9 @@ final class NativeCommentSection {
         VBox vote = new VBox(0);
         vote.getStyleClass().add("project-comment-vote");
         vote.setAlignment(Pos.TOP_CENTER);
-        Button up = voteButton(LauncherIcons.Glyph.ARROW_BIG_UP, () -> actions.vote(commentId, reply, true));
+        Button up = voteButton(LauncherIcons.Glyph.ARROW_BIG_UP, "Upvote", () -> actions.vote(commentId, reply, true));
         up.pseudoClassStateChanged(UPVOTED, "up".equals(userVote));
-        Button down = voteButton(LauncherIcons.Glyph.ARROW_BIG_DOWN, () -> actions.vote(commentId, reply, false));
+        Button down = voteButton(LauncherIcons.Glyph.ARROW_BIG_DOWN, "Downvote", () -> actions.vote(commentId, reply, false));
         down.pseudoClassStateChanged(DOWNVOTED, "down".equals(userVote));
         up.setDisable(submitting);
         down.setDisable(submitting);
@@ -432,9 +433,11 @@ final class NativeCommentSection {
         return vote;
     }
 
-    private Button voteButton(LauncherIcons.Glyph glyph, Runnable action) {
+    private Button voteButton(LauncherIcons.Glyph glyph, String tooltip, Runnable action) {
         Button button = new Button(null, LauncherIcons.icon(glyph, 24));
         button.getStyleClass().add("project-comment-vote-button");
+        button.setAccessibleText(tooltip);
+        button.setTooltip(new Tooltip(tooltip));
         button.setOnAction(event -> {
             if (currentUser.get() == null) {
                 signIn.run();

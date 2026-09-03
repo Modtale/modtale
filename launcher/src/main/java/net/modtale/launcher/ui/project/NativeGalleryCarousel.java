@@ -17,6 +17,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
@@ -166,6 +167,7 @@ final class NativeGalleryCarousel {
             Button button = new Button(null, LauncherIcons.icon(glyph, 26));
             button.getStyleClass().add("project-gallery-carousel-arrow");
             button.setAccessibleText(accessibleText);
+            button.setTooltip(new Tooltip(accessibleText));
             return button;
         }
 

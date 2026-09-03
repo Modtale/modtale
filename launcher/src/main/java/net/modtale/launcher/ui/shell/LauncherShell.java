@@ -469,6 +469,8 @@ public final class LauncherShell {
         brand.setMinWidth(142);
         brand.setAlignment(Pos.CENTER_LEFT);
         brand.setMnemonicParsing(false);
+        brand.setAccessibleText("Go to Play");
+        brand.setTooltip(new Tooltip("Go to Play"));
         brand.setOnAction(event -> showView(LauncherView.PLAY));
         configureBrandLogoHoverAnimation(brand, logo);
 
