@@ -441,7 +441,7 @@ const sampleUserSummary = {
     username: 'modtale_creator',
     avatarUrl: 'https://cdn.modtale.net/avatars/modtale_creator.png',
     bannerUrl: 'https://cdn.modtale.net/banners/modtale_creator.png',
-    bio: 'Creator of performance-focused Minecraft tools.',
+    bio: 'Creator of performance-focused Hytale tools.',
     createdAt: '2025-01-16T13:44:02Z',
     tier: 'STANDARD',
     roles: ['USER'],
@@ -520,7 +520,7 @@ const sampleProject = {
         docs: 'https://docs.modtale.net/skyforge-utilities',
         issues: 'https://github.com/modtale/skyforge-utilities/issues',
     },
-    types: ['SERVER'],
+    types: [],
     allowModpacks: true,
     allowComments: true,
     hmWikiEnabled: true,
@@ -1387,7 +1387,7 @@ export const ApiDocs: React.FC = () => {
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
             <div className="w-full max-w-[112rem] px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 mx-auto py-16 overflow-x-hidden">
                 <div className="text-center mb-12 w-full">
-                    <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">
+                    <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white mb-4 tracking-normal">
                         Modtale <span className="text-modtale-accent">API v1</span>
                     </h1>
                     <p className="text-lg text-slate-600 dark:text-slate-400 max-w-3xl mx-auto mb-6">

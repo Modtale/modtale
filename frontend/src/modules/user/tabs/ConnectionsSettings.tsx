@@ -129,7 +129,7 @@ export function ConnectionsSettings({ user, onUpdate }: ConnectionsSettingsProps
                 <div className="flex items-center gap-4 mb-8 border-b border-slate-200 dark:border-white/10 pb-6">
                     <div className="p-3 bg-slate-100 dark:bg-white/5 rounded-2xl text-slate-500"><LinkIcon className="w-5 h-5 text-modtale-accent" /></div>
                     <div>
-                        <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Connected Accounts</h3>
+                        <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-normal">Connected Accounts</h3>
                         <p className="text-xs text-slate-500 font-medium mt-1">Link accounts to sign in easily and display them on your profile.</p>
                     </div>
                 </div>

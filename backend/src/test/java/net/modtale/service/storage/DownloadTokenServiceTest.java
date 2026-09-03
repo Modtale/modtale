@@ -3,7 +3,6 @@ package net.modtale.service.storage;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import net.modtale.model.project.ModpackTarget;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -25,7 +24,7 @@ class DownloadTokenServiceTest {
 
     @Test
     void generateTokenStoresPayloadAndConsumesItOnce() {
-        String token = downloadTokenService.generateToken("project-1", "1.2.3", "1.0.0", List.of("dep-a", "dep-b"));
+        String token = downloadTokenService.generateToken("project-1", "1.2.3", "1.0.0", List.of("dep-a", "dep-b"), "user-1");
 
         assertNotNull(token);
         assertTrue(downloadTokenService.getActiveTokenCount() >= 1);
@@ -36,22 +35,11 @@ class DownloadTokenServiceTest {
         assertEquals("project-1", result.getProjectId());
         assertEquals("1.2.3", result.getVersion());
         assertEquals("1.0.0", result.getGameVersion());
+        assertEquals("user-1", result.getUserId());
         assertEquals(List.of("dep-a", "dep-b"), result.getSelectedDependencies());
         assertTrue(result.isUsed());
         assertNull(downloadTokenService.validateAndConsume(token));
         assertEquals(0, downloadTokenService.getActiveTokenCount());
-    }
-
-    @Test
-    void generateTokenPreservesModpackTarget() {
-        String token = downloadTokenService.generateToken(
-                "pack-1", "1.2.3", "2026.9", null, ModpackTarget.SERVER
-        );
-
-        DownloadTokenService.DownloadToken result = downloadTokenService.validateAndConsume(token);
-
-        assertNotNull(result);
-        assertEquals(ModpackTarget.SERVER, result.getModpackTarget());
     }
 
     @Test

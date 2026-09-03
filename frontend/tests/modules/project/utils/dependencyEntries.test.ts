@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
     dependencyProjectKey,
-    getDependencyEnvironment,
     getDependencyType,
     getSelectableBundleDependencies,
     isEmbeddedDependency,
@@ -20,13 +19,7 @@ describe('dependencyEntries', () => {
         });
 
         expect(dependency.dependencyType).toBe('REQUIRED');
-        expect(dependency.environment).toBe('COMMON');
         expect(dependency.source).toBe('MODTALE');
-    });
-
-    it('defaults environment to common and preserves explicit sides', () => {
-        expect(getDependencyEnvironment(dependency('REQUIRED'))).toBe('COMMON');
-        expect(getDependencyEnvironment({ ...dependency('REQUIRED'), environment: 'SERVER' })).toBe('SERVER');
     });
 
     it('classifies dependency types from structured fields', () => {

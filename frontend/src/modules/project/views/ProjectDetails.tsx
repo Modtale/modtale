@@ -49,14 +49,13 @@ const DependencyModal = lazy(() => import('../components/dialogs/DependencyModal
 interface ProjectDetailViewProps {
     currentUser: User | null;
     isLiked: (id: string) => boolean;
-    onToggleFavorite: (id: string) => void;
+    onToggleFavorite: (id: string, options?: { onError?: () => void }) => boolean | undefined;
     onDownload: (id: string) => void;
     downloadedSessionIds: Set<string>;
     onRefresh: () => Promise<void>;
 }
 
 type DownloadChannel = 'RELEASE' | 'BETA' | 'ALPHA';
-type ModpackTarget = 'UNIVERSAL' | 'CLIENT' | 'SERVER';
 
 const normalizeDownloadChannel = (channel?: string): DownloadChannel => (
     channel === 'BETA' || channel === 'ALPHA' ? channel : 'RELEASE'
@@ -389,16 +388,29 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const handleProjectFavoriteToggle = useCallback(() => {
         if (!project) return;
-        const wasLiked = isLiked(project.id);
+        let nextLiked: boolean | undefined;
+        const rollbackFavoriteCount = () => {
+            if (typeof nextLiked !== 'boolean') return;
+            setProject(previous => {
+                if (!previous || previous.id !== project.id) return previous;
+                return {
+                    ...previous,
+                    favoriteCount: Math.max(0, (previous.favoriteCount || 0) + (nextLiked ? -1 : 1))
+                };
+            });
+        };
+
+        nextLiked = onToggleFavorite(project.id, { onError: rollbackFavoriteCount });
+        if (typeof nextLiked !== 'boolean') return;
+
         setProject(previous => {
             if (!previous || previous.id !== project.id) return previous;
             return {
                 ...previous,
-                favoriteCount: Math.max(0, (previous.favoriteCount || 0) + (wasLiked ? -1 : 1))
+                favoriteCount: Math.max(0, (previous.favoriteCount || 0) + (nextLiked ? 1 : -1))
             };
         });
-        onToggleFavorite(project.id);
-    }, [isLiked, onToggleFavorite, project, setProject]);
+    }, [onToggleFavorite, project, setProject]);
 
     const handleMobileWikiNavigate = useCallback((slug: string) => {
         if (!projectUrl) return;
@@ -416,12 +428,11 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         return decoded.length > 37 && decoded.charAt(36) === '-' ? decoded.substring(37) : decoded;
     };
 
-    const resolveDownloadedFileName = (projectData: any, versionNumber: string, gameVersion: string, isBundle: boolean, target: ModpackTarget = 'UNIVERSAL') => {
+    const resolveDownloadedFileName = (projectData: any, versionNumber: string, gameVersion: string, isBundle: boolean) => {
         if (!projectData) return '';
         if (isBundle) return `${sanitizeDownloadName(projectData.title)}-UNZIP-ME.zip`;
         if (projectData.classification === 'MODPACK') {
-            const suffix = target === 'UNIVERSAL' ? '' : `-${target.toLowerCase()}`;
-            return `${sanitizeDownloadName(projectData.title)}-${versionNumber}${suffix}.zip`;
+            return `${sanitizeDownloadName(projectData.title)}-${versionNumber}.zip`;
         }
 
         const matchedVersion = (projectData.versions || []).find((v: any) => {
@@ -434,14 +445,13 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         return extractFileNameFromUrl(matchedVersion?.fileUrl);
     };
 
-    const finishVersionDownload = async (versionNumber: string, gameVersion: string, selectedDeps: string[], channel: DownloadChannel = 'RELEASE', target: ModpackTarget = 'UNIVERSAL') => {
+    const finishVersionDownload = async (versionNumber: string, gameVersion: string, selectedDeps: string[], channel: DownloadChannel = 'RELEASE') => {
         if (!project) return;
         const currentProject = project;
         const isBundle = selectedDeps.length > 0;
         const depsQuery = isBundle ? `?deps=${selectedDeps.map(encodeURIComponent).join(',')}` : '';
         const params = new URLSearchParams();
         if (gameVersion) params.set('gameVersion', gameVersion);
-        if (currentProject.classification === 'MODPACK' && target !== 'UNIVERSAL') params.set('target', target);
         const queryPrefix = isBundle ? '&' : '?';
         const resolverQuery = params.toString() ? `${queryPrefix}${params.toString()}` : '';
 
@@ -457,7 +467,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 const baseUrl = (api.defaults.baseURL || '').replace(/\/$/, '');
                 downloadUrl = baseUrl + downloadUrl;
             }
-            setLastDownloadedFileName(resolveDownloadedFileName(currentProject, versionNumber, gameVersion, isBundle, target));
+            setLastDownloadedFileName(resolveDownloadedFileName(currentProject, versionNumber, gameVersion, isBundle));
 
             window.open(downloadUrl, '_blank');
             setShowDownloadFx(true);
@@ -487,7 +497,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         throw new Error('The server did not return a usable download link for this file.');
     };
 
-    const handleDownloadClick = async (url: string, versionNumber: string, gameVersion: string, deps: any[], channel: string, target: ModpackTarget = 'UNIVERSAL') => {
+    const handleDownloadClick = async (url: string, versionNumber: string, gameVersion: string, deps: any[], channel: string) => {
         try {
             const downloadChannel = normalizeDownloadChannel(channel);
 
@@ -526,7 +536,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 return;
             }
 
-            await finishVersionDownload(versionNumber, gameVersion, [], downloadChannel, target);
+            await finishVersionDownload(versionNumber, gameVersion, [], downloadChannel);
         } catch (e: unknown) {
             showDownloadError(e, 'We could not prepare this download.');
         }
@@ -668,6 +678,9 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                         onToggleExperimental={toggleExperimental}
                         onViewHistory={() => navigate(projectUrl + '/changelog')}
                         isModpack={project.classification === 'MODPACK'}
+                        projectId={project.id}
+                        projectHandle={SiteRoutes.projectHandle(project)}
+                        onLauncherFallback={() => navigate(SiteRoutes.launcher())}
                     />
                 )}
                 {isDepModalOpen && pendingDownload && (

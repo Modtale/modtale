@@ -37,7 +37,7 @@ jobs:
   detect-changes:
     name: Detect Changes
     needs: dedupe
-    if: needs.dedupe.outputs.should_run == 'true'
+    if: needs.dedupe.outputs.should_run == 'true' && github.repository == 'Modtale/modtale' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'Modtale/modtale')
     runs-on: ubuntu-latest
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
@@ -59,7 +59,7 @@ jobs:
   audit:
     name: Lighthouse Audit (non-blocking)
     needs: detect-changes
-    if: needs.detect-changes.outputs.frontend == 'true'
+    if: needs.detect-changes.outputs.frontend == 'true' && github.repository == 'Modtale/modtale' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'Modtale/modtale')
     runs-on: ubuntu-latest
     continue-on-error: true
     defaults:

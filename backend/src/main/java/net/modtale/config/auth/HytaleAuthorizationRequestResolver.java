@@ -3,14 +3,12 @@ package net.modtale.config.auth;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizationRequestResolver;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestCustomizers;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
-import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestCustomizers;
 
 /**
- * Hytale requires S256 PKCE even for confidential clients. Spring Security only
- * enables PKCE automatically for public clients, so apply it explicitly to this
- * registration while leaving the other providers' requests unchanged.
+ * Applies Hytale's required S256 PKCE to its confidential OAuth client.
  */
 public class HytaleAuthorizationRequestResolver implements OAuth2AuthorizationRequestResolver {
 
@@ -31,8 +29,14 @@ public class HytaleAuthorizationRequestResolver implements OAuth2AuthorizationRe
     }
 
     @Override
-    public OAuth2AuthorizationRequest resolve(HttpServletRequest request, String clientRegistrationId) {
-        return addHytalePkce(delegate.resolve(request, clientRegistrationId), clientRegistrationId);
+    public OAuth2AuthorizationRequest resolve(
+            HttpServletRequest request,
+            String clientRegistrationId
+    ) {
+        return addHytalePkce(
+                delegate.resolve(request, clientRegistrationId),
+                clientRegistrationId
+        );
     }
 
     private OAuth2AuthorizationRequest addHytalePkce(
@@ -43,7 +47,8 @@ public class HytaleAuthorizationRequestResolver implements OAuth2AuthorizationRe
             return authorizationRequest;
         }
 
-        OAuth2AuthorizationRequest.Builder builder = OAuth2AuthorizationRequest.from(authorizationRequest);
+        OAuth2AuthorizationRequest.Builder builder =
+                OAuth2AuthorizationRequest.from(authorizationRequest);
         OAuth2AuthorizationRequestCustomizers.withPkce().accept(builder);
         return builder.build();
     }

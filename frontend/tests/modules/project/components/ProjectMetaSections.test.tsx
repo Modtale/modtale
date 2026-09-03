@@ -138,14 +138,13 @@ describe('ProjectMetaSections dependencies', () => {
         expect(container.textContent).toContain('0.5.3');
     });
 
-    it('shows optional and environment metadata for modpack entries', async () => {
+    it('shows optional metadata for modpack entries', async () => {
         const modpack = { ...project, classification: 'MODPACK' } as Project;
         const dependencies: ProjectDependency[] = [{
-            projectId: 'client-mod',
-            projectTitle: 'Client Mod',
+            projectId: 'optional-mod',
+            projectTitle: 'Optional Mod',
             versionNumber: '3.0.0',
-            dependencyType: 'OPTIONAL',
-            environment: 'CLIENT'
+            dependencyType: 'OPTIONAL'
         }];
 
         await act(async () => {
@@ -157,6 +156,5 @@ describe('ProjectMetaSections dependencies', () => {
         });
 
         expect(container.textContent).toContain('Optional');
-        expect(container.textContent).toContain('Client only');
     });
 });

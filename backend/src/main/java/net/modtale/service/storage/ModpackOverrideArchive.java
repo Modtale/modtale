@@ -9,7 +9,6 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
-import net.modtale.model.project.ProjectDependency;
 
 public final class ModpackOverrideArchive {
     private static final int MAX_FILES = 10_000;
@@ -45,7 +44,7 @@ public final class ModpackOverrideArchive {
                 if (bytes.length > MAX_FILE_SIZE) throw new IOException("An override file exceeds the 32 MiB limit.");
                 total += bytes.length;
                 if (total > MAX_TOTAL_SIZE) throw new IOException("Override bundle exceeds the 512 MiB expanded limit.");
-                files.add(new OverrideFile(parsed.path(), parsed.environment(), bytes));
+                files.add(new OverrideFile(parsed.path(), bytes));
             }
         }
         if (files.isEmpty()) throw new IOException("Override bundle does not contain any files.");
@@ -63,20 +62,26 @@ public final class ModpackOverrideArchive {
             }
         }
         String lower = path.toLowerCase(Locale.ROOT);
-        ProjectDependency.Environment environment;
-        String prefix;
-        if (lower.startsWith("overrides/common/")) {
-            environment = ProjectDependency.Environment.COMMON;
-            prefix = "overrides/common/";
-        } else if (lower.startsWith("overrides/client/")) {
-            environment = ProjectDependency.Environment.CLIENT;
-            prefix = "overrides/client/";
-        } else if (lower.startsWith("overrides/server/")) {
-            environment = ProjectDependency.Environment.SERVER;
-            prefix = "overrides/server/";
+        String prefix = "overrides/";
+        if (!lower.startsWith(prefix)) {
+            throw new IOException("Override files must be inside overrides/.");
         }
-        else throw new IOException("Override files must be inside overrides/common, overrides/client, or overrides/server.");
         String relative = path.substring(prefix.length());
+        if (relative.isBlank()) {
+            throw new IOException("Override bundle contains an empty override path.");
+        }
+        String[] relativeSegments = relative.split("/", -1);
+        String hytaleRoot;
+        if ("mods".equalsIgnoreCase(relativeSegments[0])) {
+            hytaleRoot = "Mods";
+        } else if ("saves".equalsIgnoreCase(relativeSegments[0])) {
+            hytaleRoot = "Saves";
+        } else {
+            throw new IOException("Override files must be inside overrides/Mods/ or overrides/Saves/.");
+        }
+        if (relativeSegments.length < 2) {
+            throw new IOException("Override bundle contains an empty Hytale destination path.");
+        }
         for (String segment : relative.split("/")) {
             if (segment.matches(".*[<>:\"|?*\\p{Cntrl}].*") || segment.endsWith(".") || segment.endsWith(" ")) {
                 throw new IOException("Override bundle contains a non-portable path.");
@@ -89,9 +94,10 @@ public final class ModpackOverrideArchive {
         if (BLOCKED_EXTENSIONS.stream().anyMatch(lower::endsWith)) {
             throw new IOException("Override bundle contains a blocked executable, script, or nested archive.");
         }
-        return new ParsedPath(prefix + relative, environment);
+        return new ParsedPath(prefix + hytaleRoot + "/" + String.join("/",
+                java.util.Arrays.copyOfRange(relativeSegments, 1, relativeSegments.length)));
     }
 
-    private record ParsedPath(String path, ProjectDependency.Environment environment) {}
-    public record OverrideFile(String path, ProjectDependency.Environment environment, byte[] bytes) {}
+    private record ParsedPath(String path) {}
+    public record OverrideFile(String path, byte[] bytes) {}
 }

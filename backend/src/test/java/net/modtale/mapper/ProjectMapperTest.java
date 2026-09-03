@@ -135,7 +135,6 @@ class ProjectMapperTest {
         dependency.setTitle("Core Display");
         dependency.setClassification(ProjectClassification.PLUGIN);
         dependency.setSlug("core");
-        dependency.setEnvironment(ProjectDependency.Environment.SERVER);
         ProjectDependencyDTO dependencyDto = ProjectMapper.toDependencyDTO(dependency);
 
         assertNull(withoutReview.reviewStatus());
@@ -145,7 +144,6 @@ class ProjectMapperTest {
         assertEquals("modtale:core", dependencyDto.projectId());
         assertEquals(ProjectDependency.DependencyType.EMBEDDED, dependencyDto.dependencyType());
         assertEquals(ProjectDependency.Source.MODTALE, dependencyDto.source());
-        assertEquals(ProjectDependency.Environment.SERVER, dependencyDto.environment());
         assertEquals("/icons/core.png", dependencyDto.icon());
         assertEquals("Core Display", dependencyDto.title());
         assertEquals(ProjectClassification.PLUGIN, dependencyDto.classification());
@@ -208,7 +206,7 @@ class ProjectMapperTest {
         project.setCustomLicenseOpenSource(true);
         project.setLastTrendingNotification("2026-01-02");
         project.setLinks(Map.of("docs", "https://example.com/docs"));
-        project.setTypes(List.of("SERVER"));
+        project.setTypes(List.of("PLUGIN"));
         project.setAllowModpacks(true);
         project.setAllowComments(true);
         project.setHmWikiEnabled(true);

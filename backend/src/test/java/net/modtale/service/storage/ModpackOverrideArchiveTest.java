@@ -18,26 +18,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ModpackOverrideArchiveTest {
 
     @Test
-    void readsLayeredOverridesAndPreservesPortablePaths() throws Exception {
+    void readsOverridesAndPreservesPortablePaths() throws Exception {
         List<ModpackOverrideArchive.OverrideFile> files = ModpackOverrideArchive.read(new ByteArrayInputStream(zip(Map.of(
-                "overrides/common/config/game.json", "{}",
-                "overrides/client/config/ui.toml", "scale=2",
-                "overrides/server/config/server.properties", "pvp=true"
+                "overrides/Mods/example/game.json", "{}",
+                "overrides/Mods/example/ui.toml", "scale=2",
+                "overrides/Saves/example/config.json", "{}"
         ))));
 
         assertEquals(3, files.size());
-        assertTrue(files.stream().anyMatch(file -> file.path().equals("overrides/client/config/ui.toml")));
+        assertTrue(files.stream().anyMatch(file -> file.path().equals("overrides/Mods/example/ui.toml")));
     }
 
     @Test
     void rejectsTraversalWrongRootsCaseCollisionsScriptsAndNestedArchives() throws Exception {
         for (Map<String, String> entries : List.of(
-                Map.of("overrides/common/../secret.txt", "bad"),
+                Map.of("overrides/../secret.txt", "bad"),
                 Map.of("config/game.json", "bad"),
-                new LinkedHashMap<>(Map.of("overrides/common/A.txt", "one", "overrides/common/a.TXT", "two")),
-                Map.of("overrides/client/install.ps1", "bad"),
-                Map.of("overrides/server/mods.zip", "bad"),
-                Map.of("overrides/common/config/NUL.txt", "bad")
+                new LinkedHashMap<>(Map.of("overrides/Mods/A.txt", "one", "overrides/mods/a.TXT", "two")),
+                Map.of("overrides/Mods/install.ps1", "bad"),
+                Map.of("overrides/Mods/mods.zip", "bad"),
+                Map.of("overrides/Mods/config/NUL.txt", "bad"),
+                Map.of("overrides/config/settings.json", "not a Hytale root")
         )) {
             assertThrows(IOException.class, () -> ModpackOverrideArchive.read(new ByteArrayInputStream(zip(entries))));
         }

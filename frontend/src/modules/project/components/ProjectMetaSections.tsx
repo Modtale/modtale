@@ -8,7 +8,7 @@ import { SiteRoutes } from '@/utils/routes';
 import { BACKEND_URL } from '@/utils/api';
 import { buildVersionGroups, type VersionGroup } from '@/utils/modHelpers';
 import type { Project, ProjectDependency } from '@/types';
-import { getDependencyEnvironment, getDependencyType, isEmbeddedDependency, isExternalDependency, isOptionalDependency } from '../utils/dependencyEntries';
+import { getDependencyType, isEmbeddedDependency, isExternalDependency, isOptionalDependency } from '../utils/dependencyEntries';
 
 interface ProjectMetaSectionsProps {
     project: Project;
@@ -146,7 +146,6 @@ export const ProjectMetaSections: React.FC<ProjectMetaSectionsProps> = React.mem
                             const iconUrl = isExternal ? null : getIconUrl(dep.icon || meta?.icon);
                             const title = dep.title || meta?.title || dep.projectTitle || dep.projectId;
                             const dependencyType = getDependencyType(dep);
-                            const environment = getDependencyEnvironment(dep);
                             const sourceLabel = getSourceLabel(dep.source);
                             const className = "w-full flex items-center gap-3 p-3 rounded-xl bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/5 hover:border-modtale-accent/50 hover:shadow-md transition-all group text-left block";
                             const body = (
@@ -165,7 +164,6 @@ export const ProjectMetaSections: React.FC<ProjectMetaSectionsProps> = React.mem
                                         <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent truncate">{title}</div>
                                         <div className="text-[10px] text-slate-600 dark:text-slate-400 flex items-center gap-2">
                                             <span className={isOptionalDependency(dep) ? '' : 'text-amber-600 dark:text-amber-500 font-bold'}>{dependencyType === 'OPTIONAL' ? 'Optional' : dependencyType === 'EMBEDDED' ? 'Embedded' : 'Required'}</span>
-                                            {isModpack && <span>{environment === 'CLIENT' ? 'Client only' : environment === 'SERVER' ? 'Server only' : 'Client + server'}</span>}
                                             {isExternal && <span className="font-bold text-orange-600 dark:text-orange-400">{sourceLabel}</span>}
                                             {!isModpack && isEmbeddedDependency(dep) && isExternal && <span className="text-emerald-600 dark:text-emerald-400 font-bold">Bundled</span>}
                                             <span className="font-mono opacity-75">v{dep.versionNumber}</span>

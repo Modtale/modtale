@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy, useRef } from 'react';
+import React, { useState, useEffect, Suspense, lazy, useCallback, useRef } from 'react';
 import { Route, Routes, useNavigate, useLocation, Navigate, BrowserRouter } from 'react-router-dom';
 import { StaticRouter } from 'react-router';
 import { HelmetProvider } from 'react-helmet-async';
@@ -36,6 +36,9 @@ const Dashboard = lazy(() => import('@/modules/user/views/Dashboard').then((modu
 const VerifyEmail = lazy(() => import('@/modules/auth/views/VerifyEmail').then((module) => ({ default: module.VerifyEmail })));
 const ResetPassword = lazy(() => import('@/modules/auth/views/ResetPassword').then((module) => ({ default: module.ResetPassword })));
 const MfaVerify = lazy(() => import('@/modules/auth/views/MfaVerify').then((module) => ({ default: module.MfaVerify })));
+const LauncherAuth = lazy(() => import('@/modules/auth/views/LauncherAuth').then((module) => ({ default: module.LauncherAuth })));
+const LauncherPage = lazy(() => import('@/modules/launcher/views/LauncherPage').then((module) => ({ default: module.LauncherPage })));
+const WorldModListView = lazy(() => import('@/modules/worldlist/views/WorldModListView').then((module) => ({ default: module.WorldModListView })));
 const CreateProject = lazy(() => import('@/modules/project/views/CreateProject').then((module) => ({ default: module.CreateProject })));
 const ProjectEditorView = lazy(() => import('@/modules/project/views/ProjectEditor').then((module) => ({ default: module.ProjectEditorView })));
 const AdminPanel = lazy(() => import('@/modules/admin/views/AdminPanel').then((module) => ({ default: module.AdminPanel })));
@@ -43,6 +46,10 @@ const ApiDocs = lazy(() => import('@/modules/core/views/ApiDocs').then((module) 
 const SwaggerDocs = lazy(() => import('@/modules/core/views/SwaggerDocs').then((module) => ({ default: module.SwaggerDocs })));
 
 const RouteLoading = () => <div className="p-20 flex justify-center"><Spinner /></div>;
+
+type FavoriteToggleOptions = {
+    onError?: () => void;
+};
 
 const StatusRedirect = () => {
     useEffect(() => {
@@ -75,33 +82,29 @@ const hasLikelyAuthCookie = () => {
     return /(?:^|;\s*)(SESSION|JSESSIONID|XSRF-TOKEN)=/.test(cookies);
 };
 
-const projectRouteBase = (pathname: string) => {
-    const match = pathname.match(/^\/(project|mod|modpack|world)\/[^/]+/i);
-    return match ? match[0].toLowerCase() : '';
-};
+const setProjectLikedState = (user: User, projectId: string, liked: boolean): User => {
+    const likedProjectIds = user.likedProjectIds || [];
+    const alreadyLiked = likedProjectIds.includes(projectId);
 
-const isProjectModalSubroute = (pathname: string) => (
-    /^\/(project|mod|modpack|world)\/[^/]+\/(download|changelog|gallery)\/?$/i.test(pathname)
-);
+    if (alreadyLiked === liked) return user;
+
+    return {
+        ...user,
+        likedProjectIds: liked
+            ? [...likedProjectIds, projectId]
+            : likedProjectIds.filter(likedProjectId => likedProjectId !== projectId)
+    };
+};
 
 const ScrollToTop = () => {
     const { pathname } = useLocation();
-    const previousPathRef = useRef<string | null>(null);
+    const previousPathnameRef = useRef<string | undefined>(undefined);
 
     useEffect(() => {
-        const previousPath = previousPathRef.current;
-        const previousProjectBase = previousPath ? projectRouteBase(previousPath) : '';
-        const nextProjectBase = projectRouteBase(pathname);
-        const isSameProjectModalTransition = Boolean(
-            previousPath
-            && previousProjectBase
-            && previousProjectBase === nextProjectBase
-            && (isProjectModalSubroute(previousPath) || isProjectModalSubroute(pathname))
-        );
+        const previousPathname = previousPathnameRef.current;
+        previousPathnameRef.current = pathname;
 
-        previousPathRef.current = pathname;
-
-        if (isSameProjectModalTransition) {
+        if (previousPathname && SiteRoutes.isSameProjectModalContext(previousPathname, pathname)) {
             return;
         }
 
@@ -119,6 +122,8 @@ const AppContent: React.FC = () => {
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [isDarkMode, setIsDarkMode] = useState(true);
     const [statusModal, setStatusModal] = useState<{ type: 'success' | 'error' | 'warning' | 'info'; title: string; msg: string } | null>(null);
+    const userRef = useRef<User | null>(null);
+    const pendingFavoriteIdsRef = useRef<Set<string>>(new Set());
 
     const navigate = useNavigate();
     const location = useLocation();
@@ -131,7 +136,9 @@ const AppContent: React.FC = () => {
             const decodedError = decodeURIComponent(oauthError).replace(/\+/g, ' ');
             setGlobalError(decodedError);
             clearPendingSignInMethod();
-            navigate(location.pathname, { replace: true });
+            params.delete('oauth_error');
+            const remainingSearch = params.toString();
+            navigate(`${location.pathname}${remainingSearch ? `?${remainingSearch}` : ''}`, { replace: true });
         }
     }, [location, navigate]);
 
@@ -157,7 +164,11 @@ const AppContent: React.FC = () => {
         });
     };
 
-    const fetchUser = async () => {
+    useEffect(() => {
+        userRef.current = user;
+    }, [user]);
+
+    const fetchUser = useCallback(async () => {
         if (!hasLikelyAuthCookie()) {
             setLoadingAuth(false);
             return;
@@ -166,26 +177,30 @@ const AppContent: React.FC = () => {
         try {
             const res = await api.get(`/user/me?t=${Date.now()}`);
             if (res.data) {
-                setUser(normalizeUser(res.data));
+                const normalizedUser = normalizeUser(res.data);
+                userRef.current = normalizedUser;
+                setUser(normalizedUser);
                 completeSignInMethod();
                 if ((res.data as any).is_new_account) {
                     setShowOnboarding(true);
                 }
             }
         } catch (e: any) {
+            userRef.current = null;
             setUser(null);
         } finally {
             setLoadingAuth(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         fetchUser();
-    }, []);
+    }, [fetchUser]);
 
     const handleLogout = async () => {
         try {
             await api.post('/auth/logout');
+            userRef.current = null;
             setUser(null);
             setShowOnboarding(false);
             navigate(SiteRoutes.home());
@@ -197,20 +212,37 @@ const AppContent: React.FC = () => {
     const handleNavigate = (page: string) => { navigate(page === 'home' ? SiteRoutes.home() : `/${page}`); };
     const handleUserClick = (userId: string, username?: string) => { navigate(SiteRoutes.creator(userId, username)); };
 
-    const handleToggleFavorite = async (id: string) => {
-        if (!user) return;
-        const previousUser = user;
-        const likedProjectIds = user.likedProjectIds || [];
-        const isLiked = likedProjectIds.includes(id);
-        const newProjectLikes = isLiked ? likedProjectIds.filter(lid => lid !== id) : [...likedProjectIds, id];
-        setUser({ ...user, likedProjectIds: newProjectLikes });
-        try {
-            await api.post(`/projects/${id}/favorite`);
-        } catch (e) {
-            setUser(previousUser);
-            fetchUser();
-        }
-    };
+    const handleToggleFavorite = useCallback((id: string, options?: FavoriteToggleOptions) => {
+        if (!id || pendingFavoriteIdsRef.current.has(id)) return undefined;
+
+        const currentUser = userRef.current;
+        if (!currentUser) return undefined;
+
+        const wasLiked = (currentUser.likedProjectIds || []).includes(id);
+        const nextLiked = !wasLiked;
+        const nextUser = setProjectLikedState(currentUser, id, nextLiked);
+
+        userRef.current = nextUser;
+        pendingFavoriteIdsRef.current.add(id);
+        setUser(nextUser);
+
+        api.post(`/projects/${id}/favorite`)
+            .catch(() => {
+                setUser(latestUser => {
+                    if (!latestUser || latestUser.id !== currentUser.id) return latestUser;
+                    const revertedUser = setProjectLikedState(latestUser, id, wasLiked);
+                    userRef.current = revertedUser;
+                    return revertedUser;
+                });
+                options?.onError?.();
+                fetchUser();
+            })
+            .finally(() => {
+                pendingFavoriteIdsRef.current.delete(id);
+            });
+
+        return nextLiked;
+    }, [fetchUser]);
 
     const handleDownload = (id: string) => { if (!downloadedSessionIds.has(id)) setDownloadedSessionIds(prev => new Set(prev).add(id)); };
     const onShowStatus = (type: 'success' | 'error' | 'warning' | 'info', title: string, msg: string) => setStatusModal({ type, title, msg });
@@ -340,6 +372,9 @@ const AppContent: React.FC = () => {
                                     <Route path="/verify" element={<VerifyEmail />} />
                                     <Route path="/reset-password" element={<ResetPassword />} />
                                     <Route path="/mfa" element={<MfaVerify />} />
+                                    <Route path="/launcher" element={<LauncherPage />} />
+                                    <Route path="/launcher/auth" element={<LauncherAuth user={user} loadingAuth={loadingAuth} />} />
+                                    <Route path="/lists/:id" element={<WorldModListView />} />
 
                                     <Route path="/terms" element={<TermsOfService />} />
                                     <Route path="/privacy" element={<PrivacyPolicy />} />

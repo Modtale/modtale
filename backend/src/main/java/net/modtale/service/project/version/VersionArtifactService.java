@@ -44,15 +44,23 @@ public class VersionArtifactService {
         boolean isModpack = effectiveClassification == ProjectClassification.MODPACK;
 
         storageService.validateUploadSize(file);
+        FileValidationService.ManifestInspection manifest = null;
         if (file != null && !file.isEmpty()) {
-            fileValidationService.validateProjectFile(file, effectiveClassification.name());
+            manifest = fileValidationService.validateProjectFile(file, effectiveClassification.name());
         }
 
         String filePath = null;
         String fileHash = null;
+        Long curseForgeFingerprint = null;
         if (file != null) {
             if (!isModpack) {
                 fileHash = calculateSha256(file);
+                try {
+                    curseForgeFingerprint = CurseForgeFingerprint.calculate(file);
+                } catch (java.io.IOException ex) {
+                    throw StorageArtifactOperationException.from(ex,
+                            "Failed to read the uploaded file while calculating its provider fingerprint.");
+                }
                 Query duplicateQuery = new Query(Criteria.where("versions.hash").is(fileHash).and("deletedAt").is(null));
                 if (mongoTemplate.exists(duplicateQuery, Project.class)) {
                     throw new InvalidVersionRequestException("This file has already been uploaded to Modtale.");
@@ -62,7 +70,10 @@ public class VersionArtifactService {
             filePath = storageService.upload(file, folder);
         }
 
-        return new PreparedVersionArtifact(effectiveClassification, filePath, fileHash);
+        String manifestId = manifest == null ? null : manifest.getGroup() + ":" + manifest.getName();
+        String manifestVersion = manifest == null ? null : manifest.getVersion();
+        return new PreparedVersionArtifact(effectiveClassification, filePath, fileHash, manifestId, manifestVersion,
+                curseForgeFingerprint);
     }
 
     private ProjectClassification resolveClassificationForUpload(Project project, MultipartFile file) {
@@ -111,6 +122,16 @@ public class VersionArtifactService {
         }
     }
 
-    public record PreparedVersionArtifact(ProjectClassification classification, String filePath, String fileHash) {
+    public record PreparedVersionArtifact(
+            ProjectClassification classification,
+            String filePath,
+            String fileHash,
+            String manifestId,
+            String manifestVersion,
+            Long curseForgeFingerprint
+    ) {
+        public PreparedVersionArtifact(ProjectClassification classification, String filePath, String fileHash) {
+            this(classification, filePath, fileHash, null, null, null);
+        }
     }
 }

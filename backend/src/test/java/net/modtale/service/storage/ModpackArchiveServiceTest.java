@@ -17,7 +17,6 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
-import net.modtale.model.project.ModpackTarget;
 import net.modtale.repository.project.ProjectRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -139,7 +138,6 @@ class ModpackArchiveServiceTest {
                 ProjectDependency.DependencyType.OPTIONAL
         );
         curseForge.setExternalFileUrl("https://www.curseforge.com/hytale/mods/external-mod/files/8227810");
-        curseForge.setEnvironment(ProjectDependency.Environment.CLIENT);
         version.setDependencies(List.of(hosted, curseForge));
 
         Project hostedProject = dependencyProject("plugin", ProjectClassification.PLUGIN);
@@ -157,10 +155,14 @@ class ModpackArchiveServiceTest {
         JsonNode lock = new ObjectMapper().readTree(entries.get("modtale.lock.json"));
 
         assertEquals("modtale-pack", manifest.get("format").asText());
+        assertEquals("hytale", manifest.at("/game/id").asText());
+        assertFalse(manifest.has("target"));
         assertEquals(List.of("2026.8", "2026.9"),
                 new ObjectMapper().convertValue(manifest.at("/game/versions"), List.class));
         assertFalse(manifest.toString().contains("cachedFileUrl"));
         assertEquals("modtale-lock", lock.get("format").asText());
+        assertEquals("hytale", lock.get("game").asText());
+        assertFalse(lock.has("target"));
         assertEquals("BUNDLED", lock.at("/entries/0/distribution").asText());
         assertEquals("plugin.jar", lock.at("/entries/0/path").asText());
         assertEquals(bytes("plugin-binary").length, lock.at("/entries/0/size").asInt());
@@ -169,8 +171,30 @@ class ModpackArchiveServiceTest {
         assertEquals("1450386", lock.at("/entries/1/provider/projectId").asText());
         assertEquals("8227810", lock.at("/entries/1/provider/fileId").asText());
         assertEquals("OPTIONAL", lock.at("/entries/1/dependencyType").asText());
-        assertEquals("CLIENT", lock.at("/entries/1/environment").asText());
+        assertFalse(lock.at("/entries/1").has("environment"));
         assertFalse(entries.containsKey("External-Mod-1.0.0.jar"));
+    }
+
+    @Test
+    void generateModpackZipIncludesOneUnifiedOverrideTree() throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", null);
+        version.setOverrideFileUrl("modpack-overrides/source.zip");
+        when(archiveSupport.download("modpack-overrides/source.zip")).thenReturn(zip(Map.of(
+                "overrides/Mods/example/game.json", "{}",
+                "overrides/Saves/example/config.json", "{}"
+        )));
+        when(archiveSupport.newZipMultipartFile(eq("sky-pack-1.0.0.zip"), any()))
+                .thenAnswer(invocation -> mock(MultipartFile.class));
+        when(archiveSupport.upload(any(MultipartFile.class), eq("modpacks"))).thenReturn("modpacks/generated.zip");
+
+        Map<String, String> entries = unzip(service.generateModpackZip(pack, version));
+        JsonNode lock = new ObjectMapper().readTree(entries.get("modtale.lock.json"));
+
+        assertTrue(entries.containsKey("overrides/Mods/example/game.json"));
+        assertTrue(entries.containsKey("overrides/Saves/example/config.json"));
+        assertEquals(2, lock.path("overrides").size());
+        assertFalse(lock.at("/overrides/0").has("environment"));
     }
 
     @Test
@@ -196,56 +220,6 @@ class ModpackArchiveServiceTest {
         byte[] second = service.generateModpackZip(pack, version);
 
         assertArrayEquals(first, second);
-    }
-
-    @Test
-    void generateModpackZipFiltersClientAndServerVariantsWithoutCachingThem() throws Exception {
-        Project pack = pack();
-        ProjectVersion version = version("1.0.0", "modpacks/universal.zip");
-        ProjectDependency common = new ProjectDependency("common", "Common", "1.0.0");
-        ProjectDependency client = new ProjectDependency("client", "Client", "1.0.0");
-        client.setEnvironment(ProjectDependency.Environment.CLIENT);
-        ProjectDependency server = new ProjectDependency("server", "Server", "1.0.0");
-        server.setEnvironment(ProjectDependency.Environment.SERVER);
-        version.setDependencies(List.of(common, client, server));
-        version.setOverrideFileUrl("modpack-overrides/source.zip");
-        when(archiveSupport.download("modpack-overrides/source.zip")).thenReturn(zip(Map.of(
-                "overrides/common/config.json", "common",
-                "overrides/client/ui.toml", "client",
-                "overrides/server/server.properties", "server"
-        )));
-
-        for (ProjectDependency dependency : version.getDependencies()) {
-            ProjectVersion dependencyVersion = version("1.0.0", "files/" + dependency.getProjectId() + ".jar");
-            when(archiveSupport.resolveDependency(dependency)).thenReturn(new DownloadArchiveSupport.ResolvedDependency(
-                    dependencyProject(dependency.getProjectId(), ProjectClassification.PLUGIN), dependencyVersion
-            ));
-            when(archiveSupport.download(dependencyVersion.getFileUrl())).thenReturn(bytes(dependency.getProjectId()));
-            when(archiveSupport.extractOriginalFilename(dependencyVersion.getFileUrl())).thenReturn(dependency.getProjectId() + ".jar");
-        }
-
-        Map<String, String> clientEntries = unzip(service.generateModpackZip(pack, version, ModpackTarget.CLIENT));
-        JsonNode clientLock = new ObjectMapper().readTree(clientEntries.get("modtale.lock.json"));
-        Map<String, String> serverEntries = unzip(service.generateModpackZip(pack, version, ModpackTarget.SERVER));
-        JsonNode serverLock = new ObjectMapper().readTree(serverEntries.get("modtale.lock.json"));
-
-        assertEquals("CLIENT", clientLock.get("target").asText());
-        assertTrue(clientEntries.containsKey("common.jar"));
-        assertTrue(clientEntries.containsKey("client.jar"));
-        assertFalse(clientEntries.containsKey("server.jar"));
-        assertTrue(clientEntries.containsKey("overrides/common/config.json"));
-        assertTrue(clientEntries.containsKey("overrides/client/ui.toml"));
-        assertFalse(clientEntries.containsKey("overrides/server/server.properties"));
-        assertEquals(2, clientLock.path("overrides").size());
-        assertEquals("SERVER", serverLock.get("target").asText());
-        assertTrue(serverEntries.containsKey("common.jar"));
-        assertFalse(serverEntries.containsKey("client.jar"));
-        assertTrue(serverEntries.containsKey("server.jar"));
-        assertTrue(serverEntries.containsKey("overrides/common/config.json"));
-        assertFalse(serverEntries.containsKey("overrides/client/ui.toml"));
-        assertTrue(serverEntries.containsKey("overrides/server/server.properties"));
-        assertEquals("modpacks/universal.zip", version.getFileUrl());
-        verify(projectRepository, never()).save(pack);
     }
 
     @Test
@@ -373,8 +347,8 @@ class ModpackArchiveServiceTest {
     private static byte[] validEmptyArchive() throws IOException {
         return zip(Map.of(
                 "modpack.json", "{\"formatVersion\":1,\"game\":\"hytale\",\"files\":[]}",
-                "manifest.json", "{\"format\":\"modtale-pack\",\"schemaVersion\":1,\"pack\":{},\"game\":{},\"dependencies\":[]}",
-                "modtale.lock.json", "{\"format\":\"modtale-lock\",\"lockVersion\":1,\"pack\":{},\"gameVersions\":[],\"entries\":[]}"
+                "manifest.json", "{\"format\":\"modtale-pack\",\"schemaVersion\":1,\"pack\":{},\"game\":{\"id\":\"hytale\",\"versions\":[]},\"dependencies\":[]}",
+                "modtale.lock.json", "{\"format\":\"modtale-lock\",\"lockVersion\":1,\"game\":\"hytale\",\"pack\":{},\"gameVersions\":[],\"entries\":[]}"
         ));
     }
 

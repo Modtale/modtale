@@ -24,12 +24,6 @@ public class ProjectDependency {
         EMBEDDED
     }
 
-    public enum Environment {
-        COMMON,
-        CLIENT,
-        SERVER
-    }
-
     private String id = UUID.randomUUID().toString();
     private String projectId;
     private String projectTitle;
@@ -43,7 +37,6 @@ public class ProjectDependency {
     @Transient
     private String slug;
     private DependencyType dependencyType = DependencyType.REQUIRED;
-    private Environment environment = Environment.COMMON;
     private Source source = Source.MODTALE;
     private String externalId;
     private String externalUrl;
@@ -129,11 +122,6 @@ public class ProjectDependency {
     public DependencyType getDependencyType() { return dependencyType == null ? DependencyType.REQUIRED : dependencyType; }
     public void setDependencyType(DependencyType dependencyType) {
         this.dependencyType = dependencyType == null ? DependencyType.REQUIRED : dependencyType;
-    }
-
-    public Environment getEnvironment() { return environment == null ? Environment.COMMON : environment; }
-    public void setEnvironment(Environment environment) {
-        this.environment = environment == null ? Environment.COMMON : environment;
     }
 
     public Source getSource() { return source == null ? Source.MODTALE : source; }

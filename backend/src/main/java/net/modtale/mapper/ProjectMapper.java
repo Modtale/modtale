@@ -423,7 +423,6 @@ public class ProjectMapper {
                 dependency.getProjectTitle(),
                 dependency.getVersionNumber(),
                 dependency.getDependencyType(),
-                dependency.getEnvironment(),
                 dependency.getSource(),
                 dependency.getExternalId(),
                 dependency.getExternalUrl(),

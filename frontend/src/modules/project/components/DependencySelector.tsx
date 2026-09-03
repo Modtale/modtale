@@ -4,10 +4,10 @@ import { projectClient } from '@/modules/project/api/projectClient';
 import { compareSemVer } from '@/utils/modHelpers';
 import { theme } from '@/styles/theme';
 import { BACKEND_URL } from '@/utils/api';
-import type { DependencyEnvironment, DependencySource, DependencyType, ExternalProjectFile, ExternalProjectReference, Project, ProjectDependency, ProjectVersion } from '@/types';
+import type { DependencySource, DependencyType, ExternalProjectFile, ExternalProjectReference, Project, ProjectDependency, ProjectVersion } from '@/types';
 import { VersionRelationKind } from '@/types';
 import { useScrollLock } from '@/hooks/useScrollLock';
-import { dependencyProjectKey, getDependencyEnvironment, getDependencyType, isExternalDependency, isOptionalDependency, normalizeDependencyReference } from '../utils/dependencyEntries';
+import { dependencyProjectKey, getDependencyType, isExternalDependency, isOptionalDependency, normalizeDependencyReference } from '../utils/dependencyEntries';
 import { useToast } from '@/components/ui/Toast';
 import { ModalPortal } from '@/components/ui/ModalPortal';
 
@@ -85,12 +85,6 @@ const MODPACK_ENTRY_TYPE_OPTIONS: DropdownOption<DependencyType>[] = [
     { value: 'OPTIONAL', label: 'Optional' }
 ];
 
-const ENVIRONMENT_OPTIONS: DropdownOption<DependencyEnvironment>[] = [
-    { value: 'COMMON', label: 'Client + server' },
-    { value: 'CLIENT', label: 'Client only' },
-    { value: 'SERVER', label: 'Server only' }
-];
-
 const CustomDropdown = <T extends string>({
     value,
     options,
@@ -165,7 +159,6 @@ const buildModtaleDependency = (project: Project, versionNumber: string, depende
     projectTitle: project.title,
     versionNumber,
     dependencyType,
-    environment: 'COMMON',
     source: 'MODTALE'
 });
 
@@ -175,7 +168,6 @@ const cloneDependencyForForm = (dependency: ProjectDependency): ProjectDependenc
     projectTitle: dependency.projectTitle,
     versionNumber: dependency.versionNumber,
     dependencyType: getDependencyType(dependency),
-    environment: getDependencyEnvironment(dependency),
     source: dependency.source || 'MODTALE',
     externalId: dependency.externalId,
     externalUrl: dependency.externalUrl,
@@ -511,13 +503,6 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
         onChange(next);
     };
 
-    const changeEnvironment = (index: number, environment: DependencyEnvironment) => {
-        if (disabled || !isModpack || isIncompatibilityMode) return;
-        const next = [...dependencies];
-        next[index] = { ...next[index], environment };
-        onChange(next);
-    };
-
     const resolveExternalDetails = async () => {
         if (!externalUrl.trim()) {
             setExternalError('Enter an external project URL.');
@@ -598,7 +583,6 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
             projectTitle: title,
             versionNumber: version,
             dependencyType,
-            environment: 'COMMON',
             source,
             externalId: resolved.externalId,
             externalUrl: referenceUrl,
@@ -972,16 +956,6 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                                                 onChange={nextType => cycleDependencyType(index, nextType)}
                                                 disabled={disabled}
                                                 className="w-32"
-                                                buttonClassName="rounded-lg px-2 py-1.5 text-xs"
-                                            />
-                                        )}
-                                        {dependency && isModpack && !isIncompatibilityMode && (
-                                            <CustomDropdown
-                                                value={getDependencyEnvironment(dependency)}
-                                                options={ENVIRONMENT_OPTIONS}
-                                                onChange={environment => changeEnvironment(index, environment)}
-                                                disabled={disabled}
-                                                className="w-36"
                                                 buttonClassName="rounded-lg px-2 py-1.5 text-xs"
                                             />
                                         )}

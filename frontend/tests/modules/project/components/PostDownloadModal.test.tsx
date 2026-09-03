@@ -1,10 +1,12 @@
+import React from 'react';
 import { act } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 
 import { PostDownloadModal } from '@/modules/project/components/dialogs/PostDownloadModal';
 
-describe('PostDownloadModal prefab instructions', () => {
+describe('PostDownloadModal', () => {
     let container: HTMLDivElement;
     let root: Root;
 
@@ -15,21 +17,46 @@ describe('PostDownloadModal prefab instructions', () => {
     });
 
     afterEach(async () => {
-        await act(async () => root.unmount());
+        await act(async () => {
+            root.unmount();
+        });
         container.remove();
         document.body.style.overflow = '';
+    });
+
+    it('links users to the launcher download page', async () => {
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <PostDownloadModal
+                        isOpen={true}
+                        onClose={vi.fn()}
+                        classification="PLUGIN"
+                        title="Skyforge"
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        expect(document.body.textContent).toContain('You can install mods automatically using the Modtale Launcher.');
+
+        const launcherLink = document.body.querySelector('a[aria-label="Download Modtale Launcher"]');
+
+        expect(launcherLink?.getAttribute('href')).toBe('/launcher');
     });
 
     it('routes prefab-tagged worlds through asset-pack and Paste Tool guidance', async () => {
         await act(async () => {
             root.render(
-                <PostDownloadModal
-                    isOpen
-                    onClose={() => undefined}
-                    classification="SAVE"
-                    title="Castle Prefab"
-                    tags={['Prefab', 'Structure']}
-                />
+                <MemoryRouter>
+                    <PostDownloadModal
+                        isOpen
+                        onClose={() => undefined}
+                        classification="SAVE"
+                        title="Castle Prefab"
+                        tags={['Prefab', 'Structure']}
+                    />
+                </MemoryRouter>
             );
         });
 
@@ -42,13 +69,15 @@ describe('PostDownloadModal prefab instructions', () => {
     it('keeps normal world-save installation guidance unchanged', async () => {
         await act(async () => {
             root.render(
-                <PostDownloadModal
-                    isOpen
-                    onClose={() => undefined}
-                    classification="SAVE"
-                    title="Adventure World"
-                    tags={['Adventure Map']}
-                />
+                <MemoryRouter>
+                    <PostDownloadModal
+                        isOpen
+                        onClose={() => undefined}
+                        classification="SAVE"
+                        title="Adventure World"
+                        tags={['Adventure Map']}
+                    />
+                </MemoryRouter>
             );
         });
 

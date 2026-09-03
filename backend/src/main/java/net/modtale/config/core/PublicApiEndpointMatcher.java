@@ -30,6 +30,7 @@ public final class PublicApiEndpointMatcher {
             "/api/v1/og/",
             "/api/v1/download/",
             "/api/v1/download-bundle/",
+            "/api/v1/lists/",
             "/api/v1/meta/",
             "/api/v1/version/",
             "/api/v1/wiki/"
@@ -46,7 +47,8 @@ public final class PublicApiEndpointMatcher {
         String normalizedPath = path.trim();
         String normalizedMethod = method.toUpperCase(Locale.ROOT);
 
-        if (normalizedMethod.equals("POST") && normalizedPath.equals("/api/v1/users/batch")) {
+        if (normalizedMethod.equals("POST") && (normalizedPath.equals("/api/v1/users/batch")
+                || normalizedPath.equals("/api/v1/projects/external/identify"))) {
             return true;
         }
 
