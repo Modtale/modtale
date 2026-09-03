@@ -1,16 +1,21 @@
 package net.modtale.launcher.ui.common;
 
 import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.function.Supplier;
+import javafx.animation.FadeTransition;
 import javafx.animation.PauseTransition;
+import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
 import javafx.css.PseudoClass;
 import javafx.event.EventHandler;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.control.ScrollBar;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.stage.Window;
 import javafx.util.Duration;
@@ -18,7 +23,7 @@ import net.modtale.launcher.LauncherPerformanceProbe;
 import net.modtale.launcher.ui.browse.card.ProjectCardFactory;
 
 /**
- * Gives every launcher scroll surface the same input behavior as Chromium while
+ * Gives every launcher scroll surface the same input behavior as the web app while
  * keeping expensive hover animations quiet during a gesture.
  */
 public final class LauncherScrollSupport {
@@ -26,6 +31,8 @@ public final class LauncherScrollSupport {
     private static final String INSTALLED_PROPERTY = LauncherScrollSupport.class.getName() + ".installed";
     private static final PseudoClass SCROLLING = PseudoClass.getPseudoClass("scrolling");
     private static final Duration INTERACTION_IDLE_DELAY = Duration.millis(220);
+    private static final Duration SCROLLBAR_IDLE_DELAY = Duration.millis(750);
+    private static final Duration SCROLLBAR_FADE_DURATION = Duration.millis(180);
     private static final double JAVAFX_DISCRETE_WHEEL_UNIT = 40;
     private static final double BROWSER_DISCRETE_WHEEL_UNIT = 120;
     private static final double WHEEL_UNIT_TOLERANCE = 0.01;
@@ -36,6 +43,7 @@ public final class LauncherScrollSupport {
     private final EventHandler<ScrollEvent> scrollHandler = this::observeNativeScroll;
     private final Set<Node> configuredNodes = Collections.newSetFromMap(new WeakHashMap<>());
     private final Set<Node> installedRoots = Collections.newSetFromMap(new WeakHashMap<>());
+    private final Map<ScrollBar, ScrollbarVisibility> scrollbarVisibility = new WeakHashMap<>();
     private final ListChangeListener<Window> windowListener = change -> {
         while (change.next()) {
             if (change.wasAdded()) change.getAddedSubList().forEach(this::installWindow);
@@ -85,6 +93,7 @@ public final class LauncherScrollSupport {
         }
         configureNode(root);
         installedRoots.add(root);
+        Platform.runLater(() -> configureScrollbars(root));
         if (!observingWindows) {
             observingWindows = true;
             Window.getWindows().addListener(windowListener);
@@ -106,6 +115,7 @@ public final class LauncherScrollSupport {
 
     public void smoothScrollTo(ScrollPane pane, double horizontalValue, double verticalValue) {
         if (pane == null) return;
+        revealScrollbars(pane);
         activateScrollInteraction();
         interactionIdleTimer.restart();
         animator.animateTo(pane, horizontalValue, verticalValue, System.nanoTime());
@@ -130,6 +140,7 @@ public final class LauncherScrollSupport {
             interactionIdleTimer.restart();
             ScrollRequest request = scrollRequest(event);
             if (request == null) return;
+            revealScrollbars(request.pane());
             if (isPreciseScroll(event)) {
                 animator.cancel(request.pane());
                 return;
@@ -252,6 +263,65 @@ public final class LauncherScrollSupport {
         if (root != null) {
             root.getProperties().remove(ProjectCardFactory.SCROLL_ACTIVE_PROPERTY);
             root.pseudoClassStateChanged(SCROLLING, false);
+        }
+    }
+
+    private void configureScrollbars(Node root) {
+        root.lookupAll(".scroll-bar").stream()
+                .filter(ScrollBar.class::isInstance)
+                .map(ScrollBar.class::cast)
+                .forEach(this::configureScrollbar);
+    }
+
+    private void revealScrollbars(ScrollPane pane) {
+        configureScrollbars(pane);
+        pane.lookupAll(".scroll-bar").stream()
+                .filter(ScrollBar.class::isInstance)
+                .map(ScrollBar.class::cast)
+                .filter(Node::isVisible)
+                .forEach(bar -> scrollbarVisibility.get(bar).reveal());
+    }
+
+    private void configureScrollbar(ScrollBar bar) {
+        if (scrollbarVisibility.containsKey(bar)) return;
+        ScrollbarVisibility visibility = new ScrollbarVisibility(bar);
+        scrollbarVisibility.put(bar, visibility);
+        bar.addEventHandler(MouseEvent.MOUSE_ENTERED, event -> visibility.reveal());
+        bar.addEventHandler(MouseEvent.MOUSE_EXITED, event -> visibility.scheduleFade());
+        bar.valueProperty().addListener((observable, previous, value) -> visibility.reveal());
+        bar.setOpacity(0);
+    }
+
+    private static final class ScrollbarVisibility {
+        private final ScrollBar bar;
+        private final PauseTransition idle = new PauseTransition(SCROLLBAR_IDLE_DELAY);
+        private final FadeTransition fade;
+
+        private ScrollbarVisibility(ScrollBar bar) {
+            this.bar = bar;
+            fade = new FadeTransition(SCROLLBAR_FADE_DURATION, bar);
+            idle.setOnFinished(event -> fade());
+        }
+
+        private void reveal() {
+            fade.stop();
+            idle.stop();
+            bar.setOpacity(1);
+            scheduleFade();
+        }
+
+        private void scheduleFade() {
+            idle.playFromStart();
+        }
+
+        private void fade() {
+            if (bar.isHover()) {
+                scheduleFade();
+                return;
+            }
+            fade.setFromValue(bar.getOpacity());
+            fade.setToValue(0);
+            fade.playFromStart();
         }
     }
 

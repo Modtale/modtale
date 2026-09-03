@@ -382,7 +382,6 @@ public final class LauncherShell {
         boolean webMode = nextView == LauncherView.PROJECT;
         boolean discoverMode = nextView == LauncherView.DISCOVER;
         boolean launcherPage = nextView == LauncherView.PLAY || nextView == LauncherView.LIBRARY;
-        boolean libraryPage = nextView == LauncherView.LIBRARY;
         boolean documentMode = usesDocumentHeight(nextView);
         boolean playPage = nextView == LauncherView.PLAY;
         toggleStyleClass(sceneLayer, "play-screen", playPage);
@@ -399,13 +398,7 @@ public final class LauncherShell {
         if (workspaceRoot != null) {
             toggleStyleClass(workspaceRoot, "play-workspace", playPage);
             workspaceRoot.setSpacing(discoverMode ? WORKSPACE_SPACING : 0);
-            Insets pageInsets = webMode
-                    ? Insets.EMPTY
-                    : libraryPage
-                            ? LauncherLayout.navbarInsets(18, 28)
-                            : launcherPage
-                                    ? LauncherLayout.LAUNCHER_WORKSPACE_INSETS
-                                    : LauncherLayout.WORKSPACE_INSETS;
+            Insets pageInsets = webMode ? Insets.EMPTY : LauncherLayout.WORKSPACE_INSETS;
             workspaceRoot.setPadding(new Insets(
                     pageInsets.getTop(), 0, 0, pageInsets.getLeft()));
             mainToolbar.setPadding(new Insets(0, pageInsets.getRight(), 8, 0));

@@ -74,6 +74,7 @@ import net.modtale.launcher.ui.browse.card.ProjectCardViewStyle;
 import net.modtale.launcher.ui.browse.controls.ProjectBrowseSort;
 import net.modtale.launcher.ui.common.LauncherExternalLinks;
 import net.modtale.launcher.ui.common.LauncherIcons;
+import net.modtale.launcher.ui.common.LauncherLayout;
 import net.modtale.launcher.ui.common.LauncherView;
 import net.modtale.launcher.ui.feedback.LauncherFeedback;
 import net.modtale.launcher.ui.settings.LauncherSettingsController;
@@ -88,6 +89,7 @@ public final class LauncherPlayController {
     private static final int BLOG_POST_PAGE_SIZE = 4;
     private static final int FRIEND_LIMIT = 6;
     private static final double SIDEBAR_WIDTH = 336;
+    private static final double SIDEBAR_SCROLL_GUTTER = LauncherLayout.navbarRightInset();
     private static final double SIDEBAR_PREF_HEIGHT = 672;
     private static final double BLOG_POST_LOAD_THRESHOLD = 0.82;
     private static final double BLOG_POST_FILL_PADDING = 96;
@@ -105,7 +107,7 @@ public final class LauncherPlayController {
     private static final double CATALOG_CARD_HEIGHT = Math.round(CATALOG_CARD_WIDTH / 3.0) + CATALOG_GRID_CARD_BODY_HEIGHT;
     private static final double CATALOG_SCROLL_HEIGHT = CATALOG_CARD_HEIGHT + 18;
     private static final double CATALOG_STAGE_TOP_MARGIN = 8;
-    private static final double CATALOG_STAGE_LEFT_OFFSET = -12;
+    private static final double CATALOG_STAGE_LEFT_OFFSET = 0;
     private static final double CATALOG_STAGE_GAP = 14;
     private static final double CATALOG_SECTION_GAP = 8;
     private static final double CATALOG_HEADER_HEIGHT = 30;
@@ -716,6 +718,9 @@ public final class LauncherPlayController {
     private Node sidebar() {
         VBox sidebar = new VBox(18);
         sidebar.getStyleClass().add("play-sidebar");
+        sidebar.setMinWidth(SIDEBAR_WIDTH);
+        sidebar.setPrefWidth(SIDEBAR_WIDTH);
+        sidebar.setMaxWidth(SIDEBAR_WIDTH);
         sidebar.getChildren().addAll(
                 identitySection(),
                 friendsSection(),
@@ -724,13 +729,14 @@ public final class LauncherPlayController {
 
         ScrollPane scroll = new ScrollPane(sidebar);
         scroll.getStyleClass().add("play-sidebar-scroll");
-        scroll.setFitToWidth(true);
+        scroll.setFitToWidth(false);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         scroll.setPannable(true);
-        scroll.setPrefWidth(SIDEBAR_WIDTH);
-        scroll.setMinWidth(SIDEBAR_WIDTH);
-        scroll.setMaxWidth(SIDEBAR_WIDTH);
+        double scrollWidth = SIDEBAR_WIDTH + SIDEBAR_SCROLL_GUTTER;
+        scroll.setPrefWidth(scrollWidth);
+        scroll.setMinWidth(scrollWidth);
+        scroll.setMaxWidth(scrollWidth);
         scroll.setMinHeight(0);
         scroll.setPrefHeight(SIDEBAR_PREF_HEIGHT);
         scroll.setMaxHeight(Double.MAX_VALUE);
