@@ -19,11 +19,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import javafx.animation.Interpolator;
-import javafx.animation.KeyFrame;
-import javafx.animation.KeyValue;
 import javafx.animation.PauseTransition;
-import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.collections.FXCollections;
@@ -72,9 +68,6 @@ public final class ProjectBrowseController {
 
     private static final double RESULTS_INDICATOR_WIDTH = 126;
     private static final double RESULTS_INDICATOR_SHOW_BUFFER = 10;
-    private static final Duration PAGINATION_SCROLL_DURATION = Duration.millis(420);
-    private static final Interpolator PAGINATION_SCROLL_EASE = Interpolator.SPLINE(0.16, 1.0, 0.30, 1.0);
-
     private final ModtaleApiClient apiClient;
     private final Executor executor;
     private final Runnable applySettings;
@@ -84,6 +77,7 @@ public final class ProjectBrowseController {
     private final BiConsumer<String, String> toast;
     private final Runnable showDiscover;
     private final Supplier<LauncherView> currentView;
+    private final LauncherScrollSupport scrollSupport;
     private final TextField searchField = new TextField();
     private final ComboBox<ProjectBrowseSort> sortCombo = new ComboBox<>();
     private final ComboBox<Integer> pageSizeCombo = new ComboBox<>();
@@ -113,7 +107,6 @@ public final class ProjectBrowseController {
     private Button filterToggleButton;
     private Button sortButton;
     private Label sortButtonLabel;
-    private Timeline paginationScrollTimeline;
     private Button previousPageButton;
     private Button nextPageButton;
     private Button jumpPageButton;
@@ -158,6 +151,7 @@ public final class ProjectBrowseController {
         this.toast = toast;
         this.showDiscover = showDiscover;
         this.currentView = currentView;
+        this.scrollSupport = scrollSupport;
         this.renderer = new ProjectBrowserRenderer(projectResults, viewDeck, contentBody, projectCardFactory,
                 favoriteResolver, gameVersion, onInstall, onOpenPage, onOpenCreator, onToggleFavorite);
         this.categories = new ProjectBrowseCategories(scrollSupport, this::searchProjects);
@@ -906,30 +900,7 @@ public final class ProjectBrowseController {
     }
 
     private void animateBrowseToTop(ScrollPane scrollPane) {
-        if (paginationScrollTimeline != null) {
-            paginationScrollTimeline.stop();
-        }
-
-        double start = scrollPane.getVvalue();
-        double end = scrollPane.getVmin();
-        if (Math.abs(start - end) <= 0.001) {
-            scrollPane.setVvalue(end);
-            return;
-        }
-
-        Timeline timeline = new Timeline(
-                new KeyFrame(Duration.ZERO, new KeyValue(scrollPane.vvalueProperty(), start)),
-                new KeyFrame(PAGINATION_SCROLL_DURATION,
-                        new KeyValue(scrollPane.vvalueProperty(), end, PAGINATION_SCROLL_EASE))
-        );
-        paginationScrollTimeline = timeline;
-        timeline.setOnFinished(event -> {
-            scrollPane.setVvalue(end);
-            if (paginationScrollTimeline == timeline) {
-                paginationScrollTimeline = null;
-            }
-        });
-        timeline.play();
+        scrollSupport.smoothScrollTo(scrollPane, Double.NaN, scrollPane.getVmin());
     }
 
     private ScrollPane enclosingScrollPane() {

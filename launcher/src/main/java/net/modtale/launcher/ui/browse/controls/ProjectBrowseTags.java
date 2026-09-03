@@ -108,7 +108,6 @@ public final class ProjectBrowseTags {
         tagScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         tagScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         tagScroll.setMaxHeight(240);
-        tagScroll.addEventFilter(ScrollEvent.SCROLL, event -> scrollTags(tagScroll, event));
         header.addEventFilter(ScrollEvent.SCROLL, ScrollEvent::consume);
         popover.getChildren().setAll(header, tagScroll);
     }
@@ -118,18 +117,4 @@ public final class ProjectBrowseTags {
         onChange.run();
     }
 
-    private static void scrollTags(ScrollPane scrollPane, ScrollEvent event) {
-        double scrollable = scrollPane.getContent().getLayoutBounds().getHeight()
-                - scrollPane.getViewportBounds().getHeight();
-        if (scrollable > 1) {
-            double pixels = switch (event.getTextDeltaYUnits()) {
-                case LINES -> event.getTextDeltaY() * 48;
-                case PAGES -> event.getTextDeltaY() * Math.max(120, scrollPane.getViewportBounds().getHeight() * 0.86);
-                case NONE -> event.getDeltaY();
-            };
-            double next = scrollPane.getVvalue() - pixels / scrollable;
-            scrollPane.setVvalue(Math.max(scrollPane.getVmin(), Math.min(next, scrollPane.getVmax())));
-        }
-        event.consume();
-    }
 }

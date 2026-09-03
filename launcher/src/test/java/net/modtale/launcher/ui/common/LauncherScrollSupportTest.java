@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 class LauncherScrollSupportTest {
 
     @Test
-    void leavesPlatformPixelScrollingAndInertiaUntouched() {
+    void leavesPreciseTouchpadScrollingAndInertiaUntouched() {
         StackPane root = new StackPane();
         StackPane scrollTarget = new StackPane();
         root.getChildren().add(scrollTarget);
@@ -29,6 +29,24 @@ class LauncherScrollSupportTest {
         assertTrue(root.getPseudoClassStates().contains(PseudoClass.getPseudoClass("scrolling")),
                 "scrolling must suppress transient hover repaints until input becomes idle");
         assertEquals(1, timer.restartCount);
+    }
+
+    @Test
+    void distinguishesDiscreteWheelInputFromPreciseTouchpadInput() {
+        assertTrue(LauncherScrollSupport.isPreciseScroll(pixelScroll(-24, false)));
+        assertTrue(LauncherScrollSupport.isPreciseScroll(pixelScroll(-24, true)));
+        assertFalse(LauncherScrollSupport.isPreciseScroll(pixelScroll(-40, false)),
+                "JavaFX reports a physical Linux wheel notch as an indirect 40px event");
+        assertFalse(LauncherScrollSupport.isPreciseScroll(lineScroll(-120)));
+    }
+
+    @Test
+    void normalizesJavaFxWheelNotchesToTheBrowserDistance() {
+        ScrollEvent wheelNotch = pixelScroll(-40, false);
+        ScrollEvent touchpadDelta = pixelScroll(-24, false);
+
+        assertEquals(-120, LauncherScrollSupport.browserDelta(wheelNotch, wheelNotch.getDeltaY()));
+        assertEquals(-24, LauncherScrollSupport.browserDelta(touchpadDelta, touchpadDelta.getDeltaY()));
     }
 
     @Test
@@ -68,6 +86,32 @@ class LauncherScrollSupportTest {
                 0,
                 ScrollEvent.VerticalTextScrollUnits.NONE,
                 0,
+                0,
+                null
+        );
+    }
+
+    private static ScrollEvent lineScroll(double deltaY) {
+        return new ScrollEvent(
+                ScrollEvent.SCROLL,
+                20,
+                20,
+                20,
+                20,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                0,
+                deltaY,
+                0,
+                deltaY,
+                ScrollEvent.HorizontalTextScrollUnits.CHARACTERS,
+                0,
+                ScrollEvent.VerticalTextScrollUnits.LINES,
+                deltaY / 40,
                 0,
                 null
         );
