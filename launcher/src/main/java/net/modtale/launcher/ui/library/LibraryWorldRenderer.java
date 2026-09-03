@@ -389,6 +389,17 @@ final class LibraryWorldRenderer {
         HBox header = new HBox(8, title, count, spacer, toggle);
         header.getStyleClass().add("library-world-content-header");
         header.setAlignment(Pos.CENTER_LEFT);
+        header.setPickOnBounds(true);
+        header.setOnMouseClicked(event -> {
+            Node target = event.getTarget() instanceof Node node ? node : null;
+            while (target != null && target != header) {
+                if (target == toggle) {
+                    return;
+                }
+                target = target.getParent();
+            }
+            toggleModpackContents.accept(model.installed());
+        });
 
         VBox card = new VBox(8);
         card.getStyleClass().add("library-world-content-card");
