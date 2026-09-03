@@ -33,7 +33,7 @@ import { StatusModal } from '@/components/ui/StatusModal';
 import { api, extractApiErrorMessage } from '@/utils/api';
 import { projectClient } from '../api/projectClient';
 import { mergeProjectVersionChangelogs, projectNeedsChangelogHydration } from '../utils/changelogHydration';
-import { getSelectableBundleDependencies } from '../utils/dependencyEntries';
+import { getSelectableBundleDependencies, hasCurseForgeDependencies } from '../utils/dependencyEntries';
 import { resolveGalleryImages } from '../utils/galleryImages';
 import { countGalleryCarouselMarkers } from '../utils/galleryCarouselMarker';
 import { useScrollLock } from '@/hooks/useScrollLock';
@@ -499,6 +499,9 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const handleDownloadClick = async (url: string, versionNumber: string, gameVersion: string, deps: any[], channel: string) => {
         try {
+            if (project?.classification === 'MODPACK' && hasCurseForgeDependencies(deps)) {
+                throw new Error('This modpack version contains CurseForge projects and can only be installed with Modtale Launcher.');
+            }
             const downloadChannel = normalizeDownloadChannel(channel);
 
             if (!versionNumber) {

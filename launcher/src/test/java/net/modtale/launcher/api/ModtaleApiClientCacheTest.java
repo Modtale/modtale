@@ -83,6 +83,21 @@ class ModtaleApiClientCacheTest {
     }
 
     @Test
+    void identifiesNativeLauncherRequests() throws IOException {
+        AtomicReference<String> clientHeader = new AtomicReference<>();
+        startServer("/api/v1/projects/project-one/versions/1.0.0/download-url", exchange -> {
+            clientHeader.set(exchange.getRequestHeaders().getFirst("X-Modtale-Client"));
+            respond(exchange, """
+                    {"downloadUrl":"/download/launcher-token","expiresIn":60}
+                    """);
+        });
+
+        client().getDownloadUrl("project-one", "1.0.0", "");
+
+        assertEquals("launcher", clientHeader.get());
+    }
+
+    @Test
     void clearResponseCacheForcesNextPublicGetToRefetch() throws IOException {
         AtomicInteger requests = new AtomicInteger();
         startServer("/api/v1/projects", exchange -> {
