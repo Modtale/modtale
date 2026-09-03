@@ -40,6 +40,7 @@ class NyoCfClientTest {
     @Test
     void mapsBrowseDetailVersionsAndExactVerifiedDownload() {
         AtomicInteger browseRequests = new AtomicInteger();
+        AtomicInteger detailRequests = new AtomicInteger();
         server.createContext("/api/v1/hytale/mods/search", exchange -> {
             browseRequests.incrementAndGet();
             assertTrue(exchange.getRequestURI().getRawQuery().contains("q=compost"));
@@ -56,9 +57,12 @@ class NyoCfClientTest {
                 """));
         server.createContext("/api/v1/hytale/mods/1450386/description", exchange -> respond(exchange,
                 "{\"description\":\"<p>Rich project description</p>\"}"));
-        server.createContext("/api/v1/hytale/mods/1450386", exchange -> respond(exchange, """
-                {"id":1450386,"game_id":70216,"is_available":true,"name":"Simple Compost","slug":"simple-compost","summary":"Compost things","download_count":798,"logo":{"thumbnail_url":"https://media.forgecdn.net/icon.png"},"links":{"website":"https://www.curseforge.com/hytale/mods/simple-compost"},"authors":[{"name":"Builder"}],"categories":[{"name":"Gameplay"}],"screenshots":[{"url":"https://media.forgecdn.net/screenshot.png"}],"dates":{"modified":"2026-08-27T15:17:03Z"}}
-                """));
+        server.createContext("/api/v1/hytale/mods/1450386", exchange -> {
+            detailRequests.incrementAndGet();
+            respond(exchange, """
+                {"id":1450386,"game_id":70216,"is_available":true,"name":"Simple Compost","slug":"simple-compost","summary":"Compost things","download_count":798,"logo":{"thumbnail_url":"https://media.forgecdn.net/icon.png"},"links":{"website":"https://www.curseforge.com/hytale/mods/simple-compost"},"authors":[{"name":"Builder"}],"categories":[{"name":"Gameplay"}],"screenshots":[{"url":"https://media.forgecdn.net/screenshot.png","thumbnail_url":"https://media.forgecdn.net/screenshot-thumb.png"}],"dates":{"modified":"2026-08-27T15:17:03Z"}}
+                """);
+        });
 
         ProjectPage browse = client.search(new ProjectSearchQuery("compost", null, "Early Access", "downloads",
                 0, 20, null, null, null, null, null, null));
@@ -68,9 +72,12 @@ class NyoCfClientTest {
         DownloadUrlResponse download = client.download(1450386, 8747324);
 
         assertEquals("curseforge:1450386", browse.content().getFirst().routeKey());
+        assertEquals("https://media.forgecdn.net/screenshot-thumb.png", browse.content().getFirst().bannerUrl());
         assertEquals(2, browseRequests.get());
         assertTrue(browse.content().getFirst().isCurseForge());
         assertEquals("<p>Rich project description</p>", detail.about());
+        assertEquals("https://media.forgecdn.net/screenshot.png", detail.bannerUrl());
+        assertEquals(1, detailRequests.get());
         assertEquals("8747324", detail.versions().getFirst().id());
         assertEquals("https://www.curseforge.com/api/v1/mods/1450386/files/8747324/download",
                 download.downloadUrl());
