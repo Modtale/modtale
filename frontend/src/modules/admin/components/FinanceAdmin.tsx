@@ -20,10 +20,10 @@ const Card = ({ title, value, icon: Icon, color }: any) => (
 );
 
 interface FinanceAdminProps {
-    isSuperAdmin: boolean;
+    canManageFinance: boolean;
 }
 
-export function FinanceAdmin({ isSuperAdmin }: FinanceAdminProps) {
+export function FinanceAdmin({ canManageFinance }: FinanceAdminProps) {
     const defaultCreatives = [
         { placement: 'SIDEBAR_CARD', imageUrl: '' },
         { placement: 'WIDE_BANNER', imageUrl: '' },
@@ -68,7 +68,7 @@ export function FinanceAdmin({ isSuperAdmin }: FinanceAdminProps) {
     }).format((cents || 0) / 100);
 
     const loadCampaigns = async () => {
-        if (!isSuperAdmin) return;
+        if (!canManageFinance) return;
         try {
             const rows = await financeClient.getAdCampaigns();
             setCampaigns(rows || []);
@@ -281,7 +281,7 @@ export function FinanceAdmin({ isSuperAdmin }: FinanceAdminProps) {
                 <button onClick={saveSettings} className={theme.components.buttonPrimary}><Save className="h-4 w-4" /> Save Finance Settings</button>
             </div>
 
-            {isSuperAdmin ? (
+            {canManageFinance ? (
                 <>
                     <div className={theme.components.panel + ' space-y-4 p-5'}>
                         <h3 className="text-lg font-black text-slate-900 dark:text-white">Start Ad Campaign</h3>

@@ -20,6 +20,7 @@ export enum AdminPermission {
     USER_RAW_EDIT = 'USER_RAW_EDIT',
     AUDIT_LOG_READ = 'AUDIT_LOG_READ',
     PLATFORM_ANALYTICS_READ = 'PLATFORM_ANALYTICS_READ',
+    PLATFORM_FINANCE_MANAGE = 'PLATFORM_FINANCE_MANAGE',
     STATUS_INCIDENT_READ = 'STATUS_INCIDENT_READ',
     STATUS_INCIDENT_MANAGE = 'STATUS_INCIDENT_MANAGE'
 }
@@ -70,6 +71,7 @@ export const ADMIN_PERMISSION_GROUPS = [
         group: 'Platform',
         permissions: [
             { id: AdminPermission.PLATFORM_ANALYTICS_READ, label: 'Read Platform Analytics' },
+            { id: AdminPermission.PLATFORM_FINANCE_MANAGE, label: 'Manage Platform Finance' },
             { id: AdminPermission.AUDIT_LOG_READ, label: 'Read Audit Logs' },
             { id: AdminPermission.STATUS_INCIDENT_READ, label: 'Read Status Incidents' },
             { id: AdminPermission.STATUS_INCIDENT_MANAGE, label: 'Manage Status Incidents' }
@@ -82,13 +84,6 @@ type MaybeUser = {
     roles?: string[] | null;
     adminPermissions?: string[] | null;
 } | null | undefined;
-
-export const LEGACY_SUPER_ADMIN_ID = '692620f7c2f3266e23ac0ded';
-
-export const isSuperAdminUser = (user: MaybeUser): boolean => {
-    if (!user) return false;
-    return user.id === LEGACY_SUPER_ADMIN_ID || Boolean(user.roles?.includes('SUPER_ADMIN'));
-};
 
 const isKnownAdminPermission = (value: string): value is AdminPermission =>
     (ALL_ADMIN_PERMISSIONS as string[]).includes(value);
@@ -113,4 +108,4 @@ export const hasAnyAdminPermission = (user: MaybeUser, permissions?: AdminPermis
     return permissions.some(permission => effective.has(permission));
 };
 
-export const isAdminUser = (user: MaybeUser): boolean => hasAnyAdminPermission(user) || isSuperAdminUser(user);
+export const isAdminUser = (user: MaybeUser): boolean => hasAnyAdminPermission(user);

@@ -12,7 +12,7 @@ import { PlatformAnalytics } from '../components/PlatformAnalytics';
 import { AuditLogs } from '../components/AuditLogs';
 import { FinanceAdmin } from '../components/FinanceAdmin';
 import { StatusIncidents } from '../components/StatusIncidents';
-import { AdminPermission, hasAdminPermission, hasAnyAdminPermission, isAdminUser, isSuperAdminUser } from '../utils/access';
+import { AdminPermission, hasAdminPermission, hasAnyAdminPermission, isAdminUser } from '../utils/access';
 import type { AdminVerificationQueueItem } from '@/types';
 
 interface AdminPanelProps {
@@ -38,7 +38,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     const [reportsError, setReportsError] = useState<string | null>(null);
 
     const isAdmin = isAdminUser(currentUser);
-    const isSuperAdmin = isSuperAdminUser(currentUser);
+    const canManageFinance = hasAdminPermission(currentUser, AdminPermission.PLATFORM_FINANCE_MANAGE);
     const canReadReviewQueue = hasAdminPermission(currentUser, AdminPermission.PROJECT_REVIEW_READ);
     const canDecideReviews = hasAdminPermission(currentUser, AdminPermission.PROJECT_REVIEW_DECIDE);
     const canRescanVersions = hasAdminPermission(currentUser, AdminPermission.PROJECT_VERSION_RESCAN);
@@ -72,7 +72,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         reports: canReadReports,
         status: canReadStatus,
         analytics: canReadAnalytics,
-        finance: isSuperAdmin,
+        finance: canManageFinance,
         projects: canUseProjectManagement,
         users: canUseUserManagement,
         logs: canReadLogs
@@ -84,7 +84,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         canReadStatus,
         canUseProjectManagement,
         canUseUserManagement,
-        isSuperAdmin
+        canManageFinance
     ]);
     const firstAllowedTab = (Object.keys(tabAccess) as AdminTab[]).find(tab => tabAccess[tab]);
 
@@ -265,7 +265,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                         label="Platform Analytics"
                                     />
                                 )}
-                                {isSuperAdmin && (
+                                {canManageFinance && (
                                     <SidebarButton
                                         tab="finance"
                                         icon={Wallet}
@@ -345,9 +345,9 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                 </div>
                             )}
 
-                            {activeTab === 'finance' && isSuperAdmin && (
+                            {activeTab === 'finance' && canManageFinance && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    <FinanceAdmin isSuperAdmin={isSuperAdmin} />
+                                    <FinanceAdmin canManageFinance={canManageFinance} />
                                 </div>
                             )}
 
