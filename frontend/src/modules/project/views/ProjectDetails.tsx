@@ -89,6 +89,9 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const [showDownloadFx, setShowDownloadFx] = useState(false);
     const [preReleaseGameVersions, setPreReleaseGameVersions] = useState<string[]>([]);
     const [orderedGameVersions, setOrderedGameVersions] = useState<string[]>([]);
+    const [gameVersionCatalogPending, setGameVersionCatalogPending] = useState(false);
+    const [gameVersionCatalogReady, setGameVersionCatalogReady] = useState(false);
+    const [gameVersionCatalogError, setGameVersionCatalogError] = useState(false);
 
     const [isDepModalOpen, setIsDepModalOpen] = useState(false);
     const [pendingDownload, setPendingDownload] = useState<{ versionNumber: string; gameVersion: string; dependencies: any[]; channel: DownloadChannel } | null>(null);
@@ -181,17 +184,42 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
         let isCancelled = false;
         gameVersionCatalogProjectRef.current = project.id;
+        setGameVersionCatalogPending(true);
+        setGameVersionCatalogReady(false);
+        setGameVersionCatalogError(false);
 
         projectClient.getMetaGameVersionCatalog()
             .then((catalog) => {
                 if (isCancelled) return;
+                const orderedVersions = catalog?.orderedVersions || catalog?.allVersions || [];
+                if (orderedVersions.length === 0) {
+                    throw new Error('The game version catalog was empty.');
+                }
                 setPreReleaseGameVersions(catalog?.preReleaseVersions || []);
-                setOrderedGameVersions(catalog?.orderedVersions || catalog?.allVersions || []);
+                setOrderedGameVersions(orderedVersions);
             })
-            .catch(() => {
-                if (isCancelled) return;
-                setPreReleaseGameVersions([]);
-                setOrderedGameVersions([]);
+            .catch(async () => {
+                try {
+                    const versions = await projectClient.getMetaGameVersions();
+                    if (isCancelled) return;
+                    if (versions.length === 0) {
+                        throw new Error('The game version list was empty.');
+                    }
+                    setPreReleaseGameVersions([]);
+                    setOrderedGameVersions(versions);
+                } catch {
+                    if (isCancelled) return;
+                    gameVersionCatalogProjectRef.current = null;
+                    setPreReleaseGameVersions([]);
+                    setOrderedGameVersions([]);
+                    setGameVersionCatalogError(true);
+                }
+            })
+            .finally(() => {
+                if (!isCancelled) {
+                    setGameVersionCatalogPending(false);
+                    setGameVersionCatalogReady(true);
+                }
             });
 
         return () => {
@@ -522,6 +550,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     }, [project?.versions]);
 
     const versionPayloadPending = Boolean((isHistoryOpen || isDownloadOpen) && !project?.versions);
+    const downloadModalPending = versionPayloadPending || (isDownloadOpen && (!gameVersionCatalogReady || gameVersionCatalogPending));
     const galleryPayloadPending = Boolean(isGalleryRoute && !project?.galleryImages);
     const navigationWikiData = wikiData?.mod?.pages?.length > 0 ? wikiData : displayWikiData;
     const navigationWikiSlug = wikiPageSlug || displaySlug;
@@ -596,7 +625,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 {isReportOpen && <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetId={project.id} targetType="PROJECT" targetTitle={project.title} />}
                 {showPostDownloadModal && <PostDownloadModal isOpen={showPostDownloadModal} onClose={() => setShowPostDownloadModal(false)} classification={project.classification!} title={project.title} channel={lastDownloadChannel} isBundle={lastDownloadWasBundle} fileName={lastDownloadedFileName} tags={project.tags} />}
 
-                {(isHistoryOpen || isDownloadOpen) && versionPayloadPending && (
+                {(isHistoryOpen || isDownloadOpen) && downloadModalPending && (
                     <div className={theme.components.modalOverlay}>
                         <div className={`${theme.components.modalContent} max-w-md`}>
                             <div className="flex items-center justify-center p-12">
@@ -616,7 +645,15 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                         hasStableVersions={hasStableBuilds}
                     />
                 )}
-                {isDownloadOpen && !versionPayloadPending && (
+                {isDownloadOpen && gameVersionCatalogError && !downloadModalPending && (
+                    <StatusModal
+                        type="error"
+                        title="Download Unavailable"
+                        message="We could not load the game version catalog. Please try again."
+                        onClose={() => navigate(projectUrl)}
+                    />
+                )}
+                {isDownloadOpen && !gameVersionCatalogError && !downloadModalPending && (
                     <DownloadModal
                         show={isDownloadOpen}
                         onClose={() => navigate(projectUrl)}

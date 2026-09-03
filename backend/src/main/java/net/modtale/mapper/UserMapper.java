@@ -1,6 +1,7 @@
 package net.modtale.mapper;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Collectors;
 import net.modtale.model.dto.user.UserDTO;
 import net.modtale.model.dto.user.UserSummaryDTO;
@@ -21,7 +22,7 @@ public class UserMapper {
                 user.getTier(),
                 user.getRoles(),
                 user.getAccountType(),
-                user.getBadges()
+                badgesFor(user)
         );
     }
 
@@ -38,7 +39,7 @@ public class UserMapper {
         dto.setTier(user.getTier());
         dto.setRoles(user.getRoles());
         dto.setAccountType(user.getAccountType());
-        dto.setBadges(user.getBadges());
+        dto.setBadges(badgesFor(user));
 
         dto.setOrganizationRoles(user.getOrganizationRoles());
         dto.setOrganizationMembers(user.getOrganizationMembers());
@@ -76,5 +77,12 @@ public class UserMapper {
         }
 
         return dto;
+    }
+
+    private static List<Object> badgesFor(User user) {
+        List<Object> badges = new ArrayList<>();
+        if (user.getBadges() != null) badges.addAll(user.getBadges());
+        if (user.getProfileBadges() != null) badges.addAll(user.getProfileBadges());
+        return badges;
     }
 }

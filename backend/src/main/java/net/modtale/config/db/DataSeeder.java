@@ -2086,6 +2086,25 @@ public class DataSeeder implements CommandLineRunner {
             );
         }
 
+        Object profileBadges = user.get("profileBadges");
+        if (profileBadges instanceof List<?> profileBadgeList) {
+            safeUser.put(
+                    "profileBadges",
+                    profileBadgeList.stream()
+                            .filter(Document.class::isInstance)
+                            .map(Document.class::cast)
+                            .map(badge -> doc(
+                                    "id", boundedString(badge.get("id"), "", 80),
+                                    "label", boundedString(badge.get("label"), "", 80),
+                                    "tooltip", boundedString(badge.get("tooltip"), "", 160),
+                                    "imageUrl", boundedString(badge.get("imageUrl"), "", 1000),
+                                    "darkImageUrl", boundedString(badge.get("darkImageUrl"), "", 1000)
+                            ))
+                            .limit(20)
+                            .collect(Collectors.toList())
+            );
+        }
+
         return safeUser;
     }
 

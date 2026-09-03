@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText, CalendarClock } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
 import { StatusModal } from '@/components/ui/StatusModal';
@@ -12,7 +12,7 @@ import { PlatformAnalytics } from '../components/PlatformAnalytics';
 import { AuditLogs } from '../components/AuditLogs';
 import { StatusIncidents } from '../components/StatusIncidents';
 import { AdminPermission, hasAdminPermission, hasAnyAdminPermission, isAdminUser } from '../utils/access';
-import type { Project } from '@/types';
+import type { AdminVerificationQueueItem } from '@/types';
 
 interface AdminPanelProps {
     currentUser: any;
@@ -24,12 +24,14 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     const [activeTab, setActiveTab] = useState<AdminTab>('verification');
     const [status, setStatus] = useState<any>(null);
 
-    const [pendingProjects, setPendingProjects] = useState<Project[]>([]);
+    const [pendingProjects, setPendingProjects] = useState<AdminVerificationQueueItem[]>([]);
     const [loadingQueue, setLoadingQueue] = useState(false);
     const [queueError, setQueueError] = useState<string | null>(null);
+    const queueRequestInFlight = useRef(false);
 
     const [reviewingProject, setReviewingProject] = useState<any>(null);
     const [loadingReview, setLoadingReview] = useState(false);
+    const [loadingReviewId, setLoadingReviewId] = useState<string>();
 
     const [reports, setReports] = useState<any[]>([]);
     const [reportsError, setReportsError] = useState<string | null>(null);
@@ -101,7 +103,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     useEffect(() => {
         if (!canReadReviewQueue) return;
         const interval = setInterval(() => {
-            fetchQueue();
+            fetchQueue(true);
         }, 30_000);
         return () => clearInterval(interval);
     }, [canReadReviewQueue]);
@@ -112,17 +114,20 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         }
     }, [activeTab, firstAllowedTab, isAdmin, tabAccess]);
 
-    const fetchQueue = async () => {
-        if (!canReadReviewQueue) return;
-        setLoadingQueue(true);
+    const fetchQueue = async (background = false) => {
+        if (!canReadReviewQueue || queueRequestInFlight.current) return;
+        queueRequestInFlight.current = true;
+        if (!background) setLoadingQueue(true);
         try {
             const data = await adminClient.getVerificationQueue();
+            if (!Array.isArray(data)) throw new Error('The verification queue returned an invalid response.');
             setPendingProjects(data);
             setQueueError(null);
         } catch (e) {
             setQueueError(extractApiErrorMessage(e, 'We could not load the verification queue.'));
         } finally {
-            setLoadingQueue(false);
+            queueRequestInFlight.current = false;
+            if (!background) setLoadingQueue(false);
         }
     };
 
@@ -138,7 +143,9 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     };
 
     const fetchProjectDetails = async (id: string) => {
+        if (loadingReview) return;
         setLoadingReview(true);
+        setLoadingReviewId(id);
         try {
             const data = await adminClient.getReviewDetails(id);
             setReviewingProject(data);
@@ -146,19 +153,20 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
             setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, "We could not load this project's review details.") });
         } finally {
             setLoadingReview(false);
+            setLoadingReviewId(undefined);
         }
     };
 
     const handleApprove = async () => {
         setStatus({ type: 'success', title: 'Approved', msg: 'Project published successfully.' });
         setReviewingProject(null);
-        fetchQueue();
+        fetchQueue(true);
     };
 
     const handleReject = async (reason: string) => {
         setStatus({ type: 'info', title: 'Rejected', msg: 'Project returned to drafts.' });
         setReviewingProject(null);
-        fetchQueue();
+        fetchQueue(true);
     };
 
     if (!currentUser || !isAdmin) {
@@ -287,15 +295,19 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                         <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Review pending projects and updates.</p>
                                     </div>
                                     {queueError && (
-                                        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
-                                            {queueError}
+                                        <div className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                                            <span>{queueError}</span>
+                                            <button type="button" onClick={() => fetchQueue()} className="shrink-0 rounded-lg border border-current px-3 py-1.5 font-bold hover:bg-red-100 dark:hover:bg-red-500/10">
+                                                Retry
+                                            </button>
                                         </div>
                                     )}
                                     <VerificationQueue
                                         pendingProjects={pendingProjects}
                                         loadingQueue={loadingQueue}
+                                        loadFailed={queueError !== null}
                                         loadingReview={loadingReview}
-                                        reviewingId={reviewingProject?.mod?.id}
+                                        reviewingId={loadingReviewId}
                                         onReview={fetchProjectDetails}
                                     />
                                 </div>

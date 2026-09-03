@@ -1,10 +1,6 @@
 package net.modtale.service.admin.review;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
@@ -24,57 +20,40 @@ public class ProjectReviewQueueService {
     }
 
     public List<Project> getVerificationQueue() {
-        Query pendingProjectsQuery = new Query(Criteria.where("status").is(ProjectStatus.PENDING));
-        pendingProjectsQuery.fields().exclude("about", "comments", "galleryImages");
-        List<Project> pendingProjects = mongoTemplate.find(pendingProjectsQuery, Project.class);
-
-        Query pendingVersionsQuery = new Query(Criteria.where("status").is(ProjectStatus.PUBLISHED).and("versions.reviewStatus").is("PENDING"));
-        pendingVersionsQuery.fields().exclude("about", "comments", "galleryImages");
-        List<Project> pendingVersions = mongoTemplate.find(pendingVersionsQuery, Project.class);
-
-        Set<Project> combined = new HashSet<>(pendingProjects);
-        combined.addAll(pendingVersions);
-
-        List<Project> result = new ArrayList<>(combined.stream()
-                .filter(this::hasReviewReadyVersion)
-                .toList());
-
-        result.sort(Comparator.comparing(project -> project.getUpdatedAt() == null ? "" : project.getUpdatedAt()));
-        return result;
-    }
-
-    private boolean hasReviewReadyVersion(Project project) {
-        if (project == null) {
-            return false;
-        }
-
-        List<ProjectVersion> versions = project.getVersions();
-        if (versions == null || versions.isEmpty()) {
-            return project.getStatus() == ProjectStatus.PENDING;
-        }
-
-        boolean hasScanningVersion = versions.stream().anyMatch(version ->
-                version != null
-                        && version.getScanResult() != null
-                        && version.getScanResult().getStatus() == ScanStatus.SCANNING
+        Criteria reviewCandidate = new Criteria().orOperator(
+                Criteria.where("status").is(ProjectStatus.PENDING),
+                new Criteria().andOperator(
+                        Criteria.where("status").is(ProjectStatus.PUBLISHED),
+                        Criteria.where("versions").elemMatch(
+                                Criteria.where("reviewStatus").is(ProjectVersion.ReviewStatus.PENDING)
+                        )
+                )
         );
+        Criteria noVersionIsScanning = Criteria.where("versions").not().elemMatch(
+                Criteria.where("scanResult.status").is(ScanStatus.SCANNING)
+        );
+        Query query = new Query(new Criteria().andOperator(reviewCandidate, noVersionIsScanning));
 
-        if (hasScanningVersion) {
-            return false;
-        }
+        query.fields()
+                .include("id")
+                .include("title")
+                .include("description")
+                .include("author")
+                .include("imageUrl")
+                .include("classification")
+                .include("status")
+                .include("updatedAt")
+                .include("versions.id")
+                .include("versions.versionNumber")
+                .include("versions.changelog")
+                .include("versions.reviewStatus")
+                .include("versions.scanResult.status")
+                .include("versions.scanResult.verdict")
+                .include("versions.scanResult.riskScore")
+                .include("versions.scanResult.knownIssueCount")
+                .include("versions.scanResult.newIssueCount")
+                .include("versions.scanResult.escalatedIssueCount");
 
-        if (project.getStatus() == ProjectStatus.PENDING) {
-            return true;
-        }
-
-        return versions.stream().anyMatch(version -> {
-            if (version == null || version.getReviewStatus() != ProjectVersion.ReviewStatus.PENDING) {
-                return false;
-            }
-            if (version.getScanResult() == null) {
-                return true;
-            }
-            return version.getScanResult().getStatus() != ScanStatus.SCANNING;
-        });
+        return mongoTemplate.find(query, Project.class);
     }
 }

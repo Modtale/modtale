@@ -76,6 +76,36 @@ class GameVersionServiceTest {
     }
 
     @Test
+    void sortsSemverVersionsBeforeLegacyBuildsAndOrdersLegacyByRelease() {
+        GameVersionCatalogOrderingService orderingService = new GameVersionCatalogOrderingService(
+                new AppGameVersionProperties("https://versions.example/release.xml", "https://versions.example/pre.xml", 1_000L)
+        );
+
+        GameVersionService.GameVersionCatalog catalog = orderingService.buildCatalog(
+                new GameVersionCatalogSourceService.GameVersionCatalogSource(
+                        List.of("0.5.3", "0.5.7"),
+                        List.of(),
+                        List.of(
+                                "2026.3.26-89796e57b",
+                                "2026.04.02-ABCDEF123",
+                                "2026.03.11-123456789"
+                        )
+                )
+        );
+
+        assertEquals(
+                List.of(
+                        "0.5.7",
+                        "0.5.3",
+                        "2026.04.02-ABCDEF123",
+                        "2026.3.26-89796e57b",
+                        "2026.03.11-123456789"
+                ),
+                catalog.allVersions()
+        );
+    }
+
+    @Test
     void initialRefreshSurfacesDownloadFailures() {
         RestTemplate restTemplate = new RestTemplate();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();

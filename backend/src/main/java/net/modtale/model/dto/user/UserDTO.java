@@ -31,7 +31,7 @@ public class UserDTO {
     private List<String> followingIds;
     private List<String> followerIds;
     private List<User.ConnectedAccount> connectedAccounts;
-    private List<String> badges;
+    private List<Object> badges;
     private User.NotificationPreferences notificationPreferences;
 
     public String getId() { return id; }
@@ -80,8 +80,8 @@ public class UserDTO {
     public void setFollowerIds(List<String> followerIds) { this.followerIds = followerIds; }
     public List<User.ConnectedAccount> getConnectedAccounts() { return connectedAccounts; }
     public void setConnectedAccounts(List<User.ConnectedAccount> connectedAccounts) { this.connectedAccounts = connectedAccounts; }
-    public List<String> getBadges() { return badges; }
-    public void setBadges(List<String> badges) { this.badges = badges; }
+    public List<Object> getBadges() { return badges; }
+    public void setBadges(List<Object> badges) { this.badges = badges; }
     public User.NotificationPreferences getNotificationPreferences() { return notificationPreferences; }
     public void setNotificationPreferences(User.NotificationPreferences notificationPreferences) { this.notificationPreferences = notificationPreferences; }
 }

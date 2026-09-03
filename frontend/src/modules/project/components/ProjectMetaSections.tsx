@@ -6,7 +6,7 @@ import { SidebarSection } from '@/modules/project/components/ProjectLayout';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { SiteRoutes } from '@/utils/routes';
 import { BACKEND_URL } from '@/utils/api';
-import { buildVersionGroups, compareGameVersionsDesc, type VersionGroup } from '@/utils/modHelpers';
+import { buildVersionGroups, type VersionGroup } from '@/utils/modHelpers';
 import type { Project, ProjectDependency } from '@/types';
 
 interface ProjectMetaSectionsProps {
@@ -73,7 +73,7 @@ export const ProjectMetaSections: React.FC<ProjectMetaSectionsProps> = React.mem
             set.delete(version);
             return true;
         });
-        const unordered = Array.from(set).sort(compareGameVersionsDesc);
+        const unordered = Array.from(set);
 
         return [...ordered, ...unordered];
     }, [project.versions, orderedGameVersions]);

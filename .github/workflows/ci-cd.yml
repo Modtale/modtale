@@ -603,15 +603,15 @@ jobs:
             echo "revision=$FRONTEND_REVISION" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Notify Status Bot of Frontend Production Deploy
+      - name: Notify Admin Bot of Frontend Production Deploy
         if: env.ENV_TYPE == 'prod' && steps.deploy_frontend.outputs.revision != ''
         env:
-          STATUS_DISCORD_WEBHOOK_URL: ${{ secrets.STATUS_DISCORD_WEBHOOK_URL }}
+          ADMIN_DISCORD_WEBHOOK_URL: ${{ secrets.ADMIN_DISCORD_WEBHOOK_URL }}
           COMPONENT_NAME: Frontend
           SERVICE_NAME: ${{ env.FRONTEND_SERVICE }}
           SERVICE_URL: ${{ env.FRONTEND_DOMAIN }}
           DEPLOYED_REVISION: ${{ steps.deploy_frontend.outputs.revision }}
-        run: bash .github/scripts/notify-status-deploy.sh
+        run: bash .github/scripts/notify-admin-deploy.sh
 
       - name: Determine Frontend URL
         run: |
@@ -656,15 +656,15 @@ jobs:
             fi
           fi
 
-      - name: Notify Status Bot of Backend Production Deploy
+      - name: Notify Admin Bot of Backend Production Deploy
         if: env.ENV_TYPE == 'prod' && (steps.update_backend_self_awareness.outputs.revision != '' || steps.deploy_backend.outputs.revision != '')
         env:
-          STATUS_DISCORD_WEBHOOK_URL: ${{ secrets.STATUS_DISCORD_WEBHOOK_URL }}
+          ADMIN_DISCORD_WEBHOOK_URL: ${{ secrets.ADMIN_DISCORD_WEBHOOK_URL }}
           COMPONENT_NAME: Backend
           SERVICE_NAME: ${{ env.BACKEND_SERVICE }}
           SERVICE_URL: ${{ env.BACKEND_DOMAIN }}
           DEPLOYED_REVISION: ${{ steps.update_backend_self_awareness.outputs.revision || steps.deploy_backend.outputs.revision }}
-        run: bash .github/scripts/notify-status-deploy.sh
+        run: bash .github/scripts/notify-admin-deploy.sh
 
       - name: Retain two preview R2 credential versions
         if: env.ENV_TYPE == 'preview' && env.R2_RUNTIME_CREDENTIALS_REPLACED == 'true'

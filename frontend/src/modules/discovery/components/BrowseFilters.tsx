@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { GLOBAL_TAGS } from '@/data/categories';
 import { projectClient } from '@/modules/project/api/projectClient';
-import { buildVersionGroups, compareSemVer, parseSelectedVersions, type VersionGroup } from '@/utils/modHelpers';
+import { buildVersionGroups, parseSelectedVersions, type VersionGroup } from '@/utils/modHelpers';
 import { DropdownSelect } from '@/components/ui/DropdownSelect';
 import { CalendarWidget } from '@/components/ui/CalendarWidget';
 import { SortDropdown } from './SortDropdown';
@@ -241,8 +241,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
         }).catch(async () => {
             try {
                 const versions = await projectClient.getProjectGameVersions();
-                const sorted = versions.sort((a: string, b: string) => compareSemVer(b, a));
-                setAllGameVersions(sorted);
+                setAllGameVersions(versions);
                 setPreReleaseVersionSet(new Set());
                 setHasLoadedGameVersions(true);
             } catch {

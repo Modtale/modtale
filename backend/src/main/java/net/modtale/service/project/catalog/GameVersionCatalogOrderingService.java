@@ -12,7 +12,7 @@ import net.modtale.config.properties.AppGameVersionProperties;
 
 final class GameVersionCatalogOrderingService {
 
-    private static final Pattern GAME_VERSION_PATTERN = Pattern.compile("^(\\d{4})\\.(\\d{2})\\.(\\d{2})-([a-zA-Z0-9]+)$");
+    private static final Pattern GAME_VERSION_PATTERN = Pattern.compile("^(\\d{4})\\.(\\d{1,2})\\.(\\d{1,2})-([a-zA-Z0-9]+)$");
     private static final Pattern SEMVER_PATTERN = Pattern.compile(
             "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)"
                     + "(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?"
@@ -79,14 +79,10 @@ final class GameVersionCatalogOrderingService {
         ParsedVersion legacyA = parseLegacyVersion(a);
         ParsedVersion legacyB = parseLegacyVersion(b);
 
-        int rankA = semverA != null ? 0 : (legacyA != null ? 1 : 2);
-        int rankB = semverB != null ? 0 : (legacyB != null ? 1 : 2);
+        int rankA = legacyA != null ? 1 : (semverA != null ? 0 : 2);
+        int rankB = legacyB != null ? 1 : (semverB != null ? 0 : 2);
         if (rankA != rankB) {
             return Integer.compare(rankA, rankB);
-        }
-
-        if (semverA != null && semverB != null) {
-            return compareSemverDesc(semverA, semverB);
         }
 
         if (legacyA != null && legacyB != null) {
@@ -97,6 +93,10 @@ final class GameVersionCatalogOrderingService {
             return legacyB.hash.compareTo(legacyA.hash);
         }
 
+        if (semverA != null && semverB != null) {
+            return compareSemverDesc(semverA, semverB);
+        }
+
         return b.compareTo(a);
     }
 
@@ -105,7 +105,13 @@ final class GameVersionCatalogOrderingService {
         if (!matcher.matches()) {
             return null;
         }
-        String dateKey = matcher.group(1) + matcher.group(2) + matcher.group(3);
+        String dateKey = String.format(
+                Locale.ROOT,
+                "%04d%02d%02d",
+                Integer.parseInt(matcher.group(1)),
+                Integer.parseInt(matcher.group(2)),
+                Integer.parseInt(matcher.group(3))
+        );
         return new ParsedVersion(dateKey, matcher.group(4));
     }
 

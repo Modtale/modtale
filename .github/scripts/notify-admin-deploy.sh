@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ -z "${STATUS_DISCORD_WEBHOOK_URL:-}" ]; then
-  echo "STATUS_DISCORD_WEBHOOK_URL is not configured; skipping status deploy notification."
+if [ -z "${ADMIN_DISCORD_WEBHOOK_URL:-}" ]; then
+  echo "ADMIN_DISCORD_WEBHOOK_URL is not configured; skipping admin deploy notification."
   exit 0
 fi
 
@@ -13,9 +13,9 @@ fi
 
 clean_frontend_url="${FRONTEND_DOMAIN:-https://modtale.net}"
 clean_frontend_url="${clean_frontend_url%/}"
-status_page_url="${clean_frontend_url}/status"
+admin_url="${clean_frontend_url}/admin"
 avatar_url="${clean_frontend_url}/assets/favicon.png"
-service_url="${SERVICE_URL:-$status_page_url}"
+service_url="${SERVICE_URL:-$clean_frontend_url}"
 
 wait_for_full_traffic() {
   local service_json
@@ -46,11 +46,11 @@ commit_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
 timestamp="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
 payload=$(jq -n \
-  --arg username "Modtale Status" \
+  --arg username "Modtale Admin Bot" \
   --arg avatarUrl "$avatar_url" \
   --arg content "**Production deploy complete:** ${COMPONENT_NAME} revision \`${DEPLOYED_REVISION}\` is serving all traffic." \
   --arg title "${COMPONENT_NAME} production revision live" \
-  --arg url "$status_page_url" \
+  --arg url "$admin_url" \
   --arg service "$SERVICE_NAME" \
   --arg serviceUrl "$service_url" \
   --arg revision "$DEPLOYED_REVISION" \
@@ -80,6 +80,6 @@ payload=$(jq -n \
 curl --fail --silent --show-error \
   -H "Content-Type: application/json" \
   -d "$payload" \
-  "$STATUS_DISCORD_WEBHOOK_URL"
+  "$ADMIN_DISCORD_WEBHOOK_URL"
 
-echo "Sent status deploy notification for $COMPONENT_NAME revision $DEPLOYED_REVISION."
+echo "Sent admin deploy notification for $COMPONENT_NAME revision $DEPLOYED_REVISION."
