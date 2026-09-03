@@ -303,12 +303,12 @@ describe('useProjectEditor', () => {
             hmWikiSlug: null
         });
 
-        const iconUpload = mockedApi.put.mock.calls[1];
+        const iconUpload = mockedApi.put.mock.calls.find(([url]) => url === '/projects/project-1/icon')!;
         expect(iconUpload[0]).toBe('/projects/project-1/icon');
         expect(iconUpload[1]).toBeInstanceOf(FormData);
         expect((iconUpload[1] as FormData).get('file')).toBe(iconFile);
 
-        const bannerUpload = mockedApi.put.mock.calls[2];
+        const bannerUpload = mockedApi.put.mock.calls.find(([url]) => url === '/projects/project-1/banner')!;
         expect(bannerUpload[0]).toBe('/projects/project-1/banner');
         expect(bannerUpload[1]).toBeInstanceOf(FormData);
         expect((bannerUpload[1] as FormData).get('file')).toBe(bannerFile);

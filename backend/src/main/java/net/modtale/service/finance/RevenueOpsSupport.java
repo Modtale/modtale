@@ -4,6 +4,7 @@ import net.modtale.model.finance.AdCampaign;
 import net.modtale.model.finance.FinanceLedgerEntry;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.ApiKey;
+import net.modtale.model.user.AdminPermission;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
@@ -304,7 +305,7 @@ public class RevenueOpsSupport {
         if (requester == null) {
             throw new SecurityException("Authentication required.");
         }
-        if (accessControlService.isSuperAdmin(requester)) {
+        if (accessControlService.hasAdminPermission(requester, AdminPermission.PLATFORM_FINANCE_MANAGE)) {
             return;
         }
         if (project == null || project.getAuthorId() == null || project.getAuthorId().isBlank()) {
@@ -330,7 +331,7 @@ public class RevenueOpsSupport {
         if (requester == null || organization == null) {
             throw new SecurityException("Organization ownership could not be verified.");
         }
-        if (accessControlService.isSuperAdmin(requester)) {
+        if (accessControlService.hasAdminPermission(requester, AdminPermission.PLATFORM_FINANCE_MANAGE)) {
             return;
         }
         if (organization.getAccountType() != User.AccountType.ORGANIZATION) {
