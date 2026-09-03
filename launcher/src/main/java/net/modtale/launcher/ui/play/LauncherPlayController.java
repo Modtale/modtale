@@ -38,7 +38,6 @@ import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.CustomMenuItem;
 import javafx.scene.control.Label;
-import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tooltip;
@@ -668,7 +667,7 @@ public final class LauncherPlayController {
 
         Button setup = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_DOWN, 18));
         setup.getStyleClass().add("play-launch-arrow");
-        setup.setTooltip(new Tooltip("Select launch build"));
+        setup.setTooltip(new Tooltip("Select patchline"));
         setup.setOnAction(event -> showLaunchDropdown(setup));
         StackPane.setAlignment(setup, Pos.CENTER_RIGHT);
         StackPane.setMargin(setup, new Insets(0, 7, 0, 0));
@@ -1768,15 +1767,7 @@ public final class LauncherPlayController {
         List<String> patchlines = form.hytaleBranchCombo().getItems().isEmpty()
                 ? List.of("release", "pre-release")
                 : List.copyOf(form.hytaleBranchCombo().getItems());
-        menu.getItems().add(patchlineMenu(patchlines, HytaleApiClient.normalizeBranch(form.hytaleBranchCombo().getValue())));
-        menu.getItems().add(buildMenu(form));
-        menu.show(owner, Side.BOTTOM, 0, 8);
-    }
-
-    private Menu patchlineMenu(List<String> patchlines, String selectedPatchline) {
-        String selected = HytaleApiClient.normalizeBranch(selectedPatchline);
-        Menu menu = new Menu("Patchline: " + LauncherSettingsForm.hytalePatchlineLabel(selected),
-                LauncherIcons.icon(LauncherIcons.Glyph.SLIDERS, 14));
+        String selected = HytaleApiClient.normalizeBranch(form.hytaleBranchCombo().getValue());
         for (String patchline : dropdownPatchlines(patchlines)) {
             String normalized = HytaleApiClient.normalizeBranch(patchline);
             menu.getItems().add(launchMenuItem(
@@ -1786,7 +1777,7 @@ public final class LauncherPlayController {
                     () -> selectLaunchPatchline(normalized)
             ));
         }
-        return menu;
+        menu.show(owner, Side.BOTTOM, 0, 8);
     }
 
     private List<String> dropdownPatchlines(List<String> patchlines) {
@@ -1827,26 +1818,6 @@ public final class LauncherPlayController {
         return ordered;
     }
 
-    private Menu buildMenu(LauncherSettingsForm form) {
-        String label = versionsLoading ? "Versions: loading" : "Version: " + selectedVersionLabel(settingsController.settings());
-        Menu buildMenu = new Menu(label, LauncherIcons.icon(LauncherIcons.Glyph.ZAP, 14));
-        List<HytaleVersion> versions = List.copyOf(form.hytaleVersionCombo().getItems());
-        if (versionsLoading || versions.isEmpty()) {
-            MenuItem message = new MenuItem(versionsLoading ? "Loading versions..." : "Waiting for version refresh");
-            message.setDisable(true);
-            buildMenu.getItems().add(message);
-            return buildMenu;
-        }
-
-        HytaleVersion selectedVersion = form.hytaleVersionCombo().getValue();
-        for (HytaleVersion version : versions) {
-            boolean selected = selectedVersion != null && selectedVersion.build() == version.build();
-            buildMenu.getItems().add(launchMenuItem(versionSwitchLabel(version), LauncherIcons.Glyph.ZAP,
-                    selected, () -> selectLaunchBuild(version)));
-        }
-        return buildMenu;
-    }
-
     private MenuItem launchMenuItem(String label, LauncherIcons.Glyph glyph, boolean selected, Runnable action) {
         MenuItem item = new MenuItem(label, LauncherIcons.icon(selected ? LauncherIcons.Glyph.CHECK : glyph, 14));
         item.setOnAction(event -> action.run());
@@ -1873,15 +1844,6 @@ public final class LauncherPlayController {
         loadedVersionsKey = "";
         buildMetric.setText("Loading");
         loadHytaleVersions(false);
-        syncMetrics();
-    }
-
-    private void selectLaunchBuild(HytaleVersion version) {
-        if (version == null) {
-            return;
-        }
-        settingsController.form().hytaleVersionCombo().setValue(version);
-        settingsController.saveFromFields(false);
         syncMetrics();
     }
 
