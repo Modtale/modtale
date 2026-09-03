@@ -9,6 +9,8 @@ import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.IndexOptions;
+import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Sorts;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -39,6 +41,7 @@ public class MongoStatusStore implements AutoCloseable {
 
     private final StatusServiceProperties properties;
     private volatile MongoClient mongoClient;
+    private volatile boolean historyIndexEnsured;
 
     public MongoStatusStore(StatusServiceProperties properties) {
         this.properties = properties;
@@ -46,6 +49,7 @@ public class MongoStatusStore implements AutoCloseable {
 
     public Optional<StatusHistoryEntry> findLatestHistory() {
         return withDatabase(database -> {
+            ensureHistoryIndex(database);
             Document document = history(database)
                     .find()
                     .sort(Sorts.descending("timestamp"))
@@ -56,6 +60,7 @@ public class MongoStatusStore implements AutoCloseable {
 
     public List<StatusHistoryEntry> findHistoryAfter(Instant since) {
         return withDatabase(database -> {
+            ensureHistoryIndex(database);
             FindIterable<Document> documents = history(database)
                     .find(Filters.gte("timestamp", Date.from(since)))
                     .sort(Sorts.ascending("timestamp"));
@@ -69,6 +74,7 @@ public class MongoStatusStore implements AutoCloseable {
 
     public void saveHistory(StatusHistoryEntry entry) {
         withDatabase(database -> {
+            ensureHistoryIndex(database);
             history(database).insertOne(new Document()
                     .append("timestamp", Date.from(entry.timestamp()))
                     .append("siteLatency", entry.siteLatency())
@@ -84,8 +90,8 @@ public class MongoStatusStore implements AutoCloseable {
         });
     }
 
-    public IncidentBuckets findIncidentBuckets() {
-        List<StatusIncidentView> incidents = withDatabase(database -> {
+    public Optional<IncidentBuckets> findIncidentBuckets() {
+        Optional<List<StatusIncidentView>> result = withDatabase(database -> {
             List<StatusIncidentView> views = new ArrayList<>();
             for (Document document : incidents(database)
                     .find()
@@ -94,10 +100,15 @@ public class MongoStatusStore implements AutoCloseable {
                 views.add(toIncidentView(document));
             }
             return views;
-        }).orElse(List.of());
+        });
+
+        if (result.isEmpty()) {
+            return Optional.empty();
+        }
+        List<StatusIncidentView> incidents = result.get();
 
         if (incidents.isEmpty()) {
-            return IncidentBuckets.empty();
+            return Optional.of(IncidentBuckets.empty());
         }
 
         LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
@@ -122,7 +133,7 @@ public class MongoStatusStore implements AutoCloseable {
                 .limit(20)
                 .toList();
 
-        return new IncidentBuckets(active, scheduled, history);
+        return Optional.of(new IncidentBuckets(active, scheduled, history));
     }
 
     @Override
@@ -139,6 +150,23 @@ public class MongoStatusStore implements AutoCloseable {
 
     private MongoCollection<Document> incidents(MongoDatabase database) {
         return database.getCollection("status_incidents");
+    }
+
+    private void ensureHistoryIndex(MongoDatabase database) {
+        if (historyIndexEnsured) {
+            return;
+        }
+        synchronized (this) {
+            if (historyIndexEnsured) {
+                return;
+            }
+            long retentionSeconds = Math.max(60, properties.getHistoryRetention().toSeconds());
+            history(database).createIndex(
+                    Indexes.ascending("timestamp"),
+                    new IndexOptions().name("status_history_ttl").expireAfter(retentionSeconds, TimeUnit.SECONDS)
+            );
+            historyIndexEnsured = true;
+        }
     }
 
     private <T> Optional<T> withDatabase(DatabaseOperation<T> operation) {
