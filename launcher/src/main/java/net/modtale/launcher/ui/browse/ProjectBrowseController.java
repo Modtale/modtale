@@ -16,7 +16,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
-import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -85,7 +84,6 @@ public final class ProjectBrowseController {
     private final BiConsumer<String, String> toast;
     private final Runnable showDiscover;
     private final Supplier<LauncherView> currentView;
-    private final BooleanSupplier modtaleApiAvailable;
     private final TextField searchField = new TextField();
     private final ComboBox<ProjectBrowseSort> sortCombo = new ComboBox<>();
     private final ComboBox<Integer> pageSizeCombo = new ComboBox<>();
@@ -144,7 +142,6 @@ public final class ProjectBrowseController {
             BiConsumer<String, String> toast,
             Runnable showDiscover,
             Supplier<LauncherView> currentView,
-            BooleanSupplier modtaleApiAvailable,
             Function<String, Boolean> favoriteResolver,
             Supplier<String> gameVersion,
             Consumer<ProjectSummary> onInstall,
@@ -161,7 +158,6 @@ public final class ProjectBrowseController {
         this.toast = toast;
         this.showDiscover = showDiscover;
         this.currentView = currentView;
-        this.modtaleApiAvailable = modtaleApiAvailable == null ? () -> true : modtaleApiAvailable;
         this.renderer = new ProjectBrowserRenderer(projectResults, viewDeck, contentBody, projectCardFactory,
                 favoriteResolver, gameVersion, onInstall, onOpenPage, onOpenCreator, onToggleFavorite);
         this.categories = new ProjectBrowseCategories(scrollSupport, this::searchProjects);
@@ -262,9 +258,6 @@ public final class ProjectBrowseController {
     }
 
     public void loadGameVersionFilters() {
-        if (!modtaleApiAvailable.getAsBoolean()) {
-            return;
-        }
         CompletableFuture.supplyAsync(this::loadGameVersionCatalog, executor)
                 .whenComplete((catalog, error) -> Platform.runLater(() -> {
                     if (error != null || catalog == null) {
@@ -290,12 +283,6 @@ public final class ProjectBrowseController {
 
     private void requestProjects() {
         if (suppressSearch) {
-            return;
-        }
-        if (!modtaleApiAvailable.getAsBoolean()) {
-            status.accept(idleStatus.get());
-            log.accept("Sign in with Modtale to browse projects.");
-            toast.accept("Modtale sign-in required", "Sign in with Modtale to browse projects.");
             return;
         }
         applySettings.run();

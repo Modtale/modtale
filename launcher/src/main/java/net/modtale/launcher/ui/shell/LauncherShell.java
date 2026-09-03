@@ -125,7 +125,7 @@ public final class LauncherShell {
     private Node hytaleGateNode;
     private Node windowControlsNode;
     private boolean appUnlocked;
-    private boolean modtaleInitialLoadsStarted;
+    private boolean catalogInitialLoadsStarted;
     private boolean startupSnapshotScheduled;
     private boolean startupProtocolHandled;
     private boolean undecoratedWindow;
@@ -311,9 +311,7 @@ public final class LauncherShell {
                 ? LauncherView.defaultView()
                 : LauncherView.fromId(launchParameters.getNamed().get("view"));
         showView(requestedView);
-        if (accountController.isSignedIn()) {
-            startModtaleInitialLoads();
-        }
+        startCatalogInitialLoads();
         handleStartupProtocolIfRequested();
     }
 
@@ -333,15 +331,15 @@ public final class LauncherShell {
 
     public void onModtaleSignedIn() {
         if (appUnlocked) {
-            startModtaleInitialLoads();
+            browseController.renderProjects();
             playController.refreshCatalogShelves();
         }
         accountMenu.updateSelected();
     }
 
     public void onModtaleSignedOut() {
-        modtaleInitialLoadsStarted = false;
-        playController.resetCatalogShelves();
+        browseController.renderProjects();
+        playController.refreshCatalogShelves();
         if (requiresModtaleSession(navigation.currentView())) {
             showView(LauncherView.PLAY);
         }
@@ -361,7 +359,7 @@ public final class LauncherShell {
         followingController.hideModal();
         LauncherView nextView = view == null ? LauncherView.defaultView() : view;
         if (requiresModtaleSession(nextView) && !accountController.isSignedIn()) {
-            feedback.showToast("Modtale sign-in required", "Sign in with Modtale to browse projects, update mods, or view account activity.");
+            feedback.showToast("Modtale sign-in required", "Sign in with Modtale to update mods or view account activity.");
             LauncherView fallback = requiresModtaleSession(navigation.currentView())
                     ? LauncherView.PLAY
                     : navigation.currentView();
@@ -908,11 +906,11 @@ public final class LauncherShell {
         );
     }
 
-    private void startModtaleInitialLoads() {
-        if (modtaleInitialLoadsStarted || !accountController.isSignedIn()) {
+    private void startCatalogInitialLoads() {
+        if (catalogInitialLoadsStarted) {
             return;
         }
-        modtaleInitialLoadsStarted = true;
+        catalogInitialLoadsStarted = true;
         browseController.loadGameVersionFilters();
         browseController.searchProjects();
         scheduleSnapshotIfRequested();
@@ -1029,10 +1027,8 @@ public final class LauncherShell {
         return settingsController.settings().getHytaleAuthSession() != null;
     }
 
-    private static boolean requiresModtaleSession(LauncherView view) {
-        return view == LauncherView.DISCOVER
-                || view == LauncherView.PROJECT
-                || view == LauncherView.UPDATES
+    static boolean requiresModtaleSession(LauncherView view) {
+        return view == LauncherView.UPDATES
                 || view == LauncherView.NOTIFICATIONS;
     }
 

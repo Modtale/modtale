@@ -22,7 +22,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
-import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -126,7 +125,6 @@ public final class LauncherPlayController {
     private final LauncherSettingsController settingsController;
     private final LauncherFeedback feedback;
     private final Executor executor;
-    private final BooleanSupplier modtaleApiAvailable;
     private final Function<String, Boolean> favoriteResolver;
     private final Supplier<String> gameVersion;
     private final Consumer<ProjectSummary> onInstall;
@@ -183,7 +181,6 @@ public final class LauncherPlayController {
             LauncherSettingsController settingsController,
             LauncherFeedback feedback,
             Executor executor,
-            BooleanSupplier modtaleApiAvailable,
             Function<String, Boolean> favoriteResolver,
             Supplier<String> gameVersion,
             Consumer<ProjectSummary> onInstall,
@@ -199,7 +196,6 @@ public final class LauncherPlayController {
         this.settingsController = settingsController;
         this.feedback = feedback;
         this.executor = executor;
-        this.modtaleApiAvailable = modtaleApiAvailable == null ? () -> true : modtaleApiAvailable;
         this.favoriteResolver = favoriteResolver == null ? id -> false : favoriteResolver;
         this.gameVersion = gameVersion == null ? () -> "" : gameVersion;
         this.onInstall = onInstall == null ? project -> {
@@ -246,12 +242,6 @@ public final class LauncherPlayController {
         resetCatalogShelf(newReleasesShelf);
         resetCatalogShelf(trendingShelf);
         syncCatalogShelves(true);
-    }
-
-    public void resetCatalogShelves() {
-        resetCatalogShelf(newReleasesShelf);
-        resetCatalogShelf(trendingShelf);
-        showCatalogSignInMessage();
     }
 
     public void loadHytaleVersions() {
@@ -914,20 +904,11 @@ public final class LauncherPlayController {
     }
 
     private void syncCatalogShelves(boolean force) {
-        if (!modtaleApiAvailable.getAsBoolean()) {
-            showCatalogSignInMessage();
-            return;
-        }
         loadCatalogShelf(newReleasesShelf, force);
         loadCatalogShelf(trendingShelf, force);
     }
 
     private void loadCatalogShelf(CatalogShelf shelf, boolean force) {
-        if (!modtaleApiAvailable.getAsBoolean()) {
-            resetCatalogShelf(shelf);
-            showCatalogMessage(shelf, "Sign in with Modtale to see " + shelf.sort.title().toLowerCase() + ".");
-            return;
-        }
         if (shelf.loading && !force) {
             return;
         }
@@ -1003,11 +984,6 @@ public final class LauncherPlayController {
                 CATALOG_CARD_WIDTH,
                 CATALOG_CARD_HEIGHT
         );
-    }
-
-    private void showCatalogSignInMessage() {
-        showCatalogMessage(newReleasesShelf, "Sign in with Modtale to see new releases.");
-        showCatalogMessage(trendingShelf, "Sign in with Modtale to see trending projects.");
     }
 
     private void showCatalogMessage(CatalogShelf shelf, String message) {
