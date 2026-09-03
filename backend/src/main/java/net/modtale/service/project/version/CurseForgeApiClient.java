@@ -8,6 +8,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import net.modtale.config.properties.AppCurseForgeProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.RequestEntity;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ public class CurseForgeApiClient {
     private final AppCurseForgeProperties properties;
     private final RestTemplate restTemplate;
 
+    @Autowired
     public CurseForgeApiClient(AppCurseForgeProperties properties) {
         this(properties, new RestTemplate());
     }
