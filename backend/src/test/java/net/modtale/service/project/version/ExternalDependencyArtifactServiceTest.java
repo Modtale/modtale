@@ -33,6 +33,7 @@ class ExternalDependencyArtifactServiceTest {
 
         service.prepareExternalArtifacts(List.of(dependency));
 
+        assertEquals("https://www.curseforge.com/hytale/mods/simple-compost/files/8227810", dependency.getExternalUrl());
         assertEquals("https://www.curseforge.com/hytale/mods/simple-compost/files/8227810", dependency.getExternalFileUrl());
         assertEquals("SimpleCompost-1.0.0.jar", dependency.getExternalFileName());
         assertNull(dependency.getCachedFileUrl());

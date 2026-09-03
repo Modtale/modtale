@@ -92,6 +92,7 @@ public class ExternalDependencyArtifactService {
         if (filename == null) {
             filename = reference.fileName();
         }
+        dependency.setExternalUrl(reference.filePageUrl());
         dependency.setExternalFileUrl(reference.filePageUrl());
         dependency.setExternalFileName(filename == null ? "curseforge-" + reference.fileId() + ".jar" : sanitizeArchiveFilename(filename));
         dependency.setCachedFileUrl(null);

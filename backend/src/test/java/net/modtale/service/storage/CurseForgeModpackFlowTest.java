@@ -75,6 +75,7 @@ class CurseForgeModpackFlowTest {
         byte[] archive = new ModpackArchiveService(projectRepository, archiveSupport).generateModpackZip(pack, packVersion);
         Map<String, byte[]> entries = unzip(archive);
         JsonNode manifest = new ObjectMapper().readTree(entries.get("modpack.json"));
+        JsonNode lock = new ObjectMapper().readTree(entries.get("modtale.lock.json"));
 
         assertEquals("hosted-binary", new String(entries.get("hosted.jar"), StandardCharsets.UTF_8));
         assertFalse(entries.containsKey("SimpleCompost-1.0.0.jar"));
@@ -82,6 +83,12 @@ class CurseForgeModpackFlowTest {
         assertEquals("CURSEFORGE", externalEntry.get("source").asText());
         assertEquals("REFERENCE_ONLY", externalEntry.get("distribution").asText());
         assertEquals("https://www.curseforge.com/hytale/mods/simple-compost/files/8227810", externalEntry.get("url").asText());
+        assertEquals("BUNDLED", lock.at("/entries/0/distribution").asText());
+        assertEquals("hosted.jar", lock.at("/entries/0/path").asText());
+        assertEquals(64, lock.at("/entries/0/hashes/sha256").asText().length());
+        assertEquals("REFERENCE_ONLY", lock.at("/entries/1/distribution").asText());
+        assertEquals("1450386", lock.at("/entries/1/provider/projectId").asText());
+        assertEquals("8227810", lock.at("/entries/1/provider/fileId").asText());
     }
 
     private static DependencyReferenceRequest hostedReference() {
