@@ -101,6 +101,7 @@ class ProjectMapperTest {
 
         ProjectCommentDTO comment = dto.getComments().getFirst();
         assertEquals("Lock in, this one ships.", comment.content());
+        assertTrue(comment.pinned());
         assertEquals("up", comment.userVote());
         assertNotNull(comment.developerReply());
         assertEquals("ItsNeil17 says thanks.", comment.developerReply().content());
@@ -225,6 +226,7 @@ class ProjectMapperTest {
         comment.setContent("Lock in, this one ships.");
         comment.setDate("2026-01-03T10:00:00");
         comment.setUpdatedAt("2026-01-04T10:00:00");
+        comment.setPinned(true);
         comment.setUpvotes(Set.of("user-1", "user-2"));
         comment.setDownvotes(Set.of("user-3"));
 
