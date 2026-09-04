@@ -52,6 +52,8 @@ final class NativeCommentSection {
         void report(String commentId);
 
         void setPinned(String commentId, boolean pinned);
+
+        void loadMore();
     }
 
     private final CachedImageLoader imageLoader;
@@ -94,7 +96,10 @@ final class NativeCommentSection {
             List<ProjectComment> comments,
             Map<String, UserSummary> userProfiles,
             boolean loading,
-            boolean submitting
+            boolean submitting,
+            long totalCount,
+            boolean hasMore,
+            boolean loadingMore
     ) {
         CurrentUser user = currentUser.get();
         boolean curseForge = (summary != null && summary.isCurseForge())
@@ -117,7 +122,8 @@ final class NativeCommentSection {
         HBox heading = new HBox(12);
         heading.getStyleClass().add("project-comments-heading");
         heading.setAlignment(Pos.CENTER_LEFT);
-        Label title = new Label(countComments(safeComments) + (curseForge ? " CurseForge Comments" : " Comments"));
+        long displayedCount = curseForge ? Math.max(totalCount, countComments(safeComments)) : countComments(safeComments);
+        Label title = new Label(displayedCount + (curseForge ? " CurseForge Comments" : " Comments"));
         title.getStyleClass().add("project-comments-title");
         heading.getChildren().addAll(LauncherIcons.icon(LauncherIcons.Glyph.MESSAGE_SQUARE, 24), title);
         section.getChildren().add(heading);
@@ -145,6 +151,16 @@ final class NativeCommentSection {
             }
         }
         section.getChildren().add(list);
+        if (curseForge && hasMore) {
+            HBox footer = new HBox();
+            footer.setAlignment(Pos.CENTER);
+            VBox.setMargin(footer, new Insets(16, 0, 0, 0));
+            Button loadMore = primaryButton(loadingMore ? "Loading..." : "Load more comments");
+            loadMore.setDisable(loadingMore);
+            loadMore.setOnAction(event -> actions.loadMore());
+            footer.getChildren().add(loadMore);
+            section.getChildren().add(footer);
+        }
         return section;
     }
 
@@ -177,7 +193,7 @@ final class NativeCommentSection {
         HBox notice = new HBox(8);
         notice.getStyleClass().add("project-comments-disabled-notice");
         notice.setAlignment(Pos.CENTER_LEFT);
-        Label label = new Label("Comments are imported from CurseForge and are read-only here.");
+        Label label = new Label("Comments are loaded directly from CurseForge and are read-only here.");
         label.getStyleClass().add("project-comments-disabled-text");
         notice.getChildren().addAll(LauncherIcons.icon(LauncherIcons.Glyph.MESSAGE_SQUARE, 16), label);
         return notice;

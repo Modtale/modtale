@@ -10,6 +10,8 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -204,8 +206,8 @@ class ModtaleApiClientSessionTest {
     @Test
     void curseForgeCommentsAreImportedAsReadOnlyProviderContent() throws IOException {
         startSessionServer();
-        ModtaleApiClient client = new ModtaleApiClient(baseUrl(), tempDir.resolve("cf-comments-session.json"));
-        client.exchangeLauncherCode("launcher-code");
+        ModtaleApiClient client = new ModtaleApiClient(
+                HttpClient.newHttpClient(), baseUrl(), new ApiResponseCache(), siteBaseUri());
 
         List<ProjectComment> comments = client.getComments("curseforge:1450386");
         assertEquals(1, comments.size());
@@ -230,6 +232,10 @@ class ModtaleApiClientSessionTest {
 
     private String baseUrl() {
         return "http://127.0.0.1:" + server.getAddress().getPort() + "/api/v1";
+    }
+
+    private URI siteBaseUri() {
+        return URI.create("http://127.0.0.1:" + server.getAddress().getPort());
     }
 
     private void startSessionServer() throws IOException {
@@ -322,8 +328,8 @@ class ModtaleApiClientSessionTest {
             lastCommentMutation = exchange.getRequestMethod() + " " + exchange.getRequestURI();
             respond(exchange, 200, "{\"status\":\"success\"}");
         });
-        server.createContext("/api/v1/projects/external/curseforge/1450386/comments", exchange -> {
-            respond(exchange, 200, "{\"comments\":[{\"id\":\"curseforge:1\",\"user\":\"Builder\",\"content\":\"Pinned\",\"date\":\"2026-06-01T12:00:00Z\",\"pinned\":true,\"readOnly\":true,\"replies\":[{\"id\":\"curseforge:2\",\"user\":\"Author\",\"content\":\"Reply\",\"readOnly\":true}]}],\"totalCount\":2}");
+        server.createContext("/api/v1/mods/1450386/comments", exchange -> {
+            respond(exchange, 200, "{\"data\":[{\"id\":1,\"projectId\":1450386,\"text\":\"Pinned\",\"datePosted\":1788211200000,\"isPinned\":true,\"author\":{\"displayName\":\"Builder\"},\"replies\":[{\"id\":2,\"projectId\":1450386,\"text\":\"Reply\",\"author\":{\"username\":\"author\"}}]}],\"pagination\":{\"totalCount\":2}}");
         });
         server.createContext("/api/v1/projects/voile/gallery", exchange -> respond(exchange, 200, galleryJson));
         server.createContext("/api/v1/auth/logout", exchange -> {

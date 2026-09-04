@@ -76,6 +76,7 @@ import net.modtale.launcher.platform.SystemBrowser;
 import net.modtale.launcher.model.project.ProjectClassification;
 import net.modtale.launcher.model.project.GameVersionCatalog;
 import net.modtale.launcher.model.project.ProjectComment;
+import net.modtale.launcher.model.project.CurseForgeCommentsPage;
 import net.modtale.launcher.model.project.ProjectDetail;
 import net.modtale.launcher.model.project.ProjectDependency;
 import net.modtale.launcher.model.project.ProjectGallery;
@@ -184,6 +185,10 @@ public final class ProjectPageController {
     private boolean showExperimentalChangelogs;
     private boolean galleryLoading;
     private boolean commentsLoading;
+    private boolean commentsLoadingMore;
+    private boolean commentsHasMore;
+    private int commentsPage;
+    private long commentsTotalCount;
     private boolean commentSubmitting;
     private double syncedDocumentHeight = -1;
     private StackPane changelogOverlay;
@@ -271,6 +276,11 @@ public final class ProjectPageController {
                     @Override
                     public void setPinned(String commentId, boolean pinned) {
                         ProjectPageController.this.setCommentPinned(commentId, pinned);
+                    }
+
+                    @Override
+                    public void loadMore() {
+                        ProjectPageController.this.loadMoreComments();
                     }
                 },
                 () -> {
@@ -612,6 +622,10 @@ public final class ProjectPageController {
     private void resetCommentsState() {
         ++commentsRequestId;
         commentsLoading = false;
+        commentsLoadingMore = false;
+        commentsHasMore = false;
+        commentsPage = 0;
+        commentsTotalCount = 0;
         commentSubmitting = false;
         currentComments = List.of();
         commentUserProfiles = Map.of();
@@ -789,11 +803,18 @@ public final class ProjectPageController {
                     }
                     currentComments = payload.comments();
                     commentUserProfiles = payload.userProfiles();
+                    commentsPage = payload.page();
+                    commentsTotalCount = payload.totalCount();
+                    commentsHasMore = payload.hasMore();
                     renderProject(false);
                 }));
     }
 
     private CommentsPayload fetchCommentsPayload(String projectKey) {
+        if (ModtaleApiClient.curseForgeId(projectKey) != null) {
+            CurseForgeCommentsPage page = apiClient.getCurseForgeComments(projectKey, 0);
+            return new CommentsPayload(page.comments(), Map.of(), page.page(), page.totalCount(), page.hasMore());
+        }
         List<ProjectComment> comments = apiClient.getComments(projectKey);
         List<String> userIds = collectCommentUserIds(comments);
         Map<String, UserSummary> profiles = new LinkedHashMap<>();
@@ -804,7 +825,37 @@ public final class ProjectPageController {
                 }
             }
         }
-        return new CommentsPayload(comments, profiles);
+        return new CommentsPayload(comments, profiles, 0, comments.size(), false);
+    }
+
+    private void loadMoreComments() {
+        String key = commentProjectKey();
+        if (commentsLoadingMore || !commentsHasMore || ModtaleApiClient.curseForgeId(key) == null) return;
+        int nextPage = commentsPage + 1;
+        long requestId = commentsRequestId;
+        commentsLoadingMore = true;
+        renderProject(false);
+        CompletableFuture.supplyAsync(() -> apiClient.getCurseForgeComments(key, nextPage), executor)
+                .whenComplete((page, error) -> Platform.runLater(() -> {
+                    if (requestId != commentsRequestId || !value(key, "").equals(value(commentProjectKey(), ""))) return;
+                    commentsLoadingMore = false;
+                    if (error != null) {
+                        if (toast != null) {
+                            Throwable cause = error.getCause() == null ? error : error.getCause();
+                            toast.accept("Comments unavailable", value(cause.getMessage(), "Could not load more comments."));
+                        }
+                        renderProject(false);
+                        return;
+                    }
+                    LinkedHashMap<String, ProjectComment> merged = new LinkedHashMap<>();
+                    for (ProjectComment comment : currentComments) merged.put(comment.id(), comment);
+                    for (ProjectComment comment : page.comments()) merged.putIfAbsent(comment.id(), comment);
+                    currentComments = List.copyOf(merged.values());
+                    commentsPage = page.page();
+                    commentsTotalCount = page.totalCount();
+                    commentsHasMore = page.hasMore();
+                    renderProject(false);
+                }));
     }
 
     private List<String> collectCommentUserIds(List<ProjectComment> comments) {
@@ -1067,7 +1118,10 @@ public final class ProjectPageController {
 
     private record CommentsPayload(
             List<ProjectComment> comments,
-            Map<String, UserSummary> userProfiles
+            Map<String, UserSummary> userProfiles,
+            int page,
+            long totalCount,
+            boolean hasMore
     ) {
         private CommentsPayload {
             comments = comments == null ? List.of() : List.copyOf(comments);
@@ -1574,7 +1628,10 @@ public final class ProjectPageController {
                 currentComments,
                 commentUserProfiles,
                 detail == null || commentsLoading,
-                commentSubmitting
+                commentSubmitting,
+                commentsTotalCount,
+                commentsHasMore,
+                commentsLoadingMore
         );
         if (comments != null) {
             VBox.setMargin(comments, new Insets(22, 0, 0, 0));
