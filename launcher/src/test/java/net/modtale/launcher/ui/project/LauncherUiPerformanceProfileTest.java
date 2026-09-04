@@ -99,6 +99,10 @@ class LauncherUiPerformanceProfileTest {
                     directory.resolve("launcher-browse-compact.png"));
             snapshot(buildCurseForgeBrowsePageNode(1440, 900), 1440, 900,
                     directory.resolve("launcher-browse-curseforge.png"));
+            snapshot(buildCreatorPageNode(1440, 1400, false), 1440, 1400,
+                    directory.resolve("launcher-creator-desktop.png"));
+            snapshot(buildCreatorPageNode(760, 1400, true), 760, 1400,
+                    directory.resolve("launcher-creator-compact.png"));
             return null;
         });
     }
@@ -451,6 +455,22 @@ class LauncherUiPerformanceProfileTest {
         return body;
     }
 
+    private Node buildCreatorPageNode(double width, double height, boolean compact) {
+        NativeCreatorProfileView view = creatorProfileView();
+        CreatorProfile base = creator();
+        CreatorProfile withMedia = new CreatorProfile(
+                base.id(), base.username(), LOCAL_PROFILE_IMAGE, LOCAL_PROFILE_IMAGE, base.bio(), base.createdAt(),
+                base.tier(), base.roles(), base.accountType(), base.badges(), base.followerIds(), base.followingIds(),
+                base.connectedAccounts(), base.organizationMembers(), base.organizationRoles()
+        );
+        Node page = view.render(withMedia, new ProjectPage(projects(compact ? 3 : 8), 1, 8, 0, true),
+                List.of(), false, compact);
+        if (page instanceof Region region) {
+            region.resize(width, Math.max(height, region.prefHeight(width)));
+        }
+        return page;
+    }
+
     private void snapshot(Node node, int width, int height, Path destination) throws Exception {
         StackPane root = new StackPane(node);
         Scene scene = new Scene(root, width, height, javafx.scene.paint.Color.web("#0B1120"));
@@ -469,7 +489,15 @@ class LauncherUiPerformanceProfileTest {
     }
 
     private void buildCreatorPage() {
-        NativeCreatorProfileView view = new NativeCreatorProfileView(
+        NativeCreatorProfileView view = creatorProfileView();
+        Node page = view.render(creator(), new ProjectPage(projects(12), 1, 12, 0, true), List.of(), false, false);
+        if (page instanceof Region region) {
+            region.resize(1568, Math.max(880, region.prefHeight(1568)));
+        }
+    }
+
+    private NativeCreatorProfileView creatorProfileView() {
+        return new NativeCreatorProfileView(
                 imageLoader(),
                 new ProjectCardFactory(url -> url, DIRECT_EXECUTOR),
                 () -> "2026.1",
@@ -495,10 +523,6 @@ class LauncherUiPerformanceProfileTest {
                 },
                 new SimpleDoubleProperty()
         );
-        Node page = view.render(creator(), new ProjectPage(projects(12), 1, 12, 0, true), List.of(), false, false);
-        if (page instanceof Region region) {
-            region.resize(1568, Math.max(880, region.prefHeight(1568)));
-        }
     }
 
     private void buildGalleryCarousel() {

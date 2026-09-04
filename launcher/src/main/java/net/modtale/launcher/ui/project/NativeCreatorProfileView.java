@@ -604,14 +604,17 @@ final class NativeCreatorProfileView {
         ImageView image = new ImageView();
         image.setSmooth(true);
         image.setPreserveRatio(false);
+        // Keep the remote image's natural/request dimensions out of parent layout. Otherwise the
+        // banner can make the page thousands of pixels wide before its viewport has been measured,
+        // creating a self-sustaining oversized cover crop.
+        image.setFitWidth(1);
+        image.setFitHeight(1);
         imageLoader.loadInto(image, url, requestedWidth, requestedHeight, true);
         Runnable update = () -> {
             double width = box.getWidth();
             double height = box.getHeight();
             javafx.scene.image.Image loaded = image.getImage();
             if (!Double.isFinite(width) || width <= 1 || !Double.isFinite(height) || height <= 1 || loaded == null) {
-                image.setFitWidth(requestedWidth);
-                image.setFitHeight(requestedHeight);
                 return;
             }
             double imageWidth = loaded.getWidth();
