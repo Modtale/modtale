@@ -7542,7 +7542,7 @@
 .play-shell {
     -fx-padding: 0;
     -fx-alignment: center-left;
-    -fx-spacing: 38px;
+    -fx-spacing: 18px;
 }
 
 .play-stage {
@@ -7613,6 +7613,15 @@
 .play-catalog-body {
     -fx-min-height: 308px;
     -fx-pref-height: 308px;
+}
+
+.play-catalog-edge-fade {
+    -fx-background-color: linear-gradient(
+        to right,
+        rgba(11, 17, 32, 0) 0%,
+        rgba(11, 17, 32, 0.78) 68%,
+        #0b1120 100%
+    );
 }
 
 .play-catalog-card-row {
