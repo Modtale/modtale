@@ -1,6 +1,7 @@
 package net.modtale.launcher.ui.project;
 
 import com.vladsch.flexmark.ast.BlockQuote;
+import com.vladsch.flexmark.ast.AutoLink;
 import com.vladsch.flexmark.ast.BulletList;
 import com.vladsch.flexmark.ast.Code;
 import com.vladsch.flexmark.ast.Emphasis;
@@ -20,6 +21,7 @@ import com.vladsch.flexmark.ast.StrongEmphasis;
 import com.vladsch.flexmark.ast.ThematicBreak;
 import com.vladsch.flexmark.ext.gfm.strikethrough.Strikethrough;
 import com.vladsch.flexmark.ext.gfm.strikethrough.StrikethroughExtension;
+import com.vladsch.flexmark.ext.autolink.AutolinkExtension;
 import com.vladsch.flexmark.ext.tables.TableBlock;
 import com.vladsch.flexmark.ext.tables.TableBody;
 import com.vladsch.flexmark.ext.tables.TableCell;
@@ -27,6 +29,7 @@ import com.vladsch.flexmark.ext.tables.TableHead;
 import com.vladsch.flexmark.ext.tables.TableRow;
 import com.vladsch.flexmark.ext.tables.TablesExtension;
 import com.vladsch.flexmark.ext.gfm.tasklist.TaskListExtension;
+import com.vladsch.flexmark.ext.gfm.tasklist.TaskListItem;
 import com.vladsch.flexmark.parser.Parser;
 import com.vladsch.flexmark.util.ast.Document;
 import com.vladsch.flexmark.util.ast.Node;
@@ -35,7 +38,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javafx.animation.PauseTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -43,6 +50,7 @@ import javafx.scene.Cursor;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.Clipboard;
 import javafx.scene.input.ClipboardContent;
@@ -59,6 +67,7 @@ import javafx.scene.shape.PathElement;
 import javafx.scene.text.HitInfo;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
+import javafx.scene.text.TextAlignment;
 import javafx.util.Duration;
 import net.modtale.launcher.ui.common.CachedImageLoader;
 import net.modtale.launcher.ui.common.LauncherIcons;
@@ -67,6 +76,18 @@ final class NativeMarkdownRenderer {
 
     private static final double MAX_BLOCK_IMAGE_WIDTH = 1080;
     private static final double MAX_INLINE_IMAGE_WIDTH = 480;
+    private static final Pattern HTML_ALIGNMENT = Pattern.compile(
+            "(?is)(?:align\\s*=\\s*['\"]?\\s*(left|center|right|justify)|text-align\\s*:\\s*(left|center|right|justify))");
+    private static final Pattern HTML_IFRAME_SRC = Pattern.compile(
+            "(?is)<iframe\\b[^>]*\\bsrc\\s*=\\s*(['\"])(.*?)\\1[^>]*>");
+    private static final Pattern HTML_IMAGE = Pattern.compile("(?is)<img\\b[^>]*>");
+    private static final Pattern HTML_SRC = Pattern.compile("(?is)\\bsrc\\s*=\\s*(['\"])(.*?)\\1");
+    private static final Pattern HTML_ALT = Pattern.compile("(?is)\\balt\\s*=\\s*(['\"])(.*?)\\1");
+    private static final Pattern HTML_TITLE = Pattern.compile(
+            "(?is)\\btitle\\s*=\\s*(['\"])(.*?)\\1");
+    private static final Pattern HTML_DANGEROUS_CONTENT = Pattern.compile(
+            "(?is)<(script|style|object|embed|svg)\\b[^>]*>.*?</\\1\\s*>");
+    private static final Pattern YOUTUBE_VIDEO_ID = Pattern.compile("^[A-Za-z0-9_-]{11}$");
     private static final List<String> JVM_KEYWORDS = List.of(
             "abstract", "as", "break", "case", "catch", "class", "const", "continue", "data", "default",
             "do", "else", "enum", "extends", "false", "final", "finally", "for", "fun", "if",
@@ -78,6 +99,7 @@ final class NativeMarkdownRenderer {
     private static final Parser PARSER = Parser.builder(new MutableDataSet()
                     .set(Parser.EXTENSIONS, List.of(
                             StrikethroughExtension.create(),
+                            AutolinkExtension.create(),
                             TablesExtension.create(),
                             TaskListExtension.create()
                     )))
@@ -138,14 +160,13 @@ final class NativeMarkdownRenderer {
             return rule;
         }
         if (node instanceof HtmlBlock html) {
-            String text = sanitizeHtml(html.getChars().toString());
-            return text.isBlank() ? null : paragraph(text);
+            return htmlBlock(html.getChars().toString(), prose);
         }
         return null;
     }
 
     private javafx.scene.Node heading(Heading heading) {
-        TextFlow flow = inlineFlow("project-detail-prose-h" + Math.min(3, heading.getLevel()));
+        TextFlow flow = inlineFlow("project-detail-prose-h" + Math.min(6, heading.getLevel()));
         appendInlineChildren(flow, heading, InlineStyle.PLAIN);
         return selectableTextFlow(flow);
     }
@@ -277,11 +298,39 @@ final class NativeMarkdownRenderer {
         header.getChildren().addAll(langLabel, spacer, copy);
 
         TextFlow code = highlightedCode(codeContent, lang);
-        StackPane body = new StackPane(code);
-        body.getStyleClass().add("project-detail-markdown-code-body");
-        StackPane.setAlignment(code, Pos.TOP_LEFT);
+        double longestLine = Arrays.stream(codeContent.split("\n", -1))
+                .mapToInt(String::length)
+                .max()
+                .orElse(0);
+        code.setPrefWidth(Math.max(1, longestLine * 8.2));
+        StackPane codeCanvas = new StackPane(code);
+        codeCanvas.getStyleClass().add("project-detail-markdown-code-canvas");
+        codeCanvas.setAlignment(Pos.TOP_LEFT);
+        codeCanvas.setMinWidth(code.getPrefWidth() + 32);
+        codeCanvas.setPrefWidth(code.getPrefWidth() + 32);
+        ScrollPane body = horizontalScroller(codeCanvas, "project-detail-markdown-code-body");
+        body.setPrefViewportHeight(Math.max(52, codeContent.lines().count() * 21 + 32));
         block.getChildren().addAll(header, body);
         return block;
+    }
+
+    private ScrollPane horizontalScroller(javafx.scene.Node content, String styleClass) {
+        ScrollPane scroll = new ScrollPane(content);
+        scroll.getStyleClass().add(styleClass);
+        scroll.setFitToWidth(false);
+        scroll.setFitToHeight(true);
+        scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scroll.setPannable(true);
+        scroll.setMinWidth(0);
+        scroll.setMaxWidth(Double.MAX_VALUE);
+        if (content instanceof Region region) {
+            double contentHeight = region.prefHeight(-1);
+            if (Double.isFinite(contentHeight) && contentHeight > 0) {
+                scroll.setPrefViewportHeight(contentHeight);
+            }
+        }
+        return scroll;
     }
 
     private javafx.scene.Node selectableTextFlow(TextFlow flow) {
@@ -576,7 +625,12 @@ final class NativeMarkdownRenderer {
                 rowIndex[0] += 1;
             }
         }
-        return grid;
+        ScrollPane scroll = horizontalScroller(grid, "project-detail-markdown-table-scroll");
+        double tableHeight = Math.max(48, rowIndex[0] * 40 + 8);
+        scroll.setPrefViewportHeight(tableHeight);
+        scroll.setMinHeight(tableHeight);
+        scroll.setPrefHeight(tableHeight);
+        return scroll;
     }
 
     private void addTableRow(GridPane grid, TableRow row, int rowIndex, boolean header) {
@@ -584,6 +638,11 @@ final class NativeMarkdownRenderer {
         for (Node child = row.getFirstChild(); child != null; child = child.getNext()) {
             if (child instanceof TableCell cell) {
                 TextFlow flow = inlineFlow(header ? "project-detail-markdown-th" : "project-detail-markdown-td");
+                flow.setTextAlignment(switch (cell.getAlignment()) {
+                    case CENTER -> TextAlignment.CENTER;
+                    case RIGHT -> TextAlignment.RIGHT;
+                    default -> TextAlignment.LEFT;
+                });
                 appendInlineChildren(flow, cell, InlineStyle.PLAIN);
                 grid.add(flow, col, rowIndex);
                 col += 1;
@@ -593,13 +652,18 @@ final class NativeMarkdownRenderer {
 
     private javafx.scene.Node blockImage(MarkdownImage markdownImage, VBox prose) {
         String url = markdownImage.image().getUrl().toString();
-        if (url.isBlank()) {
+        return blockImage(url, markdownImage.alt(), markdownImage.linkUrl(), prose);
+    }
+
+    private javafx.scene.Node blockImage(String url, String alt, String linkUrl, VBox prose) {
+        if (!isSafeImage(url)) {
             return null;
         }
         ImageView view = new ImageView();
         view.getStyleClass().add("project-detail-markdown-image");
         view.setPreserveRatio(true);
         view.setSmooth(true);
+        view.setAccessibleText(alt == null ? "" : alt);
 
         HBox shell = new HBox(view);
         shell.getStyleClass().add("project-detail-markdown-image-shell");
@@ -616,10 +680,7 @@ final class NativeMarkdownRenderer {
             resizeBlockImage(view, prose);
         });
         imageLoader.loadInto(view, url, 0, 0, true);
-        if (!markdownImage.linkUrl().isBlank()) {
-            shell.setCursor(Cursor.HAND);
-            shell.setOnMouseClicked(event -> openUrl.accept(markdownImage.linkUrl()));
-        }
+        makeLink(shell, linkUrl);
         return shell;
     }
 
@@ -636,16 +697,18 @@ final class NativeMarkdownRenderer {
 
     private javafx.scene.Node inlineImage(Image image) {
         String url = image.getUrl().toString();
-        if (url.isBlank()) {
+        if (!isSafeImage(url)) {
             return null;
         }
-        return imageView(url, MAX_INLINE_IMAGE_WIDTH, 0, true);
+        ImageView view = imageView(url, MAX_INLINE_IMAGE_WIDTH, 0, true);
+        view.setAccessibleText(image.getText().toString());
+        return view;
     }
 
     private ImageView imageView(String url, double requestedWidth, double requestedHeight, boolean preserveRatio) {
         ImageView view = new ImageView();
         view.getStyleClass().add("project-detail-markdown-image");
-        view.setPreserveRatio(true);
+        view.setPreserveRatio(preserveRatio);
         view.setSmooth(true);
         view.setFitWidth(requestedWidth);
         double effectiveRequestedHeight = requestedHeight > 0 ? requestedHeight : requestedWidth * 2;
@@ -711,6 +774,10 @@ final class NativeMarkdownRenderer {
             appendLink(flow, link, style);
             return;
         }
+        if (node instanceof AutoLink autoLink) {
+            appendAutoLink(flow, autoLink, style);
+            return;
+        }
         if (node instanceof Image image) {
             javafx.scene.Node rendered = inlineImage(image);
             if (rendered != null) {
@@ -734,9 +801,143 @@ final class NativeMarkdownRenderer {
         appendInlineChildren(flow, link, style.withLink());
         for (int i = start; i < flow.getChildren().size(); i++) {
             javafx.scene.Node child = flow.getChildren().get(i);
-            child.setOnMouseClicked(event -> openUrl.accept(url));
-            child.setCursor(Cursor.HAND);
+            makeLink(child, url);
         }
+    }
+
+    private void appendAutoLink(TextFlow flow, AutoLink link, InlineStyle style) {
+        String label = link.getText().toString();
+        String target = label.contains("@") && !label.contains("://") ? "mailto:" + label : label;
+        Text rendered = text(label, style.withLink());
+        makeLink(rendered, target);
+        flow.getChildren().add(rendered);
+    }
+
+    private void makeLink(javafx.scene.Node node, String url) {
+        if (!isSafeLink(url)) return;
+        node.setOnMouseClicked(event -> openUrl.accept(url));
+        node.setCursor(Cursor.HAND);
+    }
+
+    private javafx.scene.Node htmlBlock(String html, VBox prose) {
+        Matcher iframe = HTML_IFRAME_SRC.matcher(html == null ? "" : html);
+        if (iframe.find()) {
+            String videoId = youtubeVideoId(decodeEntities(iframe.group(2)));
+            if (videoId != null) {
+                Matcher title = HTML_TITLE.matcher(iframe.group());
+                return youtubeEmbed(videoId, title.find() ? decodeEntities(title.group(2)) : "YouTube video");
+            }
+        }
+        Matcher image = HTML_IMAGE.matcher(html == null ? "" : html);
+        if (image.find()) {
+            Matcher src = HTML_SRC.matcher(image.group());
+            Matcher alt = HTML_ALT.matcher(image.group());
+            if (src.find()) {
+                return blockImage(decodeEntities(src.group(2)),
+                        alt.find() ? decodeEntities(alt.group(2)) : "", "", prose);
+            }
+        }
+        String sanitized = sanitizeHtml(html);
+        if (sanitized.isBlank()) return null;
+        TextFlow flow = inlineFlow(htmlHeadingStyle(html));
+        flow.setTextAlignment(htmlAlignment(html));
+        flow.getChildren().add(text(sanitized, InlineStyle.PLAIN));
+        return selectableTextFlow(flow);
+    }
+
+    private javafx.scene.Node youtubeEmbed(String videoId, String title) {
+        StackPane media = new StackPane();
+        media.getStyleClass().add("project-detail-markdown-youtube");
+        media.setMinHeight(220);
+        media.setPrefHeight(360);
+        media.setMaxHeight(480);
+        media.setCursor(Cursor.HAND);
+
+        ImageView preview = imageView("https://i.ytimg.com/vi/" + videoId + "/hqdefault.jpg", 960, 540, false);
+        preview.fitWidthProperty().bind(media.widthProperty());
+        preview.fitHeightProperty().bind(media.heightProperty());
+        Label play = new Label("Watch on YouTube", LauncherIcons.icon(LauncherIcons.Glyph.EXTERNAL_LINK, 16));
+        play.getStyleClass().add("project-detail-markdown-youtube-action");
+        media.getChildren().addAll(preview, play);
+        media.setAccessibleText(title == null || title.isBlank() ? "YouTube video" : title);
+        media.setOnMouseClicked(event -> openUrl.accept("https://www.youtube.com/watch?v=" + videoId));
+        return media;
+    }
+
+    static String youtubeVideoId(String rawUrl) {
+        try {
+            URI uri = new URI(rawUrl == null ? "" : rawUrl.trim());
+            String scheme = lower(uri.getScheme());
+            String host = lower(uri.getHost());
+            if (!("http".equals(scheme) || "https".equals(scheme)) || host == null) return null;
+            if (host.startsWith("www.")) host = host.substring(4);
+            if (host.startsWith("m.")) host = host.substring(2);
+            String path = uri.getPath() == null ? "" : uri.getPath();
+            String candidate = null;
+            if ("youtu.be".equals(host)) {
+                candidate = firstPathSegment(path);
+            } else if ("youtube.com".equals(host) || "youtube-nocookie.com".equals(host)) {
+                for (String prefix : List.of("/embed/", "/shorts/", "/live/")) {
+                    if (path.startsWith(prefix)) candidate = firstPathSegment(path.substring(prefix.length()));
+                }
+                if ("/watch".equals(path) && uri.getRawQuery() != null) {
+                    for (String part : uri.getRawQuery().split("&")) {
+                        if (part.startsWith("v=")) candidate = part.substring(2);
+                    }
+                }
+            }
+            return candidate != null && YOUTUBE_VIDEO_ID.matcher(candidate).matches() ? candidate : null;
+        } catch (URISyntaxException ignored) {
+            return null;
+        }
+    }
+
+    private static String firstPathSegment(String path) {
+        String value = path == null ? "" : path.replaceFirst("^/+", "");
+        int slash = value.indexOf('/');
+        return slash < 0 ? value : value.substring(0, slash);
+    }
+
+    static boolean isSafeLink(String rawUrl) {
+        try {
+            URI uri = new URI(rawUrl == null ? "" : rawUrl.trim());
+            String scheme = lower(uri.getScheme());
+            return "http".equals(scheme) || "https".equals(scheme) || "mailto".equals(scheme);
+        } catch (URISyntaxException ignored) {
+            return false;
+        }
+    }
+
+    static boolean isSafeImage(String rawUrl) {
+        try {
+            String value = rawUrl == null ? "" : rawUrl.trim();
+            URI uri = new URI(value);
+            String scheme = lower(uri.getScheme());
+            return scheme == null ? !value.isBlank() : "http".equals(scheme) || "https".equals(scheme);
+        } catch (URISyntaxException ignored) {
+            return false;
+        }
+    }
+
+    private static String lower(String value) {
+        return value == null ? null : value.toLowerCase(Locale.ROOT);
+    }
+
+    static String htmlHeadingStyle(String html) {
+        Matcher heading = Pattern.compile("(?is)^\\s*<h([1-6])\\b").matcher(html == null ? "" : html);
+        return heading.find() ? "project-detail-prose-h" + heading.group(1) : "project-detail-prose-p";
+    }
+
+    static TextAlignment htmlAlignment(String html) {
+        Matcher matcher = HTML_ALIGNMENT.matcher(html == null ? "" : html);
+        if (!matcher.find()) return TextAlignment.LEFT;
+        String value = matcher.group(1) == null ? matcher.group(2) : matcher.group(1);
+        return switch (value.toLowerCase(Locale.ROOT)) {
+            case "center" -> TextAlignment.CENTER;
+            case "right" -> TextAlignment.RIGHT;
+            case "justify" -> TextAlignment.JUSTIFY;
+            default -> TextAlignment.LEFT;
+        };
     }
 
     private Text text(String value, InlineStyle style) {
@@ -758,6 +959,9 @@ final class NativeMarkdownRenderer {
     }
 
     private ParsedTask parseTask(ListItem item) {
+        if (item instanceof TaskListItem taskItem) {
+            return new ParsedTask(true, taskItem.isItemDoneMarker(), textContent(item));
+        }
         String text = textContent(item);
         if (text.matches("^\\s*\\[[ xX]]\\s+.*")) {
             return new ParsedTask(true, text.matches("^\\s*\\[[xX]]\\s+.*"), text.replaceFirst("^\\s*\\[[ xX]]\\s+", ""));
@@ -789,12 +993,22 @@ final class NativeMarkdownRenderer {
         return normalized.replace("\r\n", "\n").trim();
     }
 
-    private static String sanitizeHtml(String value) {
-        return decodeEntities(value)
+    static String sanitizeHtml(String value) {
+        String withoutDangerousContent = HTML_DANGEROUS_CONTENT.matcher(value == null ? "" : value).replaceAll("");
+        return decodeEntities(withoutDangerousContent)
                 .replaceAll("(?is)<br\\s*/?>", "\n")
                 .replaceAll("(?is)</p\\s*>", "\n")
+                .replaceAll("(?is)</(?:div|li|blockquote|h[1-6])\\s*>", "\n")
                 .replaceAll("(?is)<[^>]+>", "")
                 .trim();
+    }
+
+    static boolean parsesAutolink(String content) {
+        Document document = PARSER.parse(content == null ? "" : content);
+        for (Node node : document.getDescendants()) {
+            if (node instanceof AutoLink) return true;
+        }
+        return false;
     }
 
     private static String decodeEntities(String value) {

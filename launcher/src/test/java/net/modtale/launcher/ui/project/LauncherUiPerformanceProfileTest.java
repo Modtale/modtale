@@ -644,8 +644,23 @@ class LauncherUiPerformanceProfileTest {
                 gallery markers, and the banner scroll effect without depending on external assets.
 
                 - Fast install path
-                - Dense metadata panel
+                - [x] Dense metadata panel
                 - Smooth native scrolling
+
+                > Built for native launcher and web parity.
+
+                #### Compatibility
+
+                | Surface | Support |
+                | :------ | ------: |
+                | Web | Full |
+                | Launcher | Full |
+
+                ```json
+                {"gameVersion":"0.6.1","automaticUpdates":true}
+                ```
+
+                <div style="text-align: center">Centered project note</div>
                 """;
         return new ProjectDetail(
                 "project-1",
