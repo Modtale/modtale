@@ -92,6 +92,11 @@ public final class ProjectBrowseController {
     private final PauseTransition searchDebounce = new PauseTransition(Duration.millis(450));
     private final ChangeListener<Number> layoutResizeListener = (observable, oldValue, newValue) ->
             scheduleLayoutRefresh(oldValue, newValue);
+    private final ChangeListener<Bounds> viewportResizeListener = (observable, oldBounds, newBounds) ->
+            scheduleLayoutRefresh(
+                    oldBounds == null ? null : oldBounds.getWidth(),
+                    newBounds == null ? null : newBounds.getWidth()
+            );
     private final ProjectBrowserRenderer renderer;
     private final ProjectBrowseCategories categories;
     private final ProjectBrowseTags tags;
@@ -116,6 +121,7 @@ public final class ProjectBrowseController {
     private List<ProjectSummary> currentProjects = List.of();
     private boolean suppressSearch;
     private boolean layoutRefreshScheduled;
+    private ScrollPane observedLayoutScrollPane;
     private int currentPage;
     private int totalPageCount;
     private long totalResultCount;
@@ -329,14 +335,17 @@ public final class ProjectBrowseController {
     private Node buildView() {
         VBox content = new VBox(16);
         content.getStyleClass().add("browse-content");
+        content.setMinWidth(0);
         content.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
         VBox filters = new VBox(10);
         filters.getStyleClass().add("browse-filter-shell");
+        filters.setMinWidth(0);
 
         HBox browseControls = new HBox(12);
         browseControls.getStyleClass().add("browse-filter-row");
         browseControls.setAlignment(Pos.CENTER_LEFT);
+        browseControls.setMinWidth(0);
 
         HBox controlRow = new HBox(8);
         controlRow.getStyleClass().add("browse-control-group");
@@ -362,7 +371,7 @@ public final class ProjectBrowseController {
         resultsIndicator.setMouseTransparent(true);
         resultsIndicator.setAccessibleText("Browse results status");
         categoryPills = categories.view();
-        HBox.setHgrow(categoryPills, Priority.NEVER);
+        HBox.setHgrow(categoryPills, Priority.ALWAYS);
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         browseControls.getChildren().addAll(categoryPills, resultsIndicator, spacer, controlRow);
@@ -371,6 +380,7 @@ public final class ProjectBrowseController {
         filters.getChildren().add(browseControls);
 
         projectResults.getStyleClass().add("project-results");
+        projectResults.setMinWidth(0);
         projectResults.setMaxWidth(Double.MAX_VALUE);
         projectResults.setAlignment(Pos.TOP_LEFT);
         VBox.setVgrow(projectResults, Priority.ALWAYS);
@@ -382,6 +392,7 @@ public final class ProjectBrowseController {
         browseRoot = root;
         root.setUserData(LauncherView.DISCOVER);
         root.getStyleClass().addAll("view", "browse-view");
+        root.setMinWidth(0);
         root.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         root.addEventFilter(MouseEvent.MOUSE_PRESSED, this::hideFilterDropdownsOnOutsidePress);
         return root;
@@ -1004,9 +1015,25 @@ public final class ProjectBrowseController {
             oldScene.widthProperty().removeListener(layoutResizeListener);
             oldScene.heightProperty().removeListener(layoutResizeListener);
         }
+        observeLayoutViewport(null);
         if (newScene != null) {
             newScene.widthProperty().addListener(layoutResizeListener);
             newScene.heightProperty().addListener(layoutResizeListener);
+            Platform.runLater(() -> observeLayoutViewport(enclosingScrollPane()));
+        }
+    }
+
+    private void observeLayoutViewport(ScrollPane scrollPane) {
+        if (observedLayoutScrollPane == scrollPane) {
+            return;
+        }
+        if (observedLayoutScrollPane != null) {
+            observedLayoutScrollPane.viewportBoundsProperty().removeListener(viewportResizeListener);
+        }
+        observedLayoutScrollPane = scrollPane;
+        if (observedLayoutScrollPane != null) {
+            observedLayoutScrollPane.viewportBoundsProperty().addListener(viewportResizeListener);
+            scheduleLayoutRefresh();
         }
     }
 

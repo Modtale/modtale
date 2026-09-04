@@ -144,7 +144,7 @@ public final class ProjectBrowseCategories {
         StackPane.setAlignment(categoryScroll, Pos.CENTER_LEFT);
         StackPane.setAlignment(leftFade, Pos.CENTER_LEFT);
         StackPane.setAlignment(rightFade, Pos.CENTER_RIGHT);
-        HBox.setHgrow(frame, Priority.NEVER);
+        HBox.setHgrow(frame, Priority.ALWAYS);
         pillShell.layoutBoundsProperty().addListener((observable, oldValue, bounds) ->
                 updateContentWidth(frame, bounds.getWidth()));
         Platform.runLater(() -> updateContentWidth(frame, pillShell.getLayoutBounds().getWidth()));
@@ -230,7 +230,7 @@ public final class ProjectBrowseCategories {
         double nextWidth = Math.ceil(width);
         contentWidth.set(nextWidth);
         frame.setPrefWidth(nextWidth + VIEWPORT_CHROME_BUFFER);
-        frame.setMaxWidth(nextWidth + VIEWPORT_CHROME_BUFFER);
+        frame.setMaxWidth(Double.MAX_VALUE);
     }
 
     private void animatePill() {
