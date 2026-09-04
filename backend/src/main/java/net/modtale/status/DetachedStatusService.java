@@ -62,14 +62,13 @@ public class DetachedStatusService {
     )
     public synchronized void refreshSnapshots() {
         hydrate();
-        StatusHistoryEntry previous = latestHistory();
         StatusHistoryEntry latest = statusProbeService.performHealthCheck();
         addHistory(latest);
         mongoStatusStore.saveHistory(latest);
         refreshIncidents();
         rebuildSnapshots();
         snapshotFileStore.writeHistory(List.copyOf(history));
-        statusDiscordNotifier.notifyStatusChange(previous, latest);
+        statusDiscordNotifier.publishStatus(cached24HourStatus);
     }
 
     public SystemStatusView getSystemStatus(String range) {
