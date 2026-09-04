@@ -627,7 +627,7 @@ final class NativeCommentSection {
             Map<String, UserSummary> profiles,
             String date
     ) {
-        String id = value(userId, author == null ? "" : author.id());
+        String id = first(userId, author == null ? null : author.id());
         UserSummary profile = id.isBlank() ? null : profiles.get(id);
         String resolvedName = first(
                 profile == null ? null : profile.username(),
