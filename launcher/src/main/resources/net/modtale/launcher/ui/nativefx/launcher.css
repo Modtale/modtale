@@ -7453,6 +7453,7 @@
 .byline {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 14px;
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 700;
 }
 
@@ -7535,7 +7536,6 @@
     -fx-background-insets: 0;
     -fx-border-insets: 0;
     -fx-cursor: hand;
-    -fx-font-weight: 400;
 }
 
 .author-link:hover {
