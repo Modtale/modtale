@@ -10,6 +10,7 @@ public class Comment {
     private String content;
     private String date;
     private String updatedAt;
+    private boolean pinned;
 
     private Set<String> upvotes = new HashSet<>();
     private Set<String> downvotes = new HashSet<>();
@@ -62,6 +63,8 @@ public class Comment {
     public void setDate(String date) { this.date = date; }
     public String getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(String updatedAt) { this.updatedAt = updatedAt; }
+    public boolean isPinned() { return pinned; }
+    public void setPinned(boolean pinned) { this.pinned = pinned; }
     public Set<String> getUpvotes() { return upvotes; }
     public void setUpvotes(Set<String> upvotes) { this.upvotes = upvotes; }
     public Set<String> getDownvotes() { return downvotes; }
