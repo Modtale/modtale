@@ -491,7 +491,8 @@ jobs:
             ARGS+=("--update-secrets" "WIKI_API_KEY=WIKI_API_KEY:latest")
             ARGS+=("--update-secrets" "DISCORD_WEBHOOK_URL=DISCORD_WEBHOOK_URL:latest")
             ARGS+=("--update-secrets" "ADMIN_DISCORD_WEBHOOK_URL=ADMIN_DISCORD_WEBHOOK_URL:latest")
-            ARGS+=("--update-secrets" "STATUS_DISCORD_WEBHOOK_URL=STATUS_DISCORD_WEBHOOK_URL:latest")
+            # Only the detached status service owns the persistent #status message.
+            ARGS+=("--remove-env-vars" "STATUS_DISCORD_WEBHOOK_URL")
           elif [ "${{ env.ENV_TYPE }}" = "dev" ]; then
             ARGS+=("--cpu" "1")
             ARGS+=("--min-instances" "0")

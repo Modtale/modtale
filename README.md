@@ -111,7 +111,7 @@ The Spring Boot backend relies on environment variables. You can set these in yo
 | `R2_SECRET_KEY` | Storage Secret Key | `your_dev_secret_key` |
 | `R2_ENDPOINT` | Storage Endpoint URL | `https://<accountid>.r2.cloudflarestorage.com` |
 | `WARDEN_ENABLED` | **Must be false locally** | `false` |
-| `STATUS_DISCORD_WEBHOOK_URL` | Optional Discord webhook for status-change alerts | `https://discord.com/api/webhooks/...` |
+| `STATUS_DISCORD_WEBHOOK_URL` | Optional Discord webhook for the continually updated status mirror | `https://discord.com/api/webhooks/...` |
 | `STATUS_CHECKER_ENABLED` | Opt into the legacy embedded backend checker | `false` |
 
 Detached status service variables:
