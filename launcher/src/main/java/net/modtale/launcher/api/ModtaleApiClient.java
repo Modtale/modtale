@@ -268,22 +268,22 @@ public class ModtaleApiClient {
     }
 
     public List<ProjectComment> getComments(String projectId) {
-        CommentsResponse response = get("/projects/" + encodePath(projectId) + "/comments", CommentsResponse.class);
+        CommentsResponse response = get(commentsPath(projectId), CommentsResponse.class);
         return response == null ? List.of() : response.comments();
     }
 
     public void postComment(String projectId, String content) {
-        post("/projects/" + encodePath(projectId) + "/comments",
+        post(commentsPath(projectId),
                 java.util.Map.of("content", content == null ? "" : content), Object.class);
     }
 
     public void updateComment(String projectId, String commentId, String content) {
-        put("/projects/" + encodePath(projectId) + "/comments/" + encodePath(commentId),
+        put(commentsPath(projectId) + "/" + encodePath(commentId),
                 java.util.Map.of("content", content == null ? "" : content), Object.class);
     }
 
     public void deleteComment(String projectId, String commentId) {
-        delete("/projects/" + encodePath(projectId) + "/comments/" + encodePath(commentId), Object.class);
+        delete(commentsPath(projectId) + "/" + encodePath(commentId), Object.class);
     }
 
     public void replyToComment(String projectId, String commentId, String reply) {
@@ -292,10 +292,14 @@ public class ModtaleApiClient {
     }
 
     public void voteComment(String projectId, String commentId, boolean upvote, boolean reply) {
-        String target = reply
-                ? "/projects/" + encodePath(projectId) + "/comments/" + encodePath(commentId) + "/reply/vote"
-                : "/projects/" + encodePath(projectId) + "/comments/" + encodePath(commentId) + "/vote";
+        String target = commentsPath(projectId) + "/" + encodePath(commentId)
+                + (reply ? "/reply/vote" : "/vote");
         post(target + "?upvote=" + upvote, java.util.Map.of(), Object.class);
+    }
+
+    public void setCommentPinned(String projectId, String commentId, boolean pinned) {
+        put(commentsPath(projectId) + "/" + encodePath(commentId) + "/pin?pinned=" + pinned,
+                java.util.Map.of(), Object.class);
     }
 
     public String submitReport(String targetId, String targetType, String reason, String description) {
@@ -428,6 +432,13 @@ public class ModtaleApiClient {
         } catch (NumberFormatException ignored) {
             return null;
         }
+    }
+
+    private static String commentsPath(String projectId) {
+        Long externalId = curseForgeId(projectId);
+        return externalId == null
+                ? "/projects/" + encodePath(projectId) + "/comments"
+                : "/projects/external/curseforge/" + externalId + "/comments";
     }
 
     public List<String> getGameVersions() {

@@ -50,6 +50,8 @@ final class NativeCommentSection {
         void vote(String commentId, boolean reply, boolean upvote);
 
         void report(String commentId);
+
+        void setPinned(String commentId, boolean pinned);
     }
 
     private final CachedImageLoader imageLoader;
@@ -96,6 +98,7 @@ final class NativeCommentSection {
     ) {
         CurrentUser user = currentUser.get();
         boolean creator = isCreator(user, summary, detail);
+        boolean canPin = creator || (user != null && user.hasAdminPermission("PROJECT_MODERATE"));
         boolean disabled = detail != null && Boolean.FALSE.equals(detail.allowComments());
         if (disabled && !creator) {
             return null;
@@ -131,7 +134,7 @@ final class NativeCommentSection {
             list.getChildren().add(stateCard("No comments yet. Be the first to share your thoughts!"));
         } else {
             for (ProjectComment comment : safeComments) {
-                list.getChildren().add(commentCard(comment, summary, detail, safeProfiles, creator, submitting));
+                list.getChildren().add(commentCard(comment, summary, detail, safeProfiles, creator, canPin, submitting));
             }
         }
         section.getChildren().add(list);
@@ -225,6 +228,7 @@ final class NativeCommentSection {
             ProjectDetail detail,
             Map<String, UserSummary> profiles,
             boolean creator,
+            boolean canPin,
             boolean submitting
     ) {
         CurrentUser user = currentUser.get();
@@ -235,17 +239,18 @@ final class NativeCommentSection {
 
         HBox card = new HBox(16);
         card.getStyleClass().add("project-comment-card");
+        if (comment.pinned()) card.getStyleClass().add("pinned");
         card.setAlignment(Pos.TOP_LEFT);
         card.getChildren().add(voteWidget(comment.id(), false, comment.score(), comment.userVoteFor(user == null ? null : user.id()), submitting));
 
         VBox body = new VBox(0);
         body.setMinWidth(0);
         HBox.setHgrow(body, Priority.ALWAYS);
-        body.getChildren().add(commentHeader(identity, roleBadge(userId, summary, detail), 40));
+        body.getChildren().add(commentHeader(identity, roleBadge(userId, summary, detail), comment.pinned(), 40));
         Node markdown = markdown(comment.content());
         VBox.setMargin(markdown, new Insets(8, 0, 0, 0));
         body.getChildren().add(markdown);
-        body.getChildren().add(actionsRow(comment, creator, owner));
+        body.getChildren().add(actionsRow(comment, creator, canPin, owner));
 
         if (replyingCommentId != null && replyingCommentId.equals(comment.id())) {
             body.getChildren().add(replyForm(comment.id(), submitting));
@@ -257,7 +262,7 @@ final class NativeCommentSection {
         return card;
     }
 
-    private Node commentHeader(CommentIdentity identity, RoleBadge roleBadge, double avatarSize) {
+    private Node commentHeader(CommentIdentity identity, RoleBadge roleBadge, boolean pinned, double avatarSize) {
         HBox header = new HBox(12);
         header.getStyleClass().add("project-comment-header");
         header.setAlignment(Pos.CENTER_LEFT);
@@ -270,7 +275,14 @@ final class NativeCommentSection {
             name.setCursor(Cursor.HAND);
             name.setOnMouseClicked(event -> openProfile.accept(identity.userId(), identity.username()));
         }
-        meta.getChildren().add(name);
+        HBox nameRow = new HBox(8, name);
+        nameRow.setAlignment(Pos.CENTER_LEFT);
+        if (pinned) {
+            Label badge = new Label("Pinned", LauncherIcons.icon(LauncherIcons.Glyph.PIN, 11));
+            badge.getStyleClass().add("project-comment-pinned-badge");
+            nameRow.getChildren().add(badge);
+        }
+        meta.getChildren().add(nameRow);
         if (roleBadge != null) {
             meta.getChildren().add(roleBadge(roleBadge));
         }
@@ -281,11 +293,15 @@ final class NativeCommentSection {
         return header;
     }
 
-    private Node actionsRow(ProjectComment comment, boolean creator, boolean owner) {
+    private Node actionsRow(ProjectComment comment, boolean creator, boolean canPin, boolean owner) {
         HBox row = new HBox(16);
         row.getStyleClass().add("project-comment-actions");
         row.setAlignment(Pos.CENTER_LEFT);
         VBox.setMargin(row, new Insets(12, 0, 0, 0));
+        if (canPin) {
+            row.getChildren().add(actionButton(comment.pinned() ? "Unpin" : "Pin", LauncherIcons.Glyph.PIN,
+                    () -> actions.setPinned(comment.id(), !comment.pinned())));
+        }
         if (creator && comment.developerReply() == null) {
             row.getChildren().add(actionButton("Reply", LauncherIcons.Glyph.MESSAGE_SQUARE, () -> {
                 replyingCommentId = comment.id();
@@ -377,7 +393,7 @@ final class NativeCommentSection {
         card.getStyleClass().add("project-comment-developer-reply");
         card.setMinWidth(0);
         HBox.setHgrow(card, Priority.ALWAYS);
-        card.getChildren().add(commentHeader(identity, roleBadge(replyUserId, summary, detail), 32));
+        card.getChildren().add(commentHeader(identity, roleBadge(replyUserId, summary, detail), false, 32));
         Node markdown = markdown(reply.content());
         VBox.setMargin(markdown, new Insets(8, 0, 0, 0));
         card.getChildren().add(markdown);
@@ -547,6 +563,10 @@ final class NativeCommentSection {
 
     private static boolean isCreator(CurrentUser user, ProjectSummary summary, ProjectDetail detail) {
         if (user == null) {
+            return false;
+        }
+        if ((summary != null && summary.isCurseForge())
+                || (detail != null && value(detail.id(), "").startsWith("curseforge:"))) {
             return false;
         }
         String userId = value(user.id(), "");

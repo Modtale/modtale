@@ -267,6 +267,11 @@ public final class ProjectPageController {
                     public void report(String commentId) {
                         ProjectPageController.this.reportComment(commentId);
                     }
+
+                    @Override
+                    public void setPinned(String commentId, boolean pinned) {
+                        ProjectPageController.this.setCommentPinned(commentId, pinned);
+                    }
                 },
                 () -> {
                     if (currentProject != null) {
@@ -897,6 +902,17 @@ public final class ProjectPageController {
         );
     }
 
+    private void setCommentPinned(String commentId, boolean pinned) {
+        String projectKey = commentProjectKey();
+        if (isBlank(commentId) || isBlank(projectKey)) return;
+        runCommentMutation(
+                () -> apiClient.setCommentPinned(projectKey, commentId, pinned),
+                pinned ? "Comment pinned." : "Comment unpinned.",
+                "Could not update the pinned comment.",
+                this::fetchCommentsForCurrentProject
+        );
+    }
+
     private void runCommentMutation(Runnable mutation, String successMessage, String errorMessage, Runnable afterSuccess) {
         String projectKey = commentProjectKey();
         if (isBlank(projectKey)) {
@@ -1031,6 +1047,10 @@ public final class ProjectPageController {
     private boolean isCurrentProjectCreator(ProjectSummary summary, ProjectDetail detail) {
         CurrentUser user = currentUserSupplier.get();
         if (user == null) {
+            return false;
+        }
+        if ((summary != null && summary.isCurseForge())
+                || (detail != null && value(detail.id(), "").startsWith("curseforge:"))) {
             return false;
         }
         String userId = value(user.id(), "");

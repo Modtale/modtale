@@ -143,8 +143,22 @@ final class ProjectSocialService {
         projectService.evictProjectCache(project);
     }
 
+    void setCommentPinned(String projectId, String commentId, boolean pinned) {
+        Project project = getProject(projectId);
+        if (project.getComments() == null) {
+            throw new ResourceNotFoundException("Comment not found.");
+        }
+        Comment comment = project.getComments().stream()
+                .filter(candidate -> candidate.getId().equals(commentId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found."));
+        comment.setPinned(pinned);
+        projectRepository.save(project);
+        projectService.evictProjectCache(project);
+    }
+
     private Project getProject(String projectId) {
-        Project project = projectService.getRawProjectById(projectId);
+        Project project = projectService.getRawProjectByRouteKey(projectId);
         if (project == null) {
             throw new ResourceNotFoundException("Project not found.");
         }

@@ -13,6 +13,7 @@ public record ProjectComment(
         String content,
         String date,
         String updatedAt,
+        boolean pinned,
         Integer upvoteCount,
         Integer downvoteCount,
         String userVote,
