@@ -76,6 +76,21 @@ public class SocialController {
         return ResponseEntity.ok().build();
     }
 
+    @PutMapping("/{id}/comments/{commentId}/pin")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'COMMENT_REPLY', authentication)"
+            + " or @apiSecurity.hasAdminPermission('PROJECT_MODERATE', authentication)")
+    public ResponseEntity<Void> setCommentPinned(
+            @PathVariable String id,
+            @PathVariable String commentId,
+            @RequestParam boolean pinned,
+            Authentication authentication
+    ) {
+        rejectApiKey(authentication, "pinning comments");
+        accountService.requireCurrentUser(authentication, "pinning a comment");
+        socialService.setCommentPinned(id, commentId, pinned);
+        return ResponseEntity.ok().build();
+    }
+
     private void rejectApiKey(Authentication authentication, String action) {
         if (accessControlService.isApiKey(authentication)) {
             throw new ApiKeyOperationForbiddenException("API keys cannot be used for " + action + ".");
