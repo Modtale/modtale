@@ -1744,6 +1744,14 @@ public final class ProjectPageController {
         box.setMaxWidth(Double.MAX_VALUE);
         Label number = new Label(value);
         number.getStyleClass().add("project-detail-stat-number");
+        if (value.length() >= 11) {
+            number.getStyleClass().add("long");
+        } else if (value.length() >= 8) {
+            number.getStyleClass().add("condensed");
+        }
+        number.setMinWidth(0);
+        number.setMaxWidth(Double.MAX_VALUE);
+        number.setAlignment(Pos.CENTER);
         HBox caption = new HBox(6, LauncherIcons.icon(glyph, 14), new Label(label.toUpperCase(Locale.ROOT)));
         caption.getStyleClass().add("project-detail-stat-caption");
         caption.setAlignment(Pos.CENTER);
