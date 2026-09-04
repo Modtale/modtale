@@ -115,7 +115,7 @@ The Spring Boot backend relies on environment variables. You can set these in yo
 | `STRIPE_PUBLISHABLE_KEY` | Stripe client key (`pk_test_...`) | `pk_test_...` |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret (`whsec_...`) | `whsec_...` |
 | `STRIPE_MOCK_ENABLED` | Optional Stripe mock mode for local testing | `false` |
-| `STATUS_DISCORD_WEBHOOK_URL` | Optional Discord webhook for status-change alerts | `https://discord.com/api/webhooks/...` |
+| `STATUS_DISCORD_WEBHOOK_URL` | Optional Discord webhook for the continually updated status mirror | `https://discord.com/api/webhooks/...` |
 | `STATUS_CHECKER_ENABLED` | Opt into the legacy embedded backend checker | `false` |
 
 Detached status service variables:

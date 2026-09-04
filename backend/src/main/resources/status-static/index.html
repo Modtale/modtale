@@ -61,53 +61,7 @@
             padding: 28px 0 44px;
         }
 
-        .topbar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-            margin-bottom: 20px;
-        }
-
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            min-width: 0;
-        }
-
-        .brand-mark {
-            width: 38px;
-            height: 38px;
-            border-radius: 8px;
-            background: var(--text);
-            color: var(--bg);
-            display: grid;
-            place-items: center;
-            font-weight: 900;
-        }
-
-        .brand-title {
-            margin: 0;
-            font-size: 18px;
-            line-height: 1.1;
-        }
-
-        .brand-subtitle {
-            margin: 3px 0 0;
-            color: var(--muted);
-            font-size: 13px;
-            font-weight: 650;
-        }
-
-        .actions {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        button,
-        .button {
+        button {
             border: 1px solid var(--line);
             background: var(--panel);
             color: var(--text);
@@ -126,8 +80,7 @@
             gap: 8px;
         }
 
-        button:hover,
-        .button:hover {
+        button:hover {
             border-color: var(--brand);
         }
 
@@ -155,37 +108,6 @@
             padding: 26px;
         }
 
-        .status-line {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex-wrap: wrap;
-            margin-bottom: 18px;
-        }
-
-        .status-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 999px;
-            background: var(--muted);
-            box-shadow: 0 0 0 5px rgba(100, 116, 139, 0.14);
-        }
-
-        .status-dot.operational {
-            background: var(--ok);
-            box-shadow: 0 0 0 5px rgba(5, 150, 105, 0.14);
-        }
-
-        .status-dot.degraded {
-            background: var(--warn);
-            box-shadow: 0 0 0 5px rgba(217, 119, 6, 0.16);
-        }
-
-        .status-dot.outage {
-            background: var(--bad);
-            box-shadow: 0 0 0 5px rgba(220, 38, 38, 0.14);
-        }
-
         .pill {
             border: 1px solid var(--line);
             border-radius: 999px;
@@ -209,27 +131,10 @@
             color: var(--bad);
         }
 
-        h1 {
-            margin: 0;
-            font-size: clamp(32px, 5vw, 58px);
-            line-height: 0.95;
-            letter-spacing: 0;
-        }
-
-        .summary-copy {
-            margin: 16px 0 0;
-            max-width: 680px;
-            color: var(--muted);
-            font-size: 16px;
-            line-height: 1.65;
-            font-weight: 560;
-        }
-
         .metrics {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 10px;
-            margin-top: 24px;
         }
 
         .metric {
@@ -281,15 +186,16 @@
             font-weight: 650;
         }
 
-        .grid {
+        .service-list {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 12px;
-            margin-bottom: 18px;
         }
 
         .service-card {
             padding: 16px;
+            border: 1px solid var(--line);
+            background: var(--panel-soft);
+            border-radius: 8px;
         }
 
         .service-top {
@@ -453,8 +359,7 @@
         }
 
         @media (max-width: 980px) {
-            .overview,
-            .grid {
+            .overview {
                 grid-template-columns: 1fr 1fr;
             }
         }
@@ -465,23 +370,12 @@
                 padding-top: 16px;
             }
 
-            .topbar,
             .section-head {
                 align-items: stretch;
                 flex-direction: column;
             }
 
-            .actions {
-                width: 100%;
-            }
-
-            .actions button,
-            .actions .button {
-                flex: 1;
-            }
-
             .overview,
-            .grid,
             .metrics {
                 grid-template-columns: 1fr;
             }
@@ -494,31 +388,10 @@
 </head>
 <body>
 <main class="shell">
-    <header class="topbar">
-        <div class="brand">
-            <div class="brand-mark">M</div>
-            <div>
-                <p class="brand-title"><strong>Modtale Status</strong></p>
-                <p class="brand-subtitle">Detached monitor</p>
-            </div>
-        </div>
-        <div class="actions">
-            <a class="button" href="https://modtale.net">Main Site</a>
-            <button id="refresh" type="button">Refresh</button>
-        </div>
-    </header>
-
     <div id="error" class="error"></div>
 
     <section class="overview">
         <div class="panel summary-panel">
-            <div class="status-line">
-                <span id="overallDot" class="status-dot"></span>
-                <span id="overallPill" class="pill">Checking</span>
-            </div>
-            <h1 id="headline">Checking systems</h1>
-            <p id="summary" class="summary-copy">Status data is loading.</p>
-
             <div class="metrics">
                 <div class="metric">
                     <div class="metric-label">Availability</div>
@@ -531,10 +404,6 @@
                 <div class="metric">
                     <div class="metric-label">P95 Latency</div>
                     <div id="p95" class="metric-value">--</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">Last Check</div>
-                    <div id="lastCheck" class="metric-value">--</div>
                 </div>
             </div>
         </div>
@@ -551,27 +420,23 @@
         </aside>
     </section>
 
-    <section id="services" class="grid"></section>
-
     <section class="panel section">
         <div class="section-head">
             <div>
                 <h2>Availability History</h2>
-                <div class="small muted">Measured from the detached checker</div>
             </div>
             <div class="range-control" role="group" aria-label="Status history range">
                 <button type="button" data-range="24h" aria-pressed="true">24h</button>
                 <button type="button" data-range="30d" aria-pressed="false">30d</button>
             </div>
         </div>
-        <div id="history"></div>
+        <div id="services" class="service-list"></div>
     </section>
 
     <section class="panel section">
         <div class="section-head">
             <div>
                 <h2>Scheduled Maintenance</h2>
-                <div class="small muted">Planned windows</div>
             </div>
         </div>
         <div id="scheduled" class="incident-list"></div>
@@ -581,14 +446,12 @@
         <div class="section-head">
             <div>
                 <h2>Past Incidents</h2>
-                <div class="small muted">Recently resolved events</div>
             </div>
         </div>
         <div id="past" class="incident-list"></div>
     </section>
 
     <footer class="footer">
-        <span>This page is served by the detached Modtale status service.</span>
         <span id="fetchedAt">Waiting for data</span>
     </footer>
 </main>
@@ -604,21 +467,6 @@
         api: { value: 'api', status: 'apiStatus' },
         database: { value: 'db', status: 'dbStatus' },
         storage: { value: 'storage', status: 'storageStatus' }
-    };
-
-    const copy = {
-        operational: {
-            title: 'All systems operational',
-            summary: 'The main site, API, database, and storage checks are responding normally.'
-        },
-        degraded: {
-            title: 'Partial system degradation',
-            summary: 'At least one monitored service is slow or unavailable while this status service remains online.'
-        },
-        outage: {
-            title: 'Major system outage',
-            summary: 'All monitored Modtale services are failing their checks. This status service is isolated and still reachable.'
-        }
     };
 
     const $ = (id) => document.getElementById(id);
@@ -706,14 +554,6 @@
     };
 
     const renderSummary = (data) => {
-        const status = normalize(data.overall);
-        $('overallDot').className = `status-dot ${status}`;
-        $('overallPill').className = `pill ${status}`;
-        $('overallPill').textContent = label(status);
-        $('headline').textContent = data.stale ? 'Monitoring data delayed' : copy[status].title;
-        $('summary').textContent = data.stale
-            ? 'The latest collection is stale, so current service health cannot be confirmed.'
-            : copy[status].summary;
         $('availability').textContent = formatPercent(availability(data));
         const observed = Number(data.observedSamples || 0);
         const expected = Number(data.expectedSamples || 0);
@@ -726,8 +566,6 @@
         );
         $('p95').textContent = formatLatency(percentile(latencyValues, 0.95));
 
-        const lastCheck = data.timestamp ? new Date(data.timestamp) : new Date();
-        $('lastCheck').textContent = formatDateTime(lastCheck);
         $('fetchedAt').textContent = `Fetched ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     };
 
@@ -742,7 +580,7 @@
                 .join('');
 
             return `
-                <article class="panel service-card">
+                <article class="service-card">
                     <div class="service-top">
                         <div>
                             <h2 class="service-name">${escapeHtml(service.name)}</h2>
@@ -752,24 +590,6 @@
                     </div>
                     <div class="heatmap">${heat}</div>
                 </article>
-            `;
-        }).join('');
-    };
-
-    const renderHistory = (data) => {
-        const history = data.history || [];
-        $('history').innerHTML = (data.services || []).map((service) => {
-            const heat = bucketsFor(history, service.id)
-                .map((bucket, index) => `<span class="heat ${bucket === 'none' ? '' : bucket}" title="${bucket}" aria-label="${bucket || 'no data'} ${index + 1}"></span>`)
-                .join('');
-            return `
-                <div style="margin-bottom: 16px">
-                    <div class="service-top" style="margin-bottom: 8px">
-                        <h2 class="service-name">${escapeHtml(service.name)}</h2>
-                        <span class="small muted">${currentRange}</span>
-                    </div>
-                    <div class="heatmap">${heat}</div>
-                </div>
             `;
         }).join('');
     };
@@ -803,7 +623,6 @@
         lastData = data;
         renderSummary(data);
         renderServices(data);
-        renderHistory(data);
         $('activeCount').textContent = String((data.activeIncidents || []).length);
         renderIncidents('activeIncidents', data.activeIncidents || [], 'No active incidents.', 4);
         renderIncidents('scheduled', data.scheduledMaintenances || [], 'No scheduled maintenance.', 10);
@@ -811,7 +630,6 @@
     };
 
     const fetchStatus = async () => {
-        $('refresh').disabled = true;
         try {
             const response = await fetch(`${apiPath}?range=${currentRange}&t=${Date.now()}`, {
                 headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
@@ -822,7 +640,7 @@
             $('error').style.display = 'none';
             renderAll(data);
         } catch (error) {
-            $('error').textContent = 'The detached status API could not be reached from this browser.';
+            $('error').textContent = 'Status data could not be reached from this browser.';
             $('error').style.display = 'block';
             if (!lastData) {
                 renderAll({
@@ -836,8 +654,6 @@
                 });
             }
             console.error(error);
-        } finally {
-            $('refresh').disabled = false;
         }
     };
 
@@ -858,7 +674,6 @@
         });
     });
 
-    $('refresh').addEventListener('click', fetchStatus);
     fetchStatus();
     window.setInterval(fetchStatus, 60000);
 })();
