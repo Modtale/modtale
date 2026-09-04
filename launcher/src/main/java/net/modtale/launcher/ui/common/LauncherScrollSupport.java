@@ -29,6 +29,7 @@ import net.modtale.launcher.ui.browse.card.ProjectCardFactory;
 public final class LauncherScrollSupport {
 
     private static final String INSTALLED_PROPERTY = LauncherScrollSupport.class.getName() + ".installed";
+    private static final String SCROLLBAR_DISCOVERY_PROPERTY = LauncherScrollSupport.class.getName() + ".scrollbarDiscovery";
     private static final PseudoClass SCROLLING = PseudoClass.getPseudoClass("scrolling");
     private static final Duration INTERACTION_IDLE_DELAY = Duration.millis(220);
     private static final Duration SCROLLBAR_IDLE_DELAY = Duration.millis(750);
@@ -74,12 +75,21 @@ public final class LauncherScrollSupport {
     }
 
     public void configure(ScrollPane scrollPane, boolean horizontal) {
+        configureScrollbarDiscovery(scrollPane);
         Node root = rootSupplier.get();
         if (root != null) {
             install(root);
         } else if (installedRoots.isEmpty()) {
             configureNode(scrollPane);
         }
+    }
+
+    private void configureScrollbarDiscovery(ScrollPane scrollPane) {
+        if (Boolean.TRUE.equals(scrollPane.getProperties().get(SCROLLBAR_DISCOVERY_PROPERTY))) return;
+        scrollPane.getProperties().put(SCROLLBAR_DISCOVERY_PROPERTY, Boolean.TRUE);
+        scrollPane.skinProperty().addListener((observable, previous, current) ->
+                Platform.runLater(() -> configureScrollbars(scrollPane)));
+        Platform.runLater(() -> configureScrollbars(scrollPane));
     }
 
     public void install(Node root) {
