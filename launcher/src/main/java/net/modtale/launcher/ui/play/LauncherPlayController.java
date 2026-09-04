@@ -103,6 +103,7 @@ public final class LauncherPlayController {
     private static final int CATALOG_SHELF_LIMIT = 6;
     private static final double CATALOG_CARD_WIDTH = 336;
     private static final double CATALOG_GRID_GAP = 18;
+    private static final double CATALOG_EDGE_FADE_WIDTH = 52;
     private static final double CATALOG_GRID_CARD_BODY_HEIGHT = 178;
     private static final double CATALOG_CARD_HEIGHT = Math.round(CATALOG_CARD_WIDTH / 3.0) + CATALOG_GRID_CARD_BODY_HEIGHT;
     private static final double CATALOG_SCROLL_HEIGHT = CATALOG_CARD_HEIGHT + 18;
@@ -492,7 +493,7 @@ public final class LauncherPlayController {
         root.setPrefHeight(720);
         root.setMaxHeight(Double.MAX_VALUE);
 
-        HBox shell = new HBox(34);
+        HBox shell = new HBox(18);
         shell.getStyleClass().add("play-shell");
         shell.setAlignment(Pos.CENTER_LEFT);
         shell.setFillHeight(true);
@@ -611,9 +612,36 @@ public final class LauncherPlayController {
         shelf.message.setAlignment(Pos.CENTER);
         shelf.message.setMaxWidth(Double.MAX_VALUE);
 
-        body.getChildren().addAll(shelf.scroll, shelf.message);
+        Region edgeFade = new Region();
+        edgeFade.getStyleClass().add("play-catalog-edge-fade");
+        edgeFade.setMouseTransparent(true);
+        edgeFade.setManaged(false);
+        edgeFade.setMinWidth(CATALOG_EDGE_FADE_WIDTH);
+        edgeFade.setPrefWidth(CATALOG_EDGE_FADE_WIDTH);
+        edgeFade.setMaxWidth(CATALOG_EDGE_FADE_WIDTH);
+        edgeFade.setMinHeight(CATALOG_CARD_HEIGHT + 8);
+        edgeFade.setPrefHeight(CATALOG_CARD_HEIGHT + 8);
+        edgeFade.setMaxHeight(CATALOG_CARD_HEIGHT + 8);
+        edgeFade.opacityProperty().bind(Bindings.createDoubleBinding(
+                () -> catalogEdgeFadeOpacity(shelf.scroll.getHvalue(), shelf.scroll.getHmin(), shelf.scroll.getHmax()),
+                shelf.scroll.hvalueProperty(),
+                shelf.scroll.hminProperty(),
+                shelf.scroll.hmaxProperty()
+        ));
+        StackPane.setAlignment(edgeFade, Pos.TOP_RIGHT);
+
+        body.getChildren().addAll(shelf.scroll, shelf.message, edgeFade);
         showCatalogMessage(shelf, "Loading projects...");
         return body;
+    }
+
+    static double catalogEdgeFadeOpacity(double value, double min, double max) {
+        double range = max - min;
+        if (range <= 0) {
+            return 0;
+        }
+        double fadeRange = Math.max(range * 0.08, 0.02);
+        return Math.clamp((max - value) / fadeRange, 0, 1);
     }
 
     private void bindNewReleasesVisibility(StackPane root, Region dock) {
