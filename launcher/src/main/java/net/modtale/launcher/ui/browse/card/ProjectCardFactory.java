@@ -366,12 +366,12 @@ public final class ProjectCardFactory {
         row.getStyleClass().add("byline-row");
         row.setAlignment(Pos.CENTER_LEFT);
         Label by = text(prefix, textStyleClass);
-        Button author = new Button(value(project.author(), "Unknown"));
+        Label author = new Label(value(project.author(), "Unknown"));
         author.getStyleClass().addAll("author-link", textStyleClass);
         author.setAlignment(Pos.CENTER_LEFT);
         author.setTextOverrun(OverrunStyle.ELLIPSIS);
         author.setMinWidth(0);
-        author.setOnAction(event -> {
+        author.setOnMouseClicked(event -> {
             event.consume();
             onOpenCreator.accept(project);
         });
