@@ -83,6 +83,13 @@ public class User implements Serializable {
     private String gitlabRefreshToken;
     private LocalDateTime gitlabTokenExpiresAt;
 
+    private String stripeConnectAccountId;
+    private boolean stripeOnboardingComplete = false;
+    private boolean stripePayoutsEnabled = false;
+    private String stripeAccountCountry;
+    private OrgPayoutMode orgPayoutMode = OrgPayoutMode.DIRECT_TO_ORG_STRIPE;
+    private List<OrgPayoutShare> orgPayoutShares = new ArrayList<>();
+
     public User() {
         this.id = UUID.randomUUID().toString();
         this.tier = ApiKey.Tier.USER;
@@ -106,6 +113,11 @@ public class User implements Serializable {
 
     public enum AccountType {
         USER, ORGANIZATION
+    }
+
+    public enum OrgPayoutMode {
+        DIRECT_TO_ORG_STRIPE,
+        DISTRIBUTE_TO_MEMBERS
     }
 
     public static class OrganizationRole implements Serializable {
@@ -205,6 +217,24 @@ public class User implements Serializable {
         public void setProfileUrl(String profileUrl) { this.profileUrl = profileUrl; }
         public boolean isVisible() { return visible; }
         public void setVisible(boolean visible) { this.visible = visible; }
+    }
+
+    public static class OrgPayoutShare implements Serializable {
+        private static final long serialVersionUID = 1L;
+        private String userId;
+        private int percent;
+
+        public OrgPayoutShare() {}
+
+        public OrgPayoutShare(String userId, int percent) {
+            this.userId = userId;
+            this.percent = percent;
+        }
+
+        public String getUserId() { return userId; }
+        public void setUserId(String userId) { this.userId = userId; }
+        public int getPercent() { return percent; }
+        public void setPercent(int percent) { this.percent = percent; }
     }
 
     public static class ProfileBadge implements Serializable {
@@ -335,4 +365,20 @@ public class User implements Serializable {
 
     public LocalDateTime getGitlabTokenExpiresAt() { return gitlabTokenExpiresAt; }
     public void setGitlabTokenExpiresAt(LocalDateTime gitlabTokenExpiresAt) { this.gitlabTokenExpiresAt = gitlabTokenExpiresAt; }
+    public String getStripeConnectAccountId() { return stripeConnectAccountId; }
+    public void setStripeConnectAccountId(String stripeConnectAccountId) { this.stripeConnectAccountId = stripeConnectAccountId; }
+
+    public boolean isStripeOnboardingComplete() { return stripeOnboardingComplete; }
+    public void setStripeOnboardingComplete(boolean stripeOnboardingComplete) { this.stripeOnboardingComplete = stripeOnboardingComplete; }
+
+    public boolean isStripePayoutsEnabled() { return stripePayoutsEnabled; }
+    public void setStripePayoutsEnabled(boolean stripePayoutsEnabled) { this.stripePayoutsEnabled = stripePayoutsEnabled; }
+
+    public String getStripeAccountCountry() { return stripeAccountCountry; }
+    public void setStripeAccountCountry(String stripeAccountCountry) { this.stripeAccountCountry = stripeAccountCountry; }
+
+    public OrgPayoutMode getOrgPayoutMode() { return orgPayoutMode == null ? OrgPayoutMode.DIRECT_TO_ORG_STRIPE : orgPayoutMode; }
+    public void setOrgPayoutMode(OrgPayoutMode orgPayoutMode) { this.orgPayoutMode = orgPayoutMode; }
+    public List<OrgPayoutShare> getOrgPayoutShares() { return orgPayoutShares; }
+    public void setOrgPayoutShares(List<OrgPayoutShare> orgPayoutShares) { this.orgPayoutShares = orgPayoutShares; }
 }

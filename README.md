@@ -111,6 +111,10 @@ The Spring Boot backend relies on environment variables. You can set these in yo
 | `R2_SECRET_KEY` | Storage Secret Key | `your_dev_secret_key` |
 | `R2_ENDPOINT` | Storage Endpoint URL | `https://<accountid>.r2.cloudflarestorage.com` |
 | `WARDEN_ENABLED` | **Must be false locally** | `false` |
+| `STRIPE_SECRET_KEY` | Stripe server-side API key (`sk_test_...`) | `sk_test_...` |
+| `STRIPE_PUBLISHABLE_KEY` | Stripe client key (`pk_test_...`) | `pk_test_...` |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret (`whsec_...`) | `whsec_...` |
+| `STRIPE_MOCK_ENABLED` | Optional Stripe mock mode for local testing | `false` |
 | `STATUS_DISCORD_WEBHOOK_URL` | Optional Discord webhook for the continually updated status mirror | `https://discord.com/api/webhooks/...` |
 | `STATUS_CHECKER_ENABLED` | Opt into the legacy embedded backend checker | `false` |
 
@@ -137,6 +141,28 @@ To test social logins, provide each provider's client ID and secret (for example
 `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`). Hytale uses the registered Modtale
 client ID by default and requires `HYTALE_CLIENT_SECRET`; its production callback
 is `https://api.modtale.net/login/oauth2/code/hytale`.
+
+### Stripe Integration Setup (Step-by-Step)
+
+1. Create a Stripe account and switch to **Test mode** in the Stripe dashboard.
+2. Create/get API keys:
+   - `STRIPE_SECRET_KEY` from **Developers -> API keys** (`sk_test_...`)
+   - `STRIPE_PUBLISHABLE_KEY` from the same screen (`pk_test_...`)
+3. Configure backend env vars before starting Spring Boot:
+   - `STRIPE_SECRET_KEY=...`
+   - `STRIPE_PUBLISHABLE_KEY=...`
+   - `STRIPE_MOCK_ENABLED=false`
+4. Start backend (`./gradlew bootRun`) and frontend (`npm run dev`).
+5. In Stripe dashboard, ensure your account can use Checkout + Connect in test mode.
+6. Ensure `STRIPE_MOCK_ENABLED=false` in backend configuration for real integration testing.
+7. Connect a creator Stripe account from the in-app Finance Manager (`Connect / Continue Stripe`) and then click `Refresh Stripe Status`.
+8. Test one-time donations:
+   - Open a project with donations enabled.
+   - Start donation checkout and complete payment with Stripe test cards.
+   - Return to project page; donation is only counted after Stripe confirms paid/completed.
+9. Optional local-only testing without real Stripe API:
+   - Set `STRIPE_MOCK_ENABLED=true` in backend configuration.
+   - Mock mode now simulates checkout links/status only and does **not** auto-mark donations as paid.
 
 ### 3. Run the Backend
 

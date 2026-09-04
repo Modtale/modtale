@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText, CalendarClock } from 'lucide-react';
+import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText, Wallet, CalendarClock } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { extractApiErrorMessage } from '@/utils/api';
@@ -10,6 +10,7 @@ import { ReportQueue } from '../components/ReportQueue';
 import { ProjectManagement } from '../components/ProjectManagement';
 import { PlatformAnalytics } from '../components/PlatformAnalytics';
 import { AuditLogs } from '../components/AuditLogs';
+import { FinanceAdmin } from '../components/FinanceAdmin';
 import { StatusIncidents } from '../components/StatusIncidents';
 import { AdminPermission, hasAdminPermission, hasAnyAdminPermission, isAdminUser } from '../utils/access';
 import type { AdminVerificationQueueItem } from '@/types';
@@ -18,7 +19,7 @@ interface AdminPanelProps {
     currentUser: any;
 }
 
-type AdminTab = 'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'logs' | 'status';
+type AdminTab = 'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'finance' | 'logs' | 'status';
 
 export function AdminPanel({ currentUser }: AdminPanelProps) {
     const [activeTab, setActiveTab] = useState<AdminTab>('verification');
@@ -37,6 +38,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     const [reportsError, setReportsError] = useState<string | null>(null);
 
     const isAdmin = isAdminUser(currentUser);
+    const canManageFinance = hasAdminPermission(currentUser, AdminPermission.PLATFORM_FINANCE_MANAGE);
     const canReadReviewQueue = hasAdminPermission(currentUser, AdminPermission.PROJECT_REVIEW_READ);
     const canDecideReviews = hasAdminPermission(currentUser, AdminPermission.PROJECT_REVIEW_DECIDE);
     const canRescanVersions = hasAdminPermission(currentUser, AdminPermission.PROJECT_VERSION_RESCAN);
@@ -70,6 +72,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         reports: canReadReports,
         status: canReadStatus,
         analytics: canReadAnalytics,
+        finance: canManageFinance,
         projects: canUseProjectManagement,
         users: canUseUserManagement,
         logs: canReadLogs
@@ -80,7 +83,8 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         canReadReviewQueue,
         canReadStatus,
         canUseProjectManagement,
-        canUseUserManagement
+        canUseUserManagement,
+        canManageFinance
     ]);
     const firstAllowedTab = (Object.keys(tabAccess) as AdminTab[]).find(tab => tabAccess[tab]);
 
@@ -261,6 +265,13 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                         label="Platform Analytics"
                                     />
                                 )}
+                                {canManageFinance && (
+                                    <SidebarButton
+                                        tab="finance"
+                                        icon={Wallet}
+                                        label="Platform Finance"
+                                    />
+                                )}
                                 {canUseProjectManagement && (
                                     <SidebarButton
                                         tab="projects"
@@ -331,6 +342,12 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                             {activeTab === 'analytics' && canReadAnalytics && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <PlatformAnalytics />
+                                </div>
+                            )}
+
+                            {activeTab === 'finance' && canManageFinance && (
+                                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <FinanceAdmin canManageFinance={canManageFinance} />
                                 </div>
                             )}
 
