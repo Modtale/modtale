@@ -497,7 +497,8 @@ jobs:
             ARGS+=("--update-secrets" "WIKI_API_KEY=WIKI_API_KEY:latest")
             ARGS+=("--update-secrets" "DISCORD_WEBHOOK_URL=DISCORD_WEBHOOK_URL:latest")
             ARGS+=("--update-secrets" "ADMIN_DISCORD_WEBHOOK_URL=ADMIN_DISCORD_WEBHOOK_URL:latest")
-            ARGS+=("--update-secrets" "STATUS_DISCORD_WEBHOOK_URL=STATUS_DISCORD_WEBHOOK_URL:latest")
+            # Only the detached status service owns the persistent #status message.
+            ARGS+=("--remove-secrets" "STATUS_DISCORD_WEBHOOK_URL")
           elif [ "${{ env.ENV_TYPE }}" = "dev" ]; then
             ARGS+=("--cpu" "1")
             ARGS+=("--min-instances" "0")
@@ -521,7 +522,7 @@ jobs:
             ARGS+=("--update-secrets" "BLUESKY_CLIENT_ID=BLUESKY_CLIENT_ID:latest")
             ARGS+=("--update-secrets" "WARDEN_API_KEY=${{ env.WARDEN_SECRET_NAME }}:latest")
             ARGS+=("--update-secrets" "WIKI_API_KEY=WIKI_API_KEY:latest")
-            ARGS+=("--remove-env-vars" "STATUS_DISCORD_WEBHOOK_URL")
+            ARGS+=("--remove-secrets" "STATUS_DISCORD_WEBHOOK_URL")
           else
             : "${RUNTIME_SERVICE_ACCOUNT:?Set environment variable GCP_BRANCH_PREVIEW_RUNTIME_SERVICE_ACCOUNT in the branch-preview GitHub environment.}"
             # Preview services are usually idle. Request-based CPU billing avoids
@@ -541,7 +542,8 @@ jobs:
             ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_ACCESS_KEY=${{ env.SEEDING_SOURCE_R2_ACCESS_KEY_SECRET_NAME }}:latest")
             ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_SECRET_KEY=${{ env.SEEDING_SOURCE_R2_SECRET_KEY_SECRET_NAME }}:latest")
             ARGS+=("--update-secrets" "APP_SEEDING_SOURCE_R2_ENDPOINT=${{ env.SEEDING_SOURCE_R2_ENDPOINT_SECRET_NAME }}:latest")
-            ARGS+=("--remove-env-vars" "SMTP_HOST,SMTP_PORT,SMTP_USERNAME,SMTP_PASSWORD,PRE_AUTH_SECRET,GITHUB_CLIENT_ID,GITHUB_CLIENT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GITLAB_CLIENT_ID,GITLAB_CLIENT_SECRET,DISCORD_CLIENT_ID,DISCORD_CLIENT_SECRET,TWITTER_CLIENT_ID,TWITTER_CLIENT_SECRET,BLUESKY_CLIENT_ID,BLUESKY_CLIENT_SECRET,WARDEN_URL,WARDEN_API_KEY,WIKI_API_KEY,WEBHOOK_URL,HYTALEMODDING_KEY,DISCORD_WEBHOOK_URL,ADMIN_DISCORD_WEBHOOK_URL,STATUS_DISCORD_WEBHOOK_URL")
+            ARGS+=("--remove-env-vars" "SMTP_HOST,SMTP_PORT,SMTP_USERNAME,SMTP_PASSWORD,PRE_AUTH_SECRET,GITHUB_CLIENT_ID,GITHUB_CLIENT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GITLAB_CLIENT_ID,GITLAB_CLIENT_SECRET,DISCORD_CLIENT_ID,DISCORD_CLIENT_SECRET,TWITTER_CLIENT_ID,TWITTER_CLIENT_SECRET,BLUESKY_CLIENT_ID,BLUESKY_CLIENT_SECRET,WARDEN_URL,WARDEN_API_KEY,WIKI_API_KEY,WEBHOOK_URL,HYTALEMODDING_KEY,DISCORD_WEBHOOK_URL,ADMIN_DISCORD_WEBHOOK_URL")
+            ARGS+=("--remove-secrets" "STATUS_DISCORD_WEBHOOK_URL")
           fi
 
           gcloud run deploy ${{ env.BACKEND_SERVICE }} "${ARGS[@]}" --format="value(status.url)" > backend_url.txt
