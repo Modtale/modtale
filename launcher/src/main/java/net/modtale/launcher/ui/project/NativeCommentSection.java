@@ -627,7 +627,7 @@ final class NativeCommentSection {
             Map<String, UserSummary> profiles,
             String date
     ) {
-        String id = first(userId, author == null ? null : author.id());
+        String id = identityId(userId, author);
         UserSummary profile = id.isBlank() ? null : profiles.get(id);
         String resolvedName = first(
                 profile == null ? null : profile.username(),
@@ -637,6 +637,10 @@ final class NativeCommentSection {
         );
         String resolvedAvatar = first(profile == null ? null : profile.avatarUrl(), author == null ? null : author.avatarUrl(), "");
         return new CommentIdentity(id, resolvedName, resolvedAvatar, date);
+    }
+
+    static String identityId(String userId, ProjectComment.Author author) {
+        return first(userId, author == null ? null : author.id());
     }
 
     private static boolean isCreator(CurrentUser user, ProjectSummary summary, ProjectDetail detail) {
