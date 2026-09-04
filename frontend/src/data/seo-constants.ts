@@ -34,6 +34,7 @@ export const BROWSE_ROUTE_PATHS = new Set([
     '/worlds',
     '/art',
     '/data',
+    '/jams',
 ]);
 
 export const UTILITY_NOINDEX_EXACT_PATHS = new Set([
@@ -151,6 +152,53 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
             {
                 question: 'Where are incident updates posted?',
                 answer: 'The status page shows live health, which is also mirrored in one continuously updated message in the Modtale Discord server.',
+            },
+        ],
+    },
+    '/jams': {
+        title: 'Hytale Mod Jams and Creator Events | Modtale',
+        h1: 'Hytale Mod Jams',
+        description: 'Discover active and upcoming Hytale mod jams, creator challenges, community events, entries, judging, and results on Modtale.',
+        keywords: 'hytale mod jams, hytale game jam, hytale creator events, modtale jams, hytale modding competition',
+        intro: 'Join Hytale creator challenges, follow active competitions, and discover community-built entries from Modtale-hosted mod jams.',
+        contentBlocks: [
+            {
+                title: 'Build Together in Hytale Mod Jams',
+                body: 'Modtale jams give creators a focused theme, timeline, rules, and submission flow for building and sharing Hytale projects with the community.',
+            },
+            {
+                title: 'Follow Entries, Voting, and Results',
+                body: 'Each jam keeps its participating projects, judging criteria, voting period, and final winners together in one public event page.',
+            },
+            {
+                title: 'Host Community Creator Events',
+                body: 'Jam hosts can configure event milestones, invite judges, publish rules, and showcase completed entries without assembling separate tools.',
+            },
+        ],
+        relatedLinks: [
+            {
+                href: '/mods',
+                label: 'Browse Hytale Mods',
+                description: 'Discover projects created across the Modtale community.',
+            },
+            {
+                href: '/upload',
+                label: 'Publish a Project',
+                description: 'Create a Modtale project that can be submitted to eligible jams.',
+            },
+        ],
+        faq: [
+            {
+                question: 'What is a Hytale mod jam?',
+                answer: 'A Hytale mod jam is a timed creator event where participants build projects around shared rules or a theme, then submit entries for judging or community voting.',
+            },
+            {
+                question: 'Can I host a mod jam on Modtale?',
+                answer: 'Signed-in Modtale users can create a jam, configure its timeline and rules, invite judges, and manage submissions and results.',
+            },
+            {
+                question: 'Where can I see completed jam entries?',
+                answer: 'Completed jam pages retain their submitted projects, scores when published, award titles, and winners for later discovery.',
             },
         ],
     },

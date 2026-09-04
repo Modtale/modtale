@@ -18,6 +18,9 @@ export class SiteRoutes {
         return redirectTo;
     }
 
+    static jams() { return '/jams'; }
+    static jam(slug: string) { return `/jam/${slug}`; }
+
     static browse(classification?: string) {
         if (classification === 'PLUGIN') return '/plugins';
         if (classification === 'MODPACK') return '/modpacks';

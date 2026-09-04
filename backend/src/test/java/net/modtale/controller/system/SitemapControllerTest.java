@@ -8,6 +8,7 @@ import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
+import net.modtale.service.ModjamService;
 import net.modtale.service.project.query.ProjectCacheService;
 import net.modtale.service.project.query.ProjectRouteService;
 import net.modtale.service.project.query.ProjectService;
@@ -24,6 +25,7 @@ class SitemapControllerTest {
 
     private ProjectRepository projectRepository;
     private UserRepository userRepository;
+    private ModjamService modjamService;
     private ProjectService projectService;
     private SitemapController controller;
 
@@ -31,6 +33,7 @@ class SitemapControllerTest {
     void setUp() {
         projectRepository = mock(ProjectRepository.class);
         userRepository = mock(UserRepository.class);
+        modjamService = mock(ModjamService.class);
         projectService = new ProjectService(
                 mock(ProjectViewService.class),
                 mock(ProjectCacheService.class),
@@ -40,9 +43,11 @@ class SitemapControllerTest {
                 projectRepository,
                 userRepository,
                 projectService,
+                modjamService,
                 new AppFrontendProperties("https://modtale.test")
         );
         controller = new SitemapController(sitemapService);
+        when(modjamService.getAllJams()).thenReturn(List.of());
     }
 
     @Test

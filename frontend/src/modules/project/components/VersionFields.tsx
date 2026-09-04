@@ -379,6 +379,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                         onChange={(deps) => onChange({ ...data, projectIds: deps })}
                         targetGameVersion={data.gameVersions?.[0]}
                         label="Add Projects"
+                        previousDependencies={previousDependencies}
                         isModpack={true}
                         disabled={disabled}
                     />
