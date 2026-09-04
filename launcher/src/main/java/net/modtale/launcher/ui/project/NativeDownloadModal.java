@@ -693,7 +693,7 @@ final class NativeDownloadModal {
                 .filter(version -> version != null && !version.isBlank())
                 .sorted(GameVersionOrdering::compare)
                 .forEach(ordered::add);
-        return List.copyOf(ordered);
+        return GameVersionOrdering.descendingDistinct(List.copyOf(ordered));
     }
 
     private Set<String> preReleaseGameVersionSet() {

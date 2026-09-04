@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import net.modtale.launcher.model.project.GameVersionCatalog;
+import net.modtale.launcher.ui.common.GameVersionOrdering;
 
 public final class GameVersionFilterCatalog {
 
@@ -61,7 +62,7 @@ public final class GameVersionFilterCatalog {
         List<String> visible = new ArrayList<>(preReleases.size() + releases.size());
         visible.addAll(preReleases);
         visible.addAll(releases);
-        return visible;
+        return GameVersionOrdering.descendingDistinct(visible);
     }
 
     private static List<String> orderedVersions(GameVersionCatalog catalog) {
@@ -96,9 +97,6 @@ public final class GameVersionFilterCatalog {
         if (versions == null || versions.isEmpty()) {
             return List.of();
         }
-        return versions.stream()
-                .filter(version -> version != null && !version.isBlank())
-                .distinct()
-                .toList();
+        return GameVersionOrdering.descendingDistinct(versions);
     }
 }

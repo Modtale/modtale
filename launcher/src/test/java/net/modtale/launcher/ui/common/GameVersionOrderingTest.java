@@ -22,4 +22,16 @@ class GameVersionOrderingTest {
                 "1.2.0", "preview-z", "2026.10.2-bbbb", "1.2.0-rc.2", "1.2.0"
         )));
     }
+
+    @Test
+    void treatsCurseForgeEarlyAccessAsOlderThanEveryNumberedOrNamedVersion() {
+        assertEquals(List.of(
+                "0.6.0",
+                "0.5.0",
+                "preview",
+                "Early Access"
+        ), GameVersionOrdering.descendingDistinct(List.of(
+                "Early Access", "0.5.0", "preview", "0.6.0", " early access "
+        )));
+    }
 }

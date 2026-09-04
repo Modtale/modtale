@@ -1797,7 +1797,7 @@ public final class ProjectPageController {
             }
         }
         GameVersionOrdering.descendingDistinct(List.copyOf(supported)).forEach(ordered::add);
-        return List.copyOf(ordered);
+        return GameVersionOrdering.descendingDistinct(List.copyOf(ordered));
     }
 
     private Node tagsSection(ProjectDetail detail) {

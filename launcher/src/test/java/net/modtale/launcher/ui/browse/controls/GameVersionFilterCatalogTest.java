@@ -38,4 +38,11 @@ class GameVersionFilterCatalogTest {
         assertEquals(List.of("2.0.0", "1.0.0"),
                 GameVersionFilterCatalog.from(catalog).visibleVersions(false));
     }
+
+    @Test
+    void keepsCurseForgeEarlyAccessAtTheBottom() {
+        assertEquals(List.of("0.6.0", "0.5.0", "Early Access"),
+                GameVersionFilterCatalog.fromVersions(List.of("Early Access", "0.5.0", "0.6.0"))
+                        .visibleVersions(false));
+    }
 }
