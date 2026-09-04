@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { MessageSquare, Send, Edit, Trash, Flag, CornerDownRight, ArrowBigUp, ArrowBigDown } from 'lucide-react';
+import { MessageSquare, Send, Edit, Trash, Flag, CornerDownRight, ArrowBigUp, ArrowBigDown, Pin } from 'lucide-react';
 import { projectClient } from '../api/projectClient';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
@@ -11,6 +11,7 @@ import { BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
 import type { Comment, User, Project } from '@/types';
 import { getCommentRoleBadge } from '../utils/commentRoles';
+import { AdminPermission } from '@/modules/admin/utils/access';
 
 interface VoteWidgetProps {
     score: number;
@@ -182,6 +183,19 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
         }
     };
 
+    const setPinned = async (comment: Comment) => {
+        setSubmitting(true);
+        try {
+            await projectClient.setCommentPinned(projectId, comment.id, !comment.pinned);
+            await refreshComments();
+            onSuccess(comment.pinned ? 'Comment unpinned.' : 'Comment pinned.');
+        } catch (err: unknown) {
+            onError(extractApiErrorMessage(err, 'We could not update the pinned comment.'));
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     const submitReply = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!replyingCommentId) return;
@@ -202,6 +216,7 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
     if (commentsDisabled && !isCreator) return null;
 
     const currentUserAvatar = resolveAvatar(currentUser?.avatarUrl);
+    const canPin = isCreator || Boolean(currentUser?.adminPermissions?.includes(AdminPermission.PROJECT_MODERATE));
 
     return (
         <div ref={innerRef} id="comments" className="mt-12 pt-10 scroll-mt-24 border-t border-slate-200 dark:border-white/5">
@@ -278,7 +293,7 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
                     const isCommentOwner = currentUser && (currentUser.id === authorId || currentUser.username === authorUsername);
 
                     return (
-                        <div key={comment.id} className="p-4 sm:p-5 bg-slate-50 dark:bg-white/[0.02] rounded-xl border border-slate-200 dark:border-white/5 shadow-sm group relative flex gap-3 sm:gap-4">
+                        <div key={comment.id} className={`p-4 sm:p-5 rounded-xl border shadow-sm group relative flex gap-3 sm:gap-4 ${comment.pinned ? 'bg-blue-50/70 dark:bg-blue-500/[0.05] border-blue-300/60 dark:border-blue-400/30' : 'bg-slate-50 dark:bg-white/[0.02] border-slate-200 dark:border-white/5'}`}>
                             <VoteWidget score={score} userVote={userVote} onVote={(up) => handleVote(comment.id, false, up)} />
 
                             <div className="flex-1 min-w-0">
@@ -301,9 +316,12 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
                                         </div>
                                     </div>}
                                     <div className="flex flex-col">
-                                        {profileLink ? <Link to={profileLink} className="font-bold text-sm sm:text-base text-slate-900 dark:text-white hover:text-modtale-accent transition-colors">
-                                            {authorUsername}
-                                        </Link> : <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">{authorUsername}</span>}
+                                        <div className="flex items-center gap-2">
+                                            {profileLink ? <Link to={profileLink} className="font-bold text-sm sm:text-base text-slate-900 dark:text-white hover:text-modtale-accent transition-colors">
+                                                {authorUsername}
+                                            </Link> : <span className="font-bold text-sm sm:text-base text-slate-900 dark:text-white">{authorUsername}</span>}
+                                            {comment.pinned && <span className="inline-flex items-center gap-1 rounded-full border border-blue-400/30 bg-blue-500/10 px-2 py-0.5 text-[10px] font-extrabold text-blue-500 dark:text-blue-300"><Pin className="h-3 w-3" aria-hidden="true"/> Pinned</span>}
+                                        </div>
                                         {authorRoleBadge && (
                                             <span
                                                 className="w-fit text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-widest border"
@@ -327,6 +345,11 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
                                 </div>
 
                                 <div className="mt-3 flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
+                                    {canPin && (
+                                        <button aria-label={comment.pinned ? 'Unpin comment' : 'Pin comment'} type="button" onClick={() => setPinned(comment)} disabled={submitting} className="text-xs font-bold text-slate-500 hover:text-modtale-accent flex items-center gap-1.5 transition-colors disabled:opacity-50">
+                                            <Pin className="w-4 h-4" aria-hidden="true"/> {comment.pinned ? 'Unpin' : 'Pin'}
+                                        </button>
+                                    )}
                                     {isCreator && !comment.developerReply && (
                                         <button aria-label="Reply to comment" type="button" onClick={() => { setReplyingCommentId(comment.id); setReplyText(''); }} className="text-xs font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white flex items-center gap-1.5 transition-colors">
                                             <MessageSquare className="w-4 h-4" aria-hidden="true"/> Reply

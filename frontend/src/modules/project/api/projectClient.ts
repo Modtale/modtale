@@ -88,6 +88,9 @@ export const projectClient = {
     deleteComment: async (projectId: string, commentId: string) => {
         await api.delete(`/projects/${projectId}/comments/${commentId}`);
     },
+    setCommentPinned: async (projectId: string, commentId: string, pinned: boolean) => {
+        await api.put(`/projects/${projectId}/comments/${commentId}/pin`, null, { params: { pinned } });
+    },
     replyToComment: async (projectId: string, commentId: string, reply: string) => {
         await api.post(`/projects/${projectId}/comments/${commentId}/reply`, { reply });
     },

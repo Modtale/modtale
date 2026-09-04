@@ -82,6 +82,17 @@ class SocialControllerTest {
         verifyNoInteractions(socialService);
     }
 
+    @Test
+    void projectManagersCanPinComments() {
+        User user = user("owner-1");
+        when(accountService.requireCurrentUser((Authentication) null, "pinning a comment")).thenReturn(user);
+
+        var response = controller.setCommentPinned("project-1", "comment-1", true, null);
+
+        assertEquals(200, response.getStatusCode().value());
+        verify(socialService).setCommentPinned("project-1", "comment-1", true);
+    }
+
     private static User user(String id) {
         User user = new User();
         user.setId(id);
