@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Download, X, ChevronDown, FileText, AlertCircle, ChevronRight, Check } from 'lucide-react';
+import { Download, X, ChevronDown, FileText, AlertCircle, ChevronRight, Check, ExternalLink } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { buildVersionGroups, compareSemVer, formatTimeAgo, type VersionGroup } from '@/utils/modHelpers';
 import { useScrollLock } from '@/hooks/useScrollLock';
+import { getExternalDependencies, hasCurseForgeDependencies } from '@/modules/project/utils/dependencyEntries';
+import type { ProjectDependency } from '@/types';
 import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface VersionMultiSelectDropdownProps {
@@ -180,17 +182,21 @@ interface DownloadModalProps {
     versionsByGame: Record<string, any[]>;
     preReleaseGameVersions?: string[];
     orderedGameVersions: string[];
-    onDownload: (url: string, number: string, gameVersion: string, deps: any[], channel: string) => void;
+    onDownload: (url: string, number: string, gameVersion: string, deps: any[], channel: string, target?: ModpackTarget) => void;
     showExperimental: boolean;
     onToggleExperimental: () => void;
     onViewHistory: () => void;
+    isModpack?: boolean;
     isInline?: boolean;
     containerRef?: React.Ref<HTMLDivElement>;
 }
 
+type ModpackTarget = 'UNIVERSAL' | 'CLIENT' | 'SERVER';
+
 export const DownloadModal: React.FC<DownloadModalProps> = ({
-                                                                show, onClose, versionsByGame, preReleaseGameVersions = [], orderedGameVersions, onDownload, showExperimental, onToggleExperimental, onViewHistory, isInline = false, containerRef
-                                                            }) => {
+                                                                show, onClose, versionsByGame, preReleaseGameVersions = [], orderedGameVersions = [], onDownload, showExperimental, onToggleExperimental, onViewHistory, isModpack = false, isInline = false, containerRef
+}) => {
+    const [modpackTarget, setModpackTarget] = useState<ModpackTarget>('UNIVERSAL');
     useScrollLock(show && !isInline);
     const [selectedGameVersions, setSelectedGameVersions] = useState<string[]>([]);
     const [isListExpanded, setIsListExpanded] = useState(false);
@@ -380,6 +386,66 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
         return versions.filter((gv: string) => gv !== gameVersion);
     };
 
+    const externalDependenciesFor = (ver: any): ProjectDependency[] => (
+        isModpack ? getExternalDependencies(ver?.dependencies) : []
+    );
+
+    const formatExternalDependencyNames = (dependencies: ProjectDependency[]) => {
+        const names = dependencies.map(dep => dep.projectTitle || dep.externalId || dep.projectId).filter(Boolean);
+        const visibleNames = names.slice(0, 3);
+        const remainingCount = names.length - visibleNames.length;
+        return `${visibleNames.join(', ')}${remainingCount > 0 ? `, +${remainingCount} more` : ''}`;
+    };
+
+    const renderExternalDependencyNotice = (ver: any) => {
+        const externalDependencies = externalDependenciesFor(ver);
+        if (externalDependencies.length === 0) return null;
+
+        return (
+            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                <div className="flex items-start gap-2">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                    <div>
+                        <p className="text-sm font-black">This modpack uses external mods</p>
+                        <p className="mt-1 text-xs font-medium leading-relaxed">
+                            {formatExternalDependencyNames(externalDependencies)} {externalDependencies.length === 1 ? 'comes' : 'come'} from outside Modtale and is not redistributed in this archive. Use the linked source pages to obtain those files from their authors' chosen platform.
+                        </p>
+                        <ul className="mt-2 space-y-1" aria-label="External mod source pages">
+                            {externalDependencies.map((dependency, index) => (
+                                <li key={dependency.id || `${dependency.source}-${dependency.externalId || dependency.projectId}-${index}`}>
+                                    {dependency.externalUrl ? (
+                                        <a
+                                            href={dependency.externalUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-xs font-bold underline decoration-amber-500/50 underline-offset-2 hover:decoration-current"
+                                        >
+                                            {dependency.projectTitle || dependency.externalId || dependency.projectId}
+                                            <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                                        </a>
+                                    ) : (
+                                        <span className="text-xs font-bold">{dependency.projectTitle || dependency.externalId || dependency.projectId}</span>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const download = (ver: any, gameVersion: string) => {
+        if (isModpack && hasCurseForgeDependencies(ver?.dependencies)) return;
+        if (isModpack) {
+            onDownload(ver.fileUrl, ver.versionNumber, gameVersion, ver.dependencies, ver.channel, modpackTarget);
+            return;
+        }
+        onDownload(ver.fileUrl, ver.versionNumber, gameVersion, ver.dependencies, ver.channel);
+    };
+
+    const latestRequiresLauncher = isModpack && hasCurseForgeDependencies(latestVer?.dependencies);
+
     const content = (
         <div ref={containerRef} className={`${isInline ? 'w-full overflow-hidden relative flex flex-col transform transition-transform duration-500' : 'fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-2xl max-h-[90dvh] flex flex-col z-[100]'} bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl rounded-2xl overflow-hidden`} onClick={e => e.stopPropagation()}>
             <div className={`p-6 flex justify-between items-center shrink-0 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-800/50`}>
@@ -418,14 +484,38 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                     />
                 </div>
 
+                {isModpack && (
+                    <div className="mb-6">
+                        <label className={`block text-xs font-bold ${theme.colors.textSecondary} uppercase mb-2 tracking-wider`}>Pack target</label>
+                        <div className={`grid grid-cols-3 gap-2 rounded-xl border ${theme.colors.border} ${theme.colors.bgSurfaceAlt} p-1.5`}>
+                            {(['UNIVERSAL', 'CLIENT', 'SERVER'] as ModpackTarget[]).map(target => (
+                                <button
+                                    type="button"
+                                    key={target}
+                                    onClick={() => setModpackTarget(target)}
+                                    className={`rounded-lg px-2 py-2 text-xs font-black transition-colors ${modpackTarget === target ? 'bg-modtale-accent text-white shadow-sm' : `${theme.colors.textSecondary} hover:${theme.colors.textPrimary}`}`}
+                                >
+                                    {target === 'UNIVERSAL' ? 'All sides' : target === 'CLIENT' ? 'Client' : 'Server'}
+                                </button>
+                            ))}
+                        </div>
+                        <p className={`mt-2 text-xs ${theme.colors.textMuted}`}>
+                            {modpackTarget === 'UNIVERSAL'
+                                ? 'Includes common, client-only, and server-only entries.'
+                                : `Excludes ${modpackTarget === 'CLIENT' ? 'server' : 'client'}-only entries.`}
+                        </p>
+                    </div>
+                )}
+
                 {latestVer ? (
                     <>
                         <button
                             type="button"
-                            onClick={() => onDownload(latestVer.fileUrl, latestVer.versionNumber, latestGameVersion, latestVer.dependencies, latestVer.channel)}
-                            className={`w-full p-5 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 mb-6 group relative overflow-hidden ${themeClass}`}
+                            disabled={latestRequiresLauncher}
+                            onClick={() => download(latestVer, latestGameVersion)}
+                            className={`w-full p-5 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-1.5 transition-all mb-6 group relative overflow-hidden ${latestRequiresLauncher ? 'cursor-not-allowed bg-slate-200 text-slate-500 shadow-none dark:bg-slate-800 dark:text-slate-400' : `active:scale-95 ${themeClass}`}`}
                         >
-                            <div className="font-black text-xl flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-6 h-6" /> Download Latest</div>
+                            <div className="font-black text-xl flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-6 h-6" /> {latestRequiresLauncher ? 'Modtale Launcher Required' : 'Download Latest'}</div>
                             <div className={`text-xs font-bold font-mono px-3 py-1 rounded-full border flex items-center gap-2 z-10 ${getVersionBadgeColor(latestVer.channel || 'RELEASE')}`}>
                                 v{latestVer.versionNumber}
                                 {latestVer.channel !== 'RELEASE' && <span className="uppercase tracking-wider opacity-90">{latestVer.channel}</span>}
@@ -441,6 +531,12 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                                 </div>
                             )}
                         </button>
+                        {latestRequiresLauncher && (
+                            <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm font-bold text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-100">
+                                This version contains CurseForge projects. Install it through Modtale Launcher so those files are downloaded directly to your device.
+                            </div>
+                        )}
+                        {renderExternalDependencyNotice(latestVer)}
 
                         <div className="relative mb-6">
                             <div className="absolute inset-0 flex items-center"><div className={`w-full border-t ${theme.colors.borderFaint}`}></div></div>
@@ -475,13 +571,20 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                                                         Also supports: {otherCompatibleVersions(ver, gameVersion).join(', ')}
                                                     </div>
                                                 )}
+                                                {externalDependenciesFor(ver).length > 0 && (
+                                                    <div className="mt-1 inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                                                        <AlertCircle className="h-3 w-3" aria-hidden="true" />
+                                                        External mods
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                         <button
                                             type="button"
-                                            onClick={() => onDownload(ver.fileUrl, ver.versionNumber, gameVersion, ver.dependencies, ver.channel)}
-                                            className={`p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-modtale-accent hover:text-white transition-colors`}
-                                            aria-label={`Download version ${ver.versionNumber}`}
+                                            disabled={isModpack && hasCurseForgeDependencies(ver?.dependencies)}
+                                            onClick={() => download(ver, gameVersion)}
+                                            className={`p-2 rounded-lg transition-colors ${isModpack && hasCurseForgeDependencies(ver?.dependencies) ? 'cursor-not-allowed bg-slate-100 text-slate-300 dark:bg-white/5 dark:text-slate-600' : 'bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-modtale-accent hover:text-white'}`}
+                                            aria-label={isModpack && hasCurseForgeDependencies(ver?.dependencies) ? `Version ${ver.versionNumber} requires Modtale Launcher` : `Download version ${ver.versionNumber}`}
                                         >
                                             <Download className="w-4 h-4" />
                                         </button>

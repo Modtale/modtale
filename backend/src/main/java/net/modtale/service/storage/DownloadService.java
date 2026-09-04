@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.List;
 import net.modtale.config.properties.AppLimitProperties;
 import net.modtale.model.project.Project;
+import net.modtale.model.project.ModpackTarget;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
@@ -30,8 +31,12 @@ public class DownloadService {
     }
 
     public byte[] generateModpackZip(Project pack, ProjectVersion version, User user) throws IOException {
+        return generateModpackZip(pack, version, user, ModpackTarget.UNIVERSAL);
+    }
+
+    public byte[] generateModpackZip(Project pack, ProjectVersion version, User user, ModpackTarget target) throws IOException {
         rateLimitService.consumeModpackGeneration(user);
-        return modpackArchiveService.generateModpackZip(pack, version);
+        return modpackArchiveService.generateModpackZip(pack, version, target);
     }
 
     public byte[] generateBundleZip(Project mainProject, ProjectVersion mainVersion, List<String> selectedDependencies, User user) throws IOException {

@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.exception.InvalidDownloadTokenException;
+import net.modtale.exception.InvalidVersionRequestException;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.model.dto.response.project.BundleDownloadUrlResponse;
 import net.modtale.model.dto.response.project.DownloadUrlResponse;
@@ -11,6 +12,7 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
+import net.modtale.model.project.ModpackTarget;
 import net.modtale.model.user.User;
 import net.modtale.service.analytics.AnalyticsEligibilityService;
 import net.modtale.service.analytics.TrackingService;
@@ -26,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -152,6 +155,52 @@ class VersionDownloadOrchestrationServiceTest {
     }
 
     @Test
+    void rejectsBrowserDownloadForModpackContainingCurseForgeProjects() {
+        User user = new User();
+        Project pack = project("pack-1", "Sky Pack!", ProjectClassification.MODPACK);
+        ProjectVersion version = version("version-1", "1.0.0", null);
+        version.setDependencies(List.of(ProjectDependency.curseForge(
+                "1450386", "Simple Compost", "1.0.0",
+                "https://www.curseforge.com/hytale/mods/simple-compost/files/8227810",
+                ProjectDependency.DependencyType.REQUIRED
+        )));
+
+        when(projectService.getProjectById("pack-1", user)).thenReturn(pack);
+        when(projectVersionAccessService.requireByVersionNumber(
+                org.mockito.Mockito.eq(pack), org.mockito.Mockito.eq("1.0.0"),
+                org.mockito.Mockito.isNull(), org.mockito.Mockito.any()
+        )).thenReturn(version);
+
+        InvalidVersionRequestException error = assertThrows(
+                InvalidVersionRequestException.class,
+                () -> service.createDownloadUrl("pack-1", "1.0.0", null, user)
+        );
+
+        assertTrue(error.getMessage().contains("Modtale Launcher"));
+        verify(downloadTokenService, never()).generateToken("pack-1", "1.0.0", null);
+    }
+
+    @Test
+    void downloadVersionGeneratesNamedServerVariantFromToken() throws Exception {
+        User user = new User();
+        Project pack = project("pack-1", "Sky Pack!", ProjectClassification.MODPACK);
+        ProjectVersion version = version("version-1", "1.0.0", "modpacks/pack.zip");
+        when(downloadTokenService.validateAndConsume("server-token")).thenReturn(new DownloadTokenService.DownloadToken(
+                "pack-1", "1.0.0", null, null, ModpackTarget.SERVER, Instant.now().plusSeconds(60)
+        ));
+        when(projectService.getRawProjectById("pack-1")).thenReturn(pack);
+        when(accessControlService.canReadProject(pack, user)).thenReturn(true);
+        when(projectVersionAccessService.requireByVersionNumber(org.mockito.Mockito.eq(pack), org.mockito.Mockito.eq("1.0.0"), org.mockito.Mockito.isNull(), org.mockito.Mockito.any()))
+                .thenReturn(version);
+        when(downloadService.generateModpackZip(pack, version, user, ModpackTarget.SERVER)).thenReturn(new byte[]{7});
+
+        VersionDownloadPayload payload = service.downloadVersion("server-token", true, null, "198.51.100.9", null, user);
+
+        assertEquals("Sky_Pack_-1.0.0-server.zip", payload.filename());
+        assertArrayEquals(new byte[]{7}, payload.bytes());
+    }
+
+    @Test
     void downloadBundleTracksOnlySelectedNonEmbeddedDependenciesAndReturnsZipName() throws Exception {
         User user = new User();
         Project project = project("project-1", "Sky Tools", ProjectClassification.PLUGIN);
@@ -159,7 +208,7 @@ class VersionDownloadOrchestrationServiceTest {
         version.setDependencies(List.of(
                 new ProjectDependency("dep-1", "Dependency One", "1.0.0"),
                 new ProjectDependency("dep-2", "Dependency Two", "1.0.0"),
-                new ProjectDependency("embedded", "Embedded", "1.0.0", false, true)
+                new ProjectDependency("embedded", "Embedded", "1.0.0", ProjectDependency.DependencyType.EMBEDDED)
         ));
         Project dependencyProject = project("dep-1", "Dependency One", ProjectClassification.DATA);
 

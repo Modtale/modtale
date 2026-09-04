@@ -1,11 +1,13 @@
 import React, { lazy, Suspense, useState, useRef, useEffect } from 'react';
-import { Menu, X, Upload, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn, Code2, ChevronDown, Layout, FileCode, Database, Palette, Save, Layers, LayoutGrid } from 'lucide-react';
+import { Menu, X, Upload, LayoutDashboard, User as UserIcon, LogOut, Shield, Users, LogIn, Code2, ChevronDown, LayoutGrid } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatedThemeToggler } from '@/components/ui/AnimatedThemeToggler';
 import { useMobile } from '@/context/MobileContext';
 import { SiteRoutes } from '@/utils/routes';
+import { PROJECT_TYPES } from '@/data/categories';
 import { isAdminUser } from '@/modules/admin/utils/access';
 import type { User } from "@/types.ts";
+import { useTranslation } from 'react-i18next';
 
 const NotificationMenu = lazy(() => import('@/modules/user/components/NotificationMenu').then((module) => ({ default: module.NotificationMenu })));
 const FollowingModal = lazy(() => import('@/modules/user/components/FollowingModal').then((module) => ({ default: module.FollowingModal })));
@@ -24,6 +26,7 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
                                                   user, onLogout, currentPage, isDarkMode, toggleDarkMode
                                               }) => {
+    const { t } = useTranslation(['navigation', 'common']);
     const { isMobile } = useMobile();
     const location = useLocation();
     const navigate = useNavigate();
@@ -84,6 +87,17 @@ export const Navbar: React.FC<NavbarProps> = ({
 
     const browsePages = ['mods', 'plugins', 'modpacks', 'worlds', 'art', 'data'];
     const isBrowseActive = browsePages.includes(currentPage);
+    const projectTypeLabel = (id: string, fallback: string) => {
+        switch (id) {
+            case 'All': return t('navigation:allProjects');
+            case 'MODPACK': return t('navigation:modpacks');
+            case 'PLUGIN': return t('navigation:plugins');
+            case 'SAVE': return t('navigation:worlds');
+            case 'ART': return t('navigation:artAssets');
+            case 'DATA': return t('navigation:dataAssets');
+            default: return fallback;
+        }
+    };
 
     const widthClass = "max-w-[112rem] px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28";
     const handleSignInClose = () => {
@@ -136,61 +150,28 @@ export const Navbar: React.FC<NavbarProps> = ({
                                         }`}
                                     >
                                         <LayoutGrid className="w-4 h-4 mr-2" />
-                                        Mods
+                                        {t('navigation:mods')}
                                         <ChevronDown className={`w-3.5 h-3.5 ml-1 transition-transform duration-200 opacity-60 ${isBrowseDropdownOpen ? 'rotate-180' : ''}`} />
                                     </button>
 
                                     {isBrowseDropdownOpen && (
                                         <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
-                                            <Link
-                                                to={SiteRoutes.browse()}
-                                                onClick={() => setIsBrowseDropdownOpen(false)}
-                                                className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
-                                            >
-                                                <Layout className="w-4 h-4 mr-3 text-slate-400" />
-                                                All Projects
-                                            </Link>
-                                            <div className="h-px bg-slate-100 dark:bg-white/5 my-1 mx-2"></div>
-                                            <Link
-                                                to={SiteRoutes.browse('PLUGIN')}
-                                                onClick={() => setIsBrowseDropdownOpen(false)}
-                                                className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
-                                            >
-                                                <FileCode className="w-4 h-4 mr-3 text-slate-400" />
-                                                Plugins
-                                            </Link>
-                                            <Link
-                                                to={SiteRoutes.browse('MODPACK')}
-                                                onClick={() => setIsBrowseDropdownOpen(false)}
-                                                className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
-                                            >
-                                                <Layers className="w-4 h-4 mr-3 text-slate-400" />
-                                                Modpacks
-                                            </Link>
-                                            <Link
-                                                to={SiteRoutes.browse('SAVE')}
-                                                onClick={() => setIsBrowseDropdownOpen(false)}
-                                                className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
-                                            >
-                                                <Save className="w-4 h-4 mr-3 text-slate-400" />
-                                                Worlds
-                                            </Link>
-                                            <Link
-                                                to={SiteRoutes.browse('ART')}
-                                                onClick={() => setIsBrowseDropdownOpen(false)}
-                                                className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
-                                            >
-                                                <Palette className="w-4 h-4 mr-3 text-slate-400" />
-                                                Art Assets
-                                            </Link>
-                                            <Link
-                                                to={SiteRoutes.browse('DATA')}
-                                                onClick={() => setIsBrowseDropdownOpen(false)}
-                                                className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
-                                            >
-                                                <Database className="w-4 h-4 mr-3 text-slate-400" />
-                                                Data Assets
-                                            </Link>
+                                            {PROJECT_TYPES.map((type, index) => {
+                                                const Icon = type.icon;
+                                                return (
+                                                    <React.Fragment key={type.id}>
+                                                        {index === 1 && <div className="h-px bg-slate-100 dark:bg-white/5 my-1 mx-2"></div>}
+                                                        <Link
+                                                            to={SiteRoutes.browse(type.id === 'All' ? undefined : type.id)}
+                                                            onClick={() => setIsBrowseDropdownOpen(false)}
+                                                            className="flex items-center px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+                                                        >
+                                                            <Icon className="w-4 h-4 mr-3 text-slate-400" />
+                                                            {projectTypeLabel(type.id, type.label)}
+                                                        </Link>
+                                                    </React.Fragment>
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </div>
@@ -204,7 +185,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                     }`}
                                 >
                                     <Code2 className="w-4 h-4 mr-2" />
-                                    API
+                                    {t('navigation:api')}
                                 </Link>
                                 {user && (
                                     <>
@@ -217,7 +198,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                             }`}
                                         >
                                             <LayoutDashboard className="w-4 h-4 mr-2" />
-                                            Dashboard
+                                            {t('navigation:dashboard')}
                                         </Link>
                                         <Link
                                             to={SiteRoutes.upload()}
@@ -228,7 +209,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                             }`}
                                         >
                                             <Upload className="w-4 h-4 mr-2" />
-                                            Create
+                                            {t('common:actions.create')}
                                         </Link>
                                     </>
                                 )}
@@ -266,23 +247,23 @@ export const Navbar: React.FC<NavbarProps> = ({
                                         {isProfileOpen && (
                                             <div className="absolute right-0 mt-4 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2 origin-top-right">
                                                 <div className="px-5 py-4 border-b border-slate-100 dark:border-white/5 mb-2 bg-slate-50/50 dark:bg-white/5 mx-2 rounded-xl">
-                                                    <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Signed in as</p>
+                                                    <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">{t('navigation:signedInAs')}</p>
                                                     <p className="text-base font-black text-slate-900 dark:text-white truncate">{user.username}</p>
                                                 </div>
 
                                                 <div className="px-2 space-y-0.5">
                                                     <Link to={SiteRoutes.creator(user.id, user.username)} onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
-                                                        <UserIcon className="w-4 h-4 text-slate-400" /> Your Profile
+                                                        <UserIcon className="w-4 h-4 text-slate-400" /> {t('navigation:yourProfile')}
                                                     </Link>
                                                     <button onClick={() => { setIsProfileOpen(false); setIsFollowingOpen(true); }} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
-                                                        <Users className="w-4 h-4 text-slate-400" /> Following
+                                                        <Users className="w-4 h-4 text-slate-400" /> {t('navigation:following')}
                                                     </button>
                                                     <Link to={SiteRoutes.dashboard()} onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors">
-                                                        <LayoutDashboard className="w-4 h-4 text-slate-400" /> User Dashboard
+                                                        <LayoutDashboard className="w-4 h-4 text-slate-400" /> {t('navigation:userDashboard')}
                                                     </Link>
                                                     {isAdminUser(user) && (
                                                         <Link to={SiteRoutes.admin()} onClick={() => setIsProfileOpen(false)} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10 flex items-center gap-3 transition-colors">
-                                                            <Shield className="w-4 h-4" /> Admin Panel
+                                                            <Shield className="w-4 h-4" /> {t('navigation:adminPanel')}
                                                         </Link>
                                                     )}
                                                 </div>
@@ -291,7 +272,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                                                 <div className="px-2">
                                                     <button onClick={() => { setIsProfileOpen(false); onLogout(); }} className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 flex items-center gap-3 transition-colors">
-                                                        <LogOut className="w-4 h-4" /> Sign Out
+                                                        <LogOut className="w-4 h-4" /> {t('common:actions.signOut')}
                                                     </button>
                                                 </div>
                                             </div>
@@ -299,7 +280,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                     </div>
                                 ) : (
                                     <button onClick={() => setIsSignInOpen(true)} className="flex items-center bg-slate-900 dark:bg-modtale-accent text-white dark:text-white hover:opacity-90 font-black py-2 px-5 rounded-lg transition-all text-sm shadow-sm dark:shadow-none ml-2 hover:scale-105 active:scale-95">
-                                        <LogIn className="w-4 h-4 mr-2" /> Sign in
+                                        <LogIn className="w-4 h-4 mr-2" /> {t('common:actions.signIn')}
                                     </button>
                                 )}
                             </div>
@@ -313,7 +294,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                 <button
                                     id="mobile-menu-btn"
                                     type="button"
-                                    aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                                    aria-label={isMobileMenuOpen ? t('navigation:closeMenu') : t('navigation:openMenu')}
                                     aria-expanded={isMobileMenuOpen}
                                     aria-controls="mobile-nav-menu"
                                     onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -330,48 +311,56 @@ export const Navbar: React.FC<NavbarProps> = ({
             {isMobile && isMobileMenuOpen && (
                 <div id="mobile-nav-menu" ref={mobileMenuRef} className="absolute top-24 left-0 right-0 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 shadow-2xl p-4 flex flex-col gap-2 animate-in slide-in-from-top-2 z-50">
                     <div className="space-y-1">
-                        <div className="px-3 py-2 text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Browse</div>
-                        <Link to={SiteRoutes.browse()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Layout className="w-4 h-4 mr-3" /> All Projects</Link>
-                        <Link to={SiteRoutes.browse('PLUGIN')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><FileCode className="w-4 h-4 mr-3" /> Plugins</Link>
-                        <Link to={SiteRoutes.browse('MODPACK')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Layers className="w-4 h-4 mr-3" /> Modpacks</Link>
-                        <Link to={SiteRoutes.browse('SAVE')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Save className="w-4 h-4 mr-3" /> Worlds</Link>
-                        <Link to={SiteRoutes.browse('ART')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Palette className="w-4 h-4 mr-3" /> Art Assets</Link>
-                        <Link to={SiteRoutes.browse('DATA')} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"><Database className="w-4 h-4 mr-3" /> Data Assets</Link>
+                        <div className="px-3 py-2 text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t('navigation:browse')}</div>
+                        {PROJECT_TYPES.map((type) => {
+                            const Icon = type.icon;
+                            return (
+                                <Link
+                                    key={type.id}
+                                    to={SiteRoutes.browse(type.id === 'All' ? undefined : type.id)}
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className="flex items-center px-5 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left text-sm"
+                                >
+                                    <Icon className="w-4 h-4 mr-3" />
+                                    {projectTypeLabel(type.id, type.label)}
+                                </Link>
+                            );
+                        })}
                     </div>
 
                     <div className="h-px bg-slate-100 dark:bg-white/5 my-2"></div>
 
-                    <Link to={SiteRoutes.apiDocs()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><Code2 className="w-4 h-4 mr-3" /> API</Link>
+                    <Link to={SiteRoutes.apiDocs()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><Code2 className="w-4 h-4 mr-3" /> {t('navigation:api')}</Link>
                     {user && (
                         <>
-                            <Link to={SiteRoutes.dashboard()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><LayoutDashboard className="w-4 h-4 mr-3" /> Dashboard</Link>
-                            <Link to={SiteRoutes.upload()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><Upload className="w-4 h-4 mr-3" /> Create Project</Link>
+                            <Link to={SiteRoutes.dashboard()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><LayoutDashboard className="w-4 h-4 mr-3" /> {t('navigation:dashboard')}</Link>
+                            <Link to={SiteRoutes.upload()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 text-left"><Upload className="w-4 h-4 mr-3" /> {t('navigation:createProject')}</Link>
                         </>
                     )}
 
                     {isAdminUser(user) && (
-                        <Link to={SiteRoutes.admin()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 font-bold text-red-600 dark:text-red-400 text-left"><Shield className="w-4 h-4 mr-3" /> Admin Panel</Link>
+                        <Link to={SiteRoutes.admin()} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 font-bold text-red-600 dark:text-red-400 text-left"><Shield className="w-4 h-4 mr-3" /> {t('navigation:adminPanel')}</Link>
                     )}
 
                     <div className="h-px bg-slate-100 dark:bg-white/5 my-2"></div>
 
                     <div className="flex items-center justify-between p-3">
-                        <span className="font-bold text-slate-700 dark:text-slate-200">Theme</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-200">{t('common:theme')}</span>
                         <AnimatedThemeToggler onToggle={toggleDarkMode} className="p-2 bg-slate-100 dark:bg-white/10 rounded-lg text-slate-600 dark:text-slate-300" />
                     </div>
 
                     {user ? (
                         <>
                             <Link to={SiteRoutes.creator(user.id, user.username)} onClick={() => setIsMobileMenuOpen(false)} className="p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-3">
-                                <img src={user.avatarUrl} className="h-6 w-6 shrink-0 rounded-full object-cover" alt="" /> Profile
+                                <img src={user.avatarUrl} className="h-6 w-6 shrink-0 rounded-full object-cover" alt="" /> {t('navigation:profile')}
                             </Link>
                             <button onClick={() => { setIsFollowingOpen(true); setIsMobileMenuOpen(false); }} className="p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-white/5 font-bold text-slate-700 dark:text-slate-200 flex items-center gap-3">
-                                <Users className="w-5 h-5" /> Following
+                                <Users className="w-5 h-5" /> {t('navigation:following')}
                             </button>
-                            <button onClick={onLogout} className="p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 font-bold text-red-500 flex items-center gap-3"><LogOut className="w-5 h-5" /> Sign Out</button>
+                            <button onClick={onLogout} className="p-3 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 font-bold text-red-500 flex items-center gap-3"><LogOut className="w-5 h-5" /> {t('common:actions.signOut')}</button>
                         </>
                     ) : (
-                        <button onClick={() => { setIsSignInOpen(true); setIsMobileMenuOpen(false); }} className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-3 rounded-xl font-bold mt-2 flex items-center justify-center gap-2"><LogIn className="w-4 h-4" /> Sign In</button>
+                        <button onClick={() => { setIsSignInOpen(true); setIsMobileMenuOpen(false); }} className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-3 rounded-xl font-bold mt-2 flex items-center justify-center gap-2"><LogIn className="w-4 h-4" /> {t('common:actions.signIn')}</button>
                     )}
                 </div>
             )}

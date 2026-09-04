@@ -6,6 +6,10 @@ export enum VersionRelationKind {
     INCOMPATIBILITY = 'INCOMPATIBILITY'
 }
 
+export type DependencySource = 'MODTALE' | 'CURSEFORGE' | 'GITHUB' | 'WEBSITE' | 'OTHER';
+export type DependencyType = 'REQUIRED' | 'OPTIONAL' | 'EMBEDDED';
+export type DependencyEnvironment = 'COMMON' | 'CLIENT' | 'SERVER';
+
 export interface ConnectedAccount {
     provider: string;
     providerId: string;
@@ -69,15 +73,57 @@ export interface User {
 }
 
 export interface ProjectDependency {
+    id?: string;
     projectId: string;
     projectTitle: string;
     versionNumber: string;
+    dependencyType?: DependencyType;
+    environment?: DependencyEnvironment;
+    source?: DependencySource | string;
+    externalId?: string;
+    externalUrl?: string;
+    externalFileUrl?: string;
+    externalFileName?: string;
+    externalFileSize?: number;
+    externalFileHashes?: Record<string, string>;
+    externalGameVersions?: string[];
+    externalFileStatus?: number;
+    externalDistributionAllowed?: boolean;
+    cachedFileUrl?: string;
+    hytaleProjectConfirmed?: boolean;
     icon?: string;
     title?: string;
     classification?: string;
     slug?: string;
     isOptional?: boolean;
     isEmbedded?: boolean;
+}
+
+export interface ExternalProjectFile {
+    id?: string;
+    displayName?: string;
+    fileName?: string;
+    versionNumber?: string;
+    releaseType?: string;
+    downloadUrl?: string;
+    fileSize?: number;
+    hashes?: Record<string, string>;
+    gameVersions?: string[];
+    fileStatus?: number;
+    available?: boolean;
+}
+
+export interface ExternalProjectReference {
+    source: DependencySource;
+    externalId: string;
+    title: string;
+    versionNumber: string;
+    externalUrl: string;
+    iconUrl?: string;
+    summary?: string;
+    hytaleProjectConfirmed: boolean;
+    distributionAllowed?: boolean;
+    files?: ExternalProjectFile[];
 }
 
 export interface ManifestDependencySuggestion {
@@ -88,7 +134,6 @@ export interface ManifestDependencySuggestion {
     versionNumber: string;
     optional: boolean;
     confidence: number;
-    dependencyEntry: string;
 }
 
 export interface ManifestInspectionResult {

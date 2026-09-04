@@ -126,10 +126,11 @@ class ProjectDeletionServiceTest {
         project.setImageUrl("https://cdn.modtale.net/icon.png");
         project.setBannerUrl("https://cdn.modtale.net/banner.png");
         project.setGalleryImages(new ArrayList<>(List.of("https://cdn.modtale.net/one.png")));
-        project.setModIds(new ArrayList<>(List.of("dep-2")));
+        project.setChildProjectIds(new ArrayList<>(List.of("dep-2")));
 
         ProjectVersion version = version("1.0.0");
         version.setFileUrl("files/project-1/main.jar");
+        version.setOverrideFileUrl("modpack-overrides/project-1/overrides.zip");
         version.setDependencies(List.of(new ProjectDependency("dep-1", "Dependency One", "2.0.0")));
         project.setVersions(new ArrayList<>(List.of(version)));
 
@@ -144,6 +145,7 @@ class ProjectDeletionServiceTest {
 
         verify(trackingService).deleteProjectAnalytics("project-1");
         verify(storageService).deleteFile("files/project-1/main.jar");
+        verify(storageService).deleteFile("modpack-overrides/project-1/overrides.zip");
         verify(storageService).deleteFile("https://cdn.modtale.net/icon.png");
         verify(storageService).deleteFile("https://cdn.modtale.net/banner.png");
         verify(storageService).deleteFile("https://cdn.modtale.net/one.png");

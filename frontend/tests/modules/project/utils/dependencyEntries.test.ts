@@ -1,39 +1,74 @@
 import { describe, expect, it } from 'vitest';
-import { parseDependencyEntry, serializeDependencyEntry, serializeProjectDependency } from '@/modules/project/utils/dependencyEntries';
+import {
+    dependencyProjectKey,
+    getDependencyEnvironment,
+    getDependencyType,
+    getSelectableBundleDependencies,
+    hasCurseForgeDependencies,
+    isEmbeddedDependency,
+    isExternalDependency,
+    isOptionalDependency,
+    normalizeDependencyReference
+} from '@/modules/project/utils/dependencyEntries';
+import type { ProjectDependency } from '@/types';
 
 describe('dependencyEntries', () => {
-    it('parses optional and embedded flags in any order', () => {
-        expect(parseDependencyEntry('dep-1:1.2.3:embedded:optional')).toEqual({
-            projectId: 'dep-1',
-            versionNumber: '1.2.3',
-            isOptional: true,
-            isEmbedded: true
-        });
-    });
-
-    it('serializes dependency flags without dropping compatibility for empty flags', () => {
-        expect(serializeDependencyEntry({
-            projectId: 'dep-1',
-            versionNumber: '1.2.3',
-            isOptional: false,
-            isEmbedded: false
-        })).toBe('dep-1:1.2.3');
-
-        expect(serializeDependencyEntry({
-            projectId: 'dep-1',
-            versionNumber: '1.2.3',
-            isOptional: true,
-            isEmbedded: true
-        })).toBe('dep-1:1.2.3:optional:embedded');
-    });
-
-    it('serializes project dependency objects from API data', () => {
-        expect(serializeProjectDependency({
+    it('normalizes missing dependency shape defaults', () => {
+        const dependency = normalizeDependencyReference({
             projectId: 'dep-1',
             projectTitle: 'Dependency One',
-            versionNumber: '1.2.3',
-            isOptional: true,
-            isEmbedded: true
-        })).toBe('dep-1:1.2.3:optional:embedded');
+            versionNumber: '1.2.3'
+        });
+
+        expect(dependency.dependencyType).toBe('REQUIRED');
+        expect(dependency.environment).toBe('COMMON');
+        expect(dependency.source).toBe('MODTALE');
     });
+
+    it('defaults environment to common and preserves explicit sides', () => {
+        expect(getDependencyEnvironment(dependency('REQUIRED'))).toBe('COMMON');
+        expect(getDependencyEnvironment({ ...dependency('REQUIRED'), environment: 'SERVER' })).toBe('SERVER');
+    });
+
+    it('classifies dependency types from structured fields', () => {
+        const optional = dependency('OPTIONAL');
+        const embedded = dependency('EMBEDDED');
+
+        expect(getDependencyType(optional)).toBe('OPTIONAL');
+        expect(isOptionalDependency(optional)).toBe(true);
+        expect(isEmbeddedDependency(optional)).toBe(false);
+        expect(isEmbeddedDependency(embedded)).toBe(true);
+    });
+
+    it('keeps source in the dependency key so external IDs do not collide with Modtale IDs', () => {
+        expect(dependencyProjectKey(dependency('REQUIRED', 'MODTALE'))).toBe('MODTALE:dep-1');
+        expect(dependencyProjectKey(dependency('REQUIRED', 'GITHUB'))).toBe('GITHUB:dep-1');
+        expect(isExternalDependency(dependency('REQUIRED', 'GITHUB'))).toBe(true);
+    });
+
+    it('never routes a modpack through the generic nested bundle flow', () => {
+        const dependencies = [
+            dependency('REQUIRED'),
+            dependency('OPTIONAL', 'GITHUB')
+        ];
+
+        expect(getSelectableBundleDependencies('MODPACK', dependencies)).toEqual([]);
+        expect(getSelectableBundleDependencies('PLUGIN', dependencies)).toEqual([dependencies[0]]);
+    });
+
+    it('detects CurseForge dependencies in a modpack plan', () => {
+        expect(hasCurseForgeDependencies([dependency('REQUIRED', 'CURSEFORGE')])).toBe(true);
+        expect(hasCurseForgeDependencies([dependency('REQUIRED', 'MODTALE')])).toBe(false);
+    });
+});
+
+const dependency = (
+    dependencyType: ProjectDependency['dependencyType'],
+    source: ProjectDependency['source'] = 'MODTALE'
+): ProjectDependency => ({
+    projectId: 'dep-1',
+    projectTitle: 'Dependency One',
+    versionNumber: '1.2.3',
+    dependencyType,
+    source
 });

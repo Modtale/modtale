@@ -4,6 +4,7 @@ import { BACKEND_URL } from '@/utils/api';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { StatusModal } from '@/components/ui/StatusModal';
+import { useTranslation } from 'react-i18next';
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
@@ -85,6 +86,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                                                            sidebarContent,
                                                                            onBack
                                                                        }) => {
+    const { t } = useTranslation(['project', 'common']);
     const [cropperOpen, setCropperOpen] = useState(false);
     const [tempImage, setTempImage] = useState<string | null>(null);
     const [tempImageFile, setTempImageFile] = useState<File | null>(null);
@@ -200,7 +202,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                     {finalBanner ? (
                         <OptimizedImage
                             src={finalBanner}
-                            alt="Project Banner"
+                                alt={t('project:bannerAlt')}
                             baseWidth={1920}
                             priority={true}
                             className="w-full h-full object-cover opacity-100"
@@ -224,14 +226,14 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                         <input type="file" accept="image/*" onChange={e => handleFileSelect(e, 'banner')} className="hidden" />
                         {finalBanner ? (
                             <div className="flex flex-col items-end">
-                                <div className="flex items-center gap-2"><ImageIcon className="w-4 h-4" /> Change Banner</div>
-                                <span className="text-[10px] font-medium text-white/50">Rec: 1920x640</span>
+                                    <div className="flex items-center gap-2"><ImageIcon className="w-4 h-4" /> {t('project:changeBanner')}</div>
+                                    <span className="text-[10px] font-medium text-white/50">{t('project:shortRecommendedBannerSize')}</span>
                             </div>
                         ) : (
                             <div className="flex flex-col items-center">
                                 <Plus className="w-8 h-8 text-white/50 mb-2" />
-                                <span className="text-lg font-bold text-white/80">Upload Banner</span>
-                                <span className="text-xs font-medium text-white/40 mt-1">Recommended: 1920x640</span>
+                                    <span className="text-lg font-bold text-white/80">{t('project:uploadBanner')}</span>
+                                    <span className="text-xs font-medium text-white/40 mt-1">{t('project:recommendedBannerSize')}</span>
                             </div>
                         )}
                     </label>
@@ -244,7 +246,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                 <div className={`absolute top-0 left-0 right-0 z-40 ${containerClasses} h-full pointer-events-none transition-[max-width,padding] duration-300`}>
                     <div className="pt-6 pointer-events-auto w-fit">
                         <button type="button" aria-label="Go back" onClick={onBack} className="flex items-center text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 p-2 md:px-4 md:py-2 rounded-full md:rounded-xl shadow-lg group/back">
-                            <ChevronLeft className="w-5 h-5 md:w-4 md:h-4 md:mr-1 group-hover/back:-translate-x-1 transition-transform" aria-hidden="true" /> <span className="hidden md:inline">Back</span>
+                            <ChevronLeft className="w-5 h-5 md:w-4 md:h-4 md:mr-1 group-hover/back:-translate-x-1 transition-transform" aria-hidden="true" /> <span className="hidden md:inline">{t('common:actions.back')}</span>
                         </button>
                     </div>
                 </div>
@@ -261,7 +263,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                     {finalIcon ? (
                                         <OptimizedImage
                                             src={finalIcon}
-                                            alt="Icon"
+                                            alt={t('project:iconAlt')}
                                             baseWidth={128}
                                             className="w-full h-full bg-transparent object-cover relative z-10"
                                         />
@@ -287,7 +289,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                     {finalIcon ? (
                                         <OptimizedImage
                                             src={finalIcon}
-                                            alt="Icon"
+                                            alt={t('project:iconAlt')}
                                             baseWidth={224}
                                             priority={true}
                                             className="w-full h-full bg-transparent object-cover relative z-10"
@@ -301,8 +303,8 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                     {isEditing && (
                                         <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-[2px] z-30">
                                             <ImageIcon className="w-8 h-8 text-white mb-2" aria-hidden="true" />
-                                            <span className="text-xs font-bold text-white">Change Icon</span>
-                                            <span className="text-[10px] font-medium text-white/70">Rec: 512x512</span>
+                                            <span className="text-xs font-bold text-white">{t('project:changeIcon')}</span>
+                                            <span className="text-[10px] font-medium text-white/70">{t('project:recommendedIconSize')}</span>
                                         </div>
                                     )}
                                 </label>

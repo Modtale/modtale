@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import net.modtale.exception.InvalidProjectRequestException;
+import net.modtale.service.storage.ModpackOverrideArchive;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -48,6 +49,15 @@ public class ProjectArchiveValidationService {
         }
 
         validateMagicNumber(file, ZIP_HEADER);
+
+        if ("MODPACK".equals(classification)) {
+            try {
+                ModpackOverrideArchive.read(file.getInputStream());
+                return null;
+            } catch (IOException ex) {
+                throw new InvalidProjectRequestException(ex.getMessage());
+            }
+        }
 
         try {
             return validateZipContents(file, classification);

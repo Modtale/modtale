@@ -1,6 +1,9 @@
 package net.modtale.service.storage;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -37,6 +40,8 @@ import static org.mockito.Mockito.when;
 
 class DownloadServiceTest {
 
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private DownloadService downloadService;
     private ProjectRepository projectRepository;
     private ProjectService projectService;
@@ -57,11 +62,12 @@ class DownloadServiceTest {
         version.setFileUrl("modpacks/already-built.zip");
         User user = user("user-1");
 
-        when(storageService.download("modpacks/already-built.zip")).thenReturn(new byte[]{1, 2, 3});
+        byte[] cachedArchive = validEmptyArchive();
+        when(storageService.download("modpacks/already-built.zip")).thenReturn(cachedArchive);
 
         byte[] zipBytes = downloadService.generateModpackZip(pack, version, user);
 
-        assertArrayEquals(new byte[]{1, 2, 3}, zipBytes);
+        assertArrayEquals(cachedArchive, zipBytes);
         verify(storageService).download("modpacks/already-built.zip");
         verifyNoInteractions(projectService, projectRepository);
     }
@@ -94,10 +100,11 @@ class DownloadServiceTest {
 
         Map<String, String> entries = unzip(zipBytes);
         assertTrue(entries.containsKey("modpack.json"));
-        assertTrue(entries.get("modpack.json").contains("\"id\": \"plugin-1\""));
-        assertTrue(entries.get("modpack.json").contains("\"version\": \"3.0.0\""));
-        assertEquals("plugin-binary", entries.get("plugins/plugin.jar"));
-        assertEquals("asset-binary", entries.get("asset-packs/assets.zip"));
+        JsonNode legacyManifest = OBJECT_MAPPER.readTree(entries.get("modpack.json"));
+        assertEquals("plugin-1", legacyManifest.path("files").get(0).path("id").asText());
+        assertEquals("3.0.0", legacyManifest.path("files").get(1).path("version").asText());
+        assertEquals("plugin-binary", entries.get("plugin.jar"));
+        assertEquals("asset-binary", entries.get("assets.zip"));
         assertEquals("modpacks/generated.zip", version.getFileUrl());
 
         ArgumentCaptor<MultipartFile> uploadCaptor = ArgumentCaptor.forClass(MultipartFile.class);
@@ -132,7 +139,7 @@ class DownloadServiceTest {
         mainVersion.setDependencies(List.of(
                 new ProjectDependency("dep-a", "Dependency A", "1.0.0"),
                 new ProjectDependency("dep-b", "Dependency B", "2.0.0"),
-                new ProjectDependency("dep-c", "Dependency C", "3.0.0", false, true)
+                new ProjectDependency("dep-c", "Dependency C", "3.0.0", ProjectDependency.DependencyType.EMBEDDED)
         ));
 
         Project dependencyB = dependencyProject("dep-b", ProjectClassification.DATA, "2.0.0", "files/123456789012345678901234567890123456-depb.jar");
@@ -201,5 +208,22 @@ class DownloadServiceTest {
             }
         }
         return entries;
+    }
+
+    private static byte[] validEmptyArchive() throws IOException {
+        try (ByteArrayOutputStream output = new ByteArrayOutputStream();
+             java.util.zip.ZipOutputStream zip = new java.util.zip.ZipOutputStream(output)) {
+            writeEntry(zip, "modpack.json", "{\"formatVersion\":1,\"game\":\"hytale\",\"files\":[]}");
+            writeEntry(zip, "manifest.json", "{\"format\":\"modtale-pack\",\"schemaVersion\":1,\"pack\":{},\"game\":{},\"dependencies\":[]}");
+            writeEntry(zip, "modtale.lock.json", "{\"format\":\"modtale-lock\",\"lockVersion\":1,\"pack\":{},\"gameVersions\":[],\"entries\":[]}");
+            zip.finish();
+            return output.toByteArray();
+        }
+    }
+
+    private static void writeEntry(java.util.zip.ZipOutputStream zip, String name, String value) throws IOException {
+        zip.putNextEntry(new ZipEntry(name));
+        zip.write(value.getBytes(StandardCharsets.UTF_8));
+        zip.closeEntry();
     }
 }

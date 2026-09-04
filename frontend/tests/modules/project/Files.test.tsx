@@ -33,13 +33,11 @@ const projectData = {
 } as any;
 
 const versionData = {
-    projectIds: [],
     versionNumber: '1.0.1',
     gameVersions: ['2026.03.11'],
     changelog: '',
     file: null,
     dependencies: [],
-    modIds: [],
     channel: 'RELEASE'
 } as any;
 
@@ -101,6 +99,26 @@ describe('Files tab loadability', () => {
         expect(container.textContent).toContain('Game Versions');
         expect(mockedProjectClient.getMetaGameVersionCatalog).toHaveBeenCalledTimes(1);
         expect(mockedProjectClient.getMetaGameVersions).not.toHaveBeenCalled();
+    });
+
+    it('renders the optional layered override bundle picker for modpacks', async () => {
+        await act(async () => {
+            root.render(
+                <ToastProvider>
+                    <VersionFields
+                        data={versionData}
+                        onChange={vi.fn()}
+                        isModpack={true}
+                        projectType="MODPACK"
+                        currentProjectId="project-1"
+                    />
+                </ToastProvider>
+            );
+        });
+
+        await waitForText(container, 'Override Bundle');
+        expect(container.textContent).toContain('Optional ZIP containing only overrides/common, overrides/client, and overrides/server files.');
+        expect(container.textContent).toContain('Optional layered configuration and resource overrides');
     });
 
     it('defaults to the latest release game version when prereleases are newer', async () => {

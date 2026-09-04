@@ -1,9 +1,10 @@
 import React, { memo, useCallback, useMemo, useState } from 'react';
-import { List, X, Download, ChevronUp, ChevronDown } from 'lucide-react';
+import { List, X, Download, ChevronUp, ChevronDown, AlertCircle } from 'lucide-react';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import { theme } from '@/styles/theme';
 import { formatTimeAgo } from '@/utils/modHelpers';
 import { useScrollLock } from '@/hooks/useScrollLock';
+import { getExternalDependencies, hasCurseForgeDependencies } from '@/modules/project/utils/dependencyEntries';
 import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface HistoryModalProps {
@@ -15,6 +16,7 @@ interface HistoryModalProps {
     onDownload: (url: string, number: string, gameVersion: string, deps: any[], channel: string) => void;
     hasExperimentalVersions?: boolean;
     hasStableVersions?: boolean;
+    isModpack?: boolean;
     isInline?: boolean;
     inlineHeight?: number;
 }
@@ -24,15 +26,20 @@ const HistoryVersionItem = memo(({
     isExpanded,
     onToggleExpand,
     onDownload,
-    badgeClass
+    badgeClass,
+    isModpack
 }: {
     ver: any;
     isExpanded: boolean;
     onToggleExpand: (id: string) => void;
     onDownload: (ver: any) => void;
     badgeClass: string;
+    isModpack: boolean;
 }) => {
     const isLong = ver.changelog && ver.changelog.length > 300;
+    const externalDependencyCount = isModpack ? getExternalDependencies(ver.dependencies).length : 0;
+    const requiresLauncher = isModpack && hasCurseForgeDependencies(ver.dependencies);
+
     return (
         <div
             className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-sm hover:border-slate-300 dark:hover:border-white/20 transition-all duration-300 rounded-xl p-5"
@@ -51,13 +58,20 @@ const HistoryVersionItem = memo(({
                         <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600"></span>
                         <span className="flex items-center gap-1.5"><Download className="w-3.5 h-3.5" /> {(ver.downloadCount || 0).toLocaleString()}</span>
                     </div>
+                    {externalDependencyCount > 0 && (
+                        <div className="mt-2 inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                            <AlertCircle className="h-3 w-3" aria-hidden="true" />
+                            External mods
+                        </div>
+                    )}
                 </div>
                 <button
                     type="button"
+                    disabled={requiresLauncher}
                     onClick={() => onDownload(ver)}
-                    className={`px-4 py-2 bg-slate-100 dark:bg-white/5 hover:bg-modtale-accent hover:text-white text-slate-500 dark:text-slate-400 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2`}
+                    className={`px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${requiresLauncher ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-white/5 dark:text-slate-600' : 'bg-slate-100 dark:bg-white/5 hover:bg-modtale-accent hover:text-white text-slate-500 dark:text-slate-400'}`}
                 >
-                    <Download className="w-4 h-4" /> Download
+                    <Download className="w-4 h-4" /> {requiresLauncher ? 'Launcher required' : 'Download'}
                 </button>
             </div>
 
@@ -78,7 +92,7 @@ const HistoryVersionItem = memo(({
 });
 
 export const HistoryModal: React.FC<HistoryModalProps> = ({
-    show, onClose, history, showExperimental, onToggleExperimental, onDownload, hasExperimentalVersions, hasStableVersions, isInline = false, inlineHeight
+    show, onClose, history, showExperimental, onToggleExperimental, onDownload, hasExperimentalVersions, hasStableVersions, isModpack = false, isInline = false, inlineHeight
 }) => {
     useScrollLock(show && !isInline);
     const [expandedChangelog, setExpandedChangelog] = useState<string | null>(null);
@@ -155,6 +169,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                                 onToggleExpand={handleToggleExpand}
                                 onDownload={handleDownloadClick}
                                 badgeClass={getVersionBadgeColor(ver.channel)}
+                                isModpack={isModpack}
                             />
                         );
                     })}
