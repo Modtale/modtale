@@ -5546,6 +5546,11 @@
     -fx-effect: dropshadow(one-pass-box, rgba(2, 6, 23, 0.16), 6, 0.08, 0, 1);
 }
 
+.project-comment-card.pinned {
+    -fx-border-color: rgba(96, 165, 250, 0.30);
+    -fx-background-color: rgba(59, 130, 246, 0.055);
+}
+
 .project-comment-vote {
     -fx-padding: 4px 0 0 0;
 }
@@ -5640,6 +5645,24 @@
     -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
     -fx-text-transform: uppercase;
+}
+
+.project-comment-pinned-badge {
+    -fx-padding: 2px 7px;
+    -fx-background-radius: 999px;
+    -fx-border-radius: 999px;
+    -fx-border-width: 1px;
+    -fx-border-color: rgba(96, 165, 250, 0.28);
+    -fx-background-color: rgba(59, 130, 246, 0.12);
+    -fx-text-fill: #93c5fd;
+    -fx-font-size: 10px;
+    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
+    -fx-font-weight: 800;
+    -fx-graphic-text-gap: 4px;
+}
+
+.project-comment-pinned-badge .svg-icon {
+    -fx-stroke: #93c5fd;
 }
 
 .project-comment-markdown {

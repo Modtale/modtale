@@ -14,10 +14,12 @@ import net.modtale.config.properties.AppLimitProperties;
 import net.modtale.exception.RateLimitExceededException;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.model.project.Comment;
+import net.modtale.model.project.ExternalProjectDiscussion;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.Report;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
+import net.modtale.repository.project.ExternalProjectDiscussionRepository;
 import net.modtale.repository.user.ReportRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.communication.NotificationService;
@@ -30,6 +32,7 @@ public class ReportService {
     private final AccountService accountService;
     private final ReportRepository reportRepository;
     private final ProjectRepository projectRepository;
+    private final ExternalProjectDiscussionRepository externalDiscussionRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final int reportsPerDay;
@@ -40,6 +43,7 @@ public class ReportService {
             AccountService accountService,
             ReportRepository reportRepository,
             ProjectRepository projectRepository,
+            ExternalProjectDiscussionRepository externalDiscussionRepository,
             UserRepository userRepository,
             NotificationService notificationService,
             AppLimitProperties limitProperties
@@ -47,6 +51,7 @@ public class ReportService {
         this.accountService = accountService;
         this.reportRepository = reportRepository;
         this.projectRepository = projectRepository;
+        this.externalDiscussionRepository = externalDiscussionRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
         this.reportsPerDay = limitProperties.reportsPerDay();
@@ -75,22 +80,25 @@ public class ReportService {
             targetSummary = user.getUsername();
         }
         else if (targetType == Report.TargetType.COMMENT) {
-            Project project = projectRepository.findByCommentsId(targetId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Comment not found or the associated project was deleted."));
-
-            Optional<Comment> commentOpt = project.getComments().stream()
-                    .filter(c -> c.getId().equals(targetId))
-                    .findFirst();
-
-            if (commentOpt.isPresent()) {
-                String content = commentOpt.get().getContent();
-
-                User commentAuthor = accountService.getPublicProfile(commentOpt.get().getUserId());
-                String authorName = commentAuthor != null ? commentAuthor.getUsername() : "Unknown User";
-
-                targetSummary = "Comment by " + authorName + ": " +
-                        (content.length() > 50 ? content.substring(0, 47) + "..." : content);
+            Optional<Comment> commentOpt = projectRepository.findByCommentsId(targetId)
+                    .flatMap(project -> project.getComments().stream().filter(c -> c.getId().equals(targetId)).findFirst());
+            if (commentOpt.isEmpty()) {
+                commentOpt = externalDiscussionRepository.findByCommentsId(targetId)
+                        .map(ExternalProjectDiscussion::getComments)
+                        .filter(comments -> comments != null)
+                        .flatMap(comments -> comments.stream().filter(c -> c.getId().equals(targetId)).findFirst());
             }
+            if (commentOpt.isEmpty()) {
+                throw new ResourceNotFoundException("Comment not found or its discussion was deleted.");
+            }
+
+            String content = commentOpt.get().getContent();
+
+            User commentAuthor = accountService.getPublicProfile(commentOpt.get().getUserId());
+            String authorName = commentAuthor != null ? commentAuthor.getUsername() : "Unknown User";
+
+            targetSummary = "Comment by " + authorName + ": " +
+                    (content.length() > 50 ? content.substring(0, 47) + "..." : content);
         }
 
         Report report = new Report();

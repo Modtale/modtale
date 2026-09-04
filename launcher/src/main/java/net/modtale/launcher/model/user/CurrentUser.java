@@ -13,11 +13,13 @@ public record CurrentUser(
         String tier,
         List<String> likedProjectIds,
         List<String> followingIds,
+        List<String> adminPermissions,
         NotificationPreferences notificationPreferences
 ) {
     public CurrentUser {
         likedProjectIds = likedProjectIds == null ? List.of() : List.copyOf(likedProjectIds);
         followingIds = followingIds == null ? List.of() : List.copyOf(followingIds);
+        adminPermissions = adminPermissions == null ? List.of() : List.copyOf(adminPermissions);
         notificationPreferences = notificationPreferences == null
                 ? NotificationPreferences.defaults()
                 : notificationPreferences;
@@ -29,6 +31,10 @@ public record CurrentUser(
 
     public boolean followsUser(String userId) {
         return userId != null && followingIds.contains(userId);
+    }
+
+    public boolean hasAdminPermission(String permission) {
+        return permission != null && adminPermissions.stream().anyMatch(permission::equalsIgnoreCase);
     }
 
     @Override
