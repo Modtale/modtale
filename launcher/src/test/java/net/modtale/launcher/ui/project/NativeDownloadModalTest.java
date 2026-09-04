@@ -57,6 +57,25 @@ class NativeDownloadModalTest {
         assertEquals(List.of("0.5.4"), selectedGameVersions(modal));
     }
 
+    @Test
+    void doesNotTreatCurseForgeEarlyAccessAsTheLatestGameVersion() throws Exception {
+        NativeDownloadModal modal = new NativeDownloadModal(
+                () -> null,
+                () -> "",
+                ignored -> {
+                },
+                ignored -> {
+                }
+        );
+
+        modal.show(project(List.of(
+                version("early", "0.9.0", "Early Access"),
+                version("current", "1.0.0", "0.5.0")
+        )), catalog("Early Access", "0.5.0"));
+
+        assertEquals(List.of("0.5.0"), selectedGameVersions(modal));
+    }
+
     private static ProjectDetail project(List<ProjectVersion> versions) {
         return new ProjectDetail(
                 "project-id",

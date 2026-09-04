@@ -21,11 +21,16 @@ public final class GameVersionOrdering {
         if (versions == null || versions.isEmpty()) return List.of();
         LinkedHashSet<String> distinct = new LinkedHashSet<>();
         versions.stream().filter(version -> version != null && !version.isBlank())
-                .map(String::trim).forEach(distinct::add);
+                .map(String::trim)
+                .map(version -> isEarlyAccess(version) ? "Early Access" : version)
+                .forEach(distinct::add);
         return distinct.stream().sorted(GameVersionOrdering::compare).toList();
     }
 
     public static int compare(String left, String right) {
+        boolean earlyAccessLeft = isEarlyAccess(left);
+        boolean earlyAccessRight = isEarlyAccess(right);
+        if (earlyAccessLeft != earlyAccessRight) return earlyAccessLeft ? 1 : -1;
         ParsedSemver semverLeft = parseSemver(left);
         ParsedSemver semverRight = parseSemver(right);
         ParsedLegacy legacyLeft = parseLegacy(left);
@@ -39,6 +44,10 @@ public final class GameVersionOrdering {
         }
         if (semverLeft != null && semverRight != null) return compareSemverDescending(semverLeft, semverRight);
         return right.compareTo(left);
+    }
+
+    public static boolean isEarlyAccess(String version) {
+        return version != null && "Early Access".equalsIgnoreCase(version.trim());
     }
 
     private static ParsedLegacy parseLegacy(String version) {
