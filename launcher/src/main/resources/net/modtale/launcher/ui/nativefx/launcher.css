@@ -6350,7 +6350,7 @@
 .project-detail-stat-box {
     -fx-min-width: 138px;
     -fx-pref-width: 138px;
-    -fx-padding: 8px 8px 12px 8px;
+    -fx-padding: 8px 0 12px 0;
 }
 
 .project-detail-stat-number {
@@ -6359,6 +6359,14 @@
     -fx-font-size: 30px;
     -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
+}
+
+.project-detail-stat-number.condensed {
+    -fx-font-size: 26px;
+}
+
+.project-detail-stat-number.long {
+    -fx-font-size: 21px;
 }
 
 .project-detail-stat-caption,
