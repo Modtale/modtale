@@ -14,6 +14,8 @@ import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
+import net.modtale.launcher.model.project.CurseForgeCommentsPage;
 import net.modtale.launcher.model.project.ProjectComment;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,13 +47,14 @@ class CurseForgeCommentsClientTest {
             int request = requests.getAndIncrement();
             assertEquals("page=" + request, exchange.getRequestURI().getQuery());
             String body = request == 0 ? """
-                    {"data":[{"id":1,"projectId":42,"text":"First","datePosted":1787419517100,
+                    {"data":[{"id":5,"projectId":42,"text":"Unpinned first from provider","author":{"displayName":"Reader"}},
+                      {"id":1,"projectId":42,"text":"First","datePosted":1787419517100,
                       "isPinned":true,"author":{"displayName":"Builder","twitchAvatarUrl":"https://static-cdn.jtvnw.net/avatar-{0}.png"},
                       "replies":[{"id":2,"projectId":42,"text":"Nested","author":{"username":"helper",
                         "twitchAvatarUrl":"https://evil.example/avatar.png"}}]}],
                      "pagination":{"index":0,"totalCount":40,"pageSize":20}}
                     """ : """
-                    {"data":[{"id":3,"projectId":42,"text":"Second","author":{"username":"reader"}},
+                    {"data":[{"id":3,"projectId":42,"text":"Second","isPinned":true,"author":{"username":"reader"}},
                      {"id":4,"projectId":999,"text":"Wrong project","author":{"username":"other"}}],
                      "pagination":{"index":1,"totalCount":40,"pageSize":20}}
                     """;
@@ -64,7 +67,7 @@ class CurseForgeCommentsClientTest {
         List<ProjectComment> comments = firstPage.comments();
 
         assertEquals(2, requests.get());
-        assertEquals(1, comments.size());
+        assertEquals(2, comments.size());
         assertEquals(40, firstPage.totalCount());
         assertTrue(firstPage.hasMore());
         ProjectComment first = comments.getFirst();
@@ -75,8 +78,15 @@ class CurseForgeCommentsClientTest {
         assertTrue(first.readOnly());
         assertEquals("Nested", first.replies().getFirst().content());
         assertNull(first.replies().getFirst().author().avatarUrl());
+        assertEquals("Unpinned first from provider", comments.get(1).content());
         assertEquals("Second", secondPage.comments().getFirst().content());
         assertTrue(!secondPage.hasMore());
+        assertEquals(
+                List.of("curseforge:1", "curseforge:3", "curseforge:5"),
+                CurseForgeCommentsPage.pinnedFirst(Stream.concat(
+                                firstPage.comments().stream(), secondPage.comments().stream())
+                        .toList()).stream().map(ProjectComment::id).toList()
+        );
     }
 
     @Test
