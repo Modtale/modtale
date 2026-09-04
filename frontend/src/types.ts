@@ -227,6 +227,7 @@ export interface Comment {
     content: string;
     date: string;
     updatedAt?: string;
+    pinned?: boolean;
     upvoteCount?: number;
     downvoteCount?: number;
     userVote?: 'up' | 'down' | null;
