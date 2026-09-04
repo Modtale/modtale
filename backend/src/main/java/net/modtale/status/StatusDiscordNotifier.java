@@ -31,7 +31,7 @@ public class StatusDiscordNotifier {
     private static final String OPERATIONAL_BLOCK = "\uD83D\uDFE9";
     private static final String DEGRADED_BLOCK = "\uD83D\uDFE8";
     private static final String OUTAGE_BLOCK = "\uD83D\uDFE5";
-    private static final String NO_DATA_BLOCK = "\u2B1B";
+    private static final String NO_DATA_BLOCK = "\u00B7";
 
     private final StatusServiceProperties properties;
     private final ObjectMapper objectMapper;
