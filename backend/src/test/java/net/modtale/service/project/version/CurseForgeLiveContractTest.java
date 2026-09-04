@@ -31,11 +31,8 @@ class CurseForgeLiveContractTest {
         CurseForgeApiClient.CurseForgeFile exact = exactReference.files().getFirst();
         CurseForgeApiClient.CurseForgeDownload download = client.getDownload(
                 Long.parseLong(project.id()), Long.parseLong(exact.id())).orElseThrow();
-        var comments = client.getComments(Long.parseLong(project.id()));
 
         assertFalse(exact.hashes().isEmpty());
-        assertEquals(comments.totalCount(), comments.comments().stream()
-                .mapToLong(CurseForgeLiveContractTest::countComments).sum());
         assertTrue(exact.fingerprint() != null && exact.fingerprint() >= 0);
         CurseForgeApiClient.CurseForgeFingerprintMatch identity = client.matchArtifacts(List.of(
                 new CurseForgeApiClient.CurseForgeArtifact(exact.fingerprint(), exact.fileName())))
@@ -58,9 +55,5 @@ class CurseForgeLiveContractTest {
         if (expectedSha1 != null) {
             assertEquals(expectedSha1, HexFormat.of().formatHex(MessageDigest.getInstance("SHA-1").digest(response.body())));
         }
-    }
-
-    private static long countComments(net.modtale.model.dto.project.CurseForgeCommentsDTO.Comment comment) {
-        return 1 + comment.replies().stream().mapToLong(CurseForgeLiveContractTest::countComments).sum();
     }
 }

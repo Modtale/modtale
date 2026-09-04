@@ -118,33 +118,6 @@ class CurseForgeApiClientTest {
     }
 
     @Test
-    void importsReadOnlyCurseForgeCommentsAndNestedReplies() {
-        Fixture fixture = fixture();
-        fixture.server.expect(requestTo("https://www.curseforge.com/api/v1/mods/1450386/comments?index=0"))
-                .andExpect(method(HttpMethod.GET))
-                .andExpect(header("User-Agent", "Modtale/1.0 (+https://modtale.net)"))
-                .andRespond(withSuccess("""
-                        {"data":[{"id":8328156,"text":"Compost moss too","projectId":1450386,
-                          "author":{"username":"builder","displayName":"Builder","twitchAvatarUrl":"https://cdn.example/avatar-{0}.png"},
-                          "datePosted":1787419517100,"isPinned":true,"replies":[
-                            {"id":8328157,"text":"Good idea","projectId":1450386,"author":{"username":"author"},
-                             "datePosted":1787419617100,"isPinned":false}
-                          ]}],"pagination":{"index":0,"totalCount":2,"pageSize":20}}
-                        """, MediaType.APPLICATION_JSON));
-
-        var result = fixture.client.getComments(1450386);
-
-        assertEquals(2, result.totalCount());
-        assertEquals("curseforge:8328156", result.comments().getFirst().id());
-        assertEquals("Builder", result.comments().getFirst().user());
-        assertEquals("https://cdn.example/avatar-70x70.png", result.comments().getFirst().author().avatarUrl());
-        assertTrue(result.comments().getFirst().pinned());
-        assertTrue(result.comments().getFirst().readOnly());
-        assertEquals("Good idea", result.comments().getFirst().replies().getFirst().content());
-        fixture.server.verify();
-    }
-
-    @Test
     void identifiesInstalledArtifactByExactFingerprintNotFilenameAlone() {
         Fixture fixture = fixture();
         fixture.server.expect(requestTo("https://nyocf.junyo.dev/api/v1/hytale/mods/batch-search"))

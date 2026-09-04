@@ -15,6 +15,7 @@ import java.util.Optional;
 import net.modtale.launcher.model.auth.SignInResponse;
 import net.modtale.launcher.model.notification.LauncherNotification;
 import net.modtale.launcher.model.project.DownloadUrlResponse;
+import net.modtale.launcher.model.project.CurseForgeCommentsPage;
 import net.modtale.launcher.model.project.ArtifactIdentity;
 import net.modtale.launcher.model.project.GameVersionCatalog;
 import net.modtale.launcher.model.project.ProjectComment;
@@ -42,6 +43,7 @@ public class ModtaleApiClient {
     private final ModtaleApiTransport transport;
     private final ModtaleDownloadClient downloadClient;
     private final NyoCfClient nyoCfClient;
+    private final CurseForgeCommentsClient curseForgeCommentsClient;
     private final LauncherSessionStore sessionStore;
     private volatile URI apiBaseUri;
     private volatile boolean storedSessionLoaded;
@@ -65,7 +67,7 @@ public class ModtaleApiClient {
                 .connectTimeout(Duration.ofSeconds(15))
                 .cookieHandler(cookieManager)
                 .followRedirects(HttpClient.Redirect.NORMAL)
-                .build(), cookieManager, apiBaseUrl, responseCache, sessionStore);
+                .build(), cookieManager, apiBaseUrl, responseCache, sessionStore, null);
     }
 
     ModtaleApiClient(HttpClient httpClient, String apiBaseUrl) {
@@ -73,7 +75,12 @@ public class ModtaleApiClient {
     }
 
     ModtaleApiClient(HttpClient httpClient, String apiBaseUrl, ApiResponseCache responseCache) {
-        this(httpClient, null, apiBaseUrl, responseCache, null);
+        this(httpClient, null, apiBaseUrl, responseCache, null, null);
+    }
+
+    ModtaleApiClient(HttpClient httpClient, String apiBaseUrl, ApiResponseCache responseCache, URI curseForgeBaseUri) {
+        this(httpClient, null, apiBaseUrl, responseCache, null,
+                new CurseForgeCommentsClient(httpClient, curseForgeBaseUri));
     }
 
     private ModtaleApiClient(
@@ -81,12 +88,15 @@ public class ModtaleApiClient {
             CookieManager cookieManager,
             String apiBaseUrl,
             ApiResponseCache responseCache,
-            LauncherSessionStore sessionStore
+            LauncherSessionStore sessionStore,
+            CurseForgeCommentsClient curseForgeCommentsClient
     ) {
         this.cookieManager = cookieManager;
         this.transport = new ModtaleApiTransport(httpClient, responseCache, this::csrfToken);
         this.downloadClient = new ModtaleDownloadClient(httpClient, this::apiBaseUri);
         this.nyoCfClient = new NyoCfClient(httpClient);
+        this.curseForgeCommentsClient = curseForgeCommentsClient == null
+                ? new CurseForgeCommentsClient(httpClient) : curseForgeCommentsClient;
         this.sessionStore = sessionStore;
         configure(apiBaseUrl);
         if (this.sessionStore != null && this.cookieManager != null) {
@@ -268,8 +278,16 @@ public class ModtaleApiClient {
     }
 
     public List<ProjectComment> getComments(String projectId) {
-        CommentsResponse response = get(readCommentsPath(projectId), CommentsResponse.class);
+        Long curseForgeProjectId = curseForgeId(projectId);
+        if (curseForgeProjectId != null) return curseForgeCommentsClient.getComments(curseForgeProjectId, 0).comments();
+        CommentsResponse response = get(nativeCommentsPath(projectId), CommentsResponse.class);
         return response == null ? List.of() : response.comments();
+    }
+
+    public CurseForgeCommentsPage getCurseForgeComments(String projectId, int page) {
+        Long curseForgeProjectId = curseForgeId(projectId);
+        if (curseForgeProjectId == null) throw new IllegalArgumentException("This is not a CurseForge project ID.");
+        return curseForgeCommentsClient.getComments(curseForgeProjectId, page);
     }
 
     public void postComment(String projectId, String content) {
@@ -432,13 +450,6 @@ public class ModtaleApiClient {
         } catch (NumberFormatException ignored) {
             return null;
         }
-    }
-
-    private static String readCommentsPath(String projectId) {
-        Long externalId = curseForgeId(projectId);
-        return externalId == null
-                ? "/projects/" + encodePath(projectId) + "/comments"
-                : "/projects/external/curseforge/" + externalId + "/comments";
     }
 
     private static String nativeCommentsPath(String projectId) {
