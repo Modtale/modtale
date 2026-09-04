@@ -429,7 +429,7 @@ public final class LauncherShell {
         pageSubtitle.setText(LauncherShellTitles.subtitleFor(nextView, browseController));
         toolbarActions.update(navigation.currentView());
         if (discoverMode) {
-            resetContentScrollToTop();
+            resetContentScrollPosition();
         }
     }
 
@@ -450,13 +450,15 @@ public final class LauncherShell {
                 || view == LauncherView.UPDATES;
     }
 
-    private void resetContentScrollToTop() {
+    private void resetContentScrollPosition() {
         if (contentScroll == null) {
             return;
         }
+        contentScroll.setHvalue(contentScroll.getHmin());
         contentScroll.setVvalue(contentScroll.getVmin());
         Platform.runLater(() -> {
             if (contentScroll != null) {
+                contentScroll.setHvalue(contentScroll.getHmin());
                 contentScroll.setVvalue(contentScroll.getVmin());
             }
         });
@@ -908,6 +910,7 @@ public final class LauncherShell {
     private Node content() {
         VBox content = new VBox(0);
         content.getStyleClass().add("content");
+        content.setMinWidth(0);
         content.setMaxHeight(Double.MAX_VALUE);
         HBox.setHgrow(content, Priority.ALWAYS);
 
@@ -932,8 +935,10 @@ public final class LauncherShell {
         scrollSupport.configure(scrollPane, false);
         contentBody = new VBox(viewDeck);
         contentBody.getStyleClass().add("body");
+        contentBody.setMinWidth(0);
         contentBody.setMaxHeight(Double.MAX_VALUE);
         VBox.setVgrow(viewDeck, Priority.ALWAYS);
+        viewDeck.setMinWidth(0);
         viewDeck.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         scrollPane.setContent(contentBody);
         projectPageController.attachScrollPane(scrollPane);

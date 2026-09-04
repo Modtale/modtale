@@ -13,6 +13,12 @@ import org.junit.jupiter.api.Test;
 class LauncherScrollSupportTest {
 
     @Test
+    void verticalOnlyScrollPaneRejectsHorizontalInput() {
+        assertEquals(0, LauncherScrollSupport.horizontalDelta(false, 72));
+        assertEquals(-72, LauncherScrollSupport.horizontalDelta(true, -72));
+    }
+
+    @Test
     void leavesPreciseTouchpadScrollingAndInertiaUntouched() {
         StackPane root = new StackPane();
         StackPane scrollTarget = new StackPane();
