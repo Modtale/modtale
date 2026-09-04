@@ -53,6 +53,10 @@ public class SocialService {
         projectSocialService.voteComment(projectId, commentId, userId, upvote);
     }
 
+    public void setCommentPinned(String projectId, String commentId, boolean pinned) {
+        projectSocialService.setCommentPinned(projectId, commentId, pinned);
+    }
+
     public void followUser(String currentUserId, String targetId) {
         userFollowService.followUser(currentUserId, targetId);
     }
