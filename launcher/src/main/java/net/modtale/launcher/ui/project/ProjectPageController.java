@@ -850,7 +850,7 @@ public final class ProjectPageController {
                     LinkedHashMap<String, ProjectComment> merged = new LinkedHashMap<>();
                     for (ProjectComment comment : currentComments) merged.put(comment.id(), comment);
                     for (ProjectComment comment : page.comments()) merged.putIfAbsent(comment.id(), comment);
-                    currentComments = List.copyOf(merged.values());
+                    currentComments = CurseForgeCommentsPage.pinnedFirst(List.copyOf(merged.values()));
                     commentsPage = page.page();
                     commentsTotalCount = page.totalCount();
                     commentsHasMore = page.hasMore();
