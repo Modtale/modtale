@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -15,6 +16,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import net.modtale.exception.UpstreamServiceException;
+import net.modtale.model.dto.project.CurseForgeCommentsDTO;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.RequestEntity;
@@ -29,6 +31,7 @@ public class CurseForgeApiClient {
     private static final int HYTALE_GAME_ID = 70216;
     private static final int MAX_FILES = 50;
     private static final int MAX_IDENTITY_CANDIDATES = 200;
+    private static final int MAX_COMMENT_PAGES = 20;
     private static final String WEBSITE_BASE = "https://www.curseforge.com";
     private static final String NYOCF_BASE = "https://nyocf.junyo.dev";
     private static final String USER_AGENT = "Modtale/1.0 (+https://modtale.net)";
@@ -101,6 +104,33 @@ public class CurseForgeApiClient {
             return Optional.of(new CurseForgeDownload(downloadUrl, file.fileName(), file.fileSize(), file.hashes()));
         } catch (RestClientException | java.io.IOException | IllegalArgumentException ex) {
             return Optional.empty();
+        }
+    }
+
+    public CurseForgeCommentsDTO getComments(long projectId) {
+        if (projectId <= 0) return new CurseForgeCommentsDTO(List.of(), 0);
+        try {
+            List<CurseForgeCommentsDTO.Comment> comments = new ArrayList<>();
+            Set<Long> seen = new LinkedHashSet<>();
+            long totalCount = 0;
+            for (int page = 0; page < MAX_COMMENT_PAGES; page++) {
+                JsonNode envelope = getJson(UriComponentsBuilder.fromUriString(WEBSITE_BASE)
+                        .path("/api/v1/mods/{projectId}/comments")
+                        .queryParam("index", page)
+                        .buildAndExpand(projectId).encode().toUri());
+                JsonNode data = envelope.path("data");
+                totalCount = Math.max(totalCount, envelope.path("pagination").path("totalCount").asLong(0));
+                if (!data.isArray() || data.isEmpty()) break;
+                for (JsonNode node : data) {
+                    CurseForgeCommentsDTO.Comment comment = parseComment(node, projectId, seen, 0);
+                    if (comment != null) comments.add(comment);
+                }
+                if (countComments(comments) >= totalCount && totalCount > 0) break;
+            }
+            long importedCount = countComments(comments);
+            return new CurseForgeCommentsDTO(List.copyOf(comments), Math.max(totalCount, importedCount));
+        } catch (RestClientException | java.io.IOException ex) {
+            throw new UpstreamServiceException(HttpStatus.BAD_GATEWAY, "CurseForge comments are unavailable.", ex);
         }
     }
 
@@ -254,6 +284,39 @@ public class CurseForgeApiClient {
                 node.path("file_length").asLong(0) > 0 ? node.path("file_length").asLong() : null,
                 parseHashes(hashes), parseGameVersions(node.path("game_versions")), null,
                 listed || node.path("is_available").asBoolean(false), Math.max(0, node.path("download_count").asLong(0)), fingerprint);
+    }
+
+    private CurseForgeCommentsDTO.Comment parseComment(JsonNode node, long projectId, Set<Long> seen, int depth) {
+        long id = node.path("id").asLong(0);
+        if (id <= 0 || node.path("projectId").asLong(projectId) != projectId || !seen.add(id) || depth > 20) return null;
+        String content = text(node, "text");
+        if (content == null) return null;
+        JsonNode authorNode = node.path("author");
+        String username = firstNonBlank(text(authorNode, "displayName"), text(authorNode, "username"), "CurseForge user");
+        String avatarUrl = text(authorNode, "twitchAvatarUrl");
+        if (avatarUrl != null) avatarUrl = avatarUrl.replace("{0}", "70x70");
+        List<CurseForgeCommentsDTO.Comment> replies = new ArrayList<>();
+        JsonNode replyNodes = node.path("replies");
+        if (replyNodes.isArray()) for (JsonNode replyNode : replyNodes) {
+            CurseForgeCommentsDTO.Comment reply = parseComment(replyNode, projectId, seen, depth + 1);
+            if (reply != null) replies.add(reply);
+        }
+        long postedAt = node.path("datePosted").asLong(0);
+        String date = postedAt > 0 ? Instant.ofEpochMilli(postedAt).toString() : null;
+        return new CurseForgeCommentsDTO.Comment("curseforge:" + id, username,
+                new CurseForgeCommentsDTO.Author(username, avatarUrl), content, date,
+                node.path("isPinned").asBoolean(false), true, List.copyOf(replies));
+    }
+
+    private static long countComments(List<CurseForgeCommentsDTO.Comment> comments) {
+        long count = 0;
+        for (CurseForgeCommentsDTO.Comment comment : comments) count += 1 + countComments(comment.replies());
+        return count;
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) if (value != null && !value.isBlank()) return value;
+        return null;
     }
 
     private JsonNode getJson(URI uri) throws java.io.IOException {

@@ -19,11 +19,14 @@ public record ProjectComment(
         String userVote,
         List<String> upvotes,
         List<String> downvotes,
-        Reply developerReply
+        Reply developerReply,
+        boolean readOnly,
+        List<ProjectComment> replies
 ) {
     public ProjectComment {
         upvotes = upvotes == null ? List.of() : List.copyOf(upvotes);
         downvotes = downvotes == null ? List.of() : List.copyOf(downvotes);
+        replies = replies == null ? List.of() : List.copyOf(replies);
     }
 
     public int score() {

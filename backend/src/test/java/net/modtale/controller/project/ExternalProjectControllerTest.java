@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 import java.util.Map;
 import net.modtale.service.project.version.CurseForgeApiClient;
+import net.modtale.model.dto.project.CurseForgeCommentsDTO;
 import net.modtale.service.project.version.ExternalProjectReferenceService;
 import org.junit.jupiter.api.Test;
 
@@ -61,5 +62,23 @@ class ExternalProjectControllerTest {
         assertEquals("no-store", response.getHeaders().getCacheControl());
         assertEquals("CURSEFORGE", response.getBody().source());
         assertEquals("a".repeat(40), response.getBody().hashes().get("sha1"));
+    }
+
+    @Test
+    void exposesReadOnlyCurseForgeCommentsWithoutLocalDiscussionState() {
+        CurseForgeApiClient api = mock(CurseForgeApiClient.class);
+        when(api.getComments(1450386)).thenReturn(new CurseForgeCommentsDTO(List.of(
+                new CurseForgeCommentsDTO.Comment("curseforge:7", "Builder",
+                        new CurseForgeCommentsDTO.Author("Builder", null), "Pulled from CurseForge",
+                        "2026-09-01T00:00:00Z", false, true, List.of())), 1));
+        ExternalProjectController controller = new ExternalProjectController(
+                mock(ExternalProjectReferenceService.class), api,
+                mock(net.modtale.service.project.version.ArtifactIdentityService.class));
+
+        var response = controller.getCurseForgeComments(1450386);
+
+        assertEquals("no-store", response.getHeaders().getCacheControl());
+        assertEquals("Pulled from CurseForge", response.getBody().comments().getFirst().content());
+        assertTrue(response.getBody().comments().getFirst().readOnly());
     }
 }

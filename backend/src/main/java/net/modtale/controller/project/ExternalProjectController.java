@@ -2,6 +2,7 @@ package net.modtale.controller.project;
 
 import net.modtale.model.dto.project.ExternalProjectReferenceDTO;
 import net.modtale.model.dto.project.CurseForgeCatalogDTO;
+import net.modtale.model.dto.project.CurseForgeCommentsDTO;
 import net.modtale.model.dto.project.ArtifactIdentityDTO;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.exception.ResourceNotFoundException;
@@ -76,6 +77,14 @@ public class ExternalProjectController {
         CurseForgeApiClient.CurseForgeProject project = curseForgeApiClient.getProject(projectId)
                 .orElseThrow(() -> new ResourceNotFoundException("CurseForge project was not found."));
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(CurseForgeCatalogDTO.Project.from(project));
+    }
+
+    @GetMapping("/projects/external/curseforge/{projectId}/comments")
+    @PreAuthorize("@apiSecurity.hasAnyPerm('PROJECT_READ', authentication)")
+    public ResponseEntity<CurseForgeCommentsDTO> getCurseForgeComments(
+            @org.springframework.web.bind.annotation.PathVariable long projectId
+    ) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(curseForgeApiClient.getComments(projectId));
     }
 
     @GetMapping("/projects/external/curseforge/{projectId}/files/{fileId}/download-url")

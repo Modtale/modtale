@@ -97,10 +97,12 @@ final class NativeCommentSection {
             boolean submitting
     ) {
         CurrentUser user = currentUser.get();
+        boolean curseForge = (summary != null && summary.isCurseForge())
+                || (detail != null && value(detail.id(), "").startsWith("curseforge:"));
         boolean creator = isCreator(user, summary, detail);
-        boolean canPin = creator || (user != null && user.hasAdminPermission("PROJECT_MODERATE"));
+        boolean canPin = !curseForge && (creator || (user != null && user.hasAdminPermission("PROJECT_MODERATE")));
         boolean disabled = detail != null && Boolean.FALSE.equals(detail.allowComments());
-        if (disabled && !creator) {
+        if (!curseForge && disabled && !creator) {
             return null;
         }
 
@@ -115,26 +117,31 @@ final class NativeCommentSection {
         HBox heading = new HBox(12);
         heading.getStyleClass().add("project-comments-heading");
         heading.setAlignment(Pos.CENTER_LEFT);
-        Label title = new Label(safeComments.size() + " Comments");
+        Label title = new Label(countComments(safeComments) + (curseForge ? " CurseForge Comments" : " Comments"));
         title.getStyleClass().add("project-comments-title");
         heading.getChildren().addAll(LauncherIcons.icon(LauncherIcons.Glyph.MESSAGE_SQUARE, 24), title);
         section.getChildren().add(heading);
 
-        if (disabled) {
+        if (curseForge) {
+            section.getChildren().add(curseForgeNotice());
+        } else if (disabled) {
             section.getChildren().add(disabledNotice());
         }
 
-        section.getChildren().add(user == null ? signInPrompt() : composer(user, submitting));
+        if (!curseForge) section.getChildren().add(user == null ? signInPrompt() : composer(user, submitting));
 
         VBox list = new VBox(16);
         list.getStyleClass().add("project-comments-list");
         if (loading) {
             list.getChildren().add(stateCard(NativeSpinner.inline(20)));
         } else if (safeComments.isEmpty()) {
-            list.getChildren().add(stateCard("No comments yet. Be the first to share your thoughts!"));
+            list.getChildren().add(stateCard(curseForge
+                    ? "No comments have been posted on CurseForge yet."
+                    : "No comments yet. Be the first to share your thoughts!"));
         } else {
             for (ProjectComment comment : safeComments) {
-                list.getChildren().add(commentCard(comment, summary, detail, safeProfiles, creator, canPin, submitting));
+                list.getChildren().add(commentCard(comment, summary, detail, safeProfiles,
+                        creator, canPin, curseForge || comment.readOnly(), submitting));
             }
         }
         section.getChildren().add(list);
@@ -163,6 +170,16 @@ final class NativeCommentSection {
         Label label = new Label("Comments are currently disabled. Only you can see them.");
         label.getStyleClass().add("project-comments-disabled-text");
         notice.getChildren().addAll(LauncherIcons.icon(LauncherIcons.Glyph.FLAG, 16), label);
+        return notice;
+    }
+
+    private Node curseForgeNotice() {
+        HBox notice = new HBox(8);
+        notice.getStyleClass().add("project-comments-disabled-notice");
+        notice.setAlignment(Pos.CENTER_LEFT);
+        Label label = new Label("Comments are imported from CurseForge and are read-only here.");
+        label.getStyleClass().add("project-comments-disabled-text");
+        notice.getChildren().addAll(LauncherIcons.icon(LauncherIcons.Glyph.MESSAGE_SQUARE, 16), label);
         return notice;
     }
 
@@ -229,6 +246,7 @@ final class NativeCommentSection {
             Map<String, UserSummary> profiles,
             boolean creator,
             boolean canPin,
+            boolean readOnly,
             boolean submitting
     ) {
         CurrentUser user = currentUser.get();
@@ -241,7 +259,10 @@ final class NativeCommentSection {
         card.getStyleClass().add("project-comment-card");
         if (comment.pinned()) card.getStyleClass().add("pinned");
         card.setAlignment(Pos.TOP_LEFT);
-        card.getChildren().add(voteWidget(comment.id(), false, comment.score(), comment.userVoteFor(user == null ? null : user.id()), submitting));
+        if (!readOnly) {
+            card.getChildren().add(voteWidget(comment.id(), false, comment.score(),
+                    comment.userVoteFor(user == null ? null : user.id()), submitting));
+        }
 
         VBox body = new VBox(0);
         body.setMinWidth(0);
@@ -250,12 +271,21 @@ final class NativeCommentSection {
         Node markdown = markdown(comment.content());
         VBox.setMargin(markdown, new Insets(8, 0, 0, 0));
         body.getChildren().add(markdown);
-        body.getChildren().add(actionsRow(comment, creator, canPin, owner));
+        if (!readOnly) body.getChildren().add(actionsRow(comment, creator, canPin, owner));
 
         if (replyingCommentId != null && replyingCommentId.equals(comment.id())) {
             body.getChildren().add(replyForm(comment.id(), submitting));
         } else if (comment.developerReply() != null) {
             body.getChildren().add(developerReply(comment, profiles, summary, detail, submitting));
+        }
+        if (!comment.replies().isEmpty()) {
+            VBox replies = new VBox(12);
+            replies.getStyleClass().add("project-comment-imported-replies");
+            VBox.setMargin(replies, new Insets(12, 0, 0, 0));
+            for (ProjectComment reply : comment.replies()) {
+                replies.getChildren().add(importedReply(reply, profiles, summary, detail));
+            }
+            body.getChildren().add(replies);
         }
 
         card.getChildren().add(body);
@@ -407,6 +437,38 @@ final class NativeCommentSection {
             actionsRow.getChildren().add(actionButton("Report", LauncherIcons.Glyph.FLAG, () -> actions.report(comment.id())));
         }
         card.getChildren().add(actionsRow);
+        row.getChildren().add(card);
+        return row;
+    }
+
+    private Node importedReply(
+            ProjectComment reply,
+            Map<String, UserSummary> profiles,
+            ProjectSummary summary,
+            ProjectDetail detail
+    ) {
+        String userId = value(reply.userId(), "");
+        CommentIdentity identity = identity(userId, reply.user(), reply.author(), profiles, reply.date());
+        HBox row = new HBox(12);
+        row.getStyleClass().add("project-comment-developer-reply-row");
+        row.getChildren().add(replyConnector());
+
+        VBox card = new VBox(0);
+        card.getStyleClass().add("project-comment-developer-reply");
+        card.setMinWidth(0);
+        HBox.setHgrow(card, Priority.ALWAYS);
+        card.getChildren().add(commentHeader(identity, roleBadge(userId, summary, detail), reply.pinned(), 32));
+        Node markdown = markdown(reply.content());
+        VBox.setMargin(markdown, new Insets(8, 0, 0, 0));
+        card.getChildren().add(markdown);
+        if (!reply.replies().isEmpty()) {
+            VBox nested = new VBox(12);
+            VBox.setMargin(nested, new Insets(12, 0, 0, 16));
+            for (ProjectComment child : reply.replies()) {
+                nested.getChildren().add(importedReply(child, profiles, summary, detail));
+            }
+            card.getChildren().add(nested);
+        }
         row.getChildren().add(card);
         return row;
     }
@@ -585,6 +647,12 @@ final class NativeCommentSection {
     private static String initial(String username) {
         String normalized = value(username, "?").trim();
         return normalized.isBlank() ? "?" : normalized.substring(0, 1).toUpperCase(Locale.ROOT);
+    }
+
+    private static int countComments(List<ProjectComment> comments) {
+        int count = 0;
+        for (ProjectComment comment : comments) count += 1 + countComments(comment.replies());
+        return count;
     }
 
     private static String first(String... values) {
