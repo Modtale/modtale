@@ -66,13 +66,16 @@ class StatusDiscordNotifierTest {
         JsonNode createBody = objectMapper.readTree(requests.get(0).body());
         assertEquals("Modtale Status", createBody.path("username").asText());
         assertEquals("https://modtale.net/assets/favicon.png", createBody.path("avatar_url").asText());
+        assertEquals("Modtale Status", createBody.path("embeds").get(0).path("title").asText());
         String description = createBody.path("embeds").get(0).path("description").asText();
         assertTrue(description.contains("Main Site"));
         assertTrue(description.contains("API Gateway"));
         assertTrue(description.contains("Database (Atlas)"));
         assertTrue(description.contains("Storage (R2)"));
-        assertTrue(description.contains("🟩"));
-        assertTrue(description.contains("🟨"));
+        assertTrue(description.contains("■"));
+        assertTrue(description.contains("▲"));
+        assertFalse(description.contains("🌐"));
+        assertFalse(description.contains("⚡"));
         assertTrue(description.contains("Operational"));
         assertTrue(description.contains("Degraded"));
         assertFalse(createBody.path("allowed_mentions").path("parse").elements().hasNext());

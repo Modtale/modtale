@@ -28,10 +28,10 @@ public class StatusDiscordNotifier {
     private static final Logger logger = LoggerFactory.getLogger(StatusDiscordNotifier.class);
     private static final int HISTORY_BUCKETS = 10;
     private static final long HISTORY_WINDOW_MILLIS = Duration.ofHours(24).toMillis();
-    private static final String GREEN_SQUARE = "\uD83D\uDFE9";
-    private static final String YELLOW_SQUARE = "\uD83D\uDFE8";
-    private static final String RED_SQUARE = "\uD83D\uDFE5";
-    private static final String NO_DATA_SQUARE = "\u2B1B";
+    private static final String OPERATIONAL_BLOCK = "■";
+    private static final String DEGRADED_BLOCK = "▲";
+    private static final String OUTAGE_BLOCK = "×";
+    private static final String NO_DATA_BLOCK = "·";
 
     private final StatusServiceProperties properties;
     private final ObjectMapper objectMapper;
@@ -181,7 +181,7 @@ public class StatusDiscordNotifier {
 
     private Map<String, Object> embed(SystemStatusView status) {
         Map<String, Object> embed = new LinkedHashMap<>();
-        embed.put("title", statusIcon(status.overall()) + " Modtale Status");
+        embed.put("title", "Modtale Status");
         embed.put("url", cleanStatusUrl());
         embed.put("color", colorFor(status.overall()));
         embed.put("description", description(status));
@@ -196,8 +196,7 @@ public class StatusDiscordNotifier {
             if (!description.isEmpty()) {
                 description.append("\n\n");
             }
-            description.append(serviceIcon(service.id()))
-                    .append(" **")
+            description.append("**")
                     .append(service.name())
                     .append("**\n")
                     .append(uptimeBar(status, service.id()))
@@ -208,7 +207,7 @@ public class StatusDiscordNotifier {
                     .append(" ms");
         }
         if (!status.activeIncidents().isEmpty()) {
-            description.append("\n\n⚠️ **")
+            description.append("\n\n**")
                     .append(status.activeIncidents().size())
                     .append(status.activeIncidents().size() == 1 ? " active incident" : " active incidents")
                     .append("** · [View details](")
@@ -263,22 +262,12 @@ public class StatusDiscordNotifier {
 
     private String statusBlock(SystemStatus status) {
         if (status == null) {
-            return NO_DATA_SQUARE;
+            return NO_DATA_BLOCK;
         }
         return switch (status) {
-            case OPERATIONAL -> GREEN_SQUARE;
-            case DEGRADED -> YELLOW_SQUARE;
-            case OUTAGE -> RED_SQUARE;
-        };
-    }
-
-    private String serviceIcon(String serviceId) {
-        return switch (serviceId) {
-            case "site" -> "🌐";
-            case "api" -> "⚡";
-            case "database" -> "🗄️";
-            case "storage" -> "📦";
-            default -> "•";
+            case OPERATIONAL -> OPERATIONAL_BLOCK;
+            case DEGRADED -> DEGRADED_BLOCK;
+            case OUTAGE -> OUTAGE_BLOCK;
         };
     }
 
@@ -287,14 +276,6 @@ public class StatusDiscordNotifier {
             case OPERATIONAL -> "Operational";
             case DEGRADED -> "Degraded";
             case OUTAGE -> "Outage";
-        };
-    }
-
-    private String statusIcon(SystemStatus status) {
-        return switch (status) {
-            case OPERATIONAL -> "🟢";
-            case DEGRADED -> "🟡";
-            case OUTAGE -> "🔴";
         };
     }
 
