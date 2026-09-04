@@ -11,6 +11,7 @@ import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.ReplaceOptions;
 import com.mongodb.client.model.Sorts;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -38,6 +39,7 @@ import org.springframework.stereotype.Repository;
 public class MongoStatusStore implements AutoCloseable {
 
     private static final Logger logger = LoggerFactory.getLogger(MongoStatusStore.class);
+    private static final String DISCORD_STATUS_MESSAGE_ID = "discord-status-message";
 
     private final StatusServiceProperties properties;
     private volatile MongoClient mongoClient;
@@ -86,6 +88,31 @@ public class MongoStatusStore implements AutoCloseable {
                     .append("apiStatus", entry.apiStatus().name())
                     .append("dbStatus", entry.dbStatus().name())
                     .append("storageStatus", entry.storageStatus().name()));
+            return null;
+        });
+    }
+
+    public Optional<String> findDiscordStatusMessageId() {
+        return withDatabase(database -> {
+            Document document = state(database).find(Filters.eq("_id", DISCORD_STATUS_MESSAGE_ID)).first();
+            return Optional.ofNullable(document)
+                    .map(value -> text(value.get("messageId")))
+                    .filter(value -> !value.isBlank());
+        }).orElse(Optional.empty());
+    }
+
+    public void saveDiscordStatusMessageId(String messageId) {
+        if (!hasText(messageId)) {
+            return;
+        }
+        withDatabase(database -> {
+            state(database).replaceOne(
+                    Filters.eq("_id", DISCORD_STATUS_MESSAGE_ID),
+                    new Document("_id", DISCORD_STATUS_MESSAGE_ID)
+                            .append("messageId", messageId.trim())
+                            .append("updatedAt", new Date()),
+                    new ReplaceOptions().upsert(true)
+            );
             return null;
         });
     }
@@ -152,6 +179,10 @@ public class MongoStatusStore implements AutoCloseable {
         return database.getCollection("status_incidents");
     }
 
+    private MongoCollection<Document> state(MongoDatabase database) {
+        return database.getCollection("status_service_state");
+    }
+
     private void ensureHistoryIndex(MongoDatabase database) {
         if (historyIndexEnsured) {
             return;
@@ -161,12 +192,48 @@ public class MongoStatusStore implements AutoCloseable {
                 return;
             }
             long retentionSeconds = Math.max(60, properties.getHistoryRetention().toSeconds());
-            history(database).createIndex(
-                    Indexes.ascending("timestamp"),
-                    new IndexOptions().name("status_history_ttl").expireAfter(retentionSeconds, TimeUnit.SECONDS)
-            );
+            MongoCollection<Document> collection = history(database);
+            try {
+                for (Document index : collection.listIndexes()) {
+                    if (!isTimestampIndex(index)) {
+                        continue;
+                    }
+                    if (isMatchingTimestampTtlIndex(index, retentionSeconds)) {
+                        historyIndexEnsured = true;
+                        return;
+                    }
+                    String indexName = index.getString("name");
+                    if (hasText(indexName) && !"_id_".equals(indexName)) {
+                        logger.info("Replacing non-TTL status history index {} with {} day retention", indexName,
+                                TimeUnit.SECONDS.toDays(retentionSeconds));
+                        collection.dropIndex(indexName);
+                    }
+                    break;
+                }
+                collection.createIndex(
+                        Indexes.ascending("timestamp"),
+                        new IndexOptions().name("timestamp").expireAfter(retentionSeconds, TimeUnit.SECONDS)
+                );
+            } catch (MongoException | IllegalArgumentException e) {
+                // Index maintenance must never prevent samples from being read or persisted.
+                logger.warn("Status history retention index could not be reconciled; continuing without TTL enforcement: {}",
+                        e.toString());
+            }
             historyIndexEnsured = true;
         }
+    }
+
+    static boolean isTimestampIndex(Document index) {
+        Document keys = index == null ? null : index.get("key", Document.class);
+        Object direction = keys == null ? null : keys.get("timestamp");
+        return keys != null && keys.size() == 1 && direction instanceof Number number && number.intValue() == 1;
+    }
+
+    static boolean isMatchingTimestampTtlIndex(Document index, long retentionSeconds) {
+        Object expiry = index == null ? null : index.get("expireAfterSeconds");
+        return isTimestampIndex(index)
+                && expiry instanceof Number number
+                && number.longValue() == retentionSeconds;
     }
 
     private <T> Optional<T> withDatabase(DatabaseOperation<T> operation) {

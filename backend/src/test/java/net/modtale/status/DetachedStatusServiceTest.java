@@ -42,6 +42,7 @@ class DetachedStatusServiceTest {
         assertEquals("site", status.services().getFirst().id());
         verify(mongoStatusStore).saveHistory(entry);
         verify(snapshotFileStore).writeHistory(List.of(entry));
+        verify(statusDiscordNotifier).publishStatus(any(SystemStatusView.class));
     }
 
     @Test

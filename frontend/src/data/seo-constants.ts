@@ -166,7 +166,7 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
     '/status': {
         title: 'System Status | Modtale',
         h1: 'Modtale System Status',
-        description: 'Live Modtale status for API, database, and storage availability, with service latency, uptime history, and Discord incident updates.',
+        description: 'Live Modtale status for API, database, and storage availability, with service latency, uptime history, and a continuously updated Discord mirror.',
         keywords: 'modtale status, modtale uptime, modtale api status, modtale incidents',
         intro: 'Track Modtale service availability across the API, database, and storage systems.',
         contentBlocks: [
@@ -179,8 +179,8 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
                 body: 'Status history helps the team and community spot degraded periods, latency spikes, and service recovery.',
             },
             {
-                title: 'Discord Incident Updates',
-                body: 'Operational changes can be mirrored into Discord so the community can follow important incidents where they already gather.',
+                title: 'Live Discord Status',
+                body: 'The latest service health and availability history are mirrored into one continuously updated Discord message.',
             },
         ],
         relatedLinks: [
@@ -202,7 +202,7 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
             },
             {
                 question: 'Where are incident updates posted?',
-                answer: 'The status page shows live health, and configured status changes can also be posted to the Modtale Discord server.',
+                answer: 'The status page shows live health, which is also mirrored in one continuously updated message in the Modtale Discord server.',
             },
         ],
     },
