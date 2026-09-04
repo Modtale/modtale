@@ -9,6 +9,7 @@ public record ProjectCommentDTO(
         String content,
         String date,
         String updatedAt,
+        boolean pinned,
         int upvoteCount,
         int downvoteCount,
         String userVote,

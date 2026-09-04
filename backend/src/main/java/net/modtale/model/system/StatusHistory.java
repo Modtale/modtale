@@ -10,7 +10,7 @@ public class StatusHistory {
     @Id
     private String id;
 
-    @Indexed
+    @Indexed(expireAfter = "30d")
     private LocalDateTime timestamp;
 
     private int apiLatency;
