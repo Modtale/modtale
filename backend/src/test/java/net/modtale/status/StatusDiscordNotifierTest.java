@@ -72,10 +72,12 @@ class StatusDiscordNotifierTest {
         assertTrue(description.contains("API Gateway"));
         assertTrue(description.contains("Database (Atlas)"));
         assertTrue(description.contains("Storage (R2)"));
-        assertTrue(description.contains("■"));
-        assertTrue(description.contains("▲"));
+        assertTrue(description.contains("🟩"));
+        assertTrue(description.contains("🟨"));
         assertFalse(description.contains("🌐"));
         assertFalse(description.contains("⚡"));
+        assertFalse(description.contains("🗄️"));
+        assertFalse(description.contains("📦"));
         assertTrue(description.contains("Operational"));
         assertTrue(description.contains("Degraded"));
         assertFalse(createBody.path("allowed_mentions").path("parse").elements().hasNext());
