@@ -11,6 +11,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import javafx.geometry.Bounds;
+import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.GridPane;
@@ -289,7 +290,8 @@ public final class ProjectBrowserRenderer {
     private double browseResultsWidth() {
         double viewportWidth = enclosingScrollViewportWidth();
         if (viewportWidth > 0) {
-            return viewportWidth;
+            VBox body = contentBody.get();
+            return contentWidthInside(viewportWidth, body == null ? Insets.EMPTY : body.getPadding());
         }
         double parentWidth = nodeWidth(projectResults.getParent());
         if (parentWidth > 0) {
@@ -305,6 +307,11 @@ public final class ProjectBrowserRenderer {
             return bodyWidth;
         }
         return nodeWidth(projectResults);
+    }
+
+    static double contentWidthInside(double viewportWidth, Insets padding) {
+        Insets safePadding = padding == null ? Insets.EMPTY : padding;
+        return Math.max(0, viewportWidth - safePadding.getLeft() - safePadding.getRight());
     }
 
     private double enclosingScrollViewportWidth() {

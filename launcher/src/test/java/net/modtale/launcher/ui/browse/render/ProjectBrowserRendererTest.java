@@ -2,6 +2,7 @@ package net.modtale.launcher.ui.browse.render;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import javafx.geometry.Insets;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import net.modtale.launcher.model.project.ProjectSummary;
@@ -38,6 +39,12 @@ class ProjectBrowserRendererTest {
     void layoutUsesConstrainedWidthWhenRenderedResultsAreStale() {
         assertEquals(2, rendererForWidths(1320, 936, 936).columnsForView(ProjectCardViewStyle.GRID));
         assertEquals(3, rendererForWidths(936, 1320, 1320).columnsForView(ProjectCardViewStyle.GRID));
+    }
+
+    @Test
+    void viewportLayoutReservesTheContentGutterForNavbarAlignment() {
+        assertEquals(1208, ProjectBrowserRenderer.contentWidthInside(1320, new Insets(0, 112, 0, 0)));
+        assertEquals(1096, ProjectBrowserRenderer.contentWidthInside(1320, new Insets(0, 112, 0, 112)));
     }
 
     private static ProjectBrowserRenderer rendererForWidth(double width) {

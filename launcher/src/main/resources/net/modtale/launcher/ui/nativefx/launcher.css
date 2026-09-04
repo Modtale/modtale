@@ -1079,7 +1079,7 @@
     -fx-pref-width: 10px;
     -fx-min-width: 10px;
     -fx-max-width: 10px;
-    -fx-opacity: 1;
+    -fx-opacity: 0;
     -fx-padding: 0;
 }
 
