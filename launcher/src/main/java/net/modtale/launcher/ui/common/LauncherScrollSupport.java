@@ -30,6 +30,8 @@ public final class LauncherScrollSupport {
 
     private static final String INSTALLED_PROPERTY = LauncherScrollSupport.class.getName() + ".installed";
     private static final String SCROLLBAR_DISCOVERY_PROPERTY = LauncherScrollSupport.class.getName() + ".scrollbarDiscovery";
+    private static final String HORIZONTAL_SCROLL_PROPERTY = LauncherScrollSupport.class.getName() + ".horizontal";
+    private static final String HORIZONTAL_LOCK_PROPERTY = LauncherScrollSupport.class.getName() + ".horizontalLock";
     private static final PseudoClass SCROLLING = PseudoClass.getPseudoClass("scrolling");
     private static final Duration INTERACTION_IDLE_DELAY = Duration.millis(220);
     private static final Duration SCROLLBAR_IDLE_DELAY = Duration.millis(750);
@@ -75,6 +77,10 @@ public final class LauncherScrollSupport {
     }
 
     public void configure(ScrollPane scrollPane, boolean horizontal) {
+        scrollPane.getProperties().put(HORIZONTAL_SCROLL_PROPERTY, horizontal);
+        if (!horizontal) {
+            lockHorizontalPosition(scrollPane);
+        }
         configureScrollbarDiscovery(scrollPane);
         Node root = rootSupplier.get();
         if (root != null) {
@@ -176,9 +182,11 @@ public final class LauncherScrollSupport {
         while (candidate != null) {
             if (candidate instanceof ScrollPane pane) {
                 LauncherScrollAnimator.ScrollMetrics metrics = LauncherScrollAnimator.metrics(pane);
-                double requestedX = deltaX;
+                boolean horizontal = horizontalScrollingEnabled(pane);
+                double requestedX = horizontalDelta(horizontal, deltaX);
                 double requestedY = deltaY;
-                if (Math.abs(requestedY) >= Math.abs(requestedX) && metrics.maxY() <= 0 && metrics.maxX() > 0) {
+                if (horizontal && Math.abs(requestedY) >= Math.abs(requestedX)
+                        && metrics.maxY() <= 0 && metrics.maxX() > 0) {
                     requestedX = requestedY;
                     requestedY = 0;
                 }
@@ -189,6 +197,31 @@ public final class LauncherScrollSupport {
             candidate = candidate.getParent();
         }
         return null;
+    }
+
+    private static boolean horizontalScrollingEnabled(ScrollPane pane) {
+        return !Boolean.FALSE.equals(pane.getProperties().get(HORIZONTAL_SCROLL_PROPERTY));
+    }
+
+    static double horizontalDelta(boolean horizontalScrollingEnabled, double requestedDelta) {
+        return horizontalScrollingEnabled ? requestedDelta : 0;
+    }
+
+    private static void lockHorizontalPosition(ScrollPane pane) {
+        if (Boolean.TRUE.equals(pane.getProperties().get(HORIZONTAL_LOCK_PROPERTY))) {
+            resetHorizontalPosition(pane);
+            return;
+        }
+        pane.getProperties().put(HORIZONTAL_LOCK_PROPERTY, Boolean.TRUE);
+        pane.hvalueProperty().addListener((observable, oldValue, newValue) -> resetHorizontalPosition(pane));
+        pane.hminProperty().addListener((observable, oldValue, newValue) -> resetHorizontalPosition(pane));
+        resetHorizontalPosition(pane);
+    }
+
+    static void resetHorizontalPosition(ScrollPane pane) {
+        if (pane != null && Math.abs(pane.getHvalue() - pane.getHmin()) > 0.0001) {
+            pane.setHvalue(pane.getHmin());
+        }
     }
 
     private boolean canConsume(
