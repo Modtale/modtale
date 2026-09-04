@@ -2,6 +2,7 @@ package net.modtale.launcher.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.sun.net.httpserver.HttpExchange;
@@ -201,7 +202,7 @@ class ModtaleApiClientSessionTest {
     }
 
     @Test
-    void curseForgeCommentsUseTheExternalDiscussionEndpoints() throws IOException {
+    void curseForgeCommentsAreImportedAsReadOnlyProviderContent() throws IOException {
         startSessionServer();
         ModtaleApiClient client = new ModtaleApiClient(baseUrl(), tempDir.resolve("cf-comments-session.json"));
         client.exchangeLauncherCode("launcher-code");
@@ -209,12 +210,10 @@ class ModtaleApiClientSessionTest {
         List<ProjectComment> comments = client.getComments("curseforge:1450386");
         assertEquals(1, comments.size());
         assertTrue(comments.getFirst().pinned());
-
-        client.postComment("curseforge:1450386", "Works in the launcher");
-        assertTrue(lastCommentMutation.contains("Works in the launcher"));
-        client.setCommentPinned("curseforge:1450386", "comment-1", false);
-        assertEquals("PUT /api/v1/projects/external/curseforge/1450386/comments/comment-1/pin?pinned=false",
-                lastCommentMutation);
+        assertTrue(comments.getFirst().readOnly());
+        assertEquals("Reply", comments.getFirst().replies().getFirst().content());
+        assertThrows(UnsupportedOperationException.class,
+                () -> client.postComment("curseforge:1450386", "This must not be stored by Modtale"));
     }
 
     @Test
@@ -324,16 +323,7 @@ class ModtaleApiClientSessionTest {
             respond(exchange, 200, "{\"status\":\"success\"}");
         });
         server.createContext("/api/v1/projects/external/curseforge/1450386/comments", exchange -> {
-            if ("GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-                respond(exchange, 200, "{\"comments\":[{\"id\":\"comment-1\",\"userId\":\"user-1\",\"content\":\"Pinned\",\"date\":\"2026-06-01T12:00:00Z\",\"pinned\":true}]}");
-                return;
-            }
-            lastCommentMutation = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-            respond(exchange, 200, "{\"status\":\"success\"}");
-        });
-        server.createContext("/api/v1/projects/external/curseforge/1450386/comments/comment-1/pin", exchange -> {
-            lastCommentMutation = exchange.getRequestMethod() + " " + exchange.getRequestURI();
-            respond(exchange, 200, "{\"status\":\"success\"}");
+            respond(exchange, 200, "{\"comments\":[{\"id\":\"curseforge:1\",\"user\":\"Builder\",\"content\":\"Pinned\",\"date\":\"2026-06-01T12:00:00Z\",\"pinned\":true,\"readOnly\":true,\"replies\":[{\"id\":\"curseforge:2\",\"user\":\"Author\",\"content\":\"Reply\",\"readOnly\":true}]}],\"totalCount\":2}");
         });
         server.createContext("/api/v1/projects/voile/gallery", exchange -> respond(exchange, 200, galleryJson));
         server.createContext("/api/v1/auth/logout", exchange -> {

@@ -268,37 +268,37 @@ public class ModtaleApiClient {
     }
 
     public List<ProjectComment> getComments(String projectId) {
-        CommentsResponse response = get(commentsPath(projectId), CommentsResponse.class);
+        CommentsResponse response = get(readCommentsPath(projectId), CommentsResponse.class);
         return response == null ? List.of() : response.comments();
     }
 
     public void postComment(String projectId, String content) {
-        post(commentsPath(projectId),
+        post(nativeCommentsPath(projectId),
                 java.util.Map.of("content", content == null ? "" : content), Object.class);
     }
 
     public void updateComment(String projectId, String commentId, String content) {
-        put(commentsPath(projectId) + "/" + encodePath(commentId),
+        put(nativeCommentsPath(projectId) + "/" + encodePath(commentId),
                 java.util.Map.of("content", content == null ? "" : content), Object.class);
     }
 
     public void deleteComment(String projectId, String commentId) {
-        delete(commentsPath(projectId) + "/" + encodePath(commentId), Object.class);
+        delete(nativeCommentsPath(projectId) + "/" + encodePath(commentId), Object.class);
     }
 
     public void replyToComment(String projectId, String commentId, String reply) {
-        post("/projects/" + encodePath(projectId) + "/comments/" + encodePath(commentId) + "/reply",
+        post(nativeCommentsPath(projectId) + "/" + encodePath(commentId) + "/reply",
                 java.util.Map.of("reply", reply == null ? "" : reply), Object.class);
     }
 
     public void voteComment(String projectId, String commentId, boolean upvote, boolean reply) {
-        String target = commentsPath(projectId) + "/" + encodePath(commentId)
+        String target = nativeCommentsPath(projectId) + "/" + encodePath(commentId)
                 + (reply ? "/reply/vote" : "/vote");
         post(target + "?upvote=" + upvote, java.util.Map.of(), Object.class);
     }
 
     public void setCommentPinned(String projectId, String commentId, boolean pinned) {
-        put(commentsPath(projectId) + "/" + encodePath(commentId) + "/pin?pinned=" + pinned,
+        put(nativeCommentsPath(projectId) + "/" + encodePath(commentId) + "/pin?pinned=" + pinned,
                 java.util.Map.of(), Object.class);
     }
 
@@ -434,11 +434,18 @@ public class ModtaleApiClient {
         }
     }
 
-    private static String commentsPath(String projectId) {
+    private static String readCommentsPath(String projectId) {
         Long externalId = curseForgeId(projectId);
         return externalId == null
                 ? "/projects/" + encodePath(projectId) + "/comments"
                 : "/projects/external/curseforge/" + externalId + "/comments";
+    }
+
+    private static String nativeCommentsPath(String projectId) {
+        if (curseForgeId(projectId) != null) {
+            throw new UnsupportedOperationException("CurseForge comments are read-only in Modtale.");
+        }
+        return "/projects/" + encodePath(projectId) + "/comments";
     }
 
     public List<String> getGameVersions() {

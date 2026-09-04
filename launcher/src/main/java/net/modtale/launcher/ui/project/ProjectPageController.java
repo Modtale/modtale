@@ -1040,6 +1040,10 @@ public final class ProjectPageController {
     }
 
     private boolean shouldShowComments(ProjectSummary summary, ProjectDetail detail) {
+        if ((summary != null && summary.isCurseForge())
+                || (detail != null && value(detail.id(), "").startsWith("curseforge:"))) {
+            return true;
+        }
         boolean disabled = detail != null && Boolean.FALSE.equals(detail.allowComments());
         return !disabled || isCurrentProjectCreator(summary, detail);
     }
