@@ -2,7 +2,6 @@ package net.modtale.model.system;
 
 import java.time.LocalDateTime;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document(collection = "status_history")
@@ -10,7 +9,10 @@ public class StatusHistory {
     @Id
     private String id;
 
-    @Indexed(expireAfter = "30d")
+    // The detached status store owns this collection's TTL index and reconciles
+    // legacy index options before replacing them. Declaring the index here makes
+    // Spring Data attempt creation first, which prevents startup when an older
+    // non-TTL timestamp index already exists.
     private LocalDateTime timestamp;
 
     private int apiLatency;
