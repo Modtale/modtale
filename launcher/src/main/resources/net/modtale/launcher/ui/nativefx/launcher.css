@@ -46,6 +46,7 @@
 .sort-button,
 .page-size-select,
 .segmented-button,
+.provider-switch-button,
 .filter-preset-button,
 .download-timeframe-button,
 .pre-release-toggle,
@@ -1246,6 +1247,7 @@
 }
 
 .segmented-control,
+.provider-switch,
 .download-timeframe-control {
     -fx-min-height: 40px;
     -fx-pref-height: 40px;
@@ -1255,6 +1257,57 @@
     -fx-border-radius: 12px;
     -fx-border-color: rgba(255, 255, 255, 0.10);
     -fx-background-color: #0f172a;
+}
+
+.provider-switch {
+    -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.18), 12, 0.10, 0, 3);
+}
+
+.provider-switch-button {
+    -fx-min-height: 32px;
+    -fx-pref-height: 32px;
+    -fx-max-height: 32px;
+    -fx-padding: 0 12px;
+    -fx-background-radius: 9px;
+    -fx-background-color: transparent;
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 12px;
+    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
+    -fx-font-weight: 900;
+}
+
+.provider-switch-button.modtale {
+    -fx-min-width: 83px;
+    -fx-pref-width: 83px;
+}
+
+.provider-switch-button.curseforge {
+    -fx-min-width: 106px;
+    -fx-pref-width: 106px;
+}
+
+.provider-switch-button:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.06);
+    -fx-text-fill: #e2e8f0;
+}
+
+.provider-switch-button:selected {
+    -fx-background-color: #2563eb;
+    -fx-text-fill: #ffffff;
+    -fx-effect: dropshadow(gaussian, rgba(37, 99, 235, 0.24), 14, 0.16, 0, 4);
+}
+
+.provider-switch-button.curseforge:selected {
+    -fx-background-color: #e4572e;
+    -fx-effect: dropshadow(gaussian, rgba(228, 87, 46, 0.24), 14, 0.16, 0, 4);
+}
+
+.provider-switch-button:hover .text {
+    -fx-fill: #e2e8f0;
+}
+
+.provider-switch-button:selected .text {
+    -fx-fill: #ffffff;
 }
 
 .toolbar-pill {
