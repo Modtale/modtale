@@ -74,6 +74,7 @@ class StatusDiscordNotifierTest {
         assertTrue(description.contains("Storage (R2)"));
         assertTrue(description.contains("🟩"));
         assertTrue(description.contains("🟨"));
+        assertFalse(description.contains("⬛"));
         assertFalse(description.contains("🌐"));
         assertFalse(description.contains("⚡"));
         assertFalse(description.contains("🗄️"));
