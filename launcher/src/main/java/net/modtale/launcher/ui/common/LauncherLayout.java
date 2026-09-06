@@ -26,4 +26,8 @@ public final class LauncherLayout {
     public static Insets launcherPageInsets(double top, double bottom) {
         return navbarInsets(top, bottom);
     }
+
+    public static double navbarBoundedWidth(double width) {
+        return Math.max(0, width - navbarLeftInset() - navbarRightInset());
+    }
 }
