@@ -8,10 +8,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Set;
 import net.modtale.controller.auth.AuthController;
 import net.modtale.config.auth.ApiKeyAuthFilter;
@@ -54,9 +51,7 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.session.web.http.CookieSerializer;
 import org.springframework.session.web.http.DefaultCookieSerializer;
-import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 public class SecurityConfig {
@@ -415,55 +410,7 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        CorsConfiguration restrictedConfig = new CorsConfiguration();
-        List<String> restrictedOrigins = new ArrayList<>();
-
-        boolean isPreview = isPreviewEnvironment();
-        Set<String> frontendOrigins = getAllowedFrontendOriginPatterns();
-        String cleanUrl = getCleanFrontendUrl();
-
-        if (isPreview) {
-            restrictedOrigins.add("https://*.run.app");
-            if (cleanUrl != null && cleanUrl.contains("dev.modtale.net")) {
-                restrictedOrigins.add(cleanUrl);
-            }
-        } else {
-            restrictedOrigins.addAll(frontendOrigins);
-        }
-
-        restrictedConfig.setAllowedOriginPatterns(restrictedOrigins);
-        restrictedConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
-        restrictedConfig.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type", "X-Xsrf-Token", "X-XSRF-TOKEN"));
-        restrictedConfig.setAllowCredentials(true);
-        restrictedConfig.setMaxAge(3600L);
-
-        source.registerCorsConfiguration("/api/v1/admin/**", restrictedConfig);
-        source.registerCorsConfiguration("/api/v1/user/api-keys/**", restrictedConfig);
-        source.registerCorsConfiguration("/api/v1/user/analytics", restrictedConfig);
-        source.registerCorsConfiguration("/api/v1/projects/*/publish", restrictedConfig);
-        source.registerCorsConfiguration("/api/v1/analytics/view/**", restrictedConfig);
-        source.registerCorsConfiguration("/api/v1/views/project/**", restrictedConfig);
-        source.registerCorsConfiguration("/api/v1/user/repos/**", restrictedConfig);
-        source.registerCorsConfiguration("/api/v1/orgs/*/repos/**", restrictedConfig);
-        source.registerCorsConfiguration("/api/v1/user/connections/**", restrictedConfig);
-        source.registerCorsConfiguration("/api/v1/orgs/*/connections/**", restrictedConfig);
-
-        CorsConfiguration publicConfig = new CorsConfiguration();
-        List<String> publicOrigins = new ArrayList<>();
-        publicOrigins.add("*");
-        publicOrigins.addAll(frontendOrigins);
-        if (isPreview) {
-            publicOrigins.add("https://*.run.app");
-        }
-        publicConfig.setAllowedOriginPatterns(publicOrigins);
-        publicConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
-        publicConfig.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type", "X-Xsrf-Token", "X-XSRF-TOKEN", "X-Modtale-Key"));
-        publicConfig.setExposedHeaders(Arrays.asList("X-Xsrf-Token", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Tier"));
-        publicConfig.setAllowCredentials(true);
-        publicConfig.setMaxAge(3600L);
-        source.registerCorsConfiguration("/**", publicConfig);
-        return source;
+        return ApiCorsPolicy.create(getAllowedFrontendOriginPatterns());
     }
 
     @Bean
