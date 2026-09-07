@@ -1,3 +1,4 @@
+import { PageSkeleton } from '@/components/ui/Skeleton';
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { SiteRoutes } from '@/utils/routes';
@@ -5,7 +6,6 @@ import { createPortal } from 'react-dom';
 import { Plus, Building2, ArrowLeft, X, ExternalLink } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { Spinner } from '@/components/ui/Spinner';
 import { organizationClient } from '../api/organizationClient';
 import { extractApiErrorMessage } from '@/utils/api';
 
@@ -80,7 +80,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
         setSelectedOrg(null);
     };
 
-    if (loading) return <div className="flex justify-center py-20"><Spinner /></div>;
+    if (loading) return <PageSkeleton />;
 
     if (selectedOrg) {
         return (

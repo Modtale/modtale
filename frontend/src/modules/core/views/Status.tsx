@@ -18,7 +18,7 @@ import {
     XCircle
 } from 'lucide-react';
 import { LineChart } from '@/components/ui/charts/LineChart';
-import { Spinner } from '@/components/ui/Spinner';
+import { ContentSkeleton } from '@/components/ui/Skeleton';
 import { DiscordBrandIcon } from '@/components/ui/icons/BrandIcons';
 
 type StatusState = 'operational' | 'degraded' | 'outage';
@@ -458,7 +458,7 @@ export const Status: React.FC = () => {
         return (
             <main className="min-h-screen bg-slate-50 dark:bg-slate-950">
                 <div className="flex min-h-[70vh] items-center justify-center">
-                    <Spinner label="Checking systems..." />
+                    <ContentSkeleton label="Checking systems" />
                 </div>
             </main>
         );

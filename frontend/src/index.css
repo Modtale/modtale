@@ -343,3 +343,17 @@
         transform: scaleX(1);
     }
 }
+
+/* Low-contrast loading placeholders; no sweeping highlights or layout movement. */
+.skeleton {
+    background-color: rgb(148 163 184 / 18%);
+    animation: skeleton-breathe 2.4s ease-in-out infinite;
+}
+.dark .skeleton { background-color: rgb(148 163 184 / 12%); }
+@keyframes skeleton-breathe {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .65; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .skeleton { animation: none; }
+}

@@ -504,7 +504,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
             </div>
 
             {children && (
-                <div className={`${containerClasses} transition-[max-width,padding] duration-300 ${isEditing ? 'mt-8' : 'mt-0 md:mt-16'} relative z-10`}>
+                <div className={`${containerClasses} transition-[max-width,padding] duration-300 ${isEditing ? 'mt-8' : 'mt-6 md:mt-16'} relative z-10`}>
                     {children}
                 </div>
             )}
