@@ -44,6 +44,7 @@ import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
+import javafx.scene.CacheHint;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
@@ -145,6 +146,8 @@ public final class ProjectPageController {
     private final Map<String, List<ProjectVersionChangelog>> changelogCache = new ConcurrentHashMap<>();
     private final Set<String> expandedChangelogIds = new HashSet<>();
     private final Map<Node, Effect> overlayBackdropEffects = new IdentityHashMap<>();
+    private final Map<Node, Boolean> overlayBackdropCacheStates = new IdentityHashMap<>();
+    private final Map<Node, CacheHint> overlayBackdropCacheHints = new IdentityHashMap<>();
     private final DoubleProperty scrollPixels = new SimpleDoubleProperty();
     private final ChangeListener<Bounds> scrollContentBoundsListener = (observable, previous, value) -> updateScrollPixels();
     private final VBox content = new VBox(0);
@@ -3004,13 +3007,21 @@ public final class ProjectPageController {
         restoreOverlayBackdrop();
         for (Node child : host.getChildren()) {
             overlayBackdropEffects.put(child, child.getEffect());
+            overlayBackdropCacheStates.put(child, child.isCache());
+            overlayBackdropCacheHints.put(child, child.getCacheHint());
+            child.setCache(true);
+            child.setCacheHint(CacheHint.SPEED);
             child.setEffect(new GaussianBlur(6));
         }
     }
 
     private void restoreOverlayBackdrop() {
         overlayBackdropEffects.forEach(Node::setEffect);
+        overlayBackdropCacheStates.forEach(Node::setCache);
+        overlayBackdropCacheHints.forEach(Node::setCacheHint);
         overlayBackdropEffects.clear();
+        overlayBackdropCacheStates.clear();
+        overlayBackdropCacheHints.clear();
     }
 
     private StackPane overlayHost() {
