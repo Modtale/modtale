@@ -223,7 +223,7 @@ const extractImportSpecifiers = (code: string) => {
 };
 
 const fetchText = async (url: string, label: string) => {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
     const body = await response.text();
 
     expect(response.status, `${label} should load over HTTP, but ${url} responded with ${response.status}.\n${body.slice(0, 500)}`).toBe(200);
@@ -263,7 +263,7 @@ describe('lazy-loaded module integrity', () => {
     });
 
     it.each(lazyImports)(
-        'serves %s from %s with direct browser imports that all resolve',
+        'serves $specifier from $sourceFile with direct browser imports that all resolve',
         async ({ sourceFile, specifier, clientUrl }) => {
             const moduleUrl = new URL(clientUrl, origin).href;
             const moduleCode = await fetchText(moduleUrl, `${sourceFile} lazy import ${specifier}`);
@@ -287,6 +287,8 @@ describe('lazy-loaded module integrity', () => {
                     );
                 })
             );
-        }
+        },
+        // The first browser import also triggers cold compilation in the dev server.
+        20_000
     );
 });
