@@ -237,6 +237,7 @@ final class NativeMarkdownRenderer {
         } else {
             Label markerLabel = new Label(markerText);
             markerLabel.getStyleClass().add("project-detail-prose-bullet");
+            markerLabel.setMinWidth(Region.USE_PREF_SIZE);
             marker = markerLabel;
         }
 

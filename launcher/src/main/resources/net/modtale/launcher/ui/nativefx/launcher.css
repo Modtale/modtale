@@ -3567,8 +3567,6 @@
 
 .project-changelog-card .project-detail-prose-bullet {
     -fx-font-size: 15px;
-    -fx-min-width: 16px;
-    -fx-pref-width: 16px;
 }
 
 .project-changelog-card .project-detail-markdown-inline-code {
@@ -6044,8 +6042,6 @@
     -fx-font-size: 18px;
     -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
-    -fx-min-width: 18px;
-    -fx-pref-width: 18px;
 }
 
 .project-detail-markdown-list-row {
