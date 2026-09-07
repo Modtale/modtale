@@ -103,7 +103,7 @@ public final class LauncherPlayController {
     private static final int CATALOG_SHELF_LIMIT = 6;
     private static final double CATALOG_CARD_WIDTH = 336;
     private static final double CATALOG_GRID_GAP = 18;
-    private static final double CATALOG_EDGE_FADE_WIDTH = 52;
+    private static final double CATALOG_EDGE_FADE_WIDTH = 64;
     private static final double CATALOG_GRID_CARD_BODY_HEIGHT = 178;
     private static final double CATALOG_CARD_HEIGHT = Math.round(CATALOG_CARD_WIDTH / 3.0) + CATALOG_GRID_CARD_BODY_HEIGHT;
     private static final double CATALOG_SCROLL_HEIGHT = CATALOG_CARD_HEIGHT + 18;
@@ -619,9 +619,9 @@ public final class LauncherPlayController {
         edgeFade.setMinWidth(CATALOG_EDGE_FADE_WIDTH);
         edgeFade.setPrefWidth(CATALOG_EDGE_FADE_WIDTH);
         edgeFade.setMaxWidth(CATALOG_EDGE_FADE_WIDTH);
-        edgeFade.setMinHeight(CATALOG_CARD_HEIGHT + 8);
-        edgeFade.setPrefHeight(CATALOG_CARD_HEIGHT + 8);
-        edgeFade.setMaxHeight(CATALOG_CARD_HEIGHT + 8);
+        edgeFade.setMinHeight(CATALOG_SCROLL_HEIGHT);
+        edgeFade.setPrefHeight(CATALOG_SCROLL_HEIGHT);
+        edgeFade.setMaxHeight(CATALOG_SCROLL_HEIGHT);
         edgeFade.opacityProperty().bind(Bindings.createDoubleBinding(
                 () -> catalogEdgeFadeOpacity(shelf.scroll.getHvalue(), shelf.scroll.getHmin(), shelf.scroll.getHmax()),
                 shelf.scroll.hvalueProperty(),

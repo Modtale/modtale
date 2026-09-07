@@ -7786,7 +7786,8 @@
     -fx-background-color: linear-gradient(
         to right,
         rgba(11, 17, 32, 0) 0%,
-        rgba(11, 17, 32, 0.78) 68%,
+        rgba(11, 17, 32, 0.16) 36%,
+        rgba(11, 17, 32, 0.72) 76%,
         #0b1120 100%
     );
 }
