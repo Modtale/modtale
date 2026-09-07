@@ -298,7 +298,7 @@ class LauncherUiPerformanceProfileTest {
         deck.resize(1320, 680);
         VBox body = new VBox(results);
         body.resize(1320, 680);
-        ProjectCardFactory factory = new ProjectCardFactory(url -> url, DIRECT_EXECUTOR);
+        ProjectCardFactory factory = new ProjectCardFactory(this::resolveProjectAsset, DIRECT_EXECUTOR);
         return new ProjectBrowserRenderer(
                 results,
                 deck,
@@ -330,7 +330,7 @@ class LauncherUiPerformanceProfileTest {
                 new ModtaleApiClient("http://localhost:1"),
                 DIRECT_EXECUTOR,
                 imageLoader(),
-                new ProjectCardFactory(url -> url, DIRECT_EXECUTOR),
+                new ProjectCardFactory(this::resolveProjectAsset, DIRECT_EXECUTOR),
                 project -> {
                 },
                 (project, version, gameVersion) -> {
@@ -421,7 +421,7 @@ class LauncherUiPerformanceProfileTest {
         StackPane deck = new StackPane();
         VBox body = new VBox(results);
         ProjectBrowserRenderer renderer = new ProjectBrowserRenderer(
-                results, deck, () -> body, new ProjectCardFactory(url -> url, DIRECT_EXECUTOR), id -> false,
+                results, deck, () -> body, new ProjectCardFactory(this::resolveProjectAsset, DIRECT_EXECUTOR), id -> false,
                 () -> "2026.1", project -> {}, project -> {}, project -> {}, project -> {}
         );
         renderer.render(projects(count), style, count);
@@ -434,7 +434,7 @@ class LauncherUiPerformanceProfileTest {
         StackPane deck = new StackPane();
         VBox body = new VBox(results);
         ProjectBrowserRenderer renderer = new ProjectBrowserRenderer(
-                results, deck, () -> body, new ProjectCardFactory(url -> url, DIRECT_EXECUTOR), id -> false,
+                results, deck, () -> body, new ProjectCardFactory(this::resolveProjectAsset, DIRECT_EXECUTOR), id -> false,
                 () -> "2026.09", project -> {}, project -> {}, project -> {}, project -> {}
         );
         List<ProjectSummary> projects = new ArrayList<>();
@@ -499,7 +499,7 @@ class LauncherUiPerformanceProfileTest {
     private NativeCreatorProfileView creatorProfileView() {
         return new NativeCreatorProfileView(
                 imageLoader(),
-                new ProjectCardFactory(url -> url, DIRECT_EXECUTOR),
+                new ProjectCardFactory(this::resolveProjectAsset, DIRECT_EXECUTOR),
                 () -> "2026.1",
                 () -> null,
                 id -> false,
@@ -559,7 +559,11 @@ class LauncherUiPerformanceProfileTest {
     }
 
     private CachedImageLoader imageLoader() {
-        return new CachedImageLoader(url -> url, DIRECT_EXECUTOR);
+        return new CachedImageLoader(this::resolveProjectAsset, DIRECT_EXECUTOR);
+    }
+
+    private String resolveProjectAsset(String url) {
+        return url == null || url.isBlank() ? LOCAL_PROFILE_IMAGE : url;
     }
 
     private ScrollEvent scrollEvent(double deltaY) {

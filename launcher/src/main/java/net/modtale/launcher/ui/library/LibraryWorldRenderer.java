@@ -479,7 +479,17 @@ final class LibraryWorldRenderer {
         shell.setPrefSize(size, size);
         shell.setMaxSize(size, size);
 
-        if (imageLoader != null && (useProjectFallback || (iconUrl != null && !iconUrl.isBlank()))) {
+        if (imageLoader != null && useProjectFallback) {
+            ImageView fallback = new ImageView();
+            fallback.setFitWidth(size);
+            fallback.setFitHeight(size);
+            fallback.setPreserveRatio(false);
+            fallback.setSmooth(true);
+            imageLoader.loadInto(fallback, null, size * 2, size * 2);
+            shell.getChildren().add(fallback);
+        }
+
+        if (imageLoader != null && iconUrl != null && !iconUrl.isBlank()) {
             ImageView image = new ImageView();
             image.setFitWidth(size);
             image.setFitHeight(size);

@@ -2362,13 +2362,22 @@ public final class ProjectPageController {
         Region backdrop = new Region();
         backdrop.getStyleClass().add("project-detail-icon-backdrop");
         backdrop.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        ImageView image = new ImageView();
-        image.setPreserveRatio(false);
-        image.setSmooth(true);
-        image.setFitWidth(mediaSize);
-        image.setFitHeight(mediaSize);
-        imageLoader.loadInto(image, imageUrl, mediaSize * 2, mediaSize * 2);
-        media.getChildren().addAll(backdrop, image);
+        ImageView fallback = new ImageView();
+        fallback.setPreserveRatio(false);
+        fallback.setSmooth(true);
+        fallback.setFitWidth(mediaSize);
+        fallback.setFitHeight(mediaSize);
+        imageLoader.loadInto(fallback, null, mediaSize * 2, mediaSize * 2);
+        media.getChildren().addAll(backdrop, fallback);
+        if (!isBlank(imageUrl)) {
+            ImageView image = new ImageView();
+            image.setPreserveRatio(false);
+            image.setSmooth(true);
+            image.setFitWidth(mediaSize);
+            image.setFitHeight(mediaSize);
+            imageLoader.loadInto(image, imageUrl, mediaSize * 2, mediaSize * 2);
+            media.getChildren().add(image);
+        }
         icon.getChildren().add(media);
         return icon;
     }

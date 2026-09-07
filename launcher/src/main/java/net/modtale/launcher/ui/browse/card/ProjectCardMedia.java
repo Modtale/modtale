@@ -99,9 +99,15 @@ public final class ProjectCardMedia {
 
         media.getChildren().add(iconBackdrop(mediaSize));
 
-        ImageView foreground = remoteImage(project.imageUrl(), mediaSize, mediaSize);
-        foreground.setMouseTransparent(true);
-        media.getChildren().add(foreground);
+        ImageView fallback = remoteImage(null, mediaSize, mediaSize);
+        fallback.setMouseTransparent(true);
+        media.getChildren().add(fallback);
+
+        if (project.imageUrl() != null && !project.imageUrl().isBlank()) {
+            ImageView foreground = remoteImage(project.imageUrl(), mediaSize, mediaSize);
+            foreground.setMouseTransparent(true);
+            media.getChildren().add(foreground);
+        }
         icon.getChildren().add(media);
         return icon;
     }
