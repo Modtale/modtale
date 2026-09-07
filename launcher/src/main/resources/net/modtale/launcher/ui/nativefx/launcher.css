@@ -9465,3 +9465,30 @@
     -fx-font-weight: 900;
     -fx-text-alignment: center;
 }
+
+/* Config editor */
+.config-editor-modal .label { -fx-text-fill: #cbd5e1; }
+.config-editor-modal .text-area,
+.config-editor-modal .text-area .content,
+.config-editor-modal .list-view,
+.config-editor-modal .split-pane {
+    -fx-background-color: #0b1120;
+    -fx-text-fill: #e2e8f0;
+}
+.config-editor-modal .text-area { -fx-highlight-fill: #1d4ed8; }
+.config-editor-modal .list-cell {
+    -fx-background-color: #0b1120;
+    -fx-text-fill: #cbd5e1;
+    -fx-padding: 10px;
+}
+.config-editor-modal .list-cell:filled:selected { -fx-background-color: #1e3a5f; -fx-text-fill: white; }
+.config-editor-modal .split-pane-divider { -fx-background-color: #1e293b; -fx-padding: 0 3px; }
+
+.config-editor-modal .config-editor-title { -fx-font-size: 22px; -fx-font-weight: bold; -fx-text-fill: #f8fafc; }
+.config-editor-modal .text-field {
+    -fx-background-color: #1e293b;
+    -fx-text-fill: #e2e8f0;
+    -fx-prompt-text-fill: #94a3b8;
+    -fx-background-radius: 6px;
+    -fx-padding: 9px;
+}

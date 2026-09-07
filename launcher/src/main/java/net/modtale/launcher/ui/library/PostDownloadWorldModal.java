@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import net.modtale.launcher.model.worldlist.WorldListConfig;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -48,6 +49,7 @@ final class PostDownloadWorldModal {
     private StackPane overlay;
     private String title = "";
     private List<String> modIds = List.of();
+    private List<WorldListConfig> configs = List.of();
     private List<WorldOption> worlds = List.of();
     private Button applyButton;
     private Button toggleAllButton;
@@ -61,7 +63,11 @@ final class PostDownloadWorldModal {
     }
 
     boolean show(String title, List<String> modIds, List<WorldOption> worlds) {
-        if (modIds == null || modIds.isEmpty() || worlds == null || worlds.isEmpty()) {
+        return show(title, modIds, worlds, List.of());
+    }
+
+    boolean show(String title, List<String> modIds, List<WorldOption> worlds, List<WorldListConfig> configs) {
+        if (modIds == null || (modIds.isEmpty() && configs.isEmpty()) || worlds == null || worlds.isEmpty()) {
             return false;
         }
         hide();
@@ -76,6 +82,7 @@ final class PostDownloadWorldModal {
                 .distinct()
                 .toList();
         this.worlds = List.copyOf(worlds);
+        this.configs = List.copyOf(configs);
         selectedWorldKeys.clear();
         this.worlds.stream()
                 .filter(WorldOption::selected)
@@ -158,6 +165,11 @@ final class PostDownloadWorldModal {
         VBox body = new VBox(16);
         body.getStyleClass().add("post-download-modal-body");
         body.getChildren().add(summaryRow());
+        if (!configs.isEmpty()) {
+            Label note = new Label(configs.size() + " shared config defaults will be added to the selected worlds. Existing files are preserved.");
+            note.setWrapText(true);
+            body.getChildren().add(note);
+        }
 
         VBox list = new VBox(8);
         list.getStyleClass().add("post-download-modal-world-list");
@@ -269,7 +281,7 @@ final class PostDownloadWorldModal {
         applyButton.setOnAction(event -> {
             List<HytaleWorld> selected = selectedWorlds();
             hide();
-            apply.accept(new Selection(selected, modIds));
+            apply.accept(new Selection(selected, modIds, configs));
         });
         HBox.setHgrow(applyButton, Priority.ALWAYS);
         footer.getChildren().addAll(skip, applyButton);
@@ -399,8 +411,10 @@ final class PostDownloadWorldModal {
         }
     }
 
-    record Selection(List<HytaleWorld> worlds, List<String> modIds) {
+    record Selection(List<HytaleWorld> worlds, List<String> modIds, List<WorldListConfig> configs) {
+        Selection(List<HytaleWorld> worlds, List<String> modIds) { this(worlds, modIds, List.of()); }
         Selection {
+            configs = configs == null ? List.of() : List.copyOf(configs);
             worlds = worlds == null ? List.of() : List.copyOf(worlds);
             modIds = modIds == null
                     ? List.of()

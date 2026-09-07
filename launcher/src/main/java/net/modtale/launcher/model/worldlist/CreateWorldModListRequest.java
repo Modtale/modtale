@@ -1,13 +1,18 @@
 package net.modtale.launcher.model.worldlist;
 
 import java.util.List;
+import net.modtale.launcher.model.worldlist.WorldListConfig;
 
 public record CreateWorldModListRequest(
         String title,
         String worldName,
         String gameVersion,
-        List<Item> mods
+        List<Item> mods,
+        List<WorldListConfig> configs
 ) {
+    public CreateWorldModListRequest(String title, String worldName, String gameVersion, List<Item> mods) {
+        this(title, worldName, gameVersion, mods, List.of());
+    }
     public CreateWorldModListRequest {
         title = value(title);
         worldName = value(worldName);

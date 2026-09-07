@@ -74,3 +74,20 @@ export const worldListToProjectDependencies = (list: WorldModList): ProjectDepen
 export const skippedWorldListItems = (list: WorldModList) => (
     (list.mods || []).filter(item => !item.projectId && !item.externalUrl)
 );
+
+/** Preserve shared config defaults when a list becomes a modpack version. */
+export const worldListToOverrideFile = async (list: WorldModList): Promise<File | undefined> => {
+    if (!list.configs?.length) return undefined;
+    const { default: JSZip } = await import('jszip');
+    const zip = new JSZip();
+    let worldName = (list.worldName || 'Shared World').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-').replace(/[. ]+$/g, '') || 'Shared World';
+    if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(worldName)) worldName = `World-${worldName}`;
+    for (const config of list.configs) {
+        if (!['GLOBAL', 'WORLD'].includes(config.scope) || config.path.split('/').some(part => !part || part === '.' || part === '..' || /[\\:]/.test(part))) {
+            throw new Error('The shared list contains an unsafe config path.');
+        }
+        const root = config.scope === 'GLOBAL' ? 'Mods' : `Saves/${worldName}/mods`;
+        zip.file(`overrides/${root}/${config.path}`, config.content);
+    }
+    return new File([await zip.generateAsync({ type: 'blob' })], 'shared-list-configs.zip', { type: 'application/zip' });
+};

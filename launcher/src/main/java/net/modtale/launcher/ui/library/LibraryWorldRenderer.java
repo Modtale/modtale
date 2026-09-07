@@ -52,6 +52,7 @@ final class LibraryWorldRenderer {
     private final LibraryProjectRenderer.WorldToggleHandler toggleWorldMods;
     private final Consumer<HytaleWorld> shareWorldSnapshot;
     private final Consumer<HytaleWorld> createModpackFromWorld;
+    private final Consumer<HytaleWorld> editConfigs;
     private final Runnable refreshLibrary;
     private final Runnable checkUpdates;
 
@@ -66,6 +67,7 @@ final class LibraryWorldRenderer {
             LibraryProjectRenderer.WorldToggleHandler toggleWorldMods,
             Consumer<HytaleWorld> shareWorldSnapshot,
             Consumer<HytaleWorld> createModpackFromWorld,
+            Consumer<HytaleWorld> editConfigs,
             Runnable refreshLibrary,
             Runnable checkUpdates
     ) {
@@ -79,6 +81,7 @@ final class LibraryWorldRenderer {
         this.toggleWorldMods = toggleWorldMods;
         this.shareWorldSnapshot = shareWorldSnapshot;
         this.createModpackFromWorld = createModpackFromWorld;
+        this.editConfigs = editConfigs;
         this.refreshLibrary = refreshLibrary;
         this.checkUpdates = checkUpdates;
     }
@@ -150,7 +153,12 @@ final class LibraryWorldRenderer {
         pack.setMinWidth(Region.USE_PREF_SIZE);
         pack.setTooltip(new Tooltip("Start a Modtale modpack from this world's enabled mods"));
         pack.setOnAction(event -> createModpackFromWorld.accept(model.world()));
-        actions.getChildren().addAll(refresh, updates, actionDivider, share, pack);
+        Button configs = secondaryButton("Configs");
+        configs.getStyleClass().add("small");
+        configs.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.FILE_CODE, 14));
+        configs.setTooltip(new Tooltip("Edit this world's mod configs"));
+        configs.setOnAction(event -> editConfigs.accept(model.world()));
+        actions.getChildren().addAll(refresh, updates, actionDivider, configs, share, pack);
 
         row.getChildren().addAll(icon, copy, actions);
         section.getChildren().add(row);
