@@ -19,6 +19,8 @@ import net.modtale.launcher.ui.common.CachedImageLoader;
 
 public final class ProjectCardMedia {
 
+    private static final String PROJECT_PLACEHOLDER_ASSET =
+            "/net/modtale/launcher/ui/nativefx/assets/project-placeholder.png";
     private static final double CARD_RADIUS = 16;
     private static final double RESTING_OUTLINE_WIDTH = 1;
     private static final double HOVER_OUTLINE_WIDTH = 3;
@@ -99,7 +101,7 @@ public final class ProjectCardMedia {
 
         media.getChildren().add(iconBackdrop(mediaSize));
 
-        ImageView fallback = remoteImage(null, mediaSize, mediaSize);
+        ImageView fallback = remoteImage(projectPlaceholderUrl(), mediaSize, mediaSize);
         fallback.setMouseTransparent(true);
         media.getChildren().add(fallback);
 
@@ -196,6 +198,10 @@ public final class ProjectCardMedia {
         ImageView view = imageView(width, height, false);
         imageLoader.loadInto(view, rawUrl, requestedImageDimension(width, imageRenderScale), requestedImageDimension(height, imageRenderScale));
         return view;
+    }
+
+    private String projectPlaceholderUrl() {
+        return java.util.Objects.requireNonNull(getClass().getResource(PROJECT_PLACEHOLDER_ASSET)).toExternalForm();
     }
 
     private ImageView remoteBannerImage(String rawUrl, double width, double height) {
