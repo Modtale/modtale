@@ -968,7 +968,7 @@
 }
 
 .browse-rail-title {
-    -fx-padding: 0 0 0 6px;
+    -fx-padding: 0 0 4px 6px;
     -fx-spacing: 2px;
     -fx-alignment: center-left;
 }
