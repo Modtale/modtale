@@ -142,9 +142,17 @@ public final class LauncherLibraryController {
                 this::setModsEnabled,
                 this::shareWorldSnapshot,
                 this::createModpackFromWorld,
+                this::editConfigs,
                 this::renderLibrary,
                 this::checkUpdates
         );
+    }
+
+    private void editConfigs(HytaleWorld world) {
+        StackPane host = overlayHost.get();
+        if (host == null) return;
+        new ConfigEditorModal(host, executor, this::renderLibrary).show(
+                settings().hytaleModsDirectory(), world.directory(), world.name());
     }
 
     public Node libraryView() {
