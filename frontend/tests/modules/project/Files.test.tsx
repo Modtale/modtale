@@ -116,9 +116,9 @@ describe('Files tab loadability', () => {
             );
         });
 
-        await waitForText(container, 'Override Bundle');
-        expect(container.textContent).toContain('Optional ZIP containing Hytale files beneath overrides/Mods/ or overrides/Saves/.');
-        expect(container.textContent).toContain('Optional layered configuration and resource overrides');
+        await waitForText(container, 'Configs & Overrides');
+        expect(container.textContent).toContain('For world-specific plugin configs, use overrides/Saves/<world>/mods/<plugin-folder>/config.json.');
+        expect(container.textContent).toContain('Config defaults and resources; existing files are preserved by the launcher');
     });
 
     it('defaults to the latest release game version when prereleases are newer', async () => {
