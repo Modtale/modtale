@@ -137,8 +137,7 @@ const AppContent: React.FC = () => {
         const params = new URLSearchParams(location.search);
         const oauthError = params.get('oauth_error');
         if (oauthError) {
-            const decodedError = decodeURIComponent(oauthError).replace(/\+/g, ' ');
-            setGlobalError(decodedError);
+            setGlobalError(oauthError);
             clearPendingSignInMethod();
             params.delete('oauth_error');
             const remainingSearch = params.toString();
