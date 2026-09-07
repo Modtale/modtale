@@ -41,6 +41,10 @@ public final class LauncherSettingsSyncService {
     private final Supplier<StackPane> overlayHost;
     private final AtomicBoolean checking = new AtomicBoolean();
     private final AtomicBoolean uploading = new AtomicBoolean();
+    private final AtomicBoolean capturing = new AtomicBoolean();
+    private final AtomicBoolean pendingLocalChange = new AtomicBoolean();
+    private final AtomicBoolean pendingRemoteCheck = new AtomicBoolean();
+    private final net.modtale.launcher.config.LauncherConfigStore configStore = new net.modtale.launcher.config.LauncherConfigStore();
 
     private volatile String lastKnownRemoteHash = "";
     private volatile String lastKnownRemoteInstalledProjectsHash = "";
@@ -64,55 +68,85 @@ public final class LauncherSettingsSyncService {
     }
 
     public void checkOnSignIn() {
+        if (capturing.get() || uploading.get()) {
+            pendingRemoteCheck.set(true);
+            return;
+        }
         if (!signedIn.getAsBoolean() || !checking.compareAndSet(false, true)) {
             return;
         }
         feedback.runAsync("Checking launcher preferences...",
-                apiClient::getLauncherSettings,
-                remote -> {
-                    checking.set(false);
-                    handleRemoteSnapshot(remote);
+                () -> {
+                    captureLocalSnapshot();
+                    return apiClient.getLauncherSettings();
                 },
-                error -> checking.set(false));
+                remote -> {
+                    if (!handleRemoteSnapshot(remote)) checking.set(false);
+                    drainLocalChanges();
+                },
+                error -> { checking.set(false); drainLocalChanges(); });
     }
 
     public void syncAfterLocalChange() {
-        if (!signedIn.getAsBoolean() || checking.get()) {
-            return;
-        }
-        LauncherSettingsSnapshot local = LauncherSettingsSnapshot.fromSettings(settingsController.settings());
-        String localHash = local.computeHash();
-        if (localHash.equals(lastKnownRemoteHash)) {
-            return;
-        }
-        if (canUploadPreferencesOnly(local)) {
-            uploadPreferences(local, false);
-        } else {
-            uploadSnapshot(local, false);
+        pendingLocalChange.set(true);
+        drainLocalChanges();
+    }
+
+    private void drainLocalChanges() {
+        if (!pendingLocalChange.get() || checking.get() || uploading.get()
+                || !capturing.compareAndSet(false, true)) return;
+        pendingLocalChange.set(false);
+        feedback.runAsync("Saving launcher configs...", this::captureLocalSnapshot, local -> {
+            capturing.set(false);
+            if (pendingRemoteCheck.getAndSet(false)) {
+                checkOnSignIn();
+                return;
+            }
+            if (signedIn.getAsBoolean() && !checking.get() && !local.computeHash().equals(lastKnownRemoteHash)) {
+                if (canUploadPreferencesOnly(local)) uploadPreferences(local, false);
+                else uploadSnapshot(local, false);
+            }
+            drainLocalChanges();
+        }, error -> {
+            capturing.set(false);
+            if (pendingRemoteCheck.getAndSet(false)) checkOnSignIn();
+        });
+    }
+
+    private LauncherSettingsSnapshot captureLocalSnapshot() {
+        LauncherSettings settings = settingsController.settings();
+        try {
+            settings.setConfigs(configStore.capture(settings));
+            settingsStore.save(settings);
+            return LauncherSettingsSnapshot.fromSettings(settings);
+        } catch (IOException ex) {
+            throw new ModtaleApiException("Could not save launcher configs: " + ex.getMessage(), ex);
         }
     }
 
-    private void handleRemoteSnapshot(LauncherSettingsSnapshot remote) {
+    private boolean handleRemoteSnapshot(LauncherSettingsSnapshot remote) {
         LauncherSettingsSnapshot local = LauncherSettingsSnapshot.fromSettings(settingsController.settings());
         if (remote == null || !remote.hasSyncedContent()) {
             uploadSnapshot(local, false);
-            return;
+            return false;
         }
 
         String localHash = local.computeHash();
         if (hashMatches(remote, localHash)) {
             lastKnownRemoteHash = localHash;
             lastKnownRemoteInstalledProjectsHash = local.installedProjectsHash();
-            return;
+            return false;
         }
 
         lastKnownRemoteHash = remote.effectiveHash();
         lastKnownRemoteInstalledProjectsHash = remote.installedProjectsHash();
         if (promptLoadRemote(remote, local)) {
             restoreSnapshot(remote);
+            return true;
         } else {
             uploadSnapshot(local, true);
         }
+        return false;
     }
 
     private boolean promptLoadRemote(LauncherSettingsSnapshot remote, LauncherSettingsSnapshot local) {
@@ -120,38 +154,65 @@ public final class LauncherSettingsSyncService {
                 overlayHost,
                 remote.installedProjects().size(),
                 local.installedProjects().size(),
-                remote.getUpdatedAt()
+                remote.getUpdatedAt(), remote.getConfigs().size(), local.getConfigs().size()
         );
     }
 
     private void restoreSnapshot(LauncherSettingsSnapshot snapshot) {
-        feedback.runAsync("Loading launcher preferences from Modtale...",
+        checking.set(true);
+        feedback.runAsync("Loading launcher settings and configs from Modtale...",
                 () -> restore(snapshot),
                 result -> {
                     LauncherSettingsSnapshot local = LauncherSettingsSnapshot.fromSettings(settingsController.settings());
                     lastKnownRemoteHash = local.computeHash();
                     lastKnownRemoteInstalledProjectsHash = local.installedProjectsHash();
                     settingsController.reloadFromStore();
+                    checking.set(false);
                     feedback.log("Loaded launcher preferences from Modtale.");
                     feedback.showToast("Preferences loaded", result.message());
-                });
+                    drainLocalChanges();
+                }, error -> { checking.set(false); });
     }
 
     private RestoreResult restore(LauncherSettingsSnapshot snapshot) {
         LauncherSettings settings = settingsController.settings();
+        int restoredConfigs;
+        try {
+            restoredConfigs = configStore.restore(snapshot.getConfigs(), settings);
+            settings.setConfigs(snapshot.getConfigs());
+        } catch (IOException ex) {
+            throw new ModtaleApiException("Could not restore launcher configs: " + ex.getMessage(), ex);
+        }
+        boolean reinstallProjects = !snapshot.installedProjectsHash()
+                .equals(LauncherSettingsSnapshot.fromSettings(settings).installedProjectsHash());
         List<InstalledProject> previousInstalls = new ArrayList<>(settings.getInstalledProjects());
         Set<String> remoteProjectIds = remoteProjectIds(snapshot);
         List<InstalledProject> preservedLocalInstalls = previousInstalls.stream()
                 .filter(project -> !remoteProjectIds.contains(project.projectId()))
                 .toList();
-        deleteRecordedFiles(previousInstalls.stream()
-                .filter(project -> remoteProjectIds.contains(project.projectId()))
-                .toList());
-        remoteProjectIds.forEach(settingsStore::removeInstalledProject);
+        if (reinstallProjects) {
+            deleteRecordedFiles(previousInstalls.stream()
+                    .filter(project -> remoteProjectIds.contains(project.projectId()))
+                    .toList());
+            remoteProjectIds.forEach(settingsStore::removeInstalledProject);
+        }
 
+        // Device paths are local: a profile from another OS must not redirect config or mod writes.
+        String modsPath = settings.getHytaleModsPath();
+        String userDataPath = settings.getHytaleUserDataPath();
+        String gamePath = settings.getHytaleGamePath();
+        String javaPath = settings.getHytaleJavaPath();
         snapshot.applyPreferencesTo(settings);
-        settings.setInstalledProjects(preservedLocalInstalls);
+        settings.setHytaleModsPath(modsPath);
+        settings.setHytaleUserDataPath(userDataPath);
+        settings.setHytaleGamePath(gamePath);
+        settings.setHytaleJavaPath(javaPath);
+        if (reinstallProjects) settings.setInstalledProjects(preservedLocalInstalls);
         settingsStore.save(settings);
+        if (!reinstallProjects) {
+            return new RestoreResult("Restored " + restoredConfigs + " config file" + plural(restoredConfigs)
+                    + " and saved preferences. Installed projects were already current.");
+        }
 
         int installed = 0;
         List<String> warnings = new ArrayList<>();
@@ -177,7 +238,8 @@ public final class LauncherSettingsSyncService {
             feedback.log("Launcher preference restore warnings: " + String.join(" ", warnings));
         }
         return new RestoreResult("Restored " + installed + " installed project" + plural(installed)
-                + preservedMessage(preservedLocalInstalls.size()) + " and saved preferences.");
+                + preservedMessage(preservedLocalInstalls.size()) + ", " + restoredConfigs + " config file"
+                + plural(restoredConfigs) + " and saved preferences.");
     }
 
     private Set<String> remoteProjectIds(LauncherSettingsSnapshot snapshot) {
@@ -273,7 +335,12 @@ public final class LauncherSettingsSyncService {
                     continue;
                 }
                 try {
-                    Files.deleteIfExists(Path.of(file));
+                    Path path = Path.of(file).toAbsolutePath().normalize();
+                    Path mods = settingsController.settings().hytaleModsDirectory().toAbsolutePath().normalize();
+                    String name = path.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+                    if (!mods.equals(path.getParent()) || !(name.endsWith(".jar") || name.endsWith(".zip")
+                            || name.endsWith(".hmasset") || name.endsWith(".hymod"))) continue;
+                    Files.deleteIfExists(path);
                 } catch (IOException ex) {
                     LOG.warn("Could not delete stale installed file while restoring snapshot: {}", file, ex);
                     // A stale file should not block restoring the account snapshot.
@@ -302,7 +369,7 @@ public final class LauncherSettingsSyncService {
         if (!uploading.compareAndSet(false, true)) {
             return;
         }
-        feedback.runAsync("Saving launcher preferences to Modtale...",
+        feedback.runAsync("Saving launcher settings and configs to Modtale...",
                 () -> preferencesOnly
                         ? apiClient.updateLauncherSettingsPreferences(snapshot)
                         : apiClient.updateLauncherSettings(snapshot),
@@ -314,12 +381,18 @@ public final class LauncherSettingsSyncService {
                     lastKnownRemoteInstalledProjectsHash = saved == null || hashMatches(saved, snapshotHash)
                             ? snapshot.installedProjectsHash()
                             : saved.installedProjectsHash();
+                    if (pendingRemoteCheck.getAndSet(false)) checkOnSignIn();
+                    else drainLocalChanges();
                     if (announce) {
                         feedback.log("Saved this device's launcher preferences to Modtale.");
                         feedback.showToast("Preferences saved", "This device is now the account snapshot.");
                     }
                 },
-                error -> uploading.set(false));
+                error -> {
+                    uploading.set(false);
+                    if (pendingRemoteCheck.getAndSet(false)) checkOnSignIn();
+                    else drainLocalChanges();
+                });
     }
 
     private boolean canUploadPreferencesOnly(LauncherSettingsSnapshot snapshot) {

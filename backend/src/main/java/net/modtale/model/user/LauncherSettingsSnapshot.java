@@ -11,6 +11,11 @@ public class LauncherSettingsSnapshot implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private int schemaVersion = 1;
+    private List<LauncherConfigSnapshot> configs = new ArrayList<>();
+
+    public List<LauncherConfigSnapshot> getConfigs() { return configs == null ? List.of() : List.copyOf(configs); }
+    public void setConfigs(List<LauncherConfigSnapshot> configs) { this.configs = configs == null ? new ArrayList<>() : new ArrayList<>(configs); }
+
     private String settingsHash = "";
     private String updatedAt = "";
     private Preferences preferences = new Preferences();

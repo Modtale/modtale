@@ -174,7 +174,7 @@ public class AccountService {
 
     public LauncherSettingsSnapshot updateLauncherSettings(String userId, LauncherSettingsSnapshot snapshot) {
         User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found."));
-        LauncherSettingsSnapshot normalized = normalizeLauncherSettings(snapshot);
+        LauncherSettingsSnapshot normalized = normalizeLauncherSettings(snapshot, user.getLauncherSettings());
         user.setLauncherSettings(normalized);
         userRepository.save(user);
         return normalized;
@@ -241,7 +241,7 @@ public class AccountService {
         accountLifecycleService.recoverUser(userId);
     }
 
-    private LauncherSettingsSnapshot normalizeLauncherSettings(LauncherSettingsSnapshot snapshot) {
+    private LauncherSettingsSnapshot normalizeLauncherSettings(LauncherSettingsSnapshot snapshot, LauncherSettingsSnapshot existing) {
         LauncherSettingsSnapshot source = snapshot == null ? new LauncherSettingsSnapshot() : snapshot;
         LauncherSettingsSnapshot normalized = new LauncherSettingsSnapshot();
         normalized.setSchemaVersion(source.getSchemaVersion());
@@ -249,6 +249,7 @@ public class AccountService {
         normalized.setUpdatedAt(LocalDateTime.now().toString());
         normalized.setPreferences(normalizeLauncherPreferences(source.getPreferences()));
         normalized.setInstalledProjects(normalizeInstalledProjects(source.getInstalledProjects()));
+        normalizeLauncherConfigs(source, existing, normalized);
         return normalized;
     }
 
@@ -264,7 +265,24 @@ public class AccountService {
         normalized.setUpdatedAt(LocalDateTime.now().toString());
         normalized.setPreferences(normalizeLauncherPreferences(source.getPreferences()));
         normalized.setInstalledProjects(normalizeInstalledProjects(stored.getInstalledProjects()));
+        normalizeLauncherConfigs(source, stored, normalized);
         return normalized;
+    }
+
+    private void normalizeLauncherConfigs(LauncherSettingsSnapshot source, LauncherSettingsSnapshot existing,
+            LauncherSettingsSnapshot normalized) {
+        try {
+            // Old clients do not know about configs and must not erase the profile's saved files.
+            var configs = source.getSchemaVersion() >= 2 ? source.getConfigs()
+                    : existing == null ? List.<net.modtale.model.user.LauncherConfigSnapshot>of() : existing.getConfigs();
+            normalized.setConfigs(net.modtale.model.user.LauncherConfigSnapshot.validate(configs));
+            if (source.getSchemaVersion() < 2 && !configs.isEmpty()) {
+                normalized.setSchemaVersion(2);
+                normalized.setSettingsHash("");
+            }
+        } catch (java.io.IOException ex) {
+            throw new InvalidAccountRequestException(ex.getMessage());
+        }
     }
 
     private LauncherSettingsSnapshot.Preferences normalizeLauncherPreferences(LauncherSettingsSnapshot.Preferences source) {

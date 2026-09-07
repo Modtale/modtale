@@ -42,6 +42,31 @@ class AccountServiceTest {
     }
 
     @Test
+    void profileSyncStoresConfigsAndPreferenceUpdatesPreserveThemForLegacyClients() {
+        User user = new User();
+        user.setId("config-user");
+        when(userRepository.findById("config-user")).thenReturn(Optional.of(user));
+        var configs = java.util.List.of(new net.modtale.model.user.LauncherConfigSnapshot("Mods/Example/config.json", "{\"value\":2}\r\n"));
+        LauncherSettingsSnapshot snapshot = new LauncherSettingsSnapshot();
+        snapshot.setSchemaVersion(2);
+        snapshot.setConfigs(configs);
+        var saved = accountService.updateLauncherSettings("config-user", snapshot);
+        assertEquals(configs, saved.getConfigs());
+        var legacy = new LauncherSettingsSnapshot();
+        assertEquals(configs, accountService.updateLauncherSettingsPreferences("config-user", legacy).getConfigs());
+        assertEquals(configs, accountService.updateLauncherSettings("config-user", legacy).getConfigs());
+        LauncherSettingsSnapshot update = new LauncherSettingsSnapshot();
+        update.setSchemaVersion(2);
+        var changed = java.util.List.of(new net.modtale.model.user.LauncherConfigSnapshot("Mods/Example/config.json", "{}"));
+        update.setConfigs(changed);
+        assertEquals(changed, accountService.updateLauncherSettingsPreferences("config-user", update).getConfigs());
+        update.setConfigs(java.util.List.of(new net.modtale.model.user.LauncherConfigSnapshot("Saves/../auth.json", "{}")));
+        assertThrows(net.modtale.exception.InvalidAccountRequestException.class,
+                () -> accountService.updateLauncherSettings("config-user", update));
+        assertEquals(changed, user.getLauncherSettings().getConfigs());
+    }
+
+    @Test
     void getPublicProfileResolvesByUsername() {
         User user = user("user-1", "AzureDoom");
         when(userRepository.findById("AzureDoom")).thenReturn(Optional.empty());
