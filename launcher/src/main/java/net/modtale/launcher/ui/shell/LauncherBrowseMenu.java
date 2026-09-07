@@ -114,7 +114,7 @@ public final class LauncherBrowseMenu {
 
         Node leadingIcon = LauncherIcons.icon(LauncherIcons.Glyph.GRID, 16);
         leadingIcon.getStyleClass().add("browse-nav-leading-icon");
-        menuLabel = new Label();
+        menuLabel = new Label(I18N.text("nav.browse"));
         menuLabel.getStyleClass().add("browse-nav-button-label");
         applyNavbarTitleFont(menuLabel);
         Node chevron = LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_DOWN, 14);
