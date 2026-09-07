@@ -357,3 +357,15 @@
 @media (prefers-reduced-motion: reduce) {
     .skeleton { animation: none; }
 }
+
+/* Skeletons retain the populated component's box model and responsive rules. */
+.skeleton-surface { position: relative; min-width: 0; }
+.skeleton-layout { pointer-events: none; user-select: none; }
+.skeleton-layout, .skeleton-layout * { color: transparent !important; text-shadow: none !important; caret-color: transparent !important; }
+.skeleton-layout img, .skeleton-layout svg, .skeleton-layout input, .skeleton-layout textarea { opacity: 0 !important; }
+.skeleton-layout [data-skeleton-media] { background-image: none !important; }
+.skeleton-layout [data-skeleton-keep], .skeleton-layout [data-skeleton-keep] * { color: revert-layer !important; opacity: 1 !important; }
+.skeleton-marks { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 60; }
+.skeleton-marks > span { position: absolute; display: block; }
+
+.skeleton-surface.h-full > .skeleton-layout { height: 100%; }

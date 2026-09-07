@@ -1,4 +1,4 @@
-import { ContentSkeleton } from '@/components/ui/Skeleton';
+import { DiagramSkeleton } from './DiagramSkeleton';
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -178,7 +178,7 @@ const DeferredMermaidChart = ({ content }: { content: string }) => {
     }
 
     if (!MermaidChart) {
-        return <ContentSkeleton rows={2} label="Loading diagram" />;
+        return <DiagramSkeleton />;
     }
 
     return <MermaidChart chart={content} />;

@@ -1,3 +1,4 @@
+import { SkeletonSurface } from '@/components/ui/Skeleton';
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ImageIcon, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 import { BACKEND_URL } from '@/utils/api';
@@ -58,6 +59,7 @@ export const SidebarSection: React.FC<SidebarSectionProps> = React.memo(({
 SidebarSection.displayName = 'SidebarSection';
 
 interface ProjectLayoutProps {
+    loading?: boolean;
     bannerUrl?: string | null;
     iconUrl?: string | null;
     isEditing?: boolean;
@@ -73,6 +75,7 @@ interface ProjectLayoutProps {
 }
 
 export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
+                                                                           loading = false,
                                                                            bannerUrl,
                                                                            iconUrl,
                                                                            isEditing,
@@ -172,6 +175,8 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
         setTempImageFile(null);
     };
 
+    const mask = (content: React.ReactNode, className = '') => loading ? <SkeletonSurface className={className}>{content}</SkeletonSurface> : content;
+    const mediaPlaceholder = <SkeletonSurface className="h-full [&>.skeleton-layout]:h-full" label="Loading project image"><div data-skeleton-media className="h-full w-full" /></SkeletonSurface>;
     const containerClasses = "max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28";
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-[#0B1120] relative pb-20 overflow-x-hidden z-0 transition-colors duration-300">
@@ -198,7 +203,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                 className={`modtale-project-banner-parallax absolute top-0 left-0 right-0 w-full aspect-[3/1] z-0 will-change-transform ${finalBanner ? 'bg-transparent' : 'bg-slate-200 dark:bg-slate-800'}`}
             >
                     <div className="absolute inset-0 z-0">
-                        {finalBanner ? (
+                        {loading ? mediaPlaceholder : finalBanner ? (
                             <OptimizedImage
                                 src={finalBanner}
                                 alt={t('project:bannerAlt')}
@@ -216,14 +221,14 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                         className="modtale-project-banner-fade absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-50 dark:from-[#0B1120] to-transparent z-10 pointer-events-none will-change-[height] [--fade-base:0.5rem] md:[--fade-base:8rem]"
                     />
 
-                    {isEditing && (
+                    {isEditing && !loading && (
                         <label className={`cursor-pointer transition-all duration-300 pointer-events-auto ${
                             finalBanner
                                 ? "absolute top-6 right-6 z-30 bg-black/60 hover:bg-black/80 text-white px-4 py-2 rounded-xl text-xs font-bold border border-white/20 backdrop-blur-sm shadow-lg hover:scale-105"
                                 : "absolute inset-0 z-30 flex flex-col items-center justify-center m-6 rounded-2xl border-2 border-dashed border-white/10 hover:border-white/30 bg-white/5 hover:bg-white/10 group/banner"
                         }`}>
                             <input type="file" accept="image/*" onChange={e => handleFileSelect(e, 'banner')} className="hidden" />
-                            {finalBanner ? (
+                            {loading ? mediaPlaceholder : finalBanner ? (
                                 <div className="flex flex-col items-end">
                                     <div className="flex items-center gap-2"><ImageIcon className="w-4 h-4" /> {t('project:changeBanner')}</div>
                                     <span className="text-[10px] font-medium text-white/50">{t('project:shortRecommendedBannerSize')}</span>
@@ -244,7 +249,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
             {onBack && (
                 <div className={`absolute top-0 left-0 right-0 h-full z-40 ${containerClasses} pointer-events-none transition-[max-width,padding] duration-300`}>
                     <div className="pt-6 pointer-events-auto w-fit">
-                        <button type="button" aria-label={t('common:actions.back')} onClick={onBack} className="flex items-center font-bold transition-all backdrop-blur-md p-2 md:px-4 md:py-2 rounded-full md:rounded-xl shadow-lg group/back text-white/90 bg-black/30 hover:bg-black/50 border border-white/10">
+                        <button type="button" aria-label={t('common:actions.back')} onClick={loading ? undefined : onBack} disabled={loading} className="flex items-center font-bold transition-all backdrop-blur-md p-2 md:px-4 md:py-2 rounded-full md:rounded-xl shadow-lg group/back text-white/90 bg-black/30 hover:bg-black/50 border border-white/10">
                             <ChevronLeft className="w-5 h-5 md:w-4 md:h-4 md:mr-1 group-hover/back:-translate-x-1 transition-transform" aria-hidden="true" /> <span className="hidden md:inline">{t('common:actions.back')}</span>
                         </button>
                     </div>
@@ -258,8 +263,8 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                             <div className="flex-shrink-0">
                                 <label className={`block w-32 h-32 rounded-3xl bg-transparent backdrop-blur-md shadow-md border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden relative group ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <div className="absolute inset-0 bg-white/40 dark:bg-slate-900/40 z-0 backdrop-blur-md" />
-                                    <input type="file" disabled={!isEditing} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
-                                    {finalIcon ? (
+                                    <input type="file" disabled={!isEditing || loading} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
+                                    {loading ? mediaPlaceholder : finalIcon ? (
                                         <OptimizedImage
                                             src={finalIcon}
                                             alt={t('project:iconAlt')}
@@ -275,7 +280,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                             </div>
                             {headerActions && (
                                 <div className="flex gap-2 mb-1">
-                                    {headerActions}
+                                    {mask(headerActions, "flex gap-2 [&>.skeleton-layout]:contents")}
                                 </div>
                             )}
                         </div>
@@ -284,8 +289,8 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                             <div className="hidden md:block flex-shrink-0 relative z-50 -mt-24 ml-2">
                                 <label className={`block w-56 h-56 rounded-3xl bg-transparent backdrop-blur-md shadow-xl border-[8px] border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden group relative ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <div className="absolute inset-0 bg-white/40 dark:bg-slate-900/40 z-0 backdrop-blur-md" />
-                                    <input type="file" disabled={!isEditing} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
-                                    {finalIcon ? (
+                                    <input type="file" disabled={!isEditing || loading} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
+                                    {loading ? mediaPlaceholder : finalIcon ? (
                                         <OptimizedImage
                                             src={finalIcon}
                                             alt={t('project:iconAlt')}
@@ -299,7 +304,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">512x512</span>
                                         </div>
                                     )}
-                                    {isEditing && (
+                                    {isEditing && !loading && (
                                         <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-[2px] z-30">
                                             <ImageIcon className="w-8 h-8 text-white mb-2" aria-hidden="true" />
                                             <span className="text-xs font-bold text-white">{t('project:changeIcon')}</span>
@@ -312,32 +317,32 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                             <div className="flex-1 min-w-0 flex flex-col justify-end pt-2 w-full">
                                 <div className="flex flex-col xl:flex-row items-start justify-between gap-4">
                                     <div className="w-full flex-1 min-w-0">
-                                        {headerContent}
+                                        {mask(headerContent)}
                                     </div>
                                     {headerActions && (
                                         <div className="hidden lg:flex items-center gap-2 flex-shrink-0 mt-2 xl:mt-0">
-                                            {headerActions}
+                                            {mask(headerActions, "flex gap-2 [&>.skeleton-layout]:contents")}
                                         </div>
                                     )}
                                 </div>
 
                                 {actionBar && (
                                     <div className="mt-8 pt-8 border-t border-slate-200 dark:border-white/10 w-full">
-                                        {actionBar}
+                                        {mask(actionBar)}
                                     </div>
                                 )}
 
-                                {tabs && <div className="mt-6 border-t border-slate-200 dark:border-white/10 pt-1">{tabs}</div>}
+                                {tabs && <div className="mt-6 border-t border-slate-200 dark:border-white/10 pt-1">{mask(tabs)}</div>}
                             </div>
                         </div>
                     </div>
 
                     <div className="flex flex-col lg:grid lg:grid-cols-12 min-h-[500px]">
                         <div className="lg:col-span-8 xl:col-span-9 p-6 md:p-12 md:border-r md:border-slate-200 md:dark:border-white/5 order-2 lg:order-1 overflow-hidden">
-                            {mainContent}
+                            {mask(mainContent, "h-full [&>.skeleton-layout]:h-full")}
                         </div>
                         <div className="lg:col-span-4 xl:col-span-3 p-3 md:p-6 space-y-6 bg-transparent border-t lg:border-t-0 border-slate-200 dark:border-white/5 order-1 lg:order-2">
-                            {sidebarContent}
+                            {mask(sidebarContent)}
                         </div>
                     </div>
                 </div>
