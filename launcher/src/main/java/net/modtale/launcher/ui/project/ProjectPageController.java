@@ -1873,21 +1873,60 @@ public final class ProjectPageController {
             return null;
         }
         List<String> sorted = orderedSupportedVersions(versions);
-        VBox groups = new VBox(8);
+        VBox groups = new VBox();
         groups.getStyleClass().add("project-detail-version-groups");
         for (GameVersionGroups.Group group : GameVersionGroups.build(sorted)) {
-            if (!group.grouped()) {
-                groups.getChildren().add(chip(group.versions().getFirst(), "project-detail-version-chip"));
-                continue;
+            VBox entry = new VBox();
+            entry.getStyleClass().add("project-detail-version-entry");
+            if (!groups.getChildren().isEmpty()) entry.getStyleClass().add("separated");
+            Label name = new Label(group.grouped() ? group.label() : group.versions().getFirst());
+            name.getStyleClass().add("project-detail-version-name");
+            name.setWrapText(true);
+            name.setMinWidth(0);
+            name.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(name, Priority.ALWAYS);
+            Label count = new Label(group.versions().size() + (group.versions().size() == 1 ? " version" : " versions"));
+            count.getStyleClass().add("project-detail-version-count");
+            count.setMinWidth(Region.USE_PREF_SIZE);
+            javafx.scene.layout.StackPane indicator = new javafx.scene.layout.StackPane();
+            indicator.setMinWidth(12);
+            indicator.setPrefWidth(12);
+            indicator.setMaxWidth(12);
+            HBox row = new HBox(12, name, count, indicator);
+            row.setAlignment(Pos.CENTER_LEFT);
+            row.setMaxWidth(Double.MAX_VALUE);
+            if (group.grouped()) {
+                Node arrow = LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_RIGHT, 12);
+                indicator.getChildren().add(arrow);
+                VBox children = new VBox(8);
+                children.getStyleClass().add("project-detail-version-group-children");
+                group.versions().forEach(version -> {
+                    Label release = new Label(version);
+                    release.setWrapText(true);
+                    release.setMinWidth(0);
+                    release.getStyleClass().add("project-detail-version-release");
+                    children.getChildren().add(release);
+                });
+                children.setVisible(false);
+                children.setManaged(false);
+                javafx.scene.control.ToggleButton toggle = new javafx.scene.control.ToggleButton();
+                toggle.getStyleClass().add("project-detail-version-row");
+                toggle.setMaxWidth(Double.MAX_VALUE);
+                toggle.setGraphic(row);
+                row.prefWidthProperty().bind(toggle.widthProperty().subtract(24));
+                toggle.setAccessibleText("Expand " + group.label() + " versions");
+                toggle.selectedProperty().addListener((observable, previous, expanded) -> {
+                    children.setVisible(expanded);
+                    children.setManaged(expanded);
+                    arrow.setRotate(expanded ? 90 : 0);
+                    toggle.setAccessibleText((expanded ? "Collapse " : "Expand ") + group.label() + " versions");
+                });
+                entry.getChildren().addAll(toggle, children);
+            } else {
+                row.getStyleClass().add("project-detail-version-row");
+                entry.getChildren().add(row);
             }
-            FlowPane children = new FlowPane(6, 6);
-            children.getStyleClass().add("project-detail-version-group-children");
-            group.versions().forEach(version -> children.getChildren().add(chip(version, "project-detail-version-chip")));
-            TitledPane dropdown = new TitledPane(group.label() + "  ·  " + group.versions().size(), children);
-            dropdown.getStyleClass().add("project-detail-version-group");
-            dropdown.setExpanded(false);
-            dropdown.setAnimated(false);
-            groups.getChildren().add(dropdown);
+            groups.getChildren().add(entry);
         }
         return section("Supported Versions", LauncherIcons.Glyph.ZAP, groups);
     }

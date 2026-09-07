@@ -6617,35 +6617,52 @@
 
 .project-detail-version-groups {
     -fx-fill-width: true;
-}
-
-.project-detail-version-group {
     -fx-background-color: rgba(255, 255, 255, 0.03);
-    -fx-border-color: rgba(255, 255, 255, 0.06);
+    -fx-border-color: rgba(255, 255, 255, 0.10);
     -fx-border-radius: 8px;
     -fx-background-radius: 8px;
 }
-
-.project-detail-version-group > .title {
-    -fx-padding: 7px 9px;
+.project-detail-version-entry.separated {
+    -fx-border-color: rgba(255, 255, 255, 0.10) transparent transparent transparent;
+    -fx-border-width: 1px 0 0 0;
+}
+.project-detail-version-row {
+    -fx-min-height: 44px;
+    -fx-padding: 10px 12px;
     -fx-background-color: transparent;
-}
-
-.project-detail-version-group > .title > .text {
-    -fx-fill: #cbd5e1;
-    -fx-font-size: 10px;
-    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
-    -fx-font-weight: 900;
-}
-
-.project-detail-version-group > .content {
     -fx-border-color: transparent;
-    -fx-background-color: transparent;
-    -fx-padding: 0;
+    -fx-border-width: 0;
+    -fx-background-radius: 6px;
+    -fx-text-fill: #cbd5e1;
 }
-
+.toggle-button.project-detail-version-row:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.05);
+    -fx-cursor: hand;
+}
+.toggle-button.project-detail-version-row:focused {
+    -fx-border-color: #38bdf8;
+    -fx-border-width: 1px;
+    -fx-border-radius: 6px;
+    -fx-padding: 9px 11px;
+}
+.project-detail-version-name {
+    -fx-text-fill: #cbd5e1;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+.project-detail-version-count {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 10px;
+}
 .project-detail-version-group-children {
-    -fx-padding: 0 9px 9px 9px;
+    -fx-padding: 0 12px 12px 12px;
+}
+.project-detail-version-release {
+    -fx-padding: 0 0 0 12px;
+    -fx-border-color: transparent transparent transparent rgba(255, 255, 255, 0.10);
+    -fx-border-width: 0 0 0 2px;
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 12px;
 }
 
 .project-detail-tag-chip {
