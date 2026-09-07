@@ -385,7 +385,7 @@ public final class ProjectPageController {
 
     public void openCreator(ProjectSummary project) {
         if (project != null && project.isCurseForge()) {
-            openUrlInBrowser(project.websiteUrl());
+            openUrlInBrowser(curseForgeCreatorPageUrl(project));
             return;
         }
         resetPageScroll();
@@ -3561,6 +3561,15 @@ public final class ProjectPageController {
 
     private static String creatorPageUrl(ProjectSummary project) {
         return LauncherConfig.siteBaseUrl().replaceAll("/+$", "") + "/creator/" + encodePathSegment(creatorHandle(project));
+    }
+
+    private static String curseForgeCreatorPageUrl(ProjectSummary project) {
+        String author = creatorHandle(project);
+        int separator = author.indexOf(',');
+        if (separator >= 0) {
+            author = author.substring(0, separator).trim();
+        }
+        return "https://www.curseforge.com/members/" + encodePathSegment(author) + "/projects";
     }
 
     private static String creatorHandle(ProjectSummary project) {
