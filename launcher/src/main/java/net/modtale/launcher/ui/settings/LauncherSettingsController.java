@@ -12,6 +12,7 @@ import java.util.function.Supplier;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -25,6 +26,7 @@ import net.modtale.launcher.i18n.LauncherI18n;
 import net.modtale.launcher.settings.LauncherSettings;
 import net.modtale.launcher.settings.SettingsStore;
 import net.modtale.launcher.ui.common.LauncherIcons;
+import net.modtale.launcher.ui.common.LauncherExternalLinks;
 import net.modtale.launcher.ui.common.LauncherView;
 import net.modtale.launcher.ui.feedback.LauncherFeedback;
 
@@ -145,8 +147,17 @@ public final class LauncherSettingsController {
         VBox root = new VBox(18);
         root.setUserData(LauncherView.SETTINGS);
         root.getStyleClass().addAll("view", "settings-view");
-        root.getChildren().addAll(languageSection(), runtimePathsSection(), libraryDefaultsSection(), maintenanceSection(), saveActions());
+        root.getChildren().addAll(languageSection(), runtimePathsSection(), libraryDefaultsSection(), maintenanceSection(), saveActions(), avatarCredit());
         return root;
+    }
+
+    private Node avatarCredit() {
+        Hyperlink credit = new Hyperlink();
+        I18N.bind(credit, "settings.credits.avatars");
+        credit.getStyleClass().add("settings-avatar-credit");
+        credit.setOnAction(event -> LauncherExternalLinks.open("https://hyvatar.io",
+                feedback == null ? null : feedback::showToast));
+        return credit;
     }
 
     private Node saveActions() {
