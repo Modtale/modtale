@@ -1,4 +1,4 @@
-import { PageSkeleton } from '@/components/ui/Skeleton';
+import { RouteSkeleton } from '@/modules/core/components/RouteSkeleton';
 import React, { useState, useEffect, Suspense, lazy, useCallback, useRef } from 'react';
 import { Route, Routes, useNavigate, useLocation, Navigate, BrowserRouter } from 'react-router-dom';
 import { StaticRouter } from 'react-router';
@@ -47,7 +47,10 @@ const AdminPanel = lazy(() => import('@/modules/admin/views/AdminPanel').then((m
 const ApiDocs = lazy(() => import('@/modules/core/views/ApiDocs').then((module) => ({ default: module.ApiDocs })));
 const SwaggerDocs = lazy(() => import('@/modules/core/views/SwaggerDocs').then((module) => ({ default: module.SwaggerDocs })));
 
-const RouteLoading = () => <PageSkeleton />;
+const RouteLoading = () => {
+    const { pathname, search } = useLocation();
+    return <RouteSkeleton pathname={pathname} search={search} />;
+};
 
 type FavoriteToggleOptions = {
     onError?: () => void;

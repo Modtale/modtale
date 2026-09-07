@@ -1,4 +1,4 @@
-import { ContentSkeleton } from '@/components/ui/Skeleton';
+import { DiagramSkeleton } from './DiagramSkeleton';
 import React, { useEffect, useMemo, useState } from 'react';
 import mermaid from 'mermaid';
 
@@ -80,7 +80,7 @@ export const MermaidChart: React.FC<{ chart: string }> = ({ chart }) => {
                 </div>
             );
         }
-        return <ContentSkeleton rows={2} label="Loading diagram" />;
+        return <DiagramSkeleton />;
     }
 
     return (

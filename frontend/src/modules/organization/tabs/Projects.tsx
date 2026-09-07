@@ -1,4 +1,4 @@
-import { ContentSkeleton } from '@/components/ui/Skeleton';
+import { ManagedProjectsSkeleton } from '@/modules/user/skeletons/fixtures';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ManagedProjectCard } from '@/components/shared/ManagedProjectCard';
@@ -50,7 +50,10 @@ export const Projects: React.FC<ProjectsProps> = ({ org, currentUser, userOrgs }
         }
     };
 
-    if (loading) return <ContentSkeleton />;
+    if (loading) return <div className="space-y-4">
+        <ManagedProjectsSkeleton canManage={canManage}
+            cardClassName={`${theme.colors.bgSurface} border ${theme.colors.border} rounded-2xl overflow-hidden shadow-sm`} />
+    </div>;
 
     return (
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">

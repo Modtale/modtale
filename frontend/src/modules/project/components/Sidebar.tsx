@@ -7,6 +7,7 @@ import { getLicenseInfo } from '@/utils/modHelpers';
 import { SiteRoutes } from '@/utils/routes';
 import type { Project, User, ProjectDependency } from '@/types';
 import { ProjectMetaSections } from './ProjectMetaSections';
+import { BeaconActivity } from '../beacon/BeaconActivity';
 
 interface SidebarProps {
     project: Project;
@@ -61,6 +62,8 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                     </div>
                 </div>
             </div>
+
+            <BeaconActivity key={project.id} projectId={project.id} />
 
             {showMetaSections && (
                 <ProjectMetaSections project={project} dependencies={dependencies} incompatibleProjectIds={incompatibleProjectIds} depMeta={depMeta} orderedGameVersions={orderedGameVersions} />

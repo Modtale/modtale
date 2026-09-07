@@ -1,4 +1,5 @@
-import { PageSkeleton } from '@/components/ui/Skeleton';
+import { SkeletonSurface } from '@/components/ui/Skeleton';
+import { skeletonUser } from '@/modules/user/skeletons/fixtures';
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { SiteRoutes } from '@/utils/routes';
@@ -80,8 +81,6 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
         setSelectedOrg(null);
     };
 
-    if (loading) return <PageSkeleton />;
-
     if (selectedOrg) {
         return (
             <div className="space-y-6 relative">
@@ -136,7 +135,7 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
             )}
             <div className="flex justify-between items-center mb-6">
                 <h1 className={`text-2xl font-black ${theme.colors.textPrimary}`}>Organizations</h1>
-                <button onClick={() => setIsCreating(true)} className={theme.components.buttonPrimary}>
+                <button disabled={loading} onClick={() => setIsCreating(true)} className={theme.components.buttonPrimary}>
                     <Plus className="w-4 h-4" /> New Org
                 </button>
             </div>
@@ -163,31 +162,44 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                 document.body
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {loading ? <OrganizationCardsSkeleton /> : <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {orgs.map(org => {
-                    const member = org.organizationMembers?.find(m => m.userId === user.id);
-                    const role = org.organizationRoles?.find(r => r.id === member?.roleId);
-
-                    return (
-                        <div key={org.id} onClick={() => setSelectedOrg(org)} className={`${theme.colors.bgSurface} border ${theme.colors.border} p-5 rounded-2xl shadow-sm hover:border-modtale-accent dark:hover:border-modtale-accent cursor-pointer transition-all group`}>
-                            <div className="flex items-center justify-between mb-4">
-                                <div className={`w-12 h-12 ${theme.colors.bgSurfaceAlt} rounded-xl flex items-center justify-center ${theme.colors.textMuted} group-hover:${theme.colors.accent} border ${theme.colors.borderFaint} transition-colors`}>
-                                    {org.avatarUrl ? <img src={org.avatarUrl} alt="" className="w-full h-full object-cover rounded-xl" /> : <Building2 className="w-6 h-6" />}
-                                </div>
-                                {role ? (
-                                    <div className={`flex items-center gap-1.5 border ${theme.colors.borderFaint} ${theme.colors.bgSurfaceAlt} px-2 py-1 rounded-md`}>
-                                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: role.color }} />
-                                        <span className={`text-[10px] font-bold uppercase tracking-wider ${theme.colors.textSecondary}`}>{role.name}</span>
-                                    </div>
-                                ) : (
-                                    <span className={`text-[10px] font-bold uppercase tracking-wider ${theme.colors.bgSurfaceAlt} border ${theme.colors.borderFaint} ${theme.colors.textMuted} px-2 py-1 rounded-md`}>Legacy Member</span>
-                                )}
-                            </div>
-                            <h3 className={`text-lg font-bold ${theme.colors.textPrimary} mb-1`}>{org.username}</h3>
-                        </div>
-                    );
+                    return <OrganizationCard key={org.id} org={org} user={user} onSelect={() => setSelectedOrg(org)} />;
                 })}
-            </div>
+            </div>}
         </div>
     );
 };
+
+export function OrganizationCard({ org, user, onSelect }: { org: User; user: User; onSelect: () => void }) {
+    const member = org.organizationMembers?.find(m => m.userId === user.id);
+    const role = org.organizationRoles?.find(r => r.id === member?.roleId);
+
+    return (
+        <div onClick={onSelect} className={`${theme.colors.bgSurface} border ${theme.colors.border} p-5 rounded-2xl shadow-sm hover:border-modtale-accent dark:hover:border-modtale-accent cursor-pointer transition-all group`}>
+            <div className="flex items-center justify-between mb-4">
+                <div className={`w-12 h-12 ${theme.colors.bgSurfaceAlt} rounded-xl flex items-center justify-center ${theme.colors.textMuted} group-hover:${theme.colors.accent} border ${theme.colors.borderFaint} transition-colors`}>
+                    {org.avatarUrl ? <img src={org.avatarUrl} alt="" className="w-full h-full object-cover rounded-xl" /> : <Building2 className="w-6 h-6" />}
+                </div>
+                {role ? (
+                    <div className={`flex items-center gap-1.5 border ${theme.colors.borderFaint} ${theme.colors.bgSurfaceAlt} px-2 py-1 rounded-md`}>
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: role.color }} />
+                        <span className={`text-[10px] font-bold uppercase tracking-wider ${theme.colors.textSecondary}`}>{role.name}</span>
+                    </div>
+                ) : (
+                    <span className={`text-[10px] font-bold uppercase tracking-wider ${theme.colors.bgSurfaceAlt} border ${theme.colors.borderFaint} ${theme.colors.textMuted} px-2 py-1 rounded-md`}>Legacy Member</span>
+                )}
+            </div>
+            <h3 className={`text-lg font-bold ${theme.colors.textPrimary} mb-1`}>{org.username}</h3>
+        </div>
+    );
+}
+
+export function OrganizationCardsSkeleton({ count = 4 }: { count?: number }) {
+    return <SkeletonSurface label="Loading organizations">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Array.from({ length: count }, (_, index) => <OrganizationCard key={index}
+                org={{ ...skeletonUser, username: 'Organization name' }} user={skeletonUser} onSelect={() => {}} />)}
+        </div>
+    </SkeletonSurface>;
+}

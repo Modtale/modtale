@@ -1,4 +1,5 @@
-import { ContentSkeleton } from '@/components/ui/Skeleton';
+import { SkeletonSurface } from '@/components/ui/Skeleton';
+import { skeletonUser } from '../skeletons/fixtures';
 import React, { useState, useEffect } from 'react';
 import { X, User as UserIcon, ExternalLink } from 'lucide-react';
 import { api } from '@/utils/api';
@@ -48,7 +49,7 @@ export function FollowingModal({ userId, onClose }: FollowingModalProps) {
 
                 <div className="flex-1 overflow-y-auto p-2">
                     {loading ? (
-                        <ContentSkeleton rows={3} label="Loading followed creators" />
+                        <FollowingListSkeleton />
                     ) : users.length === 0 ? (
                         <div className="p-8 text-center">
                             <div className="w-12 h-12 bg-slate-100 dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -60,30 +61,7 @@ export function FollowingModal({ userId, onClose }: FollowingModalProps) {
                     ) : (
                         <div className="space-y-1">
                             {users.map(u => (
-                                <Link
-                                    key={u.id}
-                                    to={SiteRoutes.creator(u.id, u.username)}
-                                    onClick={onClose}
-                                    className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <OptimizedImage
-                                            src={u.avatarUrl || '/assets/default-avatar.png'}
-                                            alt={u.username}
-                                            baseWidth={40}
-                                            className="w-10 h-10 rounded-full shrink-0 border border-slate-200 dark:border-white/10 shadow-sm"
-                                        />
-                                        <div>
-                                            <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors">{u.username}</div>
-                                            {u.roles && u.roles.length > 0 && u.roles[0] !== 'USER' && (
-                                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                    {u.roles[0]}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <ExternalLink className="w-4 h-4 text-slate-300 group-hover:text-slate-500 dark:text-slate-600 dark:group-hover:text-slate-400" />
-                                </Link>
+                                <FollowingRow key={u.id} user={u} onClose={onClose} />
                             ))}
                         </div>
                     )}
@@ -92,4 +70,40 @@ export function FollowingModal({ userId, onClose }: FollowingModalProps) {
         </div>
         </ModalPortal>
     );
+}
+
+function FollowingRow({ user: u, onClose }: { user: User; onClose: () => void }) {
+    return (
+        <Link
+            to={SiteRoutes.creator(u.id, u.username)}
+            onClick={onClose}
+            className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group"
+        >
+            <div className="flex items-center gap-3">
+                <OptimizedImage
+                    src={u.avatarUrl || '/assets/default-avatar.png'}
+                    alt={u.username}
+                    baseWidth={40}
+                    className="w-10 h-10 rounded-full shrink-0 border border-slate-200 dark:border-white/10 shadow-sm"
+                />
+                <div>
+                    <div className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-modtale-accent transition-colors">{u.username}</div>
+                    {u.roles && u.roles.length > 0 && u.roles[0] !== 'USER' && (
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            {u.roles[0]}
+                        </div>
+                    )}
+                </div>
+            </div>
+            <ExternalLink data-skeleton-keep className="w-4 h-4 text-slate-300 group-hover:text-slate-500 dark:text-slate-600 dark:group-hover:text-slate-400" />
+        </Link>
+    );
+}
+
+export function FollowingListSkeleton({ count = 3 }: { count?: number }) {
+    return <SkeletonSurface label="Loading followed creators">
+        <div className="space-y-1">
+            {Array.from({ length: count }, (_, index) => <FollowingRow key={index} user={skeletonUser} onClose={() => {}} />)}
+        </div>
+    </SkeletonSurface>;
 }
