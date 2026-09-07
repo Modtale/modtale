@@ -478,7 +478,7 @@ public final class LauncherShell {
             return Insets.EMPTY;
         }
         Insets pageInsets = LauncherLayout.WORKSPACE_INSETS;
-        boolean boundedWorkspace = view == LauncherView.DISCOVER || view == LauncherView.WARDROBE;
+        boolean boundedWorkspace = view == LauncherView.DISCOVER || view == LauncherView.LIBRARY || view == LauncherView.WARDROBE;
         double right = boundedWorkspace ? pageInsets.getRight() : 0;
         return new Insets(pageInsets.getTop(), right, 0, pageInsets.getLeft());
     }
@@ -490,7 +490,7 @@ public final class LauncherShell {
         Insets pageInsets = LauncherLayout.WORKSPACE_INSETS;
         boolean launcherPage = view == LauncherView.PLAY || view == LauncherView.LIBRARY || view == LauncherView.WARDROBE;
         double top = view == LauncherView.DISCOVER || launcherPage ? 0 : 16;
-        boolean boundedWorkspace = view == LauncherView.DISCOVER || view == LauncherView.WARDROBE;
+        boolean boundedWorkspace = view == LauncherView.DISCOVER || view == LauncherView.LIBRARY || view == LauncherView.WARDROBE;
         double right = boundedWorkspace ? 0 : pageInsets.getRight();
         return new Insets(top, right, pageInsets.getBottom(), 0);
     }

@@ -88,7 +88,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         repos, loadingRepos, manualRepo, setManualRepo, repoValid, isDirty, setIsDirty,
         slugError, setSlugError, userSearchResults, setUserSearchResults, provider,
         setProvider, markDirty, checkRepoUrl, fetchRepos, handleRoleUpdate, handleCancelInvite,
-        handleSave, handleSubmit, isSaving, handleGalleryUpload, handleGalleryVideoAdd, handleGalleryCaptionChange, handleGalleryDelete
+        handleSave, handleSubmit, isSaving, handleGalleryUpload, handleGalleryReorder, handleGalleryVideoAdd, handleGalleryCaptionChange, handleGalleryDelete
     } = useProjectEditor(
         projectData,
         currentUser,
@@ -1142,13 +1142,19 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                 handleGalleryDelete={handleGalleryDelete}
                                 handleGalleryCaptionChange={handleGalleryCaptionChange}
                                 handleGalleryVideoAdd={handleGalleryVideoAdd}
-                    handleGallerySelect={(f) => {
-                        if (isFileOverUploadLimit(f)) {
+                                handleGalleryReorder={handleGalleryReorder}
+                    handleGallerySelect={(files) => {
+                        if (files.some(isFileOverUploadLimit)) {
                             onShowStatus('error', 'Upload Failed', MAX_UPLOAD_ERROR_MESSAGE);
                             return;
                         }
-                        setGalleryCropImage(URL.createObjectURL(f));
-                        setGalleryCropFile(f);
+                        if (files.length === 1) {
+                            const [file] = files;
+                            setGalleryCropImage(URL.createObjectURL(file));
+                            setGalleryCropFile(file);
+                            return;
+                        }
+                        handleGalleryUpload(files);
                     }}
                                 isLoading={isSaving}
                             />
