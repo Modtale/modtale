@@ -178,7 +178,7 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({
                         if (selected.size === 0) onDownloadProjectOnly();
                         else onDownloadBundle(Array.from(selected));
                     }}
-                    className={`w-full ${theme.components.buttonPrimary} py-3.5 flex-col items-start`}
+                    className={`w-full ${theme.components.buttonPrimary} py-3.5 flex-col text-center`}
                 >
                     <div className="flex items-center gap-2">
                         <Download className="w-5 h-5 group-hover:-translate-y-0.5 transition-transform" />
