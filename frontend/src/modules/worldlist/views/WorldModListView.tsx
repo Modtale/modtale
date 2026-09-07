@@ -1,3 +1,4 @@
+import { configOwnerLabel } from '@/modules/worldlist/utils/configOwner';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, useParams } from 'react-router-dom';
@@ -210,7 +211,7 @@ export const WorldModListView: React.FC = () => {
                     <p className="text-sm text-slate-500 dark:text-slate-400">Config defaults are included in the ZIP. The launcher adds world configs to the worlds you select and preserves existing files.</p>
                     {list.configs.map(config => (
                         <details key={`${config.scope}/${config.path}`} className="rounded-xl border border-slate-200 p-4 dark:border-white/10">
-                            <summary className="cursor-pointer text-sm font-medium">{config.scope === 'GLOBAL' ? 'Global mods' : 'World mods'} / {config.path}</summary>
+                            <summary className="cursor-pointer text-sm font-medium">{configOwnerLabel(config.path, list.mods)} · {config.scope === 'GLOBAL' ? 'Global mods' : 'World mods'} / {config.path}</summary>
                             <pre className="mt-3 max-h-80 overflow-auto whitespace-pre text-xs">{config.content}</pre>
                         </details>
                     ))}

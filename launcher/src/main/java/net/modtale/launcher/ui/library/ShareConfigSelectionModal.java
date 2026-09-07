@@ -24,7 +24,7 @@ final class ShareConfigSelectionModal {
         overlay.setPadding(new Insets(24));
         Label title = new Label("Include configs in this list");
         title.getStyleClass().add("config-editor-title");
-        Label hint = new Label("Selected files will be public with the shared list. Choose only the mod settings you want to share. Leave everything unchecked to share mods only.");
+        Label hint = new Label("Selected files will be public with the shared list. Choose only the mod settings you want to share. Leave everything unchecked to share mods only. Unattributed folders could not be matched to a mod; their original paths are preserved.");
         hint.setWrapText(true);
         Map<ConfigFile, CheckBox> choices = new LinkedHashMap<>();
         VBox rows = new VBox(10);
