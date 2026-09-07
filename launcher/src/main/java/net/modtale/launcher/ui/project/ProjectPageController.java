@@ -106,6 +106,9 @@ import net.modtale.launcher.logging.LauncherLogger;
 
 public final class ProjectPageController {
 
+    private static final String PROJECT_PLACEHOLDER_ASSET =
+            "/net/modtale/launcher/ui/nativefx/assets/project-placeholder.png";
+
     private static final LauncherLogger LOG = LauncherLog.getLogger(ProjectPageController.class);
 
     private static final double CONTENT_MAX_WIDTH = 1568;
@@ -2367,7 +2370,7 @@ public final class ProjectPageController {
         fallback.setSmooth(true);
         fallback.setFitWidth(mediaSize);
         fallback.setFitHeight(mediaSize);
-        imageLoader.loadInto(fallback, null, mediaSize * 2, mediaSize * 2);
+        imageLoader.loadInto(fallback, projectPlaceholderUrl(), mediaSize * 2, mediaSize * 2);
         media.getChildren().addAll(backdrop, fallback);
         if (!isBlank(imageUrl)) {
             ImageView image = new ImageView();
@@ -2380,6 +2383,10 @@ public final class ProjectPageController {
         }
         icon.getChildren().add(media);
         return icon;
+    }
+
+    private String projectPlaceholderUrl() {
+        return java.util.Objects.requireNonNull(getClass().getResource(PROJECT_PLACEHOLDER_ASSET)).toExternalForm();
     }
 
     private HBox classificationBadge(String classification, double iconSize) {
