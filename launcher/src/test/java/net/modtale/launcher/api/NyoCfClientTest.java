@@ -120,6 +120,33 @@ class NyoCfClientTest {
         assertEquals(10, result.totalElements());
     }
 
+    @Test
+    void allSelectionOnlyEnrichesProjectsThatFitOnTheReturnedPage() {
+        AtomicInteger detailRequests = new AtomicInteger();
+        java.util.List<String> projectClasses = java.util.List.of(
+                "mods", "prefabs", "worlds", "bootstrap", "translations");
+        for (int index = 0; index < projectClasses.size(); index++) {
+            String projectClass = projectClasses.get(index);
+            long id = 1451000L + index;
+            server.createContext("/api/v1/hytale/" + projectClass + "/search", exchange -> respond(exchange, """
+                    {"data":[{"id":%d,"slug":"project-%d","name":"Project %d","download_count":%d}],"pagination":{"total":1}}
+                    """.formatted(id, id, id, 100 - (id - 1451000L))));
+            server.createContext("/api/v1/hytale/mods/" + id, exchange -> {
+                detailRequests.incrementAndGet();
+                respond(exchange, """
+                        {"id":%d,"game_id":70216,"is_available":true,"slug":"project-%d","links":{"website":"https://www.curseforge.com/hytale/mods/project-%d"},"screenshots":[]}
+                        """.formatted(id, id, id));
+            });
+        }
+
+        ProjectPage result = client.search(new ProjectSearchQuery(
+                "", "", null, "downloads", 0, 2,
+                null, null, null, null, null, null));
+
+        assertEquals(2, result.content().size());
+        assertEquals(2, detailRequests.get());
+    }
+
     private void respond(HttpExchange exchange, String body) throws IOException {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().add("Content-Type", "application/json");
