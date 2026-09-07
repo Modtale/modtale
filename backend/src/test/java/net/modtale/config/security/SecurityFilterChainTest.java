@@ -35,6 +35,15 @@ class SecurityFilterChainTest {
         }
     }
 
+    @Test
+    void localhostTextInsideRemoteFrontendDoesNotDisableSecureCookies() {
+        var response = new org.springframework.mock.web.MockHttpServletResponse();
+        var request = new org.springframework.mock.web.MockHttpServletRequest();
+        configuration("https://localhost.attacker.test").cookieSerializer().writeCookieValue(
+                new org.springframework.session.web.http.CookieSerializer.CookieValue(request, response, "session"));
+        assertTrue(response.getHeader("Set-Cookie").contains("Secure"));
+    }
+
     @Configuration
     @EnableWebSecurity
     static class TestSecurity {
@@ -45,15 +54,19 @@ class SecurityFilterChainTest {
 
         @Bean
         SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-            var configuration = new SecurityConfig(
+            var configuration = configuration("https://preview-example.run.app");
+            return configuration.securityFilterChain(http, mock(OAuth2AuthorizationRequestResolver.class));
+        }
+    }
+
+    private static SecurityConfig configuration(String frontendUrl) {
+        return new SecurityConfig(
                     mock(ApiKeyAuthFilter.class), mock(RateLimitFilter.class),
                     mock(OAuth2LoginService.class), mock(OidcLoginService.class),
                     mock(OAuth2AuthorizedClientRepository.class), mock(LocalUserDetailsService.class),
                     mock(PasswordEncoder.class), mock(AccountService.class),
                     mock(AuthenticationService.class), mock(LauncherAuthService.class),
-                    new AppFrontendProperties("https://preview-example.run.app")
+                    new AppFrontendProperties(frontendUrl)
             );
-            return configuration.securityFilterChain(http, mock(OAuth2AuthorizationRequestResolver.class));
-        }
     }
 }
