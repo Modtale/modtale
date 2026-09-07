@@ -945,7 +945,8 @@ final class NativeMarkdownRenderer {
     }
 
     static String htmlHeadingStyle(String html) {
-        Matcher heading = Pattern.compile("(?is)^\\s*<h([1-6])\\b").matcher(html == null ? "" : html);
+        Matcher heading = Pattern.compile("(?is)^\\s*<h([1-6])\\b[^>]*>.*?</h\\1\\s*>\\s*$")
+                .matcher(html == null ? "" : html);
         return heading.find() ? "project-detail-prose-h" + heading.group(1) : "project-detail-prose-p";
     }
 

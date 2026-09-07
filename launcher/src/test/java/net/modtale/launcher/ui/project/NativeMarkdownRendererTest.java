@@ -34,6 +34,8 @@ class NativeMarkdownRendererTest {
         assertEquals(TextAlignment.CENTER, NativeMarkdownRenderer.htmlAlignment(html));
         assertEquals("project-detail-prose-h4",
                 NativeMarkdownRenderer.htmlHeadingStyle("<h4 align=right>Heading</h4>"));
+        assertEquals("project-detail-prose-p",
+                NativeMarkdownRenderer.htmlHeadingStyle("<h2>Heading</h2><p>Body copy</p>"));
     }
 
     @Test
