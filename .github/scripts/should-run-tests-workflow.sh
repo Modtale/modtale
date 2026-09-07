@@ -35,7 +35,6 @@ if [[ "$event_name" == "push" ]]; then
   else
     echo "::warning::GitHub CLI or token unavailable; running tests to avoid missing coverage."
   fi
-
 fi
 
 echo "$reason"

@@ -28,10 +28,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
-          PR_ACTION: ${{ github.event.action }}
-          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          WORKFLOW_FILE: lighthouse.yml
         run: bash .github/scripts/should-run-tests-workflow.sh
 
   detect-changes:
