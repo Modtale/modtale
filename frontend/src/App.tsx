@@ -1,3 +1,4 @@
+import { PageSkeleton } from '@/components/ui/Skeleton';
 import React, { useState, useEffect, Suspense, lazy, useRef } from 'react';
 import { Route, Routes, useNavigate, useLocation, Navigate, BrowserRouter } from 'react-router-dom';
 import { StaticRouter } from 'react-router';
@@ -11,7 +12,6 @@ import { Home } from '@/modules/home/views/Home';
 import { Browse } from '@/modules/discovery/views/Browse';
 import { ProjectDetails } from '@/modules/project/views/ProjectDetails';
 
-import { Spinner } from '@/components/ui/Spinner';
 import { ErrorBoundary } from '@/components/ui/error/ErrorBoundary';
 import NotFound from '@/components/ui/error/NotFound';
 
@@ -42,7 +42,7 @@ const AdminPanel = lazy(() => import('@/modules/admin/views/AdminPanel').then((m
 const ApiDocs = lazy(() => import('@/modules/core/views/ApiDocs').then((module) => ({ default: module.ApiDocs })));
 const SwaggerDocs = lazy(() => import('@/modules/core/views/SwaggerDocs').then((module) => ({ default: module.SwaggerDocs })));
 
-const RouteLoading = () => <div className="p-20 flex justify-center"><Spinner /></div>;
+const RouteLoading = () => <PageSkeleton />;
 
 const StatusRedirect = () => {
     useEffect(() => {

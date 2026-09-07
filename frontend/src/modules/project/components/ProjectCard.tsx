@@ -33,14 +33,13 @@ type IdleWindow = Window & typeof globalThis & {
     cancelIdleCallback?: (handle: number) => void;
 };
 
-const skeletonShimmer = 'absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/40 dark:via-white/10 to-transparent';
-const skeletonPulse = 'animate-pulse bg-slate-200/80 dark:bg-slate-800/60';
+const skeletonPulse = 'skeleton';
 
 export const ProjectCardSkeleton = () => (
     <div className="relative min-w-0 max-w-full overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900">
         <div className={`aspect-[3/1] ${skeletonPulse}`} />
         <div className="px-6 pb-6">
-            <div className="-mt-10 mb-3 h-20 w-20 rounded-2xl border-4 border-white dark:border-slate-800 bg-slate-300/80 dark:bg-slate-700/70" />
+            <div className="-mt-10 mb-3 h-20 w-20 rounded-2xl border-4 border-white dark:border-slate-800 skeleton" />
             <div className={`h-6 w-3/5 rounded-lg ${skeletonPulse}`} />
             <div className={`mt-2 h-4 w-2/5 rounded-md ${skeletonPulse}`} />
             <div className={`mt-4 h-4 w-full rounded-md ${skeletonPulse}`} />
@@ -53,7 +52,6 @@ export const ProjectCardSkeleton = () => (
                 <div className={`h-4 w-16 rounded-md ${skeletonPulse}`} />
             </div>
         </div>
-        <div className={skeletonShimmer} />
     </div>
 );
 
@@ -78,7 +76,6 @@ export const ListProjectCardSkeleton = () => (
                 </div>
             </div>
         </div>
-        <div className={skeletonShimmer} />
     </div>
 );
 
@@ -96,7 +93,6 @@ export const CompactProjectCardSkeleton = () => (
             </div>
             <div className={`h-4 w-4 rounded ${skeletonPulse}`} />
         </div>
-        <div className={skeletonShimmer} />
     </div>
 );
 

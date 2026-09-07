@@ -1,3 +1,4 @@
+import { ContentSkeleton } from '@/components/ui/Skeleton';
 import React, { useState, useEffect } from 'react';
 import { Flag, ExternalLink, Check, X, ShieldAlert, MessageSquare, User as UserIcon, Filter } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
@@ -114,9 +115,7 @@ export function ReportQueue({ reports: initialReports, onRefresh, canResolve = f
             </div>
 
             {loading ? (
-                <div className="text-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-modtale-accent mx-auto"></div>
-                </div>
+                <ContentSkeleton label="Loading reports" />
             ) : reports.length === 0 ? (
                 <div className="text-center py-20 bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-md">
                     <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
