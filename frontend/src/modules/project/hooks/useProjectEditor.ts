@@ -180,18 +180,37 @@ export const useProjectEditor = (
         }
     };
 
-    const handleGalleryUpload = async (file: File) => {
+    const handleGalleryUpload = async (files: File | File[]) => {
         if (!projectData?.id) return;
-        const formData = new FormData();
-        formData.append('file', file);
+        const uploadFiles = Array.isArray(files) ? files : [files];
+        if (uploadFiles.length === 0) return;
         try {
-            const res = await api.post(`/projects/${projectData.id}/gallery`, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-            setProjectData(res.data);
-            onShowStatus('success', 'Uploaded', 'Image added to gallery.');
+            for (const file of uploadFiles) {
+                const formData = new FormData();
+                formData.append('file', file);
+                const res = await api.post(`/projects/${projectData.id}/gallery`, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+                setProjectData(res.data);
+            }
+            onShowStatus('success', 'Uploaded', uploadFiles.length === 1
+                ? 'Image added to gallery.'
+                : `${uploadFiles.length} images added to gallery.`);
         } catch (e: any) {
             onShowStatus('error', 'Upload Failed', extractApiErrorMessage(e, 'Failed to upload image.'));
+        }
+    };
+
+    const handleGalleryReorder = async (imageUrls: string[]) => {
+        if (!projectData?.id) return;
+        const previousOrder = projectData.galleryImages;
+        setProjectData(prev => prev ? { ...prev, galleryImages: imageUrls } : prev);
+        try {
+            const res = await api.put(`/projects/${projectData.id}/gallery/order`, { imageUrls });
+            setProjectData(res.data);
+        } catch (e: any) {
+            setProjectData(prev => prev ? { ...prev, galleryImages: previousOrder } : prev);
+            onShowStatus('error', 'Reorder Failed', extractApiErrorMessage(e, 'Failed to reorder gallery.'));
         }
     };
 
@@ -240,6 +259,6 @@ export const useProjectEditor = (
         repos, loadingRepos, manualRepo, setManualRepo, repoValid, isDirty, setIsDirty,
         slugError, setSlugError, userSearchResults, setUserSearchResults, provider,
         setProvider, markDirty, checkRepoUrl, fetchRepos, handleRoleUpdate, handleCancelInvite,
-        handleSave, handleSubmit, isSaving, handleGalleryUpload, handleGalleryVideoAdd, handleGalleryCaptionChange, handleGalleryDelete
+        handleSave, handleSubmit, isSaving, handleGalleryUpload, handleGalleryReorder, handleGalleryVideoAdd, handleGalleryCaptionChange, handleGalleryDelete
     };
 };
