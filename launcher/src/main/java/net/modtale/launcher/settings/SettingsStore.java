@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.io.IOException;
+import net.modtale.launcher.io.AtomicJsonFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import net.modtale.launcher.api.ModtaleApiException;
@@ -58,8 +59,7 @@ public class SettingsStore {
         normalize(settings);
         settings.setInstalledProjects(installedProjectRegistry.merge(settings.getInstalledProjects()));
         try {
-            Files.createDirectories(settingsPath.getParent());
-            mapper.writeValue(settingsPath.toFile(), settings);
+            AtomicJsonFile.write(settingsPath, mapper.writer(), settings);
             installedProjectRegistry.save(settings.getInstalledProjects());
         } catch (IOException ex) {
             throw new ModtaleApiException("Could not save launcher settings to " + settingsPath, ex);

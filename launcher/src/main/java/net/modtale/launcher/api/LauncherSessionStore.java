@@ -3,6 +3,7 @@ package net.modtale.launcher.api;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import net.modtale.launcher.io.AtomicJsonFile;
 import java.net.CookieStore;
 import java.net.HttpCookie;
 import java.net.URI;
@@ -75,11 +76,7 @@ final class LauncherSessionStore {
         }
 
         try {
-            Path parent = sessionPath.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
-            mapper.writerWithDefaultPrettyPrinter().writeValue(sessionPath.toFile(), storedCookies);
+            AtomicJsonFile.write(sessionPath, mapper.writerWithDefaultPrettyPrinter(), storedCookies);
         } catch (IOException ex) {
             throw new ModtaleApiException("Could not save launcher session to " + sessionPath, ex);
         }
