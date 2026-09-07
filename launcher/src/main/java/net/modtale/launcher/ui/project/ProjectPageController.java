@@ -1614,7 +1614,7 @@ public final class ProjectPageController {
         VBox main = new VBox(18);
         main.getStyleClass().add("project-detail-main");
         main.setMinWidth(0);
-        addDescriptionParts(main, textAbout(summary, detail));
+        addDescriptionParts(main, textAbout(summary, detail), isCurseForge(summary, detail));
         if (compactLayout) {
             Node mobileMeta = mobileMetaSections(summary, detail);
             if (mobileMeta != null) {
@@ -1640,7 +1640,7 @@ public final class ProjectPageController {
         return main;
     }
 
-    private void addDescriptionParts(VBox main, String about) {
+    private void addDescriptionParts(VBox main, String about, boolean curseForge) {
         String normalized = value(about, "*No description.*").replace("\r\n", "\n").trim();
         java.util.regex.Matcher matcher = GALLERY_CAROUSEL_MARKER.matcher(normalized);
         int cursor = 0;
@@ -1649,7 +1649,7 @@ public final class ProjectPageController {
         while (matcher.find()) {
             String before = normalized.substring(cursor, matcher.start()).trim();
             if (!before.isBlank()) {
-                main.getChildren().add(markdownRenderer.render(before));
+                main.getChildren().add(renderDescriptionMarkdown(before, curseForge));
                 added = true;
             }
             if (!insertedGallery) {
@@ -1664,12 +1664,21 @@ public final class ProjectPageController {
         }
         String tail = normalized.substring(cursor).trim();
         if (!tail.isBlank()) {
-            main.getChildren().add(markdownRenderer.render(tail));
+            main.getChildren().add(renderDescriptionMarkdown(tail, curseForge));
             added = true;
         }
         if (!added) {
-            main.getChildren().add(markdownRenderer.render(normalized));
+            main.getChildren().add(renderDescriptionMarkdown(normalized, curseForge));
         }
+    }
+
+    private Node renderDescriptionMarkdown(String content, boolean curseForge) {
+        return curseForge ? markdownRenderer.renderCurseForgeDescription(content) : markdownRenderer.render(content);
+    }
+
+    private static boolean isCurseForge(ProjectSummary summary, ProjectDetail detail) {
+        if (summary != null && summary.isCurseForge()) return true;
+        return detail != null && value(detail.id(), "").startsWith("curseforge:");
     }
 
     private Node inlineGalleryCarousel(VBox owner) {

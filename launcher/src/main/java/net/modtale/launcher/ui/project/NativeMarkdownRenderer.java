@@ -31,6 +31,7 @@ import com.vladsch.flexmark.ext.tables.TablesExtension;
 import com.vladsch.flexmark.ext.gfm.tasklist.TaskListExtension;
 import com.vladsch.flexmark.ext.gfm.tasklist.TaskListItem;
 import com.vladsch.flexmark.parser.Parser;
+import com.vladsch.flexmark.html2md.converter.FlexmarkHtmlConverter;
 import com.vladsch.flexmark.util.ast.Document;
 import com.vladsch.flexmark.util.ast.Node;
 import com.vladsch.flexmark.util.data.MutableDataSet;
@@ -96,6 +97,8 @@ final class NativeMarkdownRenderer {
             "switch", "this", "throw", "throws", "true", "try", "val", "var", "void", "when", "while"
     );
 
+    private static final FlexmarkHtmlConverter HTML_TO_MARKDOWN = FlexmarkHtmlConverter.builder().build();
+
     private static final Parser PARSER = Parser.builder(new MutableDataSet()
                     .set(Parser.EXTENSIONS, List.of(
                             StrikethroughExtension.create(),
@@ -114,6 +117,14 @@ final class NativeMarkdownRenderer {
     }
 
     VBox render(String content) {
+        return renderMarkdown(content);
+    }
+
+    VBox renderCurseForgeDescription(String content) {
+        return renderMarkdown(convertCurseForgeHtmlToMarkdown(content));
+    }
+
+    private VBox renderMarkdown(String content) {
         VBox prose = new VBox(0);
         prose.getStyleClass().add("project-detail-prose");
         Document document = PARSER.parse(normalizeContent(content));
@@ -1013,6 +1024,17 @@ final class NativeMarkdownRenderer {
     private static String normalizeContent(String content) {
         String normalized = content == null || content.isBlank() ? "*No description.*" : content;
         return normalized.replace("\r\n", "\n").trim();
+    }
+
+    static String convertCurseForgeHtmlToMarkdown(String content) {
+        String normalized = normalizeContent(content);
+        if (!containsHtml(normalized)) return normalized;
+        String safeHtml = HTML_DANGEROUS_CONTENT.matcher(normalized).replaceAll("");
+        return HTML_TO_MARKDOWN.convert(safeHtml).trim();
+    }
+
+    static boolean containsHtml(String content) {
+        return content != null && Pattern.compile("(?is)<\\/?[a-z][^>]*>").matcher(content).find();
     }
 
     static String sanitizeHtml(String value) {
