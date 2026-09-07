@@ -254,7 +254,12 @@ public class SecurityConfig {
 
                     csrf.ignoringRequestMatchers("/api/v1/user/api-keys/**", "/api/v1/auth/**");
                     csrf.ignoringRequestMatchers("/api/v1/users/batch");
-                    csrf.ignoringRequestMatchers(request -> request.getHeader("X-MODTALE-KEY") != null);
+                    csrf.ignoringRequestMatchers(request -> {
+                        String path = request.getRequestURI();
+                        String key = request.getHeader("X-MODTALE-KEY");
+                        return (path.equals("/api/v1") || path.startsWith("/api/v1/"))
+                                && key != null && !key.isBlank();
+                    });
 
                     if (isPreviewEnvironment()) {
                         logger.warn("SECURITY WARNING: Disabling CSRF protection for Staging/Preview environment to allow cross-site requests.");
