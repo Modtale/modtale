@@ -57,6 +57,11 @@ final class NyoCfClient {
     }
 
     private ProjectPage searchClass(ProjectSearchQuery query, String projectClass, int page, int size) {
+        return searchClass(query, projectClass, page, size, true);
+    }
+
+    private ProjectPage searchClass(ProjectSearchQuery query, String projectClass, int page, int size,
+            boolean enrichBanners) {
         String path = "/api/v1/hytale/" + projectClass + "/search?q=" + encode(value(query.search()))
                 + "&limit=" + size + "&offset=" + (page * size) + "&include_files=true";
         JsonNode envelope = get(path);
@@ -65,7 +70,7 @@ final class NyoCfClient {
             ProjectSummary project = summary(item, query.gameVersion(), projectClass);
             if (project != null) projects.add(project);
         }
-        projects = withGalleryBanners(projects);
+        if (enrichBanners) projects = withGalleryBanners(projects);
         sort(projects, query.sort());
         long total = Math.max(projects.size(), envelope.path("pagination").path("total").asLong(projects.size()));
         int pages = total == 0 ? 0 : (int) Math.ceil(total / (double) size);
@@ -75,7 +80,7 @@ final class NyoCfClient {
     private ProjectPage searchAll(ProjectSearchQuery query, int page, int size) {
         List<CompletableFuture<ProjectPage>> searches = PROJECT_CLASSES.stream()
                 .map(projectClass -> CompletableFuture.supplyAsync(
-                        () -> searchClass(query, projectClass, page, size)))
+                        () -> searchClass(query, projectClass, page, size, false)))
                 .toList();
         List<ProjectSummary> projects = new ArrayList<>();
         long total = 0;
@@ -85,7 +90,7 @@ final class NyoCfClient {
             total += result.totalElements();
         }
         sort(projects, query.sort());
-        List<ProjectSummary> pageContent = projects.stream().limit(size).toList();
+        List<ProjectSummary> pageContent = withGalleryBanners(projects.stream().limit(size).toList());
         int pages = total == 0 ? 0 : (int) Math.ceil(total / (double) size);
         return new ProjectPage(pageContent, pages, total, page, page + 1 >= pages);
     }
