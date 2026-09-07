@@ -478,6 +478,7 @@ final class LibraryWorldRenderer {
         shell.setMinSize(size, size);
         shell.setPrefSize(size, size);
         shell.setMaxSize(size, size);
+        double clipRadius = size <= CONTENT_ICON_SIZE ? 8 : 10;
 
         if (imageLoader != null && useProjectFallback) {
             ImageView fallback = new ImageView();
@@ -485,6 +486,7 @@ final class LibraryWorldRenderer {
             fallback.setFitHeight(size);
             fallback.setPreserveRatio(false);
             fallback.setSmooth(true);
+            fallback.setClip(roundedClip(size, clipRadius));
             imageLoader.loadInto(fallback, null, size * 2, size * 2);
             shell.getChildren().add(fallback);
         }
@@ -495,7 +497,7 @@ final class LibraryWorldRenderer {
             image.setFitHeight(size);
             image.setSmooth(true);
             image.setMouseTransparent(true);
-            image.setClip(roundedClip(size, size <= CONTENT_ICON_SIZE ? 8 : 10));
+            image.setClip(roundedClip(size, clipRadius));
             imageLoader.loadInto(image, iconUrl, size, size);
             shell.getChildren().add(image);
             return shell;
