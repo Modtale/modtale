@@ -28,11 +28,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
-          PR_ACTION: ${{ github.event.action }}
-          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          WORKFLOW_FILE: tests.yml
         run: bash .github/scripts/should-run-tests-workflow.sh
+
+  scripts:
+    name: Repository Script Tests
+    needs: dedupe
+    if: needs.dedupe.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+
+      - name: Test workflow and fixture scripts
+        run: node --test .github/tests/*.test.mjs mock-db/tests/*.test.mjs
 
   detect-changes:
     name: Detect Changes
@@ -80,6 +93,9 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Check frontend types
+        run: npm run check
 
       - name: Run frontend tests
         run: npm run test
