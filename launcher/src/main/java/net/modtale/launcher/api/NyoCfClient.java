@@ -116,6 +116,27 @@ final class NyoCfClient {
                 Map.of(), false, false, null, versions(files, website, null), List.of(), List.of());
     }
 
+    ProjectSummary enrichBrowseBanner(ProjectSummary summary) {
+        if (summary == null || !summary.isCurseForge()
+                || (summary.bannerUrl() != null && !summary.bannerUrl().isBlank())) {
+            return summary;
+        }
+        try {
+            long projectId = summary.curseForgeProjectId();
+            JsonNode project = metadata(projectId);
+            validateProject(project, projectId);
+            String bannerUrl = firstScreenshot(project, "thumbnail_url");
+            if (bannerUrl == null) return summary;
+            return new ProjectSummary(
+                    summary.id(), summary.slug(), summary.title(), summary.description(), summary.authorId(),
+                    summary.author(), summary.imageUrl(), bannerUrl, summary.classification(), summary.downloadCount(),
+                    summary.favoriteCount(), summary.updatedAt(), summary.versions(), summary.source(),
+                    summary.websiteUrl(), summary.distributionAllowed());
+        } catch (RuntimeException ignored) {
+            return summary;
+        }
+    }
+
     DownloadUrlResponse download(long projectId, long fileId) {
         JsonNode file = get("/api/v1/hytale/mods/" + positive(projectId) + "/files/" + positive(fileId));
         if (file.path("mod_id").asLong() != projectId || file.path("game_id").asLong() != HYTALE_GAME_ID
