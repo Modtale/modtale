@@ -30,6 +30,8 @@ import net.modtale.launcher.model.project.ProjectSummary;
 import net.modtale.launcher.model.project.ProjectVersion;
 import net.modtale.launcher.ui.browse.controls.BrowseOptions;
 import net.modtale.launcher.ui.common.LauncherIcons;
+import net.modtale.launcher.ui.common.LauncherSkeleton;
+import net.modtale.launcher.ui.common.LauncherSkeletonContent;
 
 public final class ProjectCardFactory {
 
@@ -51,6 +53,12 @@ public final class ProjectCardFactory {
 
     public ProjectCardFactory(Function<String, String> assetResolver, Executor executor) {
         this.media = new ProjectCardMedia(assetResolver, executor);
+    }
+
+    public Node loading(ProjectCardViewStyle style, double width, double height) {
+        return LauncherSkeleton.of(create(
+                LauncherSkeletonContent.project(), style, "2026.1", false,
+                p -> {}, p -> {}, p -> {}, p -> {}, width, height));
     }
 
     public void clearImageCache() {

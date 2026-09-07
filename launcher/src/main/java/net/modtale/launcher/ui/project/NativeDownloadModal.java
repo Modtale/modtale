@@ -34,6 +34,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import net.modtale.launcher.ui.common.LauncherSkeleton;
+import net.modtale.launcher.ui.common.LauncherSkeletonContent;
 import net.modtale.launcher.model.project.GameVersionCatalog;
 import net.modtale.launcher.model.project.ProjectClassification;
 import net.modtale.launcher.model.project.ProjectDetail;
@@ -263,10 +264,7 @@ final class NativeDownloadModal {
         VBox body = new VBox(0);
         body.getStyleClass().add("download-modal-body");
 
-        if (loading && project.versions().isEmpty()) {
-            body.getChildren().add(loadingState());
-            return body;
-        }
+        boolean skeleton = loading && project.versions().isEmpty();
 
         VBox versionBlock = new VBox(8);
         versionBlock.getStyleClass().add("download-modal-version-block");
@@ -277,7 +275,7 @@ final class NativeDownloadModal {
         versions.setAllowEmptySelection(false);
         versions.setEmptyText("No compatible game versions");
         versions.setMaxListHeight(224);
-        versions.setVersions(gameVersions());
+        versions.setVersions(skeleton ? LauncherSkeletonContent.version().gameVersions() : gameVersions());
         versions.setSelectedVersions(activeSelectedGameVersions());
         versions.setOnOpenChange(open -> gameVersionDropdownOpen = open);
         versions.setOnSelectionChange(next -> {
@@ -289,7 +287,8 @@ final class NativeDownloadModal {
         versionBlock.getChildren().addAll(versionLabel, versions);
         body.getChildren().add(versionBlock);
 
-        List<VersionEntry> sortedVersions = sortedVisibleVersions();
+        List<VersionEntry> sortedVersions = skeleton
+                ? List.of(new VersionEntry(LauncherSkeletonContent.version(), "2026.1")) : sortedVisibleVersions();
         VersionEntry latest = sortedVersions.isEmpty() ? null : sortedVersions.getFirst();
         if (latest == null) {
             body.getChildren().add(emptyState());
@@ -315,17 +314,7 @@ final class NativeDownloadModal {
             }
             body.getChildren().add(list);
         }
-        return body;
-    }
-
-    private Node loadingState() {
-        VBox state = new VBox(12);
-        state.getStyleClass().add("download-modal-empty");
-        state.setAlignment(Pos.CENTER);
-        state.getChildren().addAll(
-                LauncherSkeleton.rows(3)
-        );
-        return state;
+        return skeleton ? LauncherSkeleton.of(body) : body;
     }
 
     private Button latestButton(VersionEntry entry) {

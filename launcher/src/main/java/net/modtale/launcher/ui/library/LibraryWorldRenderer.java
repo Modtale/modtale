@@ -27,6 +27,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Rectangle;
 import net.modtale.launcher.ui.common.LauncherSkeleton;
+import net.modtale.launcher.ui.common.LauncherSkeletonContent;
 import net.modtale.launcher.hytale.HytaleWorldManager.HytaleWorld;
 import net.modtale.launcher.model.install.InstalledProject;
 import net.modtale.launcher.model.install.UpdateCandidate;
@@ -331,11 +332,9 @@ final class LibraryWorldRenderer {
             if (!model.loading()) {
                 return null;
             }
-            HBox loading = new HBox(10);
-            loading.getStyleClass().add("library-world-version-row");
-            loading.setAlignment(Pos.CENTER_LEFT);
-            loading.getChildren().add(LauncherSkeleton.rows(2));
-            return loading;
+            return LauncherSkeleton.of(versionControls(new LibraryWorldProjectModel(installed,
+                    LauncherSkeletonContent.detail(), model.meta(), model.update(), false, model.modIds(),
+                    model.enabledCount(), model.totalCount(), model.contents(), model.display(), model.contentsCollapsed())));
         }
 
         List<LibraryVersionChoice> choices = LibraryProjectSupport.versionChoices(

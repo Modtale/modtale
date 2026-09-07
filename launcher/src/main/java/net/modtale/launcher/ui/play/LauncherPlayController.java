@@ -53,6 +53,7 @@ import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.util.StringConverter;
 import net.modtale.launcher.ui.common.LauncherSkeleton;
+import net.modtale.launcher.ui.common.LauncherSkeletonContent;
 import net.modtale.launcher.api.ModtaleApiClient;
 import net.modtale.launcher.api.ProjectSearchQuery;
 import net.modtale.launcher.discord.DiscordRichPresenceService;
@@ -1116,7 +1117,7 @@ public final class LauncherPlayController {
             return;
         }
         friendsLoading = true;
-        friendsList.getChildren().setAll(LauncherSkeleton.rows(3));
+        renderFriendsLoading();
         CompletableFuture.supplyAsync(() -> hytaleAuthService.getFriends(settingsController.settings()), executor)
                 .whenComplete((friends, error) -> Platform.runLater(() -> {
                     friendsLoading = false;
@@ -1139,6 +1140,12 @@ public final class LauncherPlayController {
                     loadedFriendsKey = friendsKey;
                     renderFriends(friends == null ? List.of() : friends);
                 }));
+    }
+
+    private void renderFriendsLoading() {
+        friendsList.getChildren().clear();
+        for (int i = 0; i < 3; i++) friendsList.getChildren().add(LauncherSkeleton.of(
+                friendRow(new HytaleFriend("", "Community friend", "Online", "", true))));
     }
 
     private void renderFriends(List<HytaleFriend> friends) {
@@ -1237,7 +1244,7 @@ public final class LauncherPlayController {
     private void loadBlogPosts() {
         blogPostsLoading = true;
         blogPostsComplete = false;
-        newsList.getChildren().setAll(LauncherSkeleton.rows(3));
+        renderNewsLoading();
         CompletableFuture.supplyAsync(hytaleAuthService::getAllBlogPosts, executor)
                 .whenComplete((posts, error) -> Platform.runLater(() -> {
                     blogPostsLoading = false;
@@ -1248,6 +1255,12 @@ public final class LauncherPlayController {
                     blogPostsLoaded = true;
                     renderInitialBlogPosts(posts == null ? List.of() : posts);
                 }));
+    }
+
+    private void renderNewsLoading() {
+        newsList.getChildren().clear();
+        for (int i = 0; i < 3; i++) newsList.getChildren().add(LauncherSkeleton.of(
+                blogPostRow(new HytaleBlogPost("The latest news from Hytale", "", "", java.time.Instant.parse(LauncherSkeletonContent.DATE)))));
     }
 
     private void renderInitialBlogPosts(List<HytaleBlogPost> posts) {

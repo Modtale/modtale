@@ -73,6 +73,7 @@ import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import net.modtale.launcher.ui.common.LauncherSkeleton;
+import net.modtale.launcher.ui.common.LauncherSkeletonContent;
 import net.modtale.launcher.api.ModtaleApiClient;
 import net.modtale.launcher.platform.SystemBrowser;
 import net.modtale.launcher.model.project.ProjectClassification;
@@ -1243,7 +1244,7 @@ public final class ProjectPageController {
         VBox.setMargin(panel, LauncherLayout.launcherPageInsets(panelTopMargin, 56));
 
         Node header = header(summary, detail, loading);
-        Node body = loading && detail == null ? LauncherSkeleton.rows(5) : body(summary, detail);
+        Node body = loading && detail == null && !wikiMode ? LauncherSkeleton.of(body(summary, LauncherSkeletonContent.detail())) : body(summary, detail);
         panel.getChildren().addAll(header, body);
         if (!compactLayout && body instanceof Region bodyRegion) {
             panel.minHeightProperty().bind(Bindings.createDoubleBinding(
@@ -1598,6 +1599,7 @@ public final class ProjectPageController {
                 this::loadWikiPage,
                 this::prefetchWikiPage,
                 this::closeWiki,
+                wikiLoading && !wikiError,
                 compactLayout
         );
         if (compactLayout) {
@@ -1634,7 +1636,7 @@ public final class ProjectPageController {
                 detail,
                 currentComments,
                 commentUserProfiles,
-                detail == null || commentsLoading,
+                commentsLoading,
                 commentSubmitting,
                 commentsTotalCount,
                 commentsHasMore,
@@ -2765,25 +2767,41 @@ public final class ProjectPageController {
                     : "This project does not have a public changelog yet.");
             subtitle.getStyleClass().add("project-changelog-empty-subtitle");
             if (loading) {
-                empty.getChildren().add(LauncherSkeleton.rows(3));
+                for (int i = 0; i < 3; i++) list.getChildren().add(loadingChangelogCard());
             } else {
                 Label title = new Label("No versions to show.");
                 title.getStyleClass().add("project-changelog-empty-title");
                 empty.getChildren().add(title);
             }
-            empty.getChildren().add(subtitle);
-            list.getChildren().add(empty);
+            if (!loading) {
+                empty.getChildren().add(subtitle);
+                list.getChildren().add(empty);
+            }
         } else {
             visibleEntries.forEach(entry -> list.getChildren().add(changelogCard(entry)));
             if (loading) {
-                list.getChildren().add(LauncherSkeleton.rows(1));
+                list.getChildren().add(loadingChangelogCard());
             }
         }
 
         scroll.setContent(list);
-        scroll.setPrefViewportHeight(preferredChangelogViewportHeight(visibleEntries));
+        List<ChangelogEntry> layoutEntries = new ArrayList<>(visibleEntries);
+        if (loading) {
+            int placeholders = visibleEntries.isEmpty() ? 3 : 1;
+            for (int i = 0; i < placeholders; i++) layoutEntries.add(placeholderChangelog());
+        }
+        scroll.setPrefViewportHeight(preferredChangelogViewportHeight(layoutEntries));
         modal.getChildren().addAll(header, scroll);
         return modal;
+    }
+
+    private Node loadingChangelogCard() {
+        return LauncherSkeleton.of(changelogCard(placeholderChangelog()));
+    }
+
+    private static ChangelogEntry placeholderChangelog() {
+        ProjectVersion version = LauncherSkeletonContent.version();
+        return ChangelogEntry.from(version, version.changelog());
     }
 
     private HBox changelogHeader(List<ChangelogEntry> entries) {

@@ -9512,12 +9512,17 @@
 
 /* Static, low-contrast placeholders avoid motion and background animation work. */
 .loading-skeleton-block {
-    -fx-background-color: rgba(148, 163, 184, 0.12);
+    -fx-background-color: #202b3d;
     -fx-background-radius: 6;
 }
-.loading-skeleton-card {
-    -fx-background-color: rgba(15, 23, 42, 0.45);
-    -fx-background-radius: 16;
-    -fx-border-color: rgba(148, 163, 184, 0.10);
-    -fx-border-radius: 16;
+
+
+/* Preserve renderer surfaces at normal opacity while their inert content is masked. */
+.loading-skeleton:disabled {
+    -fx-opacity: 1;
+}
+
+.loading-skeleton-media {
+    -fx-background-color: #162033;
+    -fx-background-radius: 16px 16px 0 0;
 }

@@ -29,6 +29,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Rectangle;
 import net.modtale.launcher.ui.common.LauncherSkeleton;
+import net.modtale.launcher.ui.common.LauncherSkeletonContent;
 import net.modtale.launcher.model.project.ProjectPage;
 import net.modtale.launcher.model.project.ProjectSummary;
 import net.modtale.launcher.model.user.CreatorProfile;
@@ -186,14 +187,8 @@ final class NativeCreatorProfileView {
     }
 
     private HBox loadingCard() {
-        HBox card = new HBox(40);
-        card.getStyleClass().addAll("creator-profile-card", "creator-profile-loading-card");
-        card.setAlignment(Pos.TOP_LEFT);
-        card.setMaxWidth(Double.MAX_VALUE);
-        card.setMinHeight(PROFILE_CARD_HEIGHT);
-        card.setPrefHeight(PROFILE_CARD_HEIGHT);
-        card.getChildren().add(LauncherSkeleton.rows(2));
-        return card;
+        return LauncherSkeleton.of(profileCard(LauncherSkeletonContent.creator(),
+                new ProjectPage(List.of(LauncherSkeletonContent.project()), 1, 1, 0, true)));
     }
 
     private HBox profileCard(CreatorProfile profile, ProjectPage projects) {
@@ -550,8 +545,8 @@ final class NativeCreatorProfileView {
         FlowPane grid = projectGrid();
         int count = compact ? 3 : 8;
         for (int i = 0; i < count; i++) {
-            Region skeleton = LauncherSkeleton.card(compact ? 320 : projectCardWidth(), compact ? 160 : projectCardWidth(), !compact);
-            lock(skeleton, compact ? 320 : projectCardWidth(), compact ? 160 : projectCardWidth());
+            Region skeleton = (Region) projectCardFactory.loading(compact ? ProjectCardViewStyle.LIST : ProjectCardViewStyle.GRID,
+                    compact ? 320 : projectCardWidth(), compact ? 160 : projectCardWidth());
             grid.getChildren().add(skeleton);
         }
         return grid;
