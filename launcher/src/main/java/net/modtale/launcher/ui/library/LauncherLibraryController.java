@@ -1012,27 +1012,38 @@ public final class LauncherLibraryController {
     }
 
     private void shareWorldSnapshot(HytaleWorld world) {
-        settingsController.saveFromFields(false);
-        feedback.runAsync("Creating " + world.name() + " share link...", () -> {
-            accountController.ensureSignedIn();
-            return apiClient.createWorldModList(snapshotRequest(world));
-        }, list -> {
+        createSharedList(world, list -> {
             copyShareUrl(list.shareUrl());
-            String message = "Copied share link for " + list.title() + ".";
-            feedback.log(message + " " + list.shareUrl());
-            feedback.showToast("Share link copied", message);
+            feedback.showToast("Share link copied", "Copied share link for " + list.title() + ".");
         });
     }
 
     private void createModpackFromWorld(HytaleWorld world) {
-        settingsController.saveFromFields(false);
-        feedback.runAsync("Preparing " + world.name() + " modpack starter...", () -> {
-            accountController.ensureSignedIn();
-            return apiClient.createWorldModList(snapshotRequest(world));
-        }, list -> {
+        createSharedList(world, list -> {
             String target = "/upload?type=MODPACK&fromList=" + encodeQuery(list.id());
             LauncherExternalLinks.open(target, feedback::showToast);
-            feedback.log("Opening Modtale to start a modpack from " + world.name() + ".");
+        });
+    }
+
+    private void createSharedList(HytaleWorld world, java.util.function.Consumer<WorldModList> onCreated) {
+        settingsController.saveFromFields(false);
+        var capture = new net.modtale.launcher.config.WorldListConfigCapture();
+        Path globalMods = settings().hytaleModsDirectory();
+        feedback.runAsync("Finding configs for " + world.name() + "...", () -> {
+            try { return capture.discover(globalMods, world.directory()); }
+            catch (java.io.IOException ex) { throw new ModtaleApiException("Could not find mod configs", ex); }
+        }, candidates -> {
+            StackPane host = overlayHost.get();
+            if (host == null) return;
+            ShareConfigSelectionModal.show(host, candidates, selected ->
+                    feedback.runAsync("Creating " + world.name() + " share link...", () -> {
+                        accountController.ensureSignedIn();
+                        CreateWorldModListRequest request = snapshotRequest(world);
+                        try {
+                            return apiClient.createWorldModList(new CreateWorldModListRequest(request.title(), request.worldName(),
+                                    request.gameVersion(), request.mods(), capture.capture(selected, globalMods, world.directory())));
+                        } catch (java.io.IOException ex) { throw new ModtaleApiException("Could not read selected configs", ex); }
+                    }, onCreated));
         });
     }
 
@@ -1061,10 +1072,16 @@ public final class LauncherLibraryController {
                 + LibraryProjectSupport.plural(result.installedFiles().size()) + " from " + title + ".";
         feedback.log(message);
         feedback.showToast("Installed", message);
-        showPostDownloadWorldModal(title, modIdsForFiles(result.installedFiles()));
+        showPostDownloadWorldModal(title, modIdsForFiles(result.installedFiles()),
+                list.configs().stream().filter(config -> "WORLD".equals(config.scope())).toList());
     }
 
     private boolean showPostDownloadWorldModal(String title, List<String> modIds) {
+        return showPostDownloadWorldModal(title, modIds, List.of());
+    }
+
+    private boolean showPostDownloadWorldModal(String title, List<String> modIds,
+            List<net.modtale.launcher.model.worldlist.WorldListConfig> configs) {
         List<String> ids = modIds == null
                 ? List.of()
                 : modIds.stream()
@@ -1072,12 +1089,12 @@ public final class LauncherLibraryController {
                 .map(String::trim)
                 .distinct()
                 .toList();
-        if (ids.isEmpty() || worlds.isEmpty()) {
+        if ((ids.isEmpty() && configs.isEmpty()) || worlds.isEmpty()) {
             hideInstallLoadingOverlay();
             return false;
         }
         hideInstallLoadingOverlay();
-        return postDownloadWorldModal.show(title, ids, postDownloadWorldOptions(ids));
+        return postDownloadWorldModal.show(title, ids, postDownloadWorldOptions(ids), configs);
     }
 
     private List<PostDownloadWorldModal.WorldOption> postDownloadWorldOptions(List<String> modIds) {
@@ -1098,11 +1115,16 @@ public final class LauncherLibraryController {
     }
 
     private void applyPostDownloadWorldSelection(PostDownloadWorldModal.Selection selection) {
-        if (selection == null || selection.worlds().isEmpty() || selection.modIds().isEmpty()) {
+        if (selection == null || selection.worlds().isEmpty() || (selection.modIds().isEmpty() && selection.configs().isEmpty())) {
             return;
         }
         feedback.runAsync("Enabling install in selected worlds...", () -> {
             for (HytaleWorld world : selection.worlds()) {
+                try {
+                    net.modtale.launcher.install.WorldListConfigInstaller.install(selection.configs(), "WORLD", world.directory().resolve("mods"));
+                } catch (java.io.IOException ex) {
+                    throw new ModtaleApiException("Could not apply shared configs to " + world.name(), ex);
+                }
                 worldManager.setModsEnabled(world.configPath(), selection.modIds(), true);
             }
             return worldManager.loadWorlds(settingsController.settings());

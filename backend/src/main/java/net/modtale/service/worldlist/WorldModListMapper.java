@@ -43,7 +43,8 @@ final class WorldModListMapper {
                 shareUrl,
                 downloadUrl,
                 launcherInstallUrl,
-                list.getMods().stream().map(this::toItemDTO).toList()
+                list.getMods().stream().map(this::toItemDTO).toList(),
+                list.getConfigs()
         );
     }
 

@@ -92,6 +92,31 @@ class ConfigEditorModalTest {
         });
     }
 
+    @Test
+    void sharingOnlyIncludesExplicitlySelectedConfigs() throws Exception {
+        fx(() -> {
+            StackPane host = new StackPane();
+            new Scene(host, 900, 700);
+            var file = new ConfigFile(directory, directory.resolve("Example/config.json"), "World mods / Example/config.json");
+            var result = new java.util.concurrent.atomic.AtomicReference<java.util.List<ConfigFile>>();
+            ShareConfigSelectionModal.show(host, java.util.List.of(file), result::set);
+            host.applyCss();
+            host.layout();
+            var choice = find(host, javafx.scene.control.CheckBox.class);
+            assertFalse(choice.isSelected());
+            button(host, "Create shared list").fire();
+            assertEquals(java.util.List.of(), result.get());
+            ShareConfigSelectionModal.show(host, java.util.List.of(file), result::set);
+            host.applyCss();
+            host.layout();
+            find(host, javafx.scene.control.CheckBox.class).setSelected(true);
+            button(host, "Create shared list").fire();
+            assertEquals(java.util.List.of(file), result.get());
+            assertTrue(host.getChildren().isEmpty());
+            return null;
+        });
+    }
+
     private static Button button(Parent root, String text) {
         if (root instanceof Button button && button.getText().equals(text)) return button;
         for (Node child : root.getChildrenUnmodifiable()) {

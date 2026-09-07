@@ -32,6 +32,10 @@ public class WorldModList {
     private int viewCount;
     private int downloadCount;
     private List<Item> mods = new ArrayList<>();
+    private List<WorldListConfig> configs = new ArrayList<>();
+
+    public List<WorldListConfig> getConfigs() { return configs == null ? List.of() : configs; }
+    public void setConfigs(List<WorldListConfig> configs) { this.configs = configs == null ? List.of() : List.copyOf(configs); }
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id == null || id.isBlank() ? UUID.randomUUID().toString() : id; }
