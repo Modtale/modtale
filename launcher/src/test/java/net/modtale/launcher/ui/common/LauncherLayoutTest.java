@@ -23,10 +23,4 @@ class LauncherLayoutTest {
         assertEquals(navbarInsets, pageInsets);
     }
 
-    @Test
-    void navbarBoundedWidthCannotExtendPastEitherNavbarEdge() {
-        assertEquals(1096, LauncherLayout.navbarBoundedWidth(1320));
-        assertEquals(416, LauncherLayout.navbarBoundedWidth(640));
-        assertEquals(0, LauncherLayout.navbarBoundedWidth(200));
-    }
 }

@@ -27,7 +27,4 @@ public final class LauncherLayout {
         return navbarInsets(top, bottom);
     }
 
-    public static double navbarBoundedWidth(double width) {
-        return Math.max(0, width - navbarLeftInset() - navbarRightInset());
-    }
 }
