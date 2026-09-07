@@ -22,10 +22,12 @@ class ModpackOverrideArchiveTest {
         List<ModpackOverrideArchive.OverrideFile> files = ModpackOverrideArchive.read(new ByteArrayInputStream(zip(Map.of(
                 "overrides/Mods/example/game.json", "{}",
                 "overrides/Mods/example/ui.toml", "scale=2",
-                "overrides/Saves/example/config.json", "{}"
+                "overrides/Saves/My World/mods/Example_Plugin/config.json", "{}"
         ))));
 
         assertEquals(3, files.size());
+        assertTrue(files.stream().anyMatch(file -> file.path()
+                .equals("overrides/Saves/My World/mods/Example_Plugin/config.json")));
         assertTrue(files.stream().anyMatch(file -> file.path().equals("overrides/Mods/example/ui.toml")));
     }
 

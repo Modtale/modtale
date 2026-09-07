@@ -337,7 +337,7 @@ public class ModInstaller {
         if (installed == null || settings == null) {
             return;
         }
-        deleteRecordedFiles(installed);
+        deleteRecordedFiles(installed, settings);
         settings.removeInstalledProject(installed.projectId());
         settingsStore.removeInstalledProject(installed.projectId());
         settingsStore.save(settings);
@@ -389,15 +389,24 @@ public class ModInstaller {
         if (previous != null) {
             LOG.info("Removing previous install projectId=" + projectId
                     + " fileCount=" + previous.files().size());
-            deleteRecordedFiles(previous);
+            deleteRecordedFiles(previous, settings);
         }
         return previous;
     }
 
-    private static void deleteRecordedFiles(InstalledProject installed) {
+    private static void deleteRecordedFiles(InstalledProject installed, LauncherSettings settings) {
+        boolean bundle = installed.isModpack() || InstalledProject.INSTALL_BUNDLE.equals(installed.installType());
+        Path modsRoot = settings.hytaleModsDirectory().toAbsolutePath().normalize();
         installed.files().forEach(file -> {
             try {
-                Files.deleteIfExists(Path.of(file));
+                Path path = Path.of(file).toAbsolutePath().normalize();
+                // Older install records include overrides alongside mod binaries. Keep all
+                // plugin data and saves, including files Hytale has changed since installation.
+                if (bundle && (!modsRoot.equals(path.getParent())
+                        || !ArchiveInstaller.isInstallable(path.getFileName().toString()))) {
+                    return;
+                }
+                Files.deleteIfExists(path);
             } catch (IOException ignored) {
                 LOG.warn("Could not delete stale installed file " + file);
                 // Stale files should not block an update; the new install can still succeed.
