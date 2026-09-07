@@ -68,11 +68,12 @@ class NyoCfClientTest {
                 0, 20, null, null, null, null, null, null));
         client.search(new ProjectSearchQuery("compost", "mods", "Early Access", "downloads",
                 0, 20, null, null, null, null, null, null));
+        assertEquals(0, detailRequests.get());
         ProjectDetail detail = client.project(1450386);
         DownloadUrlResponse download = client.download(1450386, 8747324);
 
         assertEquals("curseforge:1450386", browse.content().getFirst().routeKey());
-        assertEquals("https://media.forgecdn.net/screenshot-thumb.png", browse.content().getFirst().bannerUrl());
+        assertEquals(null, browse.content().getFirst().bannerUrl());
         assertEquals(2, browseRequests.get());
         assertTrue(browse.content().getFirst().isCurseForge());
         assertEquals("<p>Rich project description</p>", detail.about());
@@ -121,7 +122,7 @@ class NyoCfClientTest {
     }
 
     @Test
-    void allSelectionOnlyEnrichesProjectsThatFitOnTheReturnedPage() {
+    void allSelectionDoesNotFetchPerProjectMetadata() {
         AtomicInteger detailRequests = new AtomicInteger();
         java.util.List<String> projectClasses = java.util.List.of(
                 "mods", "prefabs", "worlds", "bootstrap", "translations");
@@ -144,7 +145,7 @@ class NyoCfClientTest {
                 null, null, null, null, null, null));
 
         assertEquals(2, result.content().size());
-        assertEquals(2, detailRequests.get());
+        assertEquals(0, detailRequests.get());
     }
 
     private void respond(HttpExchange exchange, String body) throws IOException {
