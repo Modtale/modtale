@@ -373,7 +373,7 @@ public final class ProjectBrowseController {
         resultsIndicator.setMouseTransparent(true);
         resultsIndicator.setAccessibleText("Browse results status");
         categoryPills = categories.view();
-        HBox.setHgrow(categoryPills, Priority.ALWAYS);
+        HBox.setHgrow(categoryPills, Priority.NEVER);
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         browseControls.getChildren().addAll(categoryPills, resultsIndicator, spacer, controlRow);
