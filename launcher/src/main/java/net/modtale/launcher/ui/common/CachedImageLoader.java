@@ -160,7 +160,14 @@ public final class CachedImageLoader {
         if (cached != null) {
             return cached;
         }
-        Image image = new Image(imageUrl, key.requestedWidth(), key.requestedHeight(), key.preserveRatio(), true, true);
+        Image image = new Image(
+                imageUrl,
+                key.requestedWidth(),
+                key.requestedHeight(),
+                key.preserveRatio(),
+                true,
+                isHttpUrl(imageUrl)
+        );
         memoryImages.put(key, image);
         return image;
     }
