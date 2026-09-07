@@ -9,6 +9,22 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class ErrorMessageUtilsTest {
 
     @Test
+    void serverErrorsDoNotExposeInternalExceptionMessages() {
+        RuntimeException error = new RuntimeException("Database failed at mongodb://user:password@internal-host/db");
+        var response = ErrorMessageUtils.internalServerError(error, "Could not save changes.");
+        assertEquals("Could not save changes.", response.getBody().getDetail());
+        assertEquals("Could not save changes.", response.getBody().getProperties().get("error"));
+        var unhandled = new GlobalExceptionHandler().handleAllOtherExceptions(error);
+        assertEquals("The server could not complete the request.", unhandled.getBody().getDetail());
+    }
+
+    @Test
+    void clientErrorsRetainActionableValidationDetails() {
+        var response = ErrorMessageUtils.badRequest(new IllegalArgumentException("Name is already in use"), "Invalid name");
+        assertEquals("Invalid name: Name is already in use", response.getBody().getDetail());
+    }
+
+    @Test
     void describeUsesTheMostSpecificNonGenericCause() {
         RuntimeException error = new RuntimeException(
                 "Internal Server Error",
