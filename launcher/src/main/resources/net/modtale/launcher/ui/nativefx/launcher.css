@@ -9492,3 +9492,15 @@
     -fx-background-radius: 6px;
     -fx-padding: 9px;
 }
+
+/* Static, low-contrast placeholders avoid motion and background animation work. */
+.loading-skeleton-block {
+    -fx-background-color: rgba(148, 163, 184, 0.12);
+    -fx-background-radius: 6;
+}
+.loading-skeleton-card {
+    -fx-background-color: rgba(15, 23, 42, 0.45);
+    -fx-background-radius: 16;
+    -fx-border-color: rgba(148, 163, 184, 0.10);
+    -fx-border-radius: 16;
+}

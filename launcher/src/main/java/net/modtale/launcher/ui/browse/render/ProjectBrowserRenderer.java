@@ -19,6 +19,7 @@ import javafx.scene.layout.Pane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import net.modtale.launcher.ui.common.LauncherSkeleton;
 import net.modtale.launcher.LauncherPerformanceProbe;
 import net.modtale.launcher.model.project.ProjectSummary;
 import net.modtale.launcher.ui.browse.card.ProjectCardFactory;
@@ -119,6 +120,22 @@ public final class ProjectBrowserRenderer {
         } finally {
             LauncherPerformanceProbe.recordOperation("browse.render", operationStart);
         }
+    }
+
+    public void renderLoading(ProjectCardViewStyle style, int pageSize) {
+        LayoutMetrics layout = layoutMetricsFor(style, pageSize);
+        Node container = resultsContainer(style, layout);
+        int count = Math.min(layout.pageSize(), style == ProjectCardViewStyle.LIST ? 4 : layout.columns() * 2);
+        for (int i = 0; i < count; i++) {
+            Node card = LauncherSkeleton.card(
+                    style == ProjectCardViewStyle.LIST ? Double.MAX_VALUE : layout.cardWidth(),
+                    style == ProjectCardViewStyle.LIST ? 148 : layout.cardHeight(),
+                    style == ProjectCardViewStyle.GRID);
+            if (container instanceof GridPane grid) grid.add(card, i % layout.columns(), i / layout.columns());
+            else if (container instanceof VBox list) list.getChildren().add(card);
+        }
+        projectResults.getChildren().setAll(container);
+        lastRenderedLayout = LayoutMetrics.unset();
     }
 
     public boolean shouldRenderForLayout(ProjectCardViewStyle cardViewStyle) {

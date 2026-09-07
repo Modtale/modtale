@@ -18,6 +18,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import net.modtale.launcher.ui.common.LauncherSkeleton;
 import net.modtale.launcher.model.project.ProjectDetail;
 import net.modtale.launcher.model.project.WikiBundle;
 import net.modtale.launcher.model.project.WikiBundle.WikiNode;
@@ -49,7 +50,7 @@ final class NativeWikiView {
         main.setMaxWidth(Double.MAX_VALUE);
 
         if (bundle == null && loading) {
-            VBox state = state("Loading wiki…", "Fetching this project's HytaleModding documentation.", true);
+            VBox state = LauncherSkeleton.rows(5);
             main.getChildren().add(state);
             return main;
         }

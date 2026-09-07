@@ -21,6 +21,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Rectangle;
+import net.modtale.launcher.ui.common.LauncherSkeleton;
 import net.modtale.launcher.api.ModtaleApiClient;
 import net.modtale.launcher.model.user.CurrentUser;
 import net.modtale.launcher.model.user.UserSummary;
@@ -166,11 +167,7 @@ public final class LauncherFollowingController {
         if (loading) {
             setVisibleManaged(summary, true);
             summary.setText("Loading followed creators...");
-            Label loadingLabel = new Label("Loading...");
-            loadingLabel.getStyleClass().add("following-loading");
-            StackPane loadingPane = new StackPane(loadingLabel);
-            loadingPane.getStyleClass().add("following-loading-pane");
-            userList.getChildren().add(loadingPane);
+            userList.getChildren().add(LauncherSkeleton.rows(4));
             return;
         }
         if (users.isEmpty()) {

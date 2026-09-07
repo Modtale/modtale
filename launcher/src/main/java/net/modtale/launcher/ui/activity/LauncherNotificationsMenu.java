@@ -28,6 +28,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Rectangle;
+import net.modtale.launcher.ui.common.LauncherSkeleton;
 import net.modtale.launcher.api.ModtaleApiClient;
 import net.modtale.launcher.model.notification.LauncherNotification;
 import net.modtale.launcher.ui.account.LauncherAccountController;
@@ -328,11 +329,7 @@ public final class LauncherNotificationsMenu {
             clearButton.setManaged(!notifications.isEmpty());
         }
         if (loading) {
-            Label loadingLabel = new Label("Loading...");
-            loadingLabel.getStyleClass().add("notification-menu-loading");
-            StackPane loadingPane = new StackPane(loadingLabel);
-            loadingPane.getStyleClass().add("notification-menu-loading-pane");
-            notificationList.getChildren().add(loadingPane);
+            notificationList.getChildren().add(LauncherSkeleton.rows(3));
             return;
         }
         if (notifications.isEmpty()) {

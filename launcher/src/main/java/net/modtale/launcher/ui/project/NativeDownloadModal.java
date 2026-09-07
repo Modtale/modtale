@@ -33,6 +33,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import net.modtale.launcher.ui.common.LauncherSkeleton;
 import net.modtale.launcher.model.project.GameVersionCatalog;
 import net.modtale.launcher.model.project.ProjectClassification;
 import net.modtale.launcher.model.project.ProjectDetail;
@@ -322,8 +323,7 @@ final class NativeDownloadModal {
         state.getStyleClass().add("download-modal-empty");
         state.setAlignment(Pos.CENTER);
         state.getChildren().addAll(
-                NativeSpinner.inline("Loading download options", 20),
-                new Label("Fetching files and compatible game versions.")
+                LauncherSkeleton.rows(3)
         );
         return state;
     }

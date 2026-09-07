@@ -28,6 +28,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Rectangle;
+import net.modtale.launcher.ui.common.LauncherSkeleton;
 import net.modtale.launcher.model.project.ProjectPage;
 import net.modtale.launcher.model.project.ProjectSummary;
 import net.modtale.launcher.model.user.CreatorProfile;
@@ -191,7 +192,7 @@ final class NativeCreatorProfileView {
         card.setMaxWidth(Double.MAX_VALUE);
         card.setMinHeight(PROFILE_CARD_HEIGHT);
         card.setPrefHeight(PROFILE_CARD_HEIGHT);
-        card.getChildren().add(NativeSpinner.centered());
+        card.getChildren().add(LauncherSkeleton.rows(2));
         return card;
     }
 
@@ -549,8 +550,7 @@ final class NativeCreatorProfileView {
         FlowPane grid = projectGrid();
         int count = compact ? 3 : 8;
         for (int i = 0; i < count; i++) {
-            Region skeleton = new Region();
-            skeleton.getStyleClass().add("creator-profile-project-skeleton");
+            Region skeleton = LauncherSkeleton.card(compact ? 320 : projectCardWidth(), compact ? 160 : projectCardWidth(), !compact);
             lock(skeleton, compact ? 320 : projectCardWidth(), compact ? 160 : projectCardWidth());
             grid.getChildren().add(skeleton);
         }

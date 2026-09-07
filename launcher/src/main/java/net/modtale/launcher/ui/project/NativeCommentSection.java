@@ -26,6 +26,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Rectangle;
+import net.modtale.launcher.ui.common.LauncherSkeleton;
 import net.modtale.launcher.model.project.ProjectComment;
 import net.modtale.launcher.model.project.ProjectDetail;
 import net.modtale.launcher.model.project.ProjectSummary;
@@ -139,7 +140,7 @@ final class NativeCommentSection {
         VBox list = new VBox(16);
         list.getStyleClass().add("project-comments-list");
         if (loading) {
-            list.getChildren().add(stateCard(NativeSpinner.inline(20)));
+            list.getChildren().add(LauncherSkeleton.rows(3));
         } else if (safeComments.isEmpty()) {
             list.getChildren().add(stateCard(curseForge
                     ? "No comments have been posted on CurseForge yet."

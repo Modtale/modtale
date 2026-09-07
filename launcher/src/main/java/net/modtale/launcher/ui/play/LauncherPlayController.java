@@ -52,6 +52,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.util.StringConverter;
+import net.modtale.launcher.ui.common.LauncherSkeleton;
 import net.modtale.launcher.api.ModtaleApiClient;
 import net.modtale.launcher.api.ProjectSearchQuery;
 import net.modtale.launcher.discord.DiscordRichPresenceService;
@@ -1115,7 +1116,7 @@ public final class LauncherPlayController {
             return;
         }
         friendsLoading = true;
-        setFriendsMessage("Loading Hytale friends...");
+        friendsList.getChildren().setAll(LauncherSkeleton.rows(3));
         CompletableFuture.supplyAsync(() -> hytaleAuthService.getFriends(settingsController.settings()), executor)
                 .whenComplete((friends, error) -> Platform.runLater(() -> {
                     friendsLoading = false;
@@ -1236,7 +1237,7 @@ public final class LauncherPlayController {
     private void loadBlogPosts() {
         blogPostsLoading = true;
         blogPostsComplete = false;
-        newsList.getChildren().setAll(messageRow("Loading Hytale posts..."));
+        newsList.getChildren().setAll(LauncherSkeleton.rows(3));
         CompletableFuture.supplyAsync(hytaleAuthService::getAllBlogPosts, executor)
                 .whenComplete((posts, error) -> Platform.runLater(() -> {
                     blogPostsLoading = false;

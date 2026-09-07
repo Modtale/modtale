@@ -72,6 +72,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import net.modtale.launcher.ui.common.LauncherSkeleton;
 import net.modtale.launcher.api.ModtaleApiClient;
 import net.modtale.launcher.platform.SystemBrowser;
 import net.modtale.launcher.model.project.ProjectClassification;
@@ -1242,7 +1243,7 @@ public final class ProjectPageController {
         VBox.setMargin(panel, LauncherLayout.launcherPageInsets(panelTopMargin, 56));
 
         Node header = header(summary, detail, loading);
-        Node body = body(summary, detail);
+        Node body = loading && detail == null ? LauncherSkeleton.rows(5) : body(summary, detail);
         panel.getChildren().addAll(header, body);
         if (!compactLayout && body instanceof Region bodyRegion) {
             panel.minHeightProperty().bind(Bindings.createDoubleBinding(
@@ -2725,7 +2726,7 @@ public final class ProjectPageController {
                     : "This project does not have a public changelog yet.");
             subtitle.getStyleClass().add("project-changelog-empty-subtitle");
             if (loading) {
-                empty.getChildren().add(NativeSpinner.centered());
+                empty.getChildren().add(LauncherSkeleton.rows(3));
             } else {
                 Label title = new Label("No versions to show.");
                 title.getStyleClass().add("project-changelog-empty-title");
@@ -2736,7 +2737,7 @@ public final class ProjectPageController {
         } else {
             visibleEntries.forEach(entry -> list.getChildren().add(changelogCard(entry)));
             if (loading) {
-                list.getChildren().add(NativeSpinner.inline(16));
+                list.getChildren().add(LauncherSkeleton.rows(1));
             }
         }
 

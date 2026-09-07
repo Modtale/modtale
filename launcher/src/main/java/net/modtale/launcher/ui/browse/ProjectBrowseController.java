@@ -316,6 +316,7 @@ public final class ProjectBrowseController {
         }
 
         updateResultsIndicator(totalResultCount, true);
+        if (currentProjects.isEmpty()) renderer.renderLoading(viewStyles.style(), selectedPageSize());
         boolean curseForge = sourceSelector.source() == ProjectBrowseSource.CURSEFORGE;
         String provider = curseForge ? "CurseForge" : "Modtale";
         status.accept("Searching " + provider + " projects...");
@@ -333,6 +334,7 @@ public final class ProjectBrowseController {
                         updateResultsIndicator(totalResultCount, false);
                         updatePaginationControls();
                         log.accept("Error: " + cause.getMessage());
+                        renderProjects();
                         toast.accept("Search failed", cause.getMessage());
                         return;
                     }
