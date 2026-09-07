@@ -81,7 +81,7 @@ public class FileValidationService {
         if (file == null || file.isEmpty()) {
             return;
         }
-        projectImageValidationService.validateImage(file, 16.0 / 9.0, "Gallery", "16:9");
+        projectImageValidationService.validateImage(file, "Gallery");
     }
 
     public static class ManifestInspection {

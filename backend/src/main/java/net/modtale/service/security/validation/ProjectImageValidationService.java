@@ -25,7 +25,15 @@ public class ProjectImageValidationService {
     private static final Pattern SVG_WIDTH_PATTERN = Pattern.compile("width\\s*=\\s*['\"]([^'\"]+)['\"]", Pattern.CASE_INSENSITIVE);
     private static final Pattern SVG_HEIGHT_PATTERN = Pattern.compile("height\\s*=\\s*['\"]([^'\"]+)['\"]", Pattern.CASE_INSENSITIVE);
 
+    public void validateImage(MultipartFile file, String type) {
+        validateImage(file, null, type, null);
+    }
+
     public void validateImage(MultipartFile file, double targetRatio, String type, String ratioLabel) {
+        validateImage(file, Double.valueOf(targetRatio), type, ratioLabel);
+    }
+
+    private void validateImage(MultipartFile file, Double targetRatio, String type, String ratioLabel) {
         if (file.getSize() > MAX_IMAGE_FILE_SIZE) {
             throw new InvalidProjectRequestException(type + " image size must not exceed 10MB.");
         }
@@ -61,7 +69,7 @@ public class ProjectImageValidationService {
             }
 
             double actualRatio = (double) image.getWidth() / image.getHeight();
-            if (Math.abs(actualRatio - targetRatio) > 0.05) {
+            if (targetRatio != null && Math.abs(actualRatio - targetRatio) > 0.05) {
                 throw new InvalidProjectRequestException(
                         String.format("%s image must have an aspect ratio of %s (Uploaded: %.2f).", type, ratioLabel, actualRatio)
                 );
@@ -88,7 +96,7 @@ public class ProjectImageValidationService {
         return sample.startsWith("<?xml") || sample.contains("<svg");
     }
 
-    private void validateSvgAspectRatio(byte[] bytes, String type, String ratioLabel, double targetRatio) {
+    private void validateSvgAspectRatio(byte[] bytes, String type, String ratioLabel, Double targetRatio) {
         String svgText = new String(bytes, StandardCharsets.UTF_8);
         Matcher svgTagMatcher = SVG_TAG_PATTERN.matcher(svgText);
         if (!svgTagMatcher.find()) {
@@ -122,7 +130,7 @@ public class ProjectImageValidationService {
         }
 
         double actualRatio = width / height;
-        if (Math.abs(actualRatio - targetRatio) > 0.05) {
+        if (targetRatio != null && Math.abs(actualRatio - targetRatio) > 0.05) {
             throw new InvalidProjectRequestException(
                     String.format("%s image must have an aspect ratio of %s (Uploaded: %.2f).", type, ratioLabel, actualRatio)
             );
