@@ -84,6 +84,8 @@ def appCopyright = 'Copyright (C) Modtale contributors'
 def appLicenseId = 'AGPL-3.0-or-later'
 def appLicense = layout.projectDirectory.file('../LICENSE')
 def appIconPng = layout.projectDirectory.file('src/main/resources/net/modtale/launcher/ui/nativefx/assets/favicon.png')
+def appIconIco = layout.projectDirectory.file('src/main/resources/net/modtale/launcher/ui/nativefx/assets/favicon.ico')
+def appIconIcns = layout.projectDirectory.file('src/main/resources/net/modtale/launcher/ui/nativefx/assets/favicon.icns')
 def distributionDirectory = layout.buildDirectory.dir('distributions')
 def linuxAppImageDirectory = layout.buildDirectory.dir('jpackage/linux-app-image')
 def linuxAppDir = layout.buildDirectory.dir("appimage/${appSlug}.AppDir")
@@ -185,6 +187,16 @@ def jpackageExecutable = java21Launcher.map {
     file("${it.executablePath.asFile.parentFile}/jpackage${extension}")
 }
 
+def nativeAppIcon = {
+    if (currentOs.isWindows()) {
+        return appIconIco
+    }
+    if (currentOs.isMacOsX()) {
+        return appIconIcns
+    }
+    return appIconPng
+}
+
 def commonJpackageArgs = {
     [
             '--input', layout.buildDirectory.dir('jpackage/input').get().asFile.absolutePath,
@@ -194,6 +206,7 @@ def commonJpackageArgs = {
             '--app-version', jpackageAppVersion,
             '--vendor', appVendor,
             '--description', appDescription,
+            '--icon', nativeAppIcon.call().asFile.absolutePath,
             '--add-modules', javaRuntimeModules.join(','),
             '--jlink-options', jpackageJlinkOptions.join(' ')
     ] + (['-Dfile.encoding=UTF-8'] + launcherJvmArgs).collectMany { ['--java-options', it] }
@@ -322,8 +335,7 @@ tasks.register('prepareLinuxAppImageRuntime', Exec) {
         commandLine([
                 executable.absolutePath,
                 '--type', 'app-image',
-                '--dest', linuxAppImageDirectory.get().asFile.absolutePath,
-                '--icon', appIconPng.asFile.absolutePath
+                '--dest', linuxAppImageDirectory.get().asFile.absolutePath
         ] + commonJpackageArgs.call())
     }
 }
