@@ -1,3 +1,4 @@
+import { useScrollLock } from '@/hooks/useScrollLock';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -199,11 +200,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
     const hasLoadedGameVersionsRef = useRef(false);
     const selectedVersions = useMemo(() => parseSelectedVersions(selectedVersion), [selectedVersion]);
 
-    useEffect(() => {
-        if (isMobile && isFilterOpen) document.body.style.overflow = 'hidden';
-        else document.body.style.overflow = '';
-        return () => { document.body.style.overflow = ''; };
-    }, [isMobile, isFilterOpen]);
+    useScrollLock(isMobile && isFilterOpen);
 
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {
