@@ -159,14 +159,7 @@ public final class LauncherBrowseMenu {
             return;
         }
 
-        List<BrowseOptions.ClassificationOption> order = List.of(
-                BrowseOptions.ClassificationOption.ALL,
-                BrowseOptions.ClassificationOption.MODPACKS,
-                BrowseOptions.ClassificationOption.PLUGINS,
-                BrowseOptions.ClassificationOption.WORLDS,
-                BrowseOptions.ClassificationOption.ART,
-                BrowseOptions.ClassificationOption.DATA
-        );
+        List<BrowseOptions.ClassificationOption> order = BrowseOptions.PROJECT_TYPES;
         for (int i = 0; i < order.size(); i++) {
             BrowseOptions.ClassificationOption option = order.get(i);
             menuPanel.getChildren().add(menuItem(option));
