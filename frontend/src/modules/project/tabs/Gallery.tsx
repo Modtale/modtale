@@ -314,21 +314,21 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
                             role="dialog"
                             aria-modal="true"
                             aria-labelledby="gallery-bulk-upload-title"
-                            className={`w-full max-w-4xl max-h-[85vh] overflow-hidden rounded-2xl border ${theme.colors.border} ${theme.colors.bgSurface} shadow-2xl`}
+                            className={`w-full max-w-2xl max-h-[88vh] overflow-hidden rounded-2xl border ${theme.colors.border} ${theme.colors.bgSurface} shadow-2xl`}
                             onClick={(event) => event.stopPropagation()}
                         >
-                            <div className={`flex items-center justify-between gap-4 border-b ${theme.colors.border} px-5 py-4`}>
+                            <div className={`flex items-center justify-between gap-4 border-b ${theme.colors.border} px-6 py-5`}>
                                 <div>
                                     <p id="gallery-bulk-upload-title" className={`text-base font-black ${theme.colors.textPrimary}`}>
                                         {isCommittingFiles
                                             ? `Uploading ${pendingFiles.length} image${pendingFiles.length === 1 ? '' : 's'}`
                                             : `Add ${pendingFiles.length} image${pendingFiles.length === 1 ? '' : 's'}`}
                                     </p>
-                                    <p className={`mt-1 text-xs font-semibold ${theme.colors.textMuted}`}>
-                                        {isCommittingFiles
-                                            ? `Image ${galleryUploadProgress?.current ?? 1} of ${galleryUploadProgress?.total ?? pendingFiles.length}`
-                                            : 'Review your selection before uploading · up to 20 gallery items'}
-                                    </p>
+                                    {isCommittingFiles && (
+                                        <p className={`mt-1 text-xs font-semibold ${theme.colors.textMuted}`}>
+                                            Image {galleryUploadProgress?.current ?? 1} of {galleryUploadProgress?.total ?? pendingFiles.length}
+                                        </p>
+                                    )}
                                 </div>
                                 {!isCommittingFiles && (
                                     <button
@@ -357,11 +357,11 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
                                 </div>
                             )}
 
-                            <div className="max-h-[60vh] overflow-y-auto p-5">
-                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                            <div className="max-h-[62vh] overflow-y-auto p-6">
+                                <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-3">
                                     {pendingFiles.map(file => (
                                         <div key={`${file.name}-${file.lastModified}`} className={`relative overflow-hidden rounded-xl border ${theme.colors.border} ${theme.colors.bgBase}`}>
-                                            <img src={(file as File & { __preview?: string }).__preview} alt="" className="aspect-video w-full object-cover" />
+                                            <img src={(file as File & { __preview?: string }).__preview} alt="" className="aspect-[4/3] w-full object-cover" />
                                             {!isCommittingFiles && <button type="button" onClick={() => removePendingFile(file)} className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-md bg-blue-950/80 text-white shadow" aria-label={`Remove ${file.name}`}><X className="h-3.5 w-3.5" /></button>}
                                             <p className={`truncate px-2 py-2 text-[10px] font-semibold ${theme.colors.textMuted}`}>{file.name}</p>
                                         </div>
@@ -370,7 +370,7 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
                             </div>
 
                             {!isCommittingFiles && (
-                                <div className={`flex items-center justify-end gap-2 border-t ${theme.colors.border} px-5 py-4`}>
+                                <div className={`flex items-center justify-end gap-2 border-t ${theme.colors.border} px-6 py-5`}>
                                     <button type="button" onClick={cancelPendingFiles} className={`rounded-lg border ${theme.colors.border} px-4 py-2.5 text-xs font-bold ${theme.colors.textSecondary}`}>Cancel</button>
                                     <button type="button" onClick={commitPendingFiles} className="rounded-lg bg-modtale-accent px-4 py-2.5 text-xs font-black text-white hover:bg-modtale-accentHover">Add {pendingFiles.length} image{pendingFiles.length === 1 ? '' : 's'}</button>
                                 </div>
