@@ -52,6 +52,8 @@ export const getCookie = (name: string): string | null => {
 };
 
 let csrfRefreshPromise: Promise<void> | null = null;
+let crossOriginCsrfToken: string | null = null;
+const readCsrfToken = () => getCookie(CSRF_COOKIE_NAME) || crossOriginCsrfToken;
 
 const shouldAttachCsrfToken = (method?: string) => WRITE_METHODS.has(method?.toLowerCase() || '');
 
@@ -67,9 +69,11 @@ const refreshCsrfToken = async () => {
     if (typeof window === 'undefined') return;
 
     if (!csrfRefreshPromise) {
-        csrfRefreshPromise = api.get(`/status?t=${Date.now()}`, {
+        csrfRefreshPromise = api.get<{ token: string }>('/auth/csrf', {
             headers: { 'Cache-Control': 'no-cache' }
-        }).then(() => undefined).finally(() => {
+        }).then(({ data }) => {
+            crossOriginCsrfToken = typeof data?.token === 'string' ? data.token : null;
+        }).finally(() => {
             csrfRefreshPromise = null;
         });
     }
@@ -94,11 +98,11 @@ api.interceptors.request.use(
 
         const retryableConfig = config as RetriableAxiosConfig;
         if (shouldAttachCsrfToken(config.method)) {
-            let token = getCookie(CSRF_COOKIE_NAME);
+            let token = readCsrfToken();
             if (!token && !retryableConfig._csrfRefreshAttempted) {
                 retryableConfig._csrfRefreshAttempted = true;
                 await refreshCsrfToken();
-                token = getCookie(CSRF_COOKIE_NAME);
+                token = readCsrfToken();
             }
 
             if (token) {
@@ -123,7 +127,7 @@ api.interceptors.response.use(
 
         try {
             await refreshCsrfToken();
-            const token = getCookie(CSRF_COOKIE_NAME);
+            const token = readCsrfToken();
             if (token) {
                 if (!config.headers) {
                     config.headers = {} as any;

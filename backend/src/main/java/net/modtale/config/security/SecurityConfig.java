@@ -247,19 +247,7 @@ public class SecurityConfig {
                             .csrfTokenRepository(tokenRepository)
                             .csrfTokenRequestHandler(requestHandler);
 
-                    csrf.ignoringRequestMatchers("/api/v1/user/api-keys/**", "/api/v1/auth/**");
-                    csrf.ignoringRequestMatchers("/api/v1/users/batch");
-                    csrf.ignoringRequestMatchers(request -> {
-                        String path = request.getRequestURI();
-                        String key = request.getHeader("X-MODTALE-KEY");
-                        return (path.equals("/api/v1") || path.startsWith("/api/v1/"))
-                                && key != null && !key.isBlank();
-                    });
-
-                    if (isPreviewEnvironment()) {
-                        logger.warn("SECURITY WARNING: Disabling CSRF protection for Staging/Preview environment to allow cross-site requests.");
-                        csrf.ignoringRequestMatchers("/**");
-                    }
+                    csrf.requireCsrfProtectionMatcher(new ApiCsrfRequestMatcher());
                 })
                 .addFilterBefore(rateLimitFilter, OAuth2LoginAuthenticationFilter.class)
                 .addFilterBefore(apiKeyAuthFilter, OAuth2LoginAuthenticationFilter.class)
@@ -290,6 +278,7 @@ public class SecurityConfig {
                         .requestMatchers("/oauth2/**", "/login**", "/error", "/logout").permitAll()
                         .requestMatchers("/api/v1/docs/**").permitAll()
                         .requestMatchers(
+                                "/api/v1/auth/csrf",
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/verify",
                                 "/api/v1/auth/signin",

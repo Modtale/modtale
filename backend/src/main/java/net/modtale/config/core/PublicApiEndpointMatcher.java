@@ -17,6 +17,7 @@ public final class PublicApiEndpointMatcher {
     private static final List<String> PUBLIC_READ_EXACT_PATHS = List.of(
             "/api/v1/tags",
             "/api/v1/status",
+            "/api/v1/auth/csrf",
             "/api/v1/analytics/platform/stats",
             "/api/v1/projects"
     );

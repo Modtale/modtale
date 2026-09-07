@@ -10,6 +10,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 final class ApiCorsPolicy {
     private static final List<String> RESTRICTED_PATHS = List.of(
             "/api/v1/admin/**",
+            "/api/v1/auth/csrf",
             "/api/v1/user/api-keys/**",
             "/api/v1/user/analytics",
             "/api/v1/projects/*/publish",

@@ -72,6 +72,23 @@ describe('api utils', () => {
         expect(config.headers['X-XSRF-TOKEN']).toBeUndefined();
     });
 
+    it('shares a token refresh for concurrent writes when API cookies are on another host', async () => {
+        let resolveRefresh!: (value: { data: { token: string } }) => void;
+        const refresh = vi.spyOn(api, 'get').mockImplementationOnce(() => new Promise(resolve => {
+            resolveRefresh = resolve;
+        }));
+        const handler = (api.interceptors.request as any).handlers[0].fulfilled;
+        const first = handler({ headers: {}, method: 'post' });
+        const second = handler({ headers: {}, method: 'put' });
+        expect(refresh).toHaveBeenCalledTimes(1);
+        expect(refresh).toHaveBeenCalledWith('/auth/csrf', { headers: { 'Cache-Control': 'no-cache' } });
+        resolveRefresh({ data: { token: 'cross-origin-token' } });
+        const configs = await Promise.all([first, second]);
+        for (const config of configs) {
+            expect(config.headers['X-XSRF-TOKEN']).toBe('cross-origin-token');
+        }
+    });
+
     it('extracts the most useful api error message available', () => {
         expect(extractApiErrorMessage('Plain string', 'Fallback')).toBe('Plain string');
 
