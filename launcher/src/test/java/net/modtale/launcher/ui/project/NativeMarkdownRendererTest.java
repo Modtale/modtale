@@ -5,11 +5,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.vladsch.flexmark.ast.ListItem;
+import com.vladsch.flexmark.ast.OrderedList;
+import com.vladsch.flexmark.parser.Parser;
+import com.vladsch.flexmark.util.ast.Node;
 import javafx.scene.text.TextAlignment;
 import org.junit.jupiter.api.Test;
 
 class NativeMarkdownRendererTest {
-
     @Test
     void enablesGfmAutolinksAndRestrictsExternalProtocols() {
         assertTrue(NativeMarkdownRenderer.parsesAutolink("Visit https://example.com for details."));
@@ -55,6 +58,35 @@ class NativeMarkdownRendererTest {
         assertTrue(markdown.contains("3. **Persistent Exploration:** Saved across sessions."));
         assertTrue(markdown.contains("4. *Cave Mode:* Switch underground."));
         assertTrue(markdown.contains("* ~~Old~~ New behavior") || markdown.contains("- ~~Old~~ New behavior"));
+    }
+
+    @Test
+    void preservesEveryItemInLongCurseForgeOrderedLists() {
+        String html = """
+                <ol>
+                <li><strong>One:</strong> First item.</li>
+                <li><strong>Two:</strong> Second item.</li>
+                <li><strong>Three:</strong> Third item.</li>
+                <li><strong>Four:</strong> Fourth item.</li>
+                <li><strong>Five:</strong> Fifth item.</li>
+                <li><strong>Six:</strong> Sixth item.</li>
+                <li><strong>Seven:</strong> Seventh item.</li>
+                </ol>
+                """;
+
+        String markdown = NativeMarkdownRenderer.convertCurseForgeHtmlToMarkdown(html);
+
+        for (int index = 1; index <= 7; index++) {
+            assertTrue(markdown.contains(index + ". "), markdown);
+        }
+
+        Node document = Parser.builder().build().parse(markdown);
+        OrderedList list = (OrderedList) document.getFirstChild();
+        int itemCount = 0;
+        for (Node child = list.getFirstChild(); child != null; child = child.getNext()) {
+            if (child instanceof ListItem) itemCount++;
+        }
+        assertEquals(7, itemCount, markdown);
     }
 
     @Test
