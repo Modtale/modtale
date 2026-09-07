@@ -33,6 +33,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     const [loadingReview, setLoadingReview] = useState(false);
     const [loadingReviewId, setLoadingReviewId] = useState<string>();
 
+    const [loadingReports, setLoadingReports] = useState(true);
     const [reports, setReports] = useState<any[]>([]);
     const [reportsError, setReportsError] = useState<string | null>(null);
 
@@ -133,12 +134,15 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
 
     const fetchReports = async () => {
         if (!canReadReports) return;
+        setLoadingReports(true);
         try {
             const data = await adminClient.getReportQueue('OPEN');
             setReports(data);
             setReportsError(null);
         } catch (e) {
             setReportsError(extractApiErrorMessage(e, 'We could not load the report queue.'));
+        } finally {
+            setLoadingReports(false);
         }
     };
 
@@ -324,7 +328,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                             {reportsError}
                                         </div>
                                     )}
-                                    <ReportQueue reports={reports} onRefresh={fetchReports} canResolve={canResolveReports} />
+                                    <ReportQueue loadingReports={loadingReports} reports={reports} onRefresh={fetchReports} canResolve={canResolveReports} />
                                 </div>
                             )}
 

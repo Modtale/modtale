@@ -1,3 +1,5 @@
+import { ProjectLoadingRegion } from '../ProjectLoadingRegion';
+import { PROJECT_LOADING_VERSIONS, loadingNoop } from '../projectLoadingData';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Download, X, ChevronDown, FileText, AlertCircle, ChevronRight, Check } from 'lucide-react';
 import { theme } from '@/styles/theme';
@@ -175,6 +177,7 @@ const VersionMultiSelectDropdown: React.FC<VersionMultiSelectDropdownProps> = ({
 };
 
 interface DownloadModalProps {
+    loading?: boolean;
     show: boolean;
     onClose: () => void;
     versionsByGame: Record<string, any[]>;
@@ -189,7 +192,7 @@ interface DownloadModalProps {
 }
 
 export const DownloadModal: React.FC<DownloadModalProps> = ({
-                                                                show, onClose, versionsByGame, preReleaseGameVersions = [], orderedGameVersions, onDownload, showExperimental, onToggleExperimental, onViewHistory, isInline = false, containerRef
+                                                                loading = false, show, onClose, versionsByGame, preReleaseGameVersions = [], orderedGameVersions, onDownload, showExperimental, onToggleExperimental, onViewHistory, isInline = false, containerRef
                                                             }) => {
     useScrollLock(show && !isInline);
     const [selectedGameVersions, setSelectedGameVersions] = useState<string[]>([]);
@@ -386,28 +389,28 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                 <div>
                     <h3 className={`text-xl font-black ${theme.colors.textPrimary} flex items-center gap-2`}><Download className={`w-5 h-5 ${theme.colors.accent}`} /> Download</h3>
                     {showPreReleaseToggle && (
-                        <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={() => setShowPreReleaseGameVersions(!showPreReleaseGameVersions)}>
+                        <ProjectLoadingRegion loading={loading} className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={() => setShowPreReleaseGameVersions(!showPreReleaseGameVersions)}>
                             <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${effectiveShowPreReleaseGameVersions ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>
                                 <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${effectiveShowPreReleaseGameVersions ? 'translate-x-4' : ''}`} />
                             </div>
                             <span className={`text-[10px] font-bold ${theme.colors.textMuted} uppercase group-hover:${theme.colors.textPrimary} transition-colors`}>Show Pre-Release Game Versions</span>
-                        </div>
+                        </ProjectLoadingRegion>
                     )}
                     {showAlphaBetaToggle && (
-                        <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
+                        <ProjectLoadingRegion loading={loading} className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
                             <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${effectiveShowExperimental ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>
                                 <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${effectiveShowExperimental ? 'translate-x-4' : ''}`} />
                             </div>
                             <span className={`text-[10px] font-bold ${theme.colors.textMuted} uppercase group-hover:${theme.colors.textPrimary} transition-colors`}>Show Beta/Alpha</span>
-                        </div>
+                        </ProjectLoadingRegion>
                     )}
                 </div>
                 {!isInline && (
-                    <button type="button" onClick={onClose} className={`p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 transition-colors`}><X className="w-5 h-5" /></button>
+                    <button type="button" aria-label="Close downloads" onClick={onClose} className={`p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 transition-colors`}><X className="w-5 h-5" /></button>
                 )}
             </div>
 
-            <div className={`p-6 overflow-visible relative flex-1 flex flex-col justify-start`}>
+            <ProjectLoadingRegion loading={loading} label="Loading downloads" className={`p-6 overflow-visible relative flex-1 flex flex-col justify-start`}>
                 <div className="mb-6">
                     <label className={`block text-xs font-bold ${theme.colors.textSecondary} uppercase mb-2 tracking-wider`}>Game Versions</label>
                     <VersionMultiSelectDropdown
@@ -501,13 +504,13 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                         )}
                     </div>
                 )}
-            </div>
+            </ProjectLoadingRegion>
 
-            <div className={`p-4 border-t border-slate-100 dark:border-white/5 shrink-0 z-10 flex items-center justify-center bg-slate-50 dark:bg-[#0B1120]`}>
+            <ProjectLoadingRegion loading={loading} label="Loading downloads" className={`p-4 border-t border-slate-100 dark:border-white/5 shrink-0 z-10 flex items-center justify-center bg-slate-50 dark:bg-[#0B1120]`}>
                 <button type="button" onClick={onViewHistory} className={`text-xs ${theme.colors.textMuted} hover:${theme.colors.accent} font-bold uppercase tracking-wider flex items-center justify-center gap-1 transition-colors w-full`}>
                     View Full Changelog <ChevronRight className="w-3 h-3" />
                 </button>
-            </div>
+            </ProjectLoadingRegion>
         </div>
     );
 
@@ -521,3 +524,9 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
         </ModalPortal>
     );
 };
+
+export function DownloadModalSkeleton({ show = true, isInline = false, onClose = loadingNoop }: { show?: boolean; isInline?: boolean; onClose?: () => void }) {
+    return <DownloadModal loading show={show} isInline={isInline} onClose={onClose}
+        versionsByGame={{ '2026.01.17': PROJECT_LOADING_VERSIONS }} orderedGameVersions={['2026.01.17']}
+        onDownload={loadingNoop} showExperimental={false} onToggleExperimental={loadingNoop} onViewHistory={loadingNoop} />;
+}

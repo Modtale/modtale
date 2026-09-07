@@ -1,4 +1,4 @@
-import { ContentSkeleton } from '@/components/ui/Skeleton';
+import { SkeletonSurface } from '@/components/ui/Skeleton';
 import React, { useState, useEffect } from 'react';
 import { Flag, ExternalLink, Check, X, ShieldAlert, MessageSquare, User as UserIcon, Filter } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
@@ -10,9 +10,10 @@ interface ReportQueueProps {
     reports: Report[];
     onRefresh: () => void;
     canResolve?: boolean;
+    loadingReports?: boolean;
 }
 
-export function ReportQueue({ reports: initialReports, onRefresh, canResolve = false }: ReportQueueProps) {
+export function ReportQueue({ reports: initialReports, onRefresh, canResolve = false, loadingReports = false }: ReportQueueProps) {
     const [reports, setReports] = useState<Report[]>(initialReports);
     const [processing, setProcessing] = useState<string | null>(null);
     const [responses, setResponses] = useState<Record<string, string>>({});
@@ -85,6 +86,17 @@ export function ReportQueue({ reports: initialReports, onRefresh, canResolve = f
         }
     };
 
+    const pending = loading || (statusFilter === 'OPEN' && loadingReports);
+    const Surface = pending ? SkeletonSurface : React.Fragment;
+    const visibleReports: Report[] = pending ? Array.from({ length: reports.length || 3 }, (_, index) => ({
+        id: `report-${index}`, reporterId: 'reporter', reporterUsername: 'Reporter name',
+        targetId: '00000000-0000-0000-0000-000000000000', targetType: 'PROJECT',
+        targetSummary: 'Reported project title', reason: 'INAPPROPRIATE_CONTENT',
+        description: 'Report description with details of the content requiring review.',
+        status: statusFilter, createdAt: '2026-01-01T12:00:00Z',
+        resolvedBy: 'Administrator', resolutionNote: 'Review outcome and response to the reporter.',
+    })) : reports;
+
     return (
         <div className="grid gap-4">
             {errorMessage && (
@@ -114,9 +126,8 @@ export function ReportQueue({ reports: initialReports, onRefresh, canResolve = f
                 </div>
             </div>
 
-            {loading ? (
-                <ContentSkeleton label="Loading reports" />
-            ) : reports.length === 0 ? (
+            <Surface><div className="grid gap-4">
+            {visibleReports.length === 0 ? (
                 <div className="text-center py-20 bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-md">
                     <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                         <ShieldAlert className="w-10 h-10 text-green-500" />
@@ -125,7 +136,7 @@ export function ReportQueue({ reports: initialReports, onRefresh, canResolve = f
                     <p className="text-slate-500 font-medium">Nothing to show for '{statusFilter}' status.</p>
                 </div>
             ) : (
-                reports.map(report => (
+                visibleReports.map(report => (
                     <div key={report.id} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl backdrop-blur-md p-6 flex flex-col md:flex-row gap-6 relative overflow-hidden group">
                         <div className={`absolute top-0 left-0 bottom-0 w-1 ${report.status === 'OPEN' ? 'bg-red-500' : report.status === 'RESOLVED' ? 'bg-green-500' : 'bg-slate-500'}`}></div>
 
@@ -204,6 +215,7 @@ export function ReportQueue({ reports: initialReports, onRefresh, canResolve = f
                     </div>
                 ))
             )}
+            </div></Surface>
         </div>
     );
 }
