@@ -133,9 +133,6 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
         <div className="space-y-6">
             <div className={`flex items-center justify-between mb-4 pb-2 border-b ${theme.colors.borderFaint}`}>
                 <h3 className={`text-xs font-bold ${theme.colors.textMuted} uppercase tracking-widest flex items-center gap-2`}><ImageIcon className="w-3 h-3"/> Gallery</h3>
-                {!readOnly && resolvedGalleryImages.length > 1 && (
-                    <span className={`text-[10px] font-semibold ${theme.colors.textMuted}`}>Drag to reorder · first item is the cover</span>
-                )}
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
