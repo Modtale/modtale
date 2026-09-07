@@ -205,7 +205,7 @@ public final class LauncherBrowseMenu {
         if (menuButton == null || menuLabel == null) {
             return;
         }
-        menuLabel.setText(browseController.isCurseForgeSource() ? "CurseForge" : I18N.text("nav.browse"));
+        menuLabel.setText(I18N.text("nav.browse"));
         if (dropdownPanel != null) {
             rebuildPanel(dropdownPanel);
         }
