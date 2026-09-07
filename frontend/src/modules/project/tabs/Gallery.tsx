@@ -14,19 +14,21 @@ interface GalleryProps {
     hasProjectPermission: (perm: Permission) => boolean;
     handleGalleryDelete: (url: string) => Promise<void>;
     handleGalleryCaptionChange: (url: string, caption: string) => Promise<void>;
-    handleGallerySelect: (files: File[]) => void;
+    handleGallerySelect: (files: File[]) => void | Promise<void>;
     handleGalleryReorder: (imageUrls: string[]) => Promise<void>;
     handleGalleryVideoAdd: (url: string) => Promise<void>;
+    galleryUploadProgress: { percent: number; current: number; total: number } | null;
     isLoading: boolean;
 }
 
 const resolveImageUrl = (url: string) => (url.startsWith('/api') ? `${BACKEND_URL}${url}` : url);
 
-export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProjectPermission, handleGalleryDelete, handleGalleryCaptionChange, handleGallerySelect, handleGalleryReorder, handleGalleryVideoAdd, isLoading }) => {
+export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProjectPermission, handleGalleryDelete, handleGalleryCaptionChange, handleGallerySelect, handleGalleryReorder, handleGalleryVideoAdd, galleryUploadProgress, isLoading }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [youtubeUrl, setYoutubeUrl] = useState('');
     const [copiedEmbedUrl, setCopiedEmbedUrl] = useState<string | null>(null);
     const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+    const [isCommittingFiles, setIsCommittingFiles] = useState(false);
     const [draggedUrl, setDraggedUrl] = useState<string | null>(null);
     const [draftOrder, setDraftOrder] = useState<string[]>([]);
     const resolvedGalleryImages = useMemo(
@@ -66,15 +68,20 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
         setPendingFiles([]);
     };
 
-    const commitPendingFiles = () => {
-        if (pendingFiles.length === 0) return;
+    const commitPendingFiles = async () => {
+        if (pendingFiles.length === 0 || isCommittingFiles) return;
         const files = pendingFiles;
-        setPendingFiles([]);
-        handleGallerySelect(files);
-        files.forEach(file => {
-            const preview = (file as File & { __preview?: string }).__preview;
-            if (preview) URL.revokeObjectURL(preview);
-        });
+        setIsCommittingFiles(true);
+        try {
+            await handleGallerySelect(files);
+        } finally {
+            setPendingFiles([]);
+            setIsCommittingFiles(false);
+            files.forEach(file => {
+                const preview = (file as File & { __preview?: string }).__preview;
+                if (preview) URL.revokeObjectURL(preview);
+            });
+        }
     };
 
     const moveDraggedItem = (targetUrl: string) => {
@@ -143,6 +150,25 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
             <div className={`flex items-center justify-between mb-4 pb-2 border-b ${theme.colors.borderFaint}`}>
                 <h3 className={`text-xs font-bold ${theme.colors.textMuted} uppercase tracking-widest flex items-center gap-2`}><ImageIcon className="w-3 h-3"/> Gallery</h3>
             </div>
+
+            {galleryUploadProgress?.total === 1 && (
+                <div className={`rounded-xl border ${theme.colors.border} ${theme.colors.bgSurface} p-4 shadow-sm`} role="status" aria-live="polite">
+                    <div className="mb-2 flex items-center justify-between gap-4">
+                        <span className={`text-xs font-bold ${theme.colors.textPrimary}`}>
+                            {galleryUploadProgress.total === 1
+                                ? 'Uploading image'
+                                : `Uploading image ${galleryUploadProgress.current} of ${galleryUploadProgress.total}`}
+                        </span>
+                        <span className={`text-xs font-black tabular-nums ${theme.colors.textSecondary}`}>{galleryUploadProgress.percent}%</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                        <div
+                            className="h-full rounded-full bg-modtale-accent transition-[width] duration-150 ease-out"
+                            style={{ width: `${galleryUploadProgress.percent}%` }}
+                        />
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {displayedGalleryImages.map((item, idx) => (
@@ -280,7 +306,9 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
                 <ModalPortal>
                     <div
                         className="fixed inset-0 z-[300] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-in fade-in duration-200"
-                        onClick={cancelPendingFiles}
+                        onClick={() => {
+                            if (!isCommittingFiles) cancelPendingFiles();
+                        }}
                     >
                         <div
                             role="dialog"
@@ -292,36 +320,61 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
                             <div className={`flex items-center justify-between gap-4 border-b ${theme.colors.border} px-5 py-4`}>
                                 <div>
                                     <p id="gallery-bulk-upload-title" className={`text-base font-black ${theme.colors.textPrimary}`}>
-                                        Add {pendingFiles.length} image{pendingFiles.length === 1 ? '' : 's'}
+                                        {isCommittingFiles
+                                            ? `Uploading ${pendingFiles.length} image${pendingFiles.length === 1 ? '' : 's'}`
+                                            : `Add ${pendingFiles.length} image${pendingFiles.length === 1 ? '' : 's'}`}
                                     </p>
-                                    <p className={`mt-1 text-xs font-semibold ${theme.colors.textMuted}`}>Review your selection before uploading · up to 20 gallery items</p>
+                                    <p className={`mt-1 text-xs font-semibold ${theme.colors.textMuted}`}>
+                                        {isCommittingFiles
+                                            ? `Image ${galleryUploadProgress?.current ?? 1} of ${galleryUploadProgress?.total ?? pendingFiles.length}`
+                                            : 'Review your selection before uploading · up to 20 gallery items'}
+                                    </p>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={cancelPendingFiles}
-                                    className={`flex h-9 w-9 items-center justify-center rounded-lg border ${theme.colors.border} ${theme.colors.textSecondary} transition-colors hover:bg-slate-100 dark:hover:bg-white/5`}
-                                    aria-label="Close bulk image upload"
-                                >
-                                    <X className="h-4 w-4" />
-                                </button>
+                                {!isCommittingFiles && (
+                                    <button
+                                        type="button"
+                                        onClick={cancelPendingFiles}
+                                        className={`flex h-9 w-9 items-center justify-center rounded-lg border ${theme.colors.border} ${theme.colors.textSecondary} transition-colors hover:bg-slate-100 dark:hover:bg-white/5`}
+                                        aria-label="Close bulk image upload"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                )}
                             </div>
+
+                            {isCommittingFiles && (
+                                <div className={`border-b ${theme.colors.border} px-5 py-4`} role="status" aria-live="polite">
+                                    <div className="mb-2 flex items-center justify-between gap-4">
+                                        <span className={`text-xs font-bold ${theme.colors.textSecondary}`}>Uploading gallery</span>
+                                        <span className={`text-xs font-black tabular-nums ${theme.colors.textPrimary}`}>{galleryUploadProgress?.percent ?? 0}%</span>
+                                    </div>
+                                    <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                                        <div
+                                            className="h-full rounded-full bg-modtale-accent transition-[width] duration-150 ease-out"
+                                            style={{ width: `${galleryUploadProgress?.percent ?? 0}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="max-h-[60vh] overflow-y-auto p-5">
                                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                                     {pendingFiles.map(file => (
                                         <div key={`${file.name}-${file.lastModified}`} className={`relative overflow-hidden rounded-xl border ${theme.colors.border} ${theme.colors.bgBase}`}>
                                             <img src={(file as File & { __preview?: string }).__preview} alt="" className="aspect-video w-full object-cover" />
-                                            <button type="button" onClick={() => removePendingFile(file)} className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-md bg-blue-950/80 text-white shadow" aria-label={`Remove ${file.name}`}><X className="h-3.5 w-3.5" /></button>
+                                            {!isCommittingFiles && <button type="button" onClick={() => removePendingFile(file)} className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-md bg-blue-950/80 text-white shadow" aria-label={`Remove ${file.name}`}><X className="h-3.5 w-3.5" /></button>}
                                             <p className={`truncate px-2 py-2 text-[10px] font-semibold ${theme.colors.textMuted}`}>{file.name}</p>
                                         </div>
                                     ))}
                                 </div>
                             </div>
 
-                            <div className={`flex items-center justify-end gap-2 border-t ${theme.colors.border} px-5 py-4`}>
-                                <button type="button" onClick={cancelPendingFiles} className={`rounded-lg border ${theme.colors.border} px-4 py-2.5 text-xs font-bold ${theme.colors.textSecondary}`}>Cancel</button>
-                                <button type="button" onClick={commitPendingFiles} className="rounded-lg bg-modtale-accent px-4 py-2.5 text-xs font-black text-white hover:bg-modtale-accentHover">Add {pendingFiles.length} image{pendingFiles.length === 1 ? '' : 's'}</button>
-                            </div>
+                            {!isCommittingFiles && (
+                                <div className={`flex items-center justify-end gap-2 border-t ${theme.colors.border} px-5 py-4`}>
+                                    <button type="button" onClick={cancelPendingFiles} className={`rounded-lg border ${theme.colors.border} px-4 py-2.5 text-xs font-bold ${theme.colors.textSecondary}`}>Cancel</button>
+                                    <button type="button" onClick={commitPendingFiles} className="rounded-lg bg-modtale-accent px-4 py-2.5 text-xs font-black text-white hover:bg-modtale-accentHover">Add {pendingFiles.length} image{pendingFiles.length === 1 ? '' : 's'}</button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </ModalPortal>
