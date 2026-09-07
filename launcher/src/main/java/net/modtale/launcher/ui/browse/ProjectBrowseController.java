@@ -499,6 +499,9 @@ public final class ProjectBrowseController {
     private void selectSource(ProjectBrowseSource source) {
         searchState.reset();
         activeBrowseView = BrowseOptions.BrowseViewOption.defaultOption();
+        if (source == ProjectBrowseSource.MODTALE) {
+            withSuppressedSearch(() -> sortCombo.setValue(ProjectBrowseSort.RELEVANCE));
+        }
         categories.showCurseForgeOptions(source == ProjectBrowseSource.CURSEFORGE);
         updateSortOptions();
         refreshBrowseControls();
