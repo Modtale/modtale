@@ -80,11 +80,6 @@ const StatusRedirect = () => {
     );
 };
 
-const hasLikelyAuthCookie = () => {
-    if (typeof document === 'undefined') return false;
-    const cookies = document.cookie || '';
-    return /(?:^|;\s*)(SESSION|JSESSIONID|XSRF-TOKEN)=/.test(cookies);
-};
 
 const setProjectLikedState = (user: User, projectId: string, liked: boolean): User => {
     const likedProjectIds = user.likedProjectIds || [];
@@ -137,8 +132,7 @@ const AppContent: React.FC = () => {
         const params = new URLSearchParams(location.search);
         const oauthError = params.get('oauth_error');
         if (oauthError) {
-            const decodedError = decodeURIComponent(oauthError).replace(/\+/g, ' ');
-            setGlobalError(decodedError);
+            setGlobalError(oauthError);
             clearPendingSignInMethod();
             params.delete('oauth_error');
             const remainingSearch = params.toString();
@@ -173,11 +167,8 @@ const AppContent: React.FC = () => {
     }, [user]);
 
     const fetchUser = useCallback(async () => {
-        if (!hasLikelyAuthCookie()) {
-            setLoadingAuth(false);
-            return;
-        }
-
+        // Session cookies can be HttpOnly or scoped to another API host.
+        // Only the server can reliably tell whether this browser is signed in.
         try {
             const res = await api.get(`/user/me?t=${Date.now()}`);
             if (res.data) {

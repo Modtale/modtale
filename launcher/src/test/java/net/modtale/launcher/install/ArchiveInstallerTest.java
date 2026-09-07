@@ -89,6 +89,44 @@ class ArchiveInstallerTest {
     }
 
     @Test
+    void rejectsOverrideTraversalBeforeWritingInstanceFiles() throws IOException {
+        Path archive = overrideArchive("overrides/Mods/../settings.json");
+        Path instance = tempDir.resolve("instance");
+        assertThrows(IOException.class, () -> new ArchiveInstaller().installModpackArchive(
+                archive, instance.resolve("Mods"), instance));
+        assertTrue(Files.notExists(instance.resolve("settings.json")));
+    }
+
+    @Test
+    void rejectsOverridesThroughExistingSymbolicLinks() throws IOException {
+        Path instance = tempDir.resolve("instance");
+        Path mods = Files.createDirectories(instance.resolve("Mods"));
+        Path outside = Files.createDirectory(tempDir.resolve("outside"));
+        try {
+            Files.createSymbolicLink(mods.resolve("linked"), outside);
+        } catch (UnsupportedOperationException | IOException ex) {
+            org.junit.jupiter.api.Assumptions.abort("Symbolic links are unavailable: " + ex.getMessage());
+        }
+        Path archive = overrideArchive("overrides/Mods/linked/settings.json");
+        assertThrows(IOException.class, () -> new ArchiveInstaller().installModpackArchive(archive, mods, instance));
+        assertTrue(Files.notExists(outside.resolve("settings.json")));
+    }
+
+    private Path overrideArchive(String entryPath) throws IOException {
+        Path archive = tempDir.resolve("override.zip");
+        String content = "settings";
+        String lock = """
+                {"format":"modtale-lock","lockVersion":1,"game":"hytale","entries":[],
+                 "overrides":[{"path":"%s","size":%d,"hashes":{"sha256":"%s"}}]}
+                """.formatted(entryPath, content.length(), sha256(content));
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(archive))) {
+            add(zip, "modtale.lock.json", lock);
+            add(zip, entryPath, content);
+        }
+        return archive;
+    }
+
+    @Test
     void installsVerifiedLockedPackAndAppliesAllOverrides() throws IOException {
         Path archive = tempDir.resolve("locked-modpack.zip");
         String bundled = "bundled mod";

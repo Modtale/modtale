@@ -8,10 +8,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Set;
 import net.modtale.controller.auth.AuthController;
 import net.modtale.config.auth.ApiKeyAuthFilter;
@@ -54,9 +51,7 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.session.web.http.CookieSerializer;
 import org.springframework.session.web.http.DefaultCookieSerializer;
-import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 public class SecurityConfig {
@@ -129,8 +124,9 @@ public class SecurityConfig {
     }
 
     private boolean isLocalhost() {
-        String cleanUrl = getCleanFrontendUrl();
-        return cleanUrl != null && (cleanUrl.contains("localhost") || cleanUrl.contains("127.0.0.1"));
+        String host = safeHostFromUrl(getCleanFrontendUrl());
+        return "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host)
+                || "[::1]".equals(host);
     }
 
     private Set<String> getAllowedFrontendOriginPatterns() {
@@ -172,7 +168,7 @@ public class SecurityConfig {
 
     private boolean isAllowedFrontendHost(String host) {
         if (host == null || host.isBlank()) return false;
-        String normalized = host.toLowerCase();
+        String normalized = host.toLowerCase(java.util.Locale.ROOT);
         for (String originPattern : getAllowedFrontendOriginPatterns()) {
             String allowedHost = safeHostFromUrl(originPattern);
             if (allowedHost != null && normalized.equalsIgnoreCase(allowedHost)) {
@@ -252,14 +248,7 @@ public class SecurityConfig {
                             .csrfTokenRepository(tokenRepository)
                             .csrfTokenRequestHandler(requestHandler);
 
-                    csrf.ignoringRequestMatchers("/api/v1/user/api-keys/**", "/api/v1/auth/**");
-                    csrf.ignoringRequestMatchers("/api/v1/users/batch");
-                    csrf.ignoringRequestMatchers(request -> request.getHeader("X-MODTALE-KEY") != null);
-
-                    if (isPreviewEnvironment()) {
-                        logger.warn("SECURITY WARNING: Disabling CSRF protection for Staging/Preview environment to allow cross-site requests.");
-                        csrf.ignoringRequestMatchers("/**");
-                    }
+                    csrf.requireCsrfProtectionMatcher(new ApiCsrfRequestMatcher());
                 })
                 .addFilterBefore(rateLimitFilter, OAuth2LoginAuthenticationFilter.class)
                 .addFilterBefore(apiKeyAuthFilter, OAuth2LoginAuthenticationFilter.class)
@@ -269,10 +258,7 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                         .sessionFixation().migrateSession()
                 )
-                .formLogin(form -> form
-                        .loginProcessingUrl("/api/v1/auth/login-legacy")
-                        .permitAll()
-                )
+                .formLogin(form -> form.disable())
                 .oauth2Login(oauth2 -> oauth2
                         .authorizationEndpoint(authorization -> authorization
                                 .authorizationRequestResolver(authorizationRequestResolver)
@@ -290,6 +276,7 @@ public class SecurityConfig {
                         .requestMatchers("/oauth2/**", "/login**", "/error", "/logout").permitAll()
                         .requestMatchers("/api/v1/docs/**").permitAll()
                         .requestMatchers(
+                                "/api/v1/auth/csrf",
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/verify",
                                 "/api/v1/auth/signin",
@@ -346,10 +333,6 @@ public class SecurityConfig {
 
                             boolean isValidOrigin = isAllowedFrontendHost(originHost);
                             boolean isValidReferer = isAllowedFrontendHost(refererHost);
-
-                            if (isPreviewEnvironment() && (origin != null && origin.contains(".run.app"))) {
-                                return new AuthorizationDecision(true);
-                            }
 
                             return new AuthorizationDecision(isValidOrigin || isValidReferer);
                         })
@@ -410,55 +393,7 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        CorsConfiguration restrictedConfig = new CorsConfiguration();
-        List<String> restrictedOrigins = new ArrayList<>();
-
-        boolean isPreview = isPreviewEnvironment();
-        Set<String> frontendOrigins = getAllowedFrontendOriginPatterns();
-        String cleanUrl = getCleanFrontendUrl();
-
-        if (isPreview) {
-            restrictedOrigins.add("https://*.run.app");
-            if (cleanUrl != null && cleanUrl.contains("dev.modtale.net")) {
-                restrictedOrigins.add(cleanUrl);
-            }
-        } else {
-            restrictedOrigins.addAll(frontendOrigins);
-        }
-
-        restrictedConfig.setAllowedOriginPatterns(restrictedOrigins);
-        restrictedConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
-        restrictedConfig.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type", "X-Xsrf-Token", "X-XSRF-TOKEN"));
-        restrictedConfig.setAllowCredentials(true);
-        restrictedConfig.setMaxAge(3600L);
-
-        source.registerCorsConfiguration("/api/v1/admin/**", restrictedConfig);
-        source.registerCorsConfiguration("/api/v1/user/api-keys/**", restrictedConfig);
-        source.registerCorsConfiguration("/api/v1/user/analytics", restrictedConfig);
-        source.registerCorsConfiguration("/api/v1/projects/*/publish", restrictedConfig);
-        source.registerCorsConfiguration("/api/v1/analytics/view/**", restrictedConfig);
-        source.registerCorsConfiguration("/api/v1/views/project/**", restrictedConfig);
-        source.registerCorsConfiguration("/api/v1/user/repos/**", restrictedConfig);
-        source.registerCorsConfiguration("/api/v1/orgs/*/repos/**", restrictedConfig);
-        source.registerCorsConfiguration("/api/v1/user/connections/**", restrictedConfig);
-        source.registerCorsConfiguration("/api/v1/orgs/*/connections/**", restrictedConfig);
-
-        CorsConfiguration publicConfig = new CorsConfiguration();
-        List<String> publicOrigins = new ArrayList<>();
-        publicOrigins.add("*");
-        publicOrigins.addAll(frontendOrigins);
-        if (isPreview) {
-            publicOrigins.add("https://*.run.app");
-        }
-        publicConfig.setAllowedOriginPatterns(publicOrigins);
-        publicConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"));
-        publicConfig.setAllowedHeaders(Arrays.asList("Authorization", "Cache-Control", "Content-Type", "X-Xsrf-Token", "X-XSRF-TOKEN", "X-Modtale-Key"));
-        publicConfig.setExposedHeaders(Arrays.asList("X-Xsrf-Token", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Tier"));
-        publicConfig.setAllowCredentials(true);
-        publicConfig.setMaxAge(3600L);
-        source.registerCorsConfiguration("/**", publicConfig);
-        return source;
+        return ApiCorsPolicy.create(getAllowedFrontendOriginPatterns());
     }
 
     @Bean

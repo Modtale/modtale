@@ -41,24 +41,30 @@ final class ModtaleDownloadClient {
             long elapsedMs = Duration.between(started, Instant.now()).toMillis();
             LOG.info("GET " + LogSanitizer.uri(uri) + " -> HTTP "
                     + response.statusCode() + " in " + elapsedMs + "ms");
-            ModtaleApiTransport.ensureSuccess(response.statusCode(), uri.toString());
-            String filename = filenameFromDisposition(response.headers().firstValue("Content-Disposition"))
-                    .or(() -> filenameFromUri(uri))
-                    .orElse("download.bin");
-            Path tempFile = Files.createTempFile("modtale-", "-" + SafeDownloadName.sanitize(filename));
             try (InputStream body = response.body()) {
-                Files.copy(body, tempFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                ModtaleApiTransport.ensureSuccess(response.statusCode(), uri.toString());
+                String filename = filenameFromDisposition(response.headers().firstValue("Content-Disposition"))
+                        .or(() -> filenameFromUri(uri))
+                        .orElse("download.bin");
+                Path tempFile = Files.createTempFile("modtale-", "-" + SafeDownloadName.sanitize(filename));
+                boolean completed = false;
+                try {
+                    Files.copy(body, tempFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    LOG.info("Saved " + LogSanitizer.uri(uri)
+                            + " as " + filename
+                            + " contentType=" + response.headers().firstValue("Content-Type").orElse("")
+                            + " temp=" + tempFile
+                            + " bytes=" + Files.size(tempFile));
+                    completed = true;
+                    return new ModtaleApiClient.DownloadedFile(
+                            tempFile, filename, response.headers().firstValue("Content-Type").orElse("")
+                    );
+                } finally {
+                    if (!completed) {
+                        Files.deleteIfExists(tempFile);
+                    }
+                }
             }
-            LOG.info("Saved " + LogSanitizer.uri(uri)
-                    + " as " + filename
-                    + " contentType=" + response.headers().firstValue("Content-Type").orElse("")
-                    + " temp=" + tempFile
-                    + " bytes=" + Files.size(tempFile));
-            return new ModtaleApiClient.DownloadedFile(
-                    tempFile,
-                    filename,
-                    response.headers().firstValue("Content-Type").orElse("")
-            );
         } catch (IOException ex) {
             LOG.warn("Could not download " + LogSanitizer.uri(uri), ex);
             throw new ModtaleApiException("Could not download " + LogSanitizer.uri(uri), ex);

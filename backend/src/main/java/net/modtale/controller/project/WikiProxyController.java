@@ -83,7 +83,6 @@ public class WikiProxyController {
 
     @ExceptionHandler(UpstreamServiceException.class)
     public ResponseEntity<ProblemDetail> handleWikiUpstream(UpstreamServiceException ex) {
-        return ResponseEntity.status(ex.getStatus())
-                .body(ErrorMessageUtils.problemDetail(ex.getStatus(), ErrorMessageUtils.describe(ex, "Wiki upstream request failed.")));
+        return ErrorMessageUtils.response(ex.getStatus(), ex, "Wiki upstream request failed.");
     }
 }

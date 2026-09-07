@@ -97,6 +97,11 @@ while IFS= read -r path; do
       launcher=true
       launcher_build=true
       ;;
+    .github/workflows/tests.yml|.github/scripts/detect-component-changes.sh|.github/scripts/should-run-tests-workflow.sh)
+      frontend=true
+      backend=true
+      launcher=true
+      ;;
     .github/workflows/launcher-release.yml)
       launcher=true
       ;;
