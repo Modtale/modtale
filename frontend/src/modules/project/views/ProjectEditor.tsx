@@ -86,7 +86,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         repos, loadingRepos, manualRepo, setManualRepo, repoValid, isDirty, setIsDirty,
         slugError, setSlugError, userSearchResults, setUserSearchResults, provider,
         setProvider, markDirty, checkRepoUrl, fetchRepos, handleRoleUpdate, handleCancelInvite,
-        handleSave, handleSubmit, isSaving, handleGalleryUpload, handleGalleryReorder, handleGalleryVideoAdd, handleGalleryCaptionChange, handleGalleryDelete
+        handleSave, handleSubmit, isSaving, galleryUploadProgress, handleGalleryUpload, handleGalleryReorder, handleGalleryVideoAdd, handleGalleryCaptionChange, handleGalleryDelete
     } = useProjectEditor(
         projectData,
         currentUser,
@@ -1093,6 +1093,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                 handleGalleryCaptionChange={handleGalleryCaptionChange}
                                 handleGalleryVideoAdd={handleGalleryVideoAdd}
                                 handleGalleryReorder={handleGalleryReorder}
+                                galleryUploadProgress={galleryUploadProgress}
                     handleGallerySelect={(files) => {
                         if (files.some(isFileOverUploadLimit)) {
                             onShowStatus('error', 'Upload Failed', MAX_UPLOAD_ERROR_MESSAGE);
