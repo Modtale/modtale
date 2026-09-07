@@ -109,6 +109,7 @@ public final class ProjectBrowseController {
     private final VBox sortDropdown = new VBox();
     private final Map<ProjectBrowseSort, Button> sortOptionButtons = new LinkedHashMap<>();
     private final Map<ProjectBrowseSort, Node> sortOptionChecks = new LinkedHashMap<>();
+    private final List<Runnable> controlStateListeners = new ArrayList<>();
 
     private Button tagToggleButton;
     private Button filterToggleButton;
@@ -192,6 +193,24 @@ public final class ProjectBrowseController {
 
     public BrowseOptions.BrowseViewOption activeBrowseView() {
         return activeBrowseView;
+    }
+
+    public boolean isCurseForgeSource() {
+        return sourceSelector.source() == ProjectBrowseSource.CURSEFORGE;
+    }
+
+    public ProjectBrowseSort selectedBrowseSort() {
+        return selectedSort();
+    }
+
+    public void selectBrowseSort(ProjectBrowseSort sort) {
+        selectSort(sort == null ? ProjectBrowseSort.DOWNLOADS : sort);
+    }
+
+    public void addControlStateListener(Runnable listener) {
+        if (listener != null) {
+            controlStateListeners.add(listener);
+        }
     }
 
     public String title() {
@@ -430,6 +449,7 @@ public final class ProjectBrowseController {
                 activeBrowseView = selectedSort().browseView();
                 showDiscover.run();
             }
+            notifyControlStateListeners();
             searchProjects();
         });
         sortCombo.valueProperty().addListener((observable, oldValue, newValue) -> refreshSortDropdown());
@@ -482,7 +502,12 @@ public final class ProjectBrowseController {
         categories.showCurseForgeOptions(source == ProjectBrowseSource.CURSEFORGE);
         updateSortOptions();
         refreshBrowseControls();
+        notifyControlStateListeners();
         searchProjects();
+    }
+
+    private void notifyControlStateListeners() {
+        controlStateListeners.forEach(Runnable::run);
     }
 
     private void configurePagination() {
@@ -563,7 +588,11 @@ public final class ProjectBrowseController {
                     sortDropdownItem(ProjectBrowseSort.UPDATED),
                     sortDropdownItem(ProjectBrowseSort.NEWEST)
             );
-            if (selectedSort() == ProjectBrowseSort.FAVORITES) sortCombo.setValue(ProjectBrowseSort.DOWNLOADS);
+            if (selectedSort() != ProjectBrowseSort.DOWNLOADS
+                    && selectedSort() != ProjectBrowseSort.UPDATED
+                    && selectedSort() != ProjectBrowseSort.NEWEST) {
+                sortCombo.setValue(ProjectBrowseSort.DOWNLOADS);
+            }
         } else {
             sortDropdown.getChildren().setAll(
                     sortDropdownItem(ProjectBrowseSort.DOWNLOADS),

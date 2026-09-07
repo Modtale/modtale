@@ -20,6 +20,7 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import net.modtale.launcher.ui.browse.ProjectBrowseController;
 import net.modtale.launcher.ui.browse.controls.BrowseOptions;
+import net.modtale.launcher.ui.browse.controls.ProjectBrowseSort;
 import net.modtale.launcher.ui.common.LauncherIcons;
 import net.modtale.launcher.ui.common.LauncherOverlaySupport;
 import net.modtale.launcher.ui.common.LauncherView;
@@ -41,6 +42,7 @@ public final class LauncherBrowseMenu {
     private final Supplier<LauncherView> currentView;
 
     private Button menuButton;
+    private Label menuLabel;
     private Node visualAnchor;
     private VBox dropdownPanel;
 
@@ -52,6 +54,7 @@ public final class LauncherBrowseMenu {
         this.browseController = browseController;
         this.sceneLayer = sceneLayer;
         this.currentView = currentView;
+        this.browseController.addControlStateListener(this::refreshPresentation);
     }
 
     public Button button() {
@@ -111,13 +114,12 @@ public final class LauncherBrowseMenu {
 
         Node leadingIcon = LauncherIcons.icon(LauncherIcons.Glyph.GRID, 16);
         leadingIcon.getStyleClass().add("browse-nav-leading-icon");
-        Label label = new Label();
-        I18N.bind(label, "nav.browse");
-        label.getStyleClass().add("browse-nav-button-label");
-        applyNavbarTitleFont(label);
+        menuLabel = new Label();
+        menuLabel.getStyleClass().add("browse-nav-button-label");
+        applyNavbarTitleFont(menuLabel);
         Node chevron = LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_DOWN, 14);
         chevron.getStyleClass().add("browse-nav-chevron");
-        HBox labelCluster = new HBox(4, label, chevron);
+        HBox labelCluster = new HBox(4, menuLabel, chevron);
         labelCluster.setAlignment(Pos.CENTER);
         HBox content = new HBox(8, leadingIcon, labelCluster);
         content.getStyleClass().add("browse-nav-button-content");
@@ -127,6 +129,7 @@ public final class LauncherBrowseMenu {
 
         dropdownPanel = buildPanel();
         button.setOnAction(event -> toggle());
+        refreshPresentation();
         return button;
     }
 
@@ -139,6 +142,22 @@ public final class LauncherBrowseMenu {
         menuPanel.setVisible(false);
         menuPanel.setManaged(false);
         menuPanel.setMouseTransparent(false);
+
+        rebuildPanel(menuPanel);
+        return menuPanel;
+    }
+
+    private void rebuildPanel(VBox menuPanel) {
+        menuPanel.getChildren().clear();
+        if (browseController.isCurseForgeSource()) {
+            List<ProjectBrowseSort> sorts = List.of(
+                    ProjectBrowseSort.DOWNLOADS,
+                    ProjectBrowseSort.UPDATED,
+                    ProjectBrowseSort.NEWEST
+            );
+            sorts.forEach(sort -> menuPanel.getChildren().add(sortMenuItem(sort)));
+            return;
+        }
 
         List<BrowseOptions.ClassificationOption> order = List.of(
                 BrowseOptions.ClassificationOption.ALL,
@@ -157,7 +176,39 @@ public final class LauncherBrowseMenu {
                 menuPanel.getChildren().add(separator);
             }
         }
-        return menuPanel;
+    }
+
+    private Button sortMenuItem(ProjectBrowseSort sort) {
+        Button item = new Button(sort.title().isBlank() ? sort.label() : sort.title());
+        item.getStyleClass().add("browse-dropdown-item");
+        item.setGraphic(LauncherIcons.icon(sortIcon(sort), 16));
+        item.setAlignment(Pos.CENTER_LEFT);
+        item.setMaxWidth(Double.MAX_VALUE);
+        pseudo(item, "selected", browseController.selectedBrowseSort() == sort);
+        item.setOnAction(event -> {
+            hide();
+            browseController.selectBrowseSort(sort);
+        });
+        return item;
+    }
+
+    private static LauncherIcons.Glyph sortIcon(ProjectBrowseSort sort) {
+        return switch (sort) {
+            case DOWNLOADS -> LauncherIcons.Glyph.DOWNLOAD;
+            case UPDATED -> LauncherIcons.Glyph.CLOCK;
+            case NEWEST -> LauncherIcons.Glyph.ZAP;
+            default -> LauncherIcons.Glyph.GRID;
+        };
+    }
+
+    private void refreshPresentation() {
+        if (menuButton == null || menuLabel == null) {
+            return;
+        }
+        menuLabel.setText(browseController.isCurseForgeSource() ? "CurseForge" : I18N.text("nav.browse"));
+        if (dropdownPanel != null) {
+            rebuildPanel(dropdownPanel);
+        }
     }
 
     private Button menuItem(BrowseOptions.ClassificationOption option) {
@@ -187,6 +238,7 @@ public final class LauncherBrowseMenu {
         if (layer == null || dropdownPanel == null || menuButton == null || visualAnchor == null) {
             return;
         }
+        refreshPresentation();
         dropdownPanel.applyCss();
         dropdownPanel.autosize();
         position();
