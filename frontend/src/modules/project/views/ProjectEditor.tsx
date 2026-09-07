@@ -32,7 +32,7 @@ import type { ProjectRole } from '@/types';
 import { Permission, PROJECT_PERMISSION_GROUPS } from '@/modules/permissions/permissions';
 import { VersionFields } from '../components/VersionFields';
 import { worldListClient } from '@/modules/worldlist/api/worldListClient';
-import { skippedWorldListItems, worldListToProjectDependencies } from '@/modules/worldlist/utils/modpackSeed';
+import { skippedWorldListItems, worldListToProjectDependencies, worldListToOverrideFile } from '@/modules/worldlist/utils/modpackSeed';
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
@@ -166,7 +166,8 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         setActiveTab('files');
 
         worldListClient.get(seedListId)
-            .then(list => {
+            .then(async list => {
+                const seededConfigs = await worldListToOverrideFile(list);
                 const seededDependencies = worldListToProjectDependencies(list);
                 const skippedCount = skippedWorldListItems(list).length;
                 setVersionData(current => {
@@ -178,6 +179,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                     return {
                         ...current,
                         dependencies: mergedDependencies,
+                        file: current.file || seededConfigs || null,
                         versionNumber: current.versionNumber || '1.0.0',
                         gameVersions: current.gameVersions?.length
                             ? current.gameVersions

@@ -37,6 +37,7 @@ class WorldModListArchiveServiceTest {
         list.setCreatedAt(Instant.parse("2026-06-20T12:00:00Z"));
         list.setLastViewedAt(Instant.parse("2026-06-20T12:30:00Z"));
         list.setExpiresAt(Instant.parse("2026-07-20T12:00:00Z"));
+        list.setConfigs(List.of(new net.modtale.model.worldlist.WorldListConfig("WORLD", "Example_Plugin/config.json", "{\"value\":2}")));
         list.setMods(List.of(
                 item("Cool Mod", "1.0.0", true, "storage/cool.jar"),
                 item("External Mod", "0.2.0", false, "")
@@ -46,6 +47,8 @@ class WorldModListArchiveServiceTest {
         Map<String, String> entries = entries(archive);
 
         assertTrue(entries.containsKey("modtale-list.json"));
+        assertEquals("{\"value\":2}", entries.get("configs/world/mods/Example_Plugin/config.json"));
+        assertTrue(entries.get("modtale-list.json").contains("Example_Plugin/config.json"));
         assertTrue(entries.get("modtale-list.json").contains("\"createdAt\" : \"2026-06-20T12:00:00Z\""));
         assertTrue(entries.get("README.txt").contains("Cozy World"));
         assertEquals("cool-bytes", entries.get("Cool-Mod-1.0.0.jar"));

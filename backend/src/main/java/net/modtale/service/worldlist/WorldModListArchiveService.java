@@ -36,6 +36,11 @@ public class WorldModListArchiveService {
             writeEntry(zip, entries, "modtale-list.json", manifestWriter.writeValueAsBytes(list));
             writeEntry(zip, entries, "README.txt", readme(list).getBytes(StandardCharsets.UTF_8));
 
+            for (var config : net.modtale.model.worldlist.WorldListConfig.validate(list.getConfigs())) {
+                zip.putNextEntry(new ZipEntry(config.archivePath()));
+                zip.write(config.content().getBytes(StandardCharsets.UTF_8));
+                zip.closeEntry();
+            }
             for (WorldModList.Item item : list.getMods()) {
                 if (!item.isDownloadable() || item.getFileUrl() == null || item.getFileUrl().isBlank()) {
                     continue;
@@ -70,7 +75,10 @@ public class WorldModListArchiveService {
                 + "List: " + firstText(list.getTitle(), "Shared mod list") + "\n"
                 + "Game version: " + firstText(list.getGameVersion(), "Not specified") + "\n\n"
                 + "This ZIP contains the downloadable Modtale projects from the shared list. "
-                + "Some local or external entries may appear only in modtale-list.json.";
+                + "Some local or external entries may appear only in modtale-list.json. "
+                + "Selected config defaults are in configs/global/Mods/ and configs/world/mods/. "
+                + "Copy global configs into UserData/Mods and world configs into the target save's mods folder. "
+                + "Preserve existing files and close Hytale before applying configs.";
     }
 
     private static String unique(Set<String> entries, String filename) {

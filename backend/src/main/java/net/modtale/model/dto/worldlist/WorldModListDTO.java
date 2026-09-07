@@ -21,7 +21,8 @@ public record WorldModListDTO(
         String shareUrl,
         String downloadUrl,
         String launcherInstallUrl,
-        List<Item> mods
+        List<Item> mods,
+        List<net.modtale.model.worldlist.WorldListConfig> configs
 ) {
     public record Item(
             String id,
