@@ -112,6 +112,20 @@ class ArchiveInstallerTest {
         assertTrue(Files.notExists(outside.resolve("settings.json")));
     }
 
+    @Test
+    void existingConfigIsPreservedAndMissingWorldConfigIsSeeded() throws IOException {
+        Path instance = tempDir.resolve("UserData");
+        Path config = instance.resolve("Saves/My World/mods/Example_Plugin/config.json");
+        Path archive = overrideArchive("overrides/Saves/My World/mods/Example_Plugin/config.json");
+        ArchiveInstaller installer = new ArchiveInstaller();
+        installer.installModpackArchive(archive, instance.resolve("Mods"), instance);
+        assertEquals("settings", Files.readString(config));
+        Files.writeString(config, "custom settings");
+        assertTrue(installer.installModpackArchive(archive, instance.resolve("Mods"), instance).isEmpty());
+        assertEquals("custom settings", Files.readString(config));
+        assertTrue(Files.notExists(instance.resolve("Saves/My World/Mods")));
+    }
+
     private Path overrideArchive(String entryPath) throws IOException {
         Path archive = tempDir.resolve("override.zip");
         String content = "settings";

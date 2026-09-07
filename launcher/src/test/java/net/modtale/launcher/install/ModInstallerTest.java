@@ -172,6 +172,64 @@ class ModInstallerTest {
     }
 
     @Test
+    void modpackLifecyclePreservesHytaleConfigAndSaveData() throws Exception {
+        String configPath = "Saves/My World/mods/Example_Plugin/config.json";
+        String worldPath = "Saves/My World/universe/worlds/default/config.json";
+        String config = "{}";
+        String hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                .digest(config.getBytes(StandardCharsets.UTF_8)));
+        String lock = """
+                {"format":"modtale-lock","lockVersion":1,"game":"hytale",
+                 "entries":[{"distribution":"BUNDLED","path":"example.jar","size":2,"hashes":{"sha256":"%s"}}],
+                 "overrides":[
+                   {"path":"overrides/%s","size":2,"hashes":{"sha256":"%s"}},
+                   {"path":"overrides/%s","size":2,"hashes":{"sha256":"%s"}}]}
+                """.formatted(hash, configPath, hash, worldPath, hash);
+        byte[] pack = zip(entry("modtale.lock.json", lock), entry("example.jar", config),
+                entry("overrides/" + configPath, config), entry("overrides/" + worldPath, config));
+        startServer();
+        for (String number : List.of("1.0.0", "1.1.0")) {
+            server.createContext("/api/v1/projects/pack/versions/" + number + "/dependencies",
+                    exchange -> respondJson(exchange, "{}"));
+            server.createContext("/api/v1/projects/pack/versions/" + number + "/download-url", exchange -> respondJson(exchange,
+                    """
+                    {"downloadUrl":"%s/files/pack.zip","expiresIn":60}
+                    """.formatted(serverBaseUrl())));
+        }
+        server.createContext("/files/pack.zip", exchange -> respondBytes(exchange, pack, "application/zip"));
+        ProjectVersion version = new ProjectVersion("v1", "1.0.0", List.of("2026.1"), "", 0,
+                "2026-01-01T00:00:00Z", "", List.of(), "RELEASE");
+        ProjectVersion next = new ProjectVersion("v2", "1.1.0", List.of("2026.1"), "", 0,
+                "2026-01-02T00:00:00Z", "", List.of(), "RELEASE");
+        ProjectDetail project = new ProjectDetail("pack", "pack", "Pack", "", "Creator", "MODPACK",
+                "2026-01-01T00:00:00Z", "MIT", "", List.of(), List.of(version, next));
+        Path instance = tempDir.resolve("UserData");
+        LauncherSettings settings = new LauncherSettings();
+        settings.setHytaleUserDataPath(instance.toString());
+        settings.setHytaleModsPath(instance.resolve("Mods").toString());
+        settings.setGameVersion("2026.1");
+        ModInstaller installer = new ModInstaller(new ModtaleApiClient(apiBaseUrl()),
+                new SettingsStore(tempDir.resolve("settings.json")));
+        InstallResult initial = installer.installAndRecord(project, version, settings, "2026.1");
+        assertEquals(config, Files.readString(instance.resolve(configPath)));
+        Files.writeString(instance.resolve(configPath), "player config");
+        Files.writeString(instance.resolve(worldPath), "progressed world");
+        InstallResult updated = installer.updateAndRecord(project, next, settings);
+        assertEquals("1.1.0", updated.installedProject().installedVersion());
+        assertEquals(config, Files.readString(instance.resolve("Mods/example.jar")));
+        assertEquals("player config", Files.readString(instance.resolve(configPath)));
+        assertEquals("progressed world", Files.readString(instance.resolve(worldPath)));
+        installer.switchVersionAndRecord(initial.installedProject(), project, version, settings);
+        assertEquals("player config", Files.readString(instance.resolve(configPath)));
+        // Exercise cleanup of overrides recorded by older launchers too.
+        installer.uninstallAndRecord(initial.installedProject(), settings);
+        assertEquals("player config", Files.readString(instance.resolve(configPath)));
+        assertEquals("progressed world", Files.readString(instance.resolve(worldPath)));
+        assertTrue(settings.getInstalledProjects().isEmpty());
+        assertTrue(Files.notExists(instance.resolve("Mods/example.jar")));
+    }
+
+    @Test
     void modpackInstallInstallsExactCurseForgeFiles() throws IOException {
         AtomicReference<String> downloadQuery = new AtomicReference<>("");
         AtomicInteger curseForgeDownloads = new AtomicInteger();

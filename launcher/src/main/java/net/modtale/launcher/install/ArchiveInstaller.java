@@ -105,7 +105,7 @@ public class ArchiveInstaller {
                     safeFilename(source.getFileName().toString()),
                     destinationPaths
             );
-            pending.add(new PendingInstall(source, destination));
+            pending.add(new PendingInstall(source, destination, false));
         }
 
         List<JsonNode> overrides = new ArrayList<>();
@@ -124,13 +124,25 @@ public class ArchiveInstaller {
                 throw new IOException("Override destination must be inside Hytale Mods/ or Saves/: " + archivePath);
             }
             Path destination = resolveInstanceDestination(instanceDirectory, hytalePath);
-            pending.add(new PendingInstall(source, destination));
+            // Hytale writes plugin configuration and world state back into these files.
+            // Pack overrides seed missing files; existing user data must survive reinstalls.
+            if (Files.exists(destination)) {
+                if (!Files.isRegularFile(destination)) {
+                    throw new IOException("Override destination is not a file: " + archivePath);
+                }
+                continue;
+            }
+            pending.add(new PendingInstall(source, destination, true));
         }
 
         List<Path> installed = new ArrayList<>();
         for (PendingInstall install : pending) {
             Files.createDirectories(install.destination().getParent());
-            Files.copy(install.source(), install.destination(), StandardCopyOption.REPLACE_EXISTING);
+            if (install.seedOnly()) {
+                Files.copy(install.source(), install.destination());
+            } else {
+                Files.copy(install.source(), install.destination(), StandardCopyOption.REPLACE_EXISTING);
+            }
             installed.add(install.destination());
         }
         return installed;
@@ -271,7 +283,7 @@ public class ArchiveInstaller {
         return extractedDirectory;
     }
 
-    private static boolean isInstallable(String entryName) {
+    static boolean isInstallable(String entryName) {
         String filename = Path.of(entryName).getFileName().toString();
         String lower = filename.toLowerCase(Locale.ROOT);
         return lower.endsWith(".jar") || lower.endsWith(".zip") || lower.endsWith(".hmasset") || lower.endsWith(".hymod");
@@ -358,6 +370,6 @@ public class ArchiveInstaller {
         return sanitized.isBlank() ? "modtale-download.jar" : sanitized;
     }
 
-    private record PendingInstall(Path source, Path destination) {
+    private record PendingInstall(Path source, Path destination, boolean seedOnly) {
     }
 }
