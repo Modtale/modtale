@@ -1,3 +1,4 @@
+import { ContentSkeleton, PageSkeleton } from '@/components/ui/Skeleton';
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -27,7 +28,6 @@ import { WikiMobileNavigation, WikiSidebar } from '../components/HMWiki';
 
 import { ProjectLayout } from '../components/ProjectLayout';
 import { GalleryCarouselViewer } from '../components/GalleryCarouselViewer';
-import { Spinner } from '@/components/ui/Spinner';
 import NotFound from '@/components/ui/error/NotFound';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { api, extractApiErrorMessage } from '@/utils/api';
@@ -575,7 +575,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     }, []);
 
     if (isNotFound) return <NotFound />;
-    if (loading || !project) return <div className={`min-h-screen ${theme.colors.bgBase} flex items-center justify-center`}><Spinner /></div>;
+    if (loading || !project) return <PageSkeleton />;
 
     const canEdit = project.canEdit ?? Boolean(
         currentUser && (
@@ -644,7 +644,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                     <div className={theme.components.modalOverlay}>
                         <div className={`${theme.components.modalContent} max-w-md`}>
                             <div className="flex items-center justify-center p-12">
-                                <Spinner />
+                                <ContentSkeleton rows={3} />
                             </div>
                         </div>
                     </div>
@@ -753,7 +753,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                         {galleryPayloadPending ? (
                             <div className={`${theme.components.modalContent} mx-auto max-w-md`}>
                                 <div className="flex items-center justify-center p-12">
-                                    <Spinner />
+                                    <ContentSkeleton rows={3} />
                                 </div>
                             </div>
                         ) : galleryItems.length > 0 ? (

@@ -1,3 +1,4 @@
+import { PageSkeleton } from '@/components/ui/Skeleton';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
@@ -88,7 +89,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         repos, loadingRepos, manualRepo, setManualRepo, repoValid, isDirty, setIsDirty,
         slugError, setSlugError, userSearchResults, setUserSearchResults, provider,
         setProvider, markDirty, checkRepoUrl, fetchRepos, handleRoleUpdate, handleCancelInvite,
-        handleSave, handleSubmit, isSaving, handleGalleryUpload, handleGalleryVideoAdd, handleGalleryCaptionChange, handleGalleryDelete
+        handleSave, handleSubmit, isSaving, galleryUploadProgress, handleGalleryUpload, handleGalleryReorder, handleGalleryVideoAdd, handleGalleryCaptionChange, handleGalleryDelete
     } = useProjectEditor(
         projectData,
         currentUser,
@@ -274,7 +275,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         };
     }, [showCardPreview]);
 
-    if (loading || !projectData) return <div className="min-h-screen flex items-center justify-center"><Spinner /></div>;
+    if (loading || !projectData) return <PageSkeleton />;
 
     const readOnly = projectData.status === 'PENDING' || projectData.status === 'ARCHIVED';
     const isModpack = projectData.classification === 'MODPACK';
@@ -1144,13 +1145,20 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                 handleGalleryDelete={handleGalleryDelete}
                                 handleGalleryCaptionChange={handleGalleryCaptionChange}
                                 handleGalleryVideoAdd={handleGalleryVideoAdd}
-                    handleGallerySelect={(f) => {
-                        if (isFileOverUploadLimit(f)) {
+                                handleGalleryReorder={handleGalleryReorder}
+                                galleryUploadProgress={galleryUploadProgress}
+                    handleGallerySelect={(files) => {
+                        if (files.some(isFileOverUploadLimit)) {
                             onShowStatus('error', 'Upload Failed', MAX_UPLOAD_ERROR_MESSAGE);
                             return;
                         }
-                        setGalleryCropImage(URL.createObjectURL(f));
-                        setGalleryCropFile(f);
+                        if (files.length === 1) {
+                            const [file] = files;
+                            setGalleryCropImage(URL.createObjectURL(file));
+                            setGalleryCropFile(file);
+                            return;
+                        }
+                        return handleGalleryUpload(files);
                     }}
                                 isLoading={isSaving}
                             />

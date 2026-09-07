@@ -1,3 +1,4 @@
+import { ContentSkeleton } from '@/components/ui/Skeleton';
 import React from 'react';
 import type { AdminVerificationQueueItem } from '@/types';
 import { CheckCircle, Clock, Shield, AlertCircle, ShieldAlert } from 'lucide-react';
@@ -15,7 +16,7 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
                                                                         pendingProjects, loadingQueue, loadFailed, loadingReview, reviewingId, onReview
                                                                     }) => {
     if (loadingQueue) {
-        return <div className="text-center py-24 text-slate-400 font-bold animate-pulse">Loading queue...</div>;
+        return <ContentSkeleton label="Loading queue" />;
     }
 
     if (loadFailed && pendingProjects.length === 0) {

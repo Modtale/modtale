@@ -56,22 +56,22 @@ export function PlatformAnalytics() {
     }, [range]);
 
     if (loading) return (
-        <div className="w-full space-y-8 animate-pulse">
+        <div className="w-full space-y-8">
             <div className="flex justify-between items-end mb-8">
                 <div>
-                    <div className="h-10 w-72 bg-slate-200 dark:bg-white/10 rounded-xl mb-3"></div>
-                    <div className="h-4 w-48 bg-slate-200 dark:bg-white/10 rounded-lg"></div>
+                    <div className="h-10 w-72 bg-slate-200 dark:bg-white/10 rounded-xl mb-3 skeleton"></div>
+                    <div className="h-4 w-48 bg-slate-200 dark:bg-white/10 rounded-lg skeleton"></div>
                 </div>
-                <div className="h-12 w-48 bg-slate-200 dark:bg-white/10 rounded-2xl"></div>
+                <div className="h-12 w-48 bg-slate-200 dark:bg-white/10 rounded-2xl skeleton"></div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[...Array(4)].map((_, i) => (
-                    <div key={i} className="h-40 bg-slate-200/50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10"></div>
+                    <div key={i} className="h-40 bg-slate-200/50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 skeleton"></div>
                 ))}
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {[...Array(4)].map((_, i) => (
-                    <div key={i} className="h-[500px] bg-slate-200/50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10"></div>
+                    <div key={i} className="h-[500px] bg-slate-200/50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 skeleton"></div>
                 ))}
             </div>
         </div>

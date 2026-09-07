@@ -1,8 +1,9 @@
+import { ContentSkeleton } from '@/components/ui/Skeleton';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { api, extractApiErrorMessage } from '@/utils/api';
 import type { Project, User } from '@/types';
-import { Building2, Plus, Users, Loader2 } from 'lucide-react';
+import { Building2, Plus, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { ManagedProjectCard } from '@/components/shared/ManagedProjectCard';
@@ -94,7 +95,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
         }
     };
 
-    if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-modtale-accent" /></div>;
+    if (loading) return <ContentSkeleton />;
 
     return (
         <div className="space-y-8">

@@ -1,3 +1,4 @@
+import { PageSkeleton } from '@/components/ui/Skeleton';
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { api } from '@/utils/api';
@@ -6,7 +7,6 @@ import { SiteRoutes } from '@/utils/routes';
 import { useSSRData } from '@/context/SSRContext';
 import { ProfileLayout } from '../components/ProfileLayout';
 import { ProjectCard, ProjectCardSkeleton } from '@/modules/project/components/ProjectCard';
-import { Spinner } from '@/components/ui/Spinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import NotFound from '@/components/ui/error/NotFound';
 import { ReportModal } from '@/modules/project/components/dialogs/ReportModal';
@@ -227,7 +227,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
         return rangeWithDots;
     };
 
-    if (loadingUser) return <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark"><Spinner fullScreen /></div>;
+    if (loadingUser) return <PageSkeleton profile />;
     if (notFound) return <NotFound />;
     if (!profileUser) return <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center"><h2 className="text-2xl font-black text-slate-900 dark:text-white">User not found</h2><button onClick={onBack} className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200">Go Back</button></div>;
 

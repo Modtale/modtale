@@ -1,3 +1,4 @@
+import { ContentSkeleton } from '@/components/ui/Skeleton';
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
@@ -177,7 +178,7 @@ const DeferredMermaidChart = ({ content }: { content: string }) => {
     }
 
     if (!MermaidChart) {
-        return <div className="animate-pulse h-32 bg-slate-100 dark:bg-slate-800 rounded-xl my-4" />;
+        return <ContentSkeleton rows={2} label="Loading diagram" />;
     }
 
     return <MermaidChart chart={content} />;
