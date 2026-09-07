@@ -9,6 +9,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.layout.HBox;
+import javafx.scene.shape.Circle;
 
 public final class ProjectBrowseSourceSelector {
 
@@ -55,6 +56,10 @@ public final class ProjectBrowseSourceSelector {
     private void addButton(HBox selector, ProjectBrowseSource candidate) {
         Button button = new Button(candidate.label());
         button.getStyleClass().addAll("provider-switch-button", candidate.name().toLowerCase());
+        Circle providerDot = new Circle(3);
+        providerDot.getStyleClass().add("provider-switch-dot");
+        button.setGraphic(providerDot);
+        button.setGraphicTextGap(6);
         button.setAccessibleText("Browse " + candidate.label() + " projects");
         button.setOnAction(event -> select(candidate));
         buttons.put(candidate, button);
