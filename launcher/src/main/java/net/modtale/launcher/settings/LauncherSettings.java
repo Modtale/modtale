@@ -12,6 +12,15 @@ import net.modtale.launcher.model.install.InstalledProject;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class LauncherSettings {
 
+    private List<net.modtale.launcher.model.sync.LauncherConfigSnapshot> configs = new ArrayList<>();
+
+    public List<net.modtale.launcher.model.sync.LauncherConfigSnapshot> getConfigs() {
+        return configs == null ? List.of() : List.copyOf(configs);
+    }
+    public void setConfigs(List<net.modtale.launcher.model.sync.LauncherConfigSnapshot> configs) {
+        this.configs = configs == null ? new ArrayList<>() : new ArrayList<>(configs);
+    }
+
     private String lastUsername = "";
     private String hytaleModsPath = HytalePathDetector.defaultModsDirectory().toString();
     private String hytaleGamePath = HytalePathDetector.defaultGameDirectory().toString();

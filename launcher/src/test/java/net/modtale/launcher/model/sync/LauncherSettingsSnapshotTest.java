@@ -96,6 +96,34 @@ class LauncherSettingsSnapshotTest {
         );
     }
 
+    @Test
+    void configContentsAndPathsAffectHashAndTravelInPreferenceOnlyUpdates() {
+        LauncherSettings settings = settings("/mods/a.jar");
+        var before = LauncherSettingsSnapshot.fromSettings(settings);
+        var configs = List.of(new LauncherConfigSnapshot("Mods/Example/config.json", "{\"value\":2}"));
+        settings.setConfigs(configs);
+        var after = LauncherSettingsSnapshot.fromSettings(settings);
+        assertFalse(before.computeHash().equals(after.computeHash()));
+        assertEquals(before.installedProjectsHash(), after.installedProjectsHash());
+        assertEquals(2, after.getSchemaVersion());
+        assertEquals(configs, after.preferencesOnly().getConfigs());
+        settings.setConfigs(List.of(new LauncherConfigSnapshot("Mods/Example/config.json", "{\"value\":3}")));
+        assertFalse(after.computeHash().equals(LauncherSettingsSnapshot.fromSettings(settings).computeHash()));
+    }
+
+    @Test
+    void configHashIsStableAcrossOrderingAndRoundTrips() throws Exception {
+        var configs = List.of(new LauncherConfigSnapshot("Mods/Example/a.json", "{}"),
+                new LauncherConfigSnapshot("Saves/My World/mods/Example/b.ini", "value=2"));
+        LauncherSettings settings = settings("/mods/a.jar");
+        settings.setConfigs(configs);
+        var snapshot = LauncherSettingsSnapshot.fromSettings(settings);
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        var restored = mapper.readValue(mapper.writeValueAsString(snapshot), LauncherSettingsSnapshot.class);
+        restored.setConfigs(configs.reversed());
+        assertEquals(snapshot.computeHash(), restored.computeHash());
+    }
+
     private static LauncherSettings settings(String filePath) {
         LauncherSettings settings = new LauncherSettings();
         settings.setHytaleModsPath("/mods");

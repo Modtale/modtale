@@ -20,8 +20,19 @@ public final class HytaleConfigFiles {
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 
     public List<ConfigFile> discover(Path globalMods, Path world) throws IOException {
+        List<ConfigFile> files = new ArrayList<>(discoverMods(globalMods));
+        files.addAll(discoverWorld(world));
+        return List.copyOf(files);
+    }
+
+    public List<ConfigFile> discoverMods(Path mods) throws IOException {
         List<ConfigFile> files = new ArrayList<>();
-        scan(globalMods, "Global mods", files);
+        scan(mods, "Global mods", files);
+        return List.copyOf(files);
+    }
+
+    public List<ConfigFile> discoverWorld(Path world) throws IOException {
+        List<ConfigFile> files = new ArrayList<>();
         scan(world.resolve("mods"), "World mods", files);
         add(world, world.resolve("config.json"), "World", files);
         Path worlds = world.resolve("universe/worlds");

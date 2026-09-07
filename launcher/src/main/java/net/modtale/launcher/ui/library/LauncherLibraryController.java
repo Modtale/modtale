@@ -151,7 +151,10 @@ public final class LauncherLibraryController {
     private void editConfigs(HytaleWorld world) {
         StackPane host = overlayHost.get();
         if (host == null) return;
-        new ConfigEditorModal(host, executor, this::renderLibrary).show(
+        new ConfigEditorModal(host, executor, () -> {
+            renderLibrary();
+            accountController.syncLocalSettings();
+        }).show(
                 settings().hytaleModsDirectory(), world.directory(), world.name());
     }
 
@@ -1067,6 +1070,7 @@ public final class LauncherLibraryController {
     private void finishWorldModListInstall(WorldModListInstallResult result) {
         WorldModList list = result.list();
         renderLibrary();
+        accountController.syncLocalSettings();
         String title = list.title().isBlank() ? "shared mod list" : list.title();
         String message = "Installed " + result.installedFiles().size() + " file"
                 + LibraryProjectSupport.plural(result.installedFiles().size()) + " from " + title + ".";
@@ -1135,6 +1139,7 @@ public final class LauncherLibraryController {
             feedback.log("Enabled " + selection.modIds().size() + " mod" + LibraryProjectSupport.plural(selection.modIds().size())
                     + " in " + selection.worlds().size() + " world" + LibraryProjectSupport.plural(selection.worlds().size()) + ".");
             feedback.showToast("Worlds updated", "Enabled the install in selected worlds.");
+            accountController.syncLocalSettings();
         });
     }
 
