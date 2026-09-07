@@ -23,6 +23,12 @@ export interface WorldModListItem {
     unavailableReason?: string;
 }
 
+export interface WorldListConfig {
+    scope: 'GLOBAL' | 'WORLD';
+    path: string;
+    content: string;
+}
+
 export interface WorldModList {
     id: string;
     title: string;
@@ -40,6 +46,7 @@ export interface WorldModList {
     downloadUrl: string;
     launcherInstallUrl: string;
     mods: WorldModListItem[];
+    configs?: WorldListConfig[];
 }
 
 export const worldListDownloadUrl = (id: string) => `${API_BASE_URL}/lists/${encodeURIComponent(id)}/download`;

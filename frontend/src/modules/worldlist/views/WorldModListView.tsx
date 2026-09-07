@@ -182,6 +182,7 @@ export const WorldModListView: React.FC = () => {
                             {list.ownerUsername && <span>Shared by {list.ownerUsername}</span>}
                             <span>Expires {formatDate(list.expiresAt)}</span>
                             <span>{list.modCount} mod{list.modCount === 1 ? '' : 's'}</span>
+                            {!!list.configs?.length && <span>{list.configs.length} config file{list.configs.length === 1 ? '' : 's'}</span>}
                             <span>{list.viewCount} view{list.viewCount === 1 ? '' : 's'}</span>
                         </div>
                     </div>
@@ -202,6 +203,19 @@ export const WorldModListView: React.FC = () => {
                     </div>
                 </div>
             </section>
+
+            {!!list.configs?.length && (
+                <section className="space-y-3 pt-6">
+                    <h2 className="text-lg font-bold">Included configs</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Config defaults are included in the ZIP. The launcher adds world configs to the worlds you select and preserves existing files.</p>
+                    {list.configs.map(config => (
+                        <details key={`${config.scope}/${config.path}`} className="rounded-xl border border-slate-200 p-4 dark:border-white/10">
+                            <summary className="cursor-pointer text-sm font-medium">{config.scope === 'GLOBAL' ? 'Global mods' : 'World mods'} / {config.path}</summary>
+                            <pre className="mt-3 max-h-80 overflow-auto whitespace-pre text-xs">{config.content}</pre>
+                        </details>
+                    ))}
+                </section>
+            )}
 
             <section className="space-y-4 pt-6">
                 {list.mods.map((item, index) => (

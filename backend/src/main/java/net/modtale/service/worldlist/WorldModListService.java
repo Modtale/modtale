@@ -81,6 +81,11 @@ public class WorldModListService {
         list.setLastViewedAt(now);
         list.setExpiresAt(now.plus(EXPIRY_WINDOW));
         list.setMods(items.values().stream().toList());
+        try {
+            list.setConfigs(net.modtale.model.worldlist.WorldListConfig.validate(request.configs()));
+        } catch (IOException ex) {
+            throw new InvalidProjectRequestException(ex.getMessage());
+        }
         return mapper.toDTO(repository.save(list));
     }
 

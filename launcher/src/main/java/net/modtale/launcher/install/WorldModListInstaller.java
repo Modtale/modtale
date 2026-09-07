@@ -46,8 +46,10 @@ public final class WorldModListInstaller {
             LOG.info("Extracting shared list archive listId=" + list.id()
                     + " filename=" + download.filename()
                     + " temp=" + download.path());
-            List<Path> installedFiles = archiveInstaller.extractInstallableEntries(download.path(), settings.hytaleModsDirectory());
-            if (installedFiles.isEmpty()) {
+            net.modtale.launcher.model.worldlist.WorldListConfig.validate(list.configs());
+            List<Path> installedFiles = new java.util.ArrayList<>(archiveInstaller.extractInstallableEntries(download.path(), settings.hytaleModsDirectory()));
+            installedFiles.addAll(WorldListConfigInstaller.install(list.configs(), "GLOBAL", settings.hytaleModsDirectory()));
+            if (installedFiles.isEmpty() && list.configs().isEmpty()) {
                 LOG.warn("Shared list archive had no installable files listId=" + list.id());
                 throw new ModtaleApiException("This shared list did not include any installable files.");
             }

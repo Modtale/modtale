@@ -255,6 +255,21 @@ class WorldModListServiceTest {
         assertEquals(3, download.bytes().length);
     }
 
+    @Test
+    void persistsAndReturnsConfigAttachments() {
+        var configs = List.of(new net.modtale.model.worldlist.WorldListConfig("WORLD", "Example/config.json", "{}"));
+        var item = new CreateWorldModListRequest.Item("Example:Plugin", "", "", "Example", "1", ProjectClassification.PLUGIN,
+                ProjectDependency.Source.OTHER, "Example:Plugin", "", "");
+        var result = service.create(new CreateWorldModListRequest("List", "World", "0.5.0", List.of(item), configs), owner());
+        assertEquals(configs, result.configs());
+        org.mockito.ArgumentCaptor<WorldModList> saved = org.mockito.ArgumentCaptor.forClass(WorldModList.class);
+        org.mockito.Mockito.verify(repository).save(saved.capture());
+        assertEquals(configs, saved.getValue().getConfigs());
+        var invalid = List.of(new net.modtale.model.worldlist.WorldListConfig("WORLD", "../config.json", "{}"));
+        org.junit.jupiter.api.Assertions.assertThrows(net.modtale.exception.InvalidProjectRequestException.class,
+                () -> service.create(new CreateWorldModListRequest("List", "World", "0.5.0", List.of(item), invalid), owner()));
+    }
+
     private static User owner() {
         User user = new User();
         user.setId("user-1");
