@@ -1,12 +1,8 @@
 package net.modtale.launcher.ui.browse.card;
 
-import static net.modtale.launcher.ui.browse.card.ProjectCardFormatter.value;
-
-import java.util.Locale;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
 import javafx.geometry.Pos;
-import javafx.scene.control.Label;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
@@ -101,17 +97,11 @@ public final class ProjectCardMedia {
         clip.setArcHeight(mediaRadius * 2);
         media.setClip(clip);
 
-        if (project.imageUrl() != null && !project.imageUrl().isBlank()) {
-            media.getChildren().add(iconBackdrop(mediaSize));
+        media.getChildren().add(iconBackdrop(mediaSize));
 
-            ImageView foreground = remoteImage(project.imageUrl(), mediaSize, mediaSize);
-            foreground.setMouseTransparent(true);
-            media.getChildren().add(foreground);
-        } else {
-            media.getStyleClass().add("project-icon-fallback-media");
-            Label initial = new Label(value(project.title(), "M").substring(0, 1).toUpperCase(Locale.ROOT));
-            media.getChildren().add(initial);
-        }
+        ImageView foreground = remoteImage(project.imageUrl(), mediaSize, mediaSize);
+        foreground.setMouseTransparent(true);
+        media.getChildren().add(foreground);
         icon.getChildren().add(media);
         return icon;
     }
