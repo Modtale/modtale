@@ -23,6 +23,7 @@ import net.modtale.launcher.model.project.ProjectDetail;
 import net.modtale.launcher.model.project.ProjectGallery;
 import net.modtale.launcher.model.project.ProjectMeta;
 import net.modtale.launcher.model.project.ProjectPage;
+import net.modtale.launcher.model.project.ProjectSummary;
 import net.modtale.launcher.model.project.ProjectVersion;
 import net.modtale.launcher.model.project.ProjectVersionChangelog;
 import net.modtale.launcher.model.project.VersionDependenciesView;
@@ -192,6 +193,10 @@ public class ModtaleApiClient {
 
     public ProjectPage searchCurseForgeMods(ProjectSearchQuery query) {
         return nyoCfClient.search(query);
+    }
+
+    public ProjectSummary enrichCurseForgeBrowseBanner(ProjectSummary summary) {
+        return nyoCfClient.enrichBrowseBanner(summary);
     }
 
     public ProjectDetail getCurseForgeProject(long projectId) {

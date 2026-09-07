@@ -69,6 +69,7 @@ public final class ProjectBrowseController {
 
     private static final double RESULTS_INDICATOR_WIDTH = 126;
     private static final double RESULTS_INDICATOR_SHOW_BUFFER = 10;
+    private static final int CURSEFORGE_BANNER_BATCH_SIZE = 4;
     private final ModtaleApiClient apiClient;
     private final Executor executor;
     private final Runnable applySettings;
@@ -126,6 +127,7 @@ public final class ProjectBrowseController {
     private int currentPage;
     private int totalPageCount;
     private long totalResultCount;
+    private long bannerEnrichmentGeneration;
     private BrowseOptions.BrowseViewOption activeBrowseView = BrowseOptions.BrowseViewOption.defaultOption();
 
     public ProjectBrowseController(
@@ -812,11 +814,54 @@ public final class ProjectBrowseController {
         updateResultsIndicator(totalResultCount, false);
         updatePaginationControls();
         renderProjects();
+        if (sourceSelector.source() == ProjectBrowseSource.CURSEFORGE) {
+            loadCurseForgeBanners(++bannerEnrichmentGeneration, page.content());
+        } else {
+            bannerEnrichmentGeneration++;
+        }
         log.accept("Found " + page.content().size() + " projects.");
         ProjectSearchQuery nextQuery = searchQuery();
         if (!nextQuery.equals(query) && searchState.shouldSearchForLayout(nextQuery, currentProjects)) {
             requestProjects();
         }
+    }
+
+    private void loadCurseForgeBanners(long generation, List<ProjectSummary> projects) {
+        List<ProjectSummary> missing = projects.stream()
+                .filter(ProjectSummary::isCurseForge)
+                .filter(project -> project.bannerUrl() == null || project.bannerUrl().isBlank())
+                .toList();
+        loadCurseForgeBannerBatch(generation, missing, 0);
+    }
+
+    private void loadCurseForgeBannerBatch(long generation, List<ProjectSummary> projects, int start) {
+        if (start >= projects.size() || generation != bannerEnrichmentGeneration) return;
+        int end = Math.min(start + CURSEFORGE_BANNER_BATCH_SIZE, projects.size());
+        List<CompletableFuture<ProjectSummary>> requests = projects.subList(start, end).stream()
+                .map(project -> CompletableFuture.supplyAsync(
+                        () -> apiClient.enrichCurseForgeBrowseBanner(project), executor))
+                .toList();
+        CompletableFuture.allOf(requests.toArray(CompletableFuture[]::new))
+                .whenComplete((ignored, error) -> Platform.runLater(() -> {
+                    if (error != null || generation != bannerEnrichmentGeneration
+                            || sourceSelector.source() != ProjectBrowseSource.CURSEFORGE) {
+                        return;
+                    }
+                    Map<String, ProjectSummary> enriched = new LinkedHashMap<>();
+                    for (CompletableFuture<ProjectSummary> request : requests) {
+                        ProjectSummary project = request.getNow(null);
+                        if (project != null && project.bannerUrl() != null && !project.bannerUrl().isBlank()) {
+                            enriched.put(project.id(), project);
+                        }
+                    }
+                    if (!enriched.isEmpty()) {
+                        currentProjects = currentProjects.stream()
+                                .map(project -> enriched.getOrDefault(project.id(), project))
+                                .toList();
+                        renderProjects();
+                    }
+                    loadCurseForgeBannerBatch(generation, projects, end);
+                }));
     }
 
     private void renderProjectsForLayoutChange() {

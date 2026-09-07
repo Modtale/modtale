@@ -69,11 +69,13 @@ class NyoCfClientTest {
         client.search(new ProjectSearchQuery("compost", "mods", "Early Access", "downloads",
                 0, 20, null, null, null, null, null, null));
         assertEquals(0, detailRequests.get());
+        var enrichedBrowseProject = client.enrichBrowseBanner(browse.content().getFirst());
         ProjectDetail detail = client.project(1450386);
         DownloadUrlResponse download = client.download(1450386, 8747324);
 
         assertEquals("curseforge:1450386", browse.content().getFirst().routeKey());
         assertEquals(null, browse.content().getFirst().bannerUrl());
+        assertEquals("https://media.forgecdn.net/screenshot-thumb.png", enrichedBrowseProject.bannerUrl());
         assertEquals(2, browseRequests.get());
         assertTrue(browse.content().getFirst().isCurseForge());
         assertEquals("<p>Rich project description</p>", detail.about());
