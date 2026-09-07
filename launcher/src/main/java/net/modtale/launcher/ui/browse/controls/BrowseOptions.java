@@ -109,11 +109,11 @@ public final class BrowseOptions {
 
     public enum ClassificationOption {
         ALL("All Projects", "", "All Projects", LauncherIcons.Glyph.LAYOUT),
+        MODPACKS("Modpacks", ProjectClassification.MODPACK, "Modpacks", LauncherIcons.Glyph.LAYERS),
         PLUGINS("Plugins", ProjectClassification.PLUGIN, "Plugins", LauncherIcons.Glyph.FILE_CODE),
         DATA("Data", ProjectClassification.DATA, "Data Assets", LauncherIcons.Glyph.DATABASE),
         ART("Art", ProjectClassification.ART, "Art Assets", LauncherIcons.Glyph.PALETTE),
         WORLDS("Worlds", ProjectClassification.SAVE, "Worlds", LauncherIcons.Glyph.SAVE),
-        MODPACKS("Modpacks", ProjectClassification.MODPACK, "Modpacks", LauncherIcons.Glyph.LAYERS),
         CURSEFORGE_ALL("All", "", "All", LauncherIcons.Glyph.LAYOUT),
         CURSEFORGE_MODS("Mods", "mods", "Mods", LauncherIcons.Glyph.FILE_CODE),
         CURSEFORGE_PREFABS("Prefabs", "prefabs", "Prefabs", LauncherIcons.Glyph.IMAGE),
