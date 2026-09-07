@@ -1,3 +1,4 @@
+import { ContentSkeleton } from '@/components/ui/Skeleton';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { UserPlus, ChevronDown, Check, Shield, Trash2 } from 'lucide-react';
@@ -125,7 +126,7 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
         }
     };
 
-    if (loading) return <div className="p-12 flex justify-center"><Spinner /></div>;
+    if (loading) return <ContentSkeleton />;
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">

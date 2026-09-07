@@ -1,3 +1,4 @@
+import { PageSkeleton } from '@/components/ui/Skeleton';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
@@ -222,7 +223,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         };
     }, [showCardPreview]);
 
-    if (loading || !projectData) return <div className="min-h-screen flex items-center justify-center"><Spinner /></div>;
+    if (loading || !projectData) return <PageSkeleton />;
 
     const readOnly = projectData.status === 'PENDING' || projectData.status === 'ARCHIVED';
     const isModpack = projectData.classification === 'MODPACK';

@@ -169,12 +169,12 @@ function FilterSelect({
 
 function AuditLogsSkeleton() {
     return (
-        <div className="space-y-6 animate-pulse">
+        <div className="space-y-6">
             <div className="rounded-3xl border border-slate-200 bg-slate-200/60 p-6 dark:border-white/10 dark:bg-white/5">
-                <div className="mb-4 h-6 w-40 rounded-xl bg-slate-300/70 dark:bg-white/10" />
+                <div className="mb-4 h-6 w-40 rounded-xl bg-slate-300/70 dark:bg-white/10 skeleton" />
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr),minmax(0,0.6fr),minmax(0,0.6fr),auto,auto]">
                     {[...Array(5)].map((_, index) => (
-                        <div key={index} className="h-12 rounded-2xl bg-slate-300/70 dark:bg-white/10" />
+                        <div key={index} className="h-12 rounded-2xl bg-slate-300/70 dark:bg-white/10 skeleton" />
                     ))}
                 </div>
             </div>

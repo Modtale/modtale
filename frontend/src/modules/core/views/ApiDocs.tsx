@@ -1436,9 +1436,9 @@ export const ApiDocs: React.FC = () => {
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="h-28 rounded-2xl bg-slate-100 dark:bg-white/5 animate-pulse" />
-                                <div className="h-28 rounded-2xl bg-slate-100 dark:bg-white/5 animate-pulse" />
-                                <div className="h-28 rounded-2xl bg-slate-100 dark:bg-white/5 animate-pulse" />
+                                <div className="h-28 rounded-2xl skeleton" />
+                                <div className="h-28 rounded-2xl skeleton" />
+                                <div className="h-28 rounded-2xl skeleton" />
                             </div>
                         </div>
                     </div>

@@ -1,5 +1,6 @@
+import { ContentSkeleton } from '@/components/ui/Skeleton';
 import React, { useState, useEffect } from 'react';
-import { X, User as UserIcon, Loader2, ExternalLink } from 'lucide-react';
+import { X, User as UserIcon, ExternalLink } from 'lucide-react';
 import { api } from '@/utils/api';
 import type { User } from '@/types';
 import { Link } from 'react-router-dom';
@@ -47,10 +48,7 @@ export function FollowingModal({ userId, onClose }: FollowingModalProps) {
 
                 <div className="flex-1 overflow-y-auto p-2">
                     {loading ? (
-                        <div className="p-8 text-center text-slate-400 flex flex-col items-center gap-2">
-                            <Loader2 className="w-6 h-6 animate-spin text-modtale-accent" />
-                            <span className="text-xs font-bold">Loading...</span>
-                        </div>
+                        <ContentSkeleton rows={3} label="Loading followed creators" />
                     ) : users.length === 0 ? (
                         <div className="p-8 text-center">
                             <div className="w-12 h-12 bg-slate-100 dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-3">
