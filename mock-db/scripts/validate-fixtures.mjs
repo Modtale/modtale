@@ -1,25 +1,13 @@
+import { defaultFixtureDirectory, collectionNames } from './fixture-files.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
-const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
 const fixtureDir = process.env.MOCK_DB_COLLECTION_DIR
   ? path.resolve(process.env.MOCK_DB_COLLECTION_DIR)
-  : path.join(repoRoot, 'mock-db', 'generated', 'collections');
+  : defaultFixtureDirectory;
 
-const requiredCollections = [
-  'users',
-  'projects',
-  'project_monthly_stats',
-  'platform_monthly_stats',
-  'admin_logs',
-  'reports',
-  'notifications',
-  'api_keys',
-  'banned_emails',
-  'status_incidents',
-  'status_history',
-];
+const requiredCollections = collectionNames;
 
 const collectionsAllowedToBeEmpty = new Set([
   'status_incidents',
