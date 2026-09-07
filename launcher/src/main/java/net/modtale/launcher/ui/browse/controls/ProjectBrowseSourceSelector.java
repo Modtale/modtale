@@ -1,22 +1,16 @@
 package net.modtale.launcher.ui.browse.controls;
 
-import static net.modtale.launcher.ui.common.LauncherUi.pseudo;
-
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.function.Consumer;
-import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.control.Button;
-import javafx.scene.layout.HBox;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 import javafx.scene.shape.Circle;
 
 public final class ProjectBrowseSourceSelector {
 
     private final Consumer<ProjectBrowseSource> onSelect;
-    private final Map<ProjectBrowseSource, Button> buttons = new LinkedHashMap<>();
     private ProjectBrowseSource source = ProjectBrowseSource.MODTALE;
-    private Node view;
+    private MenuButton picker;
 
     public ProjectBrowseSourceSelector(Consumer<ProjectBrowseSource> onSelect) {
         this.onSelect = onSelect;
@@ -27,20 +21,28 @@ public final class ProjectBrowseSourceSelector {
     }
 
     public Node view() {
-        if (view == null) {
-            HBox selector = new HBox(4);
-            selector.getStyleClass().add("provider-switch");
-            selector.setAlignment(Pos.CENTER);
-            addButton(selector, ProjectBrowseSource.MODTALE);
-            addButton(selector, ProjectBrowseSource.CURSEFORGE);
+        if (picker == null) {
+            picker = new MenuButton();
+            picker.getStyleClass().add("provider-picker");
+            addItem(ProjectBrowseSource.MODTALE);
+            addItem(ProjectBrowseSource.CURSEFORGE);
             refresh();
-            view = selector;
         }
-        return view;
+        return picker;
     }
 
     public void refresh() {
-        buttons.forEach((candidate, button) -> pseudo(button, "selected", candidate == source));
+        if (picker == null) {
+            return;
+        }
+        picker.setText(source.label());
+        picker.getStyleClass().removeAll("modtale", "curseforge");
+        picker.getStyleClass().add(source.name().toLowerCase());
+        Circle providerDot = new Circle(3.5);
+        providerDot.getStyleClass().add("provider-picker-dot");
+        picker.setGraphic(providerDot);
+        picker.setGraphicTextGap(7);
+        picker.setAccessibleText("Browse source: " + source.label());
     }
 
     void select(ProjectBrowseSource selected) {
@@ -53,16 +55,9 @@ public final class ProjectBrowseSourceSelector {
         onSelect.accept(source);
     }
 
-    private void addButton(HBox selector, ProjectBrowseSource candidate) {
-        Button button = new Button(candidate.label());
-        button.getStyleClass().addAll("provider-switch-button", candidate.name().toLowerCase());
-        Circle providerDot = new Circle(3);
-        providerDot.getStyleClass().add("provider-switch-dot");
-        button.setGraphic(providerDot);
-        button.setGraphicTextGap(6);
-        button.setAccessibleText("Browse " + candidate.label() + " projects");
-        button.setOnAction(event -> select(candidate));
-        buttons.put(candidate, button);
-        selector.getChildren().add(button);
+    private void addItem(ProjectBrowseSource candidate) {
+        MenuItem item = new MenuItem(candidate.label());
+        item.setOnAction(event -> select(candidate));
+        picker.getItems().add(item);
     }
 }
