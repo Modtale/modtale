@@ -1,9 +1,10 @@
+import { useScrollLock } from '@/hooks/useScrollLock';
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { createPortal } from 'react-dom';
 import { Save, UploadCloud, Eye, Image as ImageIcon, Users, BookOpen, Settings, FileText, ExternalLink, Send, Check, X, Tag, Scale, Link as LinkIcon, Edit2, Edit3, XCircle, Undo2, AlertTriangle, Info } from 'lucide-react';
 
-import type { User, Project, ProjectVersion } from '@/types';
+import type { ProjectDependency, User, Project, ProjectVersion } from '@/types';
 import { theme } from '@/styles/theme';
 import { SiteRoutes } from '@/utils/routes';
 import { GLOBAL_TAGS, LICENSES } from '@/data/categories';
@@ -20,7 +21,6 @@ import { Settings as SettingsTab } from '../tabs/Settings';
 import { WikiPreview } from '../tabs/WikiPreview';
 import { projectClient } from '../api/projectClient';
 import { api, extractApiErrorMessage } from '@/utils/api';
-import { serializeProjectDependency } from '../utils/dependencyEntries';
 import { Spinner } from '@/components/ui/Spinner';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { StatusModal } from '@/components/ui/StatusModal';
@@ -31,9 +31,27 @@ import type { MetadataFormData, VersionFormData } from '../components/FormShared
 import type { ProjectRole } from '@/types';
 import { Permission, PROJECT_PERMISSION_GROUPS } from '@/modules/permissions/permissions';
 import { VersionFields } from '../components/VersionFields';
+import { worldListClient } from '@/modules/worldlist/api/worldListClient';
+import { skippedWorldListItems, worldListToProjectDependencies } from '@/modules/worldlist/utils/modpackSeed';
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
+
+const appendDependenciesToFormData = (formData: FormData, dependencies: ProjectDependency[] = []) => {
+    dependencies.forEach((dependency, index) => {
+        if (dependency.id) formData.append(`dependencies[${index}].id`, dependency.id);
+        formData.append(`dependencies[${index}].projectId`, dependency.projectId);
+        formData.append(`dependencies[${index}].projectTitle`, dependency.projectTitle || '');
+        formData.append(`dependencies[${index}].versionNumber`, dependency.versionNumber);
+        formData.append(`dependencies[${index}].dependencyType`, dependency.dependencyType || 'REQUIRED');
+        formData.append(`dependencies[${index}].source`, dependency.source || 'MODTALE');
+        if (dependency.externalId) formData.append(`dependencies[${index}].externalId`, dependency.externalId);
+        if (dependency.externalUrl) formData.append(`dependencies[${index}].externalUrl`, dependency.externalUrl);
+        if (dependency.externalFileUrl) formData.append(`dependencies[${index}].externalFileUrl`, dependency.externalFileUrl);
+        if (dependency.externalFileName) formData.append(`dependencies[${index}].externalFileName`, dependency.externalFileName);
+        if (dependency.hytaleProjectConfirmed) formData.append(`dependencies[${index}].hytaleProjectConfirmed`, 'true');
+    });
+};
 const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
 const CARD_PREVIEW_BASE_WIDTH = 340;
 const CARD_PREVIEW_FALLBACK_HEIGHT = 390;
@@ -60,7 +78,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         title: '', summary: '', description: '', tags: [], links: {}, repositoryUrl: '', iconFile: null, iconPreview: null, slug: '', customLicenseOpenSource: false
     });
     const [versionData, setVersionData] = useState<VersionFormData>({
-        projectIds: [], incompatibleProjectIds: [], versionNumber: '', gameVersions: [], changelog: '', file: null, dependencies: [], modIds: [], channel: 'RELEASE', replaceExisting: false
+        dependencies: [], incompatibleProjectIds: [], versionNumber: '', gameVersions: [], changelog: '', file: null, channel: 'RELEASE', replaceExisting: false
     });
 
     const [bannerFile, setBannerFile] = useState<File | null>(null);
@@ -70,7 +88,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         repos, loadingRepos, manualRepo, setManualRepo, repoValid, isDirty, setIsDirty,
         slugError, setSlugError, userSearchResults, setUserSearchResults, provider,
         setProvider, markDirty, checkRepoUrl, fetchRepos, handleRoleUpdate, handleCancelInvite,
-        handleSave, handleSubmit, isSaving, handleGalleryUpload, handleGalleryVideoAdd, handleGalleryCaptionChange, handleGalleryDelete
+        handleSave, handleSubmit, isSaving, handleGalleryUpload, handleGalleryReorder, handleGalleryVideoAdd, handleGalleryCaptionChange, handleGalleryDelete
     } = useProjectEditor(
         projectData,
         currentUser,
@@ -113,6 +131,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
     const [galleryCropFile, setGalleryCropFile] = useState<File | null>(null);
     const [statusModal, setStatusModal] = useState<any>(null);
     const [isStatusChanging, setIsStatusChanging] = useState(false);
+    const seededListRef = useRef('');
 
     useEffect(() => {
         if (projectData) {
@@ -132,6 +151,53 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             if (projectData.bannerUrl) setBannerPreview(projectData.bannerUrl);
         }
     }, [projectData]);
+
+    useEffect(() => {
+        if (!projectData || projectData.classification !== 'MODPACK') {
+            return;
+        }
+
+        const seedListId = new URLSearchParams(location.search).get('seedList') || '';
+        if (!seedListId || seededListRef.current === seedListId) {
+            return;
+        }
+
+        seededListRef.current = seedListId;
+        setActiveTab('files');
+
+        worldListClient.get(seedListId)
+            .then(list => {
+                const seededDependencies = worldListToProjectDependencies(list);
+                const skippedCount = skippedWorldListItems(list).length;
+                setVersionData(current => {
+                    const existingKeys = new Set((current.dependencies || []).map(dep => `${dep.source || 'MODTALE'}:${dep.projectId}`));
+                    const mergedDependencies = [
+                        ...(current.dependencies || []),
+                        ...seededDependencies.filter(dep => !existingKeys.has(`${dep.source || 'MODTALE'}:${dep.projectId}`))
+                    ];
+                    return {
+                        ...current,
+                        dependencies: mergedDependencies,
+                        versionNumber: current.versionNumber || '1.0.0',
+                        gameVersions: current.gameVersions?.length
+                            ? current.gameVersions
+                            : list.gameVersion
+                                ? [list.gameVersion]
+                                : current.gameVersions
+                    };
+                });
+                onShowStatus(
+                    skippedCount > 0 ? 'warning' : 'success',
+                    skippedCount > 0 ? 'Modpack Seeded' : 'Modpack Ready',
+                    skippedCount > 0
+                        ? `Added ${seededDependencies.length} mod${seededDependencies.length === 1 ? '' : 's'} from the shared list. ${skippedCount} local-only item${skippedCount === 1 ? '' : 's'} could not be added automatically.`
+                        : `Added ${seededDependencies.length} mod${seededDependencies.length === 1 ? '' : 's'} from the shared list.`
+                );
+            })
+            .catch(error => {
+                onShowStatus('error', 'List Unavailable', extractApiErrorMessage(error, 'We could not load that shared mod list.'));
+            });
+    }, [location.search, onShowStatus, projectData]);
 
     useEffect(() => {
         const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -161,10 +227,10 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         return () => window.clearTimeout(delayDebounceFn);
     }, [inviteUsername, inviteUserId, setUserSearchResults]);
 
+    useScrollLock(showCardPreview);
+
     useEffect(() => {
         if (!showCardPreview) return;
-
-        const originalOverflow = document.body.style.overflow;
 
         const updateCardPreviewScale = () => {
             const card = cardPreviewRef.current;
@@ -188,7 +254,6 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             }
         };
 
-        document.body.style.overflow = 'hidden';
         const animationFrame = window.requestAnimationFrame(updateCardPreviewScale);
         window.addEventListener('resize', updateCardPreviewScale);
         window.addEventListener('keydown', handleCardPreviewKeyDown);
@@ -200,7 +265,6 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         }
 
         return () => {
-            document.body.style.overflow = originalOverflow;
             window.cancelAnimationFrame(animationFrame);
             window.removeEventListener('resize', updateCardPreviewScale);
             window.removeEventListener('keydown', handleCardPreviewKeyDown);
@@ -427,7 +491,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             formData.append('versionNumber', versionData.versionNumber);
             versionData.gameVersions.forEach(version => formData.append('gameVersions', version));
             if (versionData.file) formData.append('file', versionData.file);
-            (versionData.projectIds || []).forEach(dep => formData.append('modIds', dep));
+            appendDependenciesToFormData(formData, versionData.dependencies || []);
             (versionData.incompatibleProjectIds || []).forEach(projectId => formData.append('incompatibleProjectIds', projectId));
             if (versionData.changelog) formData.append('changelog', versionData.changelog);
             formData.append('channel', versionData.channel || 'RELEASE');
@@ -440,14 +504,12 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             const refreshed = await projectClient.getProjectFull(projectData.id);
             setProjectData(refreshed);
             setVersionData({
-                projectIds: versionData.projectIds || [],
-                incompatibleProjectIds: versionData.incompatibleProjectIds || [],
+                dependencies: [],
+                incompatibleProjectIds: [],
                 versionNumber: '',
                 gameVersions: versionData.gameVersions,
                 changelog: '',
                 file: null,
-                dependencies: [],
-                modIds: [],
                 channel: versionData.channel || 'RELEASE',
                 replaceExisting: false
             });
@@ -462,14 +524,12 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
     const handleStartEditVersion = (version: ProjectVersion) => {
         setEditingVersion(version);
         setEditVersionData({
-            projectIds: (version.dependencies || []).map(serializeProjectDependency),
+            dependencies: version.dependencies || [],
             incompatibleProjectIds: version.incompatibleProjectIds || [],
             versionNumber: version.versionNumber || '',
             gameVersions: version.gameVersions || (version.gameVersion ? [version.gameVersion] : []),
             changelog: version.changelog || '',
             file: null,
-            dependencies: [],
-            modIds: [],
             channel: version.channel || 'RELEASE',
             replaceExisting: false
         });
@@ -484,7 +544,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         setIsSavingVersion(true);
         try {
             await projectClient.updateVersion(projectData.id, editingVersion.id, {
-                modIds: editVersionData.projectIds || [],
+                dependencies: editVersionData.dependencies || [],
                 incompatibleProjectIds: editVersionData.incompatibleProjectIds || [],
                 gameVersions: editVersionData.gameVersions,
                 changelog: editVersionData.changelog || '',
@@ -890,7 +950,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                 className={`flex items-center gap-3 group rounded-2xl -ml-3 px-3 py-1.5 ${readOnly ? '' : 'cursor-pointer hover:bg-black/5 dark:hover:bg-white/5'} transition-colors`}
                                 onClick={() => { if (!readOnly) setIsEditingTitle(true); }}
                             >
-                                <h1 className={`text-4xl md:text-5xl font-black ${theme.colors.textPrimary} tracking-tighter break-words`}>{metaData.title || 'Project Title'}</h1>
+                                <h1 className={`text-4xl md:text-5xl font-black ${theme.colors.textPrimary} tracking-normal break-words`}>{metaData.title || 'Project Title'}</h1>
                                 {!readOnly && <Edit3 className="w-5 h-5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />}
                             </div>
                         )}
@@ -1082,13 +1142,19 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                 handleGalleryDelete={handleGalleryDelete}
                                 handleGalleryCaptionChange={handleGalleryCaptionChange}
                                 handleGalleryVideoAdd={handleGalleryVideoAdd}
-                    handleGallerySelect={(f) => {
-                        if (isFileOverUploadLimit(f)) {
+                                handleGalleryReorder={handleGalleryReorder}
+                    handleGallerySelect={(files) => {
+                        if (files.some(isFileOverUploadLimit)) {
                             onShowStatus('error', 'Upload Failed', MAX_UPLOAD_ERROR_MESSAGE);
                             return;
                         }
-                        setGalleryCropImage(URL.createObjectURL(f));
-                        setGalleryCropFile(f);
+                        if (files.length === 1) {
+                            const [file] = files;
+                            setGalleryCropImage(URL.createObjectURL(file));
+                            setGalleryCropFile(file);
+                            return;
+                        }
+                        handleGalleryUpload(files);
                     }}
                                 isLoading={isSaving}
                             />
