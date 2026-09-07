@@ -102,6 +102,28 @@ describe('GalleryCarousel', () => {
         expect(iframe.getAttribute('src')).toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ');
     });
 
+    it('does not auto-advance while a youtube video is active', async () => {
+        vi.useFakeTimers();
+
+        await act(async () => {
+            root.render(
+                <GalleryCarousel
+                    images={['https://www.youtube.com/watch?v=dQw4w9WgXcQ', '/two.png']}
+                    title="Skyforge"
+                />
+            );
+        });
+
+        expect(container.querySelector('iframe[title="Skyforge gallery video 1"]')).not.toBeNull();
+
+        await act(async () => {
+            vi.advanceTimersByTime(16000);
+        });
+
+        expect(container.querySelector('iframe[title="Skyforge gallery video 1"]')).not.toBeNull();
+        expect(container.querySelector('img[alt="Skyforge gallery image 2"]')).toBeNull();
+    });
+
     it('supports a controlled active index for the gallery popup', async () => {
         const onActiveIndexChange = vi.fn();
 
