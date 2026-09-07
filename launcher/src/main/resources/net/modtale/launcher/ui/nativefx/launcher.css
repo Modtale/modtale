@@ -1260,30 +1260,36 @@
 }
 
 .provider-switch {
+    -fx-min-height: 34px;
+    -fx-pref-height: 34px;
+    -fx-max-height: 34px;
+    -fx-padding: 3px;
+    -fx-background-radius: 10px;
+    -fx-border-radius: 10px;
     -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.18), 12, 0.10, 0, 3);
 }
 
 .provider-switch-button {
-    -fx-min-height: 32px;
-    -fx-pref-height: 32px;
-    -fx-max-height: 32px;
-    -fx-padding: 0 12px;
-    -fx-background-radius: 9px;
+    -fx-min-height: 28px;
+    -fx-pref-height: 28px;
+    -fx-max-height: 28px;
+    -fx-padding: 0 10px;
+    -fx-background-radius: 7px;
     -fx-background-color: transparent;
     -fx-text-fill: #94a3b8;
-    -fx-font-size: 12px;
+    -fx-font-size: 11px;
     -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
 
 .provider-switch-button.modtale {
-    -fx-min-width: 83px;
-    -fx-pref-width: 83px;
+    -fx-min-width: 72px;
+    -fx-pref-width: 72px;
 }
 
 .provider-switch-button.curseforge {
-    -fx-min-width: 106px;
-    -fx-pref-width: 106px;
+    -fx-min-width: 92px;
+    -fx-pref-width: 92px;
 }
 
 .provider-switch-button:hover {
