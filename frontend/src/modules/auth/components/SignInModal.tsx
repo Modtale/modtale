@@ -1,3 +1,4 @@
+import { useScrollLock } from '@/hooks/useScrollLock';
 import React, { useState, useEffect } from 'react';
 import { X, ArrowRight, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { DiscordBrandIcon, GitHubBrandIcon, GoogleBrandIcon, HytaleBrandIcon } from '@/components/ui/icons/BrandIcons';
@@ -37,11 +38,11 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
     const [statusModal, setStatusModal] = useState<{ type?: 'error' | 'info'; title: string; msg: string } | null>(null);
     const [lastSignInMethod, setLastSignInMethod] = useState<SignInMethod | null>(null);
 
+    useScrollLock(isOpen);
+
     useEffect(() => {
         setMounted(true);
         if (isOpen) setLastSignInMethod(getLastSignInMethod());
-        if (isOpen) document.body.style.overflow = 'hidden';
-        return () => { document.body.style.overflow = ''; };
     }, [isOpen]);
 
     if (!isOpen || !mounted) return null;
