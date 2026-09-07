@@ -47,7 +47,7 @@ final class ConfigEditorModal {
     void show(Path globalMods, Path world, String worldName) {
         Label title = new Label("Configs · " + worldName);
         title.getStyleClass().add("config-editor-title");
-        Label hint = new Label("Close Hytale before editing. JSON is validated; other formats are saved as text. A backup is kept beside each saved file.");
+        Label hint = new Label("Close Hytale before editing. JSON is validated; other formats are saved as text. A backup is kept beside each saved file. Configs are saved in launcher settings and sync when signed in.");
         hint.setWrapText(true);
         hint.getStyleClass().add("library-muted-text");
         search.setPromptText("Search config files");

@@ -16,7 +16,12 @@ import net.modtale.launcher.settings.LauncherSettings;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class LauncherSettingsSnapshot {
 
-    private int schemaVersion = 1;
+    private int schemaVersion = 2;
+    private List<LauncherConfigSnapshot> configs = new ArrayList<>();
+
+    public List<LauncherConfigSnapshot> getConfigs() { return configs == null ? List.of() : List.copyOf(configs); }
+    public void setConfigs(List<LauncherConfigSnapshot> configs) { this.configs = configs == null ? new ArrayList<>() : new ArrayList<>(configs); }
+
     private String settingsHash = "";
     private String updatedAt = "";
     private Preferences preferences = new Preferences();
@@ -29,6 +34,7 @@ public class LauncherSettingsSnapshot {
                 .filter(LauncherSettingsSnapshot::isSyncedProject)
                 .map(InstalledProjectSnapshot::fromInstalledProject)
                 .toList());
+        snapshot.setConfigs(settings == null ? List.of() : settings.getConfigs());
         snapshot.refreshHash();
         return snapshot;
     }
@@ -52,7 +58,7 @@ public class LauncherSettingsSnapshot {
     }
 
     public boolean hasSyncedContent() {
-        return !installedProjects().isEmpty()
+        return !getConfigs().isEmpty() || !installedProjects().isEmpty()
                 || (settingsHash != null && !settingsHash.isBlank())
                 || (updatedAt != null && !updatedAt.isBlank());
     }
@@ -80,6 +86,7 @@ public class LauncherSettingsSnapshot {
         copy.setUpdatedAt(updatedAt);
         copy.setPreferences(preferences);
         copy.setInstalledProjects(List.of());
+        copy.setConfigs(getConfigs());
         return copy;
     }
 
@@ -119,6 +126,8 @@ public class LauncherSettingsSnapshot {
                         .thenComparing(project -> value(project.installedVersionId))
                         .thenComparing(project -> value(project.installedVersion)))
                 .forEach(project -> payload.add(project.canonicalPayload()));
+        getConfigs().stream().sorted(Comparator.comparing(LauncherConfigSnapshot::path))
+                .forEach(config -> payload.add("config=" + config.path() + ":" + hashPayload(config.content())));
         return payload.toString();
     }
 

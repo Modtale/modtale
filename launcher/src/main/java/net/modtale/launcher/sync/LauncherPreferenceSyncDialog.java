@@ -22,12 +22,16 @@ final class LauncherPreferenceSyncDialog {
     private final int remoteProjects;
     private final int localProjects;
     private final String updatedAt;
+    private final int remoteConfigs;
+    private final int localConfigs;
 
     private LauncherPreferenceSyncDialog(
             int remoteProjects,
             int localProjects,
-            String updatedAt
+            String updatedAt, int remoteConfigs, int localConfigs
     ) {
+        this.remoteConfigs = remoteConfigs;
+        this.localConfigs = localConfigs;
         this.remoteProjects = Math.max(0, remoteProjects);
         this.localProjects = Math.max(0, localProjects);
         this.updatedAt = updatedAt == null ? "" : updatedAt.trim();
@@ -37,17 +41,17 @@ final class LauncherPreferenceSyncDialog {
             Supplier<StackPane> host,
             int remoteProjects,
             int localProjects,
-            String updatedAt
+            String updatedAt, int remoteConfigs, int localConfigs
     ) {
         LauncherPreferenceSyncDialog dialog = new LauncherPreferenceSyncDialog(
                 remoteProjects,
                 localProjects,
-                updatedAt
+                updatedAt, remoteConfigs, localConfigs
         );
         StatusModal.Result result = StatusModal.builder(host)
                 .type(StatusModal.Type.INFO)
-                .title("Different preferences found")
-                .message("Your Modtale account has launcher preferences that differ from this device.")
+                .title("Different launcher settings found")
+                .message("Your Modtale account has different launcher settings or configs. Close Hytale before loading them. Existing configs will be backed up before replacement.")
                 .secondaryLabel("Use this device")
                 .actionLabel("Load from Modtale")
                 .content(dialog.summaryCard())
@@ -60,9 +64,9 @@ final class LauncherPreferenceSyncDialog {
         summary.getStyleClass().add("preference-sync-summary");
         summary.setAlignment(Pos.CENTER);
         summary.getChildren().add(summaryLine("Modtale account",
-                remoteProjects + " installed project" + plural(remoteProjects)));
+                remoteProjects + " installed project" + plural(remoteProjects) + ", " + remoteConfigs + " configs"));
         summary.getChildren().add(summaryLine("This device",
-                localProjects + " installed project" + plural(localProjects)));
+                localProjects + " installed project" + plural(localProjects) + ", " + localConfigs + " configs"));
         summary.getChildren().add(summaryLine("Last saved", savedAtLabel()));
         return summary;
     }
