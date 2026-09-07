@@ -29,40 +29,43 @@ const getSourceLabel = (source?: string) => {
     }
 };
 
-const SupportedVersionPill = ({ version }: { version: string }) => (
-    <span className="inline-flex items-center px-2.5 py-1 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-md text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
-        {version}
-    </span>
-);
-
 const SupportedVersionGroup = ({ group }: { group: VersionGroup }) => {
     const [isOpen, setIsOpen] = React.useState(false);
-
-    if (!group.grouped) {
-        const version = group.versions[0];
-        return version ? <SupportedVersionPill version={version} /> : null;
-    }
+    const contentId = React.useId();
+    const rowClass = "flex w-full min-h-11 items-center gap-3 px-3 py-2.5 text-left";
+    const contents = (
+        <>
+            <span className="min-w-0 flex-1 break-all text-xs font-bold text-slate-700 dark:text-slate-300">{group.grouped ? group.label : group.versions[0]}</span>
+            <span className="shrink-0 text-[10px] tabular-nums text-slate-500 dark:text-slate-400">
+                {group.versions.length} {group.versions.length === 1 ? 'version' : 'versions'}
+            </span>
+            <span className="w-3 shrink-0" aria-hidden="true">
+                {group.grouped && <ChevronRight className={`h-3 w-3 transition-transform motion-reduce:transition-none ${isOpen ? 'rotate-90' : ''}`} />}
+            </span>
+        </>
+    );
 
     return (
-        <div className="w-full rounded-lg border border-slate-200 dark:border-white/5 bg-slate-50/70 dark:bg-white/[0.03] overflow-hidden">
-            <button
-                type="button"
-                aria-expanded={isOpen}
-                aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${group.label} versions`}
-                onClick={() => setIsOpen(prev => !prev)}
-                className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 text-left text-[10px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide hover:text-modtale-accent dark:hover:text-modtale-accent transition-colors"
-            >
-                <span>{group.label}</span>
-                <span className="flex items-center gap-1 text-slate-500 dark:text-slate-400 normal-case tracking-normal">
-                    {group.versions.length}
-                    <ChevronRight className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-90' : ''}`} aria-hidden="true" />
-                </span>
-            </button>
-            {isOpen && (
-                <div className="flex flex-wrap gap-1.5 px-2.5 pb-2">
-                    {group.versions.map(version => (
-                        <SupportedVersionPill key={version} version={version} />
-                    ))}
+        <div>
+            {group.grouped ? (
+                <button
+                    type="button"
+                    aria-expanded={isOpen}
+                    aria-controls={contentId}
+                    aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${group.label} versions`}
+                    onClick={() => setIsOpen(prev => !prev)}
+                    className={`${rowClass} hover:bg-slate-100 dark:hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-modtale-accent`}
+                >
+                    {contents}
+                </button>
+            ) : <div className={rowClass}>{contents}</div>}
+            {group.grouped && (
+                <div id={contentId} hidden={!isOpen} className="px-3 pb-3">
+                    {isOpen && <ul className="space-y-2 border-l-2 border-slate-200 pl-3 dark:border-white/10">
+                        {group.versions.map(version => (
+                            <li key={version} className="break-all text-xs text-slate-600 dark:text-slate-400">{version}</li>
+                        ))}
+                    </ul>}
                 </div>
             )}
         </div>
@@ -102,7 +105,7 @@ export const ProjectMetaSections: React.FC<ProjectMetaSectionsProps> = React.mem
         <>
             {gameVersions.length > 0 && (
                 <SidebarSection title="Supported Versions" icon={Gamepad2}>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50/70 divide-y divide-slate-200 dark:border-white/10 dark:bg-white/[0.03] dark:divide-white/10">
                         {gameVersionGroups.map(group => (
                             <SupportedVersionGroup key={group.label} group={group} />
                         ))}
