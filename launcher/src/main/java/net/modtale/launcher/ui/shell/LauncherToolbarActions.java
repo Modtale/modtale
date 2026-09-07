@@ -52,7 +52,7 @@ public final class LauncherToolbarActions {
             case PLAY -> actions.getChildren().get(1).setVisible(true);
             case LIBRARY, UPDATES -> actions.getChildren().get(2).setVisible(true);
             case SETTINGS -> actions.getChildren().get(3).setVisible(true);
-            case NOTIFICATIONS, PROJECT -> {
+            case NOTIFICATIONS, PROJECT, WARDROBE -> {
             }
         }
     }

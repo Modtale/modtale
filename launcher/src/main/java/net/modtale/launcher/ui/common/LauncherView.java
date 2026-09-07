@@ -6,6 +6,7 @@ public enum LauncherView {
     DISCOVER("discover"),
     PLAY("play"),
     LIBRARY("library"),
+    WARDROBE("wardrobe"),
     UPDATES("updates"),
     NOTIFICATIONS("notifications"),
     SETTINGS("settings"),
