@@ -73,6 +73,7 @@ export const GalleryCarouselViewer: React.FC<GalleryCarouselViewerProps> = ({
     const rawActiveIndex = isControlled ? activeIndex : localActiveIndex;
     const safeActiveIndex = clampIndex(rawActiveIndex, imageCount);
     const activeImage = resolvedImages[safeActiveIndex] || resolvedImages[0];
+    const shouldAutoAdvance = autoAdvance && activeImage?.type !== 'youtube';
 
     const setActiveIndex = useCallback((nextValue: number | ((current: number) => number)) => {
         const nextIndex = clampIndex(
@@ -101,14 +102,14 @@ export const GalleryCarouselViewer: React.FC<GalleryCarouselViewerProps> = ({
     }, [imageCount, isControlled, onActiveIndexChange, rawActiveIndex, safeActiveIndex]);
 
     useEffect(() => {
-        if (!autoAdvance || imageCount <= 1) return;
+        if (!shouldAutoAdvance || imageCount <= 1) return;
 
         const timer = window.setTimeout(() => {
             setActiveIndex((prev) => (prev + 1) % imageCount);
         }, AUTO_ADVANCE_MS);
 
         return () => window.clearTimeout(timer);
-    }, [autoAdvance, imageCount, safeActiveIndex, setActiveIndex]);
+    }, [imageCount, safeActiveIndex, setActiveIndex, shouldAutoAdvance]);
 
     useEffect(() => {
         if (imageCount <= 1) return;
@@ -221,7 +222,7 @@ export const GalleryCarouselViewer: React.FC<GalleryCarouselViewerProps> = ({
                         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-blue-950/80 px-3 py-1 text-xs font-black tracking-wider text-white shadow-lg sm:hidden">
                             {safeActiveIndex + 1} / {imageCount}
                         </div>
-                        {autoAdvance && (
+                        {shouldAutoAdvance && (
                             <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-950/40" aria-hidden="true">
                                 <div
                                     key={`${activeImage.url}-${safeActiveIndex}`}
