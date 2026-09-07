@@ -182,7 +182,7 @@ class ModpackArchiveServiceTest {
         version.setOverrideFileUrl("modpack-overrides/source.zip");
         when(archiveSupport.download("modpack-overrides/source.zip")).thenReturn(zip(Map.of(
                 "overrides/Mods/example/game.json", "{}",
-                "overrides/Saves/example/config.json", "{}"
+                "overrides/Saves/My World/mods/Example_Plugin/config.json", "{}"
         )));
         when(archiveSupport.newZipMultipartFile(eq("sky-pack-1.0.0.zip"), any()))
                 .thenAnswer(invocation -> mock(MultipartFile.class));
@@ -192,7 +192,7 @@ class ModpackArchiveServiceTest {
         JsonNode lock = new ObjectMapper().readTree(entries.get("modtale.lock.json"));
 
         assertTrue(entries.containsKey("overrides/Mods/example/game.json"));
-        assertTrue(entries.containsKey("overrides/Saves/example/config.json"));
+        assertTrue(entries.containsKey("overrides/Saves/My World/mods/Example_Plugin/config.json"));
         assertEquals(2, lock.path("overrides").size());
         assertFalse(lock.at("/overrides/0").has("environment"));
     }
