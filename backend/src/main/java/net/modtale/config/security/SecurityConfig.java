@@ -124,8 +124,9 @@ public class SecurityConfig {
     }
 
     private boolean isLocalhost() {
-        String cleanUrl = getCleanFrontendUrl();
-        return cleanUrl != null && (cleanUrl.contains("localhost") || cleanUrl.contains("127.0.0.1"));
+        String host = safeHostFromUrl(getCleanFrontendUrl());
+        return "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host)
+                || "[::1]".equals(host);
     }
 
     private Set<String> getAllowedFrontendOriginPatterns() {
@@ -167,7 +168,7 @@ public class SecurityConfig {
 
     private boolean isAllowedFrontendHost(String host) {
         if (host == null || host.isBlank()) return false;
-        String normalized = host.toLowerCase();
+        String normalized = host.toLowerCase(java.util.Locale.ROOT);
         for (String originPattern : getAllowedFrontendOriginPatterns()) {
             String allowedHost = safeHostFromUrl(originPattern);
             if (allowedHost != null && normalized.equalsIgnoreCase(allowedHost)) {
@@ -332,10 +333,6 @@ public class SecurityConfig {
 
                             boolean isValidOrigin = isAllowedFrontendHost(originHost);
                             boolean isValidReferer = isAllowedFrontendHost(refererHost);
-
-                            if (isPreviewEnvironment() && (origin != null && origin.contains(".run.app"))) {
-                                return new AuthorizationDecision(true);
-                            }
 
                             return new AuthorizationDecision(isValidOrigin || isValidReferer);
                         })

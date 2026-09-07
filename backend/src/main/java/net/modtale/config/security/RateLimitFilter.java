@@ -60,7 +60,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        boolean isWrite = WRITE_METHODS.contains(req.getMethod().toUpperCase());
+        boolean isWrite = WRITE_METHODS.contains(req.getMethod().toUpperCase(java.util.Locale.ROOT));
         String clientIp = getClientIp(req);
         String userAgent = req.getHeader("User-Agent");
         String apiKeyHeader = req.getHeader("X-MODTALE-KEY");
@@ -156,7 +156,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private boolean isBlockedAgent(String ua) {
         if (ua == null || ua.isBlank()) return true;
-        String lowerUA = ua.toLowerCase();
+        String lowerUA = ua.toLowerCase(java.util.Locale.ROOT);
         return BLOCKED_AGENTS.stream().anyMatch(lowerUA::contains);
     }
 
