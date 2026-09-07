@@ -23,6 +23,7 @@ repositories {
 def currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 dependencies {
+    implementation 'com.twelvemonkeys.imageio:imageio-webp:3.15.0'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.2'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.22.2'
     implementation 'com.vladsch.flexmark:flexmark:0.64.8'

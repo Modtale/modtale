@@ -1,5 +1,6 @@
 package net.modtale.launcher.ui.common;
 
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -24,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
+import javax.imageio.ImageIO;
 import javafx.application.Platform;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -80,23 +82,18 @@ public final class CachedImageLoader {
             return;
         }
 
-        Path cachedFile = cacheFile(resolvedUrl);
-        if (Files.isRegularFile(cachedFile)) {
-            setImage(view, key, imageFor(key, cachedFile.toUri().toString()));
-            return;
-        }
-
-        downloads.computeIfAbsent(resolvedUrl, this::downloadAsync)
-                .whenComplete((path, error) -> {
-                    if (error != null || path == null) {
-                        return;
-                    }
-                    Platform.runLater(() -> {
-                        if (Objects.equals(view.getProperties().get(IMAGE_KEY_PROPERTY), key)) {
-                            setImage(view, key, imageFor(key, path.toUri().toString()));
-                        }
-                    });
-                });
+        CompletableFuture<Path> pending = downloads.computeIfAbsent(resolvedUrl, this::downloadAsync);
+        pending.whenComplete((path, error) -> {
+            downloads.remove(resolvedUrl, pending);
+            if (error != null || path == null) {
+                return;
+            }
+            Platform.runLater(() -> {
+                if (Objects.equals(view.getProperties().get(IMAGE_KEY_PROPERTY), key)) {
+                    setImage(view, key, imageFor(key, path.toUri().toString()));
+                }
+            });
+        });
     }
 
     public void clearMemory() {
@@ -110,11 +107,19 @@ public final class CachedImageLoader {
     }
 
     private CompletableFuture<Path> downloadAsync(String resolvedUrl) {
-        return CompletableFuture.supplyAsync(() -> download(resolvedUrl), executor)
-                .whenComplete((path, error) -> downloads.remove(resolvedUrl));
+        return CompletableFuture.supplyAsync(() -> download(resolvedUrl), executor);
     }
 
     private Path download(String resolvedUrl) {
+        Path cachedFile = cacheFile(resolvedUrl);
+        if (Files.isRegularFile(cachedFile)) {
+            try {
+                prepareCachedImage(cachedFile);
+                return cachedFile;
+            } catch (IOException ex) {
+                throw new IllegalStateException("Could not decode cached image " + resolvedUrl, ex);
+            }
+        }
         URI uri = URI.create(resolvedUrl);
         HttpRequest request = HttpRequest.newBuilder(uri)
                 .timeout(Duration.ofSeconds(45))
@@ -125,19 +130,21 @@ public final class CachedImageLoader {
         try {
             HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                response.body().close();
                 throw new IOException("Image request returned HTTP " + response.statusCode());
             }
 
             Files.createDirectories(cacheDirectory);
             Path destination = cacheFile(resolvedUrl);
             Path temporary = Files.createTempFile(cacheDirectory, "image-", ".tmp");
-            try (InputStream body = response.body()) {
-                Files.copy(body, temporary, StandardCopyOption.REPLACE_EXISTING);
-            }
             try {
-                Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            } catch (AtomicMoveNotSupportedException ex) {
-                Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING);
+                try (InputStream body = response.body()) {
+                    Files.copy(body, temporary, StandardCopyOption.REPLACE_EXISTING);
+                }
+                prepareCachedImage(temporary);
+                replaceFile(temporary, destination);
+            } finally {
+                Files.deleteIfExists(temporary);
             }
             return destination;
         } catch (IOException ex) {
@@ -145,6 +152,41 @@ public final class CachedImageLoader {
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Image download was interrupted.", ex);
+        }
+    }
+
+    // JavaFX cannot decode WebP. Detect the bytes rather than the URL extension,
+    // and normalize on the download executor, including files cached by older launchers.
+    static void prepareCachedImage(Path path) throws IOException {
+        byte[] header;
+        try (InputStream input = Files.newInputStream(path)) {
+            header = input.readNBytes(12);
+        }
+        if (header.length != 12
+                || header[0] != 'R' || header[1] != 'I' || header[2] != 'F' || header[3] != 'F'
+                || header[8] != 'W' || header[9] != 'E' || header[10] != 'B' || header[11] != 'P') {
+            return;
+        }
+        BufferedImage decoded = ImageIO.read(path.toFile());
+        if (decoded == null) {
+            throw new IOException("Could not decode WebP image");
+        }
+        Path converted = Files.createTempFile(path.getParent(), "decoded-image-", ".png");
+        try {
+            if (!ImageIO.write(decoded, "png", converted.toFile())) {
+                throw new IOException("Could not encode decoded image as PNG");
+            }
+            replaceFile(converted, path);
+        } finally {
+            Files.deleteIfExists(converted);
+        }
+    }
+
+    private static void replaceFile(Path source, Path destination) throws IOException {
+        try {
+            Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException ex) {
+            Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
