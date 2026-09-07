@@ -1802,6 +1802,18 @@ public final class ProjectPageController {
         GridPane stats = new GridPane();
         stats.getStyleClass().add("project-detail-stat-grid");
         stats.setMaxWidth(Double.MAX_VALUE);
+        Node downloads = statNumber(number(downloads(summary, detail)), "Downloads", LauncherIcons.Glyph.DOWNLOAD);
+        GridPane.setHgrow(downloads, Priority.ALWAYS);
+
+        if (summary != null && summary.isCurseForge()) {
+            ColumnConstraints column = new ColumnConstraints();
+            column.setPercentWidth(100);
+            column.setFillWidth(true);
+            stats.getColumnConstraints().add(column);
+            stats.add(downloads, 0, 0);
+            return stats;
+        }
+
         ColumnConstraints left = new ColumnConstraints();
         left.setPercentWidth(50);
         left.setFillWidth(true);
@@ -1810,9 +1822,7 @@ public final class ProjectPageController {
         right.setFillWidth(true);
         stats.getColumnConstraints().addAll(left, right);
         Node favorites = statNumber(number(favorites(summary, detail)), "Favorites", LauncherIcons.Glyph.HEART);
-        Node downloads = statNumber(number(downloads(summary, detail)), "Downloads", LauncherIcons.Glyph.DOWNLOAD);
         GridPane.setHgrow(favorites, Priority.ALWAYS);
-        GridPane.setHgrow(downloads, Priority.ALWAYS);
         stats.add(favorites, 0, 0);
         stats.add(downloads, 1, 0);
         return stats;
