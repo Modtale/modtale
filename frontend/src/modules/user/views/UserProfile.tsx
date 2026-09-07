@@ -39,6 +39,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({
         return null;
     });
 
+    const profileMatchesRoute = !!profileUser && (profileUser.id === userId || matchesHandle(profileUser.username));
+
     const [orgMembers, setOrgMembers] = useState<User[]>([]);
     const [memberOrgs, setMemberOrgs] = useState<User[]>([]);
     const [loadingUser, setLoadingUser] = useState(!profileUser);
@@ -146,7 +148,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     }, [fetchProjects, profileUser?.id]);
 
     useEffect(() => {
-        if (profileUser && !loadingProjects) {
+        if (profileUser && profileMatchesRoute && !loadingProjects) {
             const canonicalPath = SiteRoutes.creator(profileUser.id, profileUser.username);
             const currentPrefixMatch = location.pathname.match(/^\/(user|creator)\/[^/]+/i);
 
@@ -161,7 +163,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                 }
             }
         }
-    }, [profileUser, loadingProjects, totalItems, location.pathname, location.search, location.hash, navigate]);
+    }, [profileUser, profileMatchesRoute, loadingProjects, totalItems, location.pathname, location.search, location.hash, navigate]);
 
     const handleToggleFollow = async () => {
         if (!currentUser) {
