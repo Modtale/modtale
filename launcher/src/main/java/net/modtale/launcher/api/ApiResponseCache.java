@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import net.modtale.launcher.io.AtomicJsonFile;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -55,8 +56,7 @@ final class ApiResponseCache {
         CacheEntry entry = new CacheEntry(body, Instant.now());
         memory.put(key, entry);
         try {
-            Files.createDirectories(cacheDirectory);
-            mapper.writeValue(cacheFile(uri).toFile(), CachedBody.from(entry));
+            AtomicJsonFile.write(cacheFile(uri), mapper.writer(), CachedBody.from(entry));
         } catch (IOException ignored) {
             // The in-memory cache is still useful if the disk cache cannot be written.
         }

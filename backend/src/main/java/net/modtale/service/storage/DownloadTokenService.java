@@ -34,7 +34,7 @@ public class DownloadTokenService {
             this.projectId = projectId;
             this.version = version;
             this.gameVersion = gameVersion;
-            this.selectedDependencies = selectedDependencies;
+            this.selectedDependencies = selectedDependencies == null ? null : List.copyOf(selectedDependencies);
             this.userId = userId;
             this.expiresAt = expiresAt;
             this.used = false;
@@ -50,7 +50,7 @@ public class DownloadTokenService {
         public void markAsUsed() { this.used = true; }
 
         public boolean isExpired() {
-            return Instant.now().isAfter(expiresAt);
+            return !Instant.now().isBefore(expiresAt);
         }
     }
 
@@ -80,24 +80,15 @@ public class DownloadTokenService {
     }
 
     public DownloadToken validateAndConsume(String token) {
-        DownloadToken downloadToken = tokens.get(token);
-
-        if (downloadToken == null) {
+        if (token == null || token.isBlank()) {
             return null;
         }
-
-        if (downloadToken.isExpired()) {
-            tokens.remove(token);
+        // Removal is the atomic claim: concurrent requests cannot both consume it.
+        DownloadToken downloadToken = tokens.remove(token);
+        if (downloadToken == null || downloadToken.isExpired() || downloadToken.isUsed()) {
             return null;
         }
-
-        if (downloadToken.isUsed()) {
-            return null;
-        }
-
         downloadToken.markAsUsed();
-        tokens.remove(token);
-
         return downloadToken;
     }
 

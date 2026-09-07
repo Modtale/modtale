@@ -24,7 +24,7 @@ public class MongoConfig {
                 return null;
             }
             try {
-                return OAuthProvider.valueOf(source.toUpperCase());
+                return OAuthProvider.valueOf(source.toUpperCase(java.util.Locale.ROOT));
             } catch (IllegalArgumentException e) {
                 try {
                     return OAuthProvider.valueOf(source);

@@ -1,3 +1,4 @@
+import { useScrollLock } from '@/hooks/useScrollLock';
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { createPortal } from 'react-dom';
@@ -226,10 +227,10 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         return () => window.clearTimeout(delayDebounceFn);
     }, [inviteUsername, inviteUserId, setUserSearchResults]);
 
+    useScrollLock(showCardPreview);
+
     useEffect(() => {
         if (!showCardPreview) return;
-
-        const originalOverflow = document.body.style.overflow;
 
         const updateCardPreviewScale = () => {
             const card = cardPreviewRef.current;
@@ -253,7 +254,6 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             }
         };
 
-        document.body.style.overflow = 'hidden';
         const animationFrame = window.requestAnimationFrame(updateCardPreviewScale);
         window.addEventListener('resize', updateCardPreviewScale);
         window.addEventListener('keydown', handleCardPreviewKeyDown);
@@ -265,7 +265,6 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         }
 
         return () => {
-            document.body.style.overflow = originalOverflow;
             window.cancelAnimationFrame(animationFrame);
             window.removeEventListener('resize', updateCardPreviewScale);
             window.removeEventListener('keydown', handleCardPreviewKeyDown);

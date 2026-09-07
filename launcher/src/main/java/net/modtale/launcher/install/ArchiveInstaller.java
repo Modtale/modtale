@@ -161,6 +161,11 @@ public class ArchiveInstaller {
         if (entryName.contains("\\") || entryName.matches("^[A-Za-z]:.*") || Path.of(entryName).isAbsolute()) {
             throw new IOException("Unsafe modpack path: " + entryName);
         }
+        for (String segment : entryName.split("/", -1)) {
+            if (segment.isBlank() || ".".equals(segment) || "..".equals(segment)) {
+                throw new IOException("Unsafe modpack path: " + entryName);
+            }
+        }
         String folded = entryName.toLowerCase(Locale.ROOT);
         if (!archivePaths.add(folded)) {
             throw new IOException("Duplicate or case-colliding modpack path: " + entryName);
@@ -177,10 +182,17 @@ public class ArchiveInstaller {
         if (relativePath.contains("\\") || relativePath.matches("^[A-Za-z]:.*") || Path.of(relativePath).isAbsolute()) {
             throw new IOException("Unsafe override destination: " + relativePath);
         }
-        Path normalizedRoot = instanceDirectory.toAbsolutePath().normalize();
+        Path normalizedRoot = instanceDirectory.toRealPath();
         Path destination = normalizedRoot.resolve(relativePath).normalize();
         if (!destination.startsWith(normalizedRoot)) {
             throw new IOException("Override escapes the Hytale instance: " + relativePath);
+        }
+        Path current = normalizedRoot;
+        for (Path segment : normalizedRoot.relativize(destination)) {
+            current = current.resolve(segment);
+            if (Files.isSymbolicLink(current)) {
+                throw new IOException("Override destination contains a symbolic link: " + relativePath);
+            }
         }
         return destination;
     }

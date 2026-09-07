@@ -33,7 +33,7 @@ export function ManageProfile({ user, onUpdate }: ManageProfileProps) {
         if (oauthError) {
             setStatusModal({
                 title: 'Account Connection Failed',
-                msg: decodeURIComponent(oauthError).replace(/\+/g, ' ')
+                msg: oauthError
             });
             setSearchParams({});
         }

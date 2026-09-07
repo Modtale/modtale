@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import net.modtale.launcher.io.AtomicJsonFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -42,8 +43,7 @@ final class InstalledProjectRegistry {
     void save(List<InstalledProject> projects) {
         List<InstalledProject> records = validProjects(projects);
         try {
-            Files.createDirectories(registryPath.getParent());
-            mapper.writeValue(registryPath.toFile(), new RegistryFile(records));
+            AtomicJsonFile.write(registryPath, mapper.writer(), new RegistryFile(records));
         } catch (IOException ex) {
             throw new ModtaleApiException("Could not save installed project registry to " + registryPath, ex);
         }
