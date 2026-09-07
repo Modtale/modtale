@@ -24,6 +24,13 @@ describe('shared list config seeding', () => {
         expect(await zip.file('overrides/Mods/Example/settings.toml')!.async('string')).toBe('value=2\r\n');
         expect(await zip.file('overrides/Saves/My World/mods/Example/config.json')!.async('string')).toBe('{"world":true}');
     });
+    it('keeps the manifest-derived folder when converting a list to a modpack', async () => {
+        const file = await worldListToOverrideFile({ ...base, mods: [{
+            id: 'item', modId: 'org.example_mods:Fancy_Mod', title: 'Unrelated marketplace title', downloadable: true,
+        }], configs: [{ scope: 'WORLD', path: 'org.example_mods_Fancy_Mod/nested/Gameplay.json', content: '{}' }] });
+        const zip = await JSZip.loadAsync(await read(file!));
+        expect(await zip.file('overrides/Saves/My World/mods/org.example_mods_Fancy_Mod/nested/Gameplay.json')!.async('string')).toBe('{}');
+    });
     it('rejects unsafe paths', async () => {
         await expect(worldListToOverrideFile({ ...base, configs: [
             { scope: 'WORLD', path: '../config.json', content: '{}' },

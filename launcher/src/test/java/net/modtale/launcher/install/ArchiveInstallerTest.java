@@ -126,6 +126,36 @@ class ArchiveInstallerTest {
         assertTrue(Files.notExists(instance.resolve("Saves/My World/Mods")));
     }
 
+    @Test
+    void attributesPackConfigToBundledManifestAfterInstall() throws Exception {
+        var jarBytes = new java.io.ByteArrayOutputStream();
+        try (var jar = new ZipOutputStream(jarBytes)) {
+            add(jar, "manifest.json", "{\"Group\":\"org.example_mods\",\"Name\":\"Fancy_Mod\"}");
+        }
+        byte[] bundled = jarBytes.toByteArray();
+        String configPath = "overrides/Saves/My World/mods/org.example_mods_Fancy_Mod/Gameplay.json";
+        String lock = """
+                {"format":"modtale-lock","lockVersion":1,"game":"hytale",
+                 "entries":[{"distribution":"BUNDLED","path":"mods/unrelated-marketplace-title.jar","size":%d,"hashes":{"sha256":"%s"}}],
+                 "overrides":[{"path":"%s","size":2,"hashes":{"sha256":"%s"}}]}
+                """.formatted(bundled.length, HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bundled)),
+                        configPath, sha256("{}"));
+        Path archive = tempDir.resolve("attributed-pack.zip");
+        try (var zip = new ZipOutputStream(Files.newOutputStream(archive))) {
+            add(zip, "modtale.lock.json", lock);
+            zip.putNextEntry(new ZipEntry("mods/unrelated-marketplace-title.jar"));
+            zip.write(bundled);
+            zip.closeEntry();
+            add(zip, configPath, "{}");
+        }
+        Path instance = tempDir.resolve("attributed-instance");
+        new ArchiveInstaller().installModpackArchive(archive, instance.resolve("Mods"), instance);
+        var found = new net.modtale.launcher.config.HytaleConfigFiles().discover(instance.resolve("Mods"), instance.resolve("Saves/My World"));
+        assertEquals(1, found.size());
+        assertEquals("org.example_mods:Fancy_Mod", found.getFirst().pluginId());
+        assertEquals("org.example_mods_Fancy_Mod/Gameplay.json", found.getFirst().root().relativize(found.getFirst().path()).toString().replace('\\', '/'));
+    }
+
     private Path overrideArchive(String entryPath) throws IOException {
         Path archive = tempDir.resolve("override.zip");
         String content = "settings";

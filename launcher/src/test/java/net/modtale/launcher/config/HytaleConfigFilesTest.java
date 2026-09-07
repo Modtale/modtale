@@ -24,7 +24,7 @@ class HytaleConfigFilesTest {
         write("Saves/Other/mods/Example_Plugin/config.json", "{}");
         List<ConfigFile> files = discover();
         assertEquals(4, files.size());
-        assertTrue(files.stream().anyMatch(file -> file.label().equals("World mods / Example_Plugin/config.json")));
+        assertTrue(files.stream().anyMatch(file -> file.label().equals("World mods / Unattributed / Example_Plugin/config.json")));
     }
 
     @Test
