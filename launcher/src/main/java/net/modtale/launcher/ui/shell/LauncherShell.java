@@ -54,6 +54,7 @@ import net.modtale.launcher.ui.activity.LauncherNotificationsController;
 import net.modtale.launcher.ui.activity.LauncherNotificationsMenu;
 import net.modtale.launcher.ui.browse.ProjectBrowseController;
 import net.modtale.launcher.ui.browse.controls.BrowseOptions;
+import net.modtale.launcher.ui.browse.controls.ProjectBrowseSort;
 import net.modtale.launcher.ui.common.CachedImageLoader;
 import net.modtale.launcher.ui.common.LauncherFonts;
 import net.modtale.launcher.ui.common.LauncherLayout;
@@ -110,6 +111,7 @@ public final class LauncherShell {
     private final LauncherToolbarActions toolbarActions;
     private final Map<LauncherView, Node> navButtons = new LinkedHashMap<>();
     private final Map<BrowseOptions.BrowseViewOption, Button> railButtons = new LinkedHashMap<>();
+    private final Map<ProjectBrowseSort, Button> curseForgeRailButtons = new LinkedHashMap<>();
     private final List<PauseTransition> stageVisibilityRetries = new ArrayList<>();
     private Cursor pendingNativeCursor;
     private Cursor appliedNativeCursor;
@@ -123,6 +125,7 @@ public final class LauncherShell {
     private BorderPane appRoot;
     private Node navbarNode;
     private StackPane sceneLayer;
+    private VBox browseRailCard;
     private HBox workspaceRoot;
     private Node railNode;
     private HBox mainToolbar;
@@ -185,6 +188,7 @@ public final class LauncherShell {
                 this::unlock
         );
         this.browseMenu = new LauncherBrowseMenu(browseController, () -> sceneLayer, navigation::currentView);
+        this.browseController.addControlStateListener(this::refreshBrowseRail);
         this.accountMenu = new LauncherAccountMenu(
                 accountController,
                 accountImageLoader,
@@ -401,9 +405,7 @@ public final class LauncherShell {
             Insets pageInsets = webMode ? Insets.EMPTY : LauncherLayout.WORKSPACE_INSETS;
             workspaceRoot.setPadding(workspaceInsetsFor(nextView));
             mainToolbar.setPadding(new Insets(0, pageInsets.getRight(), 8, 0));
-            contentBody.setPadding(new Insets(
-                    webMode || discoverMode || launcherPage ? 0 : 16,
-                    pageInsets.getRight(), pageInsets.getBottom(), 0));
+            contentBody.setPadding(contentBodyInsetsFor(nextView));
         }
         if (contentBody != null) {
             contentBody.setSpacing(webMode ? 0 : 16);
@@ -456,6 +458,17 @@ public final class LauncherShell {
         Insets pageInsets = LauncherLayout.WORKSPACE_INSETS;
         double right = view == LauncherView.DISCOVER ? pageInsets.getRight() : 0;
         return new Insets(pageInsets.getTop(), right, 0, pageInsets.getLeft());
+    }
+
+    static Insets contentBodyInsetsFor(LauncherView view) {
+        if (view == LauncherView.PROJECT) {
+            return Insets.EMPTY;
+        }
+        Insets pageInsets = LauncherLayout.WORKSPACE_INSETS;
+        boolean launcherPage = view == LauncherView.PLAY || view == LauncherView.LIBRARY;
+        double top = view == LauncherView.DISCOVER || launcherPage ? 0 : 16;
+        double right = view == LauncherView.DISCOVER ? 0 : pageInsets.getRight();
+        return new Insets(top, right, pageInsets.getBottom(), 0);
     }
 
     private void resetContentScrollPosition() {
@@ -900,14 +913,45 @@ public final class LauncherShell {
         updateSearchResetControl(clearSearch, browseSearch.getText());
         browseSearchShell.getChildren().add(clearSearch);
 
-        VBox browse = railCard("Browse");
-        for (BrowseOptions.BrowseViewOption view : BrowseOptions.BROWSE_VIEWS) {
-            addRailButton(browse, view, view.label(), view.icon(), false,
-                    event -> browseController.selectBrowseView(view));
-        }
+        browseRailCard = railCard("Browse");
+        refreshBrowseRail();
 
-        rail.getChildren().addAll(browseSearchShell, browse);
+        rail.getChildren().addAll(browseSearchShell, browseRailCard);
         return rail;
+    }
+
+    private void refreshBrowseRail() {
+        if (browseRailCard == null) {
+            return;
+        }
+        railButtons.clear();
+        curseForgeRailButtons.clear();
+        browseRailCard.getChildren().clear();
+        browseRailCard.getChildren().add(browseRailTitle(
+                browseController.isCurseForgeSource() ? "CURSEFORGE" : "BROWSE"));
+
+        if (browseController.isCurseForgeSource()) {
+            addCurseForgeRailButton(browseRailCard, ProjectBrowseSort.DOWNLOADS);
+            addCurseForgeRailButton(browseRailCard, ProjectBrowseSort.UPDATED);
+            addCurseForgeRailButton(browseRailCard, ProjectBrowseSort.NEWEST);
+        } else {
+            for (BrowseOptions.BrowseViewOption view : BrowseOptions.BROWSE_VIEWS) {
+                addRailButton(browseRailCard, view, view.label(), view.icon(), false,
+                        event -> browseController.selectBrowseView(view));
+            }
+        }
+        updateRailButtons();
+    }
+
+    private void addCurseForgeRailButton(VBox card, ProjectBrowseSort sort) {
+        String label = sort.title().isBlank() ? sort.label() : sort.title();
+        Button button = new Button(label);
+        button.getStyleClass().add("rail-link");
+        button.setMaxWidth(Double.MAX_VALUE);
+        button.setAlignment(Pos.CENTER_LEFT);
+        button.setOnAction(event -> browseController.selectBrowseSort(sort));
+        curseForgeRailButtons.put(sort, button);
+        card.getChildren().add(button);
     }
 
     private void updateSearchResetControl(Button clearSearch, String query) {
@@ -1081,6 +1125,8 @@ public final class LauncherShell {
                 || navigation.currentView() == LauncherView.PROJECT;
         railButtons.forEach((key, button) -> pseudo(button, "selected", browseView
                 && key == browseController.activeBrowseView()));
+        curseForgeRailButtons.forEach((key, button) -> pseudo(button, "selected", browseView
+                && key == browseController.selectedBrowseSort()));
     }
 
     private VBox railCard(String title) {
@@ -1089,7 +1135,7 @@ public final class LauncherShell {
         boolean browseTitle = "Browse".equals(title);
         if (browseTitle) {
             card.getStyleClass().add("browse-rail-card");
-            card.getChildren().add(browseRailTitle());
+            card.getChildren().add(browseRailTitle("BROWSE"));
         } else {
             Label label = new Label(title);
             label.getStyleClass().add("rail-title");
@@ -1098,10 +1144,10 @@ public final class LauncherShell {
         return card;
     }
 
-    private Node browseRailTitle() {
+    private Node browseRailTitle(String value) {
         HBox title = new HBox();
         title.getStyleClass().add("browse-rail-title");
-        for (char letter : "BROWSE".toCharArray()) {
+        for (char letter : value.toCharArray()) {
             Label letterLabel = new Label(String.valueOf(letter));
             letterLabel.getStyleClass().add("browse-rail-title-letter");
             title.getChildren().add(letterLabel);
