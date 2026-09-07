@@ -1,5 +1,6 @@
 package net.modtale.service.security.validation;
 
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -8,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 import tools.jackson.databind.ObjectMapper;
@@ -147,6 +149,16 @@ class FileValidationServiceTest {
         );
 
         assertEquals("Security Violation: Nested archives (.zip) are not allowed in ART", error.getMessage());
+    }
+
+    @Test
+    void validateGalleryImageAllowsNonSixteenByNineImages() throws IOException {
+        BufferedImage image = new BufferedImage(800, 500, BufferedImage.TYPE_INT_RGB);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", out);
+        MockMultipartFile file = new MockMultipartFile("file", "gallery.png", "image/png", out.toByteArray());
+
+        fileValidationService.validateGalleryImage(file);
     }
 
     private static String validManifest() {
