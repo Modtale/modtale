@@ -31,7 +31,6 @@ final class NyoCfClient {
     private static final URI DEFAULT_BASE_URI = URI.create("https://nyocf.junyo.dev");
     private static final String CURSEFORGE_SITE = "https://www.curseforge.com";
     private static final long HYTALE_GAME_ID = 70216;
-    private static final int BANNER_LOOKUP_BATCH_SIZE = 4;
     private static final List<String> PROJECT_CLASSES = List.of(
             "mods", "prefabs", "worlds", "bootstrap", "translations");
     private final HttpClient httpClient;
@@ -57,11 +56,6 @@ final class NyoCfClient {
     }
 
     private ProjectPage searchClass(ProjectSearchQuery query, String projectClass, int page, int size) {
-        return searchClass(query, projectClass, page, size, true);
-    }
-
-    private ProjectPage searchClass(ProjectSearchQuery query, String projectClass, int page, int size,
-            boolean enrichBanners) {
         String path = "/api/v1/hytale/" + projectClass + "/search?q=" + encode(value(query.search()))
                 + "&limit=" + size + "&offset=" + (page * size) + "&include_files=true";
         JsonNode envelope = get(path);
@@ -70,7 +64,6 @@ final class NyoCfClient {
             ProjectSummary project = summary(item, query.gameVersion(), projectClass);
             if (project != null) projects.add(project);
         }
-        if (enrichBanners) projects = withGalleryBanners(projects);
         sort(projects, query.sort());
         long total = Math.max(projects.size(), envelope.path("pagination").path("total").asLong(projects.size()));
         int pages = total == 0 ? 0 : (int) Math.ceil(total / (double) size);
@@ -80,7 +73,7 @@ final class NyoCfClient {
     private ProjectPage searchAll(ProjectSearchQuery query, int page, int size) {
         List<CompletableFuture<ProjectPage>> searches = PROJECT_CLASSES.stream()
                 .map(projectClass -> CompletableFuture.supplyAsync(
-                        () -> searchClass(query, projectClass, page, size, false)))
+                        () -> searchClass(query, projectClass, page, size)))
                 .toList();
         List<ProjectSummary> projects = new ArrayList<>();
         long total = 0;
@@ -90,7 +83,7 @@ final class NyoCfClient {
             total += result.totalElements();
         }
         sort(projects, query.sort());
-        List<ProjectSummary> pageContent = withGalleryBanners(projects.stream().limit(size).toList());
+        List<ProjectSummary> pageContent = projects.stream().limit(size).toList();
         int pages = total == 0 ? 0 : (int) Math.ceil(total / (double) size);
         return new ProjectPage(pageContent, pages, total, page, page + 1 >= pages);
     }
@@ -151,37 +144,6 @@ final class NyoCfClient {
                 text(item, "primary_author"), text(item, "logo_thumbnail_url"), bannerUrl, "MOD",
                 boundedInt(item.path("download_count").asLong()), 0, updated, versions,
                 "CURSEFORGE", website, true);
-    }
-
-    private List<ProjectSummary> withGalleryBanners(List<ProjectSummary> projects) {
-        List<ProjectSummary> enriched = new ArrayList<>(projects.size());
-        for (int start = 0; start < projects.size(); start += BANNER_LOOKUP_BATCH_SIZE) {
-            int end = Math.min(start + BANNER_LOOKUP_BATCH_SIZE, projects.size());
-            List<CompletableFuture<ProjectSummary>> batch = projects.subList(start, end).stream()
-                    .map(project -> CompletableFuture.supplyAsync(() -> withGalleryBanner(project)))
-                    .toList();
-            batch.stream().map(CompletableFuture::join).forEach(enriched::add);
-        }
-        return enriched;
-    }
-
-    private ProjectSummary withGalleryBanner(ProjectSummary summary) {
-        if (summary.bannerUrl() != null && !summary.bannerUrl().isBlank()) return summary;
-        try {
-            long projectId = summary.curseForgeProjectId();
-            JsonNode metadata = metadata(projectId);
-            validateProject(metadata, projectId);
-            String bannerUrl = firstScreenshot(metadata, "thumbnail_url");
-            if (bannerUrl == null) return summary;
-            return new ProjectSummary(
-                    summary.id(), summary.slug(), summary.title(), summary.description(), summary.authorId(),
-                    summary.author(), summary.imageUrl(), bannerUrl, summary.classification(), summary.downloadCount(),
-                    summary.favoriteCount(), summary.updatedAt(), summary.versions(), summary.source(),
-                    summary.websiteUrl(), summary.distributionAllowed()
-            );
-        } catch (RuntimeException ignored) {
-            return summary;
-        }
     }
 
     private JsonNode metadata(long projectId) {
