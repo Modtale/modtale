@@ -13,6 +13,7 @@ import javafx.css.PseudoClass;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
+import javafx.scene.CacheHint;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -115,6 +116,8 @@ final class NativeGalleryCarousel {
             image.getStyleClass().add("project-gallery-carousel-image");
             image.setPreserveRatio(true);
             image.setSmooth(true);
+            image.setCache(true);
+            image.setCacheHint(CacheHint.SPEED);
             image.fitWidthProperty().bind(media.widthProperty());
             image.fitHeightProperty().bind(media.heightProperty());
             media.getChildren().add(image);
@@ -249,6 +252,8 @@ final class NativeGalleryCarousel {
             thumbnail.getStyleClass().add("project-gallery-carousel-thumbnail-image");
             thumbnail.setSmooth(true);
             thumbnail.setPreserveRatio(true);
+            thumbnail.setCache(true);
+            thumbnail.setCacheHint(CacheHint.SPEED);
             thumbnail.setFitWidth(THUMBNAIL_WIDTH);
             thumbnail.setFitHeight(THUMBNAIL_HEIGHT);
             thumbnailViews.set(itemIndex, thumbnail);
