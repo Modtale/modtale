@@ -257,10 +257,7 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                         .sessionFixation().migrateSession()
                 )
-                .formLogin(form -> form
-                        .loginProcessingUrl("/api/v1/auth/login-legacy")
-                        .permitAll()
-                )
+                .formLogin(form -> form.disable())
                 .oauth2Login(oauth2 -> oauth2
                         .authorizationEndpoint(authorization -> authorization
                                 .authorizationRequestResolver(authorizationRequestResolver)
