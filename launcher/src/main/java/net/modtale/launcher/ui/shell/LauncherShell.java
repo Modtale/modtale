@@ -35,7 +35,6 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.scene.shape.Rectangle;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
@@ -125,7 +124,6 @@ public final class LauncherShell {
     private Node navbarNode;
     private StackPane sceneLayer;
     private HBox workspaceRoot;
-    private Rectangle workspaceNavbarClip;
     private Node railNode;
     private HBox mainToolbar;
     private ScrollPane contentScroll;
@@ -399,11 +397,9 @@ public final class LauncherShell {
         }
         if (workspaceRoot != null) {
             toggleStyleClass(workspaceRoot, "play-workspace", playPage);
-            workspaceRoot.setClip(discoverMode ? workspaceNavbarClip : null);
             workspaceRoot.setSpacing(discoverMode ? WORKSPACE_SPACING : 0);
             Insets pageInsets = webMode ? Insets.EMPTY : LauncherLayout.WORKSPACE_INSETS;
-            workspaceRoot.setPadding(new Insets(
-                    pageInsets.getTop(), 0, 0, pageInsets.getLeft()));
+            workspaceRoot.setPadding(workspaceInsetsFor(nextView));
             mainToolbar.setPadding(new Insets(0, pageInsets.getRight(), 8, 0));
             contentBody.setPadding(new Insets(
                     webMode || discoverMode || launcherPage ? 0 : 16,
@@ -451,6 +447,15 @@ public final class LauncherShell {
                 || view == LauncherView.DISCOVER
                 || view == LauncherView.LIBRARY
                 || view == LauncherView.UPDATES;
+    }
+
+    static Insets workspaceInsetsFor(LauncherView view) {
+        if (view == LauncherView.PROJECT) {
+            return Insets.EMPTY;
+        }
+        Insets pageInsets = LauncherLayout.WORKSPACE_INSETS;
+        double right = view == LauncherView.DISCOVER ? pageInsets.getRight() : 0;
+        return new Insets(pageInsets.getTop(), right, 0, pageInsets.getLeft());
     }
 
     private void resetContentScrollPosition() {
@@ -849,11 +854,6 @@ public final class LauncherShell {
     private Node workspace() {
         workspaceRoot = new HBox(WORKSPACE_SPACING);
         workspaceRoot.getStyleClass().add("workspace");
-        workspaceNavbarClip = new Rectangle();
-        workspaceNavbarClip.setX(LauncherLayout.navbarLeftInset());
-        workspaceNavbarClip.widthProperty().bind(workspaceRoot.widthProperty().subtract(
-                LauncherLayout.navbarLeftInset() + LauncherLayout.navbarRightInset()));
-        workspaceNavbarClip.heightProperty().bind(workspaceRoot.heightProperty());
         workspaceRoot.setPadding(new Insets(
                 LauncherLayout.WORKSPACE_INSETS.getTop(), 0,
                 0, LauncherLayout.WORKSPACE_INSETS.getLeft()));

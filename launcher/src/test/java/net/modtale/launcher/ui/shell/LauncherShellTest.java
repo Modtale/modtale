@@ -1,8 +1,10 @@
 package net.modtale.launcher.ui.shell;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import net.modtale.launcher.ui.common.LauncherLayout;
 import net.modtale.launcher.ui.common.LauncherView;
 import org.junit.jupiter.api.Test;
 
@@ -26,5 +28,13 @@ class LauncherShellTest {
         assertFalse(LauncherShell.requiresModtaleSession(LauncherView.UPDATES));
         assertFalse(LauncherShell.requiresModtaleSession(LauncherView.SETTINGS));
         assertTrue(LauncherShell.requiresModtaleSession(LauncherView.NOTIFICATIONS));
+    }
+
+    @Test
+    void browseWorkspaceReservesBothNavbarInsets() {
+        assertEquals(LauncherLayout.navbarLeftInset(),
+                LauncherShell.workspaceInsetsFor(LauncherView.DISCOVER).getLeft());
+        assertEquals(LauncherLayout.navbarRightInset(),
+                LauncherShell.workspaceInsetsFor(LauncherView.DISCOVER).getRight());
     }
 }
