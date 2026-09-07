@@ -367,7 +367,7 @@ final class NativeGalleryCarousel {
         }
 
         private void restartProgressTimeline() {
-            if (images.size() <= 1 || root.getScene() == null) {
+            if (images.size() <= 1 || root.getScene() == null || images.get(index).youtube()) {
                 if (progressTimeline != null) progressTimeline.stop();
                 progressScale.setX(0);
                 return;
