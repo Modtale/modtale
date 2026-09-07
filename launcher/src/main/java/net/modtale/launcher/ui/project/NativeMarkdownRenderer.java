@@ -828,14 +828,26 @@ final class NativeMarkdownRenderer {
                 return youtubeEmbed(videoId, title.find() ? decodeEntities(title.group(2)) : "YouTube video");
             }
         }
-        Matcher image = HTML_IMAGE.matcher(html == null ? "" : html);
+        String value = html == null ? "" : html;
+        Matcher image = HTML_IMAGE.matcher(value);
         if (image.find()) {
-            Matcher src = HTML_SRC.matcher(image.group());
-            Matcher alt = HTML_ALT.matcher(image.group());
-            if (src.find()) {
-                return blockImage(decodeEntities(src.group(2)),
-                        alt.find() ? decodeEntities(alt.group(2)) : "", "", prose);
-            }
+            VBox block = new VBox(0);
+            block.setMinWidth(0);
+            int cursor = 0;
+            do {
+                addHtmlText(block, value.substring(cursor, image.start()), html);
+                Matcher src = HTML_SRC.matcher(image.group());
+                Matcher alt = HTML_ALT.matcher(image.group());
+                if (src.find()) {
+                    javafx.scene.Node renderedImage = blockImage(decodeEntities(src.group(2)),
+                            alt.find() ? decodeEntities(alt.group(2)) : "", "", prose);
+                    if (renderedImage != null) block.getChildren().add(renderedImage);
+                }
+                cursor = image.end();
+            } while (image.find());
+            addHtmlText(block, value.substring(cursor), html);
+            if (block.getChildren().size() == 1) return block.getChildren().getFirst();
+            if (!block.getChildren().isEmpty()) return block;
         }
         String sanitized = sanitizeHtml(html);
         if (sanitized.isBlank()) return null;
@@ -843,6 +855,15 @@ final class NativeMarkdownRenderer {
         flow.setTextAlignment(htmlAlignment(html));
         flow.getChildren().add(text(sanitized, InlineStyle.PLAIN));
         return selectableTextFlow(flow);
+    }
+
+    private void addHtmlText(VBox block, String fragment, String sourceHtml) {
+        String sanitized = sanitizeHtml(fragment);
+        if (sanitized.isBlank()) return;
+        TextFlow flow = inlineFlow(htmlHeadingStyle(fragment));
+        flow.setTextAlignment(htmlAlignment(sourceHtml));
+        flow.getChildren().add(text(sanitized, InlineStyle.PLAIN));
+        block.getChildren().add(selectableTextFlow(flow));
     }
 
     private javafx.scene.Node youtubeEmbed(String videoId, String title) {
