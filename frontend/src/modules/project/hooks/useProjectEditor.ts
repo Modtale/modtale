@@ -22,6 +22,11 @@ export const useProjectEditor = (
     const [repoValid, setRepoValid] = useState(true);
     const [isDirty, setIsDirty] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [galleryUploadProgress, setGalleryUploadProgress] = useState<{
+        percent: number;
+        current: number;
+        total: number;
+    } | null>(null);
     const [slugError, setSlugError] = useState<string | null>(null);
     const [userSearchResults, setUserSearchResults] = useState<User[]>([]);
 
@@ -184,20 +189,39 @@ export const useProjectEditor = (
         if (!projectData?.id) return;
         const uploadFiles = Array.isArray(files) ? files : [files];
         if (uploadFiles.length === 0) return;
+        const totalBytes = uploadFiles.reduce((sum, file) => sum + Math.max(file.size, 1), 0);
+        let completedBytes = 0;
+        setGalleryUploadProgress({ percent: 0, current: 1, total: uploadFiles.length });
         try {
-            for (const file of uploadFiles) {
+            for (const [index, file] of uploadFiles.entries()) {
+                const fileWeight = Math.max(file.size, 1);
                 const formData = new FormData();
                 formData.append('file', file);
                 const res = await api.post(`/projects/${projectData.id}/gallery`, formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                    onUploadProgress: (event) => {
+                        const requestProgress = event.total
+                            ? Math.min(event.loaded / event.total, 1)
+                            : Math.min(event.loaded / fileWeight, 1);
+                        const percent = Math.min(99, Math.round(((completedBytes + (fileWeight * requestProgress)) / totalBytes) * 100));
+                        setGalleryUploadProgress({ percent, current: index + 1, total: uploadFiles.length });
+                    }
                 });
                 setProjectData(res.data);
+                completedBytes += fileWeight;
+                setGalleryUploadProgress({
+                    percent: Math.round((completedBytes / totalBytes) * 100),
+                    current: index + 1,
+                    total: uploadFiles.length
+                });
             }
             onShowStatus('success', 'Uploaded', uploadFiles.length === 1
                 ? 'Image added to gallery.'
                 : `${uploadFiles.length} images added to gallery.`);
         } catch (e: any) {
             onShowStatus('error', 'Upload Failed', extractApiErrorMessage(e, 'Failed to upload image.'));
+        } finally {
+            setGalleryUploadProgress(null);
         }
     };
 
@@ -259,6 +283,6 @@ export const useProjectEditor = (
         repos, loadingRepos, manualRepo, setManualRepo, repoValid, isDirty, setIsDirty,
         slugError, setSlugError, userSearchResults, setUserSearchResults, provider,
         setProvider, markDirty, checkRepoUrl, fetchRepos, handleRoleUpdate, handleCancelInvite,
-        handleSave, handleSubmit, isSaving, handleGalleryUpload, handleGalleryReorder, handleGalleryVideoAdd, handleGalleryCaptionChange, handleGalleryDelete
+        handleSave, handleSubmit, isSaving, galleryUploadProgress, handleGalleryUpload, handleGalleryReorder, handleGalleryVideoAdd, handleGalleryCaptionChange, handleGalleryDelete
     };
 };
