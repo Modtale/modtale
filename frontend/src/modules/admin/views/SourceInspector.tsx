@@ -1,3 +1,4 @@
+import { SkeletonSurface } from '@/components/ui/Skeleton';
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { Search, FileCode, Terminal, FileText, X, Folder, FolderOpen, ChevronRight, ChevronDown, ShieldAlert, CheckCircle2, Square, RefreshCw } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
@@ -445,10 +446,9 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
 
                 <div className="flex-1 bg-[#0d1117] overflow-hidden flex flex-col">
                     {loadingFile ? (
-                        <div className="flex h-full items-center justify-center text-slate-500 gap-2">
-                            <div className="animate-spin w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
-                            Decompiling...
-                        </div>
+                        <SkeletonSurface className="h-full [&>.skeleton-layout]:h-full" label="Loading source file">
+                            <CodeViewer filename={inspectorFile || 'source.txt'} content={Array.from({ length: 24 }, (_, index) => `${'    '.repeat(index % 3)}Source code line awaiting file content`).join('\n')} />
+                        </SkeletonSurface>
                     ) : inspectorFile ? (
                         <CodeViewer
                             content={inspectorContent}

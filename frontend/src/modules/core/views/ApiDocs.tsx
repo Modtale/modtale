@@ -1,3 +1,4 @@
+import { SkeletonSurface } from '@/components/ui/Skeleton';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     Activity,
@@ -1309,7 +1310,7 @@ const EndpointCard: React.FC<{ endpoint: EndpointDoc }> = ({ endpoint }) => {
 };
 
 export const ApiDocs: React.FC = () => {
-    const [data, setData] = useState<OpenApiIndex | null>(null);
+    const [loadedData, setData] = useState<OpenApiIndex | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [schemaQuery, setSchemaQuery] = useState('');
 
@@ -1333,6 +1334,15 @@ export const ApiDocs: React.FC = () => {
             isMounted = false;
         };
     }, []);
+
+    const pending = !loadedData && !error;
+    const Surface = pending ? SkeletonSurface : React.Fragment;
+    const data: OpenApiIndex | null = loadedData || (pending ? {
+        title: 'Modtale API', version: '1.0', server: 'https://api.modtale.net', totalEndpoints: 123,
+        rateLimitTiers: ['Public-IP', 'Standard-API', 'Enterprise-API'].map(name => ({ name, readPerMinute: 123, writePerMinute: 123 })),
+        schemas: [{ name: 'Response', type: 'object', fields: [], example: '{}' }],
+        endpoints: [{ method: 'GET', path: '/api/v1/projects', summary: 'Browse projects', public: true, params: [], responses: [], rateLimitTiers: [] }],
+    } : null);
 
     const grouped = useMemo(() => {
         if (!data) return new Map<string, EndpointDoc[]>();
@@ -1423,29 +1433,8 @@ export const ApiDocs: React.FC = () => {
                     </div>
                 )}
 
-                {!data && !error && (
-                    <div className="rounded-[2rem] border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/90 shadow-2xl overflow-hidden">
-                        <div className="p-6 md:p-8">
-                            <div className="flex items-center gap-3 mb-5">
-                                <div className="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 text-modtale-accent">
-                                    <Braces className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-black text-slate-900 dark:text-white">Loading API reference</h2>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400">Pulling live OpenAPI metadata, examples, and schemas from the backend.</p>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="h-28 rounded-2xl skeleton" />
-                                <div className="h-28 rounded-2xl skeleton" />
-                                <div className="h-28 rounded-2xl skeleton" />
-                            </div>
-                        </div>
-                    </div>
-                )}
-
                 {data && (
-                    <div className="space-y-10 md:space-y-14 w-full overflow-hidden">
+                    <Surface><div className="space-y-10 md:space-y-14 w-full overflow-hidden">
                         {data.rateLimitTiers.length > 0 && (
                             <section className="w-full">
                                 <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
@@ -1587,7 +1576,7 @@ export const ApiDocs: React.FC = () => {
                                 </div>
                             </section>
                         )}
-                    </div>
+                    </div></Surface>
                 )}
             </div>
         </div>

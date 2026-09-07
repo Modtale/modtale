@@ -1,3 +1,4 @@
+import { SkeletonSurface } from '@/components/ui/Skeleton';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Download, Calendar, Heart, Box, ChevronRight } from 'lucide-react';
 import { BACKEND_URL } from '@/utils/api';
@@ -33,68 +34,21 @@ type IdleWindow = Window & typeof globalThis & {
     cancelIdleCallback?: (handle: number) => void;
 };
 
-const skeletonPulse = 'skeleton';
+export const skeletonProject = {
+    id: 'loading-project', title: 'Project name', author: 'Creator name',
+    description: 'A short project description with details about the features and content included in this project.',
+    classification: 'PLUGIN', downloadCount: 12345, favoriteCount: 128,
+    updatedAt: '2026-09-01T12:00:00Z', imageUrl: '/assets/favicon.svg',
+} as Project;
 
-export const ProjectCardSkeleton = () => (
-    <div className="relative min-w-0 max-w-full overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900">
-        <div className={`aspect-[3/1] ${skeletonPulse}`} />
-        <div className="px-6 pb-6">
-            <div className="-mt-10 mb-3 h-20 w-20 rounded-2xl border-4 border-white dark:border-slate-800 skeleton" />
-            <div className={`h-6 w-3/5 rounded-lg ${skeletonPulse}`} />
-            <div className={`mt-2 h-4 w-2/5 rounded-md ${skeletonPulse}`} />
-            <div className={`mt-4 h-4 w-full rounded-md ${skeletonPulse}`} />
-            <div className={`mt-2 h-4 w-4/5 rounded-md ${skeletonPulse}`} />
-            <div className="mt-5 flex items-center justify-between">
-                <div className="flex gap-3">
-                    <div className={`h-4 w-16 rounded-md ${skeletonPulse}`} />
-                    <div className={`h-4 w-14 rounded-md ${skeletonPulse}`} />
-                </div>
-                <div className={`h-4 w-16 rounded-md ${skeletonPulse}`} />
-            </div>
-        </div>
-    </div>
+const CardSkeleton = ({ viewStyle, project = skeletonProject }: { viewStyle: ProjectCardViewStyle; project?: Project }) => (
+    <SkeletonSurface className="h-full" label="Loading project">
+        <ProjectCard project={project} viewStyle={viewStyle} isFavorite={false} onToggleFavorite={() => {}} isLoggedIn={false} disableNavigation />
+    </SkeletonSurface>
 );
-
-export const ListProjectCardSkeleton = () => (
-    <div className="relative min-w-0 max-w-full overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-4 sm:p-5">
-        <div className="flex items-center sm:items-start gap-4 sm:gap-6">
-            <div className={`h-24 w-24 sm:h-32 sm:w-32 rounded-xl shrink-0 ${skeletonPulse}`} />
-            <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-4">
-                    <div className="w-full">
-                        <div className={`h-6 w-2/5 rounded-lg ${skeletonPulse}`} />
-                        <div className={`mt-2 h-4 w-1/4 rounded-md ${skeletonPulse}`} />
-                    </div>
-                    <div className={`hidden sm:block h-8 w-24 rounded-lg ${skeletonPulse}`} />
-                </div>
-                <div className={`mt-3 h-4 w-full rounded-md ${skeletonPulse}`} />
-                <div className={`mt-2 h-4 w-4/5 rounded-md ${skeletonPulse}`} />
-                <div className="mt-5 flex gap-4 sm:gap-6">
-                    <div className={`h-4 w-16 rounded-md ${skeletonPulse}`} />
-                    <div className={`h-4 w-14 rounded-md ${skeletonPulse}`} />
-                    <div className={`h-4 w-16 rounded-md ${skeletonPulse}`} />
-                </div>
-            </div>
-        </div>
-    </div>
-);
-
-export const CompactProjectCardSkeleton = () => (
-    <div className="relative min-w-0 max-w-full overflow-hidden rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-3">
-        <div className="flex items-center gap-4">
-            <div className={`h-12 w-12 rounded-lg shrink-0 ${skeletonPulse}`} />
-            <div className="flex-1 min-w-0">
-                <div className={`h-4 w-1/2 rounded-md ${skeletonPulse}`} />
-                <div className={`mt-2 h-3 w-1/3 rounded-md ${skeletonPulse}`} />
-            </div>
-            <div className="hidden sm:flex flex-col gap-1.5 items-end">
-                <div className={`h-3 w-20 rounded-md ${skeletonPulse}`} />
-                <div className={`h-3 w-16 rounded-md ${skeletonPulse}`} />
-            </div>
-            <div className={`h-4 w-4 rounded ${skeletonPulse}`} />
-        </div>
-    </div>
-);
+export const ProjectCardSkeleton = ({ project }: { project?: Project }) => <CardSkeleton viewStyle="grid" project={project} />;
+export const ListProjectCardSkeleton = ({ project }: { project?: Project }) => <CardSkeleton viewStyle="list" project={project} />;
+export const CompactProjectCardSkeleton = ({ project }: { project?: Project }) => <CardSkeleton viewStyle="compact" project={project} />;
 
 export const ProjectCardSkeletons: React.FC<ProjectCardSkeletonsProps> = ({ viewStyle, count = 1 }) => {
     const containerClassName = viewStyle === 'grid'
@@ -381,7 +335,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                 />
             )}
 
-            <div className={`w-full aspect-[3/1] relative border-b border-slate-100 dark:border-white/5 overflow-hidden rounded-t-2xl transform-gpu shrink-0 z-20 ${resolvedBanner ? 'bg-slate-200 dark:bg-slate-800' : 'bg-slate-200 dark:bg-slate-800'} pointer-events-none`}>
+            <div data-skeleton-media className={`w-full aspect-[3/1] relative border-b border-slate-100 dark:border-white/5 overflow-hidden rounded-t-2xl transform-gpu shrink-0 z-20 ${resolvedBanner ? 'bg-slate-200 dark:bg-slate-800' : 'bg-slate-200 dark:bg-slate-800'} pointer-events-none`}>
                 {resolvedBanner && shouldLoadBanner ? (
                     <OptimizedImage
                         src={resolvedBanner}

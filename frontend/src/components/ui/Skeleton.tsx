@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
 /** Decorative placeholders share one restrained treatment in both themes. */
 export function Skeleton({ className = '' }: { className?: string }) {
@@ -14,38 +14,71 @@ export function SkeletonGroup({ children, className = '', label = 'Loading conte
     </div>;
 }
 
-export function ContentSkeleton({ rows = 4, className = '', label = 'Loading content' }: {
-    rows?: number; className?: string; label?: string;
-}) {
-    return <SkeletonGroup label={label} className={`w-full p-6 ${className}`}>
-        <div className="space-y-5">
-            {Array.from({ length: rows }, (_, index) => <div key={index} className="flex items-start gap-4">
-                <Skeleton className="h-11 w-11 shrink-0 rounded-xl" />
-                <div className="flex-1 space-y-3 py-1">
-                    <Skeleton className={index % 2 ? 'h-4 w-2/5' : 'h-4 w-1/3'} />
-                    <Skeleton className="h-3 w-5/6" />
-                    <Skeleton className="h-3 w-3/5" />
-                </div>
-            </div>)}
-        </div>
-    </SkeletonGroup>;
-}
+interface SkeletonMark { x: number; y: number; width: number; height: number; radius: number }
 
-export function PageSkeleton({ profile = false }: { profile?: boolean }) {
-    return <SkeletonGroup className="mx-auto min-h-[65vh] w-full max-w-7xl px-4 py-8 sm:px-8" label={profile ? 'Loading profile' : 'Loading page'}>
-        <div className="space-y-8">
-            <Skeleton className="h-36 w-full rounded-2xl sm:h-48" />
-            <div className="flex items-center gap-5">
-                <Skeleton className={`h-20 w-20 shrink-0 ${profile ? 'rounded-full' : 'rounded-2xl'}`} />
-                <div className="flex-1 space-y-3"><Skeleton className="h-6 w-2/5" /><Skeleton className="h-4 w-1/4" /></div>
-            </div>
-            <div className="flex gap-4 border-b border-slate-200 pb-4 dark:border-white/10">
-                {[0, 1, 2].map(index => <Skeleton key={index} className="h-4 w-20" />)}
-            </div>
-            <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_16rem]">
-                <ContentSkeleton rows={4} className="!p-0" />
-                <div className="hidden space-y-4 md:block"><Skeleton className="h-5 w-1/2" /><Skeleton className="h-3 w-full" /><Skeleton className="h-3 w-4/5" /><Skeleton className="h-3 w-3/5" /></div>
-            </div>
+/** Use the real view's layout and mask its ink, rather than approximating its boxes.
+ * The subtree is inert and never represents loaded data to assistive technology.
+ * ResizeObserver keeps the mask aligned with responsive wrapping and late fonts.
+ */
+export function SkeletonSurface({ children, className = '', label = 'Loading content' }: {
+    children: ReactNode; className?: string; label?: string;
+}) {
+    const surface = useRef<HTMLDivElement>(null);
+    const [marks, setMarks] = useState<SkeletonMark[]>([]);
+    useLayoutEffect(() => {
+        const root = surface.current;
+        const content = root?.firstElementChild as HTMLElement | null;
+        if (!root || !content || typeof Range.prototype.getClientRects !== 'function') return;
+        let frame = 0;
+        let active = true;
+        const measure = () => {
+            const origin = root.getBoundingClientRect();
+            const next: SkeletonMark[] = [];
+            const add = (rect: DOMRect, text = false, radius = 4) => {
+                if (rect.width < 1 || rect.height < 1) return;
+                // Clip clamped/truncated text to the surface; don't change its layout.
+                const x = Math.max(rect.left, origin.left);
+                const width = Math.min(rect.right, origin.right) - x;
+                if (width <= 0) return;
+                const height = text ? rect.height * .58 : rect.height;
+                next.push({ x: x - origin.left, y: rect.top - origin.top + (rect.height - height) / 2,
+                    width, height, radius });
+            };
+            const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+            while (walker.nextNode()) {
+                const node = walker.currentNode;
+                const parent = node.parentElement;
+                if (!node.textContent?.trim() || !parent || parent.closest('.skeleton-surface') !== root || parent.closest('[data-skeleton-keep], .sr-only, svg, script, style, [data-skeleton-media]')) continue;
+                const clip = parent.getBoundingClientRect();
+                const range = document.createRange();
+                range.selectNodeContents(node);
+                for (const rect of range.getClientRects()) {
+                    const right = Math.min(rect.right, clip.right);
+                    const bottom = Math.min(rect.bottom, clip.bottom);
+                    if (right > rect.left && bottom > rect.top) add(new DOMRect(rect.left, rect.top, right - rect.left, bottom - rect.top), true);
+                }
+            }
+            content.querySelectorAll<HTMLElement>('img, svg, input:not([type="hidden"]), textarea, [data-skeleton-media]').forEach(node => {
+                if (node.closest('.skeleton-surface') !== root || node.closest('[data-skeleton-keep]') || node.parentElement?.closest('[data-skeleton-media]')) return;
+                const rect = node.getBoundingClientRect();
+                add(rect, false, node.tagName.toLowerCase() === 'svg' ? 3 : 8);
+            });
+            if (active) setMarks(next);
+        };
+        const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(measure); };
+        measure();
+        const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
+        observer?.observe(root);
+        observer?.observe(content);
+        content.querySelectorAll('img, [data-skeleton-media]').forEach(node => observer?.observe(node));
+        document.fonts?.ready.then(() => { if (active) schedule(); });
+        window.addEventListener('resize', schedule);
+        return () => { active = false; cancelAnimationFrame(frame); observer?.disconnect(); window.removeEventListener('resize', schedule); };
+    }, [children]);
+    return <div ref={surface} className={`skeleton-surface ${className}`} role="status" aria-label={label} aria-busy="true">
+        <div className="skeleton-layout" aria-hidden="true" inert>{children}</div>
+        <div aria-hidden="true" className="skeleton-marks">
+            {marks.map((mark, index) => <span key={index} className="skeleton" style={{ left: mark.x, top: mark.y, width: mark.width, height: mark.height, borderRadius: mark.radius }} />)}
         </div>
-    </SkeletonGroup>;
+    </div>;
 }

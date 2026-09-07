@@ -1,3 +1,5 @@
+import { ProjectLoadingRegion } from '../ProjectLoadingRegion';
+import { PROJECT_LOADING_VERSIONS, loadingNoop } from '../projectLoadingData';
 import React, { memo, useCallback, useMemo, useState } from 'react';
 import { List, X, Download, ChevronUp, ChevronDown } from 'lucide-react';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
@@ -7,6 +9,7 @@ import { useScrollLock } from '@/hooks/useScrollLock';
 import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface HistoryModalProps {
+    loading?: boolean;
     show: boolean;
     onClose: () => void;
     history: any[];
@@ -78,7 +81,7 @@ const HistoryVersionItem = memo(({
 });
 
 export const HistoryModal: React.FC<HistoryModalProps> = ({
-    show, onClose, history, showExperimental, onToggleExperimental, onDownload, hasExperimentalVersions, hasStableVersions, isInline = false, inlineHeight
+    loading = false, show, onClose, history, showExperimental, onToggleExperimental, onDownload, hasExperimentalVersions, hasStableVersions, isInline = false, inlineHeight
 }) => {
     useScrollLock(show && !isInline);
     const [expandedChangelog, setExpandedChangelog] = useState<string | null>(null);
@@ -133,18 +136,18 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                 <div>
                     <h3 className={`text-xl font-black ${theme.colors.textPrimary} flex items-center gap-2`}><List className={`w-5 h-5 ${theme.colors.accent}`} /> Changelog</h3>
                     {actualHasExperimental && actualHasStable && (
-                        <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
+                        <ProjectLoadingRegion loading={loading} className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
                             <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>
                                 <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${showExperimental ? 'translate-x-4' : ''}`} />
                             </div>
                             <span className={`text-[10px] font-bold ${theme.colors.textMuted} uppercase group-hover:${theme.colors.textPrimary} transition-colors`}>Show Beta/Alpha</span>
-                        </div>
+                        </ProjectLoadingRegion>
                     )}
                 </div>
                 <button type="button" onClick={onClose} className={`p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 transition-colors`} aria-label="Close Changelog"><X className="w-5 h-5" /></button>
             </div>
 
-            <div className={`p-6 overflow-y-auto flex-1 relative`}>
+            <ProjectLoadingRegion loading={loading} label="Loading changelog" className={`p-6 overflow-y-auto flex-1 relative`}>
                 <div className="space-y-6">
                     {visibleHistory.map((ver: any) => {
                         return (
@@ -159,7 +162,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                         );
                     })}
                 </div>
-            </div>
+            </ProjectLoadingRegion>
         </div>
     );
 
@@ -173,3 +176,8 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
         </ModalPortal>
     );
 };
+
+export function HistoryModalSkeleton({ show = true, isInline = false, inlineHeight, onClose = loadingNoop }: { show?: boolean; isInline?: boolean; inlineHeight?: number; onClose?: () => void }) {
+    return <HistoryModal loading show={show} isInline={isInline} inlineHeight={inlineHeight} onClose={onClose}
+        history={PROJECT_LOADING_VERSIONS} onDownload={loadingNoop} showExperimental={false} onToggleExperimental={loadingNoop} />;
+}
