@@ -98,9 +98,15 @@ public class LauncherUpdateService {
             HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
             LOG.info("GET " + LogSanitizer.uri(downloadUri) + " -> HTTP "
                     + response.statusCode() + " in " + Math.max(0, System.currentTimeMillis() - started) + "ms");
-            ensureSuccess(response.statusCode(), downloadUri.toString());
             try (InputStream body = response.body()) {
-                Files.copy(body, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                ensureSuccess(response.statusCode(), downloadUri.toString());
+                Path temporary = Files.createTempFile(target.getParent(), ".modtale-update-", ".tmp");
+                try {
+                    Files.copy(body, temporary, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    Files.move(temporary, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                } finally {
+                    Files.deleteIfExists(temporary);
+                }
             }
             if (isLinuxAppImage(target)) {
                 target.toFile().setExecutable(true, false);
