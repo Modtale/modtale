@@ -4,7 +4,6 @@ import java.util.function.Consumer;
 import javafx.scene.Node;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
-import javafx.scene.shape.Circle;
 
 public final class ProjectBrowseSourceSelector {
 
@@ -38,10 +37,7 @@ public final class ProjectBrowseSourceSelector {
         picker.setText(source.label());
         picker.getStyleClass().removeAll("modtale", "curseforge");
         picker.getStyleClass().add(source.name().toLowerCase());
-        Circle providerDot = new Circle(3.5);
-        providerDot.getStyleClass().add("provider-picker-dot");
-        picker.setGraphic(providerDot);
-        picker.setGraphicTextGap(7);
+        picker.setGraphic(null);
         picker.setAccessibleText("Browse source: " + source.label());
     }
 

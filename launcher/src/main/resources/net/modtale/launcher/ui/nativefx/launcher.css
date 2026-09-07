@@ -1259,16 +1259,16 @@
 }
 
 .provider-picker {
-    -fx-min-height: 28px;
-    -fx-pref-height: 28px;
-    -fx-max-height: 28px;
-    -fx-padding: 0 7px 0 9px;
-    -fx-background-radius: 8px;
-    -fx-border-radius: 8px;
+    -fx-min-height: 40px;
+    -fx-pref-height: 40px;
+    -fx-max-height: 40px;
+    -fx-padding: 0 9px 0 12px;
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
     -fx-border-color: rgba(148, 163, 184, 0.18);
     -fx-background-color: rgba(15, 23, 42, 0.70);
     -fx-text-fill: #e2e8f0;
-    -fx-font-size: 11.5px;
+    -fx-font-size: 12px;
     -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
@@ -1285,20 +1285,17 @@
 }
 
 .provider-picker .arrow {
-    -fx-background-color: #64748b;
+    -fx-background-color: #94a3b8;
     -fx-padding: 2.5px 4px 2.5px 4px;
-}
-
-.provider-picker.modtale .provider-picker-dot {
-    -fx-fill: #3b82f6;
-}
-
-.provider-picker.curseforge .provider-picker-dot {
-    -fx-fill: #f97316;
 }
 
 .provider-picker > .label {
     -fx-padding: 0;
+    -fx-text-fill: #e2e8f0;
+}
+
+.provider-picker > .label .text {
+    -fx-fill: #e2e8f0;
 }
 
 .toolbar-pill {
