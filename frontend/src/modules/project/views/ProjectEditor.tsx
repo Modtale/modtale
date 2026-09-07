@@ -1105,7 +1105,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                             setGalleryCropFile(file);
                             return;
                         }
-                        handleGalleryUpload(files);
+                        return handleGalleryUpload(files);
                     }}
                                 isLoading={isSaving}
                             />
