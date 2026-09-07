@@ -37,9 +37,15 @@ export const getCookie = (name: string): string | null => {
 
     const cookies = document.cookie.split(';');
     for (const c of cookies) {
-        const [key, val] = c.trim().split('=');
-        if (key === name) {
-            return decodeURIComponent(val);
+        const cookie = c.trim();
+        const separator = cookie.indexOf('=');
+        if (separator >= 0 && cookie.slice(0, separator) === name) {
+            try {
+                return decodeURIComponent(cookie.slice(separator + 1));
+            } catch {
+                // A malformed cookie should trigger token refresh, not abort the request.
+                return null;
+            }
         }
     }
     return null;
