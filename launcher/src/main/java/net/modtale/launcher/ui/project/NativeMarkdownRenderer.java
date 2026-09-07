@@ -711,9 +711,28 @@ final class NativeMarkdownRenderer {
         if (!isSafeImage(url)) {
             return null;
         }
-        ImageView view = imageView(url, MAX_INLINE_IMAGE_WIDTH, 0, true);
+        ImageView view = new ImageView();
+        view.getStyleClass().add("project-detail-markdown-image");
+        view.setPreserveRatio(true);
+        view.setSmooth(true);
         view.setAccessibleText(image.getText().toString());
+        view.imageProperty().addListener((observable, previous, current) -> {
+            if (current != null) {
+                current.widthProperty().addListener((imageObservable, oldWidth, newWidth) -> resizeInlineImage(view));
+                current.progressProperty().addListener((progressObservable, oldProgress, newProgress) -> resizeInlineImage(view));
+            }
+            resizeInlineImage(view);
+        });
+        imageLoader.loadInto(view, url, 0, 0, true);
+        resizeInlineImage(view);
         return view;
+    }
+
+    private void resizeInlineImage(ImageView view) {
+        javafx.scene.image.Image image = view.getImage();
+        double naturalWidth = image == null ? 0 : image.getWidth();
+        view.setFitWidth(naturalWidth > 0 ? Math.min(naturalWidth, MAX_INLINE_IMAGE_WIDTH) : 0);
+        view.setFitHeight(0);
     }
 
     private ImageView imageView(String url, double requestedWidth, double requestedHeight, boolean preserveRatio) {
