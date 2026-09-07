@@ -21,17 +21,21 @@ public final class HytaleConfigFiles {
 
     public List<ConfigFile> discover(Path globalMods, Path world) throws IOException {
         List<ConfigFile> files = new ArrayList<>(discoverMods(globalMods));
-        files.addAll(discoverWorld(world));
+        files.addAll(attribute(discoverWorldFiles(world), HytaleConfigOwnership.read(globalMods, world.resolve("mods"))));
         return List.copyOf(files);
     }
 
     public List<ConfigFile> discoverMods(Path mods) throws IOException {
         List<ConfigFile> files = new ArrayList<>();
         scan(mods, "Global mods", files);
-        return List.copyOf(files);
+        return attribute(files, HytaleConfigOwnership.read(mods));
     }
 
     public List<ConfigFile> discoverWorld(Path world) throws IOException {
+        return attribute(discoverWorldFiles(world), HytaleConfigOwnership.read(world.resolve("mods")));
+    }
+
+    private List<ConfigFile> discoverWorldFiles(Path world) throws IOException {
         List<ConfigFile> files = new ArrayList<>();
         scan(world.resolve("mods"), "World mods", files);
         add(world, world.resolve("config.json"), "World", files);
@@ -47,12 +51,28 @@ public final class HytaleConfigFiles {
         return List.copyOf(files);
     }
 
+    private List<ConfigFile> attribute(List<ConfigFile> files, HytaleConfigOwnership ownership) {
+        return files.stream().map(file -> {
+            if (!(file.label().startsWith("Global mods / ") || file.label().startsWith("World mods / "))) return file;
+            Path relative = file.root().relativize(file.path());
+            Set<String> owners = relative.getNameCount() < 2 ? Set.of() : ownership.owners(relative.getName(0).toString());
+            String id = owners.size() == 1 ? owners.iterator().next() : "";
+            String owner = id.isEmpty() ? (owners.isEmpty() ? "Unattributed" : "Ambiguous mod") : id;
+            String scope = file.label().startsWith("Global") ? "Global mods" : "World mods";
+            return new ConfigFile(file.root(), file.path(), scope + " / " + owner + " / "
+                    + relative.toString().replace('\\', '/'), id);
+        }).toList();
+    }
+
     private void scan(Path root, String scope, List<ConfigFile> files) throws IOException {
         if (!Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS)) return;
         try (Stream<Path> paths = Files.walk(root, 8)) {
             List<Path> candidates = paths.limit(20_001).toList();
             if (candidates.size() > 20_000) throw new IOException("Too many files to scan for configs.");
             for (Path path : candidates) {
+                // Loose asset packs contain game JSON, not editable plugin settings.
+                Path relative = root.relativize(path);
+                if (relative.getNameCount() > 1 && Files.isRegularFile(root.resolve(relative.getName(0)).resolve("manifest.json"), LinkOption.NOFOLLOW_LINKS)) continue;
                 add(root, path, scope, files);
                 if (files.size() > 2000) throw new IOException("Too many config files to display.");
             }
@@ -133,7 +153,8 @@ public final class HytaleConfigFiles {
         return path;
     }
 
-    public record ConfigFile(Path root, Path path, String label) {
+    public record ConfigFile(Path root, Path path, String label, String pluginId) {
+        public ConfigFile(Path root, Path path, String label) { this(root, path, label, ""); }
         @Override public String toString() { return label; }
     }
     public record Snapshot(ConfigFile file, String text) {}
