@@ -2359,23 +2359,16 @@ public final class ProjectPageController {
         media.setClip(roundedClip(media, 24));
 
         String imageUrl = first(detail == null ? null : detail.imageUrl(), summary.imageUrl());
-        if (isBlank(imageUrl)) {
-            Label initial = new Label(initialFor(textTitle(summary, detail)));
-            initial.getStyleClass().add("project-detail-icon-initial");
-            media.getStyleClass().add("project-detail-icon-fallback");
-            media.getChildren().add(initial);
-        } else {
-            Region backdrop = new Region();
-            backdrop.getStyleClass().add("project-detail-icon-backdrop");
-            backdrop.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-            ImageView image = new ImageView();
-            image.setPreserveRatio(false);
-            image.setSmooth(true);
-            image.setFitWidth(mediaSize);
-            image.setFitHeight(mediaSize);
-            imageLoader.loadInto(image, imageUrl, mediaSize * 2, mediaSize * 2);
-            media.getChildren().addAll(backdrop, image);
-        }
+        Region backdrop = new Region();
+        backdrop.getStyleClass().add("project-detail-icon-backdrop");
+        backdrop.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        ImageView image = new ImageView();
+        image.setPreserveRatio(false);
+        image.setSmooth(true);
+        image.setFitWidth(mediaSize);
+        image.setFitHeight(mediaSize);
+        imageLoader.loadInto(image, imageUrl, mediaSize * 2, mediaSize * 2);
+        media.getChildren().addAll(backdrop, image);
         icon.getChildren().add(media);
         return icon;
     }

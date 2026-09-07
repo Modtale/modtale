@@ -104,7 +104,8 @@ final class LibraryWorldRenderer {
                 model.world().name(),
                 LauncherIcons.Glyph.GLOBE,
                 44,
-                "library-detail-icon"
+                "library-detail-icon",
+                false
         );
         icon.getStyleClass().add("library-world-detail-icon");
 
@@ -454,24 +455,31 @@ final class LibraryWorldRenderer {
         LauncherIcons.Glyph glyph = ProjectClassification.isModpack(display.classification())
                 ? LauncherIcons.Glyph.LAYERS
                 : LauncherIcons.Glyph.BOX;
-        return imageIcon(iconUrl, title, glyph, size, "library-project-icon");
+        return imageIcon(iconUrl, title, glyph, size, "library-project-icon", true);
     }
 
     private StackPane contentIcon(LibraryWorldContentItem item) {
         LauncherIcons.Glyph glyph = ProjectClassification.isModpack(item.classification())
                 ? LauncherIcons.Glyph.LAYERS
                 : LauncherIcons.Glyph.FILE_CODE;
-        return imageIcon(item.icon(), item.title(), glyph, CONTENT_ICON_SIZE, "library-child-icon");
+        return imageIcon(item.icon(), item.title(), glyph, CONTENT_ICON_SIZE, "library-child-icon", false);
     }
 
-    private StackPane imageIcon(String iconUrl, String title, LauncherIcons.Glyph fallbackGlyph, double size, String styleClass) {
+    private StackPane imageIcon(
+            String iconUrl,
+            String title,
+            LauncherIcons.Glyph fallbackGlyph,
+            double size,
+            String styleClass,
+            boolean useProjectFallback
+    ) {
         StackPane shell = new StackPane();
         shell.getStyleClass().add(styleClass);
         shell.setMinSize(size, size);
         shell.setPrefSize(size, size);
         shell.setMaxSize(size, size);
 
-        if (iconUrl != null && !iconUrl.isBlank() && imageLoader != null) {
+        if (imageLoader != null && (useProjectFallback || (iconUrl != null && !iconUrl.isBlank()))) {
             ImageView image = new ImageView();
             image.setFitWidth(size);
             image.setFitHeight(size);
