@@ -13,7 +13,7 @@ import {
 import { ROUTE_SEO } from '@/data/seo-constants';
 import { SiteRoutes } from '@/utils/routes';
 import { GLASS_CARD } from '@/modules/home/styles';
-import { fetchStableLauncherRelease, type GitHubRelease, type GitHubReleaseAsset } from '../utils/launcherReleases';
+import { fetchLauncherRelease, launcherChannelForHostname, launcherReleasesUrl, type GitHubRelease, type GitHubReleaseAsset } from '../utils/launcherReleases';
 
 type LauncherPlatform = 'windows' | 'mac' | 'linux' | 'unknown';
 
@@ -30,7 +30,6 @@ type ReleaseState = {
 };
 
 const GITHUB_RELEASES_URL = 'https://github.com/Modtale/modtale/releases';
-const GITHUB_LATEST_RELEASE_URL = 'https://github.com/Modtale/modtale/releases/latest';
 
 const platformOptions: Array<{
     id: Exclude<LauncherPlatform, 'unknown'>;
@@ -332,7 +331,7 @@ export const LauncherPage: React.FC = () => {
     const [releaseState, setReleaseState] = useState<ReleaseState>({
         isLoading: true,
         releaseName: 'Latest release',
-        releaseUrl: GITHUB_LATEST_RELEASE_URL,
+        releaseUrl: GITHUB_RELEASES_URL,
         assetsByPlatform: {},
     });
 
@@ -342,7 +341,11 @@ export const LauncherPage: React.FC = () => {
         const controller = new AbortController();
         let isCancelled = false;
 
-        fetchStableLauncherRelease(controller.signal)
+        const channel = launcherChannelForHostname(window.location.hostname);
+        const fallbackReleaseUrl = launcherReleasesUrl(channel);
+        setReleaseState((current) => ({ ...current, releaseUrl: fallbackReleaseUrl }));
+
+        fetchLauncherRelease(controller.signal, channel)
             .then((launcherRelease) => {
                 if (isCancelled) return;
 
@@ -355,7 +358,7 @@ export const LauncherPage: React.FC = () => {
                 setReleaseState({
                     isLoading: false,
                     releaseName: releaseDisplayName(launcherRelease),
-                    releaseUrl: launcherRelease?.html_url || GITHUB_LATEST_RELEASE_URL,
+                    releaseUrl: launcherRelease?.html_url || fallbackReleaseUrl,
                     assetsByPlatform,
                 });
             })
