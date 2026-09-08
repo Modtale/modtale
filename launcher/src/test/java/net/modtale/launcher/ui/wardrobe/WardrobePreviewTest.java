@@ -214,7 +214,7 @@ class WardrobePreviewTest {
                 button(preview,"View render").fire();return null;
             });
             assertTrue(opened.poll(3,TimeUnit.SECONDS).getPath().contains("/render/cape/"));
-            fx(()->{button(preview,"Reset").fire();return null;});
+            fx(()->{button(preview,"Reset view").fire();return null;});
             await(()->label(preview).startsWith("Rendered cape preview"));
             assertEquals(1,fx(()->find(preview.view(),ImageView.class).getScaleX()));
             assertTrue(fetched.remove().getQuery().contains("rotate=180"));
@@ -252,7 +252,7 @@ class WardrobePreviewTest {
                 var rotated=(javafx.scene.Group)scene.getRoot().getChildrenUnmodifiable().getFirst();
                 var yaw=(javafx.scene.transform.Rotate)rotated.getTransforms().getFirst();
                 assertNotEquals(-20,yaw.getAngle());
-                button(nativePreview,"Reset").fire();
+                button(nativePreview,"Reset view").fire();
                 assertEquals(-20,yaw.getAngle());
                 assertEquals(initial,scene.getCamera().getTranslateZ(),1e-8);
                 nativePreview.clear();
@@ -448,7 +448,7 @@ class WardrobePreviewTest {
         ByteArrayOutputStream output=new ByteArrayOutputStream();ImageIO.write(image,"png",output);return output.toByteArray();
     }
     private static String label(WardrobePreview preview) {return find(preview.view(),Label.class).getText();}
-    private static Button button(WardrobePreview preview,String text) {return buttons(preview.view()).stream().filter(b->text.equals(b.getText())).findFirst().orElseThrow();}
+    private static Button button(WardrobePreview preview,String text) {return buttons(preview.view()).stream().filter(b->(text.equals(b.getText()) || text.equals(b.getAccessibleText()))).findFirst().orElseThrow();}
     private static List<Button> buttons(Node node) {
         List<Button> result=new ArrayList<>();if(node instanceof Button b)result.add(b);
         if(node instanceof Parent p)for(Node child:p.getChildrenUnmodifiable())result.addAll(buttons(child));return result;

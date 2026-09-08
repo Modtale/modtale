@@ -97,8 +97,8 @@ class CosmeticEditorUiTest {
                 JsonNode baseline = fx(() -> harness.controller().draftSnapshot());
                 assertEquals(catalog.defaultSkin(), baseline);
                 awaitPreview(harness);
-                assertTrue(fx(() -> button(harness.root(), "Link a Hytale account").isDisabled()));
-                assertTrue(fx(() -> button(harness.root(), "Save as Hytale outfit").isDisabled()));
+                assertTrue(fx(() -> button(harness.root(), "Link account").isDisabled()));
+                assertTrue(fx(() -> ((javafx.scene.control.MenuButton) button(harness.root(), "Save")).getItems().get(1).isDisable()));
 
                 CosmeticOption hair = selectFirst(harness, catalog, "haircut");
                 chooseColor(harness, catalog, hair, "Blond");
@@ -202,7 +202,7 @@ class CosmeticEditorUiTest {
                 assertTrue(pause.getWidth() + 1 >= pause.prefWidth(-1), "Active Pause label fits the compact inspector");
                 assertEquals("Pause", pause.getText()); pause.fire(); assertEquals("Play", pause.getText());
                 var animations = (javafx.scene.control.ComboBox<?>) hero.root().lookup("#wardrobe-preview-animation");
-                animations.getSelectionModel().selectFirst();
+                button(hero.root(), "Reset view").fire();
                 assertEquals("Rest pose", animations.getValue().toString()); assertTrue(pause.isDisabled());
                 assertEquals(composition, hero.controller().draftSnapshot(), "Preview motion cannot change the outfit");
                 return null;

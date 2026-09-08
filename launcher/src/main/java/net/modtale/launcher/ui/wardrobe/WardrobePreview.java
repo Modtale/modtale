@@ -66,6 +66,7 @@ public final class WardrobePreview {
     private final HBox animationControls = new HBox(6, animations, pause);
     private LocalAvatarRenderer.Rig animationRig;
     private LocalAvatarRenderer.Clip animationClip;
+    private AnimationChoice selectedAnimation;
     private FutureTask<Void> animationPending;
     private long animationGeneration, lastPulse;
     private double animationSeconds, animationSpeed = 1;
@@ -76,9 +77,6 @@ public final class WardrobePreview {
             lastPulse = now;
             if (animationRig != null && animationClip != null) {
                 animationRig.apply(animationClip, animationSeconds);
-                if (!animationClip.looping() && animationSeconds >= animationClip.durationSeconds()) {
-                    stop(); animationPaused=true; pause.setText("Play");
-                }
             }
         }
     };
@@ -136,14 +134,21 @@ public final class WardrobePreview {
         for (Button button : new Button[]{reset, retry, external, rotateLeft, rotateRight, pause}) {
             button.getStyleClass().addAll("btn", "secondary", "small");
         }
-        HBox controls = new HBox(6, reset, retry, external);
+        reset.setText(""); reset.setAccessibleText("Reset view");
+        reset.setTooltip(new javafx.scene.control.Tooltip("Reset view"));
+        reset.setGraphic(net.modtale.launcher.ui.common.LauncherIcons.icon(
+                net.modtale.launcher.ui.common.LauncherIcons.Glyph.ROTATE_CCW, 14));
+        reset.getStyleClass().add("wardrobe-preview-reset");
+        reset.setMinSize(30, 30); reset.setPrefSize(30, 30);
+        HBox controls = new HBox(6, animationControls, reset, retry, external);
+        HBox.setHgrow(animationControls, javafx.scene.layout.Priority.ALWAYS);
         controls.setAlignment(Pos.CENTER);
         HBox rotationControls = new HBox(6, rotateLeft, rotateRight);
         rotationControls.setAlignment(Pos.CENTER);
         rotationControls.visibleProperty().bind(rotateLeft.visibleProperty());
         rotationControls.managedProperty().bind(rotationControls.visibleProperty());
         animations.setId("wardrobe-preview-animation");
-        animations.getStyleClass().add("select");
+        animations.getStyleClass().addAll("select", "wardrobe-preview-motion");
         animations.setStyle("-fx-font-size: 11px;");
         animations.setAccessibleText("Preview animation");
         animations.setMinWidth(0); animations.setMaxWidth(Double.MAX_VALUE);
@@ -163,12 +168,11 @@ public final class WardrobePreview {
             animationPaused = !animationPaused;
             if (animationPaused) animationTimer.stop();
             else {
-                if (!animationClip.looping() && animationSeconds >= animationClip.durationSeconds()) animationSeconds=0;
                 lastPulse=0; animationTimer.start();
             }
             pause.setText(animationPaused ? "Play" : "Pause");
         });
-        VBox footer = new VBox(6, status, rotationControls, animationControls, controls);
+        VBox footer = new VBox(6, status, rotationControls, controls);
         footer.setAlignment(Pos.CENTER);
         footer.setPadding(new Insets(8));
         root.setBottom(footer);
@@ -177,6 +181,8 @@ public final class WardrobePreview {
             else if (request != null) show(request.username, request.skinId, request.cape);
         });
         reset.setOnAction(event -> {
+            selectedAnimation = null;
+            if (!animations.getItems().isEmpty()) animations.getSelectionModel().selectFirst();
             if (renderedCape()) { capeAngle = 180; zoom = 1; reloadCape(); } else resetView();
         });
         rotateLeft.setOnAction(event -> rotateCape(-30));
@@ -293,7 +299,9 @@ public final class WardrobePreview {
                         animationRig=LocalAvatarRenderer.rig(model);
                         animations.getItems().add(new AnimationChoice(null));
                         animationRig.animations().forEach(option -> animations.getItems().add(new AnimationChoice(option)));
-                        animations.getSelectionModel().selectFirst();
+                        AnimationChoice resume = selectedAnimation;
+                        animations.getSelectionModel().select(animations.getItems().stream()
+                                .filter(choice -> choice.equals(resume)).findFirst().orElse(animations.getItems().getFirst()));
                         animationControls.setVisible(animations.getItems().size()>1);
                         readyStatus("Local outfit preview · Drag to rotate · Scroll to zoom", "Drag to rotate. Scroll to zoom.");
                         controls(true, false, false);
@@ -468,6 +476,7 @@ public final class WardrobePreview {
         stopAnimation();
         AnimationChoice choice=animations.getValue();
         if(animationRig==null || choice==null)return;
+        selectedAnimation = choice;
         if(choice.option==null) {
             readyStatus("Local outfit preview · Drag to rotate · Scroll to zoom", "Drag to rotate. Scroll to zoom.");
             return;
@@ -478,7 +487,7 @@ public final class WardrobePreview {
         showStatus("Loading animation…");
         FutureTask<Void> task=new FutureTask<>(() -> {
             try {
-                var clip=LocalAvatarRenderer.loadAnimation(assets,option.animation(),option.looping());
+                var clip=LocalAvatarRenderer.loadAnimation(assets,option.animation(),true);
                 if(!Thread.currentThread().isInterrupted())Platform.runLater(() -> {
                     if(disposed || ticket!=animationGeneration)return;
                     animationPending=null; animationClip=clip; animationSpeed=option.speed();

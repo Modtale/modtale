@@ -55,7 +55,8 @@ public final class CosmeticEditorController implements AutoCloseable {
     private final Button reset = button("Reset", LauncherIcons.Glyph.RESTORE, this::reset);
     private final Button remove = secondaryButton("Remove item");
     private final Button apply = primaryButton("Apply outfit");
-    private final Button saveOfficial = secondaryButton("Save as Hytale outfit");
+    private final MenuItem saveOfficial = new MenuItem("Save to Hytale");
+    private final MenuButton saveMenu = new MenuButton("Save");
     private final CheckBox ownedOnly = new CheckBox("Owned only");
     private final Button previous = secondaryButton("Previous");
     private final Button next = secondaryButton("Next");
@@ -129,6 +130,10 @@ public final class CosmeticEditorController implements AutoCloseable {
         inspector.getStyleClass().add("wardrobe-inspector"); inspector.setPrefWidth(310); inspector.setMinWidth(270);
         inspector.setMaxHeight(Region.USE_PREF_SIZE);
         Node previewNode = preview.view(); if (previewNode instanceof Region r) { r.setPrefHeight(330); r.setMinHeight(270); }
+        choiceName.visibleProperty().bind(choiceName.textProperty().isNotEmpty()
+                .and(choiceName.textProperty().isNotEqualTo("Your character"))
+                .and(choiceName.textProperty().isNotEqualTo("Your look")));
+        choiceName.managedProperty().bind(choiceName.visibleProperty());
         choiceName.setWrapText(true); requirement.setWrapText(true); changes.setWrapText(true);
         variant.getStyleClass().add("wardrobe-filter"); variant.setMaxWidth(Double.MAX_VALUE);
         variant.setConverter(new javafx.util.StringConverter<>() {
@@ -138,11 +143,17 @@ public final class CosmeticEditorController implements AutoCloseable {
         variant.setOnAction(e -> { if (!settingVariants) chooseVariant(); });
         remove.setOnAction(e -> { if (draft != null) { draft.remove(category); changed(); showOptions(selectedAsset); } });
         remove.setMaxWidth(Double.MAX_VALUE);
-        Button save = secondaryButton("Save outfit locally"); save.setOnAction(e -> saveLocal()); save.setMaxWidth(Double.MAX_VALUE);
+        MenuItem saveLocal = new MenuItem("Save to Saved looks"); saveLocal.setOnAction(e -> saveLocal());
+        saveMenu.getStyleClass().addAll("btn", "secondary", "cosmetic-save-menu");
+        saveMenu.getItems().setAll(saveLocal, saveOfficial);
+        saveMenu.setMinWidth(Region.USE_PREF_SIZE);
         apply.setMaxWidth(Double.MAX_VALUE); apply.setOnAction(e -> applyDraft());
-        saveOfficial.setMaxWidth(Double.MAX_VALUE); saveOfficial.setOnAction(e -> saveOfficial());
+        saveOfficial.setOnAction(e -> saveOfficial());
+        HBox actions = new HBox(8, saveMenu, apply);
+        HBox.setHgrow(apply, Priority.ALWAYS);
+        remove.getStyleClass().add("cosmetic-quiet-action");
         inspector.getChildren().addAll(previewNode, choiceName,
-                colors, variant, requirement, remove, changes, save, saveOfficial, apply);
+                colors, variant, requirement, remove, changes, actions);
         HBox workspace = new HBox(18, categories, selectionPanel, inspector); workspace.setAlignment(Pos.TOP_LEFT);
         workspace.setMinWidth(0);
         root.getChildren().addAll(toolbar, state, workspace);
@@ -334,9 +345,9 @@ public final class CosmeticEditorController implements AutoCloseable {
         remove.setVisible(hasDraft && OutfitDraft.canRemove(category) && !draft.selected(category).isBlank()); remove.setManaged(remove.isVisible());
         apply.setDisable(!hasDraft || activeProfile().isBlank() || applying || locked);
         saveOfficial.setDisable(!hasDraft || activeProfile().isBlank() || applying || locked);
-        apply.setTooltip(new Tooltip(locked ? "This outfit contains locked cosmetics." : "Apply this outfit and save the previous look locally."));
-        saveOfficial.setTooltip(new Tooltip(locked ? "This outfit contains locked cosmetics." : "Save to your Hytale account."));
-        apply.setText(applying ? "Applying…" : activeUsername().isBlank() ? "Link a Hytale account" : "Apply to " + activeUsername());
+        apply.setTooltip(new Tooltip(locked ? "This outfit contains locked cosmetics." : "Apply to " + activeUsername() + " and save the previous look locally."));
+        saveMenu.setDisable(!hasDraft || applying);
+        apply.setText(applying ? "Applying…" : activeUsername().isBlank() ? "Link account" : "Apply");
         changes.setText(locked ? "Contains locked items" : hasDraft && draft.dirty() ? "Unapplied changes" : "");
     }
     private boolean hasLockedSelection() {

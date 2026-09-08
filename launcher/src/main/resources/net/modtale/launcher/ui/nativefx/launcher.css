@@ -9566,3 +9566,22 @@
 .cosmetic-owned-filter { -fx-text-fill: #94a3b8; -fx-font-size: 12; }
 .cosmetic-owned-filter .box { -fx-background-color: #15243a; -fx-border-color: #334155; -fx-border-radius: 4; }
 .cosmetic-owned-filter:selected .mark { -fx-background-color: #60a5fa; }
+
+.btn.secondary.cosmetic-quiet-action, .btn.secondary.wardrobe-preview-reset {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-text-fill: #94a3b8;
+    -fx-effect: null;
+}
+.wardrobe-preview-reset { -fx-padding: 6; }
+.btn.secondary.cosmetic-quiet-action:hover, .btn.secondary.wardrobe-preview-reset:hover {
+    -fx-background-color: #1b3156;
+    -fx-text-fill: #e2e8f0;
+}
+.wardrobe-preview-motion {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
+
+.cosmetic-save-menu > .label { -fx-text-fill: #cbd5e1; }

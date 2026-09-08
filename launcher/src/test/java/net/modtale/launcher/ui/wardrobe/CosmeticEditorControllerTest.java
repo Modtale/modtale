@@ -89,14 +89,14 @@ class CosmeticEditorControllerTest {
         try (Harness h = new Harness()) {
             fx(() -> { button(h.root(), "Load current look").fire(); return null; });
             await(() -> h.controller.draftSnapshot().equals(json(FRESH)));
-            h.accept(() -> button(h.root(), "Save as Hytale outfit").fire(), "My outfit", "New outfit");
+            h.accept(() -> saveToHytale(h.root()).fire(), "My outfit", "New outfit");
             Mutation create = h.mutation("create");
             assertEquals("New outfit", create.name());
             assertEquals(json(FRESH), create.skin());
             await(() -> "Ready".equals(h.status.getText()));
             fx(() -> {
-                assertFalse(button(h.root(), "Save as Hytale outfit").isDisabled());
-                button(h.root(), "Save as Hytale outfit").fire();
+                assertFalse(saveToHytale(h.root()).isDisable());
+                saveToHytale(h.root()).fire();
                 assertNull(h.dialog(), "Capacity rejection must happen before asking for a name");
                 return null;
             });
@@ -109,7 +109,7 @@ class CosmeticEditorControllerTest {
             fx(() -> {
                 assertTrue(nodes(h.root(), Label.class).stream().noneMatch(label ->
                         List.of("Hytale outfits", "Wearing", "Main", "Adventure").contains(label.getText())));
-                assertTrue(nodes(h.root(), MenuButton.class).isEmpty());
+                assertEquals(List.of("Save"), nodes(h.root(), MenuButton.class).stream().map(MenuButton::getText).toList());
                 return null;
             });
         }
@@ -223,6 +223,10 @@ class CosmeticEditorControllerTest {
         }
     }
 
+    private static MenuItem saveToHytale(Node root) {
+        return nodes(root, MenuButton.class).stream().flatMap(menu -> menu.getItems().stream())
+                .filter(item -> "Save to Hytale".equals(item.getText())).findFirst().orElseThrow();
+    }
     private static ButtonBase button(Node root, String text) {
         return nodes(root, ButtonBase.class).stream().filter(b -> text.equals(b.getText())).findFirst().orElseThrow();
     }
