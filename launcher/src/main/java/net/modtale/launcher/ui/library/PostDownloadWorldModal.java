@@ -149,7 +149,7 @@ final class PostDownloadWorldModal {
         header.getStyleClass().add("post-download-modal-header");
         header.setAlignment(Pos.CENTER_LEFT);
 
-        HBox titleRow = new HBox(8, LauncherIcons.icon(LauncherIcons.Glyph.GLOBE, 20), new Label("Enable in Worlds"));
+        HBox titleRow = new HBox(8, LauncherIcons.icon(LauncherIcons.Glyph.GLOBE, 20), new Label("Enable in universes"));
         titleRow.getStyleClass().add("post-download-modal-title");
         titleRow.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(titleRow, Priority.ALWAYS);
@@ -164,9 +164,11 @@ final class PostDownloadWorldModal {
     private VBox body() {
         VBox body = new VBox(16);
         body.getStyleClass().add("post-download-modal-body");
-        body.getChildren().add(summaryRow());
+        Label packLabel = new Label(title + " · " + modIds.size() + " mods");
+        packLabel.getStyleClass().add("post-download-modal-muted");
+        body.getChildren().addAll(packLabel, summaryRow());
         if (!configs.isEmpty()) {
-            Label note = new Label(configs.size() + " shared config defaults will be added to the selected worlds. Existing files are preserved.");
+            Label note = new Label(configs.size() + " config defaults will be added to the selected universes. Existing settings are kept.");
             note.setWrapText(true);
             body.getChildren().add(note);
         }
@@ -353,7 +355,7 @@ final class PostDownloadWorldModal {
         }
         if (selectedCount != null) {
             int count = selectedWorldKeys.size();
-            selectedCount.setText(count + " world" + LibraryProjectSupport.plural(count) + " selected");
+            selectedCount.setText(count + " universe" + LibraryProjectSupport.plural(count) + " selected");
         }
         if (toggleAllButton != null) {
             toggleAllButton.setText(selectedWorldKeys.size() == worlds.size() ? "Deselect All" : "Select All");
@@ -401,7 +403,7 @@ final class PostDownloadWorldModal {
             boolean indeterminate
     ) {
         WorldOption {
-            meta = value(meta, "World save");
+            meta = value(meta, "Universe");
             totalCount = Math.max(0, totalCount);
             enabledCount = Math.max(0, Math.min(enabledCount, totalCount));
         }

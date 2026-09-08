@@ -151,7 +151,7 @@ public final class LauncherProjectActions {
 
     public void installSelectedProjectVersion(ProjectDetail project, ProjectVersion version, String gameVersion) {
         List<ProjectDependency> dependencies = NativeDependencyModal.selectableDependencies(version);
-        if (dependencyModal != null && !dependencies.isEmpty()) {
+        if (!net.modtale.launcher.model.project.ProjectClassification.isModpack(project.classification()) && dependencyModal != null && !dependencies.isEmpty()) {
             dependencyModal.show(project, version, gameVersion);
             return;
         }

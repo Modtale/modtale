@@ -1090,7 +1090,7 @@ public final class LauncherLibraryController {
         accountController.syncLocalSettings();
         showPostDownloadWorldModal(
                 value(result.installedProject().title(), "Installed project"),
-                modIdsForFiles(result.installedFiles())
+                modIdsForFiles(result.installedFiles()), result.installedProject().universeConfigs()
         );
     }
 
@@ -1152,7 +1152,7 @@ public final class LauncherLibraryController {
         feedback.runAsync("Enabling install in selected worlds...", () -> {
             for (HytaleWorld world : selection.worlds()) {
                 try {
-                    net.modtale.launcher.install.WorldListConfigInstaller.install(selection.configs(), "WORLD", world.directory().resolve("mods"));
+                    net.modtale.launcher.install.WorldListConfigInstaller.install(selection.configs(), "WORLD", world.directory().resolve("mods"), 32 * 1024 * 1024);
                 } catch (java.io.IOException ex) {
                     throw new ModtaleApiException("Could not apply shared configs to " + world.name(), ex);
                 }
@@ -1236,6 +1236,18 @@ public final class LauncherLibraryController {
             return;
         }
         feedback.runAsync("Updating " + world.name() + "...", () -> {
+            if (enabled) {
+                for (InstalledProject installed : installedProjects) {
+                    if (installed.universeConfigs().isEmpty()) continue;
+                    List<String> packIds = modIdsForFiles(installed.files().stream().map(java.nio.file.Path::of).toList());
+                    boolean entirePack = !packIds.isEmpty() && ids.containsAll(packIds);
+                    var configs = installed.universeConfigs().stream().filter(config -> config.appliesTo(ids, entirePack)).toList();
+                    if (!configs.isEmpty()) {
+                        try { net.modtale.launcher.install.WorldListConfigInstaller.install(configs, "WORLD", world.directory().resolve("mods"), 32 * 1024 * 1024); }
+                        catch (java.io.IOException ex) { throw new ModtaleApiException("Could not apply universe config defaults.", ex); }
+                    }
+                }
+            }
             worldManager.setModsEnabled(world.configPath(), ids, enabled);
             return worldManager.loadWorlds(settingsController.settings());
         }, loadedWorlds -> {

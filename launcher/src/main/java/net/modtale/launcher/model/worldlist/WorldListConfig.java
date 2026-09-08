@@ -8,13 +8,29 @@ import java.util.Locale;
 import java.util.Set;
 
 /** Config paths are relative to a plugin data folder inside global or per-world mods. */
-public record WorldListConfig(String scope, String path, String content) {
+public record WorldListConfig(String scope, String path, String content, List<String> modIds) {
+    public WorldListConfig {
+        modIds = modIds == null ? List.of() : List.copyOf(modIds);
+    }
+
+    public WorldListConfig(String scope, String path, String content) {
+        this(scope, path, content, List.of());
+    }
+
+    public boolean appliesTo(java.util.Collection<String> enabledIds, boolean entirePack) {
+        return modIds.isEmpty() ? entirePack : modIds.stream().anyMatch(enabledIds::contains);
+    }
+
     public static final int MAX_FILES = 100;
     public static final int MAX_FILE_BYTES = 1024 * 1024;
     public static final int MAX_TOTAL_BYTES = 2 * 1024 * 1024;
     private static final Set<String> EXTENSIONS = Set.of("json", "toml", "yaml", "yml", "properties", "cfg", "conf", "ini");
 
     public static List<WorldListConfig> validate(List<WorldListConfig> configs) throws IOException {
+        return validate(configs, MAX_TOTAL_BYTES);
+    }
+
+    public static List<WorldListConfig> validate(List<WorldListConfig> configs, int maxTotalBytes) throws IOException {
         if (configs == null) return List.of();
         if (configs.size() > MAX_FILES) throw new IOException("A mod list can hold at most 100 config files.");
         int total = 0;
@@ -43,7 +59,7 @@ public record WorldListConfig(String scope, String path, String content) {
             }
             int size = config.content.getBytes(StandardCharsets.UTF_8).length;
             total += size;
-            if (config.content.indexOf('\0') >= 0 || size > MAX_FILE_BYTES || total > MAX_TOTAL_BYTES) {
+            if (config.content.indexOf('\0') >= 0 || size > MAX_FILE_BYTES || total > maxTotalBytes) {
                 throw new IOException("Configs must be text, at most 1 MiB each and 2 MiB in total.");
             }
         }

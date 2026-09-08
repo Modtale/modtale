@@ -47,6 +47,81 @@ public class ArchiveInstaller {
             Path modsDirectory,
             Path instanceDirectory
     ) throws IOException {
+        return installModpackArchive(archive, modsDirectory, instanceDirectory, null);
+    }
+
+    public List<Path> installModpackArchive(Path archive, Path modsDirectory, Path instanceDirectory, Set<String> selectedOwners) throws IOException {
+        return installModpackArchive(archive, modsDirectory, instanceDirectory, selectedOwners, false);
+    }
+
+    public List<Path> installModpackConfigs(Path archive, Path modsDirectory, Path instanceDirectory, Set<String> installedOwners) throws IOException {
+        return installModpackArchive(archive, modsDirectory, instanceDirectory, installedOwners, true);
+    }
+
+    public List<net.modtale.launcher.model.worldlist.WorldListConfig> readUniverseConfigs(Path archive, Set<String> installedOwners) throws IOException {
+        return readUniverseConfigs(archive, installedOwners, java.util.Map.of());
+    }
+
+    public List<net.modtale.launcher.model.worldlist.WorldListConfig> readUniverseConfigs(Path archive, Set<String> installedOwners, java.util.Map<String, List<String>> externalModIds) throws IOException {
+        Path staging = Files.createTempDirectory("modtale-universe-defaults-");
+        try {
+            extractArchive(archive, staging);
+            Path root = modpackContentRoot(staging);
+            Path lockPath = root.resolve(LOCKFILE);
+            if (!Files.isRegularFile(lockPath)) return List.of();
+            JsonNode lock = OBJECT_MAPPER.readTree(lockPath.toFile());
+            if (lock.path("lockVersion").asInt() != 2) return List.of();
+            List<net.modtale.launcher.model.worldlist.WorldListConfig> configs = new ArrayList<>();
+            Set<String> paths = new HashSet<>();
+            Set<String> declared = new HashSet<>();
+            java.util.Map<String, List<String>> ownerModIds = new java.util.HashMap<>(externalModIds);
+            for (JsonNode entry : lock.path("entries")) {
+                String ownerKey = entry.path("source").asText() + ":" + entry.path("id").asText();
+                declared.add(ownerKey);
+                if (installedOwners.contains(ownerKey) && entry.hasNonNull("path")) {
+                    Path binary = resolveLockedSource(root, entry.path("path").asText(), new HashSet<>());
+                    verifyIntegrity(binary, entry);
+                    ownerModIds.put(ownerKey, readModIds(List.of(binary)));
+                }
+            }
+            for (JsonNode entry : lock.path("overrides")) {
+                String path = entry.path("path").asText();
+                String prefix = "overrides/Universe/mods/";
+                if (!path.startsWith(prefix)) continue;
+                JsonNode owner = entry.path("owner");
+                String key = owner.path("source").asText() + ":" + owner.path("projectId").asText();
+                if (!declared.contains(key) || !"SEED_ONLY".equals(entry.path("installPolicy").asText())
+                        || !path.equals("overrides/" + entry.path("destination").asText())) throw new IOException("Invalid universe config ownership.");
+                if (!installedOwners.contains(key)) continue;
+                Path file = resolveLockedSource(root, path, paths);
+                verifyIntegrity(file, entry);
+                if (Files.size(file) > 1024 * 1024) throw new IOException("Universe config exceeds 1 MiB.");
+                configs.add(new net.modtale.launcher.model.worldlist.WorldListConfig("WORLD", path.substring(prefix.length()), Files.readString(file), ownerModIds.getOrDefault(key, List.of())));
+            }
+            return net.modtale.launcher.model.worldlist.WorldListConfig.validate(configs, 32 * 1024 * 1024);
+        } finally { deleteRecursively(staging); }
+    }
+
+    static List<String> readModIds(List<Path> files) throws IOException {
+        List<String> ids = new ArrayList<>();
+        for (Path file : files) {
+            try (java.util.zip.ZipFile zip = new java.util.zip.ZipFile(file.toFile())) {
+                ZipEntry manifest = zip.getEntry("manifest.json");
+                if (manifest == null) continue;
+                try (InputStream input = zip.getInputStream(manifest)) {
+                    JsonNode json = OBJECT_MAPPER.readTree(input);
+                    String group = json.path("Group").asText();
+                    String name = json.path("Name").asText();
+                    if (!group.isBlank() && !name.isBlank()) ids.add(group + ":" + name);
+                }
+            } catch (java.util.zip.ZipException ignored) {
+                // Files without a readable manifest retain whole-package config application.
+            }
+        }
+        return List.copyOf(ids);
+    }
+
+    private List<Path> installModpackArchive(Path archive, Path modsDirectory, Path instanceDirectory, Set<String> selectedOwners, boolean configsOnly) throws IOException {
         Files.createDirectories(modsDirectory);
         Files.createDirectories(instanceDirectory);
         Path stagingDirectory = Files.createTempDirectory("modtale-modpack-");
@@ -58,8 +133,9 @@ public class ArchiveInstaller {
             Path contentRoot = modpackContentRoot(extractedDirectory);
             Path lockfile = contentRoot.resolve(LOCKFILE);
             if (Files.isRegularFile(lockfile)) {
-                return installLockedArchive(contentRoot, lockfile, modsDirectory, instanceDirectory);
+                return installLockedArchive(contentRoot, lockfile, modsDirectory, instanceDirectory, selectedOwners, configsOnly);
             }
+            if (configsOnly) return List.of();
             validateLegacyHytaleArchiveIfPresent(contentRoot.resolve(LEGACY_MANIFEST));
             List<Path> installed = new ArrayList<>();
             try (Stream<Path> files = Files.walk(contentRoot)) {
@@ -83,18 +159,28 @@ public class ArchiveInstaller {
             Path contentRoot,
             Path lockfile,
             Path modsDirectory,
-            Path instanceDirectory
+            Path instanceDirectory,
+            Set<String> selectedOwners,
+            boolean configsOnly
     ) throws IOException {
         JsonNode lock = OBJECT_MAPPER.readTree(lockfile.toFile());
-        if (!"modtale-lock".equals(lock.path("format").asText()) || lock.path("lockVersion").asInt(-1) != 1
+        if (!"modtale-lock".equals(lock.path("format").asText()) || !Set.of(1, 2).contains(lock.path("lockVersion").asInt(-1))
                 || !"hytale".equalsIgnoreCase(lock.path("game").asText())) {
             throw new IOException("Unsupported Modtale modpack lockfile format or version.");
         }
 
+        boolean ownedConfigs = lock.path("lockVersion").asInt() == 2;
+        Set<String> declaredOwners = new HashSet<>();
+        Set<String> installedOwners = new HashSet<>();
+        if (configsOnly && selectedOwners != null) installedOwners.addAll(selectedOwners);
+        for (JsonNode entry : lock.path("entries")) declaredOwners.add(entry.path("source").asText() + ":" + entry.path("id").asText());
         Set<String> archivePaths = new HashSet<>();
         Set<String> destinationPaths = new HashSet<>();
         List<PendingInstall> pending = new ArrayList<>();
         for (JsonNode entry : lock.path("entries")) {
+            if (configsOnly) continue;
+            String ownerKey = entry.path("source").asText() + ":" + entry.path("id").asText();
+            if (ownedConfigs && selectedOwners != null && "OPTIONAL".equals(entry.path("dependencyType").asText()) && !selectedOwners.contains(ownerKey)) continue;
             if (!"BUNDLED".equalsIgnoreCase(entry.path("distribution").asText())) {
                 continue;
             }
@@ -106,6 +192,7 @@ public class ArchiveInstaller {
                     destinationPaths
             );
             pending.add(new PendingInstall(source, destination, false));
+            installedOwners.add(ownerKey);
         }
 
         List<JsonNode> overrides = new ArrayList<>();
@@ -113,26 +200,23 @@ public class ArchiveInstaller {
         overrides.sort(Comparator.comparing(entry -> entry.path("path").asText()));
         for (JsonNode entry : overrides) {
             String archivePath = requiredText(entry, "path");
+            if (!ownedConfigs || !archivePath.startsWith("overrides/Universe/mods/") || entry.path("owner").isNull() || !entry.has("owner")) {
+                throw new IOException("Only mod-associated universe configs are supported. Saves and shared overrides cannot be installed.");
+            }
+            if (ownedConfigs) {
+                if (!"SEED_ONLY".equals(entry.path("installPolicy").asText()) || !entry.has("owner")
+                        || !archivePath.equals("overrides/" + entry.path("destination").asText())) throw new IOException("Invalid config ownership or installation policy.");
+                JsonNode owner = entry.path("owner");
+                if (!owner.isNull()) {
+                    String key = owner.path("source").asText() + ":" + owner.path("projectId").asText();
+                    if (!declaredOwners.contains(key)) throw new IOException("Unknown config owner.");
+                    if (!installedOwners.contains(key)) continue;
+                } else if (configsOnly) continue;
+            } else if (configsOnly) continue;
             Path source = resolveLockedSource(contentRoot, archivePath, archivePaths);
             verifyIntegrity(source, entry);
-            String prefix = "overrides/";
-            if (!archivePath.startsWith(prefix) || archivePath.length() == prefix.length()) {
-                throw new IOException("Override path must be inside overrides/: " + archivePath);
-            }
-            String hytalePath = archivePath.substring(prefix.length());
-            if (!(hytalePath.startsWith("Mods/") || hytalePath.startsWith("Saves/"))) {
-                throw new IOException("Override destination must be inside Hytale Mods/ or Saves/: " + archivePath);
-            }
-            Path destination = resolveInstanceDestination(instanceDirectory, hytalePath);
-            // Hytale writes plugin configuration and world state back into these files.
-            // Pack overrides seed missing files; existing user data must survive reinstalls.
-            if (Files.exists(destination)) {
-                if (!Files.isRegularFile(destination)) {
-                    throw new IOException("Override destination is not a file: " + archivePath);
-                }
-                continue;
-            }
-            pending.add(new PendingInstall(source, destination, true));
+            // Validated defaults are retained separately and applied when enabling their mod.
+
         }
 
         List<Path> installed = new ArrayList<>();

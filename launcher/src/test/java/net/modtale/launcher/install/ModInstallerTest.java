@@ -181,12 +181,9 @@ class ModInstallerTest {
         String lock = """
                 {"format":"modtale-lock","lockVersion":1,"game":"hytale",
                  "entries":[{"distribution":"BUNDLED","path":"example.jar","size":2,"hashes":{"sha256":"%s"}}],
-                 "overrides":[
-                   {"path":"overrides/%s","size":2,"hashes":{"sha256":"%s"}},
-                   {"path":"overrides/%s","size":2,"hashes":{"sha256":"%s"}}]}
-                """.formatted(hash, configPath, hash, worldPath, hash);
-        byte[] pack = zip(entry("modtale.lock.json", lock), entry("example.jar", config),
-                entry("overrides/" + configPath, config), entry("overrides/" + worldPath, config));
+                 "overrides":[]}
+                """.formatted(hash);
+        byte[] pack = zip(entry("modtale.lock.json", lock), entry("example.jar", config));
         startServer();
         for (String number : List.of("1.0.0", "1.1.0")) {
             server.createContext("/api/v1/projects/pack/versions/" + number + "/dependencies",
@@ -210,6 +207,10 @@ class ModInstallerTest {
         settings.setGameVersion("2026.1");
         ModInstaller installer = new ModInstaller(new ModtaleApiClient(apiBaseUrl()),
                 new SettingsStore(tempDir.resolve("settings.json")));
+        Files.createDirectories(instance.resolve(configPath).getParent());
+        Files.createDirectories(instance.resolve(worldPath).getParent());
+        Files.writeString(instance.resolve(configPath), config);
+        Files.writeString(instance.resolve(worldPath), config);
         InstallResult initial = installer.installAndRecord(project, version, settings, "2026.1");
         assertEquals(config, Files.readString(instance.resolve(configPath)));
         Files.writeString(instance.resolve(configPath), "player config");

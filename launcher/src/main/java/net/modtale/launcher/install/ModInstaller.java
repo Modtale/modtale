@@ -76,16 +76,16 @@ public class ModInstaller {
             throw new ModtaleApiException("Could not create Hytale mods directory " + options.modsDirectory(), ex);
         }
 
-        List<ProjectDependency> dependencies = dependencies(project, version, options);
+        boolean isModpack = ProjectClassification.isModpack(project.classification());
+        List<ProjectDependency> dependencies = isModpack ? version.dependencies() : dependencies(project, version, options);
         boolean exactDependencySelection = options.hasSelectedDependencies();
-        boolean includeOptional = exactDependencySelection || options.includeOptionalDependencies();
+        boolean includeOptional = isModpack || exactDependencySelection || options.includeOptionalDependencies();
         List<String> selectedModtaleDependencies = selectedModtaleDependencies(dependencies, includeOptional);
         List<ProjectDependency> selectedExternalDependencies = selectedExternalDependencies(dependencies, includeOptional);
         boolean hasDependencySelection = exactDependencySelection
                 ? !dependencies.isEmpty()
                 : options.includeDependencies();
         boolean isBundle = hasDependencySelection && !selectedModtaleDependencies.isEmpty();
-        boolean isModpack = ProjectClassification.isModpack(project.classification());
         List<InstalledProjectReference> selectedReferences = selectedDependencyReferences(dependencies, includeOptional);
         LOG.info("Resolved dependencies projectId=" + project.id()
                 + " total=" + dependencies.size()
@@ -108,7 +108,7 @@ public class ModInstaller {
             }
             downloadUrl = apiClient.getCurseForgeDownloadUrl(curseForgeProjectId, fileId);
         } else {
-            downloadUrl = isBundle
+            downloadUrl = isBundle && !isModpack
                     ? apiClient.getBundleDownloadUrl(project.id(), version.versionNumber(), selectedModtaleDependencies, options.gameVersion())
                     : apiClient.getDownloadUrl(project.id(), version.versionNumber(), options.gameVersion());
         }
@@ -117,96 +117,125 @@ public class ModInstaller {
                 + " url=" + LogSanitizer.url(downloadUrl == null ? "" : downloadUrl.downloadUrl()));
 
         DownloadedFile mainDownload = apiClient.download(downloadUrl);
-        boolean unpackMainDownload = isBundle || looksLikeGeneratedArchive(mainDownload);
-        LOG.info("Installing main download projectId=" + project.id()
-                + " filename=" + mainDownload.filename()
-                + " contentType=" + mainDownload.contentType()
-                + " unpack=" + unpackMainDownload
-                + " temp=" + mainDownload.path());
+        Set<String> configOwners = new LinkedHashSet<>();
+        dependencies.stream().filter(dependency -> !dependency.isExternal())
+                .filter(dependency -> includeOptional || !dependency.isOptional())
+                .forEach(dependency -> configOwners.add("MODTALE:" + dependency.projectId()));
+        Set<String> externalConfigOwners = new LinkedHashSet<>();
+        java.util.Map<String, List<String>> externalModIds = new java.util.HashMap<>();
         try {
-            if (isModpack || isBundle) {
-                installedFiles.addAll(archiveInstaller.installModpackArchive(
-                        mainDownload.path(),
-                        options.modsDirectory(),
-                        options.instanceDirectory()
-                ));
-            } else {
-                installedFiles.addAll(archiveInstaller.installDownloadedFile(
-                        mainDownload.path(),
-                        mainDownload.filename(),
-                        options.modsDirectory(),
-                        unpackMainDownload
-                ));
-            }
-            LOG.info("Installed main download projectId=" + project.id()
-                    + " fileCount=" + installedFiles.size()
-                    + " files=" + installedFiles);
-        } catch (IOException ex) {
-            LOG.warn("Could not install main download projectId=" + project.id()
-                    + " into " + options.modsDirectory(), ex);
-            throw new ModtaleApiException("Could not install " + project.title() + " into " + options.modsDirectory(), ex);
-        } finally {
-            deleteTemp(mainDownload.path());
-        }
-
-        for (ProjectDependency dependency : selectedExternalDependencies) {
-            if (dependency.isCurseForge()) {
-                installCurseForgeDependency(dependency, options.modsDirectory(), installedFiles, externalNames, warnings);
-                continue;
-            }
-            if (dependency.externalFileUrl() == null || dependency.externalFileUrl().isBlank()) {
-                warnings.add("External dependency needs manual install: " + displayName(dependency));
-                LOG.warn("External dependency missing file URL: " + displayName(dependency));
-                continue;
-            }
-            LOG.info("Downloading external dependency " + displayName(dependency)
-                    + " url=" + LogSanitizer.url(dependency.externalFileUrl()));
-            DownloadedFile externalDownload = apiClient.download(dependency.externalFileUrl());
+            boolean unpackMainDownload = isBundle || looksLikeGeneratedArchive(mainDownload);
+            LOG.info("Installing main download projectId=" + project.id()
+                    + " filename=" + mainDownload.filename()
+                    + " contentType=" + mainDownload.contentType()
+                    + " unpack=" + unpackMainDownload
+                    + " temp=" + mainDownload.path());
             try {
-                String filename = dependency.externalFileName() == null || dependency.externalFileName().isBlank()
-                        ? externalDownload.filename()
-                        : dependency.externalFileName();
-                installedFiles.addAll(archiveInstaller.installDownloadedFile(
-                        externalDownload.path(),
-                        filename,
-                        options.modsDirectory(),
-                        false
-                ));
-                externalNames.add(displayName(dependency));
-                LOG.info("Installed external dependency " + displayName(dependency)
-                        + " filename=" + filename
-                        + " totalFileCount=" + installedFiles.size());
+                if (isModpack || isBundle) {
+                    installedFiles.addAll(archiveInstaller.installModpackArchive(
+                            mainDownload.path(),
+                            options.modsDirectory(),
+                            options.instanceDirectory(),
+                            isModpack ? configOwners : null
+                    ));
+                } else {
+                    installedFiles.addAll(archiveInstaller.installDownloadedFile(
+                            mainDownload.path(),
+                            mainDownload.filename(),
+                            options.modsDirectory(),
+                            unpackMainDownload
+                    ));
+                }
+                LOG.info("Installed main download projectId=" + project.id()
+                        + " fileCount=" + installedFiles.size()
+                        + " files=" + installedFiles);
             } catch (IOException ex) {
-                warnings.add("External dependency failed: " + displayName(dependency) + " (" + ex.getMessage() + ")");
-                LOG.warn("External dependency failed: " + displayName(dependency), ex);
-            } finally {
-                deleteTemp(externalDownload.path());
+                LOG.warn("Could not install main download projectId=" + project.id()
+                        + " into " + options.modsDirectory(), ex);
+                throw new ModtaleApiException("Could not install " + project.title() + " into " + options.modsDirectory(), ex);
             }
-        }
 
-        InstalledProject installedProject = new InstalledProject(
-                project.id(),
-                project.slug(),
-                project.title(),
-                project.classification(),
-                version.versionNumber(),
-                version.id(),
-                options.gameVersion(),
-                Instant.now(),
-                Instant.now(),
-                installedFiles.stream().map(Path::toString).toList(),
-                selectedModtaleDependencies,
-                externalNames,
-                curseForgeProjectId == null ? InstalledProject.SOURCE_MODTALE : InstalledProject.SOURCE_CURSEFORGE,
-                isModpack ? InstalledProject.INSTALL_MODPACK : isBundle ? InstalledProject.INSTALL_BUNDLE : InstalledProject.INSTALL_DIRECT,
-                false,
-                selectedReferences
-        );
-        LOG.info("Completed install projectId=" + project.id()
-                + " installedVersion=" + version.versionNumber()
-                + " fileCount=" + installedFiles.size()
-                + " warnings=" + warnings.size());
-        return new InstallResult(installedProject, installedFiles, warnings);
+            for (ProjectDependency dependency : selectedExternalDependencies) {
+                if (dependency.isCurseForge()) {
+                    int before = installedFiles.size();
+                    installCurseForgeDependency(dependency, options.modsDirectory(), installedFiles, externalNames, warnings);
+                    if (isModpack && installedFiles.size() == before) throw new ModtaleApiException("The pack could not be completed: " + displayName(dependency) + " was not installed.");
+                    if (installedFiles.size() > before) {
+                        externalConfigOwners.add("CURSEFORGE:" + dependency.projectId());
+                        if (isModpack) {
+                            try { externalModIds.put("CURSEFORGE:" + dependency.projectId(), ArchiveInstaller.readModIds(installedFiles.subList(before, installedFiles.size()))); }
+                            catch (IOException ex) { throw new ModtaleApiException("Could not read config owner for " + displayName(dependency), ex); }
+                        }
+                    }
+                    continue;
+                }
+                if (dependency.externalFileUrl() == null || dependency.externalFileUrl().isBlank()) {
+                    if (isModpack) throw new ModtaleApiException("The pack needs a downloadable file for " + displayName(dependency));
+                    warnings.add("External dependency needs manual install: " + displayName(dependency));
+                    LOG.warn("External dependency missing file URL: " + displayName(dependency));
+                    continue;
+                }
+                LOG.info("Downloading external dependency " + displayName(dependency)
+                        + " url=" + LogSanitizer.url(dependency.externalFileUrl()));
+                DownloadedFile externalDownload = apiClient.download(dependency.externalFileUrl());
+                try {
+                    String filename = dependency.externalFileName() == null || dependency.externalFileName().isBlank()
+                            ? externalDownload.filename()
+                            : dependency.externalFileName();
+                    int before = installedFiles.size();
+                    installedFiles.addAll(archiveInstaller.installDownloadedFile(
+                            externalDownload.path(),
+                            filename,
+                            options.modsDirectory(),
+                            false
+                    ));
+                    if (isModpack) externalModIds.put(dependency.source() + ":" + dependency.projectId(), ArchiveInstaller.readModIds(installedFiles.subList(before, installedFiles.size())));
+                    externalNames.add(displayName(dependency));
+                    externalConfigOwners.add(dependency.source() + ":" + dependency.projectId());
+                    LOG.info("Installed external dependency " + displayName(dependency)
+                            + " filename=" + filename
+                            + " totalFileCount=" + installedFiles.size());
+                } catch (IOException ex) {
+                    if (isModpack) throw new ModtaleApiException("The pack could not install " + displayName(dependency), ex);
+                    warnings.add("External dependency failed: " + displayName(dependency) + " (" + ex.getMessage() + ")");
+                    LOG.warn("External dependency failed: " + displayName(dependency), ex);
+                } finally {
+                    deleteTemp(externalDownload.path());
+                }
+            }
+
+            if (isModpack && !externalConfigOwners.isEmpty()) {
+                try { installedFiles.addAll(archiveInstaller.installModpackConfigs(mainDownload.path(), options.modsDirectory(), options.instanceDirectory(), externalConfigOwners)); }
+                catch (IOException ex) { throw new ModtaleApiException("Could not install configs for external mods.", ex); }
+            }
+            configOwners.addAll(externalConfigOwners);
+            List<net.modtale.launcher.model.worldlist.WorldListConfig> universeConfigs;
+            try { universeConfigs = isModpack ? archiveInstaller.readUniverseConfigs(mainDownload.path(), configOwners, externalModIds) : List.of(); }
+            catch (IOException ex) { throw new ModtaleApiException("Could not read universe config defaults.", ex); }
+            InstalledProject installedProject = new InstalledProject(
+                    project.id(),
+                    project.slug(),
+                    project.title(),
+                    project.classification(),
+                    version.versionNumber(),
+                    version.id(),
+                    options.gameVersion(),
+                    Instant.now(),
+                    Instant.now(),
+                    installedFiles.stream().map(Path::toString).toList(),
+                    selectedModtaleDependencies,
+                    externalNames,
+                    curseForgeProjectId == null ? InstalledProject.SOURCE_MODTALE : InstalledProject.SOURCE_CURSEFORGE,
+                    isModpack ? InstalledProject.INSTALL_MODPACK : isBundle ? InstalledProject.INSTALL_BUNDLE : InstalledProject.INSTALL_DIRECT,
+                    false,
+                    selectedReferences, universeConfigs
+            );
+            LOG.info("Completed install projectId=" + project.id()
+                    + " installedVersion=" + version.versionNumber()
+                    + " fileCount=" + installedFiles.size()
+                    + " warnings=" + warnings.size());
+            return new InstallResult(installedProject, installedFiles, warnings);
+        } finally { deleteTemp(mainDownload.path()); }
     }
 
     private void installCurseForgeDependency(
@@ -371,7 +400,7 @@ public class ModInstaller {
                 fresh.source(),
                 fresh.installType(),
                 unlocked,
-                fresh.bundledProjects()
+                fresh.bundledProjects(), fresh.universeConfigs()
         );
     }
 

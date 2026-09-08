@@ -60,7 +60,7 @@ final class LibraryArtifactIdentityReconciler {
         return new InstalledProject(project.projectId(), project.slug(), project.title(), project.classification(),
                 project.installedVersion(), project.installedVersionId(), project.gameVersion(), project.installedAt(),
                 project.updatedAt(), List.copyOf(merged), project.dependencyProjectIds(), project.externalDependencies(),
-                project.source(), project.installType(), project.modpackUnlocked(), project.bundledProjects());
+                project.source(), project.installType(), project.modpackUnlocked(), project.bundledProjects(), project.universeConfigs());
     }
 
     private static String normalize(String path) {

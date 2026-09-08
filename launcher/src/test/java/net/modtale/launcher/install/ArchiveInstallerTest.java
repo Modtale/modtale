@@ -22,6 +22,29 @@ class ArchiveInstallerTest {
     Path tempDir;
 
     @Test
+    void enablingOneModSeedsOnlyItsDefaultsAndKeepsExistingSettings() throws IOException {
+        Path jar = tempDir.resolve("owner.jar");
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(jar))) {
+            add(zip, "manifest.json", "{\"Group\":\"Example\",\"Name\":\"Owner\"}");
+        }
+        var ids = ArchiveInstaller.readModIds(List.of(jar));
+        assertEquals(List.of("Example:Owner"), ids);
+        var owned = new net.modtale.launcher.model.worldlist.WorldListConfig("WORLD", "CustomFolder/config.json", "{}", ids);
+        var other = new net.modtale.launcher.model.worldlist.WorldListConfig("WORLD", "Other/config.json", "{}", List.of("Example:Other"));
+        var selected = List.of(owned, other).stream().filter(config -> config.appliesTo(ids, false)).toList();
+        assertEquals(List.of(owned), selected);
+        Path universe = tempDir.resolve("universe/mods");
+        WorldListConfigInstaller.install(selected, "WORLD", universe, 32 * 1024 * 1024);
+        assertEquals("{}", Files.readString(universe.resolve("CustomFolder/config.json")));
+        assertTrue(Files.notExists(universe.resolve("Other/config.json")));
+        Files.writeString(universe.resolve("CustomFolder/config.json"), "custom");
+        WorldListConfigInstaller.install(selected, "WORLD", universe, 32 * 1024 * 1024);
+        assertEquals("custom", Files.readString(universe.resolve("CustomFolder/config.json")));
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        assertEquals(owned, mapper.readValue(mapper.writeValueAsBytes(owned), net.modtale.launcher.model.worldlist.WorldListConfig.class));
+    }
+
+    @Test
     void copiesSingleDownloadedFileToModsDirectory() throws IOException {
         Path download = tempDir.resolve("download.tmp");
         Files.writeString(download, "jar");
@@ -113,47 +136,11 @@ class ArchiveInstallerTest {
     }
 
     @Test
-    void existingConfigIsPreservedAndMissingWorldConfigIsSeeded() throws IOException {
+    void rejectsSavedWorldPayloadBeforeWritingFiles() throws IOException {
         Path instance = tempDir.resolve("UserData");
-        Path config = instance.resolve("Saves/My World/mods/Example_Plugin/config.json");
-        Path archive = overrideArchive("overrides/Saves/My World/mods/Example_Plugin/config.json");
-        ArchiveInstaller installer = new ArchiveInstaller();
-        installer.installModpackArchive(archive, instance.resolve("Mods"), instance);
-        assertEquals("settings", Files.readString(config));
-        Files.writeString(config, "custom settings");
-        assertTrue(installer.installModpackArchive(archive, instance.resolve("Mods"), instance).isEmpty());
-        assertEquals("custom settings", Files.readString(config));
-        assertTrue(Files.notExists(instance.resolve("Saves/My World/Mods")));
-    }
-
-    @Test
-    void attributesPackConfigToBundledManifestAfterInstall() throws Exception {
-        var jarBytes = new java.io.ByteArrayOutputStream();
-        try (var jar = new ZipOutputStream(jarBytes)) {
-            add(jar, "manifest.json", "{\"Group\":\"org.example_mods\",\"Name\":\"Fancy_Mod\"}");
-        }
-        byte[] bundled = jarBytes.toByteArray();
-        String configPath = "overrides/Saves/My World/mods/org.example_mods_Fancy_Mod/Gameplay.json";
-        String lock = """
-                {"format":"modtale-lock","lockVersion":1,"game":"hytale",
-                 "entries":[{"distribution":"BUNDLED","path":"mods/unrelated-marketplace-title.jar","size":%d,"hashes":{"sha256":"%s"}}],
-                 "overrides":[{"path":"%s","size":2,"hashes":{"sha256":"%s"}}]}
-                """.formatted(bundled.length, HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bundled)),
-                        configPath, sha256("{}"));
-        Path archive = tempDir.resolve("attributed-pack.zip");
-        try (var zip = new ZipOutputStream(Files.newOutputStream(archive))) {
-            add(zip, "modtale.lock.json", lock);
-            zip.putNextEntry(new ZipEntry("mods/unrelated-marketplace-title.jar"));
-            zip.write(bundled);
-            zip.closeEntry();
-            add(zip, configPath, "{}");
-        }
-        Path instance = tempDir.resolve("attributed-instance");
-        new ArchiveInstaller().installModpackArchive(archive, instance.resolve("Mods"), instance);
-        var found = new net.modtale.launcher.config.HytaleConfigFiles().discover(instance.resolve("Mods"), instance.resolve("Saves/My World"));
-        assertEquals(1, found.size());
-        assertEquals("org.example_mods:Fancy_Mod", found.getFirst().pluginId());
-        assertEquals("org.example_mods_Fancy_Mod/Gameplay.json", found.getFirst().root().relativize(found.getFirst().path()).toString().replace('\\', '/'));
+        Path archive = overrideArchive("overrides/Saves/My World/universe/config.json");
+        assertThrows(IOException.class, () -> new ArchiveInstaller().installModpackArchive(archive, instance.resolve("Mods"), instance));
+        assertTrue(Files.notExists(instance.resolve("Saves")));
     }
 
     private Path overrideArchive(String entryPath) throws IOException {
@@ -171,7 +158,7 @@ class ArchiveInstallerTest {
     }
 
     @Test
-    void installsVerifiedLockedPackAndAppliesAllOverrides() throws IOException {
+    void rejectsSharedOverridePackBeforeInstallingMods() throws IOException {
         Path archive = tempDir.resolve("locked-modpack.zip");
         String bundled = "bundled mod";
         String settings = "settings";
@@ -208,14 +195,72 @@ class ArchiveInstallerTest {
         Path instance = tempDir.resolve("instance");
         Path mods = instance.resolve("mods");
 
-        List<Path> installed = new ArchiveInstaller().installModpackArchive(archive, mods, instance);
+        assertThrows(IOException.class, () -> new ArchiveInstaller().installModpackArchive(archive, mods, instance));
+        assertTrue(Files.notExists(mods.resolve("bundled.jar")));
+        assertTrue(Files.notExists(instance.resolve("Saves")));
+    }
 
-        assertEquals(4, installed.size());
-        assertEquals(bundled, Files.readString(mods.resolve("bundled.jar")));
-        assertEquals(settings, Files.readString(instance.resolve("Mods/example/settings.json")));
-        assertEquals(preferences, Files.readString(instance.resolve("Mods/example/ui.toml")));
-        assertEquals(world, Files.readString(instance.resolve("Saves/example/config.json")));
-        assertTrue(Files.notExists(mods.resolve("modtale.lock.json")));
+    @Test
+    void universeDefaultsAreDeferredAndSeedEachChosenUniverseWithoutOverwriting() throws IOException {
+        Path archive = tempDir.resolve("universe.zip");
+        String hash = sha256("{}");
+        String lock = """
+            {"format":"modtale-lock","lockVersion":2,"game":"hytale",
+             "entries":[{"id":"mod","source":"MODTALE","distribution":"BUNDLED","path":"mod.jar","size":2,"hashes":{"sha256":"%s"}}],
+             "overrides":[{"path":"overrides/Universe/mods/Example/config.json","destination":"Universe/mods/Example/config.json","owner":{"projectId":"mod","source":"MODTALE"},"installPolicy":"SEED_ONLY","size":2,"hashes":{"sha256":"%s"}}]}
+            """.formatted(hash, hash);
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(archive))) {
+            add(zip, "modtale.lock.json", lock); add(zip, "mod.jar", "{}");
+            add(zip, "overrides/Universe/mods/Example/config.json", "{}");
+        }
+        ArchiveInstaller installer = new ArchiveInstaller();
+        Path instance = tempDir.resolve("instance");
+        installer.installModpackArchive(archive, instance.resolve("Mods"), instance);
+        assertTrue(Files.notExists(instance.resolve("Universe")));
+        assertTrue(installer.readUniverseConfigs(archive, java.util.Set.of()).isEmpty());
+        var configs = installer.readUniverseConfigs(archive, java.util.Set.of("MODTALE:mod"));
+        for (String universe : List.of("Adventure", "Creative")) {
+            Path root = instance.resolve("Saves").resolve(universe).resolve("mods");
+            WorldListConfigInstaller.install(configs, "WORLD", root, 32 * 1024 * 1024);
+            assertEquals("{}", Files.readString(root.resolve("Example/config.json")));
+        }
+        Path root = instance.resolve("Saves/Adventure/mods");
+        Files.writeString(root.resolve("Example/config.json"), "{\"custom\":true}");
+        WorldListConfigInstaller.install(configs, "WORLD", root, 32 * 1024 * 1024);
+        assertEquals("{\"custom\":true}", Files.readString(root.resolve("Example/config.json")));
+    }
+
+    @Test
+    void ownedConfigsFollowOptionalSelectionAndVerifiedExternalInstalls() throws IOException {
+        Path archive = tempDir.resolve("owned-modpack.zip");
+        String bytes = "{}";
+        String hash = sha256(bytes);
+        String lock = """
+                {"format":"modtale-lock","lockVersion":2,"game":"hytale",
+                 "entries":[
+                  {"id":"optional","source":"MODTALE","dependencyType":"OPTIONAL","distribution":"BUNDLED","path":"mods/optional.jar","size":2,"hashes":{"sha256":"%s"}},
+                  {"id":"cf","source":"CURSEFORGE","distribution":"REFERENCE_ONLY"}],
+                 "overrides":[
+                  {"path":"overrides/Universe/mods/Optional/config.json","destination":"Universe/mods/Optional/config.json","installPolicy":"SEED_ONLY","owner":{"projectId":"optional","source":"MODTALE"},"size":2,"hashes":{"sha256":"%s"}},
+                  {"path":"overrides/Universe/mods/External/config.json","destination":"Universe/mods/External/config.json","installPolicy":"SEED_ONLY","owner":{"projectId":"cf","source":"CURSEFORGE"},"size":2,"hashes":{"sha256":"%s"}}]}
+                """.formatted(hash, hash, hash);
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(archive))) {
+            add(zip, "modtale.lock.json", lock);
+            add(zip, "mods/optional.jar", bytes);
+            add(zip, "overrides/Universe/mods/Optional/config.json", bytes);
+            add(zip, "overrides/Universe/mods/External/config.json", bytes);
+        }
+        var installer = new ArchiveInstaller();
+        Path instance = tempDir.resolve("owned-instance");
+        Path mods = instance.resolve("Mods");
+        assertTrue(installer.installModpackArchive(archive, mods, instance, java.util.Set.of()).isEmpty());
+        assertTrue(Files.notExists(mods.resolve("Optional/config.json")));
+        installer.installModpackArchive(archive, mods, instance, java.util.Set.of("MODTALE:optional"));
+        assertTrue(Files.notExists(mods.resolve("Optional/config.json")));
+        var external = installer.readUniverseConfigs(archive, java.util.Set.of("CURSEFORGE:cf"), java.util.Map.of("CURSEFORGE:cf", List.of("Example:External")));
+        assertEquals(1, external.size());
+        assertEquals(List.of("Example:External"), external.getFirst().modIds());
+        assertEquals(bytes, external.getFirst().content());
     }
 
     @Test

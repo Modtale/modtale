@@ -14,7 +14,11 @@ public final class WorldListConfigInstaller {
     private WorldListConfigInstaller() {}
 
     public static List<Path> install(List<WorldListConfig> configs, String scope, Path modsRoot) throws IOException {
-        List<WorldListConfig> selected = WorldListConfig.validate(configs).stream()
+        return install(configs, scope, modsRoot, WorldListConfig.MAX_TOTAL_BYTES);
+    }
+
+    public static List<Path> install(List<WorldListConfig> configs, String scope, Path modsRoot, int maxTotalBytes) throws IOException {
+        List<WorldListConfig> selected = WorldListConfig.validate(configs, maxTotalBytes).stream()
                 .filter(config -> config.scope().equals(scope)).toList();
         if (selected.isEmpty()) return List.of();
         if (Files.isSymbolicLink(modsRoot)) throw new IOException("The mods folder is a symbolic link.");
