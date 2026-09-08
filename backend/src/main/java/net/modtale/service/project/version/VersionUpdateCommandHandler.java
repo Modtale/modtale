@@ -2,6 +2,7 @@ package net.modtale.service.project.version;
 
 import java.util.List;
 import net.modtale.exception.VersionNotFoundException;
+import net.modtale.model.dto.request.project.DependencyReferenceRequest;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
@@ -43,7 +44,7 @@ public class VersionUpdateCommandHandler {
     public void updateVersion(
             String projectId,
             String versionId,
-            List<String> projectIds,
+            List<DependencyReferenceRequest> dependencies,
             List<String> incompatibleProjectIds,
             List<String> gameVersions,
             String changelog,
@@ -69,16 +70,16 @@ public class VersionUpdateCommandHandler {
         }
 
         boolean modpack = project.getClassification() == ProjectClassification.MODPACK;
-        if (projectIds != null) {
+        if (dependencies != null) {
             VersionDependencyService.ResolvedDependencies resolvedDependencies =
-                    versionMutationOrchestrationService.resolveRequestedDependencies(projectIds, modpack, true);
-            List<ProjectDependency> dependencies = resolvedDependencies.dependencies();
+                    versionMutationOrchestrationService.resolveRequestedDependencies(dependencies, modpack, true);
+            List<ProjectDependency> resolvedProjectDependencies = resolvedDependencies.dependencies();
             if (modpack) {
-                versionMutationOrchestrationService.invalidateCachedModpackArtifact(version, dependencies);
+                versionMutationOrchestrationService.invalidateCachedModpackArtifact(version, resolvedProjectDependencies);
             }
-            version.setDependencies(dependencies);
+            version.setDependencies(resolvedProjectDependencies);
             if (modpack && project.getVersions().get(0).getId().equals(versionId)) {
-                project.setModIds(resolvedDependencies.simpleProjectIds());
+                project.setChildProjectIds(resolvedDependencies.simpleProjectIds());
             }
         }
         if (incompatibleProjectIds != null) {

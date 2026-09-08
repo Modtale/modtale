@@ -1,14 +1,14 @@
+import { defaultFixtureDirectory, generatedDirectory } from './fixture-files.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 
-const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
 const fixtureDir = process.env.MOCK_DB_COLLECTION_DIR
   ? path.resolve(process.env.MOCK_DB_COLLECTION_DIR)
-  : path.join(repoRoot, 'mock-db', 'generated', 'collections');
+  : defaultFixtureDirectory;
 const outputPath = process.env.MOCK_R2_OBJECT_KEYS_FILE
   ? path.resolve(process.env.MOCK_R2_OBJECT_KEYS_FILE)
-  : path.join(repoRoot, 'mock-db', 'generated', 'r2-object-keys.txt');
+  : path.join(generatedDirectory, 'r2-object-keys.txt');
 
 const versionArtifactFields = new Set(['fileUrl', 'cachedFileUrl', 'artifactUrl']);
 const dependencyArtifactFields = new Set(['cachedFileUrl', 'externalFileUrl', 'fileUrl']);

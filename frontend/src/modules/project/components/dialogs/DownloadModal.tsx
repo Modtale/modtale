@@ -1,8 +1,14 @@
+import { ProjectLoadingRegion } from '../ProjectLoadingRegion';
+import { PROJECT_LOADING_VERSIONS, loadingNoop } from '../projectLoadingData';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Download, X, ChevronDown, FileText, AlertCircle, ChevronRight, Check } from 'lucide-react';
+import { Download, X, ChevronDown, FileText, AlertCircle, ChevronRight, MonitorDown, Check, ExternalLink } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { buildVersionGroups, compareSemVer, formatTimeAgo, type VersionGroup } from '@/utils/modHelpers';
 import { useScrollLock } from '@/hooks/useScrollLock';
+import { getExternalDependencies, hasCurseForgeDependencies } from '@/modules/project/utils/dependencyEntries';
+import { openLauncherInstallOrFallback } from '@/modules/launcher/utils/launcherProtocol';
+import { SiteRoutes } from '@/utils/routes';
+import type { ProjectDependency } from '@/types';
 import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface VersionMultiSelectDropdownProps {
@@ -175,6 +181,7 @@ const VersionMultiSelectDropdown: React.FC<VersionMultiSelectDropdownProps> = ({
 };
 
 interface DownloadModalProps {
+    loading?: boolean;
     show: boolean;
     onClose: () => void;
     versionsByGame: Record<string, any[]>;
@@ -184,13 +191,17 @@ interface DownloadModalProps {
     showExperimental: boolean;
     onToggleExperimental: () => void;
     onViewHistory: () => void;
+    isModpack?: boolean;
     isInline?: boolean;
     containerRef?: React.Ref<HTMLDivElement>;
+    projectId?: string;
+    projectHandle?: string;
+    onLauncherFallback?: () => void;
 }
 
 export const DownloadModal: React.FC<DownloadModalProps> = ({
-                                                                show, onClose, versionsByGame, preReleaseGameVersions = [], orderedGameVersions, onDownload, showExperimental, onToggleExperimental, onViewHistory, isInline = false, containerRef
-                                                            }) => {
+                                                                 loading = false, show, onClose, versionsByGame, preReleaseGameVersions = [], orderedGameVersions = [], onDownload, showExperimental, onToggleExperimental, onViewHistory, isModpack = false, isInline = false, containerRef, projectId, projectHandle, onLauncherFallback
+}) => {
     useScrollLock(show && !isInline);
     const [selectedGameVersions, setSelectedGameVersions] = useState<string[]>([]);
     const [isListExpanded, setIsListExpanded] = useState(false);
@@ -380,34 +391,104 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
         return versions.filter((gv: string) => gv !== gameVersion);
     };
 
+    const externalDependenciesFor = (ver: any): ProjectDependency[] => (
+        isModpack ? getExternalDependencies(ver?.dependencies) : []
+    );
+
+    const handleLauncherInstall = () => {
+        if (!projectId || !latestVer) return;
+
+        openLauncherInstallOrFallback(
+            {
+                projectId,
+                projectHandle,
+                versionNumber: latestVer.versionNumber,
+                gameVersion: latestGameVersion
+            },
+            onLauncherFallback ?? (() => { window.location.href = SiteRoutes.launcher(); })
+        );
+    };
+
+    const formatExternalDependencyNames = (dependencies: ProjectDependency[]) => {
+        const names = dependencies.map(dep => dep.projectTitle || dep.externalId || dep.projectId).filter(Boolean);
+        const visibleNames = names.slice(0, 3);
+        const remainingCount = names.length - visibleNames.length;
+        return `${visibleNames.join(', ')}${remainingCount > 0 ? `, +${remainingCount} more` : ''}`;
+    };
+
+    const renderExternalDependencyNotice = (ver: any) => {
+        const externalDependencies = externalDependenciesFor(ver);
+        if (externalDependencies.length === 0) return null;
+
+        return (
+            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-900 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                <div className="flex items-start gap-2">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                    <div>
+                        <p className="text-sm font-black">This modpack uses external mods</p>
+                        <p className="mt-1 text-xs font-medium leading-relaxed">
+                            {formatExternalDependencyNames(externalDependencies)} {externalDependencies.length === 1 ? 'comes' : 'come'} from outside Modtale and is not redistributed in this archive. Use the linked source pages to obtain those files from their authors' chosen platform.
+                        </p>
+                        <ul className="mt-2 space-y-1" aria-label="External mod source pages">
+                            {externalDependencies.map((dependency, index) => (
+                                <li key={dependency.id || `${dependency.source}-${dependency.externalId || dependency.projectId}-${index}`}>
+                                    {dependency.externalUrl ? (
+                                        <a
+                                            href={dependency.externalUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-xs font-bold underline decoration-amber-500/50 underline-offset-2 hover:decoration-current"
+                                        >
+                                            {dependency.projectTitle || dependency.externalId || dependency.projectId}
+                                            <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                                        </a>
+                                    ) : (
+                                        <span className="text-xs font-bold">{dependency.projectTitle || dependency.externalId || dependency.projectId}</span>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const download = (ver: any, gameVersion: string) => {
+        if (isModpack && hasCurseForgeDependencies(ver?.dependencies)) return;
+        onDownload(ver.fileUrl, ver.versionNumber, gameVersion, ver.dependencies, ver.channel);
+    };
+
+    const latestRequiresLauncher = isModpack && hasCurseForgeDependencies(latestVer?.dependencies);
+
     const content = (
         <div ref={containerRef} className={`${isInline ? 'w-full overflow-hidden relative flex flex-col transform transition-transform duration-500' : 'fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-2xl max-h-[90dvh] flex flex-col z-[100]'} bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl rounded-2xl overflow-hidden`} onClick={e => e.stopPropagation()}>
             <div className={`p-6 flex justify-between items-center shrink-0 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-800/50`}>
                 <div>
                     <h3 className={`text-xl font-black ${theme.colors.textPrimary} flex items-center gap-2`}><Download className={`w-5 h-5 ${theme.colors.accent}`} /> Download</h3>
                     {showPreReleaseToggle && (
-                        <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={() => setShowPreReleaseGameVersions(!showPreReleaseGameVersions)}>
+                        <ProjectLoadingRegion loading={loading} className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={() => setShowPreReleaseGameVersions(!showPreReleaseGameVersions)}>
                             <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${effectiveShowPreReleaseGameVersions ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>
                                 <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${effectiveShowPreReleaseGameVersions ? 'translate-x-4' : ''}`} />
                             </div>
                             <span className={`text-[10px] font-bold ${theme.colors.textMuted} uppercase group-hover:${theme.colors.textPrimary} transition-colors`}>Show Pre-Release Game Versions</span>
-                        </div>
+                        </ProjectLoadingRegion>
                     )}
                     {showAlphaBetaToggle && (
-                        <div className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
+                        <ProjectLoadingRegion loading={loading} className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
                             <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${effectiveShowExperimental ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>
                                 <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${effectiveShowExperimental ? 'translate-x-4' : ''}`} />
                             </div>
                             <span className={`text-[10px] font-bold ${theme.colors.textMuted} uppercase group-hover:${theme.colors.textPrimary} transition-colors`}>Show Beta/Alpha</span>
-                        </div>
+                        </ProjectLoadingRegion>
                     )}
                 </div>
                 {!isInline && (
-                    <button type="button" onClick={onClose} className={`p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 transition-colors`}><X className="w-5 h-5" /></button>
+                    <button type="button" aria-label="Close downloads" onClick={onClose} className={`p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 transition-colors`}><X className="w-5 h-5" /></button>
                 )}
             </div>
 
-            <div className={`p-6 overflow-visible relative flex-1 flex flex-col justify-start`}>
+            <ProjectLoadingRegion loading={loading} label="Loading downloads" className={`p-6 overflow-visible relative flex-1 flex flex-col justify-start`}>
                 <div className="mb-6">
                     <label className={`block text-xs font-bold ${theme.colors.textSecondary} uppercase mb-2 tracking-wider`}>Game Versions</label>
                     <VersionMultiSelectDropdown
@@ -422,13 +503,14 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                     <>
                         <button
                             type="button"
-                            onClick={() => onDownload(latestVer.fileUrl, latestVer.versionNumber, latestGameVersion, latestVer.dependencies, latestVer.channel)}
-                            className={`w-full p-5 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 mb-6 group relative overflow-hidden ${themeClass}`}
+                            disabled={latestRequiresLauncher}
+                            onClick={() => download(latestVer, latestGameVersion)}
+                            className={`w-full p-5 rounded-2xl shadow-lg flex flex-col items-center justify-center gap-1.5 transition-all ${projectId ? 'mb-3' : 'mb-6'} group relative overflow-hidden ${latestRequiresLauncher ? 'cursor-not-allowed bg-slate-200 text-slate-500 shadow-none dark:bg-slate-800 dark:text-slate-400' : `active:scale-95 ${themeClass}`}`}
                         >
-                            <div className="font-black text-xl flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-6 h-6" /> Download Latest</div>
-                            <div className={`text-xs font-bold font-mono px-3 py-1 rounded-full border flex items-center gap-2 z-10 ${getVersionBadgeColor(latestVer.channel || 'RELEASE')}`}>
-                                v{latestVer.versionNumber}
-                                {latestVer.channel !== 'RELEASE' && <span className="uppercase tracking-wider opacity-90">{latestVer.channel}</span>}
+                            <div className="font-black text-xl flex items-center gap-2 group-hover:scale-105 transition-transform z-10"><Download className="w-6 h-6" /> {latestRequiresLauncher ? 'Modtale Launcher Required' : 'Download Latest'}</div>
+                            <div className="text-xs font-semibold opacity-80 z-10">
+                                Version {latestVer.versionNumber}
+                                {latestVer.channel !== 'RELEASE' && <span className="capitalize"> · {latestVer.channel.toLowerCase()}</span>}
                             </div>
                             {shouldShowEntryGameVersion && (
                                 <div className="text-[11px] font-semibold text-blue-50/95 z-10">
@@ -441,6 +523,23 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                                 </div>
                             )}
                         </button>
+                        {projectId && (
+                            <button
+                                type="button"
+                                onClick={handleLauncherInstall}
+                                aria-label={`Install v${latestVer.versionNumber} with Modtale Launcher`}
+                                className="mx-auto mb-6 inline-flex items-center justify-center gap-2 rounded-full border border-slate-200 bg-white/70 px-3.5 py-2 text-xs font-black text-slate-500 shadow-sm transition-colors hover:border-modtale-accent/40 hover:text-modtale-accent focus:outline-none focus:ring-2 focus:ring-modtale-accent/30 dark:border-white/10 dark:bg-white/5 dark:text-slate-400 dark:hover:border-modtale-accent/50 dark:hover:text-blue-200"
+                            >
+                                <MonitorDown className="h-4 w-4" aria-hidden="true" />
+                                Install with launcher
+                            </button>
+                        )}
+                        {latestRequiresLauncher && (
+                            <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm font-bold text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-100">
+                                This version contains CurseForge projects. Install it through Modtale Launcher so those files are downloaded directly to your device.
+                            </div>
+                        )}
+                        {renderExternalDependencyNotice(latestVer)}
 
                         <div className="relative mb-6">
                             <div className="absolute inset-0 flex items-center"><div className={`w-full border-t ${theme.colors.borderFaint}`}></div></div>
@@ -475,13 +574,20 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                                                         Also supports: {otherCompatibleVersions(ver, gameVersion).join(', ')}
                                                     </div>
                                                 )}
+                                                {externalDependenciesFor(ver).length > 0 && (
+                                                    <div className="mt-1 inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                                                        <AlertCircle className="h-3 w-3" aria-hidden="true" />
+                                                        External mods
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                         <button
                                             type="button"
-                                            onClick={() => onDownload(ver.fileUrl, ver.versionNumber, gameVersion, ver.dependencies, ver.channel)}
-                                            className={`p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-modtale-accent hover:text-white transition-colors`}
-                                            aria-label={`Download version ${ver.versionNumber}`}
+                                            disabled={isModpack && hasCurseForgeDependencies(ver?.dependencies)}
+                                            onClick={() => download(ver, gameVersion)}
+                                            className={`p-2 rounded-lg transition-colors ${isModpack && hasCurseForgeDependencies(ver?.dependencies) ? 'cursor-not-allowed bg-slate-100 text-slate-300 dark:bg-white/5 dark:text-slate-600' : 'bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:bg-modtale-accent hover:text-white'}`}
+                                            aria-label={isModpack && hasCurseForgeDependencies(ver?.dependencies) ? `Version ${ver.versionNumber} requires Modtale Launcher` : `Download version ${ver.versionNumber}`}
                                         >
                                             <Download className="w-4 h-4" />
                                         </button>
@@ -501,13 +607,13 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                         )}
                     </div>
                 )}
-            </div>
+            </ProjectLoadingRegion>
 
-            <div className={`p-4 border-t border-slate-100 dark:border-white/5 shrink-0 z-10 flex items-center justify-center bg-slate-50 dark:bg-[#0B1120]`}>
+            <ProjectLoadingRegion loading={loading} label="Loading downloads" className={`p-4 border-t border-slate-100 dark:border-white/5 shrink-0 z-10 flex items-center justify-center bg-slate-50 dark:bg-[#0B1120]`}>
                 <button type="button" onClick={onViewHistory} className={`text-xs ${theme.colors.textMuted} hover:${theme.colors.accent} font-bold uppercase tracking-wider flex items-center justify-center gap-1 transition-colors w-full`}>
                     View Full Changelog <ChevronRight className="w-3 h-3" />
                 </button>
-            </div>
+            </ProjectLoadingRegion>
         </div>
     );
 
@@ -521,3 +627,9 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
         </ModalPortal>
     );
 };
+
+export function DownloadModalSkeleton({ show = true, isInline = false, onClose = loadingNoop }: { show?: boolean; isInline?: boolean; onClose?: () => void }) {
+    return <DownloadModal loading show={show} isInline={isInline} onClose={onClose}
+        versionsByGame={{ '2026.01.17': PROJECT_LOADING_VERSIONS }} orderedGameVersions={['2026.01.17']}
+        onDownload={loadingNoop} showExperimental={false} onToggleExperimental={loadingNoop} onViewHistory={loadingNoop} />;
+}

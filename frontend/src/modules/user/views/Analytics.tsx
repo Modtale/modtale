@@ -1,3 +1,5 @@
+import { LoadingChartFrame } from '@/modules/admin/components/LoadingChartFrame';
+import { SkeletonSurface } from '@/components/ui/Skeleton';
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { BarChart2, PieChart, ChevronDown, Check, User as UserIcon, Building2, Download, Eye, TrendingUp, TrendingDown, Layers, CalendarClock } from 'lucide-react';
@@ -15,10 +17,10 @@ import { Permission } from '@/modules/permissions/permissions';
 const SummaryCard = ({ title, value, subValue, trend, icon: Icon, color, isPercent }: any) => (
     <div className="bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm hover:shadow-md transition-all relative overflow-hidden group backdrop-blur-md flex flex-col justify-between p-6">
         <div className={`absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity ${color}`}>
-            <Icon className="w-32 h-32 transform translate-x-8 -translate-y-8" />
+            <Icon data-skeleton-keep className={`w-32 h-32 transform translate-x-8 -translate-y-8 ${color}`} />
         </div>
         <div className="relative z-10 flex items-start justify-between mb-2">
-            <div className={`p-3 rounded-2xl ${color} bg-opacity-10 text-current shadow-inner`}>
+            <div data-skeleton-keep className={`p-3 rounded-2xl ${color} bg-opacity-10 text-current shadow-inner`}>
                 <Icon className="w-6 h-6" />
             </div>
             {trend !== undefined && (
@@ -29,8 +31,8 @@ const SummaryCard = ({ title, value, subValue, trend, icon: Icon, color, isPerce
             )}
         </div>
         <div className="relative z-10 mt-4">
-            <h3 className="text-slate-500 dark:text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">{title}</h3>
-            <div className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">
+            <h3 data-skeleton-keep className="text-slate-500 dark:text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">{title}</h3>
+            <div className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-normal leading-none">
                 {value}{isPercent && <span className="text-2xl text-slate-400 ml-1">%</span>}
             </div>
             {subValue && <div className="text-xs text-slate-500 dark:text-slate-400 mt-2 font-medium">{subValue}</div>}
@@ -53,14 +55,14 @@ export const Analytics: React.FC = () => {
     const [contextDropdownOpen, setContextDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const [meta, setMeta] = useState<{ title: string; subtitle: string }>({ title: '', subtitle: '' });
-    const [summary, setSummary] = useState<any>(null);
-    const [seriesData, setSeriesData] = useState<Record<string, any[]>>({});
-    const [viewsData, setViewsData] = useState<Record<string, any[]>>({});
-    const [items, setItems] = useState<string[]>([]);
-    const [itemMeta, setItemMeta] = useState<Record<string, any>>({});
-    const [fourthChart, setFourthChart] = useState<any>(null);
-    const [tableConfig, setTableConfig] = useState<{ headers: string[], rowRenderer: (id: string, stats: any) => React.ReactNode } | null>(null);
+    const [loadedMeta, setMeta] = useState<{ title: string; subtitle: string }>({ title: '', subtitle: '' });
+    const [loadedSummary, setSummary] = useState<any>(null);
+    const [loadedSeriesData, setSeriesData] = useState<Record<string, any[]>>({});
+    const [loadedViewsData, setViewsData] = useState<Record<string, any[]>>({});
+    const [loadedItems, setItems] = useState<string[]>([]);
+    const [loadedItemMeta, setItemMeta] = useState<Record<string, any>>({});
+    const [loadedFourthChart, setFourthChart] = useState<any>(null);
+    const [loadedTableConfig, setTableConfig] = useState<{ headers: string[], rowRenderer: (id: string, stats: any) => React.ReactNode } | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
 
     const normalizePointSeries = (value: any): any[] => Array.isArray(value) ? value : [];
@@ -84,7 +86,11 @@ export const Analytics: React.FC = () => {
                     hasOrgPermission(o, me.data.id, Permission.PROJECT_EDIT_METADATA)
                 );
                 setMyOrgs(adminOrgs);
-            } catch (e) { console.error("Init failed", e); }
+            } catch (e) {
+                console.error("Init failed", e);
+                setLoadError("Unable to load analytics right now.");
+                setLoading(false);
+            }
         };
         if (!id) init();
 
@@ -252,6 +258,42 @@ export const Analytics: React.FC = () => {
         fetchData();
     }, [id, range, selectedContext, currentUser?.id, myOrgs]);
 
+    // Placeholder values only reach the inert loading surface, never application state.
+    const placeholderKeys = ['pending-1', 'pending-2', 'pending-3'];
+    const placeholderSeries = Array.from({ length: 65 }, (_, index) => ({
+        date: new Date(Date.UTC(2026, 0, index + 1)).toISOString().slice(0, 10), count: 0,
+    }));
+    const meta = loading ? { title: id ? (loadedMeta.title || 'Project name') : '', subtitle: id ? 'Project Performance & Reach' : 'Overall Performance & Reach' } : loadedMeta;
+    const summary = loading ? {
+        downloads: { value: 1234, total: 12345, trend: 0 }, views: { value: 1234, total: 12345, trend: 0 },
+        conversion: 12.3, contentCount: { value: 3, label: id ? 'Versions' : 'Projects' },
+    } : loadedSummary;
+    const items = loading ? placeholderKeys : loadedItems;
+    const seriesData = loading ? Object.fromEntries(items.map(key => [key, placeholderSeries])) : loadedSeriesData;
+    const viewsData = loading ? (id ? { overall: placeholderSeries } : seriesData) : loadedViewsData;
+    const itemMeta = loading ? Object.fromEntries(items.map((key, index) => [key, { label: id ? '1.0.0' : ['Project title here', 'Another project', 'Project name'][index] }])) : loadedItemMeta;
+    const fourthChart = loading ? (id ? null : {
+        title: 'Conversion Rate (%)', icon: <PieChart className="w-5 h-5 text-orange-500" />, type: 'bar',
+        data: items.map(key => ({ id: key, label: itemMeta[key].label, value: 0 })), formatter: (v: number) => `${v.toFixed(1)}%`,
+    }) : loadedFourthChart;
+    const tableConfig = loading ? {
+        headers: id ? ['Version', 'Period Downloads', 'Total Downloads', 'Game Version', 'Released'] : ['Project Name', 'Period Downloads', 'Total Downloads', 'Updated', 'Action'],
+        rowRenderer: () => <>
+            <td className={`p-4 pl-6 font-bold text-slate-900 dark:text-white ${id ? 'flex items-center gap-2' : ''}`}>
+                {id && <span className="w-2.5 h-2.5 rounded-full inline-block mr-2 shadow-sm bg-slate-300" />}{id ? '1.0.0' : 'Project name'}
+            </td>
+            <td className="p-4 text-slate-600 dark:text-slate-300 font-mono">+1,234</td>
+            <td className="p-4 text-slate-600 dark:text-slate-300 font-mono">12,345</td>
+            {id ? <td className="p-4 text-xs font-mono text-slate-500">2026.01.01</td> :
+                <td className="p-4"><span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-slate-300 font-bold text-xs"><CalendarClock className="w-3 h-3" />2026-01-01</span></td>}
+            <td className="p-4 text-right pr-6">{id ?
+                <span className="text-xs font-bold bg-slate-200/50 dark:bg-white/10 px-2.5 py-1 rounded-md text-slate-500 border border-slate-200 dark:border-white/5">Jan 1, 2026</span> :
+                <button className="text-slate-500 font-bold text-xs border border-slate-200 dark:border-white/10 px-4 py-2 rounded-xl bg-white/50 dark:bg-white/5 shadow-sm">Details</button>}
+            </td>
+        </>,
+    } : loadedTableConfig;
+    const Surface = loading ? SkeletonSurface : React.Fragment;
+
     const calculateOverall = (source: Record<string, any[]>) => {
         const firstKey = Object.keys(source)[0];
         if (!firstKey || !source[firstKey]) return [];
@@ -308,33 +350,11 @@ export const Analytics: React.FC = () => {
         </div>
     );
 
-    if (loading) return (
-        <div className="w-full space-y-8 animate-pulse pt-2">
-            <div className="flex justify-between items-end mb-8">
-                <div>
-                    <div className="h-10 w-72 bg-slate-200 dark:bg-white/10 rounded-xl mb-3"></div>
-                    <div className="h-4 w-48 bg-slate-200 dark:bg-white/10 rounded-lg"></div>
-                </div>
-                <div className="h-12 w-48 bg-slate-200 dark:bg-white/10 rounded-2xl"></div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[...Array(4)].map((_, i) => (
-                    <div key={i} className="h-40 bg-slate-200/50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10"></div>
-                ))}
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {[...Array(4)].map((_, i) => (
-                    <div key={i} className="h-[500px] bg-slate-200/50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10"></div>
-                ))}
-            </div>
-        </div>
-    );
-
-    if (!id && !hasProjects) return (
+    if (!loading && !id && !hasProjects) return (
         <div className="mt-8 animate-in fade-in duration-500">
             {!id && myOrgs.length > 0 && (
                 <div className="flex items-center gap-3 mb-8">
-                    <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white">Analytics</h1>
+                    <h1 data-skeleton-keep className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white">Analytics</h1>
                     <span className="text-slate-300 dark:text-slate-700 text-2xl font-light">/</span>
                     <ContextSwitcher />
                 </div>
@@ -343,7 +363,7 @@ export const Analytics: React.FC = () => {
         </div>
     );
 
-    if (loadError) return (
+    if (!loading && loadError) return (
         <div className="mt-8 animate-in fade-in duration-500">
             <EmptyState icon={BarChart2} title="Analytics Unavailable" message={loadError} />
         </div>
@@ -403,11 +423,11 @@ export const Analytics: React.FC = () => {
     const activeRangeIndex = ranges.indexOf(range);
 
     return (
-        <div className="relative animate-in fade-in duration-500 pt-2">
+        <Surface><div className="relative animate-in fade-in duration-500 pt-2">
             <div className="flex flex-col md:flex-row justify-between md:items-end gap-6 mb-8">
                 <div>
                     <div className="flex items-center gap-3 mb-2">
-                        <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white">Analytics</h1>
+                        <h1 data-skeleton-keep className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white">Analytics</h1>
 
                         {(!id && myOrgs.length > 0) && (
                             <>
@@ -426,7 +446,7 @@ export const Analytics: React.FC = () => {
                     <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">{meta.subtitle}</p>
                 </div>
 
-                <div className="relative flex bg-white/60 dark:bg-black/20 p-1 rounded-xl shadow-inner border border-slate-200 dark:border-white/10 shrink-0 w-fit">
+                <div data-skeleton-keep className="relative flex bg-white/60 dark:bg-black/20 p-1 rounded-xl shadow-inner border border-slate-200 dark:border-white/10 shrink-0 w-fit">
                     <div
                         className="absolute top-1 bottom-1 w-14 rounded-lg transition-transform duration-300 ease-out bg-modtale-accent shadow-sm shadow-modtale-accent/30 border border-transparent"
                         style={{ transform: `translateX(${activeRangeIndex * 100}%)` }}
@@ -459,59 +479,59 @@ export const Analytics: React.FC = () => {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm flex flex-col h-[500px] backdrop-blur-md">
-                        <div className="flex items-center gap-4 mb-4 shrink-0 px-6 pt-6">
+                        <div data-skeleton-keep className="flex items-center gap-4 mb-4 shrink-0 px-6 pt-6">
                             <div className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm text-blue-500"><Download className="w-5 h-5" /></div>
                             <div>
-                                <h3 className="font-bold text-lg text-slate-900 dark:text-white leading-tight">Downloads over Time</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Daily download activity.</p>
+                                <h3 data-skeleton-keep className="font-bold text-lg text-slate-900 dark:text-white leading-tight">Downloads over Time</h3>
+                                <p data-skeleton-keep className="text-xs text-slate-500 dark:text-slate-400 font-medium">Daily download activity.</p>
                             </div>
                         </div>
-                        <div className="flex-1 min-h-0 px-6 pb-6">
+                        <LoadingChartFrame pending={loading} className="flex-1 min-h-0 px-6 pb-6">
                             <LineChart datasets={chartDatasets.downloads} onToggle={toggleHandler('downloads')} />
-                        </div>
+                        </LoadingChartFrame>
                     </div>
 
                     <div className="bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm flex flex-col h-[500px] backdrop-blur-md">
-                        <div className="flex items-center gap-4 mb-4 shrink-0 px-6 pt-6">
+                        <div data-skeleton-keep className="flex items-center gap-4 mb-4 shrink-0 px-6 pt-6">
                             <div className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm text-purple-500"><Eye className="w-5 h-5" /></div>
                             <div>
-                                <h3 className="font-bold text-lg text-slate-900 dark:text-white leading-tight">Views over Time</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Daily page view activity.</p>
+                                <h3 data-skeleton-keep className="font-bold text-lg text-slate-900 dark:text-white leading-tight">Views over Time</h3>
+                                <p data-skeleton-keep className="text-xs text-slate-500 dark:text-slate-400 font-medium">Daily page view activity.</p>
                             </div>
                         </div>
-                        <div className="flex-1 min-h-0 px-6 pb-6">
+                        <LoadingChartFrame pending={loading} className="flex-1 min-h-0 px-6 pb-6">
                             <LineChart datasets={chartDatasets.views} onToggle={toggleHandler('views')} />
-                        </div>
+                        </LoadingChartFrame>
                     </div>
 
                     <div className="bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm flex flex-col h-[500px] backdrop-blur-md">
-                        <div className="flex items-center gap-4 mb-4 shrink-0 px-6 pt-6">
+                        <div data-skeleton-keep className="flex items-center gap-4 mb-4 shrink-0 px-6 pt-6">
                             <div className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm text-emerald-500"><TrendingUp className="w-5 h-5" /></div>
                             <div>
-                                <h3 className="font-bold text-lg text-slate-900 dark:text-white leading-tight">Momentum (WoW %)</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Week over week growth.</p>
+                                <h3 data-skeleton-keep className="font-bold text-lg text-slate-900 dark:text-white leading-tight">Momentum (WoW %)</h3>
+                                <p data-skeleton-keep className="text-xs text-slate-500 dark:text-slate-400 font-medium">Week over week growth.</p>
                             </div>
                         </div>
-                        <div className="flex-1 min-h-0 px-6 pb-6">
+                        <LoadingChartFrame pending={loading} className="flex-1 min-h-0 px-6 pb-6">
                             <LineChart datasets={chartDatasets.growth} onToggle={toggleHandler('momentum')} yAxisFormatter={(val) => `${val > 0 ? '+' : ''}${Math.round(val)}%`} />
-                        </div>
+                        </LoadingChartFrame>
                     </div>
 
                     {chartDatasets.fourthMetric && (
                         <div className="bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm flex flex-col h-[500px] backdrop-blur-md">
-                            <div className="flex items-center gap-4 mb-4 shrink-0 px-6 pt-6">
+                            <div data-skeleton-keep className="flex items-center gap-4 mb-4 shrink-0 px-6 pt-6">
                                 <div className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm text-orange-500">{chartDatasets.fourthMetric.icon}</div>
                                 <div>
                                     <h3 className="font-bold text-lg text-slate-900 dark:text-white leading-tight">{chartDatasets.fourthMetric.title}</h3>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Breakdown by item.</p>
+                                    <p data-skeleton-keep className="text-xs text-slate-500 dark:text-slate-400 font-medium">Breakdown by item.</p>
                                 </div>
                             </div>
-                            <div className="flex-1 min-h-0 px-6 pb-6">
+                            <LoadingChartFrame pending={loading} className="flex-1 min-h-0 px-6 pb-6">
                                 {chartDatasets.fourthMetric.type === 'line' ?
                                     <LineChart datasets={chartDatasets.fourthMetric.data} /> :
                                     <BarChart data={chartDatasets.fourthMetric.data} formatter={chartDatasets.fourthMetric.formatter} onToggle={toggleHandler('breakdown')} />
                                 }
-                            </div>
+                            </LoadingChartFrame>
                         </div>
                     )}
                 </div>
@@ -546,6 +566,6 @@ export const Analytics: React.FC = () => {
                     </div>
                 </div>
             </div>
-        </div>
+        </div></Surface>
     );
 };

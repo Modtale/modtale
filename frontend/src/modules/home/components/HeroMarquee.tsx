@@ -57,7 +57,7 @@ export const FeaturedModCard = memo(({ project, priority = false }: { project: P
                 </div>
 
                 <div className="mt-8 sm:mt-10 flex-1 relative z-20 pointer-events-none">
-                    <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight">
+                    <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-normal">
                         {project.title}
                     </h3>
                     <div className="flex items-center gap-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium truncate mt-1">

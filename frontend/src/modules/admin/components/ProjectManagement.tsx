@@ -1,3 +1,4 @@
+import { SkeletonSurface } from '@/components/ui/Skeleton';
 import React, { useState, useEffect, useRef } from 'react';
 import { Package, Search, Trash2, EyeOff, Clock, AlertTriangle, ArrowRight, Hash, Terminal, Download, RotateCcw, Code, X, FileJson, Lock } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
@@ -10,6 +11,7 @@ export function ProjectManagement({ setStatus, currentAdmin: initialAdmin }: { s
     const [query, setQuery] = useState('');
     const [idQuery, setIdQuery] = useState('');
     const [loading, setLoading] = useState(false);
+    const [loadingLookup, setLoadingLookup] = useState(false);
     const [foundProject, setFoundProject] = useState<Project | null>(null);
     const [showVersions, setShowVersions] = useState(false);
     const [searchDeleted, setSearchDeleted] = useState(false);
@@ -93,6 +95,7 @@ export function ProjectManagement({ setStatus, currentAdmin: initialAdmin }: { s
         if (!idQuery.trim()) return;
 
         setLoading(true);
+        setLoadingLookup(true);
         setFoundProject(null);
         try {
             const data = await adminClient.getProjectById(idQuery.trim());
@@ -107,6 +110,7 @@ export function ProjectManagement({ setStatus, currentAdmin: initialAdmin }: { s
             });
         } finally {
             setLoading(false);
+            setLoadingLookup(false);
         }
     };
 
@@ -120,6 +124,7 @@ export function ProjectManagement({ setStatus, currentAdmin: initialAdmin }: { s
         setActionReason('');
 
         setLoading(true);
+        setLoadingLookup(true);
         try {
             const data = await adminClient.getProjectById(mod.id);
             setFoundProject(data);
@@ -127,6 +132,7 @@ export function ProjectManagement({ setStatus, currentAdmin: initialAdmin }: { s
             setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, 'We could not load the full project details.') });
         } finally {
             setLoading(false);
+            setLoadingLookup(false);
         }
     };
 
@@ -248,59 +254,7 @@ export function ProjectManagement({ setStatus, currentAdmin: initialAdmin }: { s
         }
     };
 
-    return (
-        <div className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-8 shadow-sm backdrop-blur-md">
-            <div className="flex flex-col md:flex-row gap-4 mb-10 relative z-50 items-start">
-                <div className="relative flex-1 group w-full" ref={wrapperRef}>
-                    <div className="relative">
-                        <Package className="absolute left-5 top-4 w-5 h-5 text-slate-400 group-focus-within:text-modtale-accent transition-colors" />
-                        <input
-                            type="text"
-                            placeholder={searchDeleted ? "Search deleted projects..." : "Search active projects..."}
-                            className={`w-full pl-14 px-6 py-4 bg-slate-50 dark:bg-black/20 border ${searchDeleted ? 'border-red-500/30 focus:ring-red-500' : 'border-slate-200 dark:border-white/10 focus:ring-modtale-accent'} rounded-2xl focus:ring-2 outline-none dark:text-white font-bold transition-all placeholder:font-medium`}
-                            value={query}
-                            onChange={handleInputChange}
-                            disabled={!canReadProjects}
-                            onFocus={() => { if(searchResults.length > 0) setShowResults(true); }}
-                        />
-                    </div>
-
-                    <div className="mt-2 flex items-center gap-2 px-2">
-                        <label className="flex items-center gap-2 cursor-pointer select-none group/toggle">
-                            <div className={`w-10 h-6 rounded-full p-1 transition-colors ${searchDeleted ? 'bg-red-500' : 'bg-slate-200 dark:bg-white/10'}`}>
-                                <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${searchDeleted ? 'translate-x-4' : ''}`} />
-                            </div>
-                            <input type="checkbox" className="hidden" checked={searchDeleted} disabled={!canReadProjects} onChange={e => setSearchDeleted(e.target.checked)} />
-                            <span className={`text-xs font-bold ${searchDeleted ? 'text-red-500' : 'text-slate-500 group-hover/toggle:text-slate-700 dark:group-hover/toggle:text-slate-300'}`}>Search Deleted Projects</span>
-                        </label>
-                    </div>
-
-                    {showResults && searchResults.length > 0 && (
-                        <div className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl overflow-hidden max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200 z-[60]">
-                            {searchResults.map(mod => (
-                                <button key={mod.id} onClick={() => selectProject(mod)} className="w-full text-left px-5 py-3 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors border-b border-slate-100 dark:border-white/5 last:border-0">
-                                    <div className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-white/10 overflow-hidden shrink-0"><img src={mod.imageUrl || 'https://modtale.net/assets/favicon.svg'} alt="" className="w-full h-full object-cover" /></div>
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex items-center justify-between">
-                                            <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{mod.title}</p>
-                                            {mod.status === 'DELETED' && <span className="text-[10px] bg-red-500/10 text-red-500 px-1.5 py-0.5 rounded font-black uppercase">Deleted</span>}
-                                        </div>
-                                        <p className="text-[10px] text-slate-500 font-mono">{mod.id}</p>
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                <form onSubmit={handleIdLookup} className="relative flex-1 md:flex-none md:w-80 group">
-                    <Hash className="absolute left-5 top-4 w-5 h-5 text-slate-400 group-focus-within:text-modtale-accent transition-colors" />
-                    <input type="text" placeholder="Lookup exact ID/Slug..." className="w-full pl-14 pr-14 px-6 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-modtale-accent outline-none dark:text-white font-bold transition-all placeholder:font-medium font-mono disabled:opacity-50" value={idQuery} onChange={(e) => setIdQuery(e.target.value)} disabled={!canReadProjects} />
-                    <button type="submit" disabled={loading || !idQuery.trim() || !canReadProjects} className="absolute right-2 top-2 bottom-2 aspect-square flex items-center justify-center bg-slate-200 dark:bg-white/10 hover:bg-modtale-accent hover:text-white text-slate-500 rounded-xl transition-all disabled:opacity-50 disabled:hover:bg-slate-200 dark:disabled:hover:bg-white/10"><ArrowRight className="w-5 h-5" /></button>
-                </form>
-            </div>
-
-            {foundProject && (
+    const renderProject = (foundProject: Project) => (
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="border border-slate-200 dark:border-white/10 rounded-3xl p-8 bg-slate-50/50 dark:bg-white/[0.02] mb-8">
                         <div className="flex items-center gap-6 mb-6">
@@ -450,7 +404,61 @@ export function ProjectManagement({ setStatus, currentAdmin: initialAdmin }: { s
                         </ModalPortal>
                     )}
                 </div>
-            )}
+    );
+
+    return (
+        <div className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-8 shadow-sm backdrop-blur-md">
+            <div className="flex flex-col md:flex-row gap-4 mb-10 relative z-50 items-start">
+                <div className="relative flex-1 group w-full" ref={wrapperRef}>
+                    <div className="relative">
+                        <Package className="absolute left-5 top-4 w-5 h-5 text-slate-400 group-focus-within:text-modtale-accent transition-colors" />
+                        <input
+                            type="text"
+                            placeholder={searchDeleted ? "Search deleted projects..." : "Search active projects..."}
+                            className={`w-full pl-14 px-6 py-4 bg-slate-50 dark:bg-black/20 border ${searchDeleted ? 'border-red-500/30 focus:ring-red-500' : 'border-slate-200 dark:border-white/10 focus:ring-modtale-accent'} rounded-2xl focus:ring-2 outline-none dark:text-white font-bold transition-all placeholder:font-medium`}
+                            value={query}
+                            onChange={handleInputChange}
+                            disabled={!canReadProjects}
+                            onFocus={() => { if(searchResults.length > 0) setShowResults(true); }}
+                        />
+                    </div>
+
+                    <div className="mt-2 flex items-center gap-2 px-2">
+                        <label className="flex items-center gap-2 cursor-pointer select-none group/toggle">
+                            <div className={`w-10 h-6 rounded-full p-1 transition-colors ${searchDeleted ? 'bg-red-500' : 'bg-slate-200 dark:bg-white/10'}`}>
+                                <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${searchDeleted ? 'translate-x-4' : ''}`} />
+                            </div>
+                            <input type="checkbox" className="hidden" checked={searchDeleted} disabled={!canReadProjects} onChange={e => setSearchDeleted(e.target.checked)} />
+                            <span className={`text-xs font-bold ${searchDeleted ? 'text-red-500' : 'text-slate-500 group-hover/toggle:text-slate-700 dark:group-hover/toggle:text-slate-300'}`}>Search Deleted Projects</span>
+                        </label>
+                    </div>
+
+                    {showResults && searchResults.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl backdrop-blur-xl overflow-hidden max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200 z-[60]">
+                            {searchResults.map(mod => (
+                                <button key={mod.id} onClick={() => selectProject(mod)} className="w-full text-left px-5 py-3 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center gap-3 transition-colors border-b border-slate-100 dark:border-white/5 last:border-0">
+                                    <div className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-white/10 overflow-hidden shrink-0"><img src={mod.imageUrl || 'https://modtale.net/assets/favicon.svg'} alt="" className="w-full h-full object-cover" /></div>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{mod.title}</p>
+                                            {mod.status === 'DELETED' && <span className="text-[10px] bg-red-500/10 text-red-500 px-1.5 py-0.5 rounded font-black uppercase">Deleted</span>}
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 font-mono">{mod.id}</p>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <form onSubmit={handleIdLookup} className="relative flex-1 md:flex-none md:w-80 group">
+                    <Hash className="absolute left-5 top-4 w-5 h-5 text-slate-400 group-focus-within:text-modtale-accent transition-colors" />
+                    <input type="text" placeholder="Lookup exact ID/Slug..." className="w-full pl-14 pr-14 px-6 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-modtale-accent outline-none dark:text-white font-bold transition-all placeholder:font-medium font-mono disabled:opacity-50" value={idQuery} onChange={(e) => setIdQuery(e.target.value)} disabled={!canReadProjects} />
+                    <button type="submit" disabled={loading || !idQuery.trim() || !canReadProjects} className="absolute right-2 top-2 bottom-2 aspect-square flex items-center justify-center bg-slate-200 dark:bg-white/10 hover:bg-modtale-accent hover:text-white text-slate-500 rounded-xl transition-all disabled:opacity-50 disabled:hover:bg-slate-200 dark:disabled:hover:bg-white/10"><ArrowRight className="w-5 h-5" /></button>
+                </form>
+            </div>
+
+            {loadingLookup ? <SkeletonSurface label="Loading project">{renderProject(foundProject || { id: '00000000-0000-0000-0000-000000000000', title: 'Project name', author: 'Creator name', imageUrl: '/assets/favicon.svg', status: 'PUBLISHED', versions: [] } as unknown as Project)}</SkeletonSurface> : foundProject ? renderProject(foundProject) : null}
         </div>
     );
 }

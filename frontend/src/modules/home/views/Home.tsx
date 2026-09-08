@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Search, Upload, Code } from 'lucide-react';
+import { Search, Upload, Code, MonitorDown, ArrowRight, Newspaper } from 'lucide-react';
 import { GitHubBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { api } from '@/utils/api';
+import { NEWS_POSTS, getNewsPostPath } from '@/data/news';
 import { ROUTE_SEO } from '@/data/seo-constants';
 import type { Project, User } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
@@ -14,7 +15,9 @@ import { MarqueeColumn } from '../components/HeroMarquee';
 import {
     TrendingProjectsSection,
     NewReleasesSection,
+    ModpackPreviewSection,
     DirectDownloadsSection,
+    LauncherPreviewSection,
     SmartDependenciesSection,
     ProjectAnalyticsSection,
     CommunityThreadsSection,
@@ -67,6 +70,15 @@ const WIDE_DESKTOP_COPY_CLASSES = '[@media(min-width:1260px)_and_(min-height:720
 const WIDE_DESKTOP_PRIMARY_CLASSES = '[@media(min-width:1260px)_and_(min-height:720px)]:items-start';
 const WIDE_DESKTOP_ACTIONS_CLASSES = '[@media(min-width:1260px)_and_(min-height:720px)]:items-start [@media(min-width:1260px)_and_(min-height:720px)]:self-start';
 const WIDE_DESKTOP_MARQUEE_CLASSES = '[@media(min-width:1260px)_and_(min-height:720px)]:block';
+const latestNewsPosts = [...NEWS_POSTS]
+    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+    .slice(0, 3);
+
+const formatNewsDate = (value: string) => new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+}).format(new Date(value));
 
 const getViewportSize = () => {
     if (typeof window === 'undefined') {
@@ -133,6 +145,69 @@ const FeatureShowcaseSection = ({
                 <LazySection minHeight="450px">
                     {children}
                 </LazySection>
+            </div>
+        </section>
+    );
+};
+
+const LatestNewsCards = () => {
+    if (!latestNewsPosts.length) return null;
+
+    return (
+        <section aria-labelledby="home-latest-news" className="mb-10 sm:mb-14">
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-5 text-left">
+                <div>
+                    <p className="inline-flex items-center gap-2 rounded-full border border-blue-200/80 dark:border-sky-400/20 bg-white/80 dark:bg-sky-400/10 px-3 py-1.5 text-xs font-black uppercase tracking-wide text-blue-700 dark:text-sky-300 shadow-sm">
+                        <Newspaper className="w-3.5 h-3.5" aria-hidden="true" />
+                        Latest News
+                    </p>
+                    <h3 id="home-latest-news" className="mt-3 text-2xl sm:text-3xl font-black text-slate-950 dark:text-white">
+                        Fresh notes from Modtale.
+                    </h3>
+                </div>
+                <Link
+                    to={SiteRoutes.news()}
+                    className="inline-flex items-center justify-center self-start sm:self-auto rounded-full border border-slate-300 dark:border-white/10 bg-white/80 dark:bg-slate-900/70 px-4 py-2 text-sm font-black text-slate-700 dark:text-slate-200 transition-all hover:-translate-y-0.5 hover:border-blue-400 hover:text-blue-600 dark:hover:text-sky-300"
+                >
+                    All News
+                    <ArrowRight className="ml-2 w-4 h-4" aria-hidden="true" />
+                </Link>
+            </div>
+
+            <div className={`grid gap-4 ${latestNewsPosts.length > 1 ? 'md:grid-cols-2 xl:grid-cols-3' : 'max-w-2xl mx-auto'}`}>
+                {latestNewsPosts.map((post) => (
+                    <Link
+                        key={post.slug}
+                        to={getNewsPostPath(post)}
+                        className="group overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-950/80 text-left shadow-[0_18px_48px_rgba(15,23,42,0.08)] dark:shadow-[0_18px_48px_rgba(0,0,0,0.35)] transition-all hover:-translate-y-1 hover:border-blue-300 dark:hover:border-sky-400/40"
+                    >
+                        <img
+                            src={post.socialImage}
+                            alt={post.socialImageAlt}
+                            width="1200"
+                            height="630"
+                            loading="lazy"
+                            className="aspect-[1200/630] w-full object-cover"
+                        />
+                        <div className="p-5">
+                            <div className="flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-wide text-blue-600 dark:text-sky-300">
+                                <span>{formatNewsDate(post.publishedAt)}</span>
+                                <span className="text-slate-300 dark:text-slate-600" aria-hidden="true">/</span>
+                                <span>{post.readingTime}</span>
+                            </div>
+                            <h4 className="mt-3 text-lg font-black leading-tight text-slate-950 dark:text-white group-hover:text-blue-600 dark:group-hover:text-sky-300 transition-colors">
+                                {post.title}
+                            </h4>
+                            <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                                {post.excerpt}
+                            </p>
+                            <div className="mt-4 flex items-center text-sm font-black text-blue-600 dark:text-sky-300">
+                                Read update
+                                <ArrowRight className="ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                            </div>
+                        </div>
+                    </Link>
+                ))}
             </div>
         </section>
     );
@@ -592,7 +667,6 @@ export const Home: React.FC<{
     return (
         <div
             className="min-h-screen bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-slate-300 relative selection:bg-blue-500 selection:text-white overflow-x-hidden transition-colors duration-300"
-            style={{ fontFamily: '"Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}
         >
             <Helmet>
                 <title>{homeSeo.title}</title>
@@ -1036,7 +1110,7 @@ export const Home: React.FC<{
                                     />
                                 </div>
 
-                                <h1 className={`text-4xl sm:text-5xl ${shouldUseSplitHeroLayout ? 'lg:text-6xl 2xl:text-[5.5rem] 2xl:mb-8' : ''} font-black text-slate-900 dark:text-white tracking-tighter leading-[1.05] mb-3 sm:mb-6 ${shouldUseSplitHeroLayout ? 'lg:self-start' : ''}`}>
+                                <h1 className={`text-4xl sm:text-5xl ${shouldUseSplitHeroLayout ? 'lg:text-6xl 2xl:text-[5.5rem] 2xl:mb-8' : ''} font-black text-slate-900 dark:text-white tracking-normal leading-[1.05] mb-3 sm:mb-6 ${shouldUseSplitHeroLayout ? 'lg:self-start' : ''}`}>
                                     The Hytale<br />
                                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-500 to-blue-500 dark:from-blue-400 dark:via-indigo-400 dark:to-blue-300">
                                         Community<br />Repository
@@ -1062,26 +1136,33 @@ export const Home: React.FC<{
                                         <Upload className="w-5 h-5 mr-2 sm:mr-3 text-slate-400 dark:text-slate-500" aria-hidden="true" />
                                         Publish Work
                                     </Link>
+                                    <Link
+                                        to={SiteRoutes.launcher()}
+                                        className="flex items-center justify-center px-6 sm:px-7 h-14 sm:h-16 text-base sm:text-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all w-full sm:w-auto shadow-sm hover:shadow-md hover:-translate-y-0.5 transform-gpu whitespace-nowrap"
+                                    >
+                                        <MonitorDown className="w-5 h-5 mr-2 sm:mr-3 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+                                        Launcher
+                                    </Link>
                                 </nav>
                             </div>
 
                             <div className={`${GLASS_CARD} home-hero-stats flex flex-row items-center justify-between sm:justify-start gap-2 sm:gap-10 2xl:gap-14 w-full sm:w-fit p-3.5 sm:p-6 lg:p-8 shadow-sm lg:-ml-1.5 contain-content`}>
                                 <div className="home-hero-stat-group flex flex-col items-center lg:items-start flex-1 sm:flex-none">
-                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-normal">
                                         {formatMetric(stats.totalProjects)}
                                     </span>
                                     <span className="home-hero-stat-label text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Projects</span>
                                 </div>
                                 <div className="home-hero-stat-divider w-px h-8 sm:h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
                                 <div className="home-hero-stat-group flex flex-col items-center lg:items-start flex-1 sm:flex-none">
-                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-normal">
                                         {formatMetric(stats.totalDownloads)}
                                     </span>
                                     <span className="home-hero-stat-label text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Downloads</span>
                                 </div>
                                 <div className="home-hero-stat-divider w-px h-8 sm:h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
                                 <div className="home-hero-stat-group flex flex-col items-center lg:items-start flex-1 sm:flex-none">
-                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-normal">
                                         {formatMetric(stats.totalUsers)}
                                     </span>
                                     <span className="home-hero-stat-label text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Creators</span>
@@ -1136,8 +1217,16 @@ export const Home: React.FC<{
                         </div>
                     </FeatureShowcaseSection>
 
+                    <FeatureShowcaseSection glowFrom="rgba(59, 130, 246, 0.1)" glowTo="rgba(16, 185, 129, 0.08)" align="right">
+                        <ModpackPreviewSection randomProject={previewProject} />
+                    </FeatureShowcaseSection>
+
                     <FeatureShowcaseSection glowFrom="rgba(168, 85, 247, 0.1)" glowTo="rgba(236, 72, 153, 0.08)" align="left">
                         <DirectDownloadsSection />
+                    </FeatureShowcaseSection>
+
+                    <FeatureShowcaseSection glowFrom="rgba(37, 99, 235, 0.1)" glowTo="rgba(16, 185, 129, 0.08)" align="right">
+                        <LauncherPreviewSection />
                     </FeatureShowcaseSection>
 
                     <FeatureShowcaseSection glowFrom="rgba(16, 185, 129, 0.1)" glowTo="rgba(20, 184, 166, 0.08)" align="right">
@@ -1195,7 +1284,7 @@ export const Home: React.FC<{
                                 />
                             </div>
 
-                            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white mb-6 sm:mb-8 tracking-tighter leading-[1.05]">
+                            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white mb-6 sm:mb-8 tracking-normal leading-[1.05]">
                                 Built by the community,<br />
                                 <span className="text-modtale-accent">
                                     for the community.
@@ -1205,6 +1294,8 @@ export const Home: React.FC<{
                             <p className="text-base sm:text-lg lg:text-xl text-slate-600 dark:text-slate-300 mb-10 sm:mb-14 font-medium max-w-2xl mx-auto leading-relaxed">
                                 Modtale is 100% open-source. We believe a modding repository should exist purely to serve its ecosystem, free from corporate interests.
                             </p>
+
+                            <LatestNewsCards />
 
                             <nav aria-label="Footer Actions" className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-5">
                                 <a
@@ -1222,6 +1313,7 @@ export const Home: React.FC<{
                                     <Code className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" /> View API Docs
                                 </Link>
                             </nav>
+
                         </div>
                     </section>
                 </LazySection>

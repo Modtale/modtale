@@ -728,7 +728,14 @@ public class ModjamService {
             }
 
             if (res.getRequiredDependencyId() != null && !res.getRequiredDependencyId().trim().isEmpty()) {
-                if (project.getModIds() == null || !project.getModIds().contains(res.getRequiredDependencyId().trim())) {
+                String requiredDependencyId = res.getRequiredDependencyId().trim();
+                boolean hasRequiredDependency = project.getVersions() != null && project.getVersions().stream()
+                        .filter(java.util.Objects::nonNull)
+                        .filter(version -> version.getDependencies() != null)
+                        .flatMap(version -> version.getDependencies().stream())
+                        .filter(java.util.Objects::nonNull)
+                        .anyMatch(dependency -> requiredDependencyId.equals(dependency.getProjectId()));
+                if (!hasRequiredDependency) {
                     throw new IllegalArgumentException("Project is missing the required dependency.");
                 }
             }

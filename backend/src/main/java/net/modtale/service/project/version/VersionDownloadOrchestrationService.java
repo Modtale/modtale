@@ -4,7 +4,9 @@ import java.io.IOException;
 import java.util.List;
 import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.exception.InvalidDownloadTokenException;
+import net.modtale.exception.InvalidVersionRequestException;
 import net.modtale.exception.ResourceNotFoundException;
+import net.modtale.exception.UnauthorizedException;
 import net.modtale.exception.VersionNotFoundException;
 import net.modtale.model.dto.response.project.BundleDownloadUrlResponse;
 import net.modtale.model.dto.response.project.DownloadUrlResponse;
@@ -59,11 +61,23 @@ public class VersionDownloadOrchestrationService {
     }
 
     public DownloadUrlResponse createDownloadUrl(String projectId, String versionNumber, String gameVersion, User currentUser) {
+        return createDownloadUrl(projectId, versionNumber, gameVersion, currentUser, false);
+    }
+
+    public DownloadUrlResponse createDownloadUrl(
+            String projectId,
+            String versionNumber,
+            String gameVersion,
+            User currentUser,
+            boolean launcherClient
+    ) {
         Project project = getProjectOrThrow(projectId, currentUser,
                 "We couldn't find that project, so no download link could be generated.");
-        getVersionOrThrow(project, versionNumber, gameVersion,
+        ProjectVersion version = getVersionOrThrow(project, versionNumber, gameVersion,
                 "We couldn't find the requested version for that project.");
-        String token = downloadTokenService.generateToken(projectId, versionNumber, gameVersion);
+        ensureDownloadable(project, version, launcherClient);
+        String token = downloadTokenService.generateToken(
+                projectId, versionNumber, gameVersion, null, currentUserId(currentUser));
         return new DownloadUrlResponse("/download/" + token, downloadTokenService.getTokenValiditySeconds());
     }
 
@@ -78,7 +92,7 @@ public class VersionDownloadOrchestrationService {
                 "We couldn't find that project, so no bundle download link could be generated.");
         getVersionOrThrow(project, versionNumber, gameVersion,
                 "We couldn't find the requested version for that bundle download.");
-        String token = downloadTokenService.generateToken(projectId, versionNumber, gameVersion, dependencies);
+        String token = downloadTokenService.generateToken(projectId, versionNumber, gameVersion, dependencies, currentUserId(currentUser));
         return new BundleDownloadUrlResponse("/download-bundle/" + token, downloadTokenService.getTokenValiditySeconds());
     }
 
@@ -90,20 +104,34 @@ public class VersionDownloadOrchestrationService {
             String forwardedFor,
             User currentUser
     ) throws IOException {
-        DownloadContext context = resolveDownloadContext(apiRole, referer, remoteAddress, forwardedFor, currentUser);
+        return downloadVersion(token, apiRole, referer, remoteAddress, forwardedFor, currentUser, false);
+    }
+
+    public VersionDownloadPayload downloadVersion(
+            String token,
+            boolean apiRole,
+            String referer,
+            String remoteAddress,
+            String forwardedFor,
+            User currentUser,
+            boolean launcherClient
+    ) throws IOException {
         DownloadTokenService.DownloadToken downloadToken = validateToken(token,
                 "This download link is invalid, expired, or has already been used.");
+        DownloadContext context = resolveDownloadContext(downloadToken, apiRole, referer, remoteAddress, forwardedFor, currentUser);
         Project project = getRawProjectOrThrow(downloadToken.getProjectId(),
                 "We couldn't find the project for this download link.");
-        ensureReadable(project, currentUser);
+        ensureReadable(project, context.currentUser());
         ProjectVersion targetVersion = getVersionOrThrow(project, downloadToken.getVersion(), downloadToken.getGameVersion(),
                 "We couldn't find the version requested by this download link.");
+        ensureDownloadable(project, targetVersion, launcherClient);
 
         trackDownload(project, targetVersion.getId(), context);
 
         if (project.getClassification() == ProjectClassification.MODPACK) {
             if (targetVersion.getDependencies() != null) {
-                targetVersion.getDependencies().forEach(dep -> trackDependencyDownload(dep, context));
+                targetVersion.getDependencies().stream()
+                        .forEach(dep -> trackDependencyDownload(dep, context));
             }
             byte[] zipData = downloadService.generateModpackZip(project, targetVersion, context.currentUser());
             return new VersionDownloadPayload(buildModpackFilename(project, targetVersion), zipData);
@@ -121,12 +149,12 @@ public class VersionDownloadOrchestrationService {
             String forwardedFor,
             User currentUser
     ) throws IOException {
-        DownloadContext context = resolveDownloadContext(apiRole, referer, remoteAddress, forwardedFor, currentUser);
         DownloadTokenService.DownloadToken downloadToken = validateToken(token,
                 "This bundle download link is invalid, expired, or has already been used.");
+        DownloadContext context = resolveDownloadContext(downloadToken, apiRole, referer, remoteAddress, forwardedFor, currentUser);
         Project project = getRawProjectOrThrow(downloadToken.getProjectId(),
                 "We couldn't find the project for this bundle download link.");
-        ensureReadable(project, currentUser);
+        ensureReadable(project, context.currentUser());
         ProjectVersion targetVersion = getVersionOrThrow(project, downloadToken.getVersion(), downloadToken.getGameVersion(),
                 "We couldn't find the version requested by this bundle download link.");
 
@@ -135,10 +163,13 @@ public class VersionDownloadOrchestrationService {
         List<String> selectedDependencies = downloadToken.getSelectedDependencies();
         if (targetVersion.getDependencies() != null) {
             targetVersion.getDependencies().forEach(dep -> {
+                if (dep.isExternal()) {
+                    return;
+                }
                 if (dep.isEmbedded()) {
                     return;
                 }
-                if (selectedDependencies == null || selectedDependencies.contains(dep.getModId())) {
+                if (selectedDependencies == null || selectedDependencies.contains(dep.getProjectId())) {
                     trackDependencyDownload(dep, context);
                 }
             });
@@ -149,15 +180,17 @@ public class VersionDownloadOrchestrationService {
     }
 
     private DownloadContext resolveDownloadContext(
+            DownloadTokenService.DownloadToken downloadToken,
             boolean apiRole,
             String referer,
             String remoteAddress,
             String forwardedFor,
             User currentUser
     ) {
+        User effectiveUser = requireTokenUser(downloadToken, currentUser);
         boolean apiRequest = apiRole || referer == null || !referer.startsWith(frontendUrl);
         String clientIp = forwardedFor == null ? remoteAddress : forwardedFor.split(",")[0].trim();
-        return new DownloadContext(apiRequest, clientIp, currentUser);
+        return new DownloadContext(apiRequest, clientIp, effectiveUser);
     }
 
     private DownloadTokenService.DownloadToken validateToken(String token, String failureMessage) {
@@ -166,6 +199,22 @@ public class VersionDownloadOrchestrationService {
             throw new InvalidDownloadTokenException(failureMessage);
         }
         return downloadToken;
+    }
+
+    private User requireTokenUser(DownloadTokenService.DownloadToken downloadToken, User currentUser) {
+        String tokenUserId = downloadToken.getUserId();
+        if (tokenUserId == null || tokenUserId.isBlank()) {
+            return currentUser;
+        }
+
+        if (currentUser == null || currentUser.getId() == null || !tokenUserId.equals(currentUser.getId())) {
+            throw new UnauthorizedException("Sign in with the account that created this download link before using it.");
+        }
+        return currentUser;
+    }
+
+    private String currentUserId(User currentUser) {
+        return currentUser == null ? null : currentUser.getId();
     }
 
     private Project getProjectOrThrow(String projectId, User currentUser, String failureMessage) {
@@ -195,6 +244,18 @@ public class VersionDownloadOrchestrationService {
         }
     }
 
+    private void ensureDownloadable(Project project, ProjectVersion version, boolean launcherClient) {
+        if (!launcherClient
+                && project.getClassification() == ProjectClassification.MODPACK
+                && version.getDependencies() != null
+                && version.getDependencies().stream()
+                        .anyMatch(dependency -> dependency.getSource() == ProjectDependency.Source.CURSEFORGE)) {
+            throw new InvalidVersionRequestException(
+                    "This modpack contains CurseForge projects and can only be installed with Modtale Launcher."
+            );
+        }
+    }
+
     private void trackDownload(Project project, String versionId, DownloadContext context) {
         if (analyticsEligibilityService.shouldCountProjectEngagement(project, context.currentUser())) {
             trackingService.logDownload(project.getId(), versionId, project.getAuthor(), context.apiRequest(), context.clientIp());
@@ -202,10 +263,14 @@ public class VersionDownloadOrchestrationService {
     }
 
     private void trackDependencyDownload(ProjectDependency dependency, DownloadContext context) {
-        Project dependencyProject = projectService.getRawProjectById(dependency.getModId());
+        if (dependency.isExternal()) {
+            return;
+        }
+
+        Project dependencyProject = projectService.getRawProjectById(dependency.getProjectId());
         if (dependencyProject == null || analyticsEligibilityService.shouldCountProjectEngagement(dependencyProject, context.currentUser())) {
             trackingService.logDownload(
-                    dependency.getModId(),
+                    dependency.getProjectId(),
                     null,
                     dependencyProject != null ? dependencyProject.getAuthor() : null,
                     context.apiRequest(),

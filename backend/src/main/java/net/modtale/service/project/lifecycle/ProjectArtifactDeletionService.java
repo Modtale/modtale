@@ -17,6 +17,10 @@ public class ProjectArtifactDeletionService {
     public void deleteVersionFile(ProjectVersion version) {
         if (version != null) {
             deleteStoredFile(version.getFileUrl());
+            if (version.getOverrideFileUrl() != null
+                    && !version.getOverrideFileUrl().equals(version.getFileUrl())) {
+                deleteStoredFile(version.getOverrideFileUrl());
+            }
         }
     }
 

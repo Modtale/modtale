@@ -13,6 +13,7 @@ const SECURITY_CSP = [
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data: https:",
     "connect-src 'self' https:",
+    "frame-src https://www.youtube-nocookie.com",
     "upgrade-insecure-requests",
     "require-trusted-types-for 'script'",
     "trusted-types default",

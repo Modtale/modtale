@@ -9,9 +9,9 @@
 
 <p align="center">
     <a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?style=flat-square&logo=gnu" alt="License: AGPL v3"></a>
-    <a href="https://astro.build"><img src="https://img.shields.io/badge/Astro-4.0-orange?style=flat-square&logo=astro" alt="Astro"></a>
+    <a href="https://astro.build"><img src="https://img.shields.io/badge/Astro-7.2-orange?style=flat-square&logo=astro" alt="Astro"></a>
     <a href="https://react.dev"><img src="https://img.shields.io/badge/React-19.0-blue?style=flat-square&logo=react" alt="React"></a>
-    <a href="https://spring.io/projects/spring-boot"><img src="https://img.shields.io/badge/Spring_Boot-3.3-green?style=flat-square&logo=springboot" alt="Spring Boot"></a>
+    <a href="https://spring.io/projects/spring-boot"><img src="https://img.shields.io/badge/Spring_Boot-4.1-green?style=flat-square&logo=springboot" alt="Spring Boot"></a>
     <a href="https://www.java.com"><img src="https://img.shields.io/badge/Java-21-red?style=flat-square&logo=openjdk" alt="Java 21"></a>
     <a href="https://www.mongodb.com"><img src="https://img.shields.io/badge/Database-MongoDB-forestgreen?style=flat-square&logo=mongodb" alt="MongoDB"></a>
     <a href="https://github.com/Modtale/modtale"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fghloc.vercel.app%2Fapi%2FModtale%2Fmodtale%2Fbadge&style=flat-square&logo=git" alt="Lines of Code"></a>
@@ -43,7 +43,10 @@ modtale/
 │   ├── astro.config.mjs           # Astro build & integration settings
 │   └── package.json               # Node dependencies
 │
-└── Warden/                        # Security Scanner Service (Closed Source)
+├── launcher/                      # JavaFX desktop client and native packaging
+└── mock-db/                       # Sanitized fixture generation and import tools
+
+Warden is a separate, closed-source security scanner service.
 
 ```
 
@@ -107,12 +110,17 @@ The Spring Boot backend relies on environment variables. You can set these in yo
 | Variable | Description | Example |
 | --- | --- | --- |
 | `MONGODB_URI` | Connection String | `mongodb://localhost:27017/modtale` |
+| `R2_BUCKET_NAME` | Storage Bucket | `modtale-dev` |
 | `R2_ACCESS_KEY` | Storage Access Key | `your_dev_access_key` |
 | `R2_SECRET_KEY` | Storage Secret Key | `your_dev_secret_key` |
 | `R2_ENDPOINT` | Storage Endpoint URL | `https://<accountid>.r2.cloudflarestorage.com` |
+| `R2_PUBLIC_DOMAIN` | Optional public storage URL | `https://cdn.example.test` |
 | `WARDEN_ENABLED` | **Must be false locally** | `false` |
+| `PRE_AUTH_SECRET` | Shared random MFA pre-auth signing secret; required for consistent token validation across multiple instances | Set through your deployment secret manager |
 | `STATUS_DISCORD_WEBHOOK_URL` | Optional Discord webhook for the continually updated status mirror | `https://discord.com/api/webhooks/...` |
 | `STATUS_CHECKER_ENABLED` | Opt into the legacy embedded backend checker | `false` |
+
+If `PRE_AUTH_SECRET` is unset, the backend generates a random secret for that process. In-flight MFA sign-ins will need to restart after a backend restart. Use the same configured secret on every instance of a deployment.
 
 Detached status service variables:
 
@@ -176,6 +184,26 @@ npm run dev
 
 *The web client is now accessible at `http://localhost:5173`!*
 
+### 5. Native Launcher
+
+The `launcher/` project is a native Java 21 JavaFX client for installing Modtale projects into a local Hytale mods folder. It does not use Electron.
+
+```bash
+cd launcher
+./gradlew run
+```
+
+The launcher lets users search the Modtale catalog, install the latest compatible version, include required or optional dependencies, check installed projects for updates, apply updates, and point the app at the correct Hytale mods folder.
+
+Self-contained native packages are built by default:
+
+```bash
+cd launcher
+./gradlew build
+```
+
+Package outputs land in `launcher/build/distributions/`. Windows builds produce an `.exe` installer, macOS builds produce a `.dmg`, and Linux builds produce an `.AppImage`. Each package embeds the required Java runtime, so end users do not need Java installed. Build on each target OS, or use a CI matrix, to produce all three platform artifacts.
+
 ---
 
 ## License
@@ -193,7 +221,7 @@ Modtale is free software: you can redistribute it and/or modify it under the ter
 
 ### Contributing
 
-We welcome contributions from the community! Whether it's a bug fix, a new feature, or documentation improvements, please refer to our [CONTRIBUTING.md]() for coding guidelines and pull request instructions.
+We welcome contributions from the community! Whether it's a bug fix, a new feature, or documentation improvements, please refer to our [CONTRIBUTING.md](CONTRIBUTING.md) for coding guidelines and pull request instructions.
 
 ---
 

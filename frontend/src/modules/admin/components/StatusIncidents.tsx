@@ -1,3 +1,4 @@
+import { SkeletonSurface } from '@/components/ui/Skeleton';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Activity, CalendarClock, CheckCircle2, Clock3, Megaphone, RefreshCw, Send } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
@@ -201,7 +202,7 @@ const StatusDateTimePicker = ({
 
 export const StatusIncidents: React.FC<StatusIncidentsProps> = ({ setStatus, canManage = false }) => {
     const [incidents, setIncidents] = useState<StatusIncident[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [createForm, setCreateForm] = useState({
         kind: 'MAINTENANCE' as IncidentKind,
@@ -319,6 +320,14 @@ export const StatusIncidents: React.FC<StatusIncidentsProps> = ({ setStatus, can
             )}
         </div>
     );
+
+    const pending = loading && incidents.length === 0;
+    const Surface = pending ? SkeletonSurface : React.Fragment;
+    const pendingIncident: StatusIncident = {
+        id: 'pending', kind: 'INCIDENT', state: 'INVESTIGATING', impact: 'DEGRADED',
+        title: 'Service status update', affectedServices: ['api'], createdAt: '2026-01-01T12:00:00Z', updatedAt: '2026-01-01T12:00:00Z',
+        updates: [{ id: 'pending-update', state: 'INVESTIGATING', impact: 'DEGRADED', message: 'Latest service impact and incident update.', createdAt: '2026-01-01T12:00:00Z' }],
+    };
 
     return (
         <div className="space-y-8">
@@ -478,20 +487,20 @@ export const StatusIncidents: React.FC<StatusIncidentsProps> = ({ setStatus, can
             </div>
             )}
 
-            <section className="grid gap-6 xl:grid-cols-3">
+            <Surface><section className="grid gap-6 xl:grid-cols-3">
                 <div className="space-y-3">
                     <h2 className="flex items-center gap-2 text-lg font-black text-slate-900 dark:text-white"><Clock3 className="h-5 w-5 text-amber-500" /> Active</h2>
-                    {activeIncidents.length ? activeIncidents.map((incident) => <IncidentRow key={incident.id} incident={incident} />) : <EmptyState label="No active incidents." />}
+                    {pending ? <IncidentRow incident={{ ...pendingIncident, state: 'INVESTIGATING' }} /> : activeIncidents.length ? activeIncidents.map((incident) => <IncidentRow key={incident.id} incident={incident} />) : <EmptyState label="No active incidents." />}
                 </div>
                 <div className="space-y-3">
                     <h2 className="flex items-center gap-2 text-lg font-black text-slate-900 dark:text-white"><CalendarClock className="h-5 w-5 text-blue-500" /> Scheduled</h2>
-                    {scheduledMaintenances.length ? scheduledMaintenances.map((incident) => <IncidentRow key={incident.id} incident={incident} />) : <EmptyState label="No scheduled maintenance." />}
+                    {pending ? <IncidentRow incident={{ ...pendingIncident, state: 'SCHEDULED', kind: 'MAINTENANCE' }} /> : scheduledMaintenances.length ? scheduledMaintenances.map((incident) => <IncidentRow key={incident.id} incident={incident} />) : <EmptyState label="No scheduled maintenance." />}
                 </div>
                 <div className="space-y-3">
                     <h2 className="flex items-center gap-2 text-lg font-black text-slate-900 dark:text-white"><CheckCircle2 className="h-5 w-5 text-emerald-500" /> History</h2>
-                    {history.length ? history.slice(0, 8).map((incident) => <IncidentRow key={incident.id} incident={incident} />) : <EmptyState label="No past incidents yet." />}
+                    {pending ? <IncidentRow incident={{ ...pendingIncident, state: 'RESOLVED' }} /> : history.length ? history.slice(0, 8).map((incident) => <IncidentRow key={incident.id} incident={incident} />) : <EmptyState label="No past incidents yet." />}
                 </div>
-            </section>
+            </section></Surface>
         </div>
     );
 };

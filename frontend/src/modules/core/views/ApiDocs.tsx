@@ -1,3 +1,4 @@
+import { SkeletonSurface } from '@/components/ui/Skeleton';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     Activity,
@@ -441,7 +442,7 @@ const sampleUserSummary = {
     username: 'modtale_creator',
     avatarUrl: 'https://cdn.modtale.net/avatars/modtale_creator.png',
     bannerUrl: 'https://cdn.modtale.net/banners/modtale_creator.png',
-    bio: 'Creator of performance-focused Minecraft tools.',
+    bio: 'Creator of performance-focused Hytale tools.',
     createdAt: '2025-01-16T13:44:02Z',
     tier: 'STANDARD',
     roles: ['USER'],
@@ -520,8 +521,7 @@ const sampleProject = {
         docs: 'https://docs.modtale.net/skyforge-utilities',
         issues: 'https://github.com/modtale/skyforge-utilities/issues',
     },
-    types: ['SERVER'],
-    modIds: ['67f70e06d5de9b5f94b6a111'],
+    types: [],
     allowModpacks: true,
     allowComments: true,
     hmWikiEnabled: true,
@@ -733,8 +733,9 @@ const endpointSpecificExample = (method: string, path: string, code: string): un
     if (path === '/api/v1/projects/{id}/versions/{version}/dependencies' && code === '200') {
         return {
             dependencies: [
-                { projectId: '67f70e06d5de9b5f94b6a111', projectTitle: 'Skyforge Core', versionNumber: '3.1.0', isOptional: false },
-                { projectId: '67f70e06d5de9b5f94b6a222', projectTitle: 'Skyforge Map Layer', versionNumber: '1.4.2', isOptional: true },
+                { id: 'b612a7db-3475-4c43-bb46-c951b330bcd2', projectId: '67f70e06d5de9b5f94b6a111', projectTitle: 'Skyforge Core', versionNumber: '3.1.0', dependencyType: 'REQUIRED', source: 'MODTALE' },
+                { id: '3c6b637b-76cb-4efe-9d20-c7b5356e2676', projectId: '67f70e06d5de9b5f94b6a222', projectTitle: 'Skyforge Map Layer', versionNumber: '1.4.2', dependencyType: 'OPTIONAL', source: 'MODTALE' },
+                { id: '7737a837-76d3-414a-a149-c078ff981c0b', projectId: 'curseforge:1450386', projectTitle: 'SimpleCompost', versionNumber: '1.0.0', dependencyType: 'REQUIRED', source: 'CURSEFORGE', externalId: '1450386', externalUrl: 'https://www.curseforge.com/hytale/mods/simplecompost/files/8227810', externalFileUrl: 'https://www.curseforge.com/hytale/mods/simplecompost/files/8227810', externalFileName: 'SimpleCompost-1.0.0.jar' },
             ],
         };
     }
@@ -751,7 +752,6 @@ const endpointSpecificExample = (method: string, path: string, code: string): un
                     versionNumber: '3.1.0',
                     optional: false,
                     confidence: 97,
-                    dependencyEntry: '67f70e06d5de9b5f94b6a111:3.1.0',
                 },
             ],
         };
@@ -1309,7 +1309,7 @@ const EndpointCard: React.FC<{ endpoint: EndpointDoc }> = ({ endpoint }) => {
 };
 
 export const ApiDocs: React.FC = () => {
-    const [data, setData] = useState<OpenApiIndex | null>(null);
+    const [loadedData, setData] = useState<OpenApiIndex | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [schemaQuery, setSchemaQuery] = useState('');
 
@@ -1333,6 +1333,15 @@ export const ApiDocs: React.FC = () => {
             isMounted = false;
         };
     }, []);
+
+    const pending = !loadedData && !error;
+    const Surface = pending ? SkeletonSurface : React.Fragment;
+    const data: OpenApiIndex | null = loadedData || (pending ? {
+        title: 'Modtale API', version: '1.0', server: 'https://api.modtale.net', totalEndpoints: 123,
+        rateLimitTiers: ['Public-IP', 'Standard-API', 'Enterprise-API'].map(name => ({ name, readPerMinute: 123, writePerMinute: 123 })),
+        schemas: [{ name: 'Response', type: 'object', fields: [], example: '{}' }],
+        endpoints: [{ method: 'GET', path: '/api/v1/projects', summary: 'Browse projects', public: true, params: [], responses: [], rateLimitTiers: [] }],
+    } : null);
 
     const grouped = useMemo(() => {
         if (!data) return new Map<string, EndpointDoc[]>();
@@ -1388,7 +1397,7 @@ export const ApiDocs: React.FC = () => {
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
             <div className="w-full max-w-[112rem] px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 mx-auto py-16 overflow-x-hidden">
                 <div className="text-center mb-12 w-full">
-                    <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">
+                    <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white mb-4 tracking-normal">
                         Modtale <span className="text-modtale-accent">API v1</span>
                     </h1>
                     <p className="text-lg text-slate-600 dark:text-slate-400 max-w-3xl mx-auto mb-6">
@@ -1423,29 +1432,8 @@ export const ApiDocs: React.FC = () => {
                     </div>
                 )}
 
-                {!data && !error && (
-                    <div className="rounded-[2rem] border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-900/90 shadow-2xl overflow-hidden">
-                        <div className="p-6 md:p-8">
-                            <div className="flex items-center gap-3 mb-5">
-                                <div className="p-3 rounded-2xl bg-slate-100 dark:bg-white/5 text-modtale-accent">
-                                    <Braces className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-black text-slate-900 dark:text-white">Loading API reference</h2>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400">Pulling live OpenAPI metadata, examples, and schemas from the backend.</p>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="h-28 rounded-2xl bg-slate-100 dark:bg-white/5 animate-pulse" />
-                                <div className="h-28 rounded-2xl bg-slate-100 dark:bg-white/5 animate-pulse" />
-                                <div className="h-28 rounded-2xl bg-slate-100 dark:bg-white/5 animate-pulse" />
-                            </div>
-                        </div>
-                    </div>
-                )}
-
                 {data && (
-                    <div className="space-y-10 md:space-y-14 w-full overflow-hidden">
+                    <Surface><div className="space-y-10 md:space-y-14 w-full overflow-hidden">
                         {data.rateLimitTiers.length > 0 && (
                             <section className="w-full">
                                 <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 md:p-10 shadow-2xl w-full overflow-hidden">
@@ -1587,7 +1575,7 @@ export const ApiDocs: React.FC = () => {
                                 </div>
                             </section>
                         )}
-                    </div>
+                    </div></Surface>
                 )}
             </div>
         </div>
