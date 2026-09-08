@@ -22,7 +22,14 @@ public class LifecycleService {
 
     public Project createDraft(String title, String description, ProjectClassification classification,
                                User user, String ownerId, String customSlug) {
-        return projectDraftWorkflowService.createDraft(title, description, classification, user, ownerId, customSlug);
+        return createDraft(title, description, classification, user, ownerId, customSlug, null, null, null);
+    }
+
+    public Project createDraft(String title, String description, ProjectClassification classification,
+                               User user, String ownerId, String customSlug,
+                               String about, String curseForgeUrl, String imageUrl) {
+        return projectDraftWorkflowService.createDraft(title, description, classification, user, ownerId, customSlug,
+                about, curseForgeUrl, imageUrl);
     }
 
     public void submitProject(String id, User user) {

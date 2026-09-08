@@ -478,7 +478,10 @@ public class ProjectController {
                 requestPayload.getClassification(),
                 user,
                 requestPayload.getOwner(),
-                requestPayload.getSlug()
+                requestPayload.getSlug(),
+                requestPayload.getAbout(),
+                requestPayload.getCurseForgeUrl(),
+                requestPayload.getImageUrl()
         );
         project.setCanEdit(true);
         project.setIsOwner(true);

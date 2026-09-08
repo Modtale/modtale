@@ -65,6 +65,12 @@ public class ProjectDraftWorkflowService {
 
     public Project createDraft(String title, String description, ProjectClassification classification,
                                User user, String ownerId, String customSlug) {
+        return createDraft(title, description, classification, user, ownerId, customSlug, null, null, null);
+    }
+
+    public Project createDraft(String title, String description, ProjectClassification classification,
+                               User user, String ownerId, String customSlug,
+                               String about, String curseForgeUrl, String imageUrl) {
         requireVerifiedEmail(user, "create projects");
         if (projectRepository.existsByTitleIgnoreCase(title)) {
             throw new InvalidProjectRequestException("A project with this title already exists.");
@@ -103,6 +109,9 @@ public class ProjectDraftWorkflowService {
         project.setId(UUID.randomUUID().toString());
         project.setTitle(sanitizer.sanitizePlainText(title));
         project.setDescription(sanitizer.sanitizePlainText(description));
+        project.setAbout(about);
+        if (curseForgeUrl != null) project.setLinks(new java.util.LinkedHashMap<>(java.util.Map.of("CurseForge", curseForgeUrl)));
+        project.setImageUrl(imageUrl);
         project.setClassification(classification);
         project.setAuthorId(finalAuthorId);
         project.setAuthor(finalAuthorName);

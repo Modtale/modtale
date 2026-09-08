@@ -24,6 +24,25 @@ public class CreateProjectRequest {
     )
     private String slug;
 
+    @Size(max = 50000, message = "The full description cannot exceed 50,000 characters.")
+    private String about;
+
+    @Pattern(regexp = "https://www\\.curseforge\\.com/hytale/(mods|prefabs|worlds|bootstrap|translations)/[a-z0-9-]+/?",
+            message = "The import source must be a Hytale CurseForge project URL.")
+    private String curseForgeUrl;
+
+    @Size(max = 2048)
+    @Pattern(regexp = "https://(?:[a-zA-Z0-9-]+\\.)*forgecdn\\.net/[^\\s?#]+",
+            message = "Imported icons must use a CurseForge CDN URL.")
+    private String imageUrl;
+
+    public String getAbout() { return about; }
+    public void setAbout(String about) { this.about = about; }
+    public String getCurseForgeUrl() { return curseForgeUrl; }
+    public void setCurseForgeUrl(String curseForgeUrl) { this.curseForgeUrl = curseForgeUrl; }
+    public String getImageUrl() { return imageUrl; }
+    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+
     public String getTitle() {
         return title;
     }
