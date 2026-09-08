@@ -211,10 +211,9 @@ class LauncherWardrobeUiTest {
         Path output = outputDirectory("MODTALE_WARDROBE_LIVE_SCREENSHOTS");
         Files.createDirectories(output);
         List<String> notes = new java.util.concurrent.CopyOnWriteArrayList<>();
-        var liveCardNames = new java.util.concurrent.ConcurrentHashMap<String, java.util.Set<String>>();
         notes.add("Actual LauncherWardrobeController scenes using public HyTags catalogs and real Hyvatar imagery.");
         notes.add("Captured at " + java.time.Instant.now() + ". No sign-in, settings-file reads, or account writes.");
-        notes.add("Catalog results are limited to twelve unique records for the screenshot; no synthetic cards are added.");
+        notes.add("Catalog pages are displayed using the real responsive grid; no synthetic cards are added.");
         var auth = new HytaleAuthService(null, null) {
             @Override public String freshSessionToken(LauncherSettings settings) { throw new AssertionError("Live screenshots cannot request credentials"); }
         };
@@ -222,10 +221,7 @@ class LauncherWardrobeUiTest {
             @Override public List<WardrobeItem> browseSkins(int page, String sort) {
                 List<WardrobeItem> items = super.browseSkins(page, sort);
                 notes.add("Public skin catalog: " + items.size() + " items from page " + page + ", sort=" + sort);
-                var pageItems = items.stream().limit(12).toList();
-                liveCardNames.put(items.isEmpty() || items.getFirst().kind() == WardrobeItem.Kind.SKIN ? "Skins" : "Capes",
-                        pageItems.stream().map(item -> "Preview " + item.name()).collect(java.util.stream.Collectors.toSet()));
-                return pageItems;
+                return items;
             }
             @Override public List<WardrobeItem> capes() { throw new AssertionError("Capes belong to the installed Customize catalog"); }
             @Override public WardrobeItem currentSkin(LauncherSettings settings) { throw new AssertionError("No account reads in live screenshots"); }
@@ -257,13 +253,15 @@ class LauncherWardrobeUiTest {
                     try {
                         await("live " + tab + " catalog", 180, () -> (cards(harness).size() >= 6
                                 && nodes(harness.root(), Label.class).stream().noneMatch(label -> label.getText().equals("Loading looks…"))
-                                && liveCardNames.containsKey(tab)
-                                && cards(harness).stream().allMatch(card -> liveCardNames.get(tab).contains(card.getAccessibleText())))
+                                && cards(harness).stream().allMatch(card -> card.getAccessibleText().startsWith("Preview skin ")))
                                 || nodes(harness.root(), Label.class).stream().anyMatch(label -> label.getText().contains("Try Search again.")));
                         String catalogError = fx(() -> nodes(harness.root(), Label.class).stream()
                                 .map(Label::getText).filter(text -> text.contains("Try Search again.")).findFirst().orElse(""));
                         assertTrue(catalogError.isEmpty(), catalogError);
                         assertTrue(fx(() -> cards(harness).size() >= 6), "Need at least six real " + tab + " cards");
+                        assertTrue(fx(() -> nodes(harness.root(), Label.class).stream()
+                                .noneMatch(label -> label.isVisible() && label.getText().matches("(?i).*Skin #[0-9a-f]+.*"))));
+                        assertTrue(fx(() -> cards(harness).stream().allMatch(card -> card.getTooltip() == null)));
                         String selection = fx(() -> cards(harness).getFirst().getAccessibleText());
                         click(harness, selection);
                         await("live preview response", 100, () -> {
@@ -306,7 +304,12 @@ class LauncherWardrobeUiTest {
             });
             await("scene resize", () -> Math.round(harness.stage().getScene().getWidth()) == size[0]
                     && Math.round(harness.stage().getScene().getHeight()) == size[1]);
-            await("local thumbnail loading", () -> nodes(harness.root(), ImageView.class).stream()
+            if (name.startsWith("live-")) await("full responsive rows", 100, () -> {
+                var grid = (javafx.scene.layout.GridPane)harness.root().lookup("#wardrobe-cards");
+                return cards(harness).size() == grid.getColumnConstraints().size() * 4
+                        && !button(harness.root(), "Next").isDisabled();
+            });
+            await("local thumbnail loading", 100, () -> nodes(harness.root(), ImageView.class).stream()
                     .allMatch(view -> view.getImage() == null || view.getImage().getProgress() == 1));
             WritableImage image = fx(() -> {
                 harness.root().applyCss(); harness.root().layout();

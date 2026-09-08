@@ -124,6 +124,59 @@ class LauncherWardrobeControllerTest {
         }
     }
 
+    @Test void skinGridFillsAvailableWidthAndRepaginatesWithoutMissingResults() throws Exception {
+        try (Harness h = new Harness()) {
+            List<WardrobeItem> all = new ArrayList<>();
+            for (int i = 0; i < 83; i++) all.add(new WardrobeItem(new UUID(0, i + 100),
+                    WardrobeItem.Kind.SKIN, "Grid " + i, false, "", SKIN.payload()));
+            h.gateway.skins = List.copyOf(all);
+            fx(() -> { h.stage.setWidth(1750); h.controller.refresh(); return null; });
+            await(() -> gridReady(h));
+            fx(() -> {
+                assertFalse(h.root().lookup("#wardrobe-saved-filter").isVisible(), "Skin sort dropdown must be hidden");
+                assertFalse(h.root().lookup("#wardrobe-saved-filter").isManaged());
+                assertGridWidth(h); return null;
+            });
+            List<String> seen = new ArrayList<>();
+            while (true) {
+                List<String> current = fx(() -> gridCards(h).stream().map(Button::getAccessibleText).toList());
+                seen.addAll(current);
+                if (fx(() -> button(h.root(), "Next").isDisabled())) break;
+                int count = fx(() -> ((javafx.scene.layout.GridPane)h.root().lookup("#wardrobe-cards")).getColumnConstraints().size());
+                assertEquals(count * 4, current.size(), "Every nonfinal page must have four full rows");
+                String first = current.getFirst();
+                fx(() -> { button(h.root(), "Next").fire(); return null; });
+                await(() -> !gridCards(h).isEmpty() && !gridCards(h).getFirst().getAccessibleText().equals(first)
+                        && nodes(h.root(), Label.class).stream().noneMatch(l -> l.getText().equals("Loading looks…")));
+            }
+            assertEquals(all.stream().map(item -> "Preview " + item.name()).toList(), seen,
+                    "Provider page boundaries must not duplicate or skip skins");
+            for (int width : new int[]{1100, 1450}) {
+                fx(() -> { h.stage.setWidth(width); return null; });
+                await(() -> gridReady(h) && gridCards(h).getFirst().getAccessibleText().equals("Preview Grid 0"));
+                fx(() -> { assertGridWidth(h); return null; });
+            }
+        }
+    }
+
+    private static List<Button> gridCards(Harness h) {
+        return nodes(h.root().lookup("#wardrobe-cards"), Button.class).stream()
+                .filter(b -> b.getStyleClass().contains("wardrobe-card")).toList();
+    }
+    private static boolean gridReady(Harness h) {
+        var grid = (javafx.scene.layout.GridPane)h.root().lookup("#wardrobe-cards");
+        return gridCards(h).size() == grid.getColumnConstraints().size() * 4 && !button(h.root(), "Next").isDisabled();
+    }
+    private static void assertGridWidth(Harness h) {
+        h.root().applyCss(); ((javafx.scene.Parent) h.root()).layout();
+        var grid = (javafx.scene.layout.GridPane)h.root().lookup("#wardrobe-cards");
+        int count = grid.getColumnConstraints().size();
+        List<Button> cards = gridCards(h);
+        assertEquals(0, cards.getFirst().getBoundsInParent().getMinX(), 1);
+        assertEquals(grid.getWidth(), cards.get(count - 1).getBoundsInParent().getMaxX(), 1, "Last column must reach the grid edge");
+        for (Button card : cards) assertEquals(cards.getFirst().getWidth(), card.getWidth(), 1, "Cards must have equal widths");
+    }
+
     private final class Harness implements AutoCloseable {
         final ExecutorService executor = Executors.newFixedThreadPool(2);
         final Gateway gateway = new Gateway();
@@ -175,11 +228,12 @@ class LauncherWardrobeControllerTest {
     private record Apply(WardrobeItem item, UUID expectedProfile, String actualProfile, String username) {}
     private static final class Gateway extends WardrobeApiClient {
         final BlockingQueue<Apply> applies = new LinkedBlockingQueue<>();
+        volatile List<WardrobeItem> skins = List.of(SKIN);
         final CountDownLatch hydrationStarted = new CountDownLatch(1), releaseHydration = new CountDownLatch(1);
         Gateway() { super(new HytaleAuthService(null, null) {
             @Override public String freshSessionToken(LauncherSettings settings) { throw new AssertionError("No real authentication in regression tests"); }
         }); }
-        @Override public List<WardrobeItem> browseSkins(int page, String sort) { assertFalse(Platform.isFxApplicationThread()); return List.of(SKIN); }
+        @Override public List<WardrobeItem> browseSkins(int page, String sort) { assertFalse(Platform.isFxApplicationThread()); assertEquals("user_count", sort); return skins.stream().skip((long)(page - 1) * 20).limit(20).toList(); }
         @Override public List<WardrobeItem> capes() { assertFalse(Platform.isFxApplicationThread()); return List.of(CAPE); }
         @Override public WardrobeItem hydrate(WardrobeItem item) {
             assertFalse(Platform.isFxApplicationThread());
