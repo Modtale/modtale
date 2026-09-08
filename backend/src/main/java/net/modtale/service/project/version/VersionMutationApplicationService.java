@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import net.modtale.model.dto.project.ManifestInspectionResult;
+import net.modtale.model.dto.request.project.DependencyReferenceRequest;
 import net.modtale.model.dto.request.project.CreateVersionRequest;
 import net.modtale.model.dto.request.project.UpdateVersionRequest;
 import net.modtale.model.user.User;
@@ -26,7 +27,7 @@ public class VersionMutationApplicationService {
                 requestPayload.getGameVersions(),
                 requestPayload.getFile(),
                 requestPayload.getChangelog(),
-                normalizeDependencyEntries(requestPayload.getModIds()),
+                normalizeDependencies(requestPayload.getDependencies()),
                 normalizeProjectIds(requestPayload.getIncompatibleProjectIds()),
                 requestPayload.getChannel(),
                 requestPayload.isReplaceExisting(),
@@ -42,7 +43,7 @@ public class VersionMutationApplicationService {
         versionService.updateVersion(
                 projectId,
                 versionId,
-                normalizeDependencyEntries(requestPayload.getModIds()),
+                normalizeDependencies(requestPayload.getDependencies()),
                 normalizeProjectIds(requestPayload.getIncompatibleProjectIds()),
                 requestPayload.getGameVersions(),
                 requestPayload.getChangelog(),
@@ -55,14 +56,12 @@ public class VersionMutationApplicationService {
         versionService.deleteVersion(projectId, versionId, currentUser);
     }
 
-    private List<String> normalizeDependencyEntries(List<String> rawEntries) {
-        if (rawEntries == null || rawEntries.isEmpty()) {
-            return rawEntries;
+    private List<DependencyReferenceRequest> normalizeDependencies(List<DependencyReferenceRequest> dependencies) {
+        if (dependencies == null || dependencies.isEmpty()) {
+            return dependencies;
         }
-        return rawEntries.stream()
-                .flatMap(entry -> Arrays.stream(entry.split(",")))
-                .map(String::trim)
-                .filter(entry -> !entry.isEmpty())
+        return dependencies.stream()
+                .filter(dependency -> dependency != null)
                 .collect(Collectors.toList());
     }
 

@@ -2,6 +2,7 @@
 import '../index.css';
 import { DEFAULT_SEO } from '../data/seo-constants';
 import { BACKEND_URL } from '../utils/api';
+import { DEFAULT_LOCALE, localeMetadata, supportedLocales } from '../i18n/config';
 
 interface Props {
     title?: string;
@@ -50,10 +51,15 @@ const initialDataString = initialData ? JSON.stringify(initialData).replace(/</g
 const jsonLdString = jsonLd ? JSON.stringify(jsonLd).replace(/</g, '\\u003c') : null;
 const projectBootstrapUrlString = projectBootstrapUrl ? JSON.stringify(projectBootstrapUrl).replace(/</g, '\\u003c') : null;
 const wikiBootstrapString = wikiBootstrap ? JSON.stringify(wikiBootstrap).replace(/</g, '\\u003c') : null;
+const localeBootstrap = JSON.stringify({
+    defaultLocale: DEFAULT_LOCALE,
+    supportedLocales,
+    directions: Object.fromEntries(Object.entries(localeMetadata).map(([locale, metadata]) => [locale, metadata.direction]))
+});
 ---
 
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang={DEFAULT_LOCALE} dir={localeMetadata[DEFAULT_LOCALE].direction} class="dark">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -108,6 +114,26 @@ const wikiBootstrapString = wikiBootstrap ? JSON.stringify(wikiBootstrap).replac
             } catch (e) {}
         })();
     </script>
+    <script is:inline set:html={`
+        (function() {
+            var config = ${localeBootstrap};
+            var candidates = [];
+            try { candidates.push(localStorage.getItem('modtale-locale')); } catch (e) {}
+            if (navigator.languages) candidates = candidates.concat(navigator.languages);
+            candidates.push(navigator.language, document.documentElement.lang);
+            var locale = config.defaultLocale;
+            for (var index = 0; index < candidates.length; index += 1) {
+                var candidate = String(candidates[index] || '').replace('_', '-').toLowerCase();
+                var base = candidate.split('-')[0];
+                var match = config.supportedLocales.find(function(value) {
+                    return value.toLowerCase() === candidate || value.toLowerCase() === base;
+                });
+                if (match) { locale = match; break; }
+            }
+            document.documentElement.lang = locale;
+            document.documentElement.dir = config.directions[locale] || 'ltr';
+        })();
+    `} />
 
     <script is:inline>
         (function() {

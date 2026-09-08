@@ -384,7 +384,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                     <div className="flex flex-col md:flex-row md:items-center justify-start gap-1 md:gap-3">
                                         <div className="flex items-center gap-2 flex-wrap">
                                             {headerInput ? headerInput : (
-                                                <LoadingSurface loading={loading} label="Loading profile"><h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight overflow-visible break-words pb-1 min-h-[1.2em]">{displayTitle}</h1></LoadingSurface>
+                                                <LoadingSurface loading={loading} label="Loading profile"><h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-normal leading-tight overflow-visible break-words pb-1 min-h-[1.2em]">{displayTitle}</h1></LoadingSurface>
                                             )}
 
                                             {!isEditing && (

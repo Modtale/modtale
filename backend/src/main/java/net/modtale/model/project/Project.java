@@ -49,6 +49,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
         @CompoundIndex(name = "status_game_version_downloads_idx", def = "{'status': 1, 'versions.gameVersions': 1, 'downloadCount': -1}"),
         @CompoundIndex(name = "status_game_version_updated_idx", def = "{'status': 1, 'versions.gameVersions': 1, 'updatedAt': -1}"),
         @CompoundIndex(name = "status_class_game_version_relevance_rank_idx", def = "{'status': 1, 'classification': 1, 'versions.gameVersions': 1, 'relevanceRank': 1}"),
+        @CompoundIndex(name = "status_version_hash_idx", def = "{'status': 1, 'versions.hash': 1}"),
+        @CompoundIndex(name = "status_manifest_id_idx", def = "{'status': 1, 'versions.manifestId': 1}"),
+        @CompoundIndex(name = "status_cf_fingerprint_idx", def = "{'status': 1, 'versions.curseForgeFingerprint': 1}"),
         @CompoundIndex(name = "status_expires_idx", def = "{'status': 1, 'expiresAt': 1}"),
         @CompoundIndex(name = "deleted_at_idx", def = "{'deletedAt': 1}"),
         @CompoundIndex(name = "trend_score_idx", def = "{'trendScore': -1}"),
@@ -170,8 +173,6 @@ public class Project {
 
     private List<String> types;
     private List<String> childProjectIds;
-
-    private List<String> modIds;
     private boolean allowModpacks = true;
     private boolean allowComments = true;
 
@@ -270,8 +271,6 @@ public class Project {
     public void setTypes(List<String> types) { this.types = types; }
     public List<String> getChildProjectIds() { return childProjectIds; }
     public void setChildProjectIds(List<String> childProjectIds) { this.childProjectIds = childProjectIds; }
-    public List<String> getModIds() { return modIds; }
-    public void setModIds(List<String> modIds) { this.modIds = modIds; }
     public boolean isAllowModpacks() { return allowModpacks; }
     public void setAllowModpacks(boolean allowModpacks) { this.allowModpacks = allowModpacks; }
     public boolean isAllowComments() { return allowComments; }

@@ -442,7 +442,7 @@ const sampleUserSummary = {
     username: 'modtale_creator',
     avatarUrl: 'https://cdn.modtale.net/avatars/modtale_creator.png',
     bannerUrl: 'https://cdn.modtale.net/banners/modtale_creator.png',
-    bio: 'Creator of performance-focused Minecraft tools.',
+    bio: 'Creator of performance-focused Hytale tools.',
     createdAt: '2025-01-16T13:44:02Z',
     tier: 'STANDARD',
     roles: ['USER'],
@@ -521,8 +521,7 @@ const sampleProject = {
         docs: 'https://docs.modtale.net/skyforge-utilities',
         issues: 'https://github.com/modtale/skyforge-utilities/issues',
     },
-    types: ['SERVER'],
-    modIds: ['67f70e06d5de9b5f94b6a111'],
+    types: [],
     allowModpacks: true,
     allowComments: true,
     hmWikiEnabled: true,
@@ -734,8 +733,9 @@ const endpointSpecificExample = (method: string, path: string, code: string): un
     if (path === '/api/v1/projects/{id}/versions/{version}/dependencies' && code === '200') {
         return {
             dependencies: [
-                { projectId: '67f70e06d5de9b5f94b6a111', projectTitle: 'Skyforge Core', versionNumber: '3.1.0', isOptional: false },
-                { projectId: '67f70e06d5de9b5f94b6a222', projectTitle: 'Skyforge Map Layer', versionNumber: '1.4.2', isOptional: true },
+                { id: 'b612a7db-3475-4c43-bb46-c951b330bcd2', projectId: '67f70e06d5de9b5f94b6a111', projectTitle: 'Skyforge Core', versionNumber: '3.1.0', dependencyType: 'REQUIRED', source: 'MODTALE' },
+                { id: '3c6b637b-76cb-4efe-9d20-c7b5356e2676', projectId: '67f70e06d5de9b5f94b6a222', projectTitle: 'Skyforge Map Layer', versionNumber: '1.4.2', dependencyType: 'OPTIONAL', source: 'MODTALE' },
+                { id: '7737a837-76d3-414a-a149-c078ff981c0b', projectId: 'curseforge:1450386', projectTitle: 'SimpleCompost', versionNumber: '1.0.0', dependencyType: 'REQUIRED', source: 'CURSEFORGE', externalId: '1450386', externalUrl: 'https://www.curseforge.com/hytale/mods/simplecompost/files/8227810', externalFileUrl: 'https://www.curseforge.com/hytale/mods/simplecompost/files/8227810', externalFileName: 'SimpleCompost-1.0.0.jar' },
             ],
         };
     }
@@ -752,7 +752,6 @@ const endpointSpecificExample = (method: string, path: string, code: string): un
                     versionNumber: '3.1.0',
                     optional: false,
                     confidence: 97,
-                    dependencyEntry: '67f70e06d5de9b5f94b6a111:3.1.0',
                 },
             ],
         };
@@ -1398,7 +1397,7 @@ export const ApiDocs: React.FC = () => {
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
             <div className="w-full max-w-[112rem] px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 mx-auto py-16 overflow-x-hidden">
                 <div className="text-center mb-12 w-full">
-                    <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">
+                    <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white mb-4 tracking-normal">
                         Modtale <span className="text-modtale-accent">API v1</span>
                     </h1>
                     <p className="text-lg text-slate-600 dark:text-slate-400 max-w-3xl mx-auto mb-6">

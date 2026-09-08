@@ -5,6 +5,7 @@ import { BACKEND_URL } from '@/utils/api';
 import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { StatusModal } from '@/components/ui/StatusModal';
+import { useTranslation } from 'react-i18next';
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
@@ -88,6 +89,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                                                            sidebarContent,
                                                                            onBack
                                                                        }) => {
+    const { t } = useTranslation(['project', 'common']);
     const [cropperOpen, setCropperOpen] = useState(false);
     const [tempImage, setTempImage] = useState<string | null>(null);
     const [tempImageFile, setTempImageFile] = useState<File | null>(null);
@@ -96,6 +98,14 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
     const bannerParallaxRef = useRef<HTMLDivElement>(null);
     const bannerFadeRef = useRef<HTMLDivElement>(null);
 
+    const resolveUrl = (url?: string | null) => {
+        if (!url) return null;
+        if (url.startsWith('blob:')) return url;
+        return url.startsWith('http') ? url : `${BACKEND_URL}${url}`;
+    };
+
+    const finalBanner = resolveUrl(bannerUrl);
+    const finalIcon = resolveUrl(iconUrl);
     useEffect(() => {
         if (supportsNativeScrollLinkedBanner()) return;
 
@@ -139,15 +149,6 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
             }
         };
     }, []);
-
-    const resolveUrl = (url?: string | null) => {
-        if (!url) return null;
-        if (url.startsWith('blob:')) return url;
-        return url.startsWith('http') ? url : `${BACKEND_URL}${url}`;
-    };
-
-    const finalBanner = resolveUrl(bannerUrl);
-    const finalIcon = resolveUrl(iconUrl);
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'icon' | 'banner') => {
         if (!isEditing || !e.target.files?.[0]) return;
@@ -201,55 +202,55 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                 ref={bannerParallaxRef}
                 className={`modtale-project-banner-parallax absolute top-0 left-0 right-0 w-full aspect-[3/1] z-0 will-change-transform ${finalBanner ? 'bg-transparent' : 'bg-slate-200 dark:bg-slate-800'}`}
             >
-                <div className="absolute inset-0 z-0">
-                    {loading ? mediaPlaceholder : finalBanner ? (
-                        <OptimizedImage
-                            src={finalBanner}
-                            alt="Project Banner"
-                            baseWidth={1920}
-                            priority={true}
-                            className="w-full h-full object-cover opacity-100"
-                        />
-                    ) : (
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-50 via-slate-50/20 dark:from-[#0B1120] dark:via-[#0B1120]/20 to-transparent pointer-events-none" />
-                    )}
-                </div>
-
-                <div
-                    ref={bannerFadeRef}
-                    className="modtale-project-banner-fade absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-50 dark:from-[#0B1120] to-transparent z-10 pointer-events-none will-change-[height] [--fade-base:0.5rem] md:[--fade-base:8rem]"
-                />
-
-                {isEditing && !loading && (
-                    <label className={`cursor-pointer transition-all duration-300 pointer-events-auto ${
-                        finalBanner
-                            ? "absolute top-6 right-6 z-30 bg-black/60 hover:bg-black/80 text-white px-4 py-2 rounded-xl text-xs font-bold border border-white/20 backdrop-blur-sm shadow-lg hover:scale-105"
-                            : "absolute inset-0 z-30 flex flex-col items-center justify-center m-6 rounded-2xl border-2 border-dashed border-white/10 hover:border-white/30 bg-white/5 hover:bg-white/10 group/banner"
-                    }`}>
-                        <input type="file" accept="image/*" onChange={e => handleFileSelect(e, 'banner')} className="hidden" />
-                        {finalBanner ? (
-                            <div className="flex flex-col items-end">
-                                <div className="flex items-center gap-2"><ImageIcon className="w-4 h-4" /> Change Banner</div>
-                                <span className="text-[10px] font-medium text-white/50">Rec: 1920x640</span>
-                            </div>
+                    <div className="absolute inset-0 z-0">
+                        {loading ? mediaPlaceholder : finalBanner ? (
+                            <OptimizedImage
+                                src={finalBanner}
+                                alt={t('project:bannerAlt')}
+                                baseWidth={1920}
+                                priority={true}
+                                className="w-full h-full object-cover opacity-100"
+                            />
                         ) : (
-                            <div className="flex flex-col items-center">
-                                <Plus className="w-8 h-8 text-white/50 mb-2" />
-                                <span className="text-lg font-bold text-white/80">Upload Banner</span>
-                                <span className="text-xs font-medium text-white/40 mt-1">Recommended: 1920x640</span>
-                            </div>
+                            <div className="absolute inset-0 bg-gradient-to-t from-slate-50 via-slate-50/20 dark:from-[#0B1120] dark:via-[#0B1120]/20 to-transparent pointer-events-none" />
                         )}
-                    </label>
-                )}
+                    </div>
+
+                    <div
+                        ref={bannerFadeRef}
+                        className="modtale-project-banner-fade absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-50 dark:from-[#0B1120] to-transparent z-10 pointer-events-none will-change-[height] [--fade-base:0.5rem] md:[--fade-base:8rem]"
+                    />
+
+                    {isEditing && !loading && (
+                        <label className={`cursor-pointer transition-all duration-300 pointer-events-auto ${
+                            finalBanner
+                                ? "absolute top-6 right-6 z-30 bg-black/60 hover:bg-black/80 text-white px-4 py-2 rounded-xl text-xs font-bold border border-white/20 backdrop-blur-sm shadow-lg hover:scale-105"
+                                : "absolute inset-0 z-30 flex flex-col items-center justify-center m-6 rounded-2xl border-2 border-dashed border-white/10 hover:border-white/30 bg-white/5 hover:bg-white/10 group/banner"
+                        }`}>
+                            <input type="file" accept="image/*" onChange={e => handleFileSelect(e, 'banner')} className="hidden" />
+                            {loading ? mediaPlaceholder : finalBanner ? (
+                                <div className="flex flex-col items-end">
+                                    <div className="flex items-center gap-2"><ImageIcon className="w-4 h-4" /> {t('project:changeBanner')}</div>
+                                    <span className="text-[10px] font-medium text-white/50">{t('project:shortRecommendedBannerSize')}</span>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center">
+                                    <Plus className="w-8 h-8 text-white/50 mb-2" />
+                                    <span className="text-lg font-bold text-white/80">{t('project:uploadBanner')}</span>
+                                    <span className="text-xs font-medium text-white/40 mt-1">{t('project:recommendedBannerSize')}</span>
+                                </div>
+                            )}
+                        </label>
+                    )}
             </div>
 
             <div className="w-full aspect-[3/1] pointer-events-none relative z-0" />
 
             {onBack && (
-                <div className={`absolute top-0 left-0 right-0 z-40 ${containerClasses} h-full pointer-events-none transition-[max-width,padding] duration-300`}>
+                <div className={`absolute top-0 left-0 right-0 h-full z-40 ${containerClasses} pointer-events-none transition-[max-width,padding] duration-300`}>
                     <div className="pt-6 pointer-events-auto w-fit">
-                        <button type="button" aria-label="Go back" onClick={loading ? undefined : onBack} disabled={loading} className="flex items-center text-white/90 font-bold transition-all bg-black/30 hover:bg-black/50 backdrop-blur-md border border-white/10 p-2 md:px-4 md:py-2 rounded-full md:rounded-xl shadow-lg group/back">
-                            <ChevronLeft className="w-5 h-5 md:w-4 md:h-4 md:mr-1 group-hover/back:-translate-x-1 transition-transform" aria-hidden="true" /> <span className="hidden md:inline">Back</span>
+                        <button type="button" aria-label={t('common:actions.back')} onClick={loading ? undefined : onBack} disabled={loading} className="flex items-center font-bold transition-all backdrop-blur-md p-2 md:px-4 md:py-2 rounded-full md:rounded-xl shadow-lg group/back text-white/90 bg-black/30 hover:bg-black/50 border border-white/10">
+                            <ChevronLeft className="w-5 h-5 md:w-4 md:h-4 md:mr-1 group-hover/back:-translate-x-1 transition-transform" aria-hidden="true" /> <span className="hidden md:inline">{t('common:actions.back')}</span>
                         </button>
                     </div>
                 </div>
@@ -258,7 +259,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
             <div className={`${containerClasses} relative z-50 -mt-2 md:-mt-32 transition-[max-width,padding] duration-300`}>
                 <div className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/20 rounded-3xl shadow-2xl min-h-[80vh]">
                     <div className="relative md:p-12 md:pb-6 border-b border-slate-200 dark:border-white/10 p-4 pt-0">
-                        <div className="lg:hidden flex justify-between items-end -mt-16 mb-6 relative z-50">
+                        <div className="md:hidden flex justify-between items-end -mt-16 mb-6 relative z-50">
                             <div className="flex-shrink-0">
                                 <label className={`block w-32 h-32 rounded-3xl bg-transparent backdrop-blur-md shadow-md border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden relative group ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <div className="absolute inset-0 bg-white/40 dark:bg-slate-900/40 z-0 backdrop-blur-md" />
@@ -266,7 +267,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                     {loading ? mediaPlaceholder : finalIcon ? (
                                         <OptimizedImage
                                             src={finalIcon}
-                                            alt="Icon"
+                                            alt={t('project:iconAlt')}
                                             baseWidth={128}
                                             className="w-full h-full bg-transparent object-cover relative z-10"
                                         />
@@ -284,15 +285,15 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                             )}
                         </div>
 
-                        <div className="flex flex-col lg:flex-row gap-8 items-start relative z-10">
-                            <div className="hidden lg:block flex-shrink-0 relative z-50 -mt-24 ml-2">
+                        <div className="flex flex-col md:flex-row gap-8 items-start relative z-10">
+                            <div className="hidden md:block flex-shrink-0 relative z-50 -mt-24 ml-2">
                                 <label className={`block w-56 h-56 rounded-3xl bg-transparent backdrop-blur-md shadow-xl border-[8px] border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden group relative ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <div className="absolute inset-0 bg-white/40 dark:bg-slate-900/40 z-0 backdrop-blur-md" />
                                     <input type="file" disabled={!isEditing || loading} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
                                     {loading ? mediaPlaceholder : finalIcon ? (
                                         <OptimizedImage
                                             src={finalIcon}
-                                            alt="Icon"
+                                            alt={t('project:iconAlt')}
                                             baseWidth={224}
                                             priority={true}
                                             className="w-full h-full bg-transparent object-cover relative z-10"
@@ -306,8 +307,8 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                     {isEditing && !loading && (
                                         <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-[2px] z-30">
                                             <ImageIcon className="w-8 h-8 text-white mb-2" aria-hidden="true" />
-                                            <span className="text-xs font-bold text-white">Change Icon</span>
-                                            <span className="text-[10px] font-medium text-white/70">Rec: 512x512</span>
+                                            <span className="text-xs font-bold text-white">{t('project:changeIcon')}</span>
+                                            <span className="text-[10px] font-medium text-white/70">{t('project:recommendedIconSize')}</span>
                                         </div>
                                     )}
                                 </label>

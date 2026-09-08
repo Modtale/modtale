@@ -1,5 +1,5 @@
 import { RouteSkeleton } from '@/modules/core/components/RouteSkeleton';
-import React, { useState, useEffect, Suspense, lazy, useRef } from 'react';
+import React, { useState, useEffect, Suspense, lazy, useCallback, useRef } from 'react';
 import { Route, Routes, useNavigate, useLocation, Navigate, BrowserRouter } from 'react-router-dom';
 import { StaticRouter } from 'react-router';
 import { HelmetProvider } from 'react-helmet-async';
@@ -25,6 +25,8 @@ import { SiteRoutes } from '@/utils/routes';
 import type { Classification } from '@/data/categories';
 import { normalizeUser } from '@/utils/users';
 import { clearPendingSignInMethod, completeSignInMethod } from '@/modules/auth/api/authClient';
+import { LocalizationProvider } from '@/i18n';
+import { useTranslation } from 'react-i18next';
 
 const StatusModal = lazy(() => import('@/components/ui/StatusModal').then((module) => ({ default: module.StatusModal })));
 const Onboarding = lazy(() => import('@/modules/user/components/Onboarding').then((module) => ({ default: module.Onboarding })));
@@ -35,6 +37,9 @@ const Dashboard = lazy(() => import('@/modules/user/views/Dashboard').then((modu
 const VerifyEmail = lazy(() => import('@/modules/auth/views/VerifyEmail').then((module) => ({ default: module.VerifyEmail })));
 const ResetPassword = lazy(() => import('@/modules/auth/views/ResetPassword').then((module) => ({ default: module.ResetPassword })));
 const MfaVerify = lazy(() => import('@/modules/auth/views/MfaVerify').then((module) => ({ default: module.MfaVerify })));
+const LauncherAuth = lazy(() => import('@/modules/auth/views/LauncherAuth').then((module) => ({ default: module.LauncherAuth })));
+const LauncherPage = lazy(() => import('@/modules/launcher/views/LauncherPage').then((module) => ({ default: module.LauncherPage })));
+const WorldModListView = lazy(() => import('@/modules/worldlist/views/WorldModListView').then((module) => ({ default: module.WorldModListView })));
 const CreateProject = lazy(() => import('@/modules/project/views/CreateProject').then((module) => ({ default: module.CreateProject })));
 const ProjectEditorView = lazy(() => import('@/modules/project/views/ProjectEditor').then((module) => ({ default: module.ProjectEditorView })));
 const AdminPanel = lazy(() => import('@/modules/admin/views/AdminPanel').then((module) => ({ default: module.AdminPanel })));
@@ -46,39 +51,33 @@ const RouteLoading = () => {
     return <RouteSkeleton pathname={pathname} search={search} />;
 };
 
-const hasLikelyAuthCookie = () => {
-    if (typeof document === 'undefined') return false;
-    const cookies = document.cookie || '';
-    return /(?:^|;\s*)(SESSION|JSESSIONID|XSRF-TOKEN)=/.test(cookies);
+type FavoriteToggleOptions = {
+    onError?: () => void;
 };
 
-const projectRouteBase = (pathname: string) => {
-    const match = pathname.match(/^\/(project|mod|modpack|world)\/[^/]+/i);
-    return match ? match[0].toLowerCase() : '';
-};
+const setProjectLikedState = (user: User, projectId: string, liked: boolean): User => {
+    const likedProjectIds = user.likedProjectIds || [];
+    const alreadyLiked = likedProjectIds.includes(projectId);
 
-const isProjectModalSubroute = (pathname: string) => (
-    /^\/(project|mod|modpack|world)\/[^/]+\/(download|changelog|gallery)\/?$/i.test(pathname)
-);
+    if (alreadyLiked === liked) return user;
+
+    return {
+        ...user,
+        likedProjectIds: liked
+            ? [...likedProjectIds, projectId]
+            : likedProjectIds.filter(likedProjectId => likedProjectId !== projectId)
+    };
+};
 
 const ScrollToTop = () => {
     const { pathname } = useLocation();
-    const previousPathRef = useRef<string | null>(null);
+    const previousPathnameRef = useRef<string | undefined>(undefined);
 
     useEffect(() => {
-        const previousPath = previousPathRef.current;
-        const previousProjectBase = previousPath ? projectRouteBase(previousPath) : '';
-        const nextProjectBase = projectRouteBase(pathname);
-        const isSameProjectModalTransition = Boolean(
-            previousPath
-            && previousProjectBase
-            && previousProjectBase === nextProjectBase
-            && (isProjectModalSubroute(previousPath) || isProjectModalSubroute(pathname))
-        );
+        const previousPathname = previousPathnameRef.current;
+        previousPathnameRef.current = pathname;
 
-        previousPathRef.current = pathname;
-
-        if (isSameProjectModalTransition) {
+        if (previousPathname && SiteRoutes.isSameProjectModalContext(previousPathname, pathname)) {
             return;
         }
 
@@ -96,6 +95,8 @@ const AppContent: React.FC = () => {
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [isDarkMode, setIsDarkMode] = useState(true);
     const [statusModal, setStatusModal] = useState<{ type: 'success' | 'error' | 'warning' | 'info'; title: string; msg: string } | null>(null);
+    const userRef = useRef<User | null>(null);
+    const pendingFavoriteIdsRef = useRef<Set<string>>(new Set());
 
     const navigate = useNavigate();
     const location = useLocation();
@@ -105,10 +106,11 @@ const AppContent: React.FC = () => {
         const params = new URLSearchParams(location.search);
         const oauthError = params.get('oauth_error');
         if (oauthError) {
-            const decodedError = decodeURIComponent(oauthError).replace(/\+/g, ' ');
-            setGlobalError(decodedError);
+            setGlobalError(oauthError);
             clearPendingSignInMethod();
-            navigate(location.pathname, { replace: true });
+            params.delete('oauth_error');
+            const remainingSearch = params.toString();
+            navigate(`${location.pathname}${remainingSearch ? `?${remainingSearch}` : ''}`, { replace: true });
         }
     }, [location, navigate]);
 
@@ -134,35 +136,40 @@ const AppContent: React.FC = () => {
         });
     };
 
-    const fetchUser = async () => {
-        if (!hasLikelyAuthCookie()) {
-            setLoadingAuth(false);
-            return;
-        }
+    useEffect(() => {
+        userRef.current = user;
+    }, [user]);
 
+    const fetchUser = useCallback(async () => {
+        // Session cookies can be HttpOnly or scoped to another API host.
+        // Only the server can reliably tell whether this browser is signed in.
         try {
             const res = await api.get(`/user/me?t=${Date.now()}`);
             if (res.data) {
-                setUser(normalizeUser(res.data));
+                const normalizedUser = normalizeUser(res.data);
+                userRef.current = normalizedUser;
+                setUser(normalizedUser);
                 completeSignInMethod();
                 if ((res.data as any).is_new_account) {
                     setShowOnboarding(true);
                 }
             }
         } catch (e: any) {
+            userRef.current = null;
             setUser(null);
         } finally {
             setLoadingAuth(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
         fetchUser();
-    }, []);
+    }, [fetchUser]);
 
     const handleLogout = async () => {
         try {
             await api.post('/auth/logout');
+            userRef.current = null;
             setUser(null);
             setShowOnboarding(false);
             navigate(SiteRoutes.home());
@@ -174,20 +181,37 @@ const AppContent: React.FC = () => {
     const handleNavigate = (page: string) => { navigate(page === 'home' ? SiteRoutes.home() : `/${page}`); };
     const handleUserClick = (userId: string, username?: string) => { navigate(SiteRoutes.creator(userId, username)); };
 
-    const handleToggleFavorite = async (id: string) => {
-        if (!user) return;
-        const previousUser = user;
-        const likedProjectIds = user.likedProjectIds || [];
-        const isLiked = likedProjectIds.includes(id);
-        const newProjectLikes = isLiked ? likedProjectIds.filter(lid => lid !== id) : [...likedProjectIds, id];
-        setUser({ ...user, likedProjectIds: newProjectLikes });
-        try {
-            await api.post(`/projects/${id}/favorite`);
-        } catch (e) {
-            setUser(previousUser);
-            fetchUser();
-        }
-    };
+    const handleToggleFavorite = useCallback((id: string, options?: FavoriteToggleOptions) => {
+        if (!id || pendingFavoriteIdsRef.current.has(id)) return undefined;
+
+        const currentUser = userRef.current;
+        if (!currentUser) return undefined;
+
+        const wasLiked = (currentUser.likedProjectIds || []).includes(id);
+        const nextLiked = !wasLiked;
+        const nextUser = setProjectLikedState(currentUser, id, nextLiked);
+
+        userRef.current = nextUser;
+        pendingFavoriteIdsRef.current.add(id);
+        setUser(nextUser);
+
+        api.post(`/projects/${id}/favorite`)
+            .catch(() => {
+                setUser(latestUser => {
+                    if (!latestUser || latestUser.id !== currentUser.id) return latestUser;
+                    const revertedUser = setProjectLikedState(latestUser, id, wasLiked);
+                    userRef.current = revertedUser;
+                    return revertedUser;
+                });
+                options?.onError?.();
+                fetchUser();
+            })
+            .finally(() => {
+                pendingFavoriteIdsRef.current.delete(id);
+            });
+
+        return nextLiked;
+    }, [fetchUser]);
 
     const handleDownload = (id: string) => { if (!downloadedSessionIds.has(id)) setDownloadedSessionIds(prev => new Set(prev).add(id)); };
     const onShowStatus = (type: 'success' | 'error' | 'warning' | 'info', title: string, msg: string) => setStatusModal({ type, title, msg });
@@ -317,6 +341,9 @@ const AppContent: React.FC = () => {
                                     <Route path="/verify" element={<VerifyEmail />} />
                                     <Route path="/reset-password" element={<ResetPassword />} />
                                     <Route path="/mfa" element={<MfaVerify />} />
+                                    <Route path="/launcher" element={<LauncherPage />} />
+                                    <Route path="/launcher/auth" element={<LauncherAuth user={user} loadingAuth={loadingAuth} />} />
+                                    <Route path="/lists/:id" element={<WorldModListView />} />
 
                                     <Route path="/terms" element={<TermsOfService />} />
                                     <Route path="/privacy" element={<PrivacyPolicy />} />
@@ -343,25 +370,27 @@ const AppContent: React.FC = () => {
 
 export const App: React.FC<any> = ({ initialPath, ssrData }) => {
     return (
-        <SSRProvider data={ssrData || null} initialPath={initialPath || '/'}>
-            <HelmetProvider>
-                <MobileProvider>
-                    <ExternalLinkProvider>
-                        <ToastProvider>
-                            {import.meta.env.SSR ? (
-                                <StaticRouter location={initialPath || "/"}>
-                                    <AppContent />
-                                </StaticRouter>
-                            ) : (
-                                <BrowserRouter>
-                                    <AppContent />
-                                </BrowserRouter>
-                            )}
-                        </ToastProvider>
-                    </ExternalLinkProvider>
-                </MobileProvider>
-            </HelmetProvider>
-        </SSRProvider>
+        <LocalizationProvider>
+            <SSRProvider data={ssrData || null} initialPath={initialPath || '/'}>
+                <HelmetProvider>
+                    <MobileProvider>
+                        <ExternalLinkProvider>
+                            <ToastProvider>
+                                {import.meta.env.SSR ? (
+                                    <StaticRouter location={initialPath || "/"}>
+                                        <AppContent />
+                                    </StaticRouter>
+                                ) : (
+                                    <BrowserRouter>
+                                        <AppContent />
+                                    </BrowserRouter>
+                                )}
+                            </ToastProvider>
+                        </ExternalLinkProvider>
+                    </MobileProvider>
+                </HelmetProvider>
+            </SSRProvider>
+        </LocalizationProvider>
     );
 };
 export default App;

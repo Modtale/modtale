@@ -32,6 +32,8 @@ import type { MetadataFormData, VersionFormData } from '../components/FormShared
 import type { ProjectRole } from '@/types';
 import { Permission, PROJECT_PERMISSION_GROUPS } from '@/modules/permissions/permissions';
 import { VersionFields } from '../components/VersionFields';
+import { worldListClient } from '@/modules/worldlist/api/worldListClient';
+import { skippedWorldListItems, worldListToProjectDependencies, worldListToOverrideFile } from '@/modules/worldlist/utils/modpackSeed';
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
@@ -130,6 +132,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
     const [galleryCropFile, setGalleryCropFile] = useState<File | null>(null);
     const [statusModal, setStatusModal] = useState<any>(null);
     const [isStatusChanging, setIsStatusChanging] = useState(false);
+    const seededListRef = useRef('');
 
     useEffect(() => {
         if (projectData) {
@@ -149,6 +152,55 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             if (projectData.bannerUrl) setBannerPreview(projectData.bannerUrl);
         }
     }, [projectData]);
+
+    useEffect(() => {
+        if (!projectData || projectData.classification !== 'MODPACK') {
+            return;
+        }
+
+        const seedListId = new URLSearchParams(location.search).get('seedList') || '';
+        if (!seedListId || seededListRef.current === seedListId) {
+            return;
+        }
+
+        seededListRef.current = seedListId;
+        setActiveTab('files');
+
+        worldListClient.get(seedListId)
+            .then(async list => {
+                const seededConfigs = await worldListToOverrideFile(list);
+                const seededDependencies = worldListToProjectDependencies(list);
+                const skippedCount = skippedWorldListItems(list).length;
+                setVersionData(current => {
+                    const existingKeys = new Set((current.dependencies || []).map(dep => `${dep.source || 'MODTALE'}:${dep.projectId}`));
+                    const mergedDependencies = [
+                        ...(current.dependencies || []),
+                        ...seededDependencies.filter(dep => !existingKeys.has(`${dep.source || 'MODTALE'}:${dep.projectId}`))
+                    ];
+                    return {
+                        ...current,
+                        dependencies: mergedDependencies,
+                        file: current.file || seededConfigs || null,
+                        versionNumber: current.versionNumber || '1.0.0',
+                        gameVersions: current.gameVersions?.length
+                            ? current.gameVersions
+                            : list.gameVersion
+                                ? [list.gameVersion]
+                                : current.gameVersions
+                    };
+                });
+                onShowStatus(
+                    skippedCount > 0 ? 'warning' : 'success',
+                    skippedCount > 0 ? 'Modpack Seeded' : 'Modpack Ready',
+                    skippedCount > 0
+                        ? `Added ${seededDependencies.length} mod${seededDependencies.length === 1 ? '' : 's'} from the shared list. ${skippedCount} local-only item${skippedCount === 1 ? '' : 's'} could not be added automatically.`
+                        : `Added ${seededDependencies.length} mod${seededDependencies.length === 1 ? '' : 's'} from the shared list.`
+                );
+            })
+            .catch(error => {
+                onShowStatus('error', 'List Unavailable', extractApiErrorMessage(error, 'We could not load that shared mod list.'));
+            });
+    }, [location.search, onShowStatus, projectData]);
 
     useEffect(() => {
         const handleBeforeUnload = (event: BeforeUnloadEvent) => {

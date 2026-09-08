@@ -25,6 +25,16 @@ describe('api utils', () => {
         expect(getCookie('missing')).toBeNull();
     });
 
+    it('preserves equals signs inside cookie values', () => {
+        document.cookie = 'session=abc==; path=/';
+        expect(getCookie('session')).toBe('abc==');
+    });
+
+    it('treats malformed cookie encoding as a missing token', () => {
+        document.cookie = 'XSRF-TOKEN=%E0%A4%A; path=/';
+        expect(getCookie('XSRF-TOKEN')).toBeNull();
+    });
+
     it('adds the xsrf token header for mutating requests', async () => {
         document.cookie = 'XSRF-TOKEN=csrf-token; path=/';
         const handler = (api.interceptors.request as any).handlers[0].fulfilled;
@@ -60,6 +70,23 @@ describe('api utils', () => {
         });
 
         expect(config.headers['X-XSRF-TOKEN']).toBeUndefined();
+    });
+
+    it('shares a token refresh for concurrent writes when API cookies are on another host', async () => {
+        let resolveRefresh!: (value: { data: { token: string } }) => void;
+        const refresh = vi.spyOn(api, 'get').mockImplementationOnce(() => new Promise(resolve => {
+            resolveRefresh = resolve;
+        }));
+        const handler = (api.interceptors.request as any).handlers[0].fulfilled;
+        const first = handler({ headers: {}, method: 'post' });
+        const second = handler({ headers: {}, method: 'put' });
+        expect(refresh).toHaveBeenCalledTimes(1);
+        expect(refresh).toHaveBeenCalledWith('/auth/csrf', { headers: { 'Cache-Control': 'no-cache' } });
+        resolveRefresh({ data: { token: 'cross-origin-token' } });
+        const configs = await Promise.all([first, second]);
+        for (const config of configs) {
+            expect(config.headers['X-XSRF-TOKEN']).toBe('cross-origin-token');
+        }
     });
 
     it('extracts the most useful api error message available', () => {

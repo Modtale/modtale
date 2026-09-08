@@ -158,7 +158,7 @@ final class ProjectSocialService {
     }
 
     private Project getProject(String projectId) {
-        Project project = projectService.getRawProjectById(projectId);
+        Project project = projectService.getRawProjectByRouteKey(projectId);
         if (project == null) {
             throw new ResourceNotFoundException("Project not found.");
         }

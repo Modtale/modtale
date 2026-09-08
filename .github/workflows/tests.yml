@@ -28,11 +28,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
-          PR_ACTION: ${{ github.event.action }}
-          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          WORKFLOW_FILE: tests.yml
         run: bash .github/scripts/should-run-tests-workflow.sh
+
+  scripts:
+    name: Repository Script Tests
+    needs: dedupe
+    if: needs.dedupe.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+
+      - name: Test workflow and fixture scripts
+        run: node --test .github/tests/*.test.mjs mock-db/tests/*.test.mjs
 
   detect-changes:
     name: Detect Changes
@@ -42,6 +55,7 @@ jobs:
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
       backend: ${{ steps.filter.outputs.backend }}
+      launcher: ${{ steps.filter.outputs.launcher }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -60,7 +74,7 @@ jobs:
   frontend:
     name: Frontend Tests
     needs: detect-changes
-    if: needs.detect-changes.outputs.frontend == 'true'
+    if: needs.detect-changes.outputs.frontend == 'true' && github.repository == 'Modtale/modtale' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'Modtale/modtale')
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -79,6 +93,9 @@ jobs:
 
       - name: Install frontend dependencies
         run: npm ci
+
+      - name: Check frontend types
+        run: npm run check
 
       - name: Run frontend tests
         run: npm run test
@@ -121,4 +138,32 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run backend tests
+        run: ./gradlew test
+
+  launcher:
+    name: Launcher Tests
+    needs: detect-changes
+    if: needs.detect-changes.outputs.launcher == 'true' && github.repository == 'Modtale/modtale' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'Modtale/modtale')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: launcher
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Ensure Gradle wrapper is executable
+        run: chmod +x gradlew
+
+      - name: Run launcher tests
         run: ./gradlew test

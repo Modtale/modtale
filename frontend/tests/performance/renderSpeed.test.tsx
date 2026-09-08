@@ -11,6 +11,7 @@ import { Browse } from '@/modules/discovery/views/Browse';
 import { ProjectDetails } from '@/modules/project/views/ProjectDetails';
 import { discoveryClient } from '@/modules/discovery/api/discoveryClient';
 import { projectClient } from '@/modules/project/api/projectClient';
+import { theme } from '@/styles/theme';
 import type { Project } from '@/types';
 
 vi.mock('@/modules/discovery/api/discoveryClient', () => ({
@@ -255,5 +256,10 @@ describe('critical page render budgets', () => {
         expect(navbarSource).not.toMatch(/^import\s+\{\s*NotificationMenu\s*\}/m);
         expect(navbarSource).toContain("import('@/modules/auth/components/SignInModal.tsx')");
         expect(navbarSource).toContain("import('@/modules/user/components/NotificationMenu')");
+    });
+
+    it('keeps shared modal overlays off backdrop-filter paint paths', () => {
+        expect(theme.components.modalOverlay).not.toContain('backdrop-blur');
+        expect(theme.components.modalOverlay).not.toContain('backdrop-filter');
     });
 });

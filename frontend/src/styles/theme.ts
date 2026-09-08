@@ -29,7 +29,7 @@ export const theme = {
         buttonDanger: 'bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-xl font-bold transition-colors shadow-sm disabled:opacity-50',
         buttonGhost: 'px-5 py-2.5 rounded-xl font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors disabled:opacity-50',
         iconButton: 'p-2 rounded-full text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors',
-        modalOverlay: 'fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/45 dark:bg-slate-900/70 backdrop-blur-sm p-4 animate-in fade-in duration-200',
+        modalOverlay: 'fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/55 dark:bg-slate-950/75 p-4 animate-in fade-in duration-200',
         modalContent: 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden relative flex flex-col',
         modalHeader: 'p-6 border-b border-slate-200 dark:border-white/10 flex justify-between items-center bg-slate-50/70 dark:bg-slate-800/55 shrink-0',
         modalBody: 'p-6 space-y-4 overflow-y-auto bg-transparent flex-1',

@@ -36,6 +36,7 @@ import { StatusModal } from '@/components/ui/StatusModal';
 import { api, extractApiErrorMessage } from '@/utils/api';
 import { projectClient } from '../api/projectClient';
 import { mergeProjectVersionChangelogs, projectNeedsChangelogHydration } from '../utils/changelogHydration';
+import { getSelectableBundleDependencies, hasCurseForgeDependencies } from '../utils/dependencyEntries';
 import { resolveGalleryImages } from '../utils/galleryImages';
 import { countGalleryCarouselMarkers } from '../utils/galleryCarouselMarker';
 import { useScrollLock } from '@/hooks/useScrollLock';
@@ -51,7 +52,7 @@ const DependencyModal = lazy(() => import('../components/dialogs/DependencyModal
 interface ProjectDetailViewProps {
     currentUser: User | null;
     isLiked: (id: string) => boolean;
-    onToggleFavorite: (id: string) => void;
+    onToggleFavorite: (id: string, options?: { onError?: () => void }) => boolean | undefined;
     onDownload: (id: string) => void;
     downloadedSessionIds: Set<string>;
     onRefresh: () => Promise<void>;
@@ -380,13 +381,6 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         }
     }, [project, id, location.pathname, location.search, location.hash, navigate]);
 
-    const getDependencyId = (dep: any) => {
-        if (typeof dep === 'string') return dep;
-        if (dep && typeof dep === 'object') {
-            return dep.modId || dep.projectId || dep.id || '';
-        }
-        return '';
-    };
     const showDownloadError = useCallback((error: unknown, fallback: string) => {
         setStatusModal({
             type: 'error',
@@ -397,16 +391,29 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const handleProjectFavoriteToggle = useCallback(() => {
         if (!project) return;
-        const wasLiked = isLiked(project.id);
+        let nextLiked: boolean | undefined;
+        const rollbackFavoriteCount = () => {
+            if (typeof nextLiked !== 'boolean') return;
+            setProject(previous => {
+                if (!previous || previous.id !== project.id) return previous;
+                return {
+                    ...previous,
+                    favoriteCount: Math.max(0, (previous.favoriteCount || 0) + (nextLiked ? -1 : 1))
+                };
+            });
+        };
+
+        nextLiked = onToggleFavorite(project.id, { onError: rollbackFavoriteCount });
+        if (typeof nextLiked !== 'boolean') return;
+
         setProject(previous => {
             if (!previous || previous.id !== project.id) return previous;
             return {
                 ...previous,
-                favoriteCount: Math.max(0, (previous.favoriteCount || 0) + (wasLiked ? -1 : 1))
+                favoriteCount: Math.max(0, (previous.favoriteCount || 0) + (nextLiked ? 1 : -1))
             };
         });
-        onToggleFavorite(project.id);
-    }, [isLiked, onToggleFavorite, project, setProject]);
+    }, [onToggleFavorite, project, setProject]);
 
     const handleMobileWikiNavigate = useCallback((slug: string) => {
         if (!projectUrl) return;
@@ -427,7 +434,9 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const resolveDownloadedFileName = (projectData: any, versionNumber: string, gameVersion: string, isBundle: boolean) => {
         if (!projectData) return '';
         if (isBundle) return `${sanitizeDownloadName(projectData.title)}-UNZIP-ME.zip`;
-        if (projectData.classification === 'MODPACK') return `${sanitizeDownloadName(projectData.title)}-${versionNumber}.zip`;
+        if (projectData.classification === 'MODPACK') {
+            return `${sanitizeDownloadName(projectData.title)}-${versionNumber}.zip`;
+        }
 
         const matchedVersion = (projectData.versions || []).find((v: any) => {
             if (v.versionNumber !== versionNumber) return false;
@@ -493,6 +502,9 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const handleDownloadClick = async (url: string, versionNumber: string, gameVersion: string, deps: any[], channel: string) => {
         try {
+            if (project?.classification === 'MODPACK' && hasCurseForgeDependencies(deps)) {
+                throw new Error('This modpack version contains CurseForge projects and can only be installed with Modtale Launcher.');
+            }
             const downloadChannel = normalizeDownloadChannel(channel);
 
             if (!versionNumber) {
@@ -520,7 +532,10 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 return;
             }
 
-            const selectableDeps = (deps || []).filter(dep => getDependencyId(dep) && !dep?.isEmbedded);
+            // A modpack download is already a complete, validated pack plan. Routing it
+            // through the generic project bundle endpoint nests the generated pack ZIP
+            // inside another ZIP and loses reference-only metadata.
+            const selectableDeps = getSelectableBundleDependencies(project?.classification, deps);
             if (selectableDeps.length > 0) {
                 setPendingDownload({ versionNumber, gameVersion, dependencies: selectableDeps, channel: downloadChannel });
                 setIsDepModalOpen(true);
@@ -639,6 +654,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                         onToggleExperimental={toggleExperimental}
                         onDownload={handleDownloadClick}
                         hasStableVersions={hasStableBuilds}
+                        isModpack={project.classification === 'MODPACK'}
                     />
                 )}
                 {isDownloadOpen && gameVersionCatalogError && !downloadModalPending && (
@@ -660,6 +676,10 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                         showExperimental={showExperimental}
                         onToggleExperimental={toggleExperimental}
                         onViewHistory={() => navigate(projectUrl + '/changelog')}
+                        isModpack={project.classification === 'MODPACK'}
+                        projectId={project.id}
+                        projectHandle={SiteRoutes.projectHandle(project)}
+                        onLauncherFallback={() => navigate(SiteRoutes.launcher())}
                     />
                 )}
                 {isDepModalOpen && pendingDownload && (
