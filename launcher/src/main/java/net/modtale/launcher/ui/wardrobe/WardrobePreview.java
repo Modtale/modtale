@@ -96,6 +96,16 @@ public final class WardrobePreview {
     private long generation;
     private boolean disposed;
     private double dragX, dragY, zoom = 1;
+    private CosmeticFraming framing = CosmeticFraming.forCategory("");
+    private boolean focusBack;
+
+    void focusCategory(String category) {
+        CosmeticFraming next = CosmeticFraming.forCategory(category);
+        if (next.equals(framing)) return;
+        framing = next;
+        focusBack = "cape".equals(category);
+        resetView();
+    }
     private double capeAngle = 180;
     private boolean capeDragged;
 
@@ -446,7 +456,7 @@ public final class WardrobePreview {
     }
 
     private void resetView() {
-        yaw.setAngle(-20);
+        yaw.setAngle(focusBack ? 180 : -20);
         pitch.setAngle(0);
         zoom = 1;
         fitCamera();
@@ -456,7 +466,8 @@ public final class WardrobePreview {
         if (camera == null) return;
         double aspect = Math.max(0.1, viewport.getWidth()/Math.max(1, viewport.getHeight()));
         double halfAngle = Math.atan(Math.tan(Math.toRadians(camera.getFieldOfView()/2))*Math.min(1,aspect));
-        camera.setTranslateZ(-1.15/Math.sin(halfAngle)*zoom);
+        camera.setTranslateY(framing.centerY());
+        camera.setTranslateZ(-1.15/Math.sin(halfAngle)*zoom*framing.scale());
     }
 
     private void stopAnimation() {

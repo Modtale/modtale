@@ -236,6 +236,8 @@ class CosmeticEditorUiTest {
             assertNotNull(button(hero.root(), "Saved looks"));
             capture(hero, output, "customize", 1440, 1000);
             capture(hero, output, "customize", 1000, 900);
+            openCategory(hero, catalog, "pants"); awaitPreview(hero);
+            capture(hero, output, "customize-pants", 1000, 900);
             openCategory(hero, catalog, "cape"); awaitPreview(hero);
             capture(hero, output, "customize-cape", 1440, 1000);
             capture(hero, output, "customize-cape", 1000, 900);
@@ -264,7 +266,15 @@ class CosmeticEditorUiTest {
 
     private static void openCategory(Harness harness, CosmeticCatalogClient catalog, String category) throws Exception {
         String label = catalog.categories().stream().filter(value -> value.key().equals(category)).findFirst().orElseThrow().label();
-        click(harness, label);
+        var before = fx(() -> harness.controller().draftSnapshot());
+        click(harness, CosmeticFraming.forCategory(category).group());
+        fx(() -> {
+            var choice = nodes(harness.root(), Button.class).stream().filter(button -> button.getStyleClass().contains("cosmetic-category")
+                    && button.getText().equals(label)).findFirst().orElseThrow();
+            assertTrue(choice.getParent().isVisible(), "Group must reveal the selected submenu");
+            choice.fire(); return null;
+        });
+        assertEquals(before, fx(() -> harness.controller().draftSnapshot()), "Navigation must preserve the outfit");
         String expected = "Choose " + catalog.browseAssets(category, "", 1, 12).options().getFirst().label();
         await("category " + category, () -> cards(harness).stream().anyMatch(button -> expected.equals(button.getAccessibleText()))
                 && nodes(harness.root(), Label.class).stream().noneMatch(node -> node.getText().equals("Loading cosmetics…")));
@@ -298,6 +308,7 @@ class CosmeticEditorUiTest {
     private static void capture(Harness harness, Path output, String name, int width, int height) throws Exception {
         fx(() -> { harness.stage().setWidth(width); harness.stage().setHeight(height); harness.scroll().setVvalue(0); harness.root().applyCss(); harness.root().layout(); return null; });
         await("resize", () -> Math.round(harness.stage().getScene().getWidth()) == width && Math.round(harness.stage().getScene().getHeight()) == height);
+        Thread.sleep(250); // Allow the 150 ms resize debounce to schedule its catalog replacement.
         await("responsive page settled", () -> {
             var grid = (javafx.scene.layout.GridPane) harness.root().lookup("#cosmetic-cards");
             return !cards(harness).isEmpty() && cards(harness).size() <= grid.getColumnConstraints().size() * 4

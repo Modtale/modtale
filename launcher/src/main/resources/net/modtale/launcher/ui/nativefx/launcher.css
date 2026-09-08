@@ -9650,3 +9650,8 @@
 .mod-settings-row { -fx-padding: 15px 18px; -fx-border-color: transparent transparent rgba(255,255,255,0.06) transparent; }
 .mod-settings-error { -fx-text-fill: #fda4af; -fx-font-size: 12px; }
 .mod-settings-footer { -fx-padding: 18px 24px; -fx-border-color: rgba(255,255,255,0.10) transparent transparent transparent; }
+
+.cosmetic-group { -fx-background-color: transparent; -fx-text-fill: #94a3b8; -fx-padding: 11 12; -fx-background-radius: 8; -fx-font-size: 13; -fx-font-weight: bold; -fx-cursor: hand; }
+.cosmetic-group:hover { -fx-background-color: #16243a; -fx-text-fill: #e2e8f0; }
+.cosmetic-group:selected { -fx-background-color: #101d36; -fx-text-fill: #60a5fa; }
+.cosmetic-subcategories { -fx-padding: 0 0 7 9; }

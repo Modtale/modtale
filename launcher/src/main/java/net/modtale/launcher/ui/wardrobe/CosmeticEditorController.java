@@ -72,6 +72,9 @@ public final class CosmeticEditorController implements AutoCloseable {
     private List<CosmeticOption> combinations = List.of();
     private String pendingCape;
     private final Map<String, Button> categoryButtons = new LinkedHashMap<>();
+    private final Map<String, VBox> categoryGroups = new LinkedHashMap<>();
+    private final Map<String, Button> groupButtons = new LinkedHashMap<>();
+    private final Map<String, String> lastCategory = new HashMap<>();
 
     public CosmeticEditorController(WardrobeApiClient api, WardrobeStore store, Supplier<LauncherSettings> settings,
             LauncherFeedback feedback, Executor executor) {
@@ -176,17 +179,37 @@ public final class CosmeticEditorController implements AutoCloseable {
     }
 
     private void renderCategories() {
-        categoryRail.getChildren().clear(); categoryButtons.clear();
+        categoryRail.getChildren().clear(); categoryButtons.clear(); categoryGroups.clear(); groupButtons.clear();
+        for (String group : List.of("Head", "Body", "Tops", "Bottoms", "Accessories")) {
+            VBox children = new VBox(3); children.getStyleClass().add("cosmetic-subcategories");
+            Button heading = new Button(group); heading.getStyleClass().add("cosmetic-group");
+            heading.setMaxWidth(Double.MAX_VALUE); heading.setAlignment(Pos.CENTER_LEFT);
+            heading.setOnAction(e -> {
+                category = lastCategory.getOrDefault(group, catalog.categories().stream()
+                        .filter(entry -> CosmeticFraming.forCategory(entry.key()).group().equals(group)).findFirst().orElseThrow().key());
+                page = 1; browse();
+            });
+            categoryGroups.put(group, children); groupButtons.put(group, heading);
+            categoryRail.getChildren().addAll(heading, children);
+        }
         for (CosmeticCategory entry : catalog.categories()) {
             Button button = new Button(entry.label()); button.getStyleClass().add("cosmetic-category");
             button.setMaxWidth(Double.MAX_VALUE); button.setAlignment(Pos.CENTER_LEFT);
             button.setOnAction(e -> { category = entry.key(); page = 1; browse(); });
-            categoryButtons.put(entry.key(), button); categoryRail.getChildren().add(button);
+            categoryButtons.put(entry.key(), button); categoryGroups.get(CosmeticFraming.forCategory(entry.key()).group()).getChildren().add(button);
         }
     }
 
     private void browse() {
         if (catalog == null || disposed) return;
+        String activeGroup = CosmeticFraming.forCategory(category).group();
+        lastCategory.put(activeGroup, category);
+        categoryGroups.forEach((group, children) -> {
+            boolean active = group.equals(activeGroup);
+            children.setVisible(active); children.setManaged(active);
+            groupButtons.get(group).pseudoClassStateChanged(SELECTED, active);
+        });
+        preview.focusCategory(category);
         resizePages.stop();
         long ticket = ++generation; String key = category; int requestedPage = page; int pageSize = columns * 4;
         boolean filterOwned = ownedOnly.isSelected(); boolean known = permissionsKnown;
@@ -255,8 +278,18 @@ public final class CosmeticEditorController implements AutoCloseable {
     }
 
     private Node optionCard(CosmeticOption option) {
-        ImageView image = new ImageView(new Image(cosmeticImage(option), 150, 140, true, true, true));
+        ImageView image = new ImageView(new Image(cosmeticImage(option), 256, 256, true, true, true));
         image.setFitWidth(140); image.setFitHeight(135); image.setPreserveRatio(true);
+        CosmeticFraming framing = CosmeticFraming.forCategory(option.category());
+        Runnable crop = () -> {
+            Image source = image.getImage();
+            if (source.getWidth() <= 0 || source.getHeight() <= 0) return;
+            double height = source.getHeight() * framing.cropHeight();
+            double width = Math.min(source.getWidth(), height);
+            image.setViewport(new javafx.geometry.Rectangle2D((source.getWidth() - width) / 2,
+                    source.getHeight() * framing.cropY(), width, height));
+        };
+        image.getImage().progressProperty().addListener((o, before, after) -> crop.run()); crop.run();
         Label fallback = text(option.label(), "wardrobe-card-fallback"); fallback.setMaxWidth(130); fallback.setWrapText(true);
         fallback.visibleProperty().bind(image.getImage().progressProperty().lessThan(1).or(image.getImage().errorProperty()));
         StackPane art = new StackPane(fallback, image); art.getStyleClass().add("cosmetic-card-art"); art.setPrefSize(145, 145);
@@ -366,6 +399,7 @@ public final class CosmeticEditorController implements AutoCloseable {
     }
     private void renderPreview() {
         if (draft == null || assets == null) return;
+        preview.focusCategory(category);
         preview.showLocal(assets, draft.skin());
     }
     private void updateActions() {
@@ -454,7 +488,7 @@ public final class CosmeticEditorController implements AutoCloseable {
     private void style(Dialog<?> dialog) { if (root.getScene() != null) dialog.initOwner(root.getScene().getWindow()); dialog.getDialogPane().getStyleClass().add("wardrobe-dialog"); dialog.getDialogPane().getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm()); }
     private String activeProfile() { HytaleAuthSession s = settings.get().getHytaleAuthSession(); return s == null ? "" : s.getUuid(); }
     private String activeUsername() { HytaleAuthSession s = settings.get().getHytaleAuthSession(); return s == null ? "" : s.getUsername(); }
-    private static String cosmeticImage(CosmeticOption option) { return "https://hyvatar.io/render/cosmetic/" + encode(option.category()) + "/" + encode(option.id()) + "?size=256&rotate=25"; }
+    private static String cosmeticImage(CosmeticOption option) { return "https://hyvatar.io/render/cosmetic/" + encode(option.category()) + "/" + encode(option.id()) + "?size=256&rotate=" + (option.category().equals("cape") ? "180" : "25"); }
     private static String encode(String s) { return java.net.URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20"); }
     private static String humanize(String s) { return s.replace('_', ' ').replaceAll("([a-z])([A-Z])", "$1 $2"); }
     private static Label text(String text, String style) { Label l = new Label(text); l.getStyleClass().add(style); return l; }
