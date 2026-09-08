@@ -22,6 +22,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Rectangle;
 import net.modtale.launcher.ui.common.LauncherSkeleton;
+import net.modtale.launcher.ui.common.LauncherSkeletonContent;
 import net.modtale.launcher.api.ModtaleApiClient;
 import net.modtale.launcher.model.user.CurrentUser;
 import net.modtale.launcher.model.user.UserSummary;
@@ -167,7 +168,8 @@ public final class LauncherFollowingController {
         if (loading) {
             setVisibleManaged(summary, true);
             summary.setText("Loading followed creators...");
-            userList.getChildren().add(LauncherSkeleton.rows(4));
+            for (int i = 0; i < 4; i++) userList.getChildren().add(
+                    LauncherSkeleton.of(userRow(LauncherSkeletonContent.user())));
             return;
         }
         if (users.isEmpty()) {

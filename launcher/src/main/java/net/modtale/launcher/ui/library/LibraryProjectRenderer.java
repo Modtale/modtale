@@ -27,6 +27,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.geometry.Pos;
 import net.modtale.launcher.ui.common.LauncherSkeleton;
+import net.modtale.launcher.ui.common.LauncherSkeletonContent;
 import net.modtale.launcher.hytale.HytaleWorldManager.HytaleWorld;
 import net.modtale.launcher.model.install.InstalledProject;
 import net.modtale.launcher.model.install.InstalledProjectReference;
@@ -153,8 +154,9 @@ final class LibraryProjectRenderer {
             loading.getStyleClass().add("library-inline-panel");
             loading.setAlignment(Pos.CENTER_LEFT);
             if (model.loading()) {
-                section.getChildren().add(LauncherSkeleton.rows(2));
-                return section;
+                return LauncherSkeleton.of(versionSection(new LibraryDetailModel(installed,
+                        LauncherSkeletonContent.detail(), model.update(), false, model.settings(),
+                        model.installedProjects(), model.worldToggles())));
             }
             Label meta = new Label(model.loading() ? "Loading release metadata" : "Release metadata not loaded");
             meta.getStyleClass().add("library-muted-text");

@@ -19,6 +19,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import net.modtale.launcher.ui.common.LauncherSkeleton;
+import net.modtale.launcher.ui.common.LauncherSkeletonContent;
 import net.modtale.launcher.model.project.ProjectDetail;
 import net.modtale.launcher.model.project.WikiBundle;
 import net.modtale.launcher.model.project.WikiBundle.WikiNode;
@@ -50,9 +51,7 @@ final class NativeWikiView {
         main.setMaxWidth(Double.MAX_VALUE);
 
         if (bundle == null && loading) {
-            VBox state = LauncherSkeleton.rows(5);
-            main.getChildren().add(state);
-            return main;
+            return LauncherSkeleton.of(main(LauncherSkeletonContent.wiki(), false, false, project, activeSlug));
         }
         if (bundle == null || error) {
             main.getChildren().add(state(
@@ -93,6 +92,7 @@ final class NativeWikiView {
             Consumer<String> navigate,
             Consumer<String> prefetch,
             Runnable backToProject,
+            boolean loading,
             boolean compact
     ) {
         VBox sidebar = new VBox(compact ? 12 : 24);
@@ -104,6 +104,10 @@ final class NativeWikiView {
         tree.getStyleClass().add("project-wiki-tree");
         String selectedSlug = first(activeSlug, bundle == null ? null : bundle.indexSlug(), firstSlug(pages));
         populateTree(tree, pages, selectedSlug, pageCache, navigate, prefetch);
+        if (bundle == null && loading) {
+            populateTree(tree, LauncherSkeletonContent.wiki().pages(), "", Map.of(), slug -> {}, slug -> {});
+            LauncherSkeleton.of(tree);
+        }
 
         Node navigationContent = tree;
         if (compact) {
