@@ -44,13 +44,6 @@ export const projectDetailsReviewData = {
     ...verificationReviewData[0], downloadCount: 12345,
     versions: ['v1', 'v2', 'v3'].map((id, index) => ({ id, versionNumber: `1.${index}.0`, gameVersions: ['2026.01.01'], releaseDate: '2026-01-01', downloadCount: 1234 })),
 };
-export const statusReviewData = {
-    overall: 'operational', timestamp: Date.UTC(2026, 0, 1, 12),
-    services: [{ id: 'api', name: 'API Gateway', status: 'operational', latency: 123 }, { id: 'database', name: 'Database', status: 'operational', latency: 123 }, { id: 'storage', name: 'Storage', status: 'operational', latency: 123 }],
-    history: Array.from({ length: 24 }, (_, index) => ({ time: Date.UTC(2026, 0, 1, index), api: 30 + index * 3, db: 20 + index * 2, storage: 50 + index * 4 })),
-    activeIncidents: [], scheduledMaintenances: [], incidentHistory: [],
-};
-
 export const apiDocsReviewData = {
     info: { title: 'Modtale API', version: '1.0' }, servers: [{ url: 'https://api.modtale.net' }],
     paths: { '/api/v1/projects': { get: {

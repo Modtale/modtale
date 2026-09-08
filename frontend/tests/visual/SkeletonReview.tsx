@@ -17,7 +17,6 @@ import { SSRProvider } from '../../src/context/SSRContext';
 import { DownloadModal } from '../../src/modules/project/components/dialogs/DownloadModal';
 import { HistoryModal } from '../../src/modules/project/components/dialogs/HistoryModal';
 import { Wiki } from '../../src/modules/project/components/HMWiki';
-import { Status } from '../../src/modules/core/views/Status';
 import { ApiDocs } from '../../src/modules/core/views/ApiDocs';
 import { Analytics } from '../../src/modules/user/views/Analytics';
 import { VerificationQueue } from '../../src/modules/admin/components/VerificationQueue';
@@ -25,7 +24,7 @@ import { Members } from '../../src/modules/organization/tabs/Members';
 import { ProjectEditorView } from '../../src/modules/project/views/ProjectEditor';
 import { ProjectGallerySkeleton } from '../../src/modules/project/components/ProjectGallerySkeleton';
 import { GalleryCarouselViewer } from '../../src/modules/project/components/GalleryCarouselViewer';
-import { reportReviewData, verificationReviewData, creatorAnalyticsReviewData, statusReviewData, apiDocsReviewData } from './loadingReviewFixtures';
+import { reportReviewData, verificationReviewData, creatorAnalyticsReviewData, apiDocsReviewData } from './loadingReviewFixtures';
 import { api } from '../../src/utils/api';
 import type { Project } from '../../src/types';
 import '../../src/index.css';
@@ -52,7 +51,6 @@ api.defaults.adapter = async config => {
  if(url.includes('/projects/review-project')) data=reviewProject;
  else 
  if(url.includes('/user/me')) data=reviewUser;
- else if(url.includes('/status')) data=statusReviewData;
  else if(url.includes('/analytics/creator') || url.includes('/analytics/user') || url.includes('/user/analytics')) data=creatorAnalyticsReviewData;
  else if(url.includes('/members')) data=[reviewUser,{...reviewUser,id:'other-1',username:'Blocksmith'},{...reviewUser,id:'other-2',username:'Willow'}];
  else if(url.includes('/user/profile/')) data=reviewUser;
@@ -68,7 +66,6 @@ const realFetch = window.fetch.bind(window);
 window.fetch = (input, init) => String(input).includes('/docs/openapi') ? (loading ? new Promise(()=>{}) : Promise.resolve(new Response(JSON.stringify(apiDocsReviewData),{status:200,headers:{'Content-Type':'application/json'}}))) : realFetch(input,init);
 const SkeletonCard = view === 'list' ? ListProjectCardSkeleton : view === 'compact' ? CompactProjectCardSkeleton : ProjectCardSkeleton;
 function Review() {
- if(screen==='status') return <Status/>;
  if(screen==='api-docs') return <ApiDocs/>;
  if(screen==='editor') return <Routes><Route path="/mod/:id/edit" element={<ProjectEditorView currentUser={{...reviewUser,roles:['ADMIN']}} onShowStatus={()=>{}}/>}/></Routes>;
  if(screen==='gallery') return <div className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/80"><div className="relative w-full max-w-6xl">{loading?<ProjectGallerySkeleton isInline/>:<GalleryCarouselViewer images={[1,2,3].map(index=>({url:'/assets/favicon.svg#'+index,caption:'Gallery image caption'}))} title="Project" autoAdvance={false} activeIndex={0} className="mb-0 overflow-hidden rounded-2xl border border-blue-200 bg-slate-50 shadow-xl shadow-blue-950/20 dark:border-blue-400/20 dark:bg-[#0B1120]" mediaClassName="relative aspect-video max-h-[calc(90dvh-8rem)] bg-slate-200 outline-none dark:bg-slate-950"/>}</div></div>;
