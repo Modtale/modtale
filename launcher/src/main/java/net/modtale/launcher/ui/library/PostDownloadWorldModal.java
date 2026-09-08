@@ -183,24 +183,20 @@ final class PostDownloadWorldModal {
     private HBox summaryRow() {
         HBox row = new HBox(12);
         row.getStyleClass().add("post-download-modal-summary");
-        row.setAlignment(Pos.TOP_LEFT);
+        row.setAlignment(Pos.CENTER_LEFT);
 
-        VBox copy = new VBox(3);
-        copy.setMinWidth(0);
-        HBox.setHgrow(copy, Priority.ALWAYS);
-        Label description = new Label(title + " installed. Choose where it should be enabled.");
-        description.getStyleClass().add("post-download-modal-description");
-        description.setWrapText(true);
         selectedCount = new Label();
         selectedCount.getStyleClass().add("post-download-modal-muted");
-        copy.getChildren().addAll(description, selectedCount);
+        selectedCount.setMinWidth(0);
+        selectedCount.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(selectedCount, Priority.ALWAYS);
 
         toggleAllButton = new Button();
         toggleAllButton.getStyleClass().add("post-download-modal-toggle-all");
         toggleAllButton.setMinWidth(Region.USE_PREF_SIZE);
         toggleAllButton.setMaxWidth(Region.USE_PREF_SIZE);
         toggleAllButton.setOnAction(event -> toggleAll());
-        row.getChildren().addAll(copy, toggleAllButton);
+        row.getChildren().addAll(selectedCount, toggleAllButton);
         return row;
     }
 
