@@ -5,6 +5,7 @@ import net.modtale.mapper.ProjectMapper;
 import net.modtale.model.dto.project.ProjectDTO;
 import net.modtale.model.dto.request.project.AddGalleryVideoRequest;
 import net.modtale.model.dto.request.project.RemoveGalleryImageRequest;
+import net.modtale.model.dto.request.project.ReorderGalleryRequest;
 import net.modtale.model.dto.request.project.UpdateGalleryImageCaptionRequest;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.User;
@@ -104,6 +105,18 @@ public class MediaController {
     ) {
         User user = accountService.requireCurrentUser(authentication, "updating a gallery image caption");
         Project project = projectMediaService.updateGalleryImageCaption(id, requestPayload.getImageUrl(), requestPayload.getCaption(), user);
+        return ResponseEntity.ok(ProjectMapper.toDTO(project, false, user.getId()));
+    }
+
+    @PutMapping("/{id}/gallery/order")
+    @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_GALLERY_ADD', authentication)")
+    public ResponseEntity<ProjectDTO> reorderGallery(
+            @PathVariable String id,
+            @Valid @RequestBody ReorderGalleryRequest requestPayload,
+            Authentication authentication
+    ) {
+        User user = accountService.requireCurrentUser(authentication, "reordering a project gallery");
+        Project project = projectMediaService.reorderGallery(id, requestPayload.getImageUrls(), user);
         return ResponseEntity.ok(ProjectMapper.toDTO(project, false, user.getId()));
     }
 }

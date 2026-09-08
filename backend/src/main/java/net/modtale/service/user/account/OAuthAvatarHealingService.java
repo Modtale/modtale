@@ -125,7 +125,7 @@ public class OAuthAvatarHealingService {
                         }
                     }
                     default -> {
-                        // No reliable server-side refresh path for this provider without stored tokens.
+                        // No reliable backend refresh path for this provider without stored tokens.
                     }
                 }
             } catch (RuntimeException ex) {

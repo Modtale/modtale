@@ -1,3 +1,4 @@
+import { SkeletonSurface } from '@/components/ui/Skeleton';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Download, Calendar, Heart, Box, ChevronRight } from 'lucide-react';
 import { BACKEND_URL } from '@/utils/api';
@@ -19,6 +20,7 @@ interface ProjectCardProps {
     onReady?: (projectId: string) => void;
     isVisible?: boolean;
     disableNavigation?: boolean;
+    versionLabel?: string;
 }
 
 export type ProjectCardViewStyle = 'grid' | 'list' | 'compact';
@@ -33,72 +35,21 @@ type IdleWindow = Window & typeof globalThis & {
     cancelIdleCallback?: (handle: number) => void;
 };
 
-const skeletonShimmer = 'absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/40 dark:via-white/10 to-transparent';
-const skeletonPulse = 'animate-pulse bg-slate-200/80 dark:bg-slate-800/60';
+export const skeletonProject = {
+    id: 'loading-project', title: 'Project name', author: 'Creator name',
+    description: 'A short project description with details about the features and content included in this project.',
+    classification: 'PLUGIN', downloadCount: 12345, favoriteCount: 128,
+    updatedAt: '2026-09-01T12:00:00Z', imageUrl: '/assets/favicon.svg',
+} as Project;
 
-export const ProjectCardSkeleton = () => (
-    <div className="relative min-w-0 max-w-full overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900">
-        <div className={`aspect-[3/1] ${skeletonPulse}`} />
-        <div className="px-6 pb-6">
-            <div className="-mt-10 mb-3 h-20 w-20 rounded-2xl border-4 border-white dark:border-slate-800 bg-slate-300/80 dark:bg-slate-700/70" />
-            <div className={`h-6 w-3/5 rounded-lg ${skeletonPulse}`} />
-            <div className={`mt-2 h-4 w-2/5 rounded-md ${skeletonPulse}`} />
-            <div className={`mt-4 h-4 w-full rounded-md ${skeletonPulse}`} />
-            <div className={`mt-2 h-4 w-4/5 rounded-md ${skeletonPulse}`} />
-            <div className="mt-5 flex items-center justify-between">
-                <div className="flex gap-3">
-                    <div className={`h-4 w-16 rounded-md ${skeletonPulse}`} />
-                    <div className={`h-4 w-14 rounded-md ${skeletonPulse}`} />
-                </div>
-                <div className={`h-4 w-16 rounded-md ${skeletonPulse}`} />
-            </div>
-        </div>
-        <div className={skeletonShimmer} />
-    </div>
+const CardSkeleton = ({ viewStyle, project = skeletonProject }: { viewStyle: ProjectCardViewStyle; project?: Project }) => (
+    <SkeletonSurface className="h-full" label="Loading project">
+        <ProjectCard project={project} viewStyle={viewStyle} isFavorite={false} onToggleFavorite={() => {}} isLoggedIn={false} disableNavigation />
+    </SkeletonSurface>
 );
-
-export const ListProjectCardSkeleton = () => (
-    <div className="relative min-w-0 max-w-full overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-4 sm:p-5">
-        <div className="flex items-center sm:items-start gap-4 sm:gap-6">
-            <div className={`h-24 w-24 sm:h-32 sm:w-32 rounded-xl shrink-0 ${skeletonPulse}`} />
-            <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-4">
-                    <div className="w-full">
-                        <div className={`h-6 w-2/5 rounded-lg ${skeletonPulse}`} />
-                        <div className={`mt-2 h-4 w-1/4 rounded-md ${skeletonPulse}`} />
-                    </div>
-                    <div className={`hidden sm:block h-8 w-24 rounded-lg ${skeletonPulse}`} />
-                </div>
-                <div className={`mt-3 h-4 w-full rounded-md ${skeletonPulse}`} />
-                <div className={`mt-2 h-4 w-4/5 rounded-md ${skeletonPulse}`} />
-                <div className="mt-5 flex gap-4 sm:gap-6">
-                    <div className={`h-4 w-16 rounded-md ${skeletonPulse}`} />
-                    <div className={`h-4 w-14 rounded-md ${skeletonPulse}`} />
-                    <div className={`h-4 w-16 rounded-md ${skeletonPulse}`} />
-                </div>
-            </div>
-        </div>
-        <div className={skeletonShimmer} />
-    </div>
-);
-
-export const CompactProjectCardSkeleton = () => (
-    <div className="relative min-w-0 max-w-full overflow-hidden rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900 p-3">
-        <div className="flex items-center gap-4">
-            <div className={`h-12 w-12 rounded-lg shrink-0 ${skeletonPulse}`} />
-            <div className="flex-1 min-w-0">
-                <div className={`h-4 w-1/2 rounded-md ${skeletonPulse}`} />
-                <div className={`mt-2 h-3 w-1/3 rounded-md ${skeletonPulse}`} />
-            </div>
-            <div className="hidden sm:flex flex-col gap-1.5 items-end">
-                <div className={`h-3 w-20 rounded-md ${skeletonPulse}`} />
-                <div className={`h-3 w-16 rounded-md ${skeletonPulse}`} />
-            </div>
-            <div className={`h-4 w-4 rounded ${skeletonPulse}`} />
-        </div>
-        <div className={skeletonShimmer} />
-    </div>
-);
+export const ProjectCardSkeleton = ({ project }: { project?: Project }) => <CardSkeleton viewStyle="grid" project={project} />;
+export const ListProjectCardSkeleton = ({ project }: { project?: Project }) => <CardSkeleton viewStyle="list" project={project} />;
+export const CompactProjectCardSkeleton = ({ project }: { project?: Project }) => <CardSkeleton viewStyle="compact" project={project} />;
 
 export const ProjectCardSkeletons: React.FC<ProjectCardSkeletonsProps> = ({ viewStyle, count = 1 }) => {
     const containerClassName = viewStyle === 'grid'
@@ -120,7 +71,7 @@ export const ProjectCardSkeletons: React.FC<ProjectCardSkeletonsProps> = ({ view
     );
 };
 
-export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, path, isFavorite, onToggleFavorite, isLoggedIn, priority = false, viewStyle = 'grid', onReady, isVisible = true, disableNavigation = false }) => {
+export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, path, isFavorite, onToggleFavorite, isLoggedIn, priority = false, viewStyle = 'grid', onReady, isVisible = true, disableNavigation = false, versionLabel }) => {
     const title = project.title || 'Untitled Project';
     const author = project.author || 'Unknown';
     const authorPath = project.authorId ? SiteRoutes.creator(project.authorId, author) : null;
@@ -133,7 +84,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
     const downloads = (project.downloadCount || 0).toLocaleString();
 
     const timeAgo = project.updatedAt ? formatTimeAgo(project.updatedAt) : null;
-    const childCount = (project.projectIds || project.childProjectIds || []).length;
+    const childCount = (project.childProjectIds || []).length;
     const displayClassification = toTitleCase(classification);
     const baseFavoriteCount = project.favoriteCount || 0;
     const [displayFavoriteCount, setDisplayFavoriteCount] = useState(baseFavoriteCount);
@@ -275,7 +226,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                         )}
                     </div>
                 </div>
-                <div className="hidden sm:flex flex-col items-end gap-1.5 shrink-0 text-[10px] font-bold text-slate-400 uppercase tracking-tight relative z-20">
+                <div className="hidden sm:flex flex-col items-end gap-1.5 shrink-0 text-[10px] font-bold text-slate-400 uppercase tracking-normal relative z-20">
                     <div className="flex items-center gap-3">
                         <span className="flex items-center gap-1"><Download className="w-3 h-3" /> {downloads}</span>
                         <span className="flex items-center gap-1"><Heart className={`w-3 h-3 ${isFavorite ? 'text-red-500 fill-current' : ''}`} /> {favorites}</span>
@@ -332,6 +283,13 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                                     <span className="min-w-0 truncate block">{author}</span>
                                 )}
                             </div>
+                            {versionLabel && (
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                                        {versionLabel}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                         <div className="hidden sm:flex bg-slate-100 dark:bg-white/5 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider items-center gap-1.5 shrink-0 border border-slate-200 dark:border-white/5 pointer-events-none">
                             <span className="text-blue-600 dark:text-blue-400">{getClassificationIcon(classification)}</span>
@@ -385,7 +343,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                 />
             )}
 
-            <div className={`w-full aspect-[3/1] relative border-b border-slate-100 dark:border-white/5 overflow-hidden rounded-t-2xl transform-gpu shrink-0 z-20 ${resolvedBanner ? 'bg-slate-200 dark:bg-slate-800' : 'bg-slate-200 dark:bg-slate-800'} pointer-events-none`}>
+            <div data-skeleton-media className={`w-full aspect-[3/1] relative border-b border-slate-100 dark:border-white/5 overflow-hidden rounded-t-2xl transform-gpu shrink-0 z-20 ${resolvedBanner ? 'bg-slate-200 dark:bg-slate-800' : 'bg-slate-200 dark:bg-slate-800'} pointer-events-none`}>
                 {resolvedBanner && shouldLoadBanner ? (
                     <OptimizedImage
                         src={resolvedBanner}
@@ -531,15 +489,16 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
         p.project.downloadCount === n.project.downloadCount &&
         p.project.updatedAt === n.project.updatedAt &&
         p.project.favoriteCount === n.project.favoriteCount &&
-        p.project.projectIds === n.project.projectIds &&
         p.project.childProjectIds === n.project.childProjectIds &&
         p.path === n.path &&
         p.isFavorite === n.isFavorite &&
+        p.onToggleFavorite === n.onToggleFavorite &&
         p.isLoggedIn === n.isLoggedIn &&
         p.priority === n.priority &&
         p.viewStyle === n.viewStyle &&
         p.isVisible === n.isVisible &&
-        p.disableNavigation === n.disableNavigation
+        p.disableNavigation === n.disableNavigation &&
+        p.versionLabel === n.versionLabel
     );
 });
 

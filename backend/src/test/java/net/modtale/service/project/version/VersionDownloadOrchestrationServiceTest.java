@@ -4,7 +4,9 @@ import java.time.Instant;
 import java.util.List;
 import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.exception.InvalidDownloadTokenException;
+import net.modtale.exception.InvalidVersionRequestException;
 import net.modtale.exception.ResourceNotFoundException;
+import net.modtale.exception.UnauthorizedException;
 import net.modtale.model.dto.response.project.BundleDownloadUrlResponse;
 import net.modtale.model.dto.response.project.DownloadUrlResponse;
 import net.modtale.model.project.Project;
@@ -69,14 +71,15 @@ class VersionDownloadOrchestrationServiceTest {
     @Test
     void createDownloadUrlAndBundleUrlGenerateShortLivedTokenRoutes() {
         User user = new User();
+        user.setId("user-1");
         Project project = project("project-1", "Sky Tools", ProjectClassification.PLUGIN);
         ProjectVersion version = version("version-1", "1.0.0", "files/mod.jar");
 
         when(projectService.getProjectById("project-1", user)).thenReturn(project);
         when(projectVersionAccessService.requireByVersionNumber(org.mockito.Mockito.eq(project), org.mockito.Mockito.eq("1.0.0"), org.mockito.Mockito.eq("1.21.0"), org.mockito.Mockito.any()))
                 .thenReturn(version);
-        when(downloadTokenService.generateToken("project-1", "1.0.0", "1.21.0")).thenReturn("download-token");
-        when(downloadTokenService.generateToken("project-1", "1.0.0", "1.21.0", List.of("dep-1"))).thenReturn("bundle-token");
+        when(downloadTokenService.generateToken("project-1", "1.0.0", "1.21.0", null, "user-1")).thenReturn("download-token");
+        when(downloadTokenService.generateToken("project-1", "1.0.0", "1.21.0", List.of("dep-1"), "user-1")).thenReturn("bundle-token");
         when(downloadTokenService.getTokenValiditySeconds()).thenReturn(300);
 
         DownloadUrlResponse download = service.createDownloadUrl("project-1", "1.0.0", "1.21.0", user);
@@ -94,6 +97,61 @@ class VersionDownloadOrchestrationServiceTest {
                 ResourceNotFoundException.class,
                 () -> service.createDownloadUrl("missing", "1.0.0", null, new User())
         );
+    }
+
+    @Test
+    void curseForgeModpackDownloadUrlsAreLauncherOnly() {
+        User user = new User();
+        user.setId("user-1");
+        Project pack = project("pack-1", "Sky Pack", ProjectClassification.MODPACK);
+        ProjectVersion version = version("version-1", "1.0.0", "modpacks/pack.zip");
+        version.setDependencies(List.of(ProjectDependency.curseForge(
+                "1450386", "Simple Compost", "1.0.0",
+                "https://www.curseforge.com/hytale/mods/simple-compost",
+                ProjectDependency.DependencyType.REQUIRED
+        )));
+
+        when(projectService.getProjectById("pack-1", user)).thenReturn(pack);
+        when(projectVersionAccessService.requireByVersionNumber(
+                org.mockito.Mockito.eq(pack), org.mockito.Mockito.eq("1.0.0"),
+                org.mockito.Mockito.isNull(), org.mockito.Mockito.any())).thenReturn(version);
+        when(downloadTokenService.generateToken("pack-1", "1.0.0", null, null, "user-1"))
+                .thenReturn("launcher-token");
+        when(downloadTokenService.getTokenValiditySeconds()).thenReturn(300);
+
+        assertThrows(InvalidVersionRequestException.class,
+                () -> service.createDownloadUrl("pack-1", "1.0.0", null, user));
+        DownloadUrlResponse response = service.createDownloadUrl("pack-1", "1.0.0", null, user, true);
+
+        assertEquals("/download/launcher-token", response.downloadUrl());
+    }
+
+    @Test
+    void curseForgeModpackTokenCanOnlyBeRedeemedByLauncher() throws Exception {
+        User user = new User();
+        Project pack = project("pack-1", "Sky Pack", ProjectClassification.MODPACK);
+        ProjectVersion version = version("version-1", "1.0.0", "modpacks/pack.zip");
+        version.setDependencies(List.of(ProjectDependency.curseForge(
+                "1450386", "Simple Compost", "1.0.0",
+                "https://www.curseforge.com/hytale/mods/simple-compost",
+                ProjectDependency.DependencyType.REQUIRED
+        )));
+
+        when(downloadTokenService.validateAndConsume("web-token")).thenReturn(token("pack-1", "1.0.0", null, null));
+        when(downloadTokenService.validateAndConsume("launcher-token")).thenReturn(token("pack-1", "1.0.0", null, null));
+        when(projectService.getRawProjectById("pack-1")).thenReturn(pack);
+        when(accessControlService.canReadProject(pack, user)).thenReturn(true);
+        when(projectVersionAccessService.requireByVersionNumber(
+                org.mockito.Mockito.eq(pack), org.mockito.Mockito.eq("1.0.0"),
+                org.mockito.Mockito.isNull(), org.mockito.Mockito.any())).thenReturn(version);
+        when(downloadService.generateModpackZip(pack, version, user)).thenReturn(new byte[]{9, 8, 7});
+
+        assertThrows(InvalidVersionRequestException.class,
+                () -> service.downloadVersion("web-token", false, null, null, null, user));
+        VersionDownloadPayload payload = service.downloadVersion(
+                "launcher-token", true, null, null, null, user, true);
+
+        assertArrayEquals(new byte[]{9, 8, 7}, payload.bytes());
     }
 
     @Test
@@ -159,7 +217,7 @@ class VersionDownloadOrchestrationServiceTest {
         version.setDependencies(List.of(
                 new ProjectDependency("dep-1", "Dependency One", "1.0.0"),
                 new ProjectDependency("dep-2", "Dependency Two", "1.0.0"),
-                new ProjectDependency("embedded", "Embedded", "1.0.0", false, true)
+                new ProjectDependency("embedded", "Embedded", "1.0.0", ProjectDependency.DependencyType.EMBEDDED)
         ));
         Project dependencyProject = project("dep-1", "Dependency One", ProjectClassification.DATA);
 
@@ -195,6 +253,25 @@ class VersionDownloadOrchestrationServiceTest {
 
         assertThrows(InvalidDownloadTokenException.class, () -> service.downloadVersion("invalid", false, null, null, null, user));
         assertThrows(ResourceNotFoundException.class, () -> service.downloadVersion("unreadable", false, null, null, null, user));
+    }
+
+    @Test
+    void downloadRejectsUserBoundTokenWithoutMatchingSession() {
+        User user = new User();
+        user.setId("other-user");
+
+        when(downloadTokenService.validateAndConsume("token")).thenReturn(
+                new DownloadTokenService.DownloadToken(
+                        "project-1",
+                        "1.0.0",
+                        null,
+                        null,
+                        "user-1",
+                        Instant.now().plusSeconds(60)
+                )
+        );
+
+        assertThrows(UnauthorizedException.class, () -> service.downloadVersion("token", false, null, null, null, user));
     }
 
     private static DownloadTokenService.DownloadToken token(

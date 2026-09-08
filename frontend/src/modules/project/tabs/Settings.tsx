@@ -1,3 +1,4 @@
+import { BeaconSettings } from '../beacon/BeaconSettings';
 import React from 'react';
 import { Eye, EyeOff, Globe, Archive, Tag, Link2, ToggleRight, ToggleLeft, Trash2, Settings as SettingsIcon } from 'lucide-react';
 import { theme } from '@/styles/theme';
@@ -166,6 +167,7 @@ export const Settings: React.FC<SettingsProps> = ({
                         <input value={projectData.hmWikiSlug || ''} onChange={e => { markDirty(); const newSlug = e.target.value; setProjectData(prev => prev ? {...prev, hmWikiSlug: newSlug} : null); setMetaData(prev => { const currentWiki = prev.links.WIKI || ''; if (!currentWiki || /^https?:\/\/wiki\.hytalemodding\.dev\/mods?\//i.test(currentWiki)) { return { ...prev, links: { ...prev.links, WIKI: newSlug ? `https://wiki.hytalemodding.dev/mod/${newSlug}` : '' } }; } return prev; }); }} disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)} placeholder="e.g., my-awesome-mod" className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-lg px-3 py-2 text-sm font-mono focus:border-modtale-accent focus:ring-1 focus:ring-modtale-accent outline-none transition-all`} />
                     </div>
                 )}
+                <BeaconSettings />
             </div>
             {!readOnly && hasProjectPermission(Permission.PROJECT_DELETE) && <button type="button" onClick={handleDelete} className="w-full bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white p-4 rounded-xl font-bold flex justify-center gap-2 transition-all"><Trash2 className="w-4 h-4"/> Delete Project</button>}
         </div>

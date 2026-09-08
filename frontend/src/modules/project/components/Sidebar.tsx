@@ -8,6 +8,7 @@ import { SiteRoutes } from '@/utils/routes';
 import type { Project, User, ProjectDependency } from '@/types';
 import { SponsoredAdCard } from './ads/SponsoredAdCard';
 import { ProjectMetaSections } from './ProjectMetaSections';
+import { BeaconActivity } from '../beacon/BeaconActivity';
 
 interface SidebarProps {
     project: Project;
@@ -43,7 +44,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
         <div className="flex flex-col gap-8">
             <div className="grid grid-cols-2 gap-2 py-2">
                 <div className="flex flex-col items-center justify-start">
-                    <div suppressHydrationWarning className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-1">
+                    <div suppressHydrationWarning className="text-3xl font-black text-slate-900 dark:text-white tracking-normal leading-none mb-1">
                         {(project.favoriteCount || 0).toLocaleString()}
                     </div>
                     <div className="flex items-center justify-center mt-1 h-5 w-full gap-1.5 text-slate-500 dark:text-slate-400">
@@ -53,7 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 </div>
 
                 <div className="flex flex-col items-center justify-start border-l border-slate-200 dark:border-white/5">
-                    <div suppressHydrationWarning className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-1">
+                    <div suppressHydrationWarning className="text-3xl font-black text-slate-900 dark:text-white tracking-normal leading-none mb-1">
                         {(project.downloadCount || 0).toLocaleString()}
                     </div>
                     <div className="flex items-center gap-1.5 mt-1 h-5">
@@ -62,6 +63,8 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                     </div>
                 </div>
             </div>
+
+            <BeaconActivity key={project.id} projectId={project.id} />
 
             {showMetaSections && (
                 <ProjectMetaSections project={project} dependencies={dependencies} incompatibleProjectIds={incompatibleProjectIds} depMeta={depMeta} orderedGameVersions={orderedGameVersions} />

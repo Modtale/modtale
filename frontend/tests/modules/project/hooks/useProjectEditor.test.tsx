@@ -410,7 +410,10 @@ describe('useProjectEditor', () => {
         expect(url).toBe('/projects/project-1/gallery');
         expect(formData).toBeInstanceOf(FormData);
         expect((formData as FormData).get('file')).toBe(file);
-        expect(config).toEqual({ headers: { 'Content-Type': 'multipart/form-data' } });
+        expect(config).toEqual({
+            headers: { 'Content-Type': 'multipart/form-data' },
+            onUploadProgress: expect.any(Function)
+        });
         expect(latestSnapshot.projectData.galleryImages).toEqual(['/gallery.png']);
         expect(showStatus).toHaveBeenLastCalledWith('success', 'Uploaded', 'Image added to gallery.');
     });

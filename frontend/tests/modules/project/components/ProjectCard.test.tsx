@@ -129,4 +129,45 @@ describe('ProjectCard banner fade', () => {
 
         expect(container.textContent).toContain('8');
     });
+
+    it('uses the latest favorite handler after rerendering with unchanged project data', async () => {
+        const oldToggle = vi.fn();
+        const newToggle = vi.fn();
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <ProjectCard
+                        project={baseProject}
+                        isFavorite={false}
+                        onToggleFavorite={oldToggle}
+                        isLoggedIn={true}
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <ProjectCard
+                        project={baseProject}
+                        isFavorite={false}
+                        onToggleFavorite={newToggle}
+                        isLoggedIn={true}
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        const favoriteButton = container.querySelector('button[aria-label="7 favorites"]') as HTMLButtonElement | null;
+        expect(favoriteButton).not.toBeNull();
+
+        await act(async () => {
+            favoriteButton?.click();
+        });
+
+        expect(oldToggle).not.toHaveBeenCalled();
+        expect(newToggle).toHaveBeenCalledWith('project-1');
+    });
 });

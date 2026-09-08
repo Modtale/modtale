@@ -12,6 +12,12 @@ const settle = async () => {
     });
 };
 
+const launcherProtocolMock = vi.hoisted(() => ({
+    openLauncherInstallOrFallback: vi.fn()
+}));
+
+vi.mock('@/modules/launcher/utils/launcherProtocol', () => launcherProtocolMock);
+
 describe('DownloadModal Toggle Visibility', () => {
     let container: HTMLDivElement;
     let root: Root;
@@ -28,6 +34,7 @@ describe('DownloadModal Toggle Visibility', () => {
             root.unmount();
         });
         container.remove();
+        launcherProtocolMock.openLauncherInstallOrFallback.mockClear();
     });
 
     it('hides Alpha/Beta toggle if the project has no alpha/beta versions at all', async () => {
@@ -196,6 +203,115 @@ describe('DownloadModal Toggle Visibility', () => {
         expect(onDownload).toHaveBeenCalledWith('/files/skyforge.jar', '1.0.0', '0.5.4', [], 'RELEASE');
     });
 
+    it('downloads a modpack without an environment target', async () => {
+        const onDownload = vi.fn();
+        const version = {
+            id: 'pack-v1', versionNumber: '1.0.0', channel: 'RELEASE',
+            gameVersions: ['0.5.4'], fileUrl: '/packs/sky.zip', dependencies: [],
+            releaseDate: new Date().toISOString()
+        };
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <DownloadModal
+                        show={true}
+                        onClose={vi.fn()}
+                        versionsByGame={{ '0.5.4': [version] }}
+                        orderedGameVersions={['0.5.4']}
+                        onDownload={onDownload}
+                        showExperimental={false}
+                        onToggleExperimental={vi.fn()}
+                        onViewHistory={vi.fn()}
+                        isModpack={true}
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        const latestButton = Array.from(document.body.querySelectorAll('button'))
+            .find(button => button.textContent?.includes('Download Latest')) as HTMLButtonElement;
+        await act(async () => latestButton.click());
+
+        expect(onDownload).toHaveBeenCalledWith('/packs/sky.zip', '1.0.0', '0.5.4', [], 'RELEASE');
+    });
+
+    it('directs CurseForge modpacks to the launcher instead of browser download', async () => {
+        const onDownload = vi.fn();
+        const version = {
+            id: 'pack-v1', versionNumber: '1.0.0', channel: 'RELEASE',
+            gameVersions: ['0.5.4'], fileUrl: '/packs/sky.zip',
+            dependencies: [{
+                projectId: 'curseforge:1450386', projectTitle: 'Simple Compost',
+                versionNumber: '1.0.0', dependencyType: 'REQUIRED', source: 'CURSEFORGE'
+            }],
+            releaseDate: new Date().toISOString()
+        };
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <DownloadModal
+                        show={true}
+                        onClose={vi.fn()}
+                        versionsByGame={{ '0.5.4': [version] }}
+                        orderedGameVersions={['0.5.4']}
+                        onDownload={onDownload}
+                        showExperimental={false}
+                        onToggleExperimental={vi.fn()}
+                        onViewHistory={vi.fn()}
+                        isModpack={true}
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        const launcherButton = Array.from(document.body.querySelectorAll('button'))
+            .find(button => button.textContent?.includes('Modtale Launcher Required')) as HTMLButtonElement;
+        expect(launcherButton.disabled).toBe(true);
+        expect(pageText()).toContain('downloaded directly to your device');
+        await act(async () => launcherButton.click());
+        expect(onDownload).not.toHaveBeenCalled();
+    });
+
+    it('disables browser downloads for modpacks containing CurseForge projects', async () => {
+        const onDownload = vi.fn();
+        const version = {
+            id: 'pack-v1', versionNumber: '1.0.0', channel: 'RELEASE',
+            gameVersions: ['0.5.4'], fileUrl: '/packs/sky.zip',
+            dependencies: [{
+                projectId: 'curseforge:1450386', projectTitle: 'Simple Compost',
+                versionNumber: '1.0.0', dependencyType: 'REQUIRED', source: 'CURSEFORGE'
+            }],
+            releaseDate: new Date().toISOString()
+        };
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <DownloadModal
+                        show={true}
+                        onClose={vi.fn()}
+                        versionsByGame={{ '0.5.4': [version] }}
+                        orderedGameVersions={['0.5.4']}
+                        onDownload={onDownload}
+                        showExperimental={false}
+                        onToggleExperimental={vi.fn()}
+                        onViewHistory={vi.fn()}
+                        isModpack={true}
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        const launcherButton = Array.from(document.body.querySelectorAll('button'))
+            .find(button => button.textContent?.includes('Modtale Launcher Required')) as HTMLButtonElement;
+        expect(launcherButton.disabled).toBe(true);
+        expect(pageText()).toContain('downloaded directly to your device');
+        await act(async () => launcherButton.click());
+        expect(onDownload).not.toHaveBeenCalled();
+    });
+
     it('defaults to the latest backend-ordered game version in the download modal', async () => {
         const versionsByGame = {
             '0.5.3': [
@@ -324,8 +440,8 @@ describe('DownloadModal Toggle Visibility', () => {
         await settle();
 
         expect(pageText()).toContain('View all files for 0.5.7');
-        expect(pageText()).toContain('v0.5.7');
-        expect(pageText()).not.toContain('v0.4.0');
+        expect(pageText()).toContain('Version 0.5.7');
+        expect(pageText()).not.toContain('Version 0.4.0');
     });
 
     it('selects a version family as an OR-compatible set in the download modal', async () => {
@@ -456,5 +572,175 @@ describe('DownloadModal Toggle Visibility', () => {
         });
 
         expect(onDownload).toHaveBeenCalledWith('/files/skyforge.jar', '1.0.0', '0.5.4', [], 'RELEASE');
+    });
+
+    it('warns when a modpack version includes external mods', async () => {
+        const versionsByGame = {
+            '0.5.4': [
+                {
+                    id: 'v1',
+                    versionNumber: '1.0.0',
+                    channel: 'RELEASE',
+                    gameVersion: '0.5.4',
+                    releaseDate: new Date().toISOString(),
+                    dependencies: [
+                        {
+                            projectId: 'external-shader',
+                            projectTitle: 'External Shader',
+                            versionNumber: '2.0.0',
+                            source: 'CURSEFORGE',
+                            externalUrl: 'https://www.curseforge.com/hytale/mods/external-shader/files/1234'
+                        }
+                    ]
+                }
+            ]
+        };
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <DownloadModal
+                        show={true}
+                        onClose={vi.fn()}
+                        versionsByGame={versionsByGame}
+                        preReleaseGameVersions={[]}
+                        orderedGameVersions={['0.5.4']}
+                        onDownload={vi.fn()}
+                        showExperimental={false}
+                        onToggleExperimental={vi.fn()}
+                        onViewHistory={vi.fn()}
+                        isModpack={true}
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        expect(pageText()).toContain('This modpack uses external mods');
+        expect(pageText()).toContain('External Shader');
+        expect(pageText()).toContain('is not redistributed in this archive');
+        expect(pageText()).toContain("authors' chosen platform");
+        const sourceLink = document.body.querySelector('a[href="https://www.curseforge.com/hytale/mods/external-shader/files/1234"]');
+        expect(sourceLink?.getAttribute('target')).toBe('_blank');
+        expect(sourceLink?.getAttribute('rel')).toBe('noopener noreferrer');
+    });
+
+    it('does not show the external mod warning for non-modpack projects', async () => {
+        const versionsByGame = {
+            '0.5.4': [
+                {
+                    id: 'v1',
+                    versionNumber: '1.0.0',
+                    channel: 'RELEASE',
+                    gameVersion: '0.5.4',
+                    releaseDate: new Date().toISOString(),
+                    dependencies: [
+                        {
+                            projectId: 'external-library',
+                            projectTitle: 'External Library',
+                            versionNumber: '2.0.0',
+                            source: 'CURSEFORGE'
+                        }
+                    ]
+                }
+            ]
+        };
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <DownloadModal
+                        show={true}
+                        onClose={vi.fn()}
+                        versionsByGame={versionsByGame}
+                        preReleaseGameVersions={[]}
+                        orderedGameVersions={['0.5.4']}
+                        onDownload={vi.fn()}
+                        showExperimental={false}
+                        onToggleExperimental={vi.fn()}
+                        onViewHistory={vi.fn()}
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        expect(pageText()).not.toContain('This modpack uses external mods');
+        expect(pageText()).not.toContain('External Library');
+    });
+
+    it('keeps the launcher install action hidden without project context', async () => {
+        const versionsByGame = {
+            '0.5.4': [
+                { id: 'v1', versionNumber: '1.0.0', channel: 'RELEASE', gameVersion: '0.5.4', releaseDate: new Date().toISOString(), fileUrl: '/download.zip' }
+            ]
+        };
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <DownloadModal
+                        show={true}
+                        onClose={vi.fn()}
+                        versionsByGame={versionsByGame}
+                        preReleaseGameVersions={[]}
+                        orderedGameVersions={['0.5.4']}
+                        onDownload={vi.fn()}
+                        showExperimental={false}
+                        onToggleExperimental={vi.fn()}
+                        onViewHistory={vi.fn()}
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        expect(pageText()).not.toContain('Install with launcher');
+    });
+
+    it('hands the selected version to the launcher install flow', async () => {
+        const fallback = vi.fn();
+        const versionsByGame = {
+            '0.5.4': [
+                { id: 'v1', versionNumber: '1.0.0', channel: 'RELEASE', gameVersion: '0.5.4', releaseDate: new Date().toISOString(), fileUrl: '/download.zip' }
+            ]
+        };
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <DownloadModal
+                        show={true}
+                        onClose={vi.fn()}
+                        versionsByGame={versionsByGame}
+                        preReleaseGameVersions={[]}
+                        orderedGameVersions={['0.5.4']}
+                        onDownload={vi.fn()}
+                        showExperimental={false}
+                        onToggleExperimental={vi.fn()}
+                        onViewHistory={vi.fn()}
+                        projectId="project-123"
+                        projectHandle="cool-mod"
+                        onLauncherFallback={fallback}
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        const launcherButton = Array.from(document.body.querySelectorAll('button'))
+            .find((button) => button.textContent?.includes('Install with launcher')) as HTMLButtonElement | undefined;
+
+        expect(launcherButton).toBeTruthy();
+
+        await act(async () => {
+            launcherButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        });
+
+        expect(launcherProtocolMock.openLauncherInstallOrFallback).toHaveBeenCalledWith(
+            {
+                projectId: 'project-123',
+                projectHandle: 'cool-mod',
+                versionNumber: '1.0.0',
+                gameVersion: '0.5.4'
+            },
+            fallback
+        );
     });
 });

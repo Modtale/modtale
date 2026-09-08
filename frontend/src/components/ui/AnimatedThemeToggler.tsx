@@ -38,6 +38,15 @@ export const AnimatedThemeToggler = ({
         const supportsViewTransition = 'startViewTransition' in document;
 
         if (supportsViewTransition) {
+            // Capture the clicked button before the transition can change its layout.
+            const { top, left, width, height } = buttonRef.current.getBoundingClientRect();
+            const x = left + width / 2;
+            const y = top + height / 2;
+            const maxRadius = Math.hypot(
+                Math.max(left, window.innerWidth - left),
+                Math.max(top, window.innerHeight - top)
+            );
+
             await (document as any).startViewTransition(() => {
                 flushSync(() => {
                     const newTheme = !isDark;
@@ -47,14 +56,6 @@ export const AnimatedThemeToggler = ({
                     onToggle?.();
                 });
             }).ready;
-
-            const { top, left, width, height } = buttonRef.current.getBoundingClientRect();
-            const x = left + width / 2;
-            const y = top + height / 2;
-            const maxRadius = Math.hypot(
-                Math.max(left, window.innerWidth - left),
-                Math.max(top, window.innerHeight - top)
-            );
 
             document.documentElement.animate(
                 {

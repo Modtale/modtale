@@ -10,6 +10,7 @@ describe('prefetchProject', () => {
 
     afterEach(() => {
         vi.doUnmock('@/utils/api');
+        vi.useRealTimers();
     });
 
     const loadModule = async () => {
@@ -38,7 +39,7 @@ describe('prefetchProject', () => {
         prefetchProject('p1');
 
         expect(get).toHaveBeenCalledTimes(1);
-        expect(get).toHaveBeenCalledWith('/projects/p1');
+        expect(get).toHaveBeenCalledWith('/projects/p1', { timeout: 10_000 });
     });
 
     it('lets the detail view consume a prefetched project once it resolves', async () => {
@@ -49,6 +50,32 @@ describe('prefetchProject', () => {
 
         await expect(consumePrefetchedProject('p1')).resolves.toEqual({ id: 'p1', title: 'Prefetched' });
         await expect(consumePrefetchedProject('p1')).resolves.toBeNull();
+    });
+
+    it('expires cached data before it can replace a fresh detail response', async () => {
+        vi.useFakeTimers();
+        get.mockResolvedValue({ data: { id: 'p1' } });
+        const { prefetchProject, consumePrefetchedProject } = await loadModule();
+        prefetchProject('p1');
+        await Promise.resolve();
+        vi.advanceTimersByTime(60_001);
+        await expect(consumePrefetchedProject('p1')).resolves.toBeNull();
+        prefetchProject('p1');
+        expect(get).toHaveBeenCalledTimes(2);
+    });
+
+    it('bounds both completed cache entries and simultaneous hover requests', async () => {
+        get.mockImplementation(async (url: string) => ({ data: { id: url } }));
+        const { prefetchProject, consumePrefetchedProject } = await loadModule();
+        for (let index = 0; index < 60; index++) {
+            prefetchProject(`p${index}`);
+            await Promise.resolve();
+        }
+        await expect(consumePrefetchedProject('p0')).resolves.toBeNull();
+        await expect(consumePrefetchedProject('p59')).resolves.toEqual({ id: '/projects/p59' });
+        get.mockClear().mockImplementation(() => new Promise(() => {}));
+        for (let index = 0; index < 60; index++) prefetchProject(`pending${index}`);
+        expect(get).toHaveBeenCalledTimes(8);
     });
 
     it('evicts failed prefetches so they can be retried', async () => {
