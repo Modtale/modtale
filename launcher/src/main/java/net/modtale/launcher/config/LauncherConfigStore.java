@@ -18,7 +18,9 @@ public final class LauncherConfigStore {
     public List<LauncherConfigSnapshot> capture(LauncherSettings settings) throws IOException {
         var captured = new LinkedHashMap<String, LauncherConfigSnapshot>();
         // Keep saved snapshots for temporarily unavailable worlds or mod folders.
-        for (var config : LauncherConfigSnapshot.validate(settings.getConfigs())) captured.put(config.path(), config);
+        for (var config : LauncherConfigSnapshot.validate(settings.getConfigs())) {
+            if (!HytaleConfigFiles.runtimeSnapshot(config.path())) captured.put(config.path(), config);
+        }
         Path mods = settings.hytaleModsDirectory().toAbsolutePath().normalize();
         Path userData = settings.hytaleUserDataDirectory().toAbsolutePath().normalize();
         for (var file : files.discoverMods(mods)) {
@@ -49,7 +51,8 @@ public final class LauncherConfigStore {
 
     /** Called only after the user chooses Load from Modtale. Existing files get backups. */
     public int restore(List<LauncherConfigSnapshot> configs, LauncherSettings settings) throws IOException {
-        List<LauncherConfigSnapshot> valid = LauncherConfigSnapshot.validate(configs);
+        List<LauncherConfigSnapshot> valid = LauncherConfigSnapshot.validate(configs).stream()
+                .filter(config -> !HytaleConfigFiles.runtimeSnapshot(config.path())).toList();
         for (var config : valid) destination(config, settings);
         int changed = 0;
         for (var config : valid) {

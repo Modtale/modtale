@@ -15,6 +15,26 @@ import java.util.stream.Stream;
 public final class HytaleConfigFiles {
     public static final int MAX_BYTES = 1024 * 1024;
     private static final Set<String> EXTENSIONS = Set.of("json", "toml", "yaml", "yml", "properties", "cfg", "conf", "ini");
+    private static final Set<String> RUNTIME_FOLDERS = Set.of("data", "cache", "logs", "backups", "players", "playerdata");
+
+    static boolean runtimeModData(Path relative) {
+        // The first component is the plugin's folder, which may itself be named Data.
+        for (int i = 1; i < relative.getNameCount() - 1; i++) {
+            if (RUNTIME_FOLDERS.contains(relative.getName(i).toString().toLowerCase(Locale.ROOT))) return true;
+        }
+        return false;
+    }
+
+    static boolean runtimeSnapshot(String path) {
+        Path relative = Path.of(path);
+        if (path.startsWith("Mods/") && relative.getNameCount() > 2)
+            return runtimeModData(relative.subpath(1, relative.getNameCount()));
+        if (relative.getNameCount() > 4 && relative.getName(0).toString().equals("Saves")
+                && relative.getName(2).toString().equals("mods"))
+            return runtimeModData(relative.subpath(3, relative.getNameCount()));
+        return false;
+    }
+
     private static final ObjectMapper JSON = new ObjectMapper()
             .enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
@@ -73,6 +93,7 @@ public final class HytaleConfigFiles {
                 // Loose asset packs contain game JSON, not editable plugin settings.
                 Path relative = root.relativize(path);
                 if (relative.getNameCount() > 1 && Files.isRegularFile(root.resolve(relative.getName(0)).resolve("manifest.json"), LinkOption.NOFOLLOW_LINKS)) continue;
+                if (runtimeModData(relative)) continue;
                 add(root, path, scope, files);
                 if (files.size() > 2000) throw new IOException("Too many config files to display.");
             }
