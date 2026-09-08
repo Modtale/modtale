@@ -8656,9 +8656,9 @@
     -fx-max-height: 42px;
     -fx-background-radius: 8px;
     -fx-background-color: rgba(37, 99, 235, 0.13);
-    -fx-border-width: 1px;
+    -fx-border-width: 2px;
     -fx-border-radius: 8px;
-    -fx-border-color: rgba(96, 165, 250, 0.18);
+    -fx-border-color: #1e293b;
 }
 
 .library-project-icon .svg-icon,

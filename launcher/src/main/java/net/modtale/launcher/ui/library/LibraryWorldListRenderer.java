@@ -20,6 +20,7 @@ import net.modtale.launcher.ui.common.LauncherIcons;
 final class LibraryWorldListRenderer {
 
     private static final double WORLD_ICON_SIZE = 42;
+    private static final double WORLD_ICON_MEDIA_SIZE = WORLD_ICON_SIZE - 4;
 
     private final CachedImageLoader imageLoader;
     private final Consumer<HytaleWorld> selectWorld;
@@ -71,13 +72,13 @@ final class LibraryWorldListRenderer {
         String preview = world.previewImage();
         if (!preview.isBlank() && imageLoader != null) {
             ImageView image = new ImageView();
-            image.setFitWidth(WORLD_ICON_SIZE);
-            image.setFitHeight(WORLD_ICON_SIZE);
+            image.setFitWidth(WORLD_ICON_MEDIA_SIZE);
+            image.setFitHeight(WORLD_ICON_MEDIA_SIZE);
             image.setPreserveRatio(false);
             image.setSmooth(true);
             image.setMouseTransparent(true);
-            image.setClip(roundedClip(WORLD_ICON_SIZE, 8));
-            imageLoader.loadInto(image, preview, WORLD_ICON_SIZE, WORLD_ICON_SIZE);
+            image.setClip(roundedClip(WORLD_ICON_MEDIA_SIZE, 6));
+            imageLoader.loadInto(image, preview, WORLD_ICON_MEDIA_SIZE, WORLD_ICON_MEDIA_SIZE);
             shell.getChildren().add(image);
         } else {
             shell.getChildren().add(LauncherIcons.icon(LauncherIcons.Glyph.GLOBE, 18));
