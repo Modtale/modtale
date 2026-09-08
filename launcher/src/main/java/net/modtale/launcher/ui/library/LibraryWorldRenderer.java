@@ -370,7 +370,9 @@ final class LibraryWorldRenderer {
                 .findFirst()
                 .ifPresentOrElse(versions::setValue, () -> versions.setValue(choices.getFirst()));
 
-        Button switchButton = primaryButton("Switch");
+        Button switchButton = primaryButton("");
+        switchButton.setAccessibleText("Switch version");
+        switchButton.setTooltip(new Tooltip("Switch version"));
         switchButton.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 13));
         switchButton.setOnAction(event -> {
             LibraryVersionChoice choice = versions.getValue();
