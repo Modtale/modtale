@@ -509,22 +509,22 @@ final class LibraryWorldRenderer {
 
         if (imageLoader != null && useProjectFallback) {
             ImageView fallback = new ImageView();
-            fallback.setFitWidth(mediaSize);
-            fallback.setFitHeight(mediaSize);
+            fallback.fitWidthProperty().bind(shell.widthProperty().subtract(4));
+            fallback.fitHeightProperty().bind(shell.heightProperty().subtract(4));
             fallback.setPreserveRatio(false);
             fallback.setSmooth(true);
-            fallback.setClip(roundedClip(mediaSize, clipRadius));
+            fallback.setClip(roundedClip(shell, clipRadius));
             imageLoader.loadInto(fallback, null, mediaSize * 2, mediaSize * 2);
             shell.getChildren().add(fallback);
         }
 
         if (imageLoader != null && iconUrl != null && !iconUrl.isBlank()) {
             ImageView image = new ImageView();
-            image.setFitWidth(mediaSize);
-            image.setFitHeight(mediaSize);
+            image.fitWidthProperty().bind(shell.widthProperty().subtract(4));
+            image.fitHeightProperty().bind(shell.heightProperty().subtract(4));
             image.setSmooth(true);
             image.setMouseTransparent(true);
-            image.setClip(roundedClip(mediaSize, clipRadius));
+            image.setClip(roundedClip(shell, clipRadius));
             imageLoader.loadInto(image, iconUrl, mediaSize, mediaSize);
             shell.getChildren().add(image);
             return shell;
@@ -538,8 +538,10 @@ final class LibraryWorldRenderer {
         return shell;
     }
 
-    private Rectangle roundedClip(double size, double radius) {
-        Rectangle clip = new Rectangle(size, size);
+    private Rectangle roundedClip(StackPane shell, double radius) {
+        Rectangle clip = new Rectangle();
+        clip.widthProperty().bind(shell.widthProperty().subtract(4));
+        clip.heightProperty().bind(shell.heightProperty().subtract(4));
         clip.setArcWidth(radius * 2);
         clip.setArcHeight(radius * 2);
         return clip;
