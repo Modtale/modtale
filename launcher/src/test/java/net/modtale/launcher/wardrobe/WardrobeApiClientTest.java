@@ -32,6 +32,7 @@ class WardrobeApiClientTest {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", exchange -> {
             String path = exchange.getRequestURI().toString();
+            assertEquals("ModtaleLauncher/1.0", exchange.getRequestHeaders().getFirst("User-Agent"));
             requests.add(path);
             methods.add(exchange.getRequestMethod());
             bodies.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
@@ -112,8 +113,8 @@ class WardrobeApiClientTest {
         slots();
         api.apply(api.lookupSkinHash(HASH), settings());
         assertEquals("PUT", methods.getLast());
-        assertEquals("/player-skins/slot-1", requests.getLast());
-        assertEquals("Bearer official-oauth", headers.getLast());
+        assertEquals("/player-skins/" + SLOT, requests.getLast());
+        assertEquals("Bearer official-session", headers.getLast());
         var body = new ObjectMapper().readTree(bodies.getLast());
         assertEquals("My original slot", body.path("name").asText());
         assertTrue(body.path("skinData").isTextual());
@@ -154,13 +155,13 @@ class WardrobeApiClientTest {
         assertThrows(IllegalStateException.class, () -> api.apply(cape, settings));
         assertFalse(methods.contains("PUT"));
         afterSlots = null;
-        json("/player-skins?profileId=" + ID, "{\"activeSkin\":\"missing\",\"skins\":[]}");
+        json("/player-skins", "{\"activeSkin\":\"missing\",\"skins\":[]}");
         assertThrows(IllegalStateException.class, () -> api.apply(cape, settings()));
         assertFalse(methods.contains("PUT"));
     }
     @Test void rejectedWriteIsNotReportedAsSuccess() {
         slots();
-        replies.put("/player-skins/slot-1", new Reply(403, "application/json", "{}"));
+        replies.put("/player-skins/" + SLOT, new Reply(403, "application/json", "{}"));
         var cape = new WardrobeItem(UUID.randomUUID(), WardrobeItem.Kind.CAPE, "Cape", false, "", "{\"cape\":null}");
         assertThrows(IllegalStateException.class, () -> api.apply(cape, settings()));
     }
@@ -186,11 +187,11 @@ class WardrobeApiClientTest {
     private void slots() {
         try {
             var mapper = new ObjectMapper();
-            var root = mapper.createObjectNode().put("activeSkin", "slot-1");
-            root.putArray("skins").addObject().put("id", "slot-1").put("name", "My original slot")
+            var root = mapper.createObjectNode().put("activeSkin", SLOT).put("maxSkins", 5);
+            root.putArray("skins").addObject().put("id", SLOT).put("name", "My original slot")
                     .put("skinData", "{\"bodyCharacteristic\":\"Original\",\"cape\":null}");
-            json("/player-skins?profileId=" + ID, root.toString());
-            json("/player-skins/slot-1", "{}");
+            json("/player-skins", root.toString());
+            json("/player-skins/" + SLOT, "{}");
         } catch (Exception e) { throw new RuntimeException(e); }
     }
     private static final String SLOT = "a64f44a1-aaf4-455e-a1f2-589989ca2a92";
@@ -277,11 +278,13 @@ class WardrobeApiClientTest {
 
     @Test void permissionsUseOfficialGameSessionAndRejectMalformedOrWrongProfile() {
         json("/my-account/cosmetics", "{\"cape\":[\"Cape_Royal_Emissary\"],\"haircut\":[]}");
+        json("/my-account/cosmetics", "{\"cape\":[\"Cape_Royal_Emissary\"],\"haircut\":[],\"cardBackground\":null}");
         var cosmetics = api.unlockedCosmetics(settings());
+        assertEquals(Set.of(), cosmetics.get("cardBackground"));
         assertEquals(Set.of("Cape_Royal_Emissary"), cosmetics.get("cape"));
         assertThrows(UnsupportedOperationException.class, () -> cosmetics.get("cape").clear());
         assertTrue(headers.stream().allMatch("Bearer official-session"::equals));
-        for (String response : List.of("null", "[]", "{\"cape\":null}", "{\"cape\":[42]}")) {
+        for (String response : List.of("null", "[]", "{\"cape\":[42]}")) {
             json("/my-account/cosmetics", response);
             assertThrows(IllegalStateException.class, () -> api.unlockedCosmetics(settings()));
         }

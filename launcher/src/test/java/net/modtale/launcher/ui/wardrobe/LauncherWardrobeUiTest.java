@@ -118,6 +118,7 @@ class LauncherWardrobeUiTest {
                 stage.setTitle("Wardrobe fictional fixtures — no connected account");
                 stage.setScene(scene);
                 stage.show();
+                button(controller.view(), "Skins").fire();
                 controller.refresh();
                 return new Harness(controller, stage, scroll);
             });
@@ -244,6 +245,7 @@ class LauncherWardrobeUiTest {
                 var stage = new Stage(StageStyle.UNDECORATED);
                 stage.setTitle("Wardrobe public catalog — read only, no linked account");
                 stage.setScene(scene); stage.show();
+                button(controller.view(), "Skins").fire();
                 controller.refresh();
                 return new Harness(controller, stage, scroll);
             });

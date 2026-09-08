@@ -91,7 +91,7 @@ class LauncherWardrobeControllerTest {
         try (Harness h = new Harness()) {
             WardrobeItem saved = new WardrobeItem(SKIN.id(), SKIN.kind(), "My favorite outfit", true, "Adventures", SKIN.payload());
             h.store.saveItem(saved);
-            fx(() -> { h.controller.refresh(); return null; });
+            fx(() -> { button(h.root(), "Skins").fire(); h.controller.refresh(); return null; });
             await(() -> card(h.root(), saved.name()) != null);
             // Catalog auto-selection retains the raw item; the dialog must independently resolve its saved UUID.
             FutureTask<Void> opened = submitFx(() -> { button(h.root(), "Edit saved look").fire(); return null; });
@@ -130,7 +130,7 @@ class LauncherWardrobeControllerTest {
             for (int i = 0; i < 83; i++) all.add(new WardrobeItem(new UUID(0, i + 100),
                     WardrobeItem.Kind.SKIN, "Grid " + i, false, "", SKIN.payload()));
             h.gateway.skins = List.copyOf(all);
-            fx(() -> { h.stage.setWidth(1750); h.controller.refresh(); return null; });
+            fx(() -> { h.stage.setWidth(1750); button(h.root(), "Skins").fire(); h.controller.refresh(); return null; });
             await(() -> gridReady(h));
             fx(() -> {
                 assertFalse(h.root().lookup("#wardrobe-saved-filter").isVisible(), "Skin sort dropdown must be hidden");
@@ -205,7 +205,10 @@ class LauncherWardrobeControllerTest {
                 Stage stage = new Stage();
                 Scene scene = new Scene(new StackPane(controller.view()), 1100, 800);
                 scene.getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
-                stage.setScene(scene); stage.show(); return stage;
+                stage.setScene(scene); stage.show();
+                assertTrue(((ToggleButton) button(controller.view(), "Customize")).isSelected());
+                assertNotNull(button(controller.view(), "Load current look"));
+                return stage;
             });
         }
         Node root() { return controller.view(); }

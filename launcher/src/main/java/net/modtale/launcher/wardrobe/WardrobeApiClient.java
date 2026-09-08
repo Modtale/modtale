@@ -105,6 +105,7 @@ public class WardrobeApiClient {
     }
 
     private static Set<String> stringSet(JsonNode values) {
+        if (values != null && values.isNull()) return Set.of();
         if (values == null || !values.isArray()) throw failure("Official cosmetic permissions must be arrays");
         Set<String> result = new LinkedHashSet<>();
         for (JsonNode value : values) {
@@ -167,7 +168,7 @@ public class WardrobeApiClient {
 
     private void writeSkin(LauncherSettings settings, UUID profile, String token, String method, String path, JsonNode body) {
         HttpRequest.Builder request = HttpRequest.newBuilder(official.resolve(path)).timeout(Duration.ofSeconds(30))
-                .header("Authorization", "Bearer " + token).header("Accept", "application/json");
+                .header("User-Agent", "ModtaleLauncher/1.0").header("Authorization", "Bearer " + token).header("Accept", "application/json");
         if (body != null) request.header("Content-Type", "application/json");
         request.method(method, body == null ? HttpRequest.BodyPublishers.noBody()
                 : HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8));
@@ -312,7 +313,7 @@ public class WardrobeApiClient {
         requireSelectedProfile(settings, slot.profileId());
         HttpRequest request = HttpRequest.newBuilder(official.resolve("player-skins/" + encode(slot.id())))
                 .timeout(Duration.ofSeconds(30)).header("Authorization", "Bearer " + slot.token())
-                .header("Content-Type", "application/json").header("Accept", "application/json")
+                .header("Content-Type", "application/json").header("Accept", "application/json").header("User-Agent", "ModtaleLauncher/1.0")
                 .PUT(HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8)).build();
         send(request, null, true);
     }
@@ -320,24 +321,12 @@ public class WardrobeApiClient {
     private record ActiveSkin(String profileId, String id, String name, ObjectNode skin, String token) {}
 
     private ActiveSkin activeSkin(LauncherSettings settings) {
-        if (settings == null || settings.getHytaleAuthSession() == null) throw failure("Hytale account unavailable");
-        String profileId = settings.getHytaleAuthSession().getUuid();
-        UUID.fromString(profileId);
-        String token = auth.freshAccessToken(settings);
-        requireSelectedProfile(settings, profileId);
-        JsonNode root = json(official.resolve("player-skins?profileId=" + encode(profileId)), token);
-        String active = root.path("activeSkin").asText("");
-        if (active.isBlank() || !root.path("skins").isArray()) throw failure("Official account has no active skin slot");
-        for (JsonNode slot : root.path("skins")) {
-            if (!active.equals(slot.path("id").asText())) continue;
-            if (!slot.path("skinData").isTextual()) throw failure("Active skin slot has no serialized cosmetic definition");
-            JsonNode skin = readJson(slot.path("skinData").asText());
-            requireSkin(skin);
-            String name = slot.path("name").asText("");
-            if (name.isBlank()) name = "HytagsSkin";
-            return new ActiveSkin(profileId, active, name, (ObjectNode) skin, token);
-        }
-        throw failure("Active skin slot was not returned by the official account service");
+        UUID profile = selectedProfile(settings);
+        String token = profileSession(settings, profile);
+        SkinSlots slots = slots(settings, profile, token);
+        SkinSlot active = slots.slots().stream().filter(slot -> slot.id().equals(slots.activeId())).findFirst()
+                .orElseThrow(() -> failure("Official account has no active skin slot"));
+        return new ActiveSkin(profile.toString(), active.id(), active.name(), (ObjectNode) readJson(active.skinData()), token);
     }
 
     private static void requireSelectedProfile(LauncherSettings settings, String uuid) {
@@ -389,7 +378,7 @@ public class WardrobeApiClient {
     }
 
     private String get(URI uri, String token, String accept) {
-        HttpRequest.Builder request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(30))
+        HttpRequest.Builder request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(30)).header("User-Agent", "ModtaleLauncher/1.0")
                 .header("Accept", accept).GET();
         if (token != null) {
             if (token.isBlank()) throw failure("Official authentication returned an empty session token");

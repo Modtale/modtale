@@ -59,7 +59,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
     private List<WardrobeItem> entries = List.of();
     private WardrobeItem selected;
     private String previewProfile = "";
-    private Tab tab = Tab.SKINS;
+    private Tab tab = Tab.CUSTOMIZE;
     private int page = 1;
     private long request;
     private boolean loaded, busy, applying, disposed;
@@ -144,7 +144,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
         customize.setMaxWidth(Double.MAX_VALUE);
         inspector.getChildren().addAll(previewNode, selectedName, selectedDetail, save, customize, apply);
         columns.setAlignment(Pos.TOP_LEFT); columns.getChildren().addAll(catalog, inspector);
-        root.getChildren().addAll(tabBar, columns);
+        root.getChildren().addAll(tabBar, editor.view());
         root.widthProperty().addListener((o, a, b) -> {
             // Keep the fitting room usable at the launcher's compact window size.
             double width = b.doubleValue();
