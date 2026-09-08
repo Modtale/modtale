@@ -8661,6 +8661,10 @@
     -fx-border-color: #1e293b;
 }
 
+.library-mod-icon {
+    -fx-border-width: 4px;
+}
+
 .library-project-icon .svg-icon,
 .library-detail-icon .svg-icon,
 .library-child-icon .svg-icon {

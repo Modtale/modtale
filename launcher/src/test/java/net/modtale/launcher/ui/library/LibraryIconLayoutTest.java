@@ -22,6 +22,48 @@ class LibraryIconLayoutTest {
     }
 
     @Test
+    void modIconMatchesTextOnFirstLayoutAndAfterRowRefresh() throws Exception {
+        FutureTask<Void> task = new FutureTask<>(() -> {
+            LibraryWorldRenderer renderer = new LibraryWorldRenderer(
+                    null, null, null, null, null, null, null, null, null, null, null, null, null);
+            var installed = new net.modtale.launcher.model.install.InstalledProject(
+                    "mod", "mod", "Example mod", "PLUGIN", "1.0", "v1", "2026.09",
+                    null, null, null, null, null);
+            var display = new LibraryWorldProjectDisplay("Example mod", "Example author", "PLUGIN",
+                    "", "1.0", "", false, false, false);
+            var model = new LibraryWorldProjectModel(installed, null, null, null, false,
+                    java.util.List.of(), 0, 0, java.util.List.of(), display);
+            var method = LibraryWorldRenderer.class.getDeclaredMethod("projectRow",
+                    net.modtale.launcher.hytale.HytaleWorldManager.HytaleWorld.class,
+                    LibraryWorldProjectModel.class, java.util.List.class);
+            method.setAccessible(true);
+            StackPane root = new StackPane();
+            Scene scene = new Scene(root, 900, 160);
+            scene.getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
+            root.resize(900, 160);
+            for (int refresh = 0; refresh < 3; refresh++) {
+                var row = (javafx.scene.Node) method.invoke(renderer, null, model, java.util.List.of());
+                root.getChildren().setAll(row);
+                root.applyCss();
+                for (int pulse = 0; pulse < 5; pulse++) {
+                    root.resize(pulse % 2 == 0 ? 900 : 650, 160);
+                    row.pseudoClassStateChanged(javafx.css.PseudoClass.getPseudoClass("hover"), pulse % 2 == 0);
+                    root.applyCss();
+                    root.layout();
+                    var icon = (StackPane) row.lookup(".library-project-icon");
+                    var copy = (javafx.scene.layout.VBox) row.lookup(".library-world-project-title").getParent();
+                    assertEquals(Math.max(46, copy.prefHeight(-1)), icon.getWidth(), 1,
+                            "Icon must start at its final size: refresh=" + refresh + ", pulse=" + pulse);
+                    assertEquals(icon.getWidth(), icon.getHeight(), 0.01);
+                }
+            }
+            return null;
+        });
+        Platform.runLater(task);
+        task.get(30, TimeUnit.SECONDS);
+    }
+
+    @Test
     void worldPreviewsCropLandscapeAndPortraitImagesToCenteredSquares() {
         ImageView view = new ImageView();
         LibraryWorldIcon.cropToSquare(view);
@@ -52,12 +94,14 @@ class LibraryIconLayoutTest {
                 root.layout();
                 assertEquals(style.equals("library-project-icon") ? 42 : 34, icon.getWidth());
                 assertFalse(icon.getChildren().isEmpty());
+                double border = style.equals("library-project-icon") ? 4 : 2;
+                assertEquals(border, icon.getBorder().getStrokes().getFirst().getWidths().getTop());
                 for (var child : icon.getChildren()) {
                     ImageView image = (ImageView) child;
-                    assertEquals(2, image.getBoundsInParent().getMinX(), 0.01);
-                    assertEquals(icon.getWidth() - 2, image.getBoundsInParent().getMaxX(), 0.01);
-                    assertEquals(2, image.getBoundsInParent().getMinY(), 0.01);
-                    assertEquals(icon.getHeight() - 2, image.getBoundsInParent().getMaxY(), 0.01);
+                    assertEquals(border, image.getBoundsInParent().getMinX(), 0.01);
+                    assertEquals(icon.getWidth() - border, image.getBoundsInParent().getMaxX(), 0.01);
+                    assertEquals(border, image.getBoundsInParent().getMinY(), 0.01);
+                    assertEquals(icon.getHeight() - border, image.getBoundsInParent().getMaxY(), 0.01);
                 }
             }
             return null;

@@ -198,7 +198,16 @@ final class LibraryWorldRenderer {
         VBox shell = new VBox(10);
         shell.getStyleClass().add("library-world-project-row");
 
-        HBox row = new HBox(12);
+        StackPane icon = projectIcon(model, PROJECT_ICON_SIZE);
+        VBox copy = projectCopy(model);
+        var iconSize = new javafx.beans.property.SimpleDoubleProperty(PROJECT_ICON_SIZE);
+        HBox row = new HBox(12) {
+            @Override
+            protected void layoutChildren() {
+                iconSize.set(Math.max(46, copy.prefHeight(-1)));
+                super.layoutChildren();
+            }
+        };
         row.getStyleClass().add("library-world-project-main");
         row.setAlignment(Pos.CENTER_LEFT);
 
@@ -216,9 +225,6 @@ final class LibraryWorldRenderer {
             toggle.setOnAction(() -> toggleWorldMods.setEnabled(world, model.modIds(), toggle.isSelected()));
         }
 
-        StackPane icon = projectIcon(model, PROJECT_ICON_SIZE);
-        VBox copy = projectCopy(model);
-        var iconSize = copy.heightProperty().map(height -> Math.max(46, height.doubleValue()));
         icon.minWidthProperty().bind(iconSize);
         icon.prefWidthProperty().bind(iconSize);
         icon.maxWidthProperty().bind(iconSize);
@@ -508,34 +514,38 @@ final class LibraryWorldRenderer {
     ) {
         StackPane shell = new StackPane();
         shell.getStyleClass().add(styleClass);
+        double borderWidth = styleClass.equals("library-project-icon") ? 4 : 2;
+        if (borderWidth == 4) {
+            shell.getStyleClass().add("library-mod-icon");
+        }
         shell.setMinSize(size, size);
         shell.setPrefSize(size, size);
         shell.setMaxSize(size, size);
-        double mediaSize = Math.max(1, size - 4);
-        double clipRadius = 6;
+        double mediaSize = Math.max(1, size - borderWidth * 2);
+        double clipRadius = 8 - borderWidth;
 
         if (imageLoader != null && useProjectFallback) {
             ImageView fallback = new ImageView();
-            fallback.fitWidthProperty().bind(shell.widthProperty().subtract(4));
-            fallback.fitHeightProperty().bind(shell.heightProperty().subtract(4));
+            fallback.fitWidthProperty().bind(shell.widthProperty().subtract(borderWidth * 2));
+            fallback.fitHeightProperty().bind(shell.heightProperty().subtract(borderWidth * 2));
             fallback.setPreserveRatio(true);
             fallback.setSmooth(true);
-            fallback.setClip(roundedClip(shell, clipRadius));
+            fallback.setClip(roundedClip(shell, clipRadius, borderWidth));
             imageLoader.loadInto(fallback, null, mediaSize * 3, mediaSize * 3, true);
             shell.getChildren().add(fallback);
         }
 
         if (imageLoader != null && iconUrl != null && !iconUrl.isBlank()) {
             ImageView image = new ImageView();
-            image.fitWidthProperty().bind(shell.widthProperty().subtract(4));
-            image.fitHeightProperty().bind(shell.heightProperty().subtract(4));
+            image.fitWidthProperty().bind(shell.widthProperty().subtract(borderWidth * 2));
+            image.fitHeightProperty().bind(shell.heightProperty().subtract(borderWidth * 2));
             image.setPreserveRatio(true);
             if (fallbackGlyph == LauncherIcons.Glyph.GLOBE) {
                 LibraryWorldIcon.cropToSquare(image);
             }
             image.setSmooth(true);
             image.setMouseTransparent(true);
-            image.setClip(roundedClip(shell, clipRadius));
+            image.setClip(roundedClip(shell, clipRadius, borderWidth));
             double renderScale = fallbackGlyph == LauncherIcons.Glyph.GLOBE ? 6 : 3;
             imageLoader.loadInto(image, iconUrl, mediaSize * renderScale, mediaSize * renderScale, true);
             shell.getChildren().add(image);
@@ -550,10 +560,10 @@ final class LibraryWorldRenderer {
         return shell;
     }
 
-    private Rectangle roundedClip(StackPane shell, double radius) {
+    private Rectangle roundedClip(StackPane shell, double radius, double borderWidth) {
         Rectangle clip = new Rectangle();
-        clip.widthProperty().bind(shell.widthProperty().subtract(4));
-        clip.heightProperty().bind(shell.heightProperty().subtract(4));
+        clip.widthProperty().bind(shell.widthProperty().subtract(borderWidth * 2));
+        clip.heightProperty().bind(shell.heightProperty().subtract(borderWidth * 2));
         clip.setArcWidth(radius * 2);
         clip.setArcHeight(radius * 2);
         return clip;
