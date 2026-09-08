@@ -9527,3 +9527,45 @@
     -fx-background-color: #162033;
     -fx-background-radius: 16px 16px 0 0;
 }
+/* Wardrobe uses the launcher's navy surfaces, Inter typography and blue actions. */
+.wardrobe-page { -fx-padding: 8 0 12 0; }
+.wardrobe-section-title { -fx-text-fill: #e2e8f0; -fx-font-size: 16px; -fx-font-weight: 800; }
+.wardrobe-muted { -fx-text-fill: #94a3b8; -fx-font-size: 12px; -fx-line-spacing: 4px; }
+.wardrobe-tabs { -fx-border-color: transparent transparent #1e293b transparent; -fx-padding: 0 0 12 0; }
+.wardrobe-tab { -fx-background-color: transparent; -fx-text-fill: #94a3b8; -fx-font-weight: 800; -fx-font-size: 13px; -fx-padding: 11 18; -fx-background-radius: 10; -fx-graphic-text-gap: 8; -fx-cursor: hand; }
+.wardrobe-tab:selected { -fx-background-color: #1b3156; -fx-text-fill: #93c5fd; }
+.wardrobe-tab:selected .svg-icon { -fx-stroke: #93c5fd; }
+.wardrobe-tab:hover { -fx-background-color: #16243a; }
+.wardrobe-tab:focused, .wardrobe-card:focused { -fx-border-color: #60a5fa; -fx-border-radius: 10; }
+.wardrobe-search { -fx-background-color: #101b2e; -fx-text-fill: #e2e8f0; -fx-prompt-text-fill: #64748b; -fx-border-color: #233149; -fx-background-radius: 10; -fx-border-radius: 10; -fx-padding: 12 14; -fx-font-size: 12px; }
+.wardrobe-search:focused { -fx-border-color: #3b82f6; }
+.wardrobe-filter { -fx-background-color: #101b2e; -fx-border-color: #233149; -fx-border-radius: 10; -fx-background-radius: 10; -fx-padding: 6; }
+.wardrobe-filter .list-cell { -fx-text-fill: #cbd5e1; -fx-font-size: 12px; }
+.wardrobe-card { -fx-background-color: #111d30; -fx-border-color: #243148; -fx-border-width: 1; -fx-border-radius: 13; -fx-background-radius: 13; -fx-padding: 10 10 13 10; -fx-cursor: hand; -fx-alignment: top-left; }
+.wardrobe-card:hover { -fx-border-color: #47678e; -fx-background-color: #17263c; }
+.wardrobe-card:selected { -fx-border-color: #3b82f6; -fx-background-color: #172b47; }
+.wardrobe-card-art { -fx-background-color: radial-gradient(center 50% 65%, radius 75%, #243a55, #132035); -fx-background-radius: 8; -fx-min-width: 158; }
+.wardrobe-card-name { -fx-text-fill: #e2e8f0; -fx-font-size: 12px; -fx-font-weight: 800; -fx-padding: 2 3 0 3; }
+.wardrobe-card-detail { -fx-text-fill: #7e93b0; -fx-font-size: 10px; -fx-padding: 0 3; }
+.wardrobe-card-fallback { -fx-text-fill: #64748b; -fx-font-size: 10px; -fx-font-weight: 800; }
+.wardrobe-inspector { -fx-background-color: linear-gradient(to bottom, #152238, #101b2d); -fx-border-color: #293950; -fx-background-radius: 18; -fx-border-radius: 18; -fx-padding: 20; }
+.wardrobe-selected-title { -fx-text-fill: #f8fafc; -fx-font-size: 18px; -fx-font-weight: 800; }
+.wardrobe-empty { -fx-padding: 55 24; -fx-min-width: 340; -fx-min-height: 290; -fx-background-color: #101b2a; -fx-background-radius: 14; }
+.wardrobe-empty .label { -fx-text-alignment: center; }
+.wardrobe-outfit-row { -fx-background-color: #111e31; -fx-background-radius: 12; -fx-padding: 18 20; -fx-border-color: #213148; -fx-border-radius: 12; }
+.wardrobe-dialog { -fx-background-color: #111e31; -fx-padding: 20; }
+.wardrobe-dialog .label, .wardrobe-dialog .check-box { -fx-text-fill: #cbd5e1; }
+.wardrobe-dialog .text-field { -fx-background-color: #0b1627; -fx-text-fill: #e2e8f0; -fx-padding: 10; }
+.wardrobe-dialog .button { -fx-background-color: #21334c; -fx-text-fill: #e2e8f0; -fx-background-radius: 8; -fx-padding: 9 14; }
+.wardrobe-dialog .button:default { -fx-background-color: #2563eb; -fx-text-fill: white; }
+.cosmetic-category-scroll, .cosmetic-category-scroll > .viewport { -fx-background-color: transparent; -fx-padding: 0; }
+.cosmetic-category-rail { -fx-padding: 12 8 12 0; }
+.cosmetic-category { -fx-background-color: transparent; -fx-text-fill: #94a3b8; -fx-padding: 11 12; -fx-background-radius: 8; -fx-font-size: 12; -fx-cursor: hand; }
+.cosmetic-category:hover { -fx-background-color: #16243a; -fx-text-fill: #e2e8f0; }
+.cosmetic-category:selected { -fx-background-color: #1b3156; -fx-text-fill: #93c5fd; -fx-font-weight: 800; }
+.cosmetic-card-art { -fx-background-color: radial-gradient(center 50% 60%, radius 80%, #233951, #132035); -fx-background-radius: 8; }
+.cosmetic-swatch { -fx-background-color: #0b1424; -fx-background-radius: 20; -fx-border-radius: 20; -fx-border-color: #334155; -fx-padding: 4; -fx-cursor: hand; }
+.cosmetic-swatch:selected { -fx-border-color: #93c5fd; -fx-border-width: 2; -fx-padding: 3; }
+.cosmetic-owned-filter { -fx-text-fill: #94a3b8; -fx-font-size: 12; }
+.cosmetic-owned-filter .box { -fx-background-color: #15243a; -fx-border-color: #334155; -fx-border-radius: 4; }
+.cosmetic-owned-filter:selected .mark { -fx-background-color: #60a5fa; }

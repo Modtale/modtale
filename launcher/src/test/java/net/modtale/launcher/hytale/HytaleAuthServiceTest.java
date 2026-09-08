@@ -37,6 +37,143 @@ class HytaleAuthServiceTest {
     }
 
     @Test
+    void freshAccessTokenRefreshesAndPersistsRotationWithoutCreatingGameSession() {
+        FakeHytaleApiClient apiClient = new FakeHytaleApiClient();
+        SettingsStore store = new SettingsStore(tempDir.resolve("settings.json"));
+        HytaleAuthService authService = new HytaleAuthService(apiClient, store);
+        LauncherSettings settings = new LauncherSettings();
+        HytaleAuthSession session = new HytaleAuthSession();
+        session.setRefreshToken("old-refresh");
+        session.setUuid("player-uuid");
+        session.setUsername("Player");
+        session.setExpiresAt(Instant.now().minusSeconds(1));
+        settings.setHytaleAuthSession(session);
+
+        assertEquals("fresh-access", authService.freshAccessToken(settings));
+        assertEquals("next-refresh-token", settings.getHytaleAuthSession().getRefreshToken());
+        assertEquals("next-refresh-token", store.load().getHytaleAuthSession().getRefreshToken());
+        assertEquals("fresh-access", authService.freshAccessToken(settings));
+        assertEquals(1, apiClient.refreshTokenCalls);
+        assertEquals(0, apiClient.createGameSessionCalls);
+    }
+
+    @Test
+    void tokenRefreshPreservesAccountSelectedDuringRequest() {
+        assertSelectionPreservedDuringRequest(false);
+    }
+
+    @Test
+    void gameSessionRefreshPreservesAccountSelectedDuringRequest() {
+        assertSelectionPreservedDuringRequest(true);
+    }
+
+    private void assertSelectionPreservedDuringRequest(boolean gameSession) {
+        FakeHytaleApiClient apiClient = new FakeHytaleApiClient();
+        SettingsStore store = new SettingsStore(tempDir.resolve("settings.json"));
+        HytaleAuthService authService = new HytaleAuthService(apiClient, store);
+        LauncherSettings settings = new LauncherSettings();
+        HytaleAuthSession accountA = linkedAccount("player-uuid", gameSession);
+        HytaleAuthSession accountB = linkedAccount("other-uuid", true);
+        settings.upsertHytaleAuthSession(accountB);
+        settings.upsertHytaleAuthSession(accountA);
+        Runnable switchAccount = () -> settings.selectHytaleAccount("other-uuid");
+        if (gameSession) {
+            apiClient.onCreateGameSession = switchAccount;
+            assertEquals("fresh-session-token", authService.freshSessionToken(settings));
+        } else {
+            apiClient.onRefreshToken = switchAccount;
+            assertEquals("fresh-access", authService.freshAccessToken(settings));
+        }
+        assertEquals("other-uuid", settings.getHytaleAuthSession().getUuid());
+        LauncherSettings persisted = store.load();
+        assertEquals("other-uuid", persisted.getHytaleAuthSession().getUuid());
+        assertEquals(2, persisted.getHytaleAuthSessions().size());
+        HytaleAuthSession persistedA = persisted.getHytaleAuthSessions().stream()
+                .filter(session -> session.getUuid().equals("player-uuid")).findFirst().orElseThrow();
+        assertEquals(gameSession ? "fresh-session-token" : "next-refresh-token",
+                gameSession ? persistedA.getSessionToken() : persistedA.getRefreshToken());
+        assertEquals("refresh-token", accountB.getRefreshToken());
+        assertEquals("", accountB.getSessionToken());
+    }
+
+    @Test
+    void tokenRefreshDoesNotRestoreRemovedAccount() {
+        assertRemovedDuringRequest(false);
+    }
+
+    @Test
+    void gameSessionRefreshDoesNotRestoreRemovedAccount() {
+        assertRemovedDuringRequest(true);
+    }
+
+    private void assertRemovedDuringRequest(boolean gameSession) {
+        FakeHytaleApiClient apiClient = new FakeHytaleApiClient();
+        SettingsStore store = new SettingsStore(tempDir.resolve("settings.json"));
+        HytaleAuthService authService = new HytaleAuthService(apiClient, store);
+        LauncherSettings settings = new LauncherSettings();
+        HytaleAuthSession accountA = linkedAccount("player-uuid", gameSession);
+        settings.upsertHytaleAuthSession(accountA);
+        Runnable removeAccount = () -> authService.logoutAccount(settings, "player-uuid");
+        if (gameSession) {
+            apiClient.onCreateGameSession = removeAccount;
+            assertThrows(HytaleApiException.class, () -> authService.freshSessionToken(settings));
+        } else {
+            apiClient.onRefreshToken = removeAccount;
+            assertThrows(HytaleApiException.class, () -> authService.freshAccessToken(settings));
+        }
+        assertTrue(settings.getHytaleAuthSessions().isEmpty());
+        assertTrue(store.load().getHytaleAuthSessions().isEmpty());
+        assertEquals("refresh-token", accountA.getRefreshToken());
+        assertEquals("", accountA.getSessionToken());
+    }
+
+    @Test
+    void failedRefreshDoesNotRemoveReplacementLoginForSameAccount() {
+        FakeHytaleApiClient apiClient = new FakeHytaleApiClient();
+        SettingsStore store = new SettingsStore(tempDir.resolve("settings.json"));
+        HytaleAuthService authService = new HytaleAuthService(apiClient, store);
+        LauncherSettings settings = new LauncherSettings();
+        settings.upsertHytaleAuthSession(linkedAccount("player-uuid", false));
+        HytaleAuthSession replacement = linkedAccount("player-uuid", true);
+        apiClient.onRefreshToken = () -> {
+            settings.upsertHytaleAuthSession(replacement);
+            store.save(settings);
+        };
+        apiClient.refreshTokenFailure = new HytaleApiException("invalid_grant", 400, null);
+        assertThrows(HytaleApiException.class, () -> authService.freshAccessToken(settings));
+        assertEquals(replacement, settings.getHytaleAuthSession());
+        assertEquals("valid-access", store.load().getHytaleAuthSession().getAccessToken());
+    }
+
+    private static HytaleAuthSession linkedAccount(String uuid, boolean validToken) {
+        HytaleAuthSession session = new HytaleAuthSession();
+        session.setUuid(uuid);
+        session.setUsername(uuid);
+        session.setRefreshToken("refresh-token");
+        session.setAccessToken(validToken ? "valid-access" : "expired-access");
+        session.setExpiresAt(Instant.now().plusSeconds(validToken ? 600 : -60));
+        return session;
+    }
+
+    @Test
+    void freshProfileSessionDoesNotUseLaunchOfflineFallback() {
+        FakeHytaleApiClient apiClient = new FakeHytaleApiClient();
+        apiClient.createGameSessionFailure = new HytaleApiException("unavailable", 503, null);
+        HytaleAuthService authService = new HytaleAuthService(apiClient, new SettingsStore(tempDir.resolve("settings.json")));
+        LauncherSettings settings = new LauncherSettings();
+        HytaleAuthSession session = new HytaleAuthSession();
+        session.setAccessToken("valid-access");
+        session.setRefreshToken("refresh");
+        session.setUuid("player-uuid");
+        session.setUsername("Player");
+        session.setExpiresAt(Instant.now().plusSeconds(600));
+        session.setSessionToken("expired-session");
+        session.setIdentityToken("expired-identity");
+        settings.setHytaleAuthSession(session);
+        assertThrows(HytaleApiException.class, () -> authService.freshSessionToken(settings));
+    }
+
+    @Test
     void launchSessionCreationRefreshesAndRetriesOnAuthFailure() {
         FakeHytaleApiClient apiClient = new FakeHytaleApiClient();
         HytaleAuthService authService = new HytaleAuthService(
@@ -297,6 +434,8 @@ class HytaleAuthServiceTest {
 
     private static final class FakeHytaleApiClient extends HytaleApiClient {
 
+        private Runnable onRefreshToken = () -> {};
+        private Runnable onCreateGameSession = () -> {};
         private int createGameSessionCalls;
         private int refreshTokenCalls;
         private int fetchFriendsCalls;
@@ -315,6 +454,7 @@ class HytaleAuthServiceTest {
         @Override
         public TokenResponse refreshToken(String refreshToken) {
             refreshTokenCalls++;
+            onRefreshToken.run();
             if (refreshTokenFailure != null) {
                 throw refreshTokenFailure;
             }
@@ -328,6 +468,7 @@ class HytaleAuthServiceTest {
         @Override
         public HytaleGameSession createGameSession(String accessToken, String uuid) {
             createGameSessionCalls++;
+            onCreateGameSession.run();
             if (createGameSessionFailure != null) {
                 throw createGameSessionFailure;
             }

@@ -37,4 +37,22 @@ class LauncherShellTest {
         assertEquals(LauncherLayout.navbarRightInset(),
                 LauncherShell.workspaceInsetsFor(LauncherView.DISCOVER).getRight());
     }
+
+    @Test
+    void browseBodyDoesNotReserveTheNavbarRightInsetTwice() {
+        assertEquals(0, LauncherShell.contentBodyInsetsFor(LauncherView.DISCOVER).getRight());
+    }
+
+    @Test
+    void libraryWorkspaceReservesBothNavbarInsets() {
+        assertEquals(LauncherLayout.navbarLeftInset(),
+                LauncherShell.workspaceInsetsFor(LauncherView.LIBRARY).getLeft());
+        assertEquals(LauncherLayout.navbarRightInset(),
+                LauncherShell.workspaceInsetsFor(LauncherView.LIBRARY).getRight());
+    }
+
+    @Test
+    void libraryBodyDoesNotReserveTheNavbarRightInsetTwice() {
+        assertEquals(0, LauncherShell.contentBodyInsetsFor(LauncherView.LIBRARY).getRight());
+    }
 }

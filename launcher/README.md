@@ -4,6 +4,12 @@ Native Java 21 JavaFX launcher for installing and updating Modtale projects in a
 
 The Play tab can launch a locally installed Hytale client with official Hytale authentication. Hytale launch first tries to refresh the Hytale OAuth session and create fresh game-session tokens. If Hytale authentication is unavailable or rejects the active session, Modtale may reuse the last Hytale-issued launch tokens stored for the linked account and still starts the client in authenticated mode so Hytale itself applies its first-party offline restrictions. The launcher does not create offline identities, fabricate tokens, or provide a piracy launch mode.
 
+## Wardrobe
+
+The Wardrobe tab includes a character editor driven by the installed game's complete cosmetic catalog: all 20 categories, exact color/style combinations, local native 3D outfit previews with animation playback, undo/redo, reset, and random selection. It reads `Assets.zip` in the configured game directory; **Game assets** can select another installation. The official account unlock list distinguishes owned cosmetics from preview-only items. Manage Hytale outfit slots (create, edit, rename, duplicate, wear, and delete) alongside local saved looks.
+
+Browse HyTags skins, look up usernames or skin hashes, save looks into local collections, mark favorites, and import or export a wardrobe JSON file. Skin archive previews use native 3D; capes are part of Customize. Applying uses the selected linked Hytale profile and saves the previous official outfit under **Previous looks** first; cape changes preserve the rest of the outfit. Replacing or deleting a Hytale outfit also keeps a local recovery copy.
+
 ## Run From Source
 
 ```bash

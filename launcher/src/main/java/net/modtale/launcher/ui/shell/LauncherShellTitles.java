@@ -15,6 +15,7 @@ public final class LauncherShellTitles {
         return switch (view) {
             case PLAY -> I18N.text("view.play.title");
             case LIBRARY -> I18N.text("view.library.title");
+            case WARDROBE -> I18N.text("view.wardrobe.title");
             case UPDATES -> I18N.text("view.updates.title");
             case NOTIFICATIONS -> I18N.text("view.notifications.title");
             case SETTINGS -> I18N.text("view.settings.title");
@@ -27,6 +28,7 @@ public final class LauncherShellTitles {
         return switch (view) {
             case PLAY -> I18N.text("view.play.subtitle");
             case LIBRARY -> I18N.text("view.library.subtitle");
+            case WARDROBE -> "";
             case UPDATES -> I18N.text("view.updates.subtitle");
             case NOTIFICATIONS -> I18N.text("view.notifications.subtitle");
             case SETTINGS -> I18N.text("view.settings.subtitle");
