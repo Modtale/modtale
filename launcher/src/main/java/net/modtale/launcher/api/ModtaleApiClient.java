@@ -95,7 +95,7 @@ public class ModtaleApiClient {
         this.cookieManager = cookieManager;
         this.transport = new ModtaleApiTransport(httpClient, responseCache, this::csrfToken);
         this.downloadClient = new ModtaleDownloadClient(httpClient, this::apiBaseUri);
-        this.nyoCfClient = new NyoCfClient(httpClient);
+        this.nyoCfClient = new NyoCfClient(httpClient, responseCache);
         this.curseForgeCommentsClient = curseForgeCommentsClient == null
                 ? new CurseForgeCommentsClient(httpClient) : curseForgeCommentsClient;
         this.sessionStore = sessionStore;

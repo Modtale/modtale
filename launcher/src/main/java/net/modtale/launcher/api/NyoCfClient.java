@@ -1,13 +1,9 @@
 package net.modtale.launcher.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -17,8 +13,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 import net.modtale.launcher.model.project.DownloadUrlResponse;
 import net.modtale.launcher.model.project.ProjectDetail;
 import net.modtale.launcher.model.project.ProjectPage;
@@ -34,17 +28,23 @@ final class NyoCfClient {
     private static final long HYTALE_GAME_ID = 70216;
     private static final List<String> PROJECT_CLASSES = List.of(
             "mods", "prefabs", "worlds", "bootstrap", "translations");
-    private final HttpClient httpClient;
+    private final ModtaleApiTransport transport;
     private final URI baseUri;
-    private final ObjectMapper mapper = new ObjectMapper();
-    private final ConcurrentMap<Long, JsonNode> projectMetadata = new ConcurrentHashMap<>();
 
     NyoCfClient(HttpClient httpClient) {
         this(httpClient, DEFAULT_BASE_URI);
     }
 
     NyoCfClient(HttpClient httpClient, URI baseUri) {
-        this.httpClient = httpClient;
+        this(httpClient, baseUri, new ApiResponseCache());
+    }
+
+    NyoCfClient(HttpClient httpClient, ApiResponseCache responseCache) {
+        this(httpClient, DEFAULT_BASE_URI, responseCache);
+    }
+
+    NyoCfClient(HttpClient httpClient, URI baseUri, ApiResponseCache responseCache) {
+        this.transport = new ModtaleApiTransport(httpClient, responseCache);
         this.baseUri = baseUri;
     }
 
@@ -179,8 +179,7 @@ final class NyoCfClient {
     }
 
     private JsonNode metadata(long projectId) {
-        return projectMetadata.computeIfAbsent(positive(projectId),
-                id -> get("/api/v1/hytale/mods/" + id));
+        return get("/api/v1/hytale/mods/" + positive(projectId));
     }
 
     private String firstScreenshot(JsonNode project, String preferredField) {
@@ -235,21 +234,16 @@ final class NyoCfClient {
     }
 
     private JsonNode get(String pathAndQuery) {
-        URI uri = baseUri.resolve(pathAndQuery);
-        HttpRequest request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(30))
-                .header("Accept", "application/json")
-                .header("User-Agent", "ModtaleLauncher/0.1 (+https://modtale.net)").GET().build();
-        try {
-            HttpResponse<String> response = httpClient.send(request,
-                    HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            ModtaleApiTransport.ensureSuccess(response.statusCode(), uri.toString());
-            return mapper.readTree(response.body());
-        } catch (IOException ex) {
-            throw new ModtaleApiException("Could not read CurseForge catalog data.", ex);
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            throw new ModtaleApiException("CurseForge catalog request was interrupted.", ex);
-        }
+        return transport.get(baseUri.resolve(pathAndQuery), JsonNode.class, cacheTtl(pathAndQuery));
+    }
+
+    private static Duration cacheTtl(String pathAndQuery) {
+        String path = pathAndQuery.split("\\?", 2)[0];
+        if (path.endsWith("/search")) return Duration.ofHours(26);
+        if (path.matches("/api/v1/hytale/mods/[0-9]+(/description)?")) return Duration.ofDays(7);
+        if (path.matches("/api/v1/hytale/mods/[0-9]+/files")) return Duration.ofMinutes(5);
+        // Exact file requests may contain expiring download URLs and current availability.
+        return Duration.ZERO;
     }
 
     private void sort(List<ProjectSummary> projects, String sort) {

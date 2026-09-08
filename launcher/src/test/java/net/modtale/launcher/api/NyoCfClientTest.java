@@ -11,6 +11,8 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import org.junit.jupiter.api.io.TempDir;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.modtale.launcher.model.project.DownloadUrlResponse;
 import net.modtale.launcher.model.project.ProjectDetail;
@@ -21,6 +23,9 @@ import org.junit.jupiter.api.Test;
 
 class NyoCfClientTest {
 
+    @TempDir
+    Path cacheDirectory;
+
     private HttpServer server;
     private NyoCfClient client;
 
@@ -29,12 +34,84 @@ class NyoCfClientTest {
         server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.start();
         client = new NyoCfClient(HttpClient.newHttpClient(), URI.create(
-                "http://127.0.0.1:" + server.getAddress().getPort()));
+                "http://127.0.0.1:" + server.getAddress().getPort()), new ApiResponseCache(cacheDirectory));
     }
 
     @AfterEach
     void stopServer() {
         server.stop(0);
+    }
+
+    @Test
+    void browseCacheSurvivesRestartAndCanBeCleared() {
+        AtomicInteger requests = new AtomicInteger();
+        server.createContext("/api/v1/hytale/mods/search", exchange -> {
+            requests.incrementAndGet();
+            respond(exchange, "{\"data\":[],\"pagination\":{\"total\":0}}");
+        });
+        var query = new ProjectSearchQuery("compost", "mods", null, "downloads", 0, 20,
+                null, null, null, null, null, null);
+        client.search(query);
+        ApiResponseCache diskCache = new ApiResponseCache(cacheDirectory);
+        var restarted = new NyoCfClient(HttpClient.newHttpClient(),
+                URI.create("http://127.0.0.1:" + server.getAddress().getPort()), diskCache);
+        restarted.search(query);
+        assertEquals(1, requests.get());
+        diskCache.clear();
+        restarted.search(query);
+        assertEquals(2, requests.get());
+    }
+
+    @Test
+    void metadataAndDescriptionRemainAvailableFromDiskOffline() {
+        server.createContext("/api/v1/hytale/mods/1450386/files", exchange -> respond(exchange, "[]"));
+        server.createContext("/api/v1/hytale/mods/1450386/description", exchange -> respond(exchange,
+                "{\"description\":\"Full description\"}"));
+        server.createContext("/api/v1/hytale/mods/1450386", exchange -> respond(exchange, """
+                {"id":1450386,"game_id":70216,"is_available":true,"name":"Simple Compost",
+                 "links":{"website":"https://www.curseforge.com/hytale/mods/simple-compost"},
+                 "authors":[{"name":"Builder"}],"logo":{"thumbnail_url":"https://media.forgecdn.net/icon.png"}}
+                """));
+        client.project(1450386);
+        URI baseUri = URI.create("http://127.0.0.1:" + server.getAddress().getPort());
+        server.stop(0);
+        var restarted = new NyoCfClient(HttpClient.newHttpClient(), baseUri, new ApiResponseCache(cacheDirectory));
+        assertEquals("Simple Compost", restarted.projectMeta(1450386).title());
+        assertEquals("Builder", restarted.projectMeta(1450386).author());
+        assertEquals("Full description", restarted.project(1450386).about());
+    }
+
+    @Test
+    void browseCachesQueriesAndPagesSeparately() {
+        AtomicInteger requests = new AtomicInteger();
+        server.createContext("/api/v1/hytale/mods/search", exchange -> {
+            requests.incrementAndGet();
+            respond(exchange, "{\"data\":[],\"pagination\":{\"total\":0}}");
+        });
+        for (String search : java.util.List.of("compost", "farming")) {
+            for (int page = 0; page < 2; page++) {
+                var query = new ProjectSearchQuery(search, "mods", null, "downloads", page, 20,
+                        null, null, null, null, null, null);
+                client.search(query);
+                client.search(query);
+            }
+        }
+        assertEquals(4, requests.get());
+    }
+
+    @Test
+    void exactDownloadMetadataIsAlwaysFetchedFresh() {
+        AtomicInteger requests = new AtomicInteger();
+        server.createContext("/api/v1/hytale/mods/1450386/files/8747324", exchange -> {
+            int count = requests.incrementAndGet();
+            respond(exchange, """
+                    {"id":8747324,"mod_id":1450386,"game_id":70216,"is_available":true,
+                     "file_name":"mod.jar","file_length":%d}
+                    """.formatted(count));
+        });
+        assertEquals(1L, client.download(1450386, 8747324).fileSize());
+        assertEquals(2L, client.download(1450386, 8747324).fileSize());
+        assertEquals(2, requests.get());
     }
 
     @Test
@@ -98,7 +175,7 @@ class NyoCfClientTest {
         assertEquals("curseforge:1450386", browse.content().getFirst().routeKey());
         assertEquals(null, browse.content().getFirst().bannerUrl());
         assertEquals("https://media.forgecdn.net/screenshot-thumb.png", enrichedBrowseProject.bannerUrl());
-        assertEquals(2, browseRequests.get());
+        assertEquals(1, browseRequests.get());
         assertTrue(browse.content().getFirst().isCurseForge());
         assertEquals("<p>Rich project description</p>", detail.about());
         assertEquals("https://media.forgecdn.net/screenshot.png", detail.bannerUrl());
