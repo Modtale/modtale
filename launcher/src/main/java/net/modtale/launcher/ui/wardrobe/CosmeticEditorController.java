@@ -222,7 +222,7 @@ public final class CosmeticEditorController implements AutoCloseable {
             state.setText("");
             for (CosmeticOption option : result.options()) grid.getChildren().add(optionCard(option));
             if (grid.getChildren().isEmpty()) grid.getChildren().add(text(ownedOnly.isSelected() && !permissionsKnown
-                    ? activeProfile().isBlank() ? "Link Hytale to view owned items." : "Ownership unavailable. Refresh your account."
+                    ? "Owned items unavailable."
                     : "No matching items", "wardrobe-muted"));
             pageLabel.setText("Page " + requestedPage); previous.setDisable(requestedPage <= 1); next.setDisable(!result.hasNext());
             String selected = draft == null ? "" : draft.selected(key);
@@ -311,7 +311,7 @@ public final class CosmeticEditorController implements AutoCloseable {
     }
 
     private void loadCurrent() {
-        if (activeProfile().isBlank()) { feedback.showToast("Link Hytale", "Link a Hytale account to load its current outfit."); return; }
+        if (activeProfile().isBlank()) return;
         if (draft != null && draft.dirty() && !confirm("Replace your draft?", "Load your current Hytale look and discard the unapplied edits?")) return;
         String target = activeProfile();
         long revision = draftRevision;
@@ -352,7 +352,7 @@ public final class CosmeticEditorController implements AutoCloseable {
         saveOfficial.setDisable(!hasDraft || activeProfile().isBlank() || applying || locked);
         apply.setTooltip(new Tooltip(locked ? "This outfit contains locked cosmetics." : "Apply to " + activeUsername() + " and save the previous look locally."));
         saveMenu.setDisable(!hasDraft || applying);
-        apply.setText(applying ? "Applying…" : activeUsername().isBlank() ? "Link account" : "Apply");
+        apply.setText(applying ? "Applying…" : "Apply");
         changes.setText(locked ? "Contains locked items" : hasDraft && draft.dirty() ? "Unapplied changes" : "");
     }
     private boolean hasLockedSelection() {

@@ -295,9 +295,9 @@ public final class LauncherWardrobeController implements AutoCloseable {
     private void updateSelectionActions() {
         HytaleAuthSession session = settings.get().getHytaleAuthSession();
         String username = session == null ? "" : session.getUsername();
-        apply.setText(applying ? "Applying…" : username.isBlank() ? "Link a Hytale account" : "Apply to " + username);
+        apply.setText(applying ? "Applying…" : username.isBlank() ? "Apply" : "Apply to " + username);
         apply.setDisable(selected == null || session == null || applying);
-        apply.setTooltip(new Tooltip(username.isBlank() ? "Link Hytale from the profile menu." : "Apply to " + username + ". The previous look is saved locally."));
+        apply.setTooltip(new Tooltip(username.isBlank() ? "Hytale account unavailable." : "Apply to " + username + ". The previous look is saved locally."));
         save.setDisable(selected == null || applying);
         save.setText(selected != null && store.items().stream().anyMatch(i -> i.id().equals(selected.id())) ? "Edit saved look" : "Save look");
         previous.setDisable(busy || page <= 1); next.setDisable(busy || !hasNext);

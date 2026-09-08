@@ -97,7 +97,7 @@ class CosmeticEditorUiTest {
                 JsonNode baseline = fx(() -> harness.controller().draftSnapshot());
                 assertEquals(catalog.defaultSkin(), baseline);
                 awaitPreview(harness);
-                assertTrue(fx(() -> button(harness.root(), "Link account").isDisabled()));
+                assertTrue(fx(() -> button(harness.root(), "Apply").isDisabled()));
                 assertTrue(fx(() -> ((javafx.scene.control.MenuButton) button(harness.root(), "Save")).getItems().get(1).isDisable()));
 
                 CosmeticOption hair = selectFirst(harness, catalog, "haircut");

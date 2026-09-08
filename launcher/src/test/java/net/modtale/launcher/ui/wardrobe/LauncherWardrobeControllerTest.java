@@ -137,6 +137,8 @@ class LauncherWardrobeControllerTest {
                 assertFalse(h.root().lookup("#wardrobe-saved-filter").isManaged());
                 assertGridWidth(h); return null;
             });
+            // The explicit layout above can trigger responsive repagination.
+            await(() -> gridReady(h));
             List<String> seen = new ArrayList<>();
             while (true) {
                 List<String> current = fx(() -> gridCards(h).stream().map(Button::getAccessibleText).toList());

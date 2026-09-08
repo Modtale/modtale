@@ -152,7 +152,7 @@ public class WardrobeApiClient {
     }
 
     private static UUID selectedProfile(LauncherSettings settings) {
-        if (settings == null || settings.getHytaleAuthSession() == null) throw failure("Sign in with Hytale before accessing outfits");
+        if (settings == null || settings.getHytaleAuthSession() == null) throw failure("Hytale account unavailable");
         return UUID.fromString(settings.getHytaleAuthSession().getUuid());
     }
 
@@ -278,7 +278,7 @@ public class WardrobeApiClient {
     }
 
     public void apply(WardrobeItem item, LauncherSettings settings) {
-        if (settings == null || settings.getHytaleAuthSession() == null) throw failure("Sign in with Hytale before applying skins");
+        if (settings == null || settings.getHytaleAuthSession() == null) throw failure("Hytale account unavailable");
         apply(item, settings, UUID.fromString(settings.getHytaleAuthSession().getUuid()));
     }
 
@@ -320,7 +320,7 @@ public class WardrobeApiClient {
     private record ActiveSkin(String profileId, String id, String name, ObjectNode skin, String token) {}
 
     private ActiveSkin activeSkin(LauncherSettings settings) {
-        if (settings == null || settings.getHytaleAuthSession() == null) throw failure("Sign in with Hytale before accessing skins");
+        if (settings == null || settings.getHytaleAuthSession() == null) throw failure("Hytale account unavailable");
         String profileId = settings.getHytaleAuthSession().getUuid();
         UUID.fromString(profileId);
         String token = auth.freshAccessToken(settings);

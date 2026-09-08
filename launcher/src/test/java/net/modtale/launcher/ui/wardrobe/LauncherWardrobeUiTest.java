@@ -125,7 +125,7 @@ class LauncherWardrobeUiTest {
                 await("initial skin catalog", () -> cards(harness).size() == 3);
                 click(harness, "Preview " + gateway.skins.getFirst().name());
                 awaitPreview(harness);
-                assertTrue(fx(() -> button(harness.root(), "Link a Hytale account").isDisabled()));
+                assertTrue(fx(() -> button(harness.root(), "Apply").isDisabled()));
                 capturePair(harness, output, "skins");
 
                 // Drive the real modal save dialog without blocking the test on showAndWait().
@@ -277,7 +277,7 @@ class LauncherWardrobeUiTest {
                         notes.add(tab + ": " + rendered + " thumbnails loaded successfully");
                         assertTrue(rendered >= 6, "Only " + rendered + " real thumbnails loaded for " + tab);
                         assertFalse(previewStatus.contains("could not be loaded"), "Hyvatar preview failed for " + selection);
-                        assertTrue(fx(() -> button(harness.root(), "Link a Hytale account").isDisabled()));
+                        assertTrue(fx(() -> button(harness.root(), "Apply").isDisabled()));
                         capturePair(harness, output, "live-" + tab.toLowerCase(java.util.Locale.ROOT));
                     } catch (Exception | AssertionError failure) {
                         String detail = tab + " capture failed: " + failure;

@@ -141,7 +141,7 @@ public final class LauncherPlayController {
     private final Button identityButton = new Button();
     private final StackPane identityAvatar = new StackPane();
     private final Label identityTitle = new Label("Signed out");
-    private final Label identitySubtitle = new Label("Add Hytale account");
+    private final Label identitySubtitle = new Label();
     private final VBox friendsList = new VBox(9);
     private final VBox newsList = new VBox(12);
     private final CatalogShelf newReleasesShelf = new CatalogShelf(ProjectBrowseSort.NEWEST);
@@ -906,7 +906,7 @@ public final class LauncherPlayController {
     private void syncSidebarData(LauncherSettings settings, HytaleAuthSession session) {
         if (session == null) {
             loadedFriendsKey = "";
-            setFriendsMessage("Sign in with Hytale to see friends.");
+            friendsList.getChildren().clear();
         } else {
             String friendsKey = LauncherSettings.hytaleAccountId(session);
             if (!friendsKey.equals(loadedFriendsKey) && !friendsLoading) {
@@ -1019,7 +1019,7 @@ public final class LauncherPlayController {
         if (session == null) {
             hytaleStatus.setText("Signed out");
             identityTitle.setText("Signed out");
-            identitySubtitle.setText("Add Hytale account");
+            identitySubtitle.setText("");
             updateImageAvatar(identityAvatar, "Hytale", IDENTITY_AVATAR_SIZE, PROFILE_AVATAR_RADIUS, "");
             return;
         }
@@ -1096,7 +1096,7 @@ public final class LauncherPlayController {
                     }
                     if (error != null) {
                         loadedPlaytimeKey = playtimeKey;
-                        playtimeMetric.setText(playtimeErrorMessage(error));
+                        playtimeMetric.setText("Playtime unavailable");
                         return;
                     }
                     loadedPlaytimeKey = playtimeKey;
@@ -1109,7 +1109,7 @@ public final class LauncherPlayController {
         HytaleAuthSession session = settings.getHytaleAuthSession();
         if (session == null || !session.hasRefreshToken()) {
             loadedFriendsKey = "";
-            setFriendsMessage("Sign in with Hytale to see friends.");
+            friendsList.getChildren().clear();
             return;
         }
         String friendsKey = LauncherSettings.hytaleAccountId(session);
@@ -1195,17 +1195,9 @@ public final class LauncherPlayController {
     private static String friendsErrorMessage(Throwable error) {
         Throwable cause = unwrap(error);
         if (cause instanceof HytaleApiException hytaleEx && hytaleEx.requiresSignIn()) {
-            return "Sign in with Hytale to see friends.";
+            return "Friends unavailable";
         }
         return "Friends are available in-game. Modtale could not read a launcher friend list yet.";
-    }
-
-    private static String playtimeErrorMessage(Throwable error) {
-        Throwable cause = unwrap(error);
-        if (cause instanceof HytaleApiException hytaleEx && hytaleEx.requiresSignIn()) {
-            return "Sign in required";
-        }
-        return "Playtime unavailable";
     }
 
     private static String hytaleBuildLoadErrorMessage(Throwable error) {
