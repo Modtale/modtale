@@ -837,6 +837,8 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.named('test') {
     useJUnitPlatform()
+    timeout = java.time.Duration.ofMinutes(10)
+    systemProperty 'junit.jupiter.execution.timeout.default', '60 s'
 }
 
 def javafxPlatform() {

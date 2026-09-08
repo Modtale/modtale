@@ -5,8 +5,8 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.head.sha || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -17,6 +17,7 @@ jobs:
   dedupe:
     name: Avoid Duplicate Test Runs
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     outputs:
       should_run: ${{ steps.dedupe.outputs.should_run }}
     steps:
@@ -35,6 +36,7 @@ jobs:
     needs: dedupe
     if: needs.dedupe.outputs.should_run == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -52,6 +54,7 @@ jobs:
     needs: dedupe
     if: needs.dedupe.outputs.should_run == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
       backend: ${{ steps.filter.outputs.backend }}
@@ -76,6 +79,7 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.frontend == 'true' && github.repository == 'Modtale/modtale' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'Modtale/modtale')
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: frontend
@@ -105,6 +109,7 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: backend
@@ -145,6 +150,7 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.launcher == 'true' && github.repository == 'Modtale/modtale' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'Modtale/modtale')
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: launcher
@@ -165,5 +171,18 @@ jobs:
       - name: Ensure Gradle wrapper is executable
         run: chmod +x gradlew
 
+      - name: Install virtual display for JavaFX tests
+        run: sudo apt-get update && sudo apt-get install -y xvfb xauth libgtk-3-0
+
       - name: Run launcher tests
-        run: ./gradlew test
+        run: xvfb-run -a ./gradlew test --no-daemon
+
+      - name: Upload launcher test reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-test-reports
+          path: |
+            launcher/build/reports/tests/test
+            launcher/build/test-results/test
+          if-no-files-found: ignore

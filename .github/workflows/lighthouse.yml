@@ -5,8 +5,8 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.head.sha || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -17,6 +17,7 @@ jobs:
   dedupe:
     name: Avoid Duplicate Lighthouse Runs
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     outputs:
       should_run: ${{ steps.dedupe.outputs.should_run }}
     steps:
@@ -35,6 +36,7 @@ jobs:
     needs: dedupe
     if: needs.dedupe.outputs.should_run == 'true' && github.repository == 'Modtale/modtale' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'Modtale/modtale')
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
     steps:
@@ -57,6 +59,7 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.frontend == 'true' && github.repository == 'Modtale/modtale' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'Modtale/modtale')
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     continue-on-error: true
     defaults:
       run:
