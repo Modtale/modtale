@@ -15,6 +15,8 @@ export class SiteRoutes {
     static launcher() { return '/launcher'; }
     static apiDocs() { return '/api-docs'; }
     static swaggerDocs() { return '/api-docs/swagger'; }
+    static news() { return '/news'; }
+    static newsPost(slug: string) { return `/news/${slug}`; }
     static list(id: string) { return `/lists/${id}`; }
     static createModpackFromList(id: string) {
         const params = new URLSearchParams({ type: 'MODPACK', fromList: id });

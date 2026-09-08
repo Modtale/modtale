@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Search, Upload, Code, MonitorDown } from 'lucide-react';
+import { Search, Upload, Code, MonitorDown, ArrowRight, Newspaper } from 'lucide-react';
 import { GitHubBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { api } from '@/utils/api';
+import { NEWS_POSTS, getNewsPostPath } from '@/data/news';
 import { ROUTE_SEO } from '@/data/seo-constants';
 import type { Project, User } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
@@ -69,6 +70,15 @@ const WIDE_DESKTOP_COPY_CLASSES = '[@media(min-width:1260px)_and_(min-height:720
 const WIDE_DESKTOP_PRIMARY_CLASSES = '[@media(min-width:1260px)_and_(min-height:720px)]:items-start';
 const WIDE_DESKTOP_ACTIONS_CLASSES = '[@media(min-width:1260px)_and_(min-height:720px)]:items-start [@media(min-width:1260px)_and_(min-height:720px)]:self-start';
 const WIDE_DESKTOP_MARQUEE_CLASSES = '[@media(min-width:1260px)_and_(min-height:720px)]:block';
+const latestNewsPosts = [...NEWS_POSTS]
+    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+    .slice(0, 3);
+
+const formatNewsDate = (value: string) => new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+}).format(new Date(value));
 
 const getViewportSize = () => {
     if (typeof window === 'undefined') {
@@ -135,6 +145,69 @@ const FeatureShowcaseSection = ({
                 <LazySection minHeight="450px">
                     {children}
                 </LazySection>
+            </div>
+        </section>
+    );
+};
+
+const LatestNewsCards = () => {
+    if (!latestNewsPosts.length) return null;
+
+    return (
+        <section aria-labelledby="home-latest-news" className="mb-10 sm:mb-14">
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-5 text-left">
+                <div>
+                    <p className="inline-flex items-center gap-2 rounded-full border border-blue-200/80 dark:border-sky-400/20 bg-white/80 dark:bg-sky-400/10 px-3 py-1.5 text-xs font-black uppercase tracking-wide text-blue-700 dark:text-sky-300 shadow-sm">
+                        <Newspaper className="w-3.5 h-3.5" aria-hidden="true" />
+                        Latest News
+                    </p>
+                    <h3 id="home-latest-news" className="mt-3 text-2xl sm:text-3xl font-black text-slate-950 dark:text-white">
+                        Fresh notes from Modtale.
+                    </h3>
+                </div>
+                <Link
+                    to={SiteRoutes.news()}
+                    className="inline-flex items-center justify-center self-start sm:self-auto rounded-full border border-slate-300 dark:border-white/10 bg-white/80 dark:bg-slate-900/70 px-4 py-2 text-sm font-black text-slate-700 dark:text-slate-200 transition-all hover:-translate-y-0.5 hover:border-blue-400 hover:text-blue-600 dark:hover:text-sky-300"
+                >
+                    All News
+                    <ArrowRight className="ml-2 w-4 h-4" aria-hidden="true" />
+                </Link>
+            </div>
+
+            <div className={`grid gap-4 ${latestNewsPosts.length > 1 ? 'md:grid-cols-2 xl:grid-cols-3' : 'max-w-2xl mx-auto'}`}>
+                {latestNewsPosts.map((post) => (
+                    <Link
+                        key={post.slug}
+                        to={getNewsPostPath(post)}
+                        className="group overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10 bg-white/90 dark:bg-slate-950/80 text-left shadow-[0_18px_48px_rgba(15,23,42,0.08)] dark:shadow-[0_18px_48px_rgba(0,0,0,0.35)] transition-all hover:-translate-y-1 hover:border-blue-300 dark:hover:border-sky-400/40"
+                    >
+                        <img
+                            src={post.socialImage}
+                            alt={post.socialImageAlt}
+                            width="1200"
+                            height="630"
+                            loading="lazy"
+                            className="aspect-[1200/630] w-full object-cover"
+                        />
+                        <div className="p-5">
+                            <div className="flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-wide text-blue-600 dark:text-sky-300">
+                                <span>{formatNewsDate(post.publishedAt)}</span>
+                                <span className="text-slate-300 dark:text-slate-600" aria-hidden="true">/</span>
+                                <span>{post.readingTime}</span>
+                            </div>
+                            <h4 className="mt-3 text-lg font-black leading-tight text-slate-950 dark:text-white group-hover:text-blue-600 dark:group-hover:text-sky-300 transition-colors">
+                                {post.title}
+                            </h4>
+                            <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                                {post.excerpt}
+                            </p>
+                            <div className="mt-4 flex items-center text-sm font-black text-blue-600 dark:text-sky-300">
+                                Read update
+                                <ArrowRight className="ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" aria-hidden="true" />
+                            </div>
+                        </div>
+                    </Link>
+                ))}
             </div>
         </section>
     );
@@ -1222,6 +1295,8 @@ export const Home: React.FC<{
                                 Modtale is 100% open-source. We believe a modding repository should exist purely to serve its ecosystem, free from corporate interests.
                             </p>
 
+                            <LatestNewsCards />
+
                             <nav aria-label="Footer Actions" className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-5">
                                 <a
                                     href="https://github.com/Modtale/Modtale"
@@ -1238,6 +1313,7 @@ export const Home: React.FC<{
                                     <Code className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" /> View API Docs
                                 </Link>
                             </nav>
+
                         </div>
                     </section>
                 </LazySection>

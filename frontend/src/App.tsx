@@ -45,6 +45,8 @@ const ProjectEditorView = lazy(() => import('@/modules/project/views/ProjectEdit
 const AdminPanel = lazy(() => import('@/modules/admin/views/AdminPanel').then((module) => ({ default: module.AdminPanel })));
 const ApiDocs = lazy(() => import('@/modules/core/views/ApiDocs').then((module) => ({ default: module.ApiDocs })));
 const SwaggerDocs = lazy(() => import('@/modules/core/views/SwaggerDocs').then((module) => ({ default: module.SwaggerDocs })));
+const NewsIndex = lazy(() => import('@/modules/news/views/NewsIndex').then((module) => ({ default: module.NewsIndex })));
+const NewsArticle = lazy(() => import('@/modules/news/views/NewsArticle').then((module) => ({ default: module.NewsArticle })));
 
 const RouteLoading = () => {
     const { pathname, search } = useLocation();
@@ -349,6 +351,8 @@ const AppContent: React.FC = () => {
                                     <Route path="/privacy" element={<PrivacyPolicy />} />
                                     <Route path="/api-docs" element={<ApiDocs />} />
                                     <Route path="/api-docs/swagger" element={<SwaggerDocs />} />
+                                    <Route path="/news" element={<NewsIndex />} />
+                                    <Route path="/news/:slug" element={<NewsArticle currentUser={user} />} />
 
                                     <Route path="/admin" element={
                                         loadingAuth ? <RouteLoading /> :

@@ -27,6 +27,14 @@ const url = Astro.url;
 const path = url.pathname;
 const cleanPath = normalizeSeoPath(path);
 const searchParams = url.searchParams;
+if (cleanPath === '/blogs' || cleanPath.startsWith('/blogs/')) {
+    const destinationPath = cleanPath === '/blogs'
+        ? '/news'
+        : `/news/${cleanPath.slice('/blogs/'.length)}`;
+    const query = searchParams.toString();
+    return Astro.redirect(query ? `${destinationPath}?${query}` : destinationPath, 301);
+}
+
 const routeSeo = ROUTE_SEO[cleanPath];
 let title = routeSeo?.title || DEFAULT_SEO.title;
 let description = routeSeo?.description || DEFAULT_SEO.description;

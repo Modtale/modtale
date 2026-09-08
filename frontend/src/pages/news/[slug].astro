@@ -1,0 +1,88 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import App from '../../App';
+import {
+    NEWS_INDEX_PATH,
+    SITE_URL,
+    getAbsoluteUrl,
+    getNewsPostBySlug,
+    getNewsPostUrl,
+} from '../../data/news';
+import { BACKEND_URL } from '@/utils/api';
+
+const { slug } = Astro.params;
+const post = getNewsPostBySlug(slug);
+
+if (!post) {
+    return Astro.redirect(NEWS_INDEX_PATH, 302);
+}
+
+const path = Astro.url.pathname;
+const canonicalUrl = getNewsPostUrl(post);
+
+const fetchNewsProjects = async () => {
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/v1/projects?size=10&sort=trending&view=marquee`, {
+            headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=86400' },
+            signal: AbortSignal.timeout(1500),
+        });
+        if (!response.ok) return [];
+        const data = await response.json();
+        return Array.isArray(data?.content) ? data.content : [];
+    } catch {
+        return [];
+    }
+};
+
+const initialData = {
+    newsProjects: await fetchNewsProjects(),
+};
+
+const articleSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'NewsArticle',
+    headline: post.title,
+    description: post.description,
+    image: [getAbsoluteUrl(post.socialImage)],
+    datePublished: post.publishedAt,
+    dateModified: post.updatedAt,
+    author: {
+        '@type': 'Organization',
+        name: post.author,
+        url: SITE_URL,
+    },
+    publisher: {
+        '@type': 'Organization',
+        name: 'Modtale',
+        logo: {
+            '@type': 'ImageObject',
+            url: `${SITE_URL}/assets/logo.svg`,
+        },
+    },
+    mainEntityOfPage: {
+        '@type': 'WebPage',
+        '@id': canonicalUrl,
+    },
+    keywords: post.tags.join(', '),
+};
+---
+
+<BaseLayout
+    title={`${post.title} | Modtale News`}
+    description={post.description}
+    keywords={post.tags.join(', ')}
+    image={getAbsoluteUrl(post.socialImage)}
+    imageAlt={post.socialImageAlt}
+    imageWidth="1200"
+    imageHeight="630"
+    imageType="image/png"
+    ogType="article"
+    publishedTime={post.publishedAt}
+    modifiedTime={post.updatedAt}
+    author={post.author}
+    jsonLd={articleSchema}
+    canonicalOverride={canonicalUrl}
+    initialData={initialData}
+>
+    <App client:load initialPath={path} ssrData={initialData} />
+</BaseLayout>

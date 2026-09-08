@@ -19,6 +19,11 @@ describe('SiteRoutes', () => {
         expect(SiteRoutes.project(null)).toBe('/');
     });
 
+    it('builds news routes', () => {
+        expect(SiteRoutes.news()).toBe('/news');
+        expect(SiteRoutes.newsPost('fresh-feature-showcase')).toBe('/news/fresh-feature-showcase');
+    });
+
     it('uses an explicit slug when one is provided', () => {
         expect(SiteRoutes.project({
             id: 'abc123',
