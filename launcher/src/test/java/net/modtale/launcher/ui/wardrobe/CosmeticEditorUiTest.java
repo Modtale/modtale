@@ -188,22 +188,18 @@ class CosmeticEditorUiTest {
             openCategory(hero, catalog, "haircut"); awaitPreview(hero);
             fx(() -> {
                 var animations = (javafx.scene.control.ComboBox<?>) hero.root().lookup("#wardrobe-preview-animation");
-                assertEquals("Rest pose", animations.getValue().toString());
+                assertEquals("Idle", animations.getValue().toString());
                 int walk = java.util.stream.IntStream.range(0, animations.getItems().size())
                         .filter(index -> animations.getItems().get(index).toString().equals("Walk")).findFirst().orElseThrow();
                 animations.getSelectionModel().select(walk);
                 return null;
             });
-            await("walk clip ready", () -> !hero.root().lookup("#wardrobe-preview-pause").isDisabled());
+            awaitPreview(hero);
             fx(() -> {
-                var pause = (Button) hero.root().lookup("#wardrobe-preview-pause");
-                hero.root().applyCss(); hero.root().layout();
-                assertTrue(pause.isVisible(), "Playback control is visible for an active clip");
-                assertTrue(pause.getWidth() + 1 >= pause.prefWidth(-1), "Active Pause label fits the compact inspector");
-                assertEquals("Pause", pause.getText()); pause.fire(); assertEquals("Play", pause.getText());
+                assertNull(hero.root().lookup("#wardrobe-preview-pause"));
                 var animations = (javafx.scene.control.ComboBox<?>) hero.root().lookup("#wardrobe-preview-animation");
                 button(hero.root(), "Reset view").fire();
-                assertEquals("Rest pose", animations.getValue().toString()); assertTrue(pause.isDisabled());
+                assertEquals("Idle", animations.getValue().toString());
                 assertEquals(composition, hero.controller().draftSnapshot(), "Preview motion cannot change the outfit");
                 return null;
             });
@@ -266,10 +262,7 @@ class CosmeticEditorUiTest {
                 .allMatch(view -> view.getImage() != null && view.getImage().getProgress() == 1)));
         WritableImage image = fx(() -> {
             harness.root().applyCss(); harness.root().layout();
-            var pause = (Button) harness.root().lookup("#wardrobe-preview-pause");
-            if (pause != null && pause.isVisible()) {
-                assertTrue(pause.getWidth() + 1 >= pause.prefWidth(-1), "Preview Pause/Play label must fit at " + width + "px");
-            }
+            assertNull(harness.root().lookup("#wardrobe-preview-pause"));
             return harness.stage().getScene().snapshot(null);
         });
         var outputImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);

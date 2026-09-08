@@ -62,15 +62,13 @@ public final class WardrobePreview {
     private final Button reset = new Button("Reset");
     private final Button external = new Button("Open 3D");
     private final javafx.scene.control.ComboBox<AnimationChoice> animations = new javafx.scene.control.ComboBox<>();
-    private final Button pause = new Button("Pause");
-    private final HBox animationControls = new HBox(6, animations, pause);
+    private final HBox animationControls = new HBox(6, animations);
     private LocalAvatarRenderer.Rig animationRig;
     private LocalAvatarRenderer.Clip animationClip;
     private AnimationChoice selectedAnimation;
     private FutureTask<Void> animationPending;
     private long animationGeneration, lastPulse;
     private double animationSeconds, animationSpeed = 1;
-    private boolean animationPaused;
     private final javafx.animation.AnimationTimer animationTimer = new javafx.animation.AnimationTimer() {
         @Override public void handle(long now) {
             if (lastPulse != 0) animationSeconds += (now-lastPulse)/1_000_000_000.0 * animationSpeed;
@@ -131,7 +129,7 @@ public final class WardrobePreview {
         status.setMinWidth(0);
         status.setMaxWidth(Double.MAX_VALUE);
         status.setId("wardrobe-preview-status");
-        for (Button button : new Button[]{reset, retry, external, rotateLeft, rotateRight, pause}) {
+        for (Button button : new Button[]{reset, retry, external, rotateLeft, rotateRight}) {
             button.getStyleClass().addAll("btn", "secondary", "small");
         }
         reset.setText(""); reset.setAccessibleText("Reset view");
@@ -153,25 +151,10 @@ public final class WardrobePreview {
         animations.setAccessibleText("Preview animation");
         animations.setMinWidth(0); animations.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(animations, javafx.scene.layout.Priority.ALWAYS);
-        pause.setId("wardrobe-preview-pause");
-        pause.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
         animationControls.setAlignment(Pos.CENTER);
         animationControls.setVisible(false);
         animationControls.managedProperty().bind(animationControls.visibleProperty());
         animations.valueProperty().addListener((observable, before, after) -> selectAnimation());
-        pause.visibleProperty().bind(javafx.beans.binding.Bindings.createBooleanBinding(
-                () -> animationControls.isVisible() && animations.getValue()!=null && animations.getValue().option!=null,
-                animationControls.visibleProperty(), animations.valueProperty()));
-        pause.managedProperty().bind(pause.visibleProperty());
-        pause.setOnAction(event -> {
-            if (animationClip == null) return;
-            animationPaused = !animationPaused;
-            if (animationPaused) animationTimer.stop();
-            else {
-                lastPulse=0; animationTimer.start();
-            }
-            pause.setText(animationPaused ? "Play" : "Pause");
-        });
         VBox footer = new VBox(6, status, rotationControls, controls);
         footer.setAlignment(Pos.CENTER);
         footer.setPadding(new Insets(8));
@@ -182,7 +165,7 @@ public final class WardrobePreview {
         });
         reset.setOnAction(event -> {
             selectedAnimation = null;
-            if (!animations.getItems().isEmpty()) animations.getSelectionModel().selectFirst();
+            if (!animations.getItems().isEmpty()) animations.getSelectionModel().select(defaultAnimation());
             if (renderedCape()) { capeAngle = 180; zoom = 1; reloadCape(); } else resetView();
         });
         rotateLeft.setOnAction(event -> rotateCape(-30));
@@ -312,7 +295,7 @@ public final class WardrobePreview {
                         animationRig.animations().forEach(option -> animations.getItems().add(new AnimationChoice(option)));
                         AnimationChoice resume = selectedAnimation;
                         animations.getSelectionModel().select(animations.getItems().stream()
-                                .filter(choice -> choice.equals(resume)).findFirst().orElse(animations.getItems().getFirst()));
+                                .filter(choice -> choice.equals(resume)).findFirst().orElseGet(this::defaultAnimation));
                         animationControls.setVisible(animations.getItems().size()>1);
                         readyStatus("Local outfit preview · Drag to rotate · Scroll to zoom", "Drag to rotate. Scroll to zoom.");
                         controls(true, false, false);
@@ -479,8 +462,13 @@ public final class WardrobePreview {
         animationGeneration++;
         if(animationPending!=null) { animationPending.cancel(true); animationPending=null; }
         animationTimer.stop(); lastPulse=0; animationSeconds=0; animationClip=null;
-        animationPaused=false; pause.setText("Pause"); pause.setDisable(true);
         if(animationRig!=null)animationRig.reset();
+    }
+
+    private AnimationChoice defaultAnimation() {
+        return animations.getItems().stream()
+                .filter(choice -> choice.option != null && choice.option.id().equalsIgnoreCase("Idle"))
+                .findFirst().orElse(animations.getItems().getFirst());
     }
 
     private void selectAnimation() {
@@ -502,7 +490,7 @@ public final class WardrobePreview {
                 if(!Thread.currentThread().isInterrupted())Platform.runLater(() -> {
                     if(disposed || ticket!=animationGeneration)return;
                     animationPending=null; animationClip=clip; animationSpeed=option.speed();
-                    animationRig.apply(clip,0); pause.setDisable(false); animationTimer.start();
+                    animationRig.apply(clip,0); animationTimer.start();
                     readyStatus("Local outfit preview · Drag to rotate · Scroll to zoom", "Drag to rotate. Scroll to zoom.");
                 });
             } catch(Exception error) {

@@ -327,7 +327,7 @@ class WardrobePreviewTest {
         } finally {fx(()->{preview.dispose();return null;});}
     }
 
-    @Test void localAnimationDefaultsToRestPausesRestoresAndCancelsPendingSelection() throws Exception {
+    @Test void localAnimationDefaultsToIdleRestoresAndCancelsPendingSelection() throws Exception {
         String assets=System.getenv("WARDROBE_ASSETS_ZIP");
         org.junit.jupiter.api.Assumptions.assumeTrue(assets!=null,"Set WARDROBE_ASSETS_ZIP for animation UI validation");
         var path=java.nio.file.Path.of(assets);
@@ -343,41 +343,31 @@ class WardrobePreviewTest {
                 pane.applyCss();pane.layout();assertInspectorFits(pane,preview);return pane;
             });
             var choices=fx(()->find(preview.view(),javafx.scene.control.ComboBox.class));
-            assertEquals("Rest pose",fx(()->choices.getValue().toString()));
-            assertFalse(fx(()->button(preview,"Pause").isVisible()));
-            assertFalse(fx(()->button(preview,"Pause").isManaged()));
-            assertTrue(fx(()->button(preview,"Pause").isDisabled()));
+            assertEquals("Idle",fx(()->choices.getValue().toString()));
+            await(()->!jobs.isEmpty()); jobs.removeFirst().run();
+            await(()->label(preview).startsWith("Local outfit preview"));
+            assertTrue(fx(()->buttons(preview.view()).stream().noneMatch(button -> "Pause".equals(button.getText()))));
+            fx(()->{choices.getSelectionModel().selectFirst();return null;});
             var arm=fx(()->nodeById(find(preview.view(),javafx.scene.SubScene.class).getRoot(),"bodyCharacteristic:L-Arm"));
             assertNotNull(arm);
             var original=fx(()->transform(arm));
             fx(()->{selectClip(choices,"Walk");return null;});jobs.removeFirst().run();
-            await(()->!button(preview,"Pause").isDisabled());
-            assertTrue(fx(()->button(preview,"Pause").isVisible()));
             await(()->!java.util.Arrays.equals(transform(arm),original));
-            fx(()->{button(preview,"Pause").fire();return null;});
-            var paused=fx(()->transform(arm));
             fx(()->{animationSnapshot(host,"walk");return null;});
-            Thread.sleep(80);
-            assertArrayEquals(paused,fx(()->transform(arm)));
-            fx(()->{button(preview,"Play").fire();return null;});
-            await(()->!java.util.Arrays.equals(transform(arm),paused));
             fx(()->{choices.getSelectionModel().selectFirst();return null;});
             assertArrayEquals(original,fx(()->transform(arm)));
             assertFalse(fx(()->find(preview.view(),Label.class).isManaged()));
             fx(()->{selectClip(choices,"Angry · Face");return null;});jobs.removeFirst().run();
-            await(()->!button(preview,"Pause").isDisabled());
-            fx(()->{button(preview,"Pause").fire();animationSnapshot(host,"angry");choices.getSelectionModel().selectFirst();return null;});
+            fx(()->{animationSnapshot(host,"angry");choices.getSelectionModel().selectFirst();return null;});
             // A queued facial clip must not install after Rest pose, clear, or disposal.
             fx(()->{selectClip(choices,"Angry · Face");choices.getSelectionModel().selectFirst();return null;});
             jobs.removeFirst().run();fx(()->null);
-            assertTrue(fx(()->button(preview,"Pause").isDisabled()));
             // Finish parsing while FX is occupied, then invalidate the queued completion before it can attach.
             fx(()->{
                 selectClip(choices,"Angry · Face");
                 Thread worker=Thread.startVirtualThread(jobs.removeFirst());worker.join(3000);
                 assertFalse(worker.isAlive());choices.getSelectionModel().selectFirst();return null;
             });
-            fx(()->null);assertTrue(fx(()->button(preview,"Pause").isDisabled()));
             fx(()->{selectClip(choices,"Angry · Face");preview.clear();return null;});
             jobs.removeFirst().run();fx(()->null);
             assertNull(fx(()->find(preview.view(),javafx.scene.SubScene.class)));
