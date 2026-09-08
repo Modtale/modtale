@@ -143,11 +143,11 @@ class LauncherWardrobeControllerTest {
             while (true) {
                 List<String> current = fx(() -> gridCards(h).stream().map(Button::getAccessibleText).toList());
                 seen.addAll(current);
-                if (fx(() -> button(h.root(), "Next").isDisabled())) break;
+                if (fx(() -> button(h.root(), "Next Page").isDisabled())) break;
                 int count = fx(() -> ((javafx.scene.layout.GridPane)h.root().lookup("#wardrobe-cards")).getColumnConstraints().size());
                 assertEquals(count * 4, current.size(), "Every nonfinal page must have four full rows");
                 String first = current.getFirst();
-                fx(() -> { button(h.root(), "Next").fire(); return null; });
+                fx(() -> { button(h.root(), "Next Page").fire(); return null; });
                 await(() -> !gridCards(h).isEmpty() && !gridCards(h).getFirst().getAccessibleText().equals(first)
                         && nodes(h.root(), Label.class).stream().noneMatch(l -> l.getText().equals("Loading looks…")));
             }
@@ -161,13 +161,49 @@ class LauncherWardrobeControllerTest {
         }
     }
 
+    @Test void sharedPagerHidesSinglePagesAndNavigatesSavedLooks() throws Exception {
+        try (Harness h = new Harness()) {
+            h.store.saveItem(CAPE);
+            fx(() -> { button(h.root(), "Saved looks").fire(); return null; });
+            await(() -> card(h.root(), "Catalog cape") != null);
+            fx(() -> {
+                Node pager = h.root().lookup("#wardrobe-pagination");
+                assertTrue(pager instanceof WardrobePagination);
+                assertFalse(pager.isVisible()); assertFalse(pager.isManaged());
+                return null;
+            });
+            for (int i = 0; i < 65; i++) h.store.saveItem(new WardrobeItem(new UUID(0, i + 100),
+                    WardrobeItem.Kind.SKIN, "Saved " + i, false, "", SKIN.payload()));
+            fx(() -> { h.controller.refresh(); return null; });
+            await(() -> h.root().lookup("#wardrobe-pagination").isVisible()
+                    && !h.root().lookup("#wardrobe-pagination").isDisabled());
+            String first = fx(() -> gridCards(h).getFirst().getAccessibleText());
+            fx(() -> { button(h.root(), "Page 2").fire(); return null; });
+            await(() -> !gridCards(h).getFirst().getAccessibleText().equals(first)
+                    && !h.root().lookup("#wardrobe-pagination").isDisabled());
+            fx(() -> {
+                var input = (TextField) h.root().lookup("#wardrobe-pagination").lookup(".pagination-jump-input");
+                input.setText("1"); button(h.root(), "Go to page").fire(); return null;
+            });
+            await(() -> gridCards(h).getFirst().getAccessibleText().equals(first));
+            h.gateway.skins = List.of(SKIN);
+            fx(() -> { button(h.root(), "Skins").fire(); return null; });
+            await(() -> card(h.root(), "Catalog skin") != null);
+            fx(() -> {
+                assertFalse(h.root().lookup("#wardrobe-pagination").isVisible());
+                assertFalse(h.root().lookup("#wardrobe-pagination").isManaged());
+                return null;
+            });
+        }
+    }
+
     private static List<Button> gridCards(Harness h) {
         return nodes(h.root().lookup("#wardrobe-cards"), Button.class).stream()
                 .filter(b -> b.getStyleClass().contains("wardrobe-card")).toList();
     }
     private static boolean gridReady(Harness h) {
         var grid = (javafx.scene.layout.GridPane)h.root().lookup("#wardrobe-cards");
-        return gridCards(h).size() == grid.getColumnConstraints().size() * 4 && !button(h.root(), "Next").isDisabled();
+        return gridCards(h).size() == grid.getColumnConstraints().size() * 4 && !button(h.root(), "Next Page").isDisabled();
     }
     private static void assertGridWidth(Harness h) {
         h.root().applyCss(); ((javafx.scene.Parent) h.root()).layout();
@@ -260,7 +296,7 @@ class LauncherWardrobeControllerTest {
         LauncherSettings settings = new LauncherSettings(); settings.setHytaleAuthSession(session); return settings;
     }
     private static Button card(Node root, String name) { return nodes(root, Button.class).stream().filter(b -> ("Preview " + name).equals(b.getAccessibleText())).findFirst().orElse(null); }
-    private static ButtonBase button(Node root, String text) { return nodes(root, ButtonBase.class).stream().filter(b -> text.equals(b.getText())).findFirst().orElseThrow(); }
+    private static ButtonBase button(Node root, String text) { return nodes(root, ButtonBase.class).stream().filter(b -> (text.equals(b.getText()) || text.equals(b.getAccessibleText()))).findFirst().orElseThrow(); }
     private static <T> List<T> nodes(Node node, Class<T> type) {
         List<T> result = new ArrayList<>();
         if (type.isInstance(node)) result.add(type.cast(node));

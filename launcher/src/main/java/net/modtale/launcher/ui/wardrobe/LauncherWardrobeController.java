@@ -44,7 +44,6 @@ public final class LauncherWardrobeController implements AutoCloseable {
     private final PauseTransition resizeReload = new PauseTransition(Duration.millis(150));
     private final ConcurrentMap<Integer, List<WardrobeItem>> skinPages = new ConcurrentHashMap<>();
     private int cardColumns = 3;
-    private boolean hasNext;
     private final TextField search = new TextField();
     private final ComboBox<String> filter = new ComboBox<>();
     private final Label selectedName = label("", "wardrobe-selected-title");
@@ -52,9 +51,8 @@ public final class LauncherWardrobeController implements AutoCloseable {
     private final Label status = label("", "wardrobe-muted");
     private final Button apply = primaryButton("Apply to account");
     private final Button save = secondaryButton("Save look");
-    private final Button previous = secondaryButton("Previous");
-    private final Button next = secondaryButton("Next");
-    private final Label pageLabel = label("Page 1", "wardrobe-muted");
+    private final WardrobePagination pagination = new WardrobePagination(this::goToPage);
+    private int totalPages = 1;
     private final Map<Tab, ToggleButton> tabs = new EnumMap<>(Tab.class);
     private List<WardrobeItem> entries = List.of();
     private WardrobeItem selected;
@@ -105,10 +103,10 @@ public final class LauncherWardrobeController implements AutoCloseable {
         }
         tabs.get(tab).setSelected(true);
         search.setPromptText("Username"); search.getStyleClass().add("wardrobe-search");
-        search.setOnAction(e -> { page = 1; skinPages.clear(); load(); }); HBox.setHgrow(search, Priority.ALWAYS);
-        Button lookup = iconButton("Search", LauncherIcons.Glyph.SEARCH, () -> { page = 1; skinPages.clear(); load(); });
+        search.setOnAction(e -> { page = 1; totalPages = 1; skinPages.clear(); load(); }); HBox.setHgrow(search, Priority.ALWAYS);
+        Button lookup = iconButton("Search", LauncherIcons.Glyph.SEARCH, () -> { page = 1; totalPages = 1; skinPages.clear(); load(); });
         filter.setId("wardrobe-saved-filter"); filter.setVisible(false); filter.setManaged(false);
-        filter.getStyleClass().add("wardrobe-filter"); filter.setOnAction(e -> { page = 1; load(); });
+        filter.getStyleClass().add("wardrobe-filter"); filter.setOnAction(e -> { page = 1; totalPages = 1; load(); });
         HBox searchRow = new HBox(10, search, lookup, filter);
         cards.setId("wardrobe-cards"); cards.setMinWidth(0); cards.setHgap(14); cards.setVgap(14);
         rebuildCardColumns();
@@ -116,13 +114,11 @@ public final class LauncherWardrobeController implements AutoCloseable {
         cards.widthProperty().addListener((o, before, after) -> {
             int count = Math.max(1, (int) Math.floor((after.doubleValue() + cards.getHgap()) / (180 + cards.getHgap())));
             if (count == cardColumns) return;
-            cardColumns = count; page = 1; request++; busy = loaded && tab != Tab.CUSTOMIZE; rebuildCardColumns(); renderCards();
+            cardColumns = count; page = 1; totalPages = 1; request++; busy = loaded && tab != Tab.CUSTOMIZE; rebuildCardColumns(); renderCards();
             if (loaded && tab != Tab.CUSTOMIZE) resizeReload.playFromStart();
         });
-        previous.setOnAction(e -> { page = Math.max(1, page - 1); load(); });
-        next.setOnAction(e -> { page++; load(); });
-        HBox pager = new HBox(12, previous, pageLabel, next); pager.setAlignment(Pos.CENTER);
-        catalog.getChildren().addAll(searchRow, status, cards, pager);
+        pagination.setId("wardrobe-pagination");
+        catalog.getChildren().addAll(searchRow, status, cards, pagination);
         catalog.setMinWidth(0); HBox.setHgrow(catalog, Priority.ALWAYS);
         status.managedProperty().bind(status.visibleProperty()); status.setVisible(false);
         inspector.getStyleClass().add("wardrobe-inspector"); inspector.setPrefWidth(350); inspector.setMinWidth(290);
@@ -155,7 +151,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
     }
 
     private void selectTab(Tab value) {
-        request++; tab = value; page = 1; search.clear();
+        request++; tab = value; page = 1; totalPages = 1; search.clear();
         root.getChildren().removeAll(columns, editor.view());
         if (value == Tab.CUSTOMIZE) { root.getChildren().add(editor.view()); editor.refresh(); return; }
         root.getChildren().add(columns);
@@ -163,7 +159,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
         filter.getItems().setAll("All looks", "Favorites", "Skins", "Capes");
         filter.setVisible(value == Tab.SAVED); filter.setManaged(value == Tab.SAVED);
         filter.getSelectionModel().selectFirst();
-        filter.setOnAction(e -> { page = 1; load(); });
+        filter.setOnAction(e -> { page = 1; totalPages = 1; load(); });
         search.setPromptText(value == Tab.SAVED ? "Search names and collections" : "Username");
         load();
     }
@@ -181,24 +177,25 @@ public final class LauncherWardrobeController implements AutoCloseable {
             if (!query.isBlank()) {
                 String candidate = query;
                 if (query.startsWith("https://hytags.com/skin/")) candidate = query.substring("https://hytags.com/skin/".length());
-                return new CardPage(List.of(candidate.matches("[a-fA-F0-9]{32}") ? api.lookupSkinHash(candidate) : api.lookupSkin(candidate)), false);
+                return new CardPage(List.of(candidate.matches("[a-fA-F0-9]{32}") ? api.lookupSkinHash(candidate) : api.lookupSkin(candidate)), false, 1);
             }
             return skinPage(requestedPage, pageSize);
         }, executor).whenComplete((items, error) -> Platform.runLater(() -> {
             if (disposed || generation != request) return;
             busy = false;
-            if (error != null) { hasNext = false; entries = List.of(); renderCards(); setStatus(message(error) + "  Try Search again."); }
-            else { entries = items.items(); hasNext = items.hasNext(); setStatus(""); if (selected == null && !entries.isEmpty()) select(entries.getFirst()); else renderCards(); }
+            if (error != null) { totalPages = Math.max(1, page); entries = List.of(); renderCards(); setStatus(message(error) + "  Try Search again."); }
+            else { entries = items.items(); totalPages = requestedTab == Tab.SKINS && items.hasNext()
+                    ? Math.max(totalPages, items.totalPages()) : items.totalPages(); setStatus(""); if (selected == null && !entries.isEmpty()) select(entries.getFirst()); else renderCards(); }
             updateSelectionActions();
         }));
     }
 
-    private record CardPage(List<WardrobeItem> items, boolean hasNext) {}
+    private record CardPage(List<WardrobeItem> items, boolean hasNext, int totalPages) {}
 
     private static CardPage pageItems(List<WardrobeItem> items, int page, int size) {
         int from = Math.min(items.size(), (page - 1) * size);
         int to = Math.min(items.size(), from + size);
-        return new CardPage(List.copyOf(items.subList(from, to)), to < items.size());
+        return new CardPage(List.copyOf(items.subList(from, to)), to < items.size(), Math.max(1, (items.size() + size - 1) / size));
     }
 
     /** Repage the provider's 20-item pages into four complete rows, with one-item lookahead. */
@@ -217,7 +214,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
             if (batch.size() < 20) break;
             remotePage++; skip = 0;
         }
-        return new CardPage(List.copyOf(found.subList(0, Math.min(size, found.size()))), found.size() > size);
+        return new CardPage(List.copyOf(found.subList(0, Math.min(size, found.size()))), found.size() > size, page + (found.size() > size ? 1 : 0));
     }
 
     private void rebuildCardColumns() {
@@ -237,12 +234,19 @@ public final class LauncherWardrobeController implements AutoCloseable {
                 .filter(i -> !"Capes".equals(ordering) || i.kind() == WardrobeItem.Kind.CAPE).toList();
     }
 
+    private void goToPage(int target) {
+        if (busy || target < 1 || target > totalPages || target == page) return;
+        page = target; load();
+    }
+
+    private void updatePagination() {
+        boolean paged = tab != Tab.SKINS || search.getText().isBlank();
+        pagination.update(page, paged ? totalPages : 1, busy);
+    }
+
     private void renderCards() {
         cards.getChildren().clear();
-        boolean paged = tab != Tab.SKINS || search.getText().isBlank();
-        previous.setVisible(paged); previous.setManaged(paged); next.setVisible(paged); next.setManaged(paged);
-        pageLabel.setVisible(paged); pageLabel.setManaged(paged); pageLabel.setText("Page " + page);
-        previous.setDisable(page <= 1 || busy); next.setDisable(!hasNext || busy);
+        updatePagination();
         for (int i = 0; i < entries.size(); i++) cards.add(card(entries.get(i)), i % cardColumns, i / cardColumns);
         if (entries.isEmpty()) {
             VBox empty = new VBox(12, LauncherIcons.icon(tab == Tab.SAVED ? LauncherIcons.Glyph.HEART : LauncherIcons.Glyph.SEARCH, 32),
@@ -301,7 +305,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
         apply.setTooltip(new Tooltip(username.isBlank() ? "Hytale account unavailable." : "Apply to " + username + ". The previous look is saved locally."));
         save.setDisable(selected == null || applying);
         save.setText(selected != null && store.items().stream().anyMatch(i -> i.id().equals(selected.id())) ? "Edit saved look" : "Save look");
-        previous.setDisable(busy || page <= 1); next.setDisable(busy || !hasNext);
+        updatePagination();
     }
 
     private void applySelection() {

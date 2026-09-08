@@ -43,9 +43,7 @@ public final class CosmeticEditorController implements AutoCloseable {
     private final VBox selectionPanel = new VBox(14);
     private final VBox inspector = new VBox(14);
     private final GridPane grid = new GridPane();
-    private final FlowPane pagination = new FlowPane(24, 12);
-    private final HBox pageButtons = new HBox(4);
-    private final TextField jumpPage = new TextField();
+    private final WardrobePagination pagination = new WardrobePagination(this::goToPage);
     private final javafx.animation.PauseTransition resizePages = new javafx.animation.PauseTransition(javafx.util.Duration.millis(150));
     private int columns = 3, totalPages = 1;
     private final FlowPane colors = new FlowPane(7, 7);
@@ -61,8 +59,6 @@ public final class CosmeticEditorController implements AutoCloseable {
     private final Button apply = primaryButton("Apply outfit");
     private final Button save = secondaryButton("Save");
     private final CheckBox ownedOnly = new CheckBox("Owned only");
-    private final Button previous = pageIcon(LauncherIcons.Glyph.CHEVRON_LEFT, "Previous Page");
-    private final Button next = pageIcon(LauncherIcons.Glyph.CHEVRON_RIGHT, "Next Page");
     private CosmeticCatalogClient catalog;
     private Path assets;
     private OutfitDraft draft;
@@ -245,53 +241,17 @@ public final class CosmeticEditorController implements AutoCloseable {
     }
 
     private void configurePagination() {
-        pagination.setId("cosmetic-pagination"); pagination.getStyleClass().add("pagination-nav");
-        pagination.setAlignment(Pos.CENTER); pagination.setMaxWidth(Double.MAX_VALUE);
-        HBox shell = new HBox(4, previous, pageButtons, next);
-        shell.getStyleClass().add("pagination-page-shell"); shell.setAlignment(Pos.CENTER);
-        pageButtons.getStyleClass().add("pagination-page-buttons"); pageButtons.setAlignment(Pos.CENTER);
-        previous.setOnAction(e -> goToPage(page - 1)); next.setOnAction(e -> goToPage(page + 1));
-        Label label = text("JUMP", "pagination-jump-label");
-        jumpPage.setPromptText("#"); jumpPage.getStyleClass().add("pagination-jump-input");
-        Button jump = pageIcon(LauncherIcons.Glyph.CORNER_DOWN_LEFT, "Go to page");
-        jump.getStyleClass().add("pagination-jump-button");
-        jump.disableProperty().bind(jumpPage.textProperty().isEmpty());
-        Runnable submit = () -> {
-            try { goToPage(Integer.parseInt(jumpPage.getText().trim())); }
-            catch (NumberFormatException ignored) { }
-            jumpPage.clear();
-        };
-        jump.setOnAction(e -> submit.run()); jumpPage.setOnAction(e -> submit.run());
-        HBox jumpShell = new HBox(12, label, jumpPage, jump);
-        jumpShell.getStyleClass().add("pagination-jump-shell"); jumpShell.setAlignment(Pos.CENTER);
-        pagination.getChildren().setAll(shell, jumpShell); updatePagination();
+        pagination.setId("cosmetic-pagination");
+        updatePagination();
     }
 
     private void updatePagination() {
-        pagination.setVisible(totalPages > 1); pagination.setManaged(totalPages > 1);
-        previous.setDisable(page <= 1); next.setDisable(page >= totalPages);
-        pageButtons.getChildren().clear();
-        int last = 0;
-        for (int target = 1; target <= totalPages; target++) {
-            if (totalPages > 7 && target != 1 && target != totalPages && Math.abs(target - page) > 1) continue;
-            if (last > 0 && target > last + 1) pageButtons.getChildren().add(text("...", "pagination-dots"));
-            int destination = target;
-            Button button = new Button(Integer.toString(target)); button.getStyleClass().add("pagination-button");
-            button.setMinSize(36, 36); button.setPrefSize(36, 36); button.setMaxSize(36, 36);
-            button.setAccessibleText("Page " + target); button.pseudoClassStateChanged(SELECTED, target == page);
-            button.setOnAction(e -> goToPage(destination)); pageButtons.getChildren().add(button); last = target;
-        }
+        pagination.update(page, totalPages, false);
     }
 
     private void goToPage(int target) {
         if (target < 1 || target > totalPages || target == page) return;
         page = target; browse();
-    }
-
-    private static Button pageIcon(LauncherIcons.Glyph icon, String label) {
-        Button button = new Button(); button.getStyleClass().addAll("pagination-button", "pagination-icon-button");
-        button.setGraphic(LauncherIcons.icon(icon, 16)); button.setAccessibleText(label); button.setTooltip(new Tooltip(label));
-        button.setMinSize(36, 36); button.setPrefSize(36, 36); button.setMaxSize(36, 36); return button;
     }
 
     private Node optionCard(CosmeticOption option) {
