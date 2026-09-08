@@ -99,7 +99,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
                 LauncherIcons.Glyph.HEART};
         for (Tab value : Tab.values()) {
             ToggleButton button = new ToggleButton(names[value.ordinal()], LauncherIcons.icon(icons[value.ordinal()], 16));
-            button.getStyleClass().add("wardrobe-tab"); button.setToggleGroup(group);
+            button.getStyleClass().addAll("nav-btn", "wardrobe-tab"); button.setToggleGroup(group);
             button.setOnAction(e -> { button.setSelected(true); selectTab(value); });
             tabs.put(value, button); tabBar.getChildren().add(button);
         }
