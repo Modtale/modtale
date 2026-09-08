@@ -78,7 +78,7 @@ final class LibraryWorldListRenderer {
             image.setSmooth(true);
             image.setMouseTransparent(true);
             image.setClip(roundedClip(WORLD_ICON_MEDIA_SIZE, 6));
-            imageLoader.loadInto(image, preview, WORLD_ICON_MEDIA_SIZE, WORLD_ICON_MEDIA_SIZE);
+            imageLoader.loadInto(image, preview, WORLD_ICON_MEDIA_SIZE * 3, WORLD_ICON_MEDIA_SIZE * 3);
             shell.getChildren().add(image);
         } else {
             shell.getChildren().add(LauncherIcons.icon(LauncherIcons.Glyph.GLOBE, 18));
