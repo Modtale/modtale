@@ -9569,9 +9569,44 @@
 .cosmetic-card-art { -fx-background-color: radial-gradient(center 50% 60%, radius 80%, #233951, #132035); -fx-background-radius: 8; }
 .cosmetic-swatch { -fx-background-color: #0b1424; -fx-background-radius: 20; -fx-border-radius: 20; -fx-border-color: #334155; -fx-padding: 4; -fx-cursor: hand; }
 .cosmetic-swatch:selected { -fx-border-color: #93c5fd; -fx-border-width: 2; -fx-padding: 3; }
-.cosmetic-owned-filter { -fx-text-fill: #94a3b8; -fx-font-size: 12; }
-.cosmetic-owned-filter .box { -fx-background-color: #15243a; -fx-border-color: #334155; -fx-border-radius: 4; }
-.cosmetic-owned-filter:selected .mark { -fx-background-color: #60a5fa; }
+.cosmetic-owned-filter {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 12;
+    -fx-label-padding: 0 0 0 8;
+    -fx-cursor: hand;
+}
+.cosmetic-owned-filter > .box {
+    -fx-background-color: #101b2d;
+    -fx-background-insets: 0;
+    -fx-background-radius: 6;
+    -fx-border-color: #334155;
+    -fx-border-radius: 6;
+    -fx-border-width: 1;
+    -fx-padding: 4;
+    -fx-min-width: 20;
+    -fx-min-height: 20;
+    -fx-pref-width: 20;
+    -fx-pref-height: 20;
+    -fx-effect: null;
+}
+.cosmetic-owned-filter > .box > .mark {
+    -fx-shape: "M1 5 L4 8 L10 1 L12 3 L4 12 L0 7 Z";
+    -fx-background-color: transparent;
+    -fx-padding: 5;
+    -fx-scale-shape: true;
+}
+.cosmetic-owned-filter:hover > .box { -fx-border-color: #60a5fa; }
+.cosmetic-owned-filter:selected { -fx-text-fill: #cbd5e1; }
+.cosmetic-owned-filter:selected > .box {
+    -fx-background-color: #2563eb;
+    -fx-border-color: #3b82f6;
+}
+.cosmetic-owned-filter:selected > .box > .mark { -fx-background-color: #ffffff; }
+.cosmetic-owned-filter:focused > .box {
+    -fx-border-color: #93c5fd;
+    -fx-effect: dropshadow(gaussian, rgba(59,130,246,0.35), 5, 0.4, 0, 0);
+}
+.cosmetic-owned-filter:disabled { -fx-opacity: 0.45; }
 
 .btn.secondary.cosmetic-quiet-action, .btn.secondary.wardrobe-preview-reset {
     -fx-background-color: transparent;
