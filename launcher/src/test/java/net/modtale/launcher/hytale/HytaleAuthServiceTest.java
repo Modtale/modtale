@@ -1,5 +1,7 @@
 package net.modtale.launcher.hytale;
 
+import static org.junit.jupiter.api.Assertions.assertSame;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -153,6 +155,52 @@ class HytaleAuthServiceTest {
         session.setAccessToken(validToken ? "valid-access" : "expired-access");
         session.setExpiresAt(Instant.now().plusSeconds(validToken ? 600 : -60));
         return session;
+    }
+
+    @Test void rejectedUnexpiredSessionIsReplacedUsingExistingHytaleCredentials() {
+        FakeHytaleApiClient api = new FakeHytaleApiClient();
+        SettingsStore store = new SettingsStore(tempDir.resolve("renewed.json"));
+        HytaleAuthService auth = new HytaleAuthService(api, store);
+        LauncherSettings settings = new LauncherSettings();
+        HytaleAuthSession session = linkedAccount("player-uuid", true);
+        String rejected = jwtWithExpiration(Instant.now().plusSeconds(3600));
+        session.setSessionToken(rejected);
+        session.setIdentityToken("identity");
+        settings.setHytaleAuthSession(session);
+        assertEquals(rejected, auth.freshSessionToken(settings));
+        assertEquals("fresh-session-token", auth.renewRejectedSessionToken(settings, "player-uuid", rejected));
+        assertEquals(1, api.createGameSessionCalls);
+        assertEquals(0, api.refreshTokenCalls);
+        assertEquals("fresh-session-token", store.load().getHytaleAuthSession().getSessionToken());
+    }
+
+    @Test void rejectedSessionRenewalReusesConcurrentReplacementAndGuardsProfile() {
+        FakeHytaleApiClient api = new FakeHytaleApiClient();
+        HytaleAuthService auth = new HytaleAuthService(api, new SettingsStore(tempDir.resolve("renewed.json")));
+        LauncherSettings settings = new LauncherSettings();
+        HytaleAuthSession session = linkedAccount("player-uuid", true);
+        String replacement = jwtWithExpiration(Instant.now().plusSeconds(3600));
+        session.setSessionToken(replacement);
+        session.setIdentityToken("identity");
+        settings.setHytaleAuthSession(session);
+        assertEquals(replacement, auth.renewRejectedSessionToken(settings, "player-uuid", "rejected"));
+        assertThrows(HytaleApiException.class, () -> auth.renewRejectedSessionToken(settings, "other-uuid", replacement));
+        assertEquals(0, api.createGameSessionCalls);
+    }
+
+    @Test void rejectedSessionRenewalDoesNotFallBackToRejectedToken() {
+        FakeHytaleApiClient api = new FakeHytaleApiClient();
+        api.createGameSessionFailure = new HytaleApiException("unavailable", 503, null);
+        HytaleAuthService auth = new HytaleAuthService(api, new SettingsStore(tempDir.resolve("renewed.json")));
+        LauncherSettings settings = new LauncherSettings();
+        HytaleAuthSession session = linkedAccount("player-uuid", true);
+        String rejected = jwtWithExpiration(Instant.now().plusSeconds(3600));
+        session.setSessionToken(rejected);
+        session.setIdentityToken("identity");
+        settings.setHytaleAuthSession(session);
+        assertThrows(HytaleApiException.class, () -> auth.renewRejectedSessionToken(settings, "player-uuid", rejected));
+        assertSame(session, settings.getHytaleAuthSession());
+        assertEquals(0, api.refreshTokenCalls);
     }
 
     @Test

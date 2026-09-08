@@ -333,9 +333,31 @@ public class HytaleAuthService {
     }
 
     /** Unlike launch's offline fallback, remote profile reads require a valid game session. */
-    public String freshSessionToken(LauncherSettings settings) {
+    public synchronized String freshSessionToken(LauncherSettings settings) {
         HytaleAuthSession session = ensureValidAccessToken(settings);
         if (canUseCachedFriendsSession(session)) {
+            return session.getSessionToken();
+        }
+        HytaleGameSession gameSession = createGameSessionWithRefresh(settings, session);
+        if (!gameSession.hasLaunchTokens()) {
+            throw new HytaleApiException("Hytale did not return profile session tokens.");
+        }
+        return saveGameSession(settings, session, gameSession).getSessionToken();
+    }
+
+    /** A server-rejected session can be revoked even while its JWT has time remaining. */
+    public synchronized String renewRejectedSessionToken(LauncherSettings settings, String profileId, String rejectedToken) {
+        HytaleAuthSession selected = settings.getHytaleAuthSession();
+        if (selected == null || !profileId.equals(selected.getUuid())) {
+            throw new HytaleApiException("Selected Hytale profile changed while renewing its session.");
+        }
+        HytaleAuthSession session = ensureValidAccessToken(settings);
+        if (session != selected || !profileId.equals(session.getUuid())
+                || settings.getHytaleAuthSession() != selected) {
+            throw new HytaleApiException("Selected Hytale profile changed while renewing its session.");
+        }
+        // Concurrent account-data reads may already have replaced the rejected token.
+        if (!java.util.Objects.equals(rejectedToken, session.getSessionToken()) && canUseCachedFriendsSession(session)) {
             return session.getSessionToken();
         }
         HytaleGameSession gameSession = createGameSessionWithRefresh(settings, session);

@@ -77,7 +77,7 @@ public class WardrobeApiClient {
     /** Official game-client contract: profile is scoped by the game-session bearer token. */
     public SkinSlots slots(LauncherSettings settings) {
         UUID profile = selectedProfile(settings);
-        return slots(settings, profile, profileSession(settings, profile));
+        return parseSlots(profileJson(settings, profile, "player-skins").body());
     }
 
     /**
@@ -88,7 +88,7 @@ public class WardrobeApiClient {
      */
     public Map<String, Set<String>> unlockedCosmetics(LauncherSettings settings) {
         UUID profile = selectedProfile(settings);
-        JsonNode root = json(official.resolve("my-account/cosmetics"), profileSession(settings, profile));
+        JsonNode root = profileJson(settings, profile, "my-account/cosmetics").body();
         requireSelectedProfile(settings, profile.toString());
         if (root == null || !root.isObject()) throw failure("Invalid unlocked cosmetics response");
         Map<String, Set<String>> result = new LinkedHashMap<>();
@@ -107,9 +107,7 @@ public class WardrobeApiClient {
         return java.util.Collections.unmodifiableSet(result);
     }
 
-    private SkinSlots slots(LauncherSettings settings, UUID profile, String token) {
-        JsonNode root = json(official.resolve("player-skins"), token);
-        requireSelectedProfile(settings, profile.toString());
+    private SkinSlots parseSlots(JsonNode root) {
         if (root == null || !root.isObject() || !root.path("skins").isArray()
                 || !root.path("maxSkins").isIntegralNumber() || !root.path("maxSkins").canConvertToInt()
                 || root.path("maxSkins").intValue() < 0) throw failure("Invalid official outfit slots response");
@@ -150,6 +148,23 @@ public class WardrobeApiClient {
         requireSelectedProfile(settings, profile.toString());
         if (token == null || token.isBlank()) throw failure("Official authentication returned an empty session token");
         return token;
+    }
+
+    private record ProfileResponse(JsonNode body, String token) {}
+
+    private ProfileResponse profileJson(LauncherSettings settings, UUID profile, String path) {
+        String token = profileSession(settings, profile);
+        JsonNode body;
+        try {
+            body = json(official.resolve(path), token);
+        } catch (RejectedSessionException ex) {
+            requireSelectedProfile(settings, profile.toString());
+            token = auth.renewRejectedSessionToken(settings, profile.toString(), token);
+            requireSelectedProfile(settings, profile.toString());
+            body = json(official.resolve(path), token);
+        }
+        requireSelectedProfile(settings, profile.toString());
+        return new ProfileResponse(body, token);
     }
 
     /** Page numbers are one-based. Sort must match a value/label actually published in the form. */
@@ -298,11 +313,11 @@ public class WardrobeApiClient {
 
     private ActiveSkin activeSkin(LauncherSettings settings) {
         UUID profile = selectedProfile(settings);
-        String token = profileSession(settings, profile);
-        SkinSlots slots = slots(settings, profile, token);
+        ProfileResponse response = profileJson(settings, profile, "player-skins");
+        SkinSlots slots = parseSlots(response.body());
         SkinSlot active = slots.slots().stream().filter(slot -> slot.id().equals(slots.activeId())).findFirst()
                 .orElseThrow(() -> failure("Official account has no active skin slot"));
-        return new ActiveSkin(profile.toString(), active.id(), active.name(), (ObjectNode) readJson(active.skinData()), token);
+        return new ActiveSkin(profile.toString(), active.id(), active.name(), (ObjectNode) readJson(active.skinData()), response.token());
     }
 
     private static void requireSelectedProfile(LauncherSettings settings, String uuid) {
@@ -372,6 +387,10 @@ public class WardrobeApiClient {
             })));
             {
                 if (write ? response.statusCode() < 200 || response.statusCode() >= 300 : response.statusCode() != 200) {
+                    if (!write && (response.statusCode() == 401 || response.statusCode() == 403)
+                            && body.toString(StandardCharsets.UTF_8).trim().equals("invalid token")) {
+                        throw new RejectedSessionException(response.statusCode());
+                    }
                     throw failure("Wardrobe request failed (HTTP " + response.statusCode() + ")");
                 }
                 if (write) return "";
@@ -385,6 +404,12 @@ public class WardrobeApiClient {
             Thread.currentThread().interrupt();
             throw failure("Wardrobe request interrupted");
         } catch (IOException e) { throw failure("Wardrobe service could not be reached"); }
+    }
+
+    private static final class RejectedSessionException extends IllegalStateException {
+        private RejectedSessionException(int status) {
+            super("Hytale rejected the wardrobe session (HTTP " + status + ")");
+        }
     }
 
     private static URI base(URI uri, URI production) {

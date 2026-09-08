@@ -27,6 +27,8 @@ class WardrobeApiClientTest {
     private final List<String> bodies = Collections.synchronizedList(new ArrayList<>());
     private Runnable afterSlots;
     private Runnable duringSessionRefresh;
+    private Runnable duringRejectedSessionRenewal;
+    private int renewals;
 
     @BeforeEach void start() throws Exception {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -50,10 +52,68 @@ class WardrobeApiClientTest {
         HytaleAuthService auth = new HytaleAuthService(null, null) {
             @Override public String freshAccessToken(LauncherSettings settings) { tokenCalls++; return "official-oauth"; }
             @Override public String freshSessionToken(LauncherSettings settings) { tokenCalls++; if (duringSessionRefresh != null) duringSessionRefresh.run(); return "official-session"; }
+            @Override public String renewRejectedSessionToken(LauncherSettings settings, String profile, String rejected) {
+                assertEquals(ID, profile);
+                assertEquals("official-session", rejected);
+                renewals++;
+                if (duringRejectedSessionRenewal != null) duringRejectedSessionRenewal.run();
+                return "renewed-session";
+            }
         };
         api = new WardrobeApiClient(HttpClient.newHttpClient(), auth, base, base);
     }
     @AfterEach void stop() { server.stop(0); }
+
+    @Test void rejectedCurrentLookSessionIsRenewedAndApplyUsesReplacement() {
+        replies.put("/player-skins", new Reply(403, "text/plain", "invalid token\n"));
+        duringRejectedSessionRenewal = () -> officialSlots(5);
+        api.apply(new WardrobeItem(UUID.randomUUID(), WardrobeItem.Kind.SKIN, "Test", false, "",
+                "{\"skin\":{\"bodyCharacteristic\":\"Default.01\"}}"), settings());
+        assertEquals(1, renewals);
+        assertEquals(List.of("Bearer official-session", "Bearer renewed-session", "Bearer renewed-session"), headers);
+        assertEquals(List.of("GET", "GET", "PUT"), methods);
+    }
+
+    @Test void rejectedOwnershipSessionIsRenewedOnce() {
+        replies.put("/my-account/cosmetics", new Reply(403, "text/plain", "invalid token\n"));
+        duringRejectedSessionRenewal = () -> json("/my-account/cosmetics", "{\"cape\":[\"Cape_Royal_Emissary\"]}");
+        assertEquals(Set.of("Cape_Royal_Emissary"), api.unlockedCosmetics(settings()).get("cape"));
+        assertEquals(1, renewals);
+        assertEquals(List.of("Bearer official-session", "Bearer renewed-session"), headers);
+    }
+
+    @Test void persistentRejectionStopsAfterOneRetry() {
+        replies.put("/player-skins", new Reply(403, "text/plain", "invalid token\n"));
+        assertThrows(IllegalStateException.class, () -> api.currentSkin(settings()));
+        assertEquals(1, renewals);
+        assertEquals(2, requests.size());
+    }
+
+    @Test void ordinaryForbiddenDoesNotRenewSession() {
+        replies.put("/my-account/cosmetics", new Reply(403, "text/html", "Forbidden"));
+        assertThrows(IllegalStateException.class, () -> api.unlockedCosmetics(settings()));
+        assertEquals(0, renewals);
+        assertEquals(1, requests.size());
+    }
+
+    @Test void rejectedApplyIsNeverRepeated() {
+        officialSlots(5);
+        replies.put("/player-skins/" + SLOT, new Reply(403, "text/plain", "invalid token\n"));
+        WardrobeItem item = new WardrobeItem(UUID.randomUUID(), WardrobeItem.Kind.SKIN, "Test", false, "",
+                "{\"skin\":{\"bodyCharacteristic\":\"Default.01\"}}");
+        assertThrows(IllegalStateException.class, () -> api.apply(item, settings()));
+        assertEquals(0, renewals);
+        assertEquals(List.of("GET", "PUT"), methods);
+    }
+
+    @Test void accountChangeDuringRenewalStopsRetry() {
+        LauncherSettings settings = settings();
+        replies.put("/player-skins", new Reply(403, "text/plain", "invalid token\n"));
+        duringRejectedSessionRenewal = () -> settings.getHytaleAuthSession().setUuid(UUID.randomUUID().toString());
+        assertThrows(IllegalStateException.class, () -> api.currentSkin(settings));
+        assertEquals(1, renewals);
+        assertEquals(1, requests.size());
+    }
 
     @Test void usernameLookupPreservesCosmeticsAndNeverSendsOfficialTokenToHyTags() throws Exception {
         json("/api/username/KayNeko", profile(ID, "KayNeko"));
