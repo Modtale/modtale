@@ -66,6 +66,7 @@ public final class WardrobePreview {
     private LocalAvatarRenderer.Rig animationRig;
     private LocalAvatarRenderer.Clip animationClip;
     private AnimationChoice selectedAnimation;
+    private boolean viewActions = true;
     private FutureTask<Void> animationPending;
     private long animationGeneration, lastPulse;
     private double animationSeconds, animationSpeed = 1;
@@ -524,14 +525,20 @@ public final class WardrobePreview {
         if (pending != null) { pending.cancel(true); pending = null; }
     }
 
+    void hideViewActions() {
+        viewActions = false;
+        reset.setVisible(false); reset.setManaged(false);
+        external.setVisible(false); external.setManaged(false);
+    }
+
     private boolean current(long ticket) { return !disposed && ticket == generation; }
     private void controls(boolean canReset, boolean canRetry, boolean canOpen) {
         rotateLeft.setVisible(canReset && renderedCape()); rotateLeft.setManaged(canReset && renderedCape());
         rotateRight.setVisible(canReset && renderedCape()); rotateRight.setManaged(canReset && renderedCape());
         external.setText(renderedCape() ? "View render" : "Open 3D");
-        reset.setVisible(canReset); reset.setManaged(canReset);
+        reset.setVisible(canReset && viewActions); reset.setManaged(canReset && viewActions);
         retry.setVisible(canRetry); retry.setManaged(canRetry);
-        external.setVisible(canOpen); external.setManaged(canOpen);
+        external.setVisible(canOpen && viewActions); external.setManaged(canOpen && viewActions);
     }
     private static double clamp(double value, double min, double max) { return Math.max(min,Math.min(max,value)); }
     private static void requireFx() {

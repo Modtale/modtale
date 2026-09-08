@@ -127,6 +127,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
         status.managedProperty().bind(status.visibleProperty()); status.setVisible(false);
         inspector.getStyleClass().add("wardrobe-inspector"); inspector.setPrefWidth(350); inspector.setMinWidth(290);
         inspector.setMaxWidth(390); inspector.setMaxHeight(Region.USE_PREF_SIZE);
+        preview.hideViewActions();
         Node previewNode = preview.view();
         if (previewNode instanceof Region region) { region.setPrefHeight(335); region.setMinHeight(260); }
         selectedDetail.setWrapText(true); selectedName.setWrapText(true);
