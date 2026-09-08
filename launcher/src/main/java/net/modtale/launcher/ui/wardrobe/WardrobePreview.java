@@ -276,17 +276,24 @@ public final class WardrobePreview {
     public void showLocal(java.nio.file.Path assetsZip, com.fasterxml.jackson.databind.JsonNode cosmeticDefinition) {
         requireFx();
         if (disposed) return;
-        cancel(); removeContent(); request = null;
+        if (Objects.equals(localAssets, assetsZip) && Objects.equals(localSkin, cosmeticDefinition)
+                && (pending != null || scene != null)) return;
+        boolean replacing = scene != null && localAssets != null;
+        cancel();
+        if (!replacing) removeContent();
+        request = null;
         localAssets = assetsZip;
         localSkin = cosmeticDefinition == null ? null : cosmeticDefinition.deepCopy();
         long ticket = generation;
-        controls(false, false, false);
+        if (!replacing) controls(false, false, false);
         if (!supports3d) {
             showStatus("Preview unavailable on this device.");
             return;
         }
-        showStatus("Loading preview…");
-        viewport.getChildren().setAll(progress);
+        if (!replacing) {
+            showStatus("Loading preview…");
+            viewport.getChildren().setAll(progress);
+        } else status.setText("Updating preview…");
         var draft = localSkin;
         FutureTask<Void> task = new FutureTask<>(() -> {
             try {
@@ -295,7 +302,11 @@ public final class WardrobePreview {
                     if (!current(ticket)) return;
                     pending = null;
                     try {
+                        double previousYaw = yaw.getAngle(), previousPitch = pitch.getAngle(), previousZoom = zoom;
                         installModel(model);
+                        if (replacing) {
+                            yaw.setAngle(previousYaw); pitch.setAngle(previousPitch); zoom = previousZoom; fitCamera();
+                        }
                         animationRig=LocalAvatarRenderer.rig(model);
                         animations.getItems().add(new AnimationChoice(null));
                         animationRig.animations().forEach(option -> animations.getItems().add(new AnimationChoice(option)));

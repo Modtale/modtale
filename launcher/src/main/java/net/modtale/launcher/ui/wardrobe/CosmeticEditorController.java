@@ -249,16 +249,21 @@ public final class CosmeticEditorController implements AutoCloseable {
     }
 
     private void showOptions(String assetId) {
-        colors.getChildren().clear(); settingVariants = true; variant.getItems().clear(); settingVariants = false;
-        colors.setVisible(false); colors.setManaged(false); variant.setVisible(false); variant.setManaged(false);
+        colors.setDisable(true); variant.setDisable(true);
         selectedAsset = assetId; combinations = List.of();
-        if (assetId == null || assetId.isBlank() || catalog == null) { choiceName.setText("Your character"); requirement.setText(""); return; }
+        if (assetId == null || assetId.isBlank() || catalog == null) {
+            colors.getChildren().clear(); colors.setVisible(false); colors.setManaged(false);
+            variant.setVisible(false); variant.setManaged(false);
+            choiceName.setText("Your character"); requirement.setText(""); return;
+        }
         String key = category; long ticket = generation;
         CompletableFuture.supplyAsync(() -> {
             try { return catalog.options(key, assetId); } catch (IOException e) { throw new UncheckedIOException(e); }
         }, executor).whenComplete((options, error) -> Platform.runLater(() -> {
             if (disposed || ticket != generation || !key.equals(category) || !assetId.equals(selectedAsset)) return;
             if (error != null) { requirement.setText(message(error)); return; }
+            colors.getChildren().clear(); settingVariants = true; variant.getItems().clear(); settingVariants = false;
+            colors.setDisable(false); variant.setDisable(false);
             combinations = options;
             CosmeticOption current = options.stream().filter(o -> o.id().equals(draft.selected(key))).findFirst().orElse(options.isEmpty() ? null : options.getFirst());
             if (current == null) return;

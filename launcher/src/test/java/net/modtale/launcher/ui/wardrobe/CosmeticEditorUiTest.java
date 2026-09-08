@@ -241,7 +241,17 @@ class CosmeticEditorUiTest {
         var choice = options.stream().filter(option -> option.colorId().equals(preferred)).findFirst()
                 .orElseGet(() -> options.stream().filter(option -> !option.id().equals(current)).findFirst().orElseThrow());
         await("target palette", () -> nodes(harness.root(), Button.class).stream().anyMatch(button -> ("Color " + choice.colorId()).equals(button.getAccessibleText())));
-        click(harness, "Color " + choice.colorId());
+        awaitPreview(harness);
+        fx(() -> {
+            var before = nodes(harness.root(), javafx.scene.SubScene.class).getFirst();
+            var swatch = button(harness.root(), "Color " + choice.colorId());
+            var palette = swatch.getParent();
+            swatch.fire();
+            assertSame(before, nodes(harness.root(), javafx.scene.SubScene.class).getFirst(),
+                    "Keep the current avatar while its replacement loads");
+            assertTrue(palette.isVisible() && palette.isManaged(), "Palette must not collapse during selection");
+            return null;
+        });
         await("color applied", () -> harness.controller().draftSnapshot().path(asset.category()).asText().equals(choice.id()));
     }
 
