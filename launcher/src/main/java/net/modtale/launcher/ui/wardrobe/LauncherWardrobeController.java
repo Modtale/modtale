@@ -34,6 +34,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
     private final LauncherFeedback feedback;
     private final Executor executor;
     private final WardrobePreview preview;
+    private final SavedLookThumbnails localThumbnails = new SavedLookThumbnails();
     private final CosmeticEditorController editor;
     private final java.util.function.Function<WardrobeItem, String> thumbnailResolver;
     private final VBox root = new VBox(22);
@@ -264,6 +265,16 @@ public final class LauncherWardrobeController implements AutoCloseable {
         Label fallback = label(item.kind() == WardrobeItem.Kind.CAPE ? "CAPE" : "SKIN", "wardrobe-card-fallback");
         if (image.getImage() != null) fallback.visibleProperty().bind(image.getImage().errorProperty().or(image.getImage().progressProperty().lessThan(1)));
         StackPane visual = new StackPane(fallback, image); visual.getStyleClass().add("wardrobe-card-art");
+        JsonNode savedSkin = payload(item).path("skin");
+        java.nio.file.Path assets = editor.assetsForPreview();
+        if (url.isBlank() && item.kind() == WardrobeItem.Kind.SKIN && savedSkin.isObject()
+                && java.nio.file.Files.isRegularFile(assets)) {
+            localThumbnails.load(assets, savedSkin).thenAccept(thumbnail -> {
+                if (disposed) return;
+                image.setImage(thumbnail);
+                fallback.setVisible(false);
+            });
+        }
         visual.setPrefHeight(170); visual.setMinWidth(0); visual.setMaxWidth(Double.MAX_VALUE);
         String displayName = lookName(item);
         Label name = label(displayName, "wardrobe-card-name"); hideWhenEmpty(name); name.setMinWidth(0); name.setMaxWidth(Double.MAX_VALUE);
@@ -389,5 +400,5 @@ public final class LauncherWardrobeController implements AutoCloseable {
     private static Label label(String text, String style) { Label l = new Label(text); l.getStyleClass().add(style); return l; }
     private static void hideWhenEmpty(Label label) { label.visibleProperty().bind(label.textProperty().isNotEmpty()); label.managedProperty().bind(label.visibleProperty()); }
     private static Button iconButton(String title, LauncherIcons.Glyph glyph, Runnable action) { Button b = secondaryButton(title); b.setGraphic(LauncherIcons.icon(glyph, 15)); b.setOnAction(e -> action.run()); return b; }
-    @Override public void close() { disposed = true; request++; resizeReload.stop(); skinPages.clear(); preview.dispose(); editor.close(); }
+    @Override public void close() { disposed = true; request++; resizeReload.stop(); skinPages.clear(); localThumbnails.close(); preview.dispose(); editor.close(); }
 }
