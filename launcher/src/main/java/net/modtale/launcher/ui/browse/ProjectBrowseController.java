@@ -445,15 +445,6 @@ public final class ProjectBrowseController {
                 return ProjectBrowseSort.fromLabel(value);
             }
         });
-        sortCombo.setOnAction(event -> {
-            refreshBrowseControls();
-            if (!suppressSearch) {
-                activeBrowseView = selectedSort().browseView();
-                showDiscover.run();
-            }
-            notifyControlStateListeners();
-            searchProjects();
-        });
         sortCombo.valueProperty().addListener((observable, oldValue, newValue) -> refreshSortDropdown());
         pageSizeCombo.setItems(FXCollections.observableArrayList(BrowseOptions.BROWSE_ITEMS_PER_PAGE_OPTIONS));
         pageSizeCombo.setValue(BrowseOptions.DEFAULT_ITEMS_PER_PAGE);
@@ -647,7 +638,11 @@ public final class ProjectBrowseController {
     private void selectSort(ProjectBrowseSort sort) {
         hideSortDropdown();
         sortCombo.setValue(sort);
-        refreshSortDropdown();
+        activeBrowseView = selectedSort().browseView();
+        refreshBrowseControls();
+        showDiscover.run();
+        notifyControlStateListeners();
+        searchProjects();
     }
 
     private void refreshSortDropdown() {
