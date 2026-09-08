@@ -80,14 +80,6 @@ public class WardrobeApiClient {
         return slots(settings, profile, profileSession(settings, profile));
     }
 
-    public void createSkin(LauncherSettings settings, String name, JsonNode skin, UUID expectedProfile) {
-        ObjectNode body = skinBody(name, skin);
-        String token = profileSession(settings, expectedProfile);
-        SkinSlots current = slots(settings, expectedProfile, token);
-        if (current.slots().size() >= current.max()) throw failure("All official outfit slots are occupied");
-        writeSkin(settings, expectedProfile, token, "POST", "player-skins", body);
-    }
-
     /**
      * PlayerSkinProperty keys (haircut, cape, headAccessory, etc.) map to base catalog Ids,
      * not serialized color/variant selections. Missing membership is not an unlock.
@@ -140,12 +132,6 @@ public class WardrobeApiClient {
         return new SkinSlots(activeId, root.path("maxSkins").intValue(), result);
     }
 
-    private ObjectNode skinBody(String name, JsonNode skin) {
-        if (name == null || name.isBlank()) throw new IllegalArgumentException("Outfit name must not be blank");
-        requireSkin(skin);
-        return mapper.createObjectNode().put("name", name).put("skinData", skin.toString());
-    }
-
     private static void validSlotId(String id) {
         if (id == null || !UUID.fromString(id).toString().equalsIgnoreCase(id)) {
             throw new IllegalArgumentException("Invalid official outfit slot UUID");
@@ -164,16 +150,6 @@ public class WardrobeApiClient {
         requireSelectedProfile(settings, profile.toString());
         if (token == null || token.isBlank()) throw failure("Official authentication returned an empty session token");
         return token;
-    }
-
-    private void writeSkin(LauncherSettings settings, UUID profile, String token, String method, String path, JsonNode body) {
-        HttpRequest.Builder request = HttpRequest.newBuilder(official.resolve(path)).timeout(Duration.ofSeconds(30))
-                .header("User-Agent", "ModtaleLauncher/1.0").header("Authorization", "Bearer " + token).header("Accept", "application/json");
-        if (body != null) request.header("Content-Type", "application/json");
-        request.method(method, body == null ? HttpRequest.BodyPublishers.noBody()
-                : HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8));
-        requireSelectedProfile(settings, profile.toString());
-        send(request.build(), null, true);
     }
 
     /** Page numbers are one-based. Sort must match a value/label actually published in the form. */

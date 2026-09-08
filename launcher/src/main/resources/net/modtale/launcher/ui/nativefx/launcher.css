@@ -9590,7 +9590,6 @@
     -fx-padding: 0;
 }
 
-.cosmetic-save-menu > .label { -fx-text-fill: #cbd5e1; }
 
 .mod-settings-modal { -fx-font-family: "Inter"; }
 .mod-settings-muted { -fx-text-fill: #94a3b8; -fx-font-size: 12px; -fx-font-family: "Inter SemiBold"; }

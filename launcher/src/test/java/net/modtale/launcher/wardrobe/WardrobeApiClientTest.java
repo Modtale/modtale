@@ -218,53 +218,6 @@ class WardrobeApiClientTest {
         assertThrows(UnsupportedOperationException.class, () -> result.slots().clear());
     }
 
-    @Test void creatingOfficialOutfitUsesVerifiedBodyAndProfileSession() throws Exception {
-        officialSlots(5);
-        LauncherSettings settings = settings();
-        UUID profile = UUID.fromString(ID);
-        var definition = new ObjectMapper().readTree("{\"bodyCharacteristic\":\"Default.01\",\"haircut\":\"Fringe.Black\",\"cape\":null}");
-        api.createSkin(settings, "New outfit", definition, profile);
-        assertEquals(List.of("GET", "POST"), methods);
-        assertEquals("/player-skins", requests.getLast());
-        var body = new ObjectMapper().readTree(bodies.getLast());
-        assertEquals(2, body.size());
-        assertEquals("New outfit", body.path("name").asText());
-        assertTrue(body.path("skinData").isTextual());
-        assertEquals(definition, new ObjectMapper().readTree(body.path("skinData").asText()));
-        assertTrue(headers.stream().allMatch("Bearer official-session"::equals));
-    }
-
-    @Test void officialOutfitCreationRejectsFullSlotsAndInvalidDefinitions() {
-        officialSlots(1);
-        var definition = new ObjectMapper().createObjectNode().put("bodyCharacteristic", "Default.01");
-        var settings = settings();
-        var profile = UUID.fromString(ID);
-        assertThrows(IllegalStateException.class, () -> api.createSkin(settings, "New", definition, profile));
-        assertTrue(methods.stream().allMatch("GET"::equals));
-        requests.clear();
-        assertThrows(IllegalArgumentException.class, () -> api.createSkin(settings, " ", definition, profile));
-        assertThrows(IllegalStateException.class, () -> api.createSkin(settings, "New", new ObjectMapper().createObjectNode(), profile));
-        assertTrue(requests.isEmpty());
-    }
-
-    @Test void allOutfitWritesAbortWhenAccountChangesDuringSlotRead() {
-        officialSlots(5);
-        var definition = new ObjectMapper().createObjectNode().put("bodyCharacteristic", "Default.01");
-        var settings = settings();
-        var profile = UUID.fromString(ID);
-        afterSlots = () -> settings.getHytaleAuthSession().setUuid(OTHER_SLOT);
-        assertThrows(IllegalStateException.class, () -> api.createSkin(settings, "New", definition, profile));
-        assertEquals(1, requests.size());
-        assertTrue(methods.stream().allMatch("GET"::equals));
-    }
-
-    @Test void outfitWritesAbortBeforeReadWhenAccountChangesDuringTokenRefresh() {
-        var settings = settings();
-        duringSessionRefresh = () -> settings.getHytaleAuthSession().setUuid(OTHER_SLOT);
-        assertThrows(IllegalStateException.class, () -> api.createSkin(settings, "New", new ObjectMapper().createObjectNode().put("bodyCharacteristic", "Default.01"), UUID.fromString(ID)));
-        assertTrue(requests.isEmpty());
-    }
-
     @Test void malformedSlotResponsesFailClosed() {
         for (String response : List.of("null", "{}", "{\"activeSkin\":null,\"maxSkins\":-1,\"skins\":[]}",
                 "{\"activeSkin\":\"missing\",\"maxSkins\":5,\"skins\":[]}",
@@ -288,16 +241,6 @@ class WardrobeApiClientTest {
             json("/my-account/cosmetics", response);
             assertThrows(IllegalStateException.class, () -> api.unlockedCosmetics(settings()));
         }
-    }
-
-    @Test void rejectedOfficialWriteDoesNotRetryOrExposeResponseBody() {
-        officialSlots(5);
-        afterSlots = () -> { if (methods.getLast().equals("POST")) replies.put("/player-skins", new Reply(403, "application/json", "sensitive upstream details")); };
-        var failure = assertThrows(IllegalStateException.class,
-                () -> api.createSkin(settings(), "New", new ObjectMapper().createObjectNode().put("bodyCharacteristic", "Default.01"), UUID.fromString(ID)));
-        assertTrue(failure.getMessage().contains("403"));
-        assertFalse(failure.getMessage().contains("sensitive"));
-        assertEquals(List.of("GET", "POST"), methods);
     }
 
     private void archivedSkin() {

@@ -85,22 +85,31 @@ class CosmeticEditorControllerTest {
         }
     }
 
-    @Test void createUsesLoadedLookAndFullSlotsPreventAnotherCreateDialogOrWrite() throws Exception {
+    @Test void savesLocallyThroughStatusModalWithValidationAndCancel() throws Exception {
         try (Harness h = new Harness()) {
             fx(() -> { button(h.root(), "Load current look").fire(); return null; });
             await(() -> h.controller.draftSnapshot().equals(json(FRESH)));
-            h.accept(() -> saveToHytale(h.root()).fire(), "My outfit", "New outfit");
-            Mutation create = h.mutation("create");
-            assertEquals("New outfit", create.name());
-            assertEquals(json(FRESH), create.skin());
-            await(() -> "Ready".equals(h.status.getText()));
+            FutureTask<Void> opened = submitFx(() -> { button(h.root(), "Save").fire(); return null; });
+            await(() -> h.stage.getScene().lookup(".status-modal-primary") != null);
             fx(() -> {
-                assertFalse(saveToHytale(h.root()).isDisable());
-                saveToHytale(h.root()).fire();
-                assertNull(h.dialog(), "Capacity rejection must happen before asking for a name");
-                return null;
+                TextField name = (TextField) h.stage.getScene().lookup(".status-modal-custom-content");
+                Button primary = (Button) h.stage.getScene().lookup(".status-modal-primary");
+                assertEquals("My look", name.getText());
+                name.setText(" "); assertTrue(primary.isDisabled());
+                name.setText("x".repeat(121)); assertTrue(primary.isDisabled());
+                name.setText("My saved look"); assertFalse(primary.isDisabled()); primary.fire(); return null;
             });
-            assertNull(h.gateway.mutations.poll(200, TimeUnit.MILLISECONDS), "Full slots must not issue another create");
+            opened.get(5, TimeUnit.SECONDS);
+            await(() -> new WardrobeStore(directory).items().size() == 1);
+            var saved = new WardrobeStore(directory).items().getFirst();
+            assertEquals("My saved look", saved.name());
+            assertEquals(json(FRESH), json(saved.payload()).path("skin"));
+            FutureTask<Void> cancelled = submitFx(() -> { button(h.root(), "Save").fire(); return null; });
+            await(() -> h.stage.getScene().lookup(".status-modal-secondary") != null);
+            fx(() -> { ((Button) h.stage.getScene().lookup(".status-modal-secondary")).fire(); return null; });
+            cancelled.get(5, TimeUnit.SECONDS);
+            assertEquals(List.of(saved), new WardrobeStore(directory).items());
+            assertTrue(h.gateway.mutations.isEmpty());
         }
     }
 
@@ -109,7 +118,7 @@ class CosmeticEditorControllerTest {
             fx(() -> {
                 assertTrue(nodes(h.root(), Label.class).stream().noneMatch(label ->
                         List.of("Hytale outfits", "Wearing", "Main", "Adventure").contains(label.getText())));
-                assertEquals(List.of("Save"), nodes(h.root(), MenuButton.class).stream().map(MenuButton::getText).toList());
+                assertTrue(nodes(h.root(), MenuButton.class).isEmpty());
                 return null;
             });
         }
@@ -208,11 +217,6 @@ class CosmeticEditorControllerTest {
             delayLoad();
             return new WardrobeItem(PLAYER, WardrobeItem.Kind.SKIN, "Current", false, "", "{\"skin\":" + FRESH + "}");
         }
-        @Override public void createSkin(LauncherSettings settings, String name, JsonNode skin, UUID expected) {
-            record("create", CREATED, name, skin, settings, expected);
-            List<SkinSlot> next = new ArrayList<>(snapshot.slots()); next.add(new SkinSlot(CREATED, name, skin.toString()));
-            snapshot = new SkinSlots(snapshot.activeId(), snapshot.max(), next);
-        }
         private void record(String action, String id, String name, JsonNode skin, LauncherSettings settings, UUID expected) {
             assertFalse(Platform.isFxApplicationThread(), "Slot I/O must stay off the FX thread");
             try {
@@ -223,10 +227,6 @@ class CosmeticEditorControllerTest {
         }
     }
 
-    private static MenuItem saveToHytale(Node root) {
-        return nodes(root, MenuButton.class).stream().flatMap(menu -> menu.getItems().stream())
-                .filter(item -> "Save to Hytale".equals(item.getText())).findFirst().orElseThrow();
-    }
     private static ButtonBase button(Node root, String text) {
         return nodes(root, ButtonBase.class).stream().filter(b -> text.equals(b.getText())).findFirst().orElseThrow();
     }

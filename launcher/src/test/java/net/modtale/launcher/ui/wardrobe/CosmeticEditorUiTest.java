@@ -98,7 +98,7 @@ class CosmeticEditorUiTest {
                 assertEquals(catalog.defaultSkin(), baseline);
                 awaitPreview(harness);
                 assertTrue(fx(() -> button(harness.root(), "Apply").isDisabled()));
-                assertTrue(fx(() -> ((javafx.scene.control.MenuButton) button(harness.root(), "Save")).getItems().get(1).isDisable()));
+                assertFalse(fx(() -> button(harness.root(), "Save").isDisabled()));
 
                 verifyPagination(harness, catalog);
                 CosmeticOption hair = selectFirst(harness, catalog, "haircut");
@@ -240,6 +240,16 @@ class CosmeticEditorUiTest {
             capture(hero, output, "customize-cape", 1440, 1000);
             capture(hero, output, "customize-cape", 1000, 900);
             assertEquals(composition, fx(() -> hero.controller().draftSnapshot()));
+            FutureTask<Void> saveDialog = new FutureTask<>(() -> { button(hero.root(), "Save").fire(); return null; });
+            Platform.runLater(saveDialog);
+            await("save modal", () -> hero.stage().getScene().lookup(".status-modal-primary") != null);
+            try {
+                capture(hero, output, "save", 1440, 1000);
+                capture(hero, output, "save", 1000, 900);
+            } finally {
+                fx(() -> { ((Button) hero.stage().getScene().lookup(".status-modal-secondary")).fire(); return null; });
+                saveDialog.get(5, TimeUnit.SECONDS);
+            }
         } finally { fx(() -> { wardrobe.close(); return null; }); }
     }
 

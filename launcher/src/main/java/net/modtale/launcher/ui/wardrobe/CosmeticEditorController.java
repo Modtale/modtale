@@ -23,6 +23,7 @@ import net.modtale.launcher.hytale.HytaleAuthSession;
 import net.modtale.launcher.settings.HytalePathDetector;
 import net.modtale.launcher.settings.LauncherSettings;
 import net.modtale.launcher.ui.common.LauncherIcons;
+import net.modtale.launcher.ui.common.StatusModal;
 import net.modtale.launcher.ui.feedback.LauncherFeedback;
 import net.modtale.launcher.wardrobe.*;
 import static net.modtale.launcher.ui.common.LauncherUi.*;
@@ -58,8 +59,7 @@ public final class CosmeticEditorController implements AutoCloseable {
     private final Button reset = button("Reset", LauncherIcons.Glyph.RESTORE, this::reset);
     private final Button remove = secondaryButton("Remove item");
     private final Button apply = primaryButton("Apply outfit");
-    private final MenuItem saveOfficial = new MenuItem("Save to Hytale");
-    private final MenuButton saveMenu = new MenuButton("Save");
+    private final Button save = secondaryButton("Save");
     private final CheckBox ownedOnly = new CheckBox("Owned only");
     private final Button previous = pageIcon(LauncherIcons.Glyph.CHEVRON_LEFT, "Previous Page");
     private final Button next = pageIcon(LauncherIcons.Glyph.CHEVRON_RIGHT, "Next Page");
@@ -69,7 +69,6 @@ public final class CosmeticEditorController implements AutoCloseable {
     private String category = "haircut", selectedAsset = "";
     private int page = 1;
     private long generation, accountGeneration, draftRevision;
-    private WardrobeApiClient.SkinSlots officialSlots;
     private String accountProfileLoaded = "";
     private Map<String, Set<String>> unlocked = Map.of();
     private boolean permissionsKnown, accountLoading;
@@ -91,9 +90,9 @@ public final class CosmeticEditorController implements AutoCloseable {
     public void refresh() {
         if (catalog == null && !loading) loadCatalog(findAssets());
         if (!accountProfileLoaded.equals(activeProfile())) {
-            officialSlots = null; permissionsKnown = false; unlocked = Map.of();
-            accountProfileLoaded = activeProfile(); loadAccountWardrobe();
-        } else if (officialSlots == null && !accountLoading) loadAccountWardrobe();
+            permissionsKnown = false; unlocked = Map.of();
+            accountProfileLoaded = activeProfile(); loadOwnership();
+        } else if (!permissionsKnown && !accountLoading) loadOwnership();
         updateActions();
     }
 
@@ -147,13 +146,9 @@ public final class CosmeticEditorController implements AutoCloseable {
         variant.setOnAction(e -> { if (!settingVariants) chooseVariant(); });
         remove.setOnAction(e -> { if (draft != null) { draft.remove(category); changed(); showOptions(selectedAsset); } });
         remove.setMaxWidth(Double.MAX_VALUE);
-        MenuItem saveLocal = new MenuItem("Save to Saved looks"); saveLocal.setOnAction(e -> saveLocal());
-        saveMenu.getStyleClass().addAll("btn", "secondary", "cosmetic-save-menu");
-        saveMenu.getItems().setAll(saveLocal, saveOfficial);
-        saveMenu.setMinWidth(Region.USE_PREF_SIZE);
+        save.setOnAction(e -> saveLocal()); save.setMinWidth(Region.USE_PREF_SIZE);
         apply.setMaxWidth(Double.MAX_VALUE); apply.setOnAction(e -> applyDraft());
-        saveOfficial.setOnAction(e -> saveOfficial());
-        HBox actions = new HBox(8, saveMenu, apply);
+        HBox actions = new HBox(8, save, apply);
         HBox.setHgrow(apply, Priority.ALWAYS);
         remove.getStyleClass().add("cosmetic-quiet-action");
         inspector.getChildren().addAll(previewNode, choiceName,
@@ -420,9 +415,8 @@ public final class CosmeticEditorController implements AutoCloseable {
         reset.setDisable(!hasDraft || !draft.dirty() || applying); remove.setDisable(!hasDraft || !OutfitDraft.canRemove(category) || draft.selected(category).isBlank() || applying);
         remove.setVisible(hasDraft && OutfitDraft.canRemove(category) && !draft.selected(category).isBlank()); remove.setManaged(remove.isVisible());
         apply.setDisable(!hasDraft || activeProfile().isBlank() || applying || locked);
-        saveOfficial.setDisable(!hasDraft || activeProfile().isBlank() || applying || locked);
         apply.setTooltip(new Tooltip(locked ? "This outfit contains locked cosmetics." : "Apply to " + activeUsername() + " and save the previous look locally."));
-        saveMenu.setDisable(!hasDraft || applying);
+        save.setDisable(!hasDraft || applying);
         apply.setText(applying ? "Applying…" : "Apply");
         changes.setText(locked ? "Contains locked items" : hasDraft && draft.dirty() ? "Unapplied changes" : "");
     }
@@ -439,11 +433,26 @@ public final class CosmeticEditorController implements AutoCloseable {
     private void reset() { if (draft != null) { draft.reset(); changed(); browse(); } }
     private void saveLocal() {
         if (draft == null) return;
-        askName("Save outfit", "My outfit").ifPresent(name -> {
-            WardrobeItem item = item(name, draft.skin());
-            feedback.runAsync("Saving outfit", () -> { try { store.saveItem(item); return true; } catch (IOException e) { throw new UncheckedIOException(e); } },
-                    done -> feedback.showToast("Outfit saved", "Find it under Saved looks."));
+        if (root.getScene() == null || !(root.getScene().getRoot() instanceof StackPane host)) return;
+        TextField name = new TextField("My look");
+        name.setPromptText("Look name"); name.setAccessibleText("Look name");
+        name.getStyleClass().add("wardrobe-search");
+        var invalid = javafx.beans.binding.Bindings.createBooleanBinding(
+                () -> name.getText().isBlank() || name.getText().trim().length() > 120
+                        || name.getText().codePoints().anyMatch(Character::isISOControl), name.textProperty());
+        name.setOnAction(e -> {
+            if (!invalid.get() && host.lookup(".status-modal-primary") instanceof Button primary) primary.fire();
         });
+        JsonNode skin = draft.skin();
+        Platform.runLater(() -> { name.requestFocus(); name.selectAll(); });
+        StatusModal.Result result = StatusModal.builder(() -> host).type(StatusModal.Type.INFO)
+                .title("Save look").message("Keep this outfit in Saved looks.")
+                .content(name).actionLabel("Save").actionIcon(LauncherIcons.Glyph.SAVE)
+                .secondaryLabel("Cancel").actionDisabled(invalid).showAndWait();
+        if (result != StatusModal.Result.PRIMARY) return;
+        WardrobeItem item = item(name.getText().trim(), skin);
+        feedback.runAsync("Saving look", () -> { try { store.saveItem(item); return true; } catch (IOException e) { throw new UncheckedIOException(e); } },
+                done -> feedback.showToast("Look saved", "Find it under Saved looks."));
     }
 
     private void applyDraft() {
@@ -468,45 +477,16 @@ public final class CosmeticEditorController implements AutoCloseable {
         return permissionsKnown && unlocked.getOrDefault(option.category(), Set.of()).contains(option.assetId());
     }
 
-    private void loadAccountWardrobe() {
+    private void loadOwnership() {
         String target = activeProfile(); long ticket = ++accountGeneration;
         if (target.isBlank()) { accountLoading = false; return; }
         accountLoading = true;
-        CompletableFuture.supplyAsync(() -> api.slots(settings.get()), executor).whenComplete((slots, error) -> Platform.runLater(() -> {
-            if (disposed || ticket != accountGeneration || !target.equals(activeProfile())) return;
-            accountLoading = false;
-            if (error != null) return;
-            officialSlots = slots; accountProfileLoaded = target; updateActions();
-        }));
         CompletableFuture.supplyAsync(() -> api.unlockedCosmetics(settings.get()), executor).whenComplete((rights, error) -> Platform.runLater(() -> {
             if (disposed || ticket != accountGeneration || !target.equals(activeProfile())) return;
+            accountLoading = false;
             permissionsKnown = error == null; unlocked = error == null ? rights : Map.of();
             if (catalog != null) browse();
         }));
-    }
-
-    private void saveOfficial() {
-        if (draft == null || activeProfile().isBlank()) return;
-        JsonNode skin = draft.skin();
-        if (officialSlots != null && officialSlots.slots().size() >= officialSlots.max()) {
-            feedback.showToast("Outfit slots full", "Save locally, or manage your outfits in Hytale."); return;
-        }
-        askName("Create Hytale outfit", "My outfit").ifPresent(name -> mutateSlot("Saving Hytale outfit",
-                target -> api.createSkin(settings.get(), name, skin, target)));
-    }
-
-    private Optional<String> askName(String title, String initial) {
-        TextInputDialog dialog = new TextInputDialog(initial); dialog.setTitle(title); dialog.setHeaderText(title); style(dialog);
-        dialog.getDialogPane().lookupButton(ButtonType.OK).disableProperty().bind(javafx.beans.binding.Bindings.createBooleanBinding(
-                () -> dialog.getEditor().getText().isBlank() || dialog.getEditor().getText().trim().length() > 120, dialog.getEditor().textProperty()));
-        return dialog.showAndWait().map(String::trim).filter(name -> !name.isBlank());
-    }
-    private void mutateSlot(String status, java.util.function.Consumer<UUID> work) {
-        if (applying || activeProfile().isBlank()) return;
-        UUID target = UUID.fromString(activeProfile()); applying = true; updateActions();
-        feedback.runAsync(status, () -> { work.accept(target); return true; }, done -> {
-            applying = false; updateActions(); loadAccountWardrobe(); feedback.showToast("Hytale outfits updated", "Your change was saved to Hytale.");
-        }, error -> { applying = false; updateActions(); });
     }
 
     private static WardrobeItem item(String name, JsonNode skin) { return new WardrobeItem(UUID.randomUUID(), WardrobeItem.Kind.SKIN, name, false, "Custom outfits", JSON.createObjectNode().set("skin", skin).toString()); }

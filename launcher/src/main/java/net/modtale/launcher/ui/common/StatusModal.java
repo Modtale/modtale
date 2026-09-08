@@ -68,6 +68,7 @@ public final class StatusModal {
     private final LauncherIcons.Glyph actionIcon;
     private final String secondaryLabel;
     private final Node content;
+    private final javafx.beans.value.ObservableBooleanValue actionDisabled;
     private final Map<Node, Effect> backdropEffects = new IdentityHashMap<>();
 
     private StackPane overlay;
@@ -83,6 +84,7 @@ public final class StatusModal {
         this.actionIcon = builder.actionIcon;
         this.secondaryLabel = value(builder.secondaryLabel);
         this.content = builder.content;
+        this.actionDisabled = builder.actionDisabled;
     }
 
     public Result showAndWait() {
@@ -216,6 +218,7 @@ public final class StatusModal {
         Button primary = new Button(actionLabel);
         primary.getStyleClass().add("status-modal-primary");
         primary.setOnAction(event -> complete(Result.PRIMARY));
+        if (actionDisabled != null) primary.disableProperty().bind(actionDisabled);
         if (actionIcon != null || type == Type.SUCCESS) {
             primary.setGraphic(LauncherIcons.icon(actionIcon == null ? LauncherIcons.Glyph.ARROW_RIGHT : actionIcon, 20));
         }
@@ -278,6 +281,7 @@ public final class StatusModal {
         private LauncherIcons.Glyph actionIcon;
         private String secondaryLabel = "";
         private Node content;
+        private javafx.beans.value.ObservableBooleanValue actionDisabled;
 
         private Builder(Supplier<StackPane> host) {
             this.host = host;
@@ -310,6 +314,11 @@ public final class StatusModal {
 
         public Builder secondaryLabel(String secondaryLabel) {
             this.secondaryLabel = secondaryLabel;
+            return this;
+        }
+
+        public Builder actionDisabled(javafx.beans.value.ObservableBooleanValue disabled) {
+            this.actionDisabled = disabled;
             return this;
         }
 
