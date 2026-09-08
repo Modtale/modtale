@@ -18,6 +18,7 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBase;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.image.ImageView;
@@ -91,6 +92,7 @@ class CosmeticEditorUiTest {
                 return new Harness(controller, stage, scroll);
             });
             try {
+                showAllCosmetics(harness);
                 await("catalog/default draft", () -> harness.controller().draftSnapshot() != null && cards(harness).size() > 0);
                 JsonNode baseline = fx(() -> harness.controller().draftSnapshot());
                 assertEquals(catalog.defaultSkin(), baseline);
@@ -112,13 +114,6 @@ class CosmeticEditorUiTest {
                 await("undo reset", () -> harness.controller().draftSnapshot().equals(colored));
                 click(harness, "Redo");
                 await("redo reset", () -> harness.controller().draftSnapshot().equals(baseline));
-                click(harness, "Randomize category");
-                await("randomized draft", () -> !harness.controller().draftSnapshot().equals(baseline));
-                JsonNode randomized = fx(() -> harness.controller().draftSnapshot());
-                assertFalse(catalog.resolveComposition(randomized).isEmpty());
-                click(harness, "Reset");
-                await("reset randomized draft", () -> harness.controller().draftSnapshot().equals(baseline));
-
                 CosmeticOption body = selectFirst(harness, catalog, "bodyCharacteristic");
                 chooseColor(harness, catalog, body, "15");
                 hair = selectFirst(harness, catalog, "haircut"); chooseColor(harness, catalog, hair, "Blond");
@@ -156,6 +151,22 @@ class CosmeticEditorUiTest {
         }
     }
 
+    private static void showAllCosmetics(Harness harness) throws Exception {
+        fx(() -> {
+            CheckBox owned = (CheckBox) button(harness.root(), "Owned only");
+            assertTrue(owned.isSelected(), "Owned only defaults on");
+            for (String action : List.of("Undo", "Redo")) {
+                Button control = (Button) button(harness.root(), action);
+                assertEquals("", control.getText());
+                assertNotNull(control.getGraphic());
+                assertEquals(action, control.getTooltip().getText());
+                assertSame(control.getParent(), owned.getParent());
+            }
+            owned.fire(); // This unlinked harness explicitly browses the complete installed catalog.
+            return null;
+        });
+    }
+
     private static void captureIntegrated(Harness standalone, WardrobeApiClient gateway, WardrobeStore store,
             LauncherSettings settings, java.util.concurrent.Executor executor, CosmeticCatalogClient catalog,
             JsonNode composition, Path output) throws Exception {
@@ -168,6 +179,7 @@ class CosmeticEditorUiTest {
         });
         try {
             var hero = new Harness(wardrobe.editorForTesting(), standalone.stage(), standalone.scroll());
+            showAllCosmetics(hero);
             await("integrated catalog", () -> hero.controller().draftSnapshot().hasNonNull("bodyCharacteristic") && !cards(hero).isEmpty());
             var payload = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode().set("skin", composition);
             fx(() -> { hero.controller().edit(new WardrobeItem(UUID.randomUUID(), WardrobeItem.Kind.SKIN,

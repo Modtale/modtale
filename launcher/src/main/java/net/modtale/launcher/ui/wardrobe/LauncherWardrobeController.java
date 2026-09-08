@@ -287,7 +287,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
                 && payload.path("username").asText("").isBlank()) {
             java.nio.file.Path assets = editor.assetsForPreview();
             if (java.nio.file.Files.isRegularFile(assets) && payload.path("skin").isObject()) preview.showLocal(assets, payload.path("skin"));
-            else { preview.clear(); selectedDetail.setText("Select game assets in Customize to preview this look."); }
+            else { preview.clear(); selectedDetail.setText("Set your Hytale game directory in Settings to preview this look."); }
         } else preview.show(item.kind() == WardrobeItem.Kind.CAPE ? activeUsername() : payload.path("username").asText("NPC"), payload.path("skinId").asText(""), payload.path("cape").asText(""));
         updateSelectionActions(); renderCards();
     }

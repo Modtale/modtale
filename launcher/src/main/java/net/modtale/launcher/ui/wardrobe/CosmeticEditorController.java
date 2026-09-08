@@ -19,7 +19,6 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
-import javafx.stage.FileChooser;
 import net.modtale.launcher.hytale.HytaleAuthSession;
 import net.modtale.launcher.settings.HytalePathDetector;
 import net.modtale.launcher.settings.LauncherSettings;
@@ -51,8 +50,8 @@ public final class CosmeticEditorController implements AutoCloseable {
     private final Label choiceName = text("Your look", "wardrobe-selected-title");
     private final Label requirement = text("", "wardrobe-muted");
     private final Label changes = text("Nothing applied yet", "wardrobe-muted");
-    private final Button undo = button("Undo", LauncherIcons.Glyph.ROTATE_CCW, this::undo);
-    private final Button redo = button("Redo", LauncherIcons.Glyph.ARROW_RIGHT, this::redo);
+    private final Button undo = iconButton("Undo", LauncherIcons.Glyph.UNDO, this::undo);
+    private final Button redo = iconButton("Redo", LauncherIcons.Glyph.REDO, this::redo);
     private final Button reset = button("Reset", LauncherIcons.Glyph.RESTORE, this::reset);
     private final Button remove = secondaryButton("Remove item");
     private final Button apply = primaryButton("Apply outfit");
@@ -110,11 +109,10 @@ public final class CosmeticEditorController implements AutoCloseable {
         state.setWrapText(true);
         hideWhenEmpty(state); hideWhenEmpty(requirement); hideWhenEmpty(changes);
         Button current = button("Load current look", LauncherIcons.Glyph.REFRESH_CW, this::loadCurrent);
-        Button random = button("Randomize category", LauncherIcons.Glyph.PALETTE, this::randomize);
-        Button source = button("Game assets", LauncherIcons.Glyph.BOX, this::chooseAssets);
-        FlowPane toolbar = new FlowPane(8, 8, current, random, undo, redo, reset, source); toolbar.setAlignment(Pos.CENTER_LEFT);
+        FlowPane toolbar = new FlowPane(8, 8, current, undo, redo, reset, ownedOnly); toolbar.setAlignment(Pos.CENTER_LEFT);
         search.setPromptText("Find a cosmetic"); search.getStyleClass().add("wardrobe-search");
         search.setOnAction(e -> { page = 1; browse(); }); HBox.setHgrow(search, Priority.ALWAYS);
+        ownedOnly.setSelected(true);
         ownedOnly.getStyleClass().add("cosmetic-owned-filter");
         ownedOnly.setOnAction(e -> { page = 1; browse(); });
         HBox searchRow = new HBox(10, search, button("Search", LauncherIcons.Glyph.SEARCH, () -> { page = 1; browse(); }));
@@ -127,7 +125,7 @@ public final class CosmeticEditorController implements AutoCloseable {
         previous.setOnAction(e -> { page = Math.max(1, page - 1); browse(); });
         next.setOnAction(e -> { page++; browse(); });
         HBox pagination = new HBox(12, previous, pageLabel, next); pagination.setAlignment(Pos.CENTER);
-        selectionPanel.getChildren().addAll(title, searchRow, ownedOnly, grid, pagination);
+        selectionPanel.getChildren().addAll(title, searchRow, grid, pagination);
         selectionPanel.setMinWidth(0); HBox.setHgrow(selectionPanel, Priority.ALWAYS);
         inspector.getStyleClass().add("wardrobe-inspector"); inspector.setPrefWidth(310); inspector.setMinWidth(270);
         inspector.setMaxHeight(Region.USE_PREF_SIZE);
@@ -164,19 +162,13 @@ public final class CosmeticEditorController implements AutoCloseable {
         }, executor).whenComplete((value, error) -> Platform.runLater(() -> {
             if (disposed || ticket != generation) return;
             loading = false;
-            if (error != null) { state.setText("Install Hytale or select its Assets.zip using Game assets to unlock the full cosmetic editor. " + message(error)); return; }
+            if (error != null) { state.setText("Install Hytale or set its game directory in Settings. " + message(error)); return; }
             assets = source; catalog = value;
             if (draft == null) { draft = new OutfitDraft(catalog.defaultSkin()); }
             if (pendingCape != null) { draft.choose("cape", pendingCape); pendingCape = null; category = "cape"; }
             renderCategories(); browse(); renderPreview(); updateActions();
             state.setText("");
         }));
-    }
-
-    private void chooseAssets() {
-        FileChooser chooser = new FileChooser(); chooser.setTitle("Choose Hytale game assets");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Hytale assets", "Assets.zip"));
-        var file = chooser.showOpenDialog(root.getScene().getWindow()); if (file != null) loadCatalog(file.toPath());
     }
 
     private void renderCategories() {
@@ -360,44 +352,6 @@ public final class CosmeticEditorController implements AutoCloseable {
     private void undo() { if (draft != null) { draft.undo(); changed(); browse(); } }
     private void redo() { if (draft != null) { draft.redo(); changed(); browse(); } }
     private void reset() { if (draft != null) { draft.reset(); changed(); browse(); } }
-    private void randomize() {
-        if (catalog == null || draft == null) return;
-        String key = category;
-        OutfitDraft targetDraft = draft;
-        CosmeticCatalogClient source = catalog;
-        boolean onlyOwned = ownedOnly.isSelected(); Map<String, Set<String>> rights = unlocked;
-        long revision = draftRevision;
-        feedback.runAsync("Choosing a cosmetic", () -> {
-            try {
-                var first = source.browseAssets(key, "", 1, 100);
-                if (first.total() == 0) return null;
-                String asset;
-                if (onlyOwned) {
-                    List<CosmeticOption> owned = new ArrayList<>();
-                    var batch = first; int sourcePage = 1;
-                    while (true) {
-                        batch.options().stream().filter(option -> rights.getOrDefault(key, Set.of()).contains(option.assetId())).forEach(owned::add);
-                        if (!batch.hasNext()) break;
-                        batch = source.browseAssets(key, "", ++sourcePage, 100);
-                    }
-                    if (owned.isEmpty()) return null;
-                    asset = owned.get(ThreadLocalRandom.current().nextInt(owned.size())).assetId();
-                } else {
-                    int index = ThreadLocalRandom.current().nextInt(first.total());
-                    var result = index < 100 ? first : source.browseAssets(key, "", index / 100 + 1, 100);
-                    asset = result.options().get(index % 100).assetId();
-                }
-                var choices = source.options(key, asset);
-                return choices.get(ThreadLocalRandom.current().nextInt(choices.size()));
-            }
-            catch (IOException e) { throw new UncheckedIOException(e); }
-        }, option -> {
-            if (draft != targetDraft || catalog != source || revision != draftRevision || disposed) return;
-            if (option == null) { feedback.showToast("No matching items", "Choose another category or filter."); return; }
-            draft.choose(key, option.id()); changed(); if (key.equals(category)) showOptions(option.assetId());
-        });
-    }
-
     private void saveLocal() {
         if (draft == null) return;
         askName("Save outfit", "My outfit").ifPresent(name -> {
@@ -555,6 +509,13 @@ public final class CosmeticEditorController implements AutoCloseable {
     private static void hideWhenEmpty(Label label) { label.visibleProperty().bind(label.textProperty().isNotEmpty()); label.managedProperty().bind(label.visibleProperty()); }
     private static Region spacer() { Region r = new Region(); HBox.setHgrow(r, Priority.ALWAYS); return r; }
     private static Button button(String text, LauncherIcons.Glyph icon, Runnable action) { Button b = secondaryButton(text); b.setGraphic(LauncherIcons.icon(icon, 14)); b.setOnAction(e -> action.run()); return b; }
+    private static Button iconButton(String label, LauncherIcons.Glyph icon, Runnable action) {
+        Button button = button("", icon, action);
+        button.getStyleClass().add("icon-only-button");
+        button.setMinSize(40, 40); button.setPrefSize(40, 40);
+        button.setAccessibleText(label); button.setTooltip(new Tooltip(label));
+        return button;
+    }
     private static String message(Throwable t) { while (t instanceof CompletionException && t.getCause() != null) t = t.getCause(); return t.getMessage() == null ? "Please try again." : t.getMessage(); }
     @Override public void close() { disposed = true; generation++; accountGeneration++; preview.dispose(); }
 }
