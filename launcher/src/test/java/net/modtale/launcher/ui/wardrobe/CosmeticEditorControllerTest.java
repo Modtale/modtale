@@ -7,7 +7,6 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
@@ -61,7 +60,9 @@ class CosmeticEditorControllerTest {
     @Test void lateCurrentSkinAndHydrationCannotReplaceCapeEdits() throws Exception {
         for (boolean hydrate : List.of(false, true)) {
             try (Harness h = new Harness()) {
-                fx(() -> { button(row(h.root(), "Adventure"), "Edit").fire(); return null; });
+                fx(() -> { h.controller.edit(new WardrobeItem(PLAYER, WardrobeItem.Kind.SKIN,
+                        "Saved look", false, "", "{\"skin\":" + STALE + "}")); return null; });
+                await(() -> h.controller.draftSnapshot().equals(json(STALE)));
                 h.gateway.delayLoads = true;
                 fx(() -> {
                     if (hydrate) h.controller.edit(new WardrobeItem(PLAYER, WardrobeItem.Kind.SKIN,
@@ -84,52 +85,6 @@ class CosmeticEditorControllerTest {
         }
     }
 
-    @Test void editSavesDraftWithFreshSlotNameAndBacksUpFreshDefinitionBeforeUpdating() throws Exception {
-        try (Harness h = new Harness()) {
-            fx(() -> { button(row(h.root(), "Adventure"), "Edit").fire(); return null; });
-            assertEquals(json(STALE), fx(h.controller::draftSnapshot));
-            fx(() -> { h.controller.editCape("Cape_New.Blue"); return null; });
-            JsonNode draft = json(STALE); ((com.fasterxml.jackson.databind.node.ObjectNode) draft).put("cape", "Cape_New.Blue");
-            h.gateway.freshOther("Renamed elsewhere");
-            h.accept(() -> button(h.root(), "Save changes to Hytale outfit").fire(), null, null);
-            Mutation update = h.mutation("update");
-            assertEquals(OTHER, update.id());
-            assertEquals("Renamed elsewhere", update.name());
-            assertEquals(draft, update.skin());
-            assertBackup(update, "Previous looks", "Renamed elsewhere", json(FRESH));
-            await(() -> row(h.root(), "Renamed elsewhere") != null);
-        }
-    }
-
-    @Test void renamePreservesFreshDefinitionInsteadOfTheDisplayedSnapshot() throws Exception {
-        try (Harness h = new Harness()) {
-            h.gateway.freshOther("Adventure");
-            h.accept(() -> menu(row(h.root(), "Adventure"), "Rename").fire(), "Adventure", "Renamed outfit");
-            Mutation update = h.mutation("update");
-            assertEquals(OTHER, update.id());
-            assertEquals("Renamed outfit", update.name());
-            assertEquals(json(FRESH), update.skin());
-            assertTrue(update.backups().isEmpty());
-            await(() -> row(h.root(), "Renamed outfit") != null);
-        }
-    }
-
-    @Test void duplicateUsesFreshDefinitionAndDisablesDuplicationAtCapacity() throws Exception {
-        try (Harness h = new Harness()) {
-            h.gateway.freshOther("Adventure");
-            h.accept(() -> menu(row(h.root(), "Adventure"), "Duplicate").fire(), "Adventure copy", "My copy");
-            Mutation create = h.mutation("create");
-            assertEquals("My copy", create.name());
-            assertEquals(json(FRESH), create.skin());
-            await(() -> row(h.root(), "My copy") != null);
-            fx(() -> {
-                for (String name : List.of("Main", "Adventure", "My copy"))
-                    assertTrue(menu(row(h.root(), name), "Duplicate").isDisable());
-                return null;
-            });
-        }
-    }
-
     @Test void createUsesLoadedLookAndFullSlotsPreventAnotherCreateDialogOrWrite() throws Exception {
         try (Harness h = new Harness()) {
             fx(() -> { button(h.root(), "Load current look").fire(); return null; });
@@ -138,7 +93,7 @@ class CosmeticEditorControllerTest {
             Mutation create = h.mutation("create");
             assertEquals("New outfit", create.name());
             assertEquals(json(FRESH), create.skin());
-            await(() -> row(h.root(), "New outfit") != null);
+            await(() -> "Ready".equals(h.status.getText()));
             fx(() -> {
                 assertFalse(button(h.root(), "Save as Hytale outfit").isDisabled());
                 button(h.root(), "Save as Hytale outfit").fire();
@@ -149,26 +104,15 @@ class CosmeticEditorControllerTest {
         }
     }
 
-    @Test void deletePersistsFreshRecoveryCopyBeforeCallingApiAndProtectsActiveSlot() throws Exception {
+    @Test void editorHasNoHytaleOutfitsSection() throws Exception {
         try (Harness h = new Harness()) {
-            fx(() -> { assertTrue(menu(row(h.root(), "Main"), "Delete from Hytale").isDisable()); return null; });
-            h.gateway.freshOther("Fresh recovery name");
-            h.accept(() -> menu(row(h.root(), "Adventure"), "Delete from Hytale").fire(), null, null);
-            Mutation delete = h.mutation("delete");
-            assertEquals(OTHER, delete.id());
-            assertBackup(delete, "Removed Hytale outfits", "Fresh recovery name", json(FRESH));
-            await(() -> row(h.root(), "Adventure") == null && row(h.root(), "Main") != null);
-            assertEquals(delete.backups(), new WardrobeStore(directory).items());
+            fx(() -> {
+                assertTrue(nodes(h.root(), Label.class).stream().noneMatch(label ->
+                        List.of("Hytale outfits", "Wearing", "Main", "Adventure").contains(label.getText())));
+                assertTrue(nodes(h.root(), MenuButton.class).isEmpty());
+                return null;
+            });
         }
-    }
-
-    private static void assertBackup(Mutation call, String collection, String name, JsonNode skin) {
-        assertEquals(1, call.backups().size(), "Recovery copy must already be persisted when the API is called");
-        WardrobeItem backup = call.backups().getFirst();
-        assertEquals(WardrobeItem.Kind.SKIN, backup.kind());
-        assertEquals(collection, backup.collection());
-        assertEquals(name, backup.name());
-        assertEquals(skin, json(backup.payload()).path("skin"));
     }
 
     private final class Harness implements AutoCloseable {
@@ -193,7 +137,7 @@ class CosmeticEditorControllerTest {
                 scene.getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
                 result.setScene(scene); result.show(); controller.refresh(); return result;
             });
-            await(() -> row(root(), "Adventure") != null);
+            await(() -> ((CheckBox) button(root(), "Owned only")).isSelected());
         }
         Node root() { return controller.view(); }
         DialogPane dialog() {
@@ -250,9 +194,6 @@ class CosmeticEditorControllerTest {
             });
             this.directory = directory;
         }
-        void freshOther(String name) {
-            snapshot = new SkinSlots(ACTIVE, snapshot.max(), List.of(snapshot.slots().getFirst(), new SkinSlot(OTHER, name, FRESH)));
-        }
         @Override public SkinSlots slots(LauncherSettings settings) { assertFalse(Platform.isFxApplicationThread()); return snapshot; }
         @Override public Map<String, Set<String>> unlockedCosmetics(LauncherSettings settings) { assertFalse(Platform.isFxApplicationThread()); return Map.of(); }
         private void delayLoad() {
@@ -272,15 +213,6 @@ class CosmeticEditorControllerTest {
             List<SkinSlot> next = new ArrayList<>(snapshot.slots()); next.add(new SkinSlot(CREATED, name, skin.toString()));
             snapshot = new SkinSlots(snapshot.activeId(), snapshot.max(), next);
         }
-        @Override public void updateSkin(LauncherSettings settings, String id, String name, JsonNode skin, UUID expected) {
-            record("update", id, name, skin, settings, expected);
-            snapshot = new SkinSlots(snapshot.activeId(), snapshot.max(), snapshot.slots().stream()
-                    .map(slot -> slot.id().equals(id) ? new SkinSlot(id, name, skin.toString()) : slot).toList());
-        }
-        @Override public void deleteSkin(LauncherSettings settings, String id, UUID expected) {
-            record("delete", id, "", null, settings, expected);
-            snapshot = new SkinSlots(snapshot.activeId(), snapshot.max(), snapshot.slots().stream().filter(slot -> !slot.id().equals(id)).toList());
-        }
         private void record(String action, String id, String name, JsonNode skin, LauncherSettings settings, UUID expected) {
             assertFalse(Platform.isFxApplicationThread(), "Slot I/O must stay off the FX thread");
             try {
@@ -291,14 +223,6 @@ class CosmeticEditorControllerTest {
         }
     }
 
-    private static HBox row(Node root, String name) {
-        return nodes(root, HBox.class).stream().filter(box -> !nodes(box, MenuButton.class).isEmpty()
-                && nodes(box, Label.class).stream().anyMatch(label -> name.equals(label.getText()))
-                && nodes(box, MenuButton.class).size() == 1).findFirst().orElse(null);
-    }
-    private static MenuItem menu(Node row, String text) {
-        return nodes(row, MenuButton.class).getFirst().getItems().stream().filter(item -> text.equals(item.getText())).findFirst().orElseThrow();
-    }
     private static ButtonBase button(Node root, String text) {
         return nodes(root, ButtonBase.class).stream().filter(b -> text.equals(b.getText())).findFirst().orElseThrow();
     }

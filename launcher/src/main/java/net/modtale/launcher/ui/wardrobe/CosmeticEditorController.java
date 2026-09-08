@@ -60,7 +60,6 @@ public final class CosmeticEditorController implements AutoCloseable {
     private final Button previous = secondaryButton("Previous");
     private final Button next = secondaryButton("Next");
     private final Label pageLabel = text("Page 1", "wardrobe-muted");
-    private final VBox outfitsPanel = new VBox(12);
     private CosmeticCatalogClient catalog;
     private Path assets;
     private OutfitDraft draft;
@@ -68,7 +67,7 @@ public final class CosmeticEditorController implements AutoCloseable {
     private int page = 1;
     private long generation, accountGeneration, draftRevision;
     private WardrobeApiClient.SkinSlots officialSlots;
-    private String accountProfileLoaded = "", editedSlot = "";
+    private String accountProfileLoaded = "";
     private Map<String, Set<String>> unlocked = Map.of();
     private boolean permissionsKnown, accountLoading;
     private boolean loading, applying, disposed, settingVariants;
@@ -89,7 +88,7 @@ public final class CosmeticEditorController implements AutoCloseable {
     public void refresh() {
         if (catalog == null && !loading) loadCatalog(findAssets());
         if (!accountProfileLoaded.equals(activeProfile())) {
-            editedSlot = ""; officialSlots = null; permissionsKnown = false; unlocked = Map.of();
+            officialSlots = null; permissionsKnown = false; unlocked = Map.of();
             accountProfileLoaded = activeProfile(); loadAccountWardrobe();
         } else if (officialSlots == null && !accountLoading) loadAccountWardrobe();
         updateActions();
@@ -146,7 +145,7 @@ public final class CosmeticEditorController implements AutoCloseable {
                 colors, variant, requirement, remove, changes, save, saveOfficial, apply);
         HBox workspace = new HBox(18, categories, selectionPanel, inspector); workspace.setAlignment(Pos.TOP_LEFT);
         workspace.setMinWidth(0);
-        root.getChildren().addAll(toolbar, state, workspace, outfitsPanel);
+        root.getChildren().addAll(toolbar, state, workspace);
         root.widthProperty().addListener((o, a, b) -> {
             inspector.setPrefWidth(b.doubleValue() < 1100 ? 270 : 310);
             grid.setPrefWrapLength(Math.max(165, b.doubleValue() - inspector.getPrefWidth() - 201));
@@ -290,7 +289,7 @@ public final class CosmeticEditorController implements AutoCloseable {
         long revision = draftRevision;
         feedback.runAsync("Preparing outfit", () -> api.hydrate(item), hydrated -> {
             if (disposed || revision != draftRevision) return;
-            try { draft = new OutfitDraft(JSON.readTree(hydrated.payload()).path("skin")); editedSlot = ""; refresh(); changed(); browse(); }
+            try { draft = new OutfitDraft(JSON.readTree(hydrated.payload()).path("skin")); refresh(); changed(); browse(); }
             catch (IOException e) { feedback.showToast("Could not open outfit", message(e)); }
         });
     }
@@ -303,7 +302,7 @@ public final class CosmeticEditorController implements AutoCloseable {
         feedback.runAsync("Loading Hytale outfit", () -> api.currentSkin(settings.get()), item -> {
             if (disposed || revision != draftRevision) return;
             if (!target.equals(activeProfile())) { feedback.showToast("Account changed", "Load the outfit again for the selected account."); return; }
-            try { draft = new OutfitDraft(JSON.readTree(item.payload()).path("skin")); editedSlot = ""; changed(); browse(); }
+            try { draft = new OutfitDraft(JSON.readTree(item.payload()).path("skin")); changed(); browse(); }
             catch (IOException e) { feedback.showToast("Could not load outfit", message(e)); }
         });
     }
@@ -337,7 +336,6 @@ public final class CosmeticEditorController implements AutoCloseable {
         saveOfficial.setDisable(!hasDraft || activeProfile().isBlank() || applying || locked);
         apply.setTooltip(new Tooltip(locked ? "This outfit contains locked cosmetics." : "Apply this outfit and save the previous look locally."));
         saveOfficial.setTooltip(new Tooltip(locked ? "This outfit contains locked cosmetics." : "Save to your Hytale account."));
-        saveOfficial.setText(editedSlot.isBlank() ? "Save as Hytale outfit" : "Save changes to Hytale outfit");
         apply.setText(applying ? "Applying…" : activeUsername().isBlank() ? "Link a Hytale account" : "Apply to " + activeUsername());
         changes.setText(locked ? "Contains locked items" : hasDraft && draft.dirty() ? "Unapplied changes" : "");
     }
@@ -385,18 +383,13 @@ public final class CosmeticEditorController implements AutoCloseable {
 
     private void loadAccountWardrobe() {
         String target = activeProfile(); long ticket = ++accountGeneration;
-        if (target.isBlank()) { accountLoading = false; renderOutfits(); return; }
+        if (target.isBlank()) { accountLoading = false; return; }
         accountLoading = true;
-        outfitsPanel.getChildren().setAll(text("Loading your Hytale outfits…", "wardrobe-muted"));
         CompletableFuture.supplyAsync(() -> api.slots(settings.get()), executor).whenComplete((slots, error) -> Platform.runLater(() -> {
             if (disposed || ticket != accountGeneration || !target.equals(activeProfile())) return;
             accountLoading = false;
-            if (error != null) {
-                outfitsPanel.getChildren().setAll(text("Could not load Hytale outfits: " + message(error), "wardrobe-muted"),
-                        button("Retry outfits", LauncherIcons.Glyph.REFRESH_CW, this::loadAccountWardrobe));
-                return;
-            }
-            officialSlots = slots; accountProfileLoaded = target; renderOutfits(); updateActions();
+            if (error != null) return;
+            officialSlots = slots; accountProfileLoaded = target; updateActions();
         }));
         CompletableFuture.supplyAsync(() -> api.unlockedCosmetics(settings.get()), executor).whenComplete((rights, error) -> Platform.runLater(() -> {
             if (disposed || ticket != accountGeneration || !target.equals(activeProfile())) return;
@@ -405,84 +398,16 @@ public final class CosmeticEditorController implements AutoCloseable {
         }));
     }
 
-    private void renderOutfits() {
-        outfitsPanel.getChildren().clear();
-        HBox header = new HBox(12, text("Hytale outfits", "wardrobe-section-title"), spacer(),
-                button("Refresh", LauncherIcons.Glyph.REFRESH_CW, this::loadAccountWardrobe));
-        header.setAlignment(Pos.CENTER_LEFT); outfitsPanel.getChildren().add(header);
-        if (activeProfile().isBlank()) { outfitsPanel.getChildren().clear(); return; }
-        if (officialSlots == null) return;
-        outfitsPanel.getChildren().add(text(officialSlots.slots().size() + " / " + officialSlots.max() + " slots", "wardrobe-muted"));
-        for (WardrobeApiClient.SkinSlot slot : officialSlots.slots()) {
-            boolean active = officialSlots.activeId().equals(slot.id());
-            VBox copy = new VBox(5, text(slot.name(), "wardrobe-section-title"));
-            if (active) copy.getChildren().add(text("Wearing", "wardrobe-muted"));
-            HBox.setHgrow(copy, Priority.ALWAYS);
-            Button edit = button("Edit", LauncherIcons.Glyph.EDIT, () -> editSlot(slot));
-            Button wear = button("Wear", LauncherIcons.Glyph.CHECK, () -> mutateSlot("Wearing " + slot.name(), target -> api.activateSkin(settings.get(), slot.id(), target)));
-            wear.setDisable(active);
-            MenuButton more = new MenuButton("More"); more.getStyleClass().addAll("btn", "secondary");
-            MenuItem rename = new MenuItem("Rename"); rename.setOnAction(e -> renameSlot(slot));
-            MenuItem duplicate = new MenuItem("Duplicate"); duplicate.setDisable(officialSlots.slots().size() >= officialSlots.max());
-            duplicate.setOnAction(e -> duplicateSlot(slot));
-            MenuItem delete = new MenuItem("Delete from Hytale"); delete.setDisable(active || officialSlots.slots().size() <= 1);
-            delete.setOnAction(e -> deleteSlot(slot)); more.getItems().setAll(rename, duplicate, delete);
-            HBox row = new HBox(12, copy, edit, wear, more); row.setAlignment(Pos.CENTER_LEFT); row.getStyleClass().add("wardrobe-outfit-row");
-            outfitsPanel.getChildren().add(row);
-        }
-    }
-
-    private void editSlot(WardrobeApiClient.SkinSlot slot) {
-        if (draft != null && draft.dirty() && !confirm("Replace your draft?", "Open this Hytale outfit and discard the unapplied edits?")) return;
-        try { draft = new OutfitDraft(JSON.readTree(slot.skinData())); editedSlot = slot.id(); changed(); browse(); }
-        catch (IOException e) { feedback.showToast("Could not open outfit", message(e)); }
-    }
-
     private void saveOfficial() {
         if (draft == null || activeProfile().isBlank()) return;
-        JsonNode skin = draft.skin(); String existing = editedSlot;
-        if (existing.isBlank()) {
-            if (officialSlots != null && officialSlots.slots().size() >= officialSlots.max()) {
-                feedback.showToast("Outfit slots full", "Save locally, or remove an unused Hytale outfit first."); return;
-            }
-            askName("Create Hytale outfit", "My outfit").ifPresent(name -> mutateSlot("Saving Hytale outfit", target -> api.createSkin(settings.get(), name, skin, target)));
-        } else {
-            if (!confirm("Save changes to Hytale?", "Replace this saved outfit with your draft? Its previous version will be saved locally.")) return;
-            mutateSlot("Saving Hytale outfit", target -> {
-                WardrobeApiClient.SkinSlot current = freshSlot(existing, target); backupSlot(current, "Previous looks");
-                api.updateSkin(settings.get(), existing, current.name(), skin, target);
-            });
+        JsonNode skin = draft.skin();
+        if (officialSlots != null && officialSlots.slots().size() >= officialSlots.max()) {
+            feedback.showToast("Outfit slots full", "Save locally, or manage your outfits in Hytale."); return;
         }
+        askName("Create Hytale outfit", "My outfit").ifPresent(name -> mutateSlot("Saving Hytale outfit",
+                target -> api.createSkin(settings.get(), name, skin, target)));
     }
-    private void renameSlot(WardrobeApiClient.SkinSlot slot) {
-        askName("Rename Hytale outfit", slot.name()).ifPresent(name -> mutateSlot("Renaming Hytale outfit", target -> {
-            var fresh = freshSlot(slot.id(), target); api.updateSkin(settings.get(), slot.id(), name, parseSkin(fresh), target);
-        }));
-    }
-    private void duplicateSlot(WardrobeApiClient.SkinSlot slot) {
-        askName("Duplicate Hytale outfit", slot.name() + " copy").ifPresent(name -> mutateSlot("Duplicating Hytale outfit", target -> {
-            var fresh = freshSlot(slot.id(), target); api.createSkin(settings.get(), name, parseSkin(fresh), target);
-        }));
-    }
-    private void deleteSlot(WardrobeApiClient.SkinSlot slot) {
-        if (!confirm("Delete Hytale outfit?", "Remove “" + slot.name() + "” from Hytale? A local recovery copy will be kept in Saved looks.")) return;
-        mutateSlot("Removing Hytale outfit", target -> {
-            var fresh = freshSlot(slot.id(), target); backupSlot(fresh, "Removed Hytale outfits"); api.deleteSkin(settings.get(), slot.id(), target);
-        });
-    }
-    private WardrobeApiClient.SkinSlot freshSlot(String id, UUID target) {
-        var slots = api.slots(settings.get());
-        if (!target.toString().equals(activeProfile())) throw new IllegalStateException("The active Hytale account changed");
-        return slots.slots().stream().filter(slot -> slot.id().equals(id)).findFirst().orElseThrow(() -> new IllegalStateException("This Hytale outfit no longer exists"));
-    }
-    private void backupSlot(WardrobeApiClient.SkinSlot slot, String collection) {
-        WardrobeItem snapshot = item(slot.name(), parseSkin(slot));
-        try { store.saveItem(new WardrobeItem(snapshot.id(), snapshot.kind(), snapshot.name(), false, collection, snapshot.payload())); }
-        catch (IOException e) { throw new UncheckedIOException(e); }
-    }
-    private static JsonNode parseSkin(WardrobeApiClient.SkinSlot slot) {
-        try { return JSON.readTree(slot.skinData()); } catch (IOException e) { throw new UncheckedIOException(e); }
-    }
+
     private Optional<String> askName(String title, String initial) {
         TextInputDialog dialog = new TextInputDialog(initial); dialog.setTitle(title); dialog.setHeaderText(title); style(dialog);
         dialog.getDialogPane().lookupButton(ButtonType.OK).disableProperty().bind(javafx.beans.binding.Bindings.createBooleanBinding(
@@ -491,10 +416,10 @@ public final class CosmeticEditorController implements AutoCloseable {
     }
     private void mutateSlot(String status, java.util.function.Consumer<UUID> work) {
         if (applying || activeProfile().isBlank()) return;
-        UUID target = UUID.fromString(activeProfile()); applying = true; updateActions(); outfitsPanel.setDisable(true);
+        UUID target = UUID.fromString(activeProfile()); applying = true; updateActions();
         feedback.runAsync(status, () -> { work.accept(target); return true; }, done -> {
-            applying = false; outfitsPanel.setDisable(false); updateActions(); loadAccountWardrobe(); feedback.showToast("Hytale outfits updated", "Your change was saved to Hytale.");
-        }, error -> { applying = false; outfitsPanel.setDisable(false); updateActions(); });
+            applying = false; updateActions(); loadAccountWardrobe(); feedback.showToast("Hytale outfits updated", "Your change was saved to Hytale.");
+        }, error -> { applying = false; updateActions(); });
     }
 
     private static WardrobeItem item(String name, JsonNode skin) { return new WardrobeItem(UUID.randomUUID(), WardrobeItem.Kind.SKIN, name, false, "Custom outfits", JSON.createObjectNode().set("skin", skin).toString()); }
@@ -507,7 +432,6 @@ public final class CosmeticEditorController implements AutoCloseable {
     private static String humanize(String s) { return s.replace('_', ' ').replaceAll("([a-z])([A-Z])", "$1 $2"); }
     private static Label text(String text, String style) { Label l = new Label(text); l.getStyleClass().add(style); return l; }
     private static void hideWhenEmpty(Label label) { label.visibleProperty().bind(label.textProperty().isNotEmpty()); label.managedProperty().bind(label.visibleProperty()); }
-    private static Region spacer() { Region r = new Region(); HBox.setHgrow(r, Priority.ALWAYS); return r; }
     private static Button button(String text, LauncherIcons.Glyph icon, Runnable action) { Button b = secondaryButton(text); b.setGraphic(LauncherIcons.icon(icon, 14)); b.setOnAction(e -> action.run()); return b; }
     private static Button iconButton(String label, LauncherIcons.Glyph icon, Runnable action) {
         Button button = button("", icon, action);
