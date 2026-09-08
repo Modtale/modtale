@@ -308,9 +308,9 @@ public class HytaleAuthService {
             HytaleAuthSession session,
             HytaleGameSession gameSession
     ) {
+        requireLinkedSession(settings, session);
         session.setSessionToken(gameSession.sessionToken());
         session.setIdentityToken(gameSession.identityToken());
-        settings.upsertHytaleAuthSession(session);
         settingsStore.save(settings);
         return session;
     }
@@ -327,6 +327,24 @@ public class HytaleAuthService {
         }
     }
 
+    /** Returns a usable OAuth token, persisting refresh-token rotation before returning. */
+    public String freshAccessToken(LauncherSettings settings) {
+        return ensureValidAccessToken(settings).getAccessToken();
+    }
+
+    /** Unlike launch's offline fallback, remote profile reads require a valid game session. */
+    public String freshSessionToken(LauncherSettings settings) {
+        HytaleAuthSession session = ensureValidAccessToken(settings);
+        if (canUseCachedFriendsSession(session)) {
+            return session.getSessionToken();
+        }
+        HytaleGameSession gameSession = createGameSessionWithRefresh(settings, session);
+        if (!gameSession.hasLaunchTokens()) {
+            throw new HytaleApiException("Hytale did not return profile session tokens.");
+        }
+        return saveGameSession(settings, session, gameSession).getSessionToken();
+    }
+
     private HytaleAuthSession ensureValidAccessToken(LauncherSettings settings) {
         HytaleAuthSession session = settings.getHytaleAuthSession();
         if (session == null || !session.hasRefreshToken()) {
@@ -341,12 +359,12 @@ public class HytaleAuthService {
     private HytaleAuthSession refresh(LauncherSettings settings, HytaleAuthSession session) {
         try {
             HytaleApiClient.TokenResponse token = apiClient.refreshToken(session.getRefreshToken());
+            requireLinkedSession(settings, session);
             session.setAccessToken(token.accessToken);
             if (token.refreshToken != null && !token.refreshToken.isBlank()) {
                 session.setRefreshToken(token.refreshToken);
             }
             session.setExpiresAt(expiresAt(token.expiresIn));
-            settings.upsertHytaleAuthSession(session);
             settingsStore.save(settings);
             return session;
         } catch (HytaleApiException ex) {
@@ -357,7 +375,22 @@ public class HytaleAuthService {
         }
     }
 
+    private static boolean isLinkedSession(LauncherSettings settings, HytaleAuthSession session) {
+        return settings.getHytaleAuthSessions().stream().anyMatch(linked -> linked == session);
+    }
+
+    private static void requireLinkedSession(LauncherSettings settings, HytaleAuthSession session) {
+        // Sessions are mutable objects already held by settings. Upserting here would select
+        // an old account, or restore one removed while the network request was in flight.
+        if (!isLinkedSession(settings, session)) {
+            throw new HytaleApiException("Hytale account was removed or replaced during authentication.", 409, null);
+        }
+    }
+
     private void removeExpiredSession(LauncherSettings settings, HytaleAuthSession session) {
+        if (!isLinkedSession(settings, session)) {
+            return;
+        }
         String accountId = LauncherSettings.hytaleAccountId(session);
         if (accountId.isBlank()) {
             settings.removeActiveHytaleAuthSession();

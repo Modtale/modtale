@@ -326,6 +326,10 @@ class LauncherUiPerformanceProfileTest {
     }
 
     private Node buildProjectPageNode(double width, double height, boolean compact, boolean wiki) throws Exception {
+        return buildProjectPageNode(width, height, compact, wiki, false);
+    }
+
+    Node buildProjectPageNode(double width, double height, boolean compact, boolean wiki, boolean loading) throws Exception {
         ProjectPageController controller = new ProjectPageController(
                 new ModtaleApiClient("http://localhost:1"),
                 DIRECT_EXECUTOR,
@@ -383,7 +387,8 @@ class LauncherUiPerformanceProfileTest {
                       "pageSlug":"home-1"
                     }
                     """, WikiBundle.class);
-            setField(controller, "currentWikiBundle", bundle);
+            setField(controller, "currentWikiBundle", loading ? null : bundle);
+            setField(controller, "wikiLoading", loading);
             setField(controller, "currentWikiSlug", "home-1");
             setField(controller, "wikiMode", true);
             Field cache = ProjectPageController.class.getDeclaredField("wikiPageCache");
@@ -399,7 +404,7 @@ class LauncherUiPerformanceProfileTest {
                 boolean.class
         );
         projectPage.setAccessible(true);
-        Node page = (Node) projectPage.invoke(controller, project(1), detail(), false);
+        Node page = (Node) projectPage.invoke(controller, project(1), loading ? null : detail(), loading);
         if (page instanceof Region region) {
             region.resize(width, Math.max(height, region.prefHeight(width)));
         }
@@ -496,7 +501,7 @@ class LauncherUiPerformanceProfileTest {
         }
     }
 
-    private NativeCreatorProfileView creatorProfileView() {
+    NativeCreatorProfileView creatorProfileView() {
         return new NativeCreatorProfileView(
                 imageLoader(),
                 new ProjectCardFactory(this::resolveProjectAsset, DIRECT_EXECUTOR),

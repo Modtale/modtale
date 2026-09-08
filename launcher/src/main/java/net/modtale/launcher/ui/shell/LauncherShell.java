@@ -65,6 +65,7 @@ import net.modtale.launcher.ui.feedback.LauncherFeedback;
 import net.modtale.launcher.ui.feedback.LauncherFeedbackView;
 import net.modtale.launcher.ui.library.LauncherLibraryController;
 import net.modtale.launcher.ui.play.LauncherPlayController;
+import net.modtale.launcher.ui.wardrobe.LauncherWardrobeController;
 import net.modtale.launcher.ui.project.ProjectPageController;
 import net.modtale.launcher.ui.settings.LauncherSettingsController;
 
@@ -91,6 +92,23 @@ public final class LauncherShell {
             Duration.seconds(2),
             Duration.seconds(4)
     };
+
+    private LauncherWardrobeController wardrobeController;
+    private Node wardrobeError;
+
+    public void attachWardrobeError(String message) {
+        Label title = new Label("Could not open your wardrobe");
+        title.getStyleClass().add("page-title");
+        Label detail = new Label(message + " Your saved file has not been changed.");
+        detail.setWrapText(true);
+        detail.getStyleClass().add("page-subtitle");
+        wardrobeError = new VBox(16, title, detail);
+        wardrobeError.setUserData(LauncherView.WARDROBE);
+    }
+
+    public void attachWardrobe(LauncherWardrobeController controller) {
+        wardrobeController = controller;
+    }
 
     private final LauncherNavigation navigation;
     private final LauncherFeedbackView feedbackView;
@@ -336,6 +354,7 @@ public final class LauncherShell {
     }
 
     public void onHytaleAccountsChanged() {
+        if (wardrobeController != null && navigation.currentView() == LauncherView.WARDROBE) wardrobeController.refresh();
         if (hasLinkedHytaleAccount()) {
             unlock();
         } else {
@@ -385,14 +404,16 @@ public final class LauncherShell {
         navigation.activate(nextView);
         boolean webMode = nextView == LauncherView.PROJECT;
         boolean discoverMode = nextView == LauncherView.DISCOVER;
-        boolean launcherPage = nextView == LauncherView.PLAY || nextView == LauncherView.LIBRARY;
+        boolean launcherPage = nextView == LauncherView.PLAY || nextView == LauncherView.LIBRARY || nextView == LauncherView.WARDROBE;
         boolean documentMode = usesDocumentHeight(nextView);
         boolean playPage = nextView == LauncherView.PLAY;
         toggleStyleClass(sceneLayer, "play-screen", playPage);
         setVisibleManaged(navbarNode, true);
         setVisibleManaged(railNode, discoverMode);
         setVisibleManaged(mainToolbar, !webMode && !discoverMode && !launcherPage);
-        if (nextView == LauncherView.NOTIFICATIONS) {
+        if (nextView == LauncherView.WARDROBE && wardrobeController != null) {
+            wardrobeController.refresh();
+        } else if (nextView == LauncherView.NOTIFICATIONS) {
             notificationsController.refresh();
         } else if (nextView == LauncherView.LIBRARY) {
             libraryController.refresh();
@@ -448,7 +469,8 @@ public final class LauncherShell {
         return view == LauncherView.PROJECT
                 || view == LauncherView.DISCOVER
                 || view == LauncherView.LIBRARY
-                || view == LauncherView.UPDATES;
+                || view == LauncherView.UPDATES
+                || view == LauncherView.WARDROBE;
     }
 
     static Insets workspaceInsetsFor(LauncherView view) {
@@ -456,7 +478,8 @@ public final class LauncherShell {
             return Insets.EMPTY;
         }
         Insets pageInsets = LauncherLayout.WORKSPACE_INSETS;
-        double right = view == LauncherView.DISCOVER ? pageInsets.getRight() : 0;
+        boolean boundedWorkspace = view == LauncherView.DISCOVER || view == LauncherView.LIBRARY || view == LauncherView.WARDROBE;
+        double right = boundedWorkspace ? pageInsets.getRight() : 0;
         return new Insets(pageInsets.getTop(), right, 0, pageInsets.getLeft());
     }
 
@@ -465,9 +488,10 @@ public final class LauncherShell {
             return Insets.EMPTY;
         }
         Insets pageInsets = LauncherLayout.WORKSPACE_INSETS;
-        boolean launcherPage = view == LauncherView.PLAY || view == LauncherView.LIBRARY;
+        boolean launcherPage = view == LauncherView.PLAY || view == LauncherView.LIBRARY || view == LauncherView.WARDROBE;
         double top = view == LauncherView.DISCOVER || launcherPage ? 0 : 16;
-        double right = view == LauncherView.DISCOVER ? 0 : pageInsets.getRight();
+        boolean boundedWorkspace = view == LauncherView.DISCOVER || view == LauncherView.LIBRARY || view == LauncherView.WARDROBE;
+        double right = boundedWorkspace ? 0 : pageInsets.getRight();
         return new Insets(top, right, pageInsets.getBottom(), 0);
     }
 
@@ -510,6 +534,7 @@ public final class LauncherShell {
         bar.getChildren().addAll(brand, spacer);
         addLocalizedNav(bar, LauncherView.PLAY, "nav.play", LauncherIcons.Glyph.ZAP);
         addLocalizedNav(bar, LauncherView.LIBRARY, "nav.library", LauncherIcons.Glyph.SAVE);
+        addLocalizedNav(bar, LauncherView.WARDROBE, "nav.wardrobe", LauncherIcons.Glyph.PALETTE);
         Button browseButton = browseMenu.button();
         navButtons.put(LauncherView.DISCOVER, browseButton);
         bar.getChildren().add(browseButton);
@@ -1010,6 +1035,8 @@ public final class LauncherShell {
                 notificationsController.view(),
                 settingsController.view()
         );
+        if (wardrobeController != null) viewDeck.getChildren().add(wardrobeController.view());
+        else if (wardrobeError != null) viewDeck.getChildren().add(wardrobeError);
     }
 
     private void startCatalogInitialLoads() {

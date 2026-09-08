@@ -52,6 +52,8 @@ import javafx.scene.layout.VBox;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.util.StringConverter;
+import net.modtale.launcher.ui.common.LauncherSkeleton;
+import net.modtale.launcher.ui.common.LauncherSkeletonContent;
 import net.modtale.launcher.api.ModtaleApiClient;
 import net.modtale.launcher.api.ProjectSearchQuery;
 import net.modtale.launcher.discord.DiscordRichPresenceService;
@@ -103,7 +105,7 @@ public final class LauncherPlayController {
     private static final int CATALOG_SHELF_LIMIT = 6;
     private static final double CATALOG_CARD_WIDTH = 336;
     private static final double CATALOG_GRID_GAP = 18;
-    private static final double CATALOG_EDGE_FADE_WIDTH = 52;
+    private static final double CATALOG_EDGE_FADE_WIDTH = 64;
     private static final double CATALOG_GRID_CARD_BODY_HEIGHT = 178;
     private static final double CATALOG_CARD_HEIGHT = Math.round(CATALOG_CARD_WIDTH / 3.0) + CATALOG_GRID_CARD_BODY_HEIGHT;
     private static final double CATALOG_SCROLL_HEIGHT = CATALOG_CARD_HEIGHT + 18;
@@ -619,9 +621,9 @@ public final class LauncherPlayController {
         edgeFade.setMinWidth(CATALOG_EDGE_FADE_WIDTH);
         edgeFade.setPrefWidth(CATALOG_EDGE_FADE_WIDTH);
         edgeFade.setMaxWidth(CATALOG_EDGE_FADE_WIDTH);
-        edgeFade.setMinHeight(CATALOG_CARD_HEIGHT + 8);
-        edgeFade.setPrefHeight(CATALOG_CARD_HEIGHT + 8);
-        edgeFade.setMaxHeight(CATALOG_CARD_HEIGHT + 8);
+        edgeFade.setMinHeight(CATALOG_SCROLL_HEIGHT);
+        edgeFade.setPrefHeight(CATALOG_SCROLL_HEIGHT);
+        edgeFade.setMaxHeight(CATALOG_SCROLL_HEIGHT);
         edgeFade.opacityProperty().bind(Bindings.createDoubleBinding(
                 () -> catalogEdgeFadeOpacity(shelf.scroll.getHvalue(), shelf.scroll.getHmin(), shelf.scroll.getHmax()),
                 shelf.scroll.hvalueProperty(),
@@ -1115,7 +1117,7 @@ public final class LauncherPlayController {
             return;
         }
         friendsLoading = true;
-        setFriendsMessage("Loading Hytale friends...");
+        renderFriendsLoading();
         CompletableFuture.supplyAsync(() -> hytaleAuthService.getFriends(settingsController.settings()), executor)
                 .whenComplete((friends, error) -> Platform.runLater(() -> {
                     friendsLoading = false;
@@ -1138,6 +1140,12 @@ public final class LauncherPlayController {
                     loadedFriendsKey = friendsKey;
                     renderFriends(friends == null ? List.of() : friends);
                 }));
+    }
+
+    private void renderFriendsLoading() {
+        friendsList.getChildren().clear();
+        for (int i = 0; i < 3; i++) friendsList.getChildren().add(LauncherSkeleton.of(
+                friendRow(new HytaleFriend("", "Community friend", "Online", "", true))));
     }
 
     private void renderFriends(List<HytaleFriend> friends) {
@@ -1236,7 +1244,7 @@ public final class LauncherPlayController {
     private void loadBlogPosts() {
         blogPostsLoading = true;
         blogPostsComplete = false;
-        newsList.getChildren().setAll(messageRow("Loading Hytale posts..."));
+        renderNewsLoading();
         CompletableFuture.supplyAsync(hytaleAuthService::getAllBlogPosts, executor)
                 .whenComplete((posts, error) -> Platform.runLater(() -> {
                     blogPostsLoading = false;
@@ -1247,6 +1255,12 @@ public final class LauncherPlayController {
                     blogPostsLoaded = true;
                     renderInitialBlogPosts(posts == null ? List.of() : posts);
                 }));
+    }
+
+    private void renderNewsLoading() {
+        newsList.getChildren().clear();
+        for (int i = 0; i < 3; i++) newsList.getChildren().add(LauncherSkeleton.of(
+                blogPostRow(new HytaleBlogPost("The latest news from Hytale", "", "", java.time.Instant.parse(LauncherSkeletonContent.DATE)))));
     }
 
     private void renderInitialBlogPosts(List<HytaleBlogPost> posts) {

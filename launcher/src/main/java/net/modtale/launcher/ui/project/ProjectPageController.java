@@ -72,6 +72,8 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import net.modtale.launcher.ui.common.LauncherSkeleton;
+import net.modtale.launcher.ui.common.LauncherSkeletonContent;
 import net.modtale.launcher.api.ModtaleApiClient;
 import net.modtale.launcher.platform.SystemBrowser;
 import net.modtale.launcher.model.project.ProjectClassification;
@@ -1242,7 +1244,7 @@ public final class ProjectPageController {
         VBox.setMargin(panel, LauncherLayout.launcherPageInsets(panelTopMargin, 56));
 
         Node header = header(summary, detail, loading);
-        Node body = body(summary, detail);
+        Node body = loading && detail == null && !wikiMode ? LauncherSkeleton.of(body(summary, LauncherSkeletonContent.detail())) : body(summary, detail);
         panel.getChildren().addAll(header, body);
         if (!compactLayout && body instanceof Region bodyRegion) {
             panel.minHeightProperty().bind(Bindings.createDoubleBinding(
@@ -1597,6 +1599,7 @@ public final class ProjectPageController {
                 this::loadWikiPage,
                 this::prefetchWikiPage,
                 this::closeWiki,
+                wikiLoading && !wikiError,
                 compactLayout
         );
         if (compactLayout) {
@@ -1633,7 +1636,7 @@ public final class ProjectPageController {
                 detail,
                 currentComments,
                 commentUserProfiles,
-                detail == null || commentsLoading,
+                commentsLoading,
                 commentSubmitting,
                 commentsTotalCount,
                 commentsHasMore,
@@ -1872,21 +1875,60 @@ public final class ProjectPageController {
             return null;
         }
         List<String> sorted = orderedSupportedVersions(versions);
-        VBox groups = new VBox(8);
+        VBox groups = new VBox();
         groups.getStyleClass().add("project-detail-version-groups");
         for (GameVersionGroups.Group group : GameVersionGroups.build(sorted)) {
-            if (!group.grouped()) {
-                groups.getChildren().add(chip(group.versions().getFirst(), "project-detail-version-chip"));
-                continue;
+            VBox entry = new VBox();
+            entry.getStyleClass().add("project-detail-version-entry");
+            if (!groups.getChildren().isEmpty()) entry.getStyleClass().add("separated");
+            Label name = new Label(group.grouped() ? group.label() : group.versions().getFirst());
+            name.getStyleClass().add("project-detail-version-name");
+            name.setWrapText(true);
+            name.setMinWidth(0);
+            name.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(name, Priority.ALWAYS);
+            Label count = new Label(group.versions().size() + (group.versions().size() == 1 ? " version" : " versions"));
+            count.getStyleClass().add("project-detail-version-count");
+            count.setMinWidth(Region.USE_PREF_SIZE);
+            javafx.scene.layout.StackPane indicator = new javafx.scene.layout.StackPane();
+            indicator.setMinWidth(12);
+            indicator.setPrefWidth(12);
+            indicator.setMaxWidth(12);
+            HBox row = new HBox(12, name, count, indicator);
+            row.setAlignment(Pos.CENTER_LEFT);
+            row.setMaxWidth(Double.MAX_VALUE);
+            if (group.grouped()) {
+                Node arrow = LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_RIGHT, 12);
+                indicator.getChildren().add(arrow);
+                VBox children = new VBox(8);
+                children.getStyleClass().add("project-detail-version-group-children");
+                group.versions().forEach(version -> {
+                    Label release = new Label(version);
+                    release.setWrapText(true);
+                    release.setMinWidth(0);
+                    release.getStyleClass().add("project-detail-version-release");
+                    children.getChildren().add(release);
+                });
+                children.setVisible(false);
+                children.setManaged(false);
+                javafx.scene.control.ToggleButton toggle = new javafx.scene.control.ToggleButton();
+                toggle.getStyleClass().add("project-detail-version-row");
+                toggle.setMaxWidth(Double.MAX_VALUE);
+                toggle.setGraphic(row);
+                row.prefWidthProperty().bind(toggle.widthProperty().subtract(24));
+                toggle.setAccessibleText("Expand " + group.label() + " versions");
+                toggle.selectedProperty().addListener((observable, previous, expanded) -> {
+                    children.setVisible(expanded);
+                    children.setManaged(expanded);
+                    arrow.setRotate(expanded ? 90 : 0);
+                    toggle.setAccessibleText((expanded ? "Collapse " : "Expand ") + group.label() + " versions");
+                });
+                entry.getChildren().addAll(toggle, children);
+            } else {
+                row.getStyleClass().add("project-detail-version-row");
+                entry.getChildren().add(row);
             }
-            FlowPane children = new FlowPane(6, 6);
-            children.getStyleClass().add("project-detail-version-group-children");
-            group.versions().forEach(version -> children.getChildren().add(chip(version, "project-detail-version-chip")));
-            TitledPane dropdown = new TitledPane(group.label() + "  ·  " + group.versions().size(), children);
-            dropdown.getStyleClass().add("project-detail-version-group");
-            dropdown.setExpanded(false);
-            dropdown.setAnimated(false);
-            groups.getChildren().add(dropdown);
+            groups.getChildren().add(entry);
         }
         return section("Supported Versions", LauncherIcons.Glyph.ZAP, groups);
     }
@@ -2725,25 +2767,41 @@ public final class ProjectPageController {
                     : "This project does not have a public changelog yet.");
             subtitle.getStyleClass().add("project-changelog-empty-subtitle");
             if (loading) {
-                empty.getChildren().add(NativeSpinner.centered());
+                for (int i = 0; i < 3; i++) list.getChildren().add(loadingChangelogCard());
             } else {
                 Label title = new Label("No versions to show.");
                 title.getStyleClass().add("project-changelog-empty-title");
                 empty.getChildren().add(title);
             }
-            empty.getChildren().add(subtitle);
-            list.getChildren().add(empty);
+            if (!loading) {
+                empty.getChildren().add(subtitle);
+                list.getChildren().add(empty);
+            }
         } else {
             visibleEntries.forEach(entry -> list.getChildren().add(changelogCard(entry)));
             if (loading) {
-                list.getChildren().add(NativeSpinner.inline(16));
+                list.getChildren().add(loadingChangelogCard());
             }
         }
 
         scroll.setContent(list);
-        scroll.setPrefViewportHeight(preferredChangelogViewportHeight(visibleEntries));
+        List<ChangelogEntry> layoutEntries = new ArrayList<>(visibleEntries);
+        if (loading) {
+            int placeholders = visibleEntries.isEmpty() ? 3 : 1;
+            for (int i = 0; i < placeholders; i++) layoutEntries.add(placeholderChangelog());
+        }
+        scroll.setPrefViewportHeight(preferredChangelogViewportHeight(layoutEntries));
         modal.getChildren().addAll(header, scroll);
         return modal;
+    }
+
+    private Node loadingChangelogCard() {
+        return LauncherSkeleton.of(changelogCard(placeholderChangelog()));
+    }
+
+    private static ChangelogEntry placeholderChangelog() {
+        ProjectVersion version = LauncherSkeletonContent.version();
+        return ChangelogEntry.from(version, version.changelog());
     }
 
     private HBox changelogHeader(List<ChangelogEntry> entries) {

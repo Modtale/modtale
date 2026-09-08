@@ -121,6 +121,19 @@ public final class ProjectBrowserRenderer {
         }
     }
 
+    public void renderLoading(ProjectCardViewStyle style, int pageSize) {
+        LayoutMetrics layout = layoutMetricsFor(style, pageSize);
+        Node container = resultsContainer(style, layout);
+        int count = Math.min(layout.pageSize(), style == ProjectCardViewStyle.LIST ? 4 : layout.columns() * 2);
+        for (int i = 0; i < count; i++) {
+            Node card = projectCardFactory.loading(style, layout.cardWidth(), layout.cardHeight());
+            if (container instanceof GridPane grid) grid.add(card, i % layout.columns(), i / layout.columns());
+            else if (container instanceof VBox list) list.getChildren().add(card);
+        }
+        projectResults.getChildren().setAll(container);
+        lastRenderedLayout = LayoutMetrics.unset();
+    }
+
     public boolean shouldRenderForLayout(ProjectCardViewStyle cardViewStyle) {
         return shouldRenderForLayout(cardViewStyle, pageSizeForView(cardViewStyle));
     }

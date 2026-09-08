@@ -1,6 +1,10 @@
 package net.modtale.launcher.ui.shell;
 
 import java.util.Objects;
+import java.io.IOException;
+import net.modtale.launcher.ui.wardrobe.LauncherWardrobeController;
+import net.modtale.launcher.wardrobe.WardrobeApiClient;
+import net.modtale.launcher.wardrobe.WardrobeStore;
 import javafx.application.Application;
 import javafx.scene.Node;
 import javafx.scene.layout.StackPane;
@@ -27,6 +31,7 @@ public final class LauncherRuntime {
 
     private LauncherServices services;
     private LauncherShell shell;
+    private LauncherWardrobeController wardrobeController;
 
     private LauncherRuntime() {
     }
@@ -195,6 +200,15 @@ public final class LauncherRuntime {
                 services.accountImageLoader(),
                 viewDeck
         );
+        try {
+            wardrobeController = new LauncherWardrobeController(
+                    new WardrobeApiClient(services.hytaleAuthService()),
+                    new WardrobeStore(services.settingsStore().settingsPath().getParent()),
+                    settingsController::settings, feedback, services.executor());
+            shell.attachWardrobe(wardrobeController);
+        } catch (IOException ex) {
+            shell.attachWardrobeError("The local wardrobe file could not be read. Check wardrobe.json in the launcher settings folder.");
+        }
         playController.setOnHytaleAccountsChanged(shell::onHytaleAccountsChanged);
         accountController.setOnSignedIn(shell::onModtaleSignedIn);
         accountController.setOnSignedOut(shell::onModtaleSignedOut);
@@ -205,6 +219,7 @@ public final class LauncherRuntime {
     }
 
     public void shutdown() {
+        if (wardrobeController != null) wardrobeController.close();
         if (services != null) {
             services.shutdown();
         }
