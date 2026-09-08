@@ -44,8 +44,6 @@ public final class CosmeticEditorController implements AutoCloseable {
     private final FlowPane grid = new FlowPane(12, 12);
     private final FlowPane colors = new FlowPane(7, 7);
     private final ComboBox<String> variant = new ComboBox<>();
-    private final TextField search = new TextField();
-    private final Label title = text("Customize your character", "wardrobe-section-title");
     private final Label state = text("Loading the character creator…", "wardrobe-muted");
     private final Label choiceName = text("Your look", "wardrobe-selected-title");
     private final Label requirement = text("", "wardrobe-muted");
@@ -110,13 +108,9 @@ public final class CosmeticEditorController implements AutoCloseable {
         hideWhenEmpty(state); hideWhenEmpty(requirement); hideWhenEmpty(changes);
         Button current = button("Load current look", LauncherIcons.Glyph.REFRESH_CW, this::loadCurrent);
         FlowPane toolbar = new FlowPane(8, 8, current, undo, redo, reset, ownedOnly); toolbar.setAlignment(Pos.CENTER_LEFT);
-        search.setPromptText("Find a cosmetic"); search.getStyleClass().add("wardrobe-search");
-        search.setOnAction(e -> { page = 1; browse(); }); HBox.setHgrow(search, Priority.ALWAYS);
         ownedOnly.setSelected(true);
         ownedOnly.getStyleClass().add("cosmetic-owned-filter");
         ownedOnly.setOnAction(e -> { page = 1; browse(); });
-        HBox searchRow = new HBox(10, search, button("Search", LauncherIcons.Glyph.SEARCH, () -> { page = 1; browse(); }));
-        searchRow.setAlignment(Pos.CENTER_LEFT);
         categoryRail.setMinWidth(0); categoryRail.setPrefWidth(160); categoryRail.getStyleClass().add("cosmetic-category-rail");
         ScrollPane categories = new ScrollPane(categoryRail); categories.setFitToWidth(true);
         categories.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER); categories.setPrefViewportHeight(670);
@@ -125,7 +119,7 @@ public final class CosmeticEditorController implements AutoCloseable {
         previous.setOnAction(e -> { page = Math.max(1, page - 1); browse(); });
         next.setOnAction(e -> { page++; browse(); });
         HBox pagination = new HBox(12, previous, pageLabel, next); pagination.setAlignment(Pos.CENTER);
-        selectionPanel.getChildren().addAll(title, searchRow, grid, pagination);
+        selectionPanel.getChildren().addAll(grid, pagination);
         selectionPanel.setMinWidth(0); HBox.setHgrow(selectionPanel, Priority.ALWAYS);
         inspector.getStyleClass().add("wardrobe-inspector"); inspector.setPrefWidth(310); inspector.setMinWidth(270);
         inspector.setMaxHeight(Region.USE_PREF_SIZE);
@@ -186,28 +180,27 @@ public final class CosmeticEditorController implements AutoCloseable {
         for (CosmeticCategory entry : catalog.categories()) {
             Button button = new Button(entry.label()); button.getStyleClass().add("cosmetic-category");
             button.setMaxWidth(Double.MAX_VALUE); button.setAlignment(Pos.CENTER_LEFT);
-            button.setOnAction(e -> { category = entry.key(); page = 1; search.clear(); browse(); });
+            button.setOnAction(e -> { category = entry.key(); page = 1; browse(); });
             categoryButtons.put(entry.key(), button); categoryRail.getChildren().add(button);
         }
     }
 
     private void browse() {
         if (catalog == null || disposed) return;
-        long ticket = ++generation; String key = category; String query = search.getText().trim(); int requestedPage = page;
+        long ticket = ++generation; String key = category; int requestedPage = page;
         boolean filterOwned = ownedOnly.isSelected(); boolean known = permissionsKnown;
         Map<String, Set<String>> permissions = unlocked;
         categoryButtons.forEach((id, button) -> button.pseudoClassStateChanged(SELECTED, id.equals(key)));
-        title.setText(catalog.categories().stream().filter(c -> c.key().equals(key)).map(CosmeticCategory::label).findFirst().orElse(key));
         state.setText("Loading cosmetics…");
         CompletableFuture.supplyAsync(() -> {
             try {
-                if (!filterOwned) return catalog.browseAssets(key, query, requestedPage, 12);
+                if (!filterOwned) return catalog.browseAssets(key, "", requestedPage, 12);
                 List<CosmeticOption> choices = new ArrayList<>();
                 if (known) {
                     int sourcePage = 1;
                     CosmeticCatalogClient.Page batch;
                     do {
-                        batch = catalog.browseAssets(key, query, sourcePage++, 100);
+                        batch = catalog.browseAssets(key, "", sourcePage++, 100);
                         for (CosmeticOption option : batch.options())
                             if (permissions.getOrDefault(key, Set.of()).contains(option.assetId())) choices.add(option);
                     } while (batch.hasNext());
@@ -334,7 +327,7 @@ public final class CosmeticEditorController implements AutoCloseable {
 
     public void editCape(String cape) {
         if (cape == null || cape.isBlank()) return;
-        category = "cape"; page = 1; search.clear();
+        category = "cape"; page = 1;
         if (draft == null) { pendingCape = cape; refresh(); }
         else { draft.choose("cape", cape); changed(); browse(); }
     }
