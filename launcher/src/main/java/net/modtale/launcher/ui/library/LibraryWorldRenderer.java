@@ -42,7 +42,7 @@ import net.modtale.launcher.ui.common.LauncherIcons;
 
 final class LibraryWorldRenderer {
 
-    private static final double PROJECT_ICON_SIZE = 46;
+    private static final double PROJECT_ICON_SIZE = 64;
     private static final double CONTENT_ICON_SIZE = 34;
     private static final PseudoClass CONTENTS_HOVERED = PseudoClass.getPseudoClass("contents-hovered");
 
@@ -218,6 +218,13 @@ final class LibraryWorldRenderer {
 
         StackPane icon = projectIcon(model, PROJECT_ICON_SIZE);
         VBox copy = projectCopy(model);
+        var iconSize = copy.heightProperty().map(height -> Math.max(46, height.doubleValue()));
+        icon.minWidthProperty().bind(iconSize);
+        icon.prefWidthProperty().bind(iconSize);
+        icon.maxWidthProperty().bind(iconSize);
+        icon.minHeightProperty().bind(iconSize);
+        icon.prefHeightProperty().bind(iconSize);
+        icon.maxHeightProperty().bind(iconSize);
         HBox.setHgrow(copy, Priority.ALWAYS);
 
         HBox actions = projectActions(model, configs);
@@ -511,10 +518,10 @@ final class LibraryWorldRenderer {
             ImageView fallback = new ImageView();
             fallback.fitWidthProperty().bind(shell.widthProperty().subtract(4));
             fallback.fitHeightProperty().bind(shell.heightProperty().subtract(4));
-            fallback.setPreserveRatio(false);
+            fallback.setPreserveRatio(true);
             fallback.setSmooth(true);
             fallback.setClip(roundedClip(shell, clipRadius));
-            imageLoader.loadInto(fallback, null, mediaSize * 2, mediaSize * 2);
+            imageLoader.loadInto(fallback, null, mediaSize * 3, mediaSize * 3, true);
             shell.getChildren().add(fallback);
         }
 
@@ -522,10 +529,11 @@ final class LibraryWorldRenderer {
             ImageView image = new ImageView();
             image.fitWidthProperty().bind(shell.widthProperty().subtract(4));
             image.fitHeightProperty().bind(shell.heightProperty().subtract(4));
+            image.setPreserveRatio(true);
             image.setSmooth(true);
             image.setMouseTransparent(true);
             image.setClip(roundedClip(shell, clipRadius));
-            imageLoader.loadInto(image, iconUrl, mediaSize, mediaSize);
+            imageLoader.loadInto(image, iconUrl, mediaSize * 3, mediaSize * 3, true);
             shell.getChildren().add(image);
             return shell;
         }
