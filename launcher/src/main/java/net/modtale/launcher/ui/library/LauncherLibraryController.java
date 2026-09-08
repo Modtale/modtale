@@ -539,7 +539,8 @@ public final class LauncherLibraryController {
                 .whenComplete((result, error) -> Platform.runLater(() -> {
                     Map<String, ProjectMeta> loaded = error == null && result != null ? result : Map.of();
                     for (String id : missing) {
-                        projectMetadata.put(id, loaded.getOrDefault(id, fallbackMeta()));
+                        ProjectMeta meta = loaded.get(id);
+                        if (meta != null) projectMetadata.put(id, meta);
                         loadingMetadataIds.remove(id);
                     }
                     renderWorldDetail();
@@ -549,21 +550,16 @@ public final class LauncherLibraryController {
     private List<String> metadataProjectIds() {
         LinkedHashSet<String> ids = new LinkedHashSet<>();
         for (InstalledProject project : installedProjects) {
-            if (!project.projectId().isBlank()
-                    && (project.source().isBlank() || InstalledProject.SOURCE_MODTALE.equalsIgnoreCase(project.source()))) {
+            if (LibraryProjectSupport.isManagedProject(project)) {
                 ids.add(project.projectId());
             }
             for (InstalledProjectReference reference : bundledReferences(project)) {
-                if (reference.isModtaleProject()) {
+                if (reference.isModtaleProject() || reference.projectId().startsWith("curseforge:")) {
                     ids.add(reference.projectId());
                 }
             }
         }
         return List.copyOf(ids);
-    }
-
-    private ProjectMeta fallbackMeta() {
-        return new ProjectMeta("", "", "", "", "", 0, "", "");
     }
 
     private void renderWorldRows() {
@@ -1198,7 +1194,7 @@ public final class LauncherLibraryController {
 
     private void ensureProjectDetailLoaded(InstalledProject installed) {
         if (installed == null
-                || !LibraryProjectSupport.isModtaleProject(installed)
+                || !LibraryProjectSupport.isManagedProject(installed)
                 || projectDetails.containsKey(installed.projectId())
                 || loadingProjectIds.contains(installed.projectId())) {
             return;

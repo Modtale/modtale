@@ -289,7 +289,7 @@ final class LibraryWorldRenderer {
 
     private HBox projectActions(LibraryWorldProjectModel model, List<ConfigFile> configs) {
         InstalledProject installed = model.installed();
-        boolean modtaleProject = LibraryProjectSupport.isModtaleProject(installed);
+        boolean managedProject = LibraryProjectSupport.isManagedProject(installed);
         HBox actions = new HBox(6);
         actions.getStyleClass().add("library-world-project-actions");
         actions.setAlignment(Pos.CENTER_RIGHT);
@@ -298,7 +298,7 @@ final class LibraryWorldRenderer {
             addConfigButton(actions, model.display().title(), model.modIds(), configs);
         }
 
-        if (modtaleProject && model.update() != null) {
+        if (managedProject && model.update() != null) {
             Button update = primaryButton("Update");
             update.getStyleClass().add("small");
             update.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 13));
@@ -309,19 +309,19 @@ final class LibraryWorldRenderer {
 
         Button versions = iconAction(
                 LauncherIcons.Glyph.LAYERS,
-                !modtaleProject
-                        ? "Local files do not have Modtale version history"
+                !managedProject
+                        ? "Local files do not have provider version history"
                         : model.loading()
                         ? "Loading release metadata"
                         : model.detail() == null ? "Load available versions" : "Version controls are ready below",
                 "neutral",
                 () -> {
-                    if (modtaleProject) {
+                    if (managedProject) {
                         loadVersions.accept(installed);
                     }
                 }
         );
-        versions.setDisable(!modtaleProject || model.detail() != null || model.loading());
+        versions.setDisable(!managedProject || model.detail() != null || model.loading());
 
         actions.getChildren().add(versions);
         if (model.display().unlockVisible()) {

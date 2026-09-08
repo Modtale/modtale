@@ -12,6 +12,38 @@ import org.junit.jupiter.api.Test;
 class LibraryProjectSupportTest {
 
     @Test
+    void curseForgeProjectsUseProviderMetadataAndVersionRoutes() {
+        InstalledProject installed = new InstalledProject(
+                "curseforge:1450386", "simple-compost", "Local manifest title", "PLUGIN",
+                "1.0.0", "8747324", "Early Access", Instant.EPOCH, Instant.EPOCH,
+                List.of(), List.of(), List.of(), InstalledProject.SOURCE_CURSEFORGE,
+                InstalledProject.INSTALL_DIRECT, false, List.of());
+        var meta = new net.modtale.launcher.model.project.ProjectMeta(
+                "Simple Compost", "Compost things", "https://example.com/icon.png", "Builder",
+                "MOD", 798, "", "curseforge:1450386");
+        assertTrue(LibraryProjectSupport.isManagedProject(installed));
+        assertEquals("curseforge:1450386", LibraryProjectSupport.routeKey(installed));
+        var display = LibraryWorldProjectDisplay.root(installed, meta);
+        assertEquals("Simple Compost", display.title());
+        assertEquals("Builder", display.author());
+        assertEquals(meta.icon(), display.icon());
+        assertEquals("MOD", display.classification());
+        assertEquals("1.0.0", display.version());
+        org.junit.jupiter.api.Assertions.assertFalse(display.localFile());
+    }
+
+    @Test
+    void localFilesRemainUnmanaged() {
+        InstalledProject installed = new InstalledProject(
+                "local:example", "example", "Example", "PLUGIN", "1", "", "",
+                Instant.EPOCH, Instant.EPOCH, List.of(), List.of(), List.of(),
+                InstalledProject.SOURCE_LOCAL, InstalledProject.INSTALL_DIRECT, false, List.of());
+        org.junit.jupiter.api.Assertions.assertFalse(LibraryProjectSupport.isManagedProject(installed));
+        assertTrue(LibraryWorldProjectDisplay.root(installed, null).localFile());
+        assertTrue(LibraryProjectSupport.isManagedProject(installedProject("1", "")));
+    }
+
+    @Test
     void versionChoicesKeepReleasesForOtherGameVersions() {
         InstalledProject installed = installedProject("1.0.0", "2026.03.11");
         ProjectVersion installedVersion = version("1.0.0", "2026.03.11", "2026-03-01T00:00:00Z");

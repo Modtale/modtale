@@ -229,6 +229,8 @@ public class ModtaleApiClient {
     }
 
     public ProjectMeta getProjectMeta(String idOrSlug) {
+        Long curseForgeId = curseForgeId(idOrSlug);
+        if (curseForgeId != null) return nyoCfClient.projectMeta(curseForgeId);
         return get("/projects/" + encodePath(idOrSlug) + "/meta", ProjectMeta.class);
     }
 
@@ -239,14 +241,31 @@ public class ModtaleApiClient {
                 .filter(id -> id != null && !id.isBlank())
                 .map(String::trim)
                 .distinct()
-                .limit(50)
                 .toList();
         if (ids.isEmpty()) {
             return Map.of();
         }
-        List<String> params = new ArrayList<>();
-        addParam(params, "ids", String.join(",", ids));
-        return get("/projects/meta?" + String.join("&", params), new TypeReference<>() {});
+        Map<String, ProjectMeta> result = new java.util.LinkedHashMap<>();
+        List<String> modtaleIds = ids.stream().filter(id -> curseForgeId(id) == null).toList();
+        for (int offset = 0; offset < modtaleIds.size(); offset += 50) {
+            List<String> params = new ArrayList<>();
+            addParam(params, "ids", String.join(",", modtaleIds.subList(offset, Math.min(offset + 50, modtaleIds.size()))));
+            try {
+                Map<String, ProjectMeta> batch = get("/projects/meta?" + String.join("&", params), new TypeReference<>() {});
+                result.putAll(batch);
+            } catch (ModtaleApiException ignored) {
+                // Keep metadata from other batches and providers available.
+            }
+        }
+        for (String id : ids) {
+            if (curseForgeId(id) == null) continue;
+            try {
+                result.put(id, getProjectMeta(id));
+            } catch (ModtaleApiException ignored) {
+                // One unavailable project must not hide the rest of the library.
+            }
+        }
+        return result;
     }
 
     public CreatorProfile getUserProfile(String idOrHandle) {

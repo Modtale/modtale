@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentMap;
 import net.modtale.launcher.model.project.DownloadUrlResponse;
 import net.modtale.launcher.model.project.ProjectDetail;
 import net.modtale.launcher.model.project.ProjectPage;
+import net.modtale.launcher.model.project.ProjectMeta;
 import net.modtale.launcher.model.project.ProjectSummary;
 import net.modtale.launcher.model.project.ProjectVersion;
 
@@ -92,6 +93,16 @@ final class NyoCfClient {
         String normalized = value(classification).toLowerCase(Locale.ROOT);
         if (normalized.isBlank()) return null;
         return PROJECT_CLASSES.contains(normalized) ? normalized : "mods";
+    }
+
+    ProjectMeta projectMeta(long projectId) {
+        JsonNode project = metadata(projectId);
+        validateProject(project, projectId);
+        return new ProjectMeta(
+                text(project, "name"), text(project, "summary"),
+                project.path("logo").path("thumbnail_url").textValue(),
+                join(project.path("authors"), "name"), "MOD",
+                boundedInt(project.path("download_count").asLong()), null, "curseforge:" + projectId);
     }
 
     ProjectDetail project(long projectId) {

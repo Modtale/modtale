@@ -31,7 +31,7 @@ record LibraryWorldProjectDisplay(
                 meta == null ? "" : meta.icon(),
                 installed == null ? "" : installed.installedVersion(),
                 "",
-                installed != null && !LibraryProjectSupport.isModtaleProject(installed),
+                installed != null && !LibraryProjectSupport.isManagedProject(installed),
                 installed != null && installed.isModpack(),
                 installed != null && installed.isModpack()
         );

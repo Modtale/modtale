@@ -91,7 +91,13 @@ final class LibraryProjectSupport {
     }
 
     static String routeKey(InstalledProject installed) {
+        if (installed.projectId().startsWith("curseforge:")) return installed.projectId();
         return installed.slug() == null || installed.slug().isBlank() ? installed.projectId() : installed.slug();
+    }
+
+    static boolean isManagedProject(InstalledProject installed) {
+        return installed != null && !installed.projectId().isBlank()
+                && (isModtaleProject(installed) || installed.projectId().startsWith("curseforge:"));
     }
 
     static boolean isModtaleProject(InstalledProject installed) {

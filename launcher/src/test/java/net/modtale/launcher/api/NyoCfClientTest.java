@@ -38,6 +38,28 @@ class NyoCfClientTest {
     }
 
     @Test
+    void loadsLibraryMetadataWithoutRequestingFilesOrDescription() {
+        server.createContext("/api/v1/hytale/mods/1450386", exchange -> {
+            assertEquals("/api/v1/hytale/mods/1450386", exchange.getRequestURI().getPath());
+            respond(exchange, """
+                    {"id":1450386,"game_id":70216,"is_available":true,"name":"Simple Compost",
+                     "summary":"Compost things","download_count":798,
+                     "links":{"website":"https://www.curseforge.com/hytale/mods/simple-compost"},
+                     "logo":{"thumbnail_url":"https://media.forgecdn.net/icon.png"},
+                     "authors":[{"name":"Builder"},{"name":"Helper"}]}
+                    """);
+        });
+        var meta = client.projectMeta(1450386);
+        assertEquals("Simple Compost", meta.title());
+        assertEquals("Compost things", meta.description());
+        assertEquals("https://media.forgecdn.net/icon.png", meta.icon());
+        assertEquals("Builder, Helper", meta.author());
+        assertEquals("MOD", meta.classification());
+        assertEquals(798, meta.downloads());
+        assertEquals("curseforge:1450386", meta.slug());
+    }
+
+    @Test
     void mapsBrowseDetailVersionsAndExactVerifiedDownload() {
         AtomicInteger browseRequests = new AtomicInteger();
         AtomicInteger detailRequests = new AtomicInteger();
