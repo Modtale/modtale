@@ -36,6 +36,7 @@ public class LauncherUpdateService {
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
     private final String repository;
+    private final String apiBaseUrl;
 
     public LauncherUpdateService() {
         this(LauncherConfig.launcherUpdatesRepository());
@@ -49,6 +50,11 @@ public class LauncherUpdateService {
     }
 
     LauncherUpdateService(HttpClient httpClient, String repository) {
+        this(httpClient, repository, GITHUB_API_BASE_URL);
+    }
+
+    LauncherUpdateService(HttpClient httpClient, String repository, String apiBaseUrl) {
+        this.apiBaseUrl = apiBaseUrl;
         this.httpClient = httpClient;
         this.repository = LauncherConfig.normalizeLauncherUpdatesRepository(repository);
         this.mapper = new ObjectMapper()
@@ -56,14 +62,19 @@ public class LauncherUpdateService {
     }
 
     public Optional<LauncherUpdateCandidate> latestUpdate(String currentVersion) {
-        Optional<GitHubRelease> latestRelease = latestLauncherRelease();
+        return latestUpdate(currentVersion, "stable");
+    }
+
+    public Optional<LauncherUpdateCandidate> latestUpdate(String currentVersion, String channel) {
+        Optional<GitHubRelease> latestRelease = latestLauncherRelease(channel);
         if (latestRelease.isEmpty()) {
             return Optional.empty();
         }
 
         GitHubRelease release = latestRelease.get();
         String latestVersion = LauncherVersion.normalizeTagVersion(release.tagName());
-        if (!LauncherVersion.isNewer(latestVersion, currentVersion)) {
+        boolean switchingChannel = currentVersion.contains("-develop.") != "develop".equals(channel);
+        if (!switchingChannel && !LauncherVersion.isNewer(latestVersion, currentVersion)) {
             return Optional.empty();
         }
 
@@ -159,8 +170,29 @@ public class LauncherUpdateService {
                 .max(Comparator.comparingInt(name -> assetScore(name, osName, arch)));
     }
 
-    private Optional<GitHubRelease> latestLauncherRelease() {
-        URI uri = URI.create(GITHUB_API_BASE_URL + "/repos/" + encodePath(repository) + "/releases?per_page=30");
+    private Optional<GitHubRelease> latestLauncherRelease(String channel) {
+        for (int page = 1; ; page++) {
+            List<GitHubRelease> releases = releasePage(page);
+            Optional<GitHubRelease> release = releases.stream()
+                    .filter(candidate -> matchesChannel(candidate.tagName(), candidate.draft(), candidate.prerelease(), channel))
+                    .findFirst();
+            if (release.isPresent() || releases.size() < 100) {
+                return release;
+            }
+        }
+    }
+
+    static boolean matchesChannel(String tag, boolean draft, boolean prerelease, String channel) {
+        if (draft || tag == null) {
+            return false;
+        }
+        return "develop".equals(channel)
+                ? prerelease && tag.startsWith("launcher-develop-v")
+                : !prerelease && (tag.startsWith("launcher-stable-v") || tag.startsWith("launcher-v"));
+    }
+
+    private List<GitHubRelease> releasePage(int page) {
+        URI uri = URI.create(apiBaseUrl + "/repos/" + encodePath(repository) + "/releases?per_page=100&page=" + page);
         HttpRequest request = requestBuilder(uri)
                 .header("Accept", "application/vnd.github+json")
                 .GET()
@@ -172,15 +204,8 @@ public class LauncherUpdateService {
             LOG.info("GET " + LogSanitizer.uri(uri) + " -> HTTP "
                     + response.statusCode() + " in " + Math.max(0, System.currentTimeMillis() - started) + "ms");
             ensureSuccess(response.statusCode(), uri.toString());
-            List<GitHubRelease> releases = mapper.readValue(response.body(), new TypeReference<>() {
+            return mapper.readValue(response.body(), new TypeReference<>() {
             });
-            return releases.stream()
-                    .filter(release -> !release.draft() && !release.prerelease())
-                    .filter(this::isLauncherRelease)
-                    .max((left, right) -> LauncherVersion.compare(
-                            LauncherVersion.normalizeTagVersion(left.tagName()),
-                            LauncherVersion.normalizeTagVersion(right.tagName())
-                    ));
         } catch (IOException ex) {
             LOG.warn("Could not read launcher release metadata from " + LogSanitizer.uri(uri), ex);
             throw new ModtaleApiException("Could not read launcher release metadata from " + LogSanitizer.uri(uri), ex);
@@ -189,20 +214,6 @@ public class LauncherUpdateService {
             LOG.warn("Launcher update check was interrupted.", ex);
             throw new ModtaleApiException("Launcher update check was interrupted.", ex);
         }
-    }
-
-    private boolean isLauncherRelease(GitHubRelease release) {
-        String tagName = release.tagName() == null ? "" : release.tagName().toLowerCase(Locale.ROOT);
-        String releaseName = release.name() == null ? "" : release.name().toLowerCase(Locale.ROOT);
-        return tagName.startsWith("launcher-v")
-                || releaseName.contains("launcher")
-                || hasLauncherAsset(release.assets());
-    }
-
-    private boolean hasLauncherAsset(List<GitHubAsset> assets) {
-        return assets != null && assets.stream()
-                .map(GitHubAsset::name)
-                .anyMatch(LauncherUpdateService::isLauncherAssetName);
     }
 
     private Optional<GitHubAsset> compatibleAsset(List<GitHubAsset> assets, String osName, String arch) {
@@ -232,15 +243,6 @@ public class LauncherUpdateService {
                     && architectureMatchesOrIsUnspecified(name, normalizedArch);
         }
         return false;
-    }
-
-    private static boolean isLauncherAssetName(String assetName) {
-        String name = assetName == null ? "" : assetName.toLowerCase(Locale.ROOT);
-        return name.endsWith(".exe")
-                || name.endsWith(".msi")
-                || name.endsWith(".dmg")
-                || name.endsWith(".pkg")
-                || name.endsWith(".appimage");
     }
 
     private static int assetScore(String assetName, String osName, String arch) {

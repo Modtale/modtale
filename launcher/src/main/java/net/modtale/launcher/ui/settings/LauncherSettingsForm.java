@@ -33,6 +33,7 @@ public final class LauncherSettingsForm {
     private final TextField playHytaleJavaPathField = new TextField();
     private final ComboBox<String> hytaleBranchCombo = new ComboBox<>();
     private final ComboBox<HytaleVersion> hytaleVersionCombo = new ComboBox<>();
+    private final ComboBox<String> launcherChannelCombo = new ComboBox<>();
     private final ComboBox<LocaleOption> localeCombo = new ComboBox<>();
     private final CheckBox includeDependenciesCheck = new CheckBox();
     private final CheckBox includeOptionalCheck = new CheckBox();
@@ -61,7 +62,8 @@ public final class LauncherSettingsForm {
         hytaleBranchCombo.setOnAction(event -> hytaleVersionCombo.getItems().clear());
         styleInput(modsPathField, gameVersionField, hytaleGamePathField, hytaleUserDataPathField, hytaleJavaPathField,
                 playHytaleGamePathField, playHytaleUserDataPathField, playHytaleJavaPathField);
-        styleCombo(localeCombo, hytaleBranchCombo, hytaleVersionCombo);
+        launcherChannelCombo.setItems(FXCollections.observableArrayList("stable", "develop"));
+        styleCombo(localeCombo, hytaleBranchCombo, hytaleVersionCombo, launcherChannelCombo);
         includeDependenciesCheck.getStyleClass().add("native-check");
         includeOptionalCheck.getStyleClass().add("native-check");
         autoUpdatesCheck.getStyleClass().add("native-check");
@@ -131,6 +133,10 @@ public final class LauncherSettingsForm {
         return autoUpdatesCheck;
     }
 
+    public ComboBox<String> launcherChannelCombo() {
+        return launcherChannelCombo;
+    }
+
     public CheckBox launcherAutoUpdatesCheck() {
         return launcherAutoUpdatesCheck;
     }
@@ -151,6 +157,7 @@ public final class LauncherSettingsForm {
         settings.setIncludeOptionalDependencies(includeOptionalCheck.isSelected());
         settings.setAutoCheckUpdates(autoUpdatesCheck.isSelected());
         settings.setLauncherAutoUpdates(launcherAutoUpdatesCheck.isSelected());
+        settings.setLauncherChannel(launcherChannelCombo.getValue());
         LocaleOption selectedLocale = localeCombo.getValue();
         if (selectedLocale != null) {
             settings.setLocale(selectedLocale.locale().toLanguageTag());
@@ -173,6 +180,7 @@ public final class LauncherSettingsForm {
         includeOptionalCheck.setSelected(settings.isIncludeOptionalDependencies());
         autoUpdatesCheck.setSelected(settings.isAutoCheckUpdates());
         launcherAutoUpdatesCheck.setSelected(settings.isLauncherAutoUpdates());
+        launcherChannelCombo.setValue(settings.getLauncherChannel());
         localeCombo.getItems().stream()
                 .filter(option -> option.locale().getLanguage().equals(LauncherI18n.normalize(settings.getLocale()).getLanguage()))
                 .findFirst()

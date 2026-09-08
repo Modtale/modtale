@@ -2,15 +2,21 @@ name: Launcher Release
 
 on:
   push:
-    tags:
-      - 'v*'
-      - 'launcher-v*'
+    branches: [main, develop]
+    paths:
+      - 'launcher/**'
+      - '.github/workflows/launcher-release.yml'
+      - '.github/scripts/launcher-release-metadata.sh'
   workflow_dispatch:
     inputs:
       version:
-        description: Launcher version to package, for example 0.2.0
-        required: true
+        description: Optional numeric launcher version (otherwise generated from the run number)
+        required: false
         type: string
+
+concurrency:
+  group: launcher-release-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -23,28 +29,16 @@ jobs:
     outputs:
       tag: ${{ steps.version.outputs.tag }}
       version: ${{ steps.version.outputs.version }}
+      channel: ${{ steps.version.outputs.channel }}
     steps:
-      - name: Resolve launcher version
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Resolve launcher version and channel
         id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            raw_version="${{ inputs.version }}"
-            version="${raw_version#launcher-v}"
-            version="${version#v}"
-            tag="launcher-v$version"
-          else
-            tag="${GITHUB_REF_NAME}"
-            version="${tag#launcher-v}"
-            version="${version#v}"
-          fi
-
-          if ! [[ "$version" =~ ^[0-9]+(\.[0-9]+){0,2}([.-][A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?$ ]]; then
-            echo "::error::Launcher version '$version' is not a valid package version."
-            exit 1
-          fi
-
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: bash .github/scripts/launcher-release-metadata.sh
 
   package:
     name: Package Launcher (${{ matrix.name }})
@@ -187,6 +181,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       RELEASE_TAG: ${{ needs.metadata.outputs.tag }}
       LAUNCHER_VERSION: ${{ needs.metadata.outputs.version }}
+      RELEASE_CHANNEL: ${{ needs.metadata.outputs.channel }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -202,12 +197,23 @@ jobs:
 
       - name: Publish GitHub release
         run: |
-          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            if [ "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" != true ]; then
+              echo "::error::Release $RELEASE_TAG is already published; choose a new version."
+              exit 1
+            fi
+          else
             gh release create "$RELEASE_TAG" \
               --target "$GITHUB_SHA" \
-              --title "Modtale Launcher $LAUNCHER_VERSION" \
+              --title "Modtale Launcher $LAUNCHER_VERSION ($RELEASE_CHANNEL)" \
+              --draft \
               --generate-notes
           fi
 
           mapfile -d '' release_files < <(find launcher-dist -type f -print0)
           gh release upload "$RELEASE_TAG" "${release_files[@]}" SHA256SUMS --clobber
+          if [ "$RELEASE_CHANNEL" = develop ]; then
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest
+          fi

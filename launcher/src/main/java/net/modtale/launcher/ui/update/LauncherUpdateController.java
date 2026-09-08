@@ -29,6 +29,8 @@ public final class LauncherUpdateController {
     private final Supplier<Stage> stage;
 
     private boolean checkInFlight;
+    private String observedChannel;
+    private boolean pendingManualCheck;
 
     public LauncherUpdateController(
             LauncherUpdateService updateService,
@@ -42,6 +44,15 @@ public final class LauncherUpdateController {
         this.feedback = feedback;
         this.executor = executor;
         this.stage = stage;
+        observedChannel = settingsController.settings().getLauncherChannel();
+        settingsController.addSaveListener(() -> {
+            String channel = settingsController.settings().getLauncherChannel();
+            if (!channel.equals(observedChannel)) {
+                observedChannel = channel;
+                settingsController.setLauncherUpdateStatus("Checking " + channel + " channel...");
+                checkForUpdates(false);
+            }
+        });
     }
 
     public void checkOnStartup() {
@@ -55,9 +66,7 @@ public final class LauncherUpdateController {
 
     private void checkForUpdates(boolean manual) {
         if (checkInFlight) {
-            if (manual) {
-                feedback.showToast("Launcher update check", "A launcher update check is already running.");
-            }
+            pendingManualCheck |= manual;
             return;
         }
         checkInFlight = true;
@@ -66,26 +75,39 @@ public final class LauncherUpdateController {
         }
 
         String currentVersion = LauncherVersion.current();
-        CompletableFuture.supplyAsync(() -> updateService.latestUpdate(currentVersion), executor)
+        String channel = settingsController.settings().getLauncherChannel();
+        settingsController.setLauncherUpdateStatus("Checking " + channel + " channel...");
+        CompletableFuture.supplyAsync(() -> updateService.latestUpdate(currentVersion, channel), executor)
                 .whenComplete((update, error) -> Platform.runLater(() -> {
                     checkInFlight = false;
+                    if (!channel.equals(settingsController.settings().getLauncherChannel())) {
+                        boolean retryManually = pendingManualCheck;
+                        pendingManualCheck = false;
+                        checkForUpdates(retryManually);
+                        return;
+                    }
+                    boolean announce = manual || pendingManualCheck;
+                    pendingManualCheck = false;
                     if (error != null) {
                         Throwable cause = error.getCause() == null ? error : error.getCause();
+                        settingsController.setLauncherUpdateStatus("Could not check " + channel + " updates. Try again.");
                         feedback.log("Launcher update check failed: " + cause.getMessage());
-                        if (manual) {
+                        if (announce) {
                             feedback.showToast("Launcher update check failed", cause.getMessage());
                         }
                         return;
                     }
 
                     if (update.isEmpty()) {
-                        if (manual) {
-                            feedback.log("Launcher is up to date.");
-                            feedback.showToast("Launcher is up to date", "You are running Modtale Launcher " + currentVersion + ".");
+                        settingsController.setLauncherUpdateStatus("No update available on " + channel + ". Current version: " + currentVersion + ".");
+                        if (announce) {
+                            feedback.log("No launcher update available on " + channel + ".");
+                            feedback.showToast("No launcher update available", "Channel: " + channel + ". Current version: " + currentVersion + ".");
                         }
                         return;
                     }
 
+                    settingsController.setLauncherUpdateStatus("Update available on " + channel + ": " + update.get().displayVersion());
                     handleUpdate(update.get(), currentVersion);
                 }));
     }

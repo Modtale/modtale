@@ -47,6 +47,7 @@ public final class LauncherSettingsController {
     private Supplier<LauncherCacheService.ClearResult> clearCacheAction;
     private LauncherSettings settings;
     private Node view;
+    private final Label launcherUpdateStatus = new Label();
 
     public LauncherSettingsController(
             SettingsStore settingsStore,
@@ -74,6 +75,10 @@ public final class LauncherSettingsController {
         if (listener != null) {
             saveListeners.add(listener);
         }
+    }
+
+    public void setLauncherUpdateStatus(String message) {
+        launcherUpdateStatus.setText(message);
     }
 
     public void setLauncherUpdateCheckAction(Runnable launcherUpdateCheckAction) {
@@ -226,12 +231,17 @@ public final class LauncherSettingsController {
         I18N.bind(checkLauncher, "action.checkNow");
         checkLauncher.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.REFRESH_CW, 14));
         checkLauncher.setOnAction(event -> {
-            saveFromFields(false);
             if (launcherUpdateCheckAction != null) {
                 launcherUpdateCheckAction.run();
             }
         });
-        launcherUpdates.getChildren().addAll(launcherToggles, checkLauncher);
+        GridPane channelGrid = settingsGrid();
+        addField(channelGrid, 0, I18N.binding("settings.launcherUpdates.channel"), form.launcherChannelCombo());
+        Label channelDescription = new Label();
+        I18N.bind(channelDescription, "settings.launcherUpdates.channelsDescription");
+        channelDescription.setWrapText(true);
+        launcherUpdateStatus.setWrapText(true);
+        launcherUpdates.getChildren().addAll(channelGrid, channelDescription, launcherToggles, launcherUpdateStatus, checkLauncher);
 
         VBox cache = settingsActionCard("settings.cache.title", "settings.cache.description",
                 LauncherIcons.Glyph.DATABASE);

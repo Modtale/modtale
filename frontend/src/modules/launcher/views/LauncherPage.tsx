@@ -13,22 +13,9 @@ import {
 import { ROUTE_SEO } from '@/data/seo-constants';
 import { SiteRoutes } from '@/utils/routes';
 import { GLASS_CARD } from '@/modules/home/styles';
+import { fetchStableLauncherRelease, type GitHubRelease, type GitHubReleaseAsset } from '../utils/launcherReleases';
 
 type LauncherPlatform = 'windows' | 'mac' | 'linux' | 'unknown';
-
-type GitHubReleaseAsset = {
-    name: string;
-    browser_download_url: string;
-};
-
-type GitHubRelease = {
-    tag_name?: string;
-    name?: string;
-    html_url?: string;
-    draft?: boolean;
-    prerelease?: boolean;
-    assets?: GitHubReleaseAsset[];
-};
 
 type LauncherAsset = {
     name: string;
@@ -42,7 +29,6 @@ type ReleaseState = {
     assetsByPlatform: Partial<Record<Exclude<LauncherPlatform, 'unknown'>, LauncherAsset>>;
 };
 
-const GITHUB_RELEASES_API_URL = 'https://api.github.com/repos/Modtale/modtale/releases?per_page=30';
 const GITHUB_RELEASES_URL = 'https://github.com/Modtale/modtale/releases';
 const GITHUB_LATEST_RELEASE_URL = 'https://github.com/Modtale/modtale/releases/latest';
 
@@ -138,24 +124,6 @@ const detectPlatform = (): LauncherPlatform => {
     if (platformText.includes('mac') || platformText.includes('darwin')) return 'mac';
     if (platformText.includes('linux') || platformText.includes('x11')) return 'linux';
     return 'unknown';
-};
-
-const isLauncherAssetName = (assetName?: string) => {
-    const name = (assetName || '').toLowerCase();
-    return name.endsWith('.exe')
-        || name.endsWith('.msi')
-        || name.endsWith('.dmg')
-        || name.endsWith('.pkg')
-        || name.endsWith('.appimage');
-};
-
-const isLauncherRelease = (release: GitHubRelease) => {
-    const tagName = (release.tag_name || '').toLowerCase();
-    const releaseName = (release.name || '').toLowerCase();
-
-    return tagName.startsWith('launcher-v')
-        || releaseName.includes('launcher')
-        || Boolean(release.assets?.some((asset) => isLauncherAssetName(asset.name)));
 };
 
 const isCompatibleAsset = (assetName: string, platform: Exclude<LauncherPlatform, 'unknown'>) => {
@@ -374,18 +342,10 @@ export const LauncherPage: React.FC = () => {
         const controller = new AbortController();
         let isCancelled = false;
 
-        fetch(GITHUB_RELEASES_API_URL, {
-            signal: controller.signal,
-            headers: { Accept: 'application/vnd.github+json' },
-        })
-            .then((response) => {
-                if (!response.ok) throw new Error('GitHub release lookup failed');
-                return response.json() as Promise<GitHubRelease[]>;
-            })
-            .then((releases) => {
+        fetchStableLauncherRelease(controller.signal)
+            .then((launcherRelease) => {
                 if (isCancelled) return;
 
-                const launcherRelease = releases.find((release) => !release.draft && !release.prerelease && isLauncherRelease(release)) || null;
                 const assetsByPlatform = platformOptions.reduce<ReleaseState['assetsByPlatform']>((acc, platform) => {
                     const asset = selectAssetForPlatform(launcherRelease?.assets, platform.id);
                     if (asset) acc[platform.id] = asset;

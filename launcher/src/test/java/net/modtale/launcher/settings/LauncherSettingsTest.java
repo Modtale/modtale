@@ -18,6 +18,22 @@ import org.junit.jupiter.api.io.TempDir;
 class LauncherSettingsTest {
 
     @Test
+    void persistsLauncherChannelAndDefaultsOldSettingsToStable(@TempDir Path home) throws Exception {
+        Path settingsPath = home.resolve("settings.json");
+        SettingsStore store = new SettingsStore(settingsPath);
+        Files.writeString(settingsPath, "{}");
+        assertEquals("stable", store.load().getLauncherChannel());
+        LauncherSettings settings = store.load();
+        settings.setLauncherChannel("develop");
+        store.save(settings);
+        assertEquals("develop", store.load().getLauncherChannel());
+        settings.setLauncherChannel(null);
+        assertEquals("stable", settings.getLauncherChannel());
+        settings.setLauncherChannel("unknown");
+        assertEquals("stable", settings.getLauncherChannel());
+    }
+
+    @Test
     void launcherAutoUpdatesDefaultOff() {
         LauncherSettings settings = new LauncherSettings();
 
