@@ -39,13 +39,13 @@ import { skippedWorldListItems, worldListToProjectDependencies, worldListToOverr
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
 
-const appendDependenciesToFormData = (formData: FormData, dependencies: ProjectDependency[] = []) => {
+const appendDependenciesToFormData = (formData: FormData, dependencies: ProjectDependency[] = [], isModpack = false) => {
     dependencies.forEach((dependency, index) => {
         if (dependency.id) formData.append(`dependencies[${index}].id`, dependency.id);
         formData.append(`dependencies[${index}].projectId`, dependency.projectId);
         formData.append(`dependencies[${index}].projectTitle`, dependency.projectTitle || '');
         formData.append(`dependencies[${index}].versionNumber`, dependency.versionNumber);
-        formData.append(`dependencies[${index}].dependencyType`, dependency.dependencyType || 'REQUIRED');
+        if (!isModpack) formData.append(`dependencies[${index}].dependencyType`, dependency.dependencyType || 'REQUIRED');
         formData.append(`dependencies[${index}].source`, dependency.source || 'MODTALE');
         if (dependency.externalId) formData.append(`dependencies[${index}].externalId`, dependency.externalId);
         if (dependency.externalUrl) formData.append(`dependencies[${index}].externalUrl`, dependency.externalUrl);
@@ -496,7 +496,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             versionData.gameVersions.forEach(version => formData.append('gameVersions', version));
             const uploadFile = isModpack ? await buildModpackOverrides(versionData) : versionData.file;
             if (uploadFile) formData.append('file', uploadFile);
-            appendDependenciesToFormData(formData, versionData.dependencies || []);
+            appendDependenciesToFormData(formData, versionData.dependencies || [], projectData.classification === 'MODPACK');
             (versionData.incompatibleProjectIds || []).forEach(projectId => formData.append('incompatibleProjectIds', projectId));
             if (versionData.changelog) formData.append('changelog', versionData.changelog);
             formData.append('channel', versionData.channel || 'RELEASE');
@@ -549,7 +549,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         setIsSavingVersion(true);
         try {
             await projectClient.updateVersion(projectData.id, editingVersion.id, {
-                dependencies: editVersionData.dependencies || [],
+                dependencies: projectData.classification === 'MODPACK' ? (editVersionData.dependencies || []).map(({ dependencyType, ...dependency }) => dependency) : editVersionData.dependencies || [],
                 incompatibleProjectIds: editVersionData.incompatibleProjectIds || [],
                 gameVersions: editVersionData.gameVersions,
                 changelog: editVersionData.changelog || '',

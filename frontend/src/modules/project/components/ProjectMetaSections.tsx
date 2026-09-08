@@ -127,7 +127,7 @@ export const ProjectMetaSections: React.FC<ProjectMetaSectionsProps> = React.mem
             {dependencies && dependencies.length > 0 && (
                 <SidebarSection title={isModpack ? "Included Projects" : "Dependencies"} icon={isModpack ? Box : LinkIcon}>
                     <div className="space-y-2">
-                        {externalDependencies.length > 0 && (
+                        {!isModpack && externalDependencies.length > 0 && (
                             <div className="rounded-xl border border-orange-200 dark:border-orange-900/40 bg-orange-50 dark:bg-orange-950/20 p-3 space-y-1">
                                 <div className="flex items-center gap-2 text-xs font-black text-orange-800 dark:text-orange-200">
                                     <AlertTriangle className="w-3.5 h-3.5" /> External service references
@@ -166,7 +166,7 @@ export const ProjectMetaSections: React.FC<ProjectMetaSectionsProps> = React.mem
                                     <div className="min-w-0 flex-1">
                                         <div className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-modtale-accent truncate">{title}</div>
                                         <div className="text-[10px] text-slate-600 dark:text-slate-400 flex items-center gap-2">
-                                            <span className={isOptionalDependency(dep) ? '' : 'text-amber-600 dark:text-amber-500 font-bold'}>{dependencyType === 'OPTIONAL' ? 'Optional' : dependencyType === 'EMBEDDED' ? 'Embedded' : 'Required'}</span>
+                                            {!isModpack && <span className={isOptionalDependency(dep) ? '' : 'text-amber-600 dark:text-amber-500 font-bold'}>{dependencyType === 'OPTIONAL' ? 'Optional' : dependencyType === 'EMBEDDED' ? 'Embedded' : 'Required'}</span>}
                                             {isExternal && <span className="font-bold text-orange-600 dark:text-orange-400">{sourceLabel}</span>}
                                             {!isModpack && isEmbeddedDependency(dep) && isExternal && <span className="text-emerald-600 dark:text-emerald-400 font-bold">Bundled</span>}
                                             <span className="font-mono opacity-75">v{dep.versionNumber}</span>

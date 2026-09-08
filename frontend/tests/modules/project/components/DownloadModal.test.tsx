@@ -269,9 +269,46 @@ describe('DownloadModal Toggle Visibility', () => {
         const launcherButton = Array.from(document.body.querySelectorAll('button'))
             .find(button => button.textContent?.includes('Modtale Launcher Required')) as HTMLButtonElement;
         expect(launcherButton.disabled).toBe(true);
-        expect(pageText()).toContain('downloaded directly to your device');
+        expect(pageText()).toContain('download them directly to your device');
         await act(async () => launcherButton.click());
         expect(onDownload).not.toHaveBeenCalled();
+    });
+
+    it('allows browser download of mods with CurseForge dependencies', async () => {
+        const onDownload = vi.fn();
+        const version = {
+            id: 'pack-v1', versionNumber: '1.0.0', channel: 'RELEASE',
+            gameVersions: ['0.5.4'], fileUrl: '/packs/sky.zip',
+            dependencies: [{
+                projectId: 'curseforge:1450386', projectTitle: 'Simple Compost',
+                versionNumber: '1.0.0', dependencyType: 'REQUIRED', source: 'CURSEFORGE'
+            }],
+            releaseDate: new Date().toISOString()
+        };
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <DownloadModal
+                        show={true}
+                        onClose={vi.fn()}
+                        versionsByGame={{ '0.5.4': [version] }}
+                        orderedGameVersions={['0.5.4']}
+                        onDownload={onDownload}
+                        showExperimental={false}
+                        onToggleExperimental={vi.fn()}
+                        onViewHistory={vi.fn()}
+                        isModpack={false}
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        const downloadButton = Array.from(document.body.querySelectorAll('button'))
+            .find(button => button.textContent?.includes('Download Latest')) as HTMLButtonElement;
+        expect(downloadButton.disabled).toBe(false);
+        await act(async () => downloadButton.click());
+        expect(onDownload).toHaveBeenCalled();
     });
 
     it('disables browser downloads for modpacks containing CurseForge projects', async () => {
@@ -307,7 +344,7 @@ describe('DownloadModal Toggle Visibility', () => {
         const launcherButton = Array.from(document.body.querySelectorAll('button'))
             .find(button => button.textContent?.includes('Modtale Launcher Required')) as HTMLButtonElement;
         expect(launcherButton.disabled).toBe(true);
-        expect(pageText()).toContain('downloaded directly to your device');
+        expect(pageText()).toContain('download them directly to your device');
         await act(async () => launcherButton.click());
         expect(onDownload).not.toHaveBeenCalled();
     });
@@ -615,13 +652,9 @@ describe('DownloadModal Toggle Visibility', () => {
             );
         });
 
-        expect(pageText()).toContain('This modpack uses external mods');
-        expect(pageText()).toContain('External Shader');
-        expect(pageText()).toContain('is not redistributed in this archive');
-        expect(pageText()).toContain("authors' chosen platform");
-        const sourceLink = document.body.querySelector('a[href="https://www.curseforge.com/hytale/mods/external-shader/files/1234"]');
-        expect(sourceLink?.getAttribute('target')).toBe('_blank');
-        expect(sourceLink?.getAttribute('rel')).toBe('noopener noreferrer');
+        expect(pageText()).toContain('This version includes CurseForge mods. The launcher is required to download them directly to your device.');
+        expect(pageText()).not.toContain('This modpack uses external mods');
+
     });
 
     it('does not show the external mod warning for non-modpack projects', async () => {

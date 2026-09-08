@@ -1,3 +1,4 @@
+import { openLauncherInstallOrFallback } from '@/modules/launcher/utils/launcherProtocol';
 import { ProjectPageSkeleton } from '../components/ProjectPageSkeleton';
 import { ProjectGallerySkeleton } from '../components/ProjectGallerySkeleton';
 import { DownloadModalSkeleton } from '../components/dialogs/DownloadModal';
@@ -503,7 +504,8 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const handleDownloadClick = async (url: string, versionNumber: string, gameVersion: string, deps: any[], channel: string) => {
         try {
             if (project?.classification === 'MODPACK' && hasCurseForgeDependencies(deps)) {
-                throw new Error('This modpack version contains CurseForge projects and can only be installed with Modtale Launcher.');
+                if (project) openLauncherInstallOrFallback({ projectId: project.id, versionNumber, gameVersion }, () => { window.location.href = SiteRoutes.launcher(); });
+                return;
             }
             const downloadChannel = normalizeDownloadChannel(channel);
 
@@ -536,8 +538,8 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             // through the generic project bundle endpoint nests the generated pack ZIP
             // inside another ZIP and loses reference-only metadata.
             const selectableDeps = getSelectableBundleDependencies(project?.classification, deps);
-            if (selectableDeps.length > 0) {
-                setPendingDownload({ versionNumber, gameVersion, dependencies: selectableDeps, channel: downloadChannel });
+            if (selectableDeps.length > 0 || (project?.classification !== 'MODPACK' && hasCurseForgeDependencies(deps))) {
+                setPendingDownload({ versionNumber, gameVersion, dependencies: (deps || []).filter(dep => selectableDeps.includes(dep) || dep.source === 'CURSEFORGE'), channel: downloadChannel });
                 setIsDepModalOpen(true);
                 return;
             }

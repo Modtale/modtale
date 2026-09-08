@@ -229,6 +229,8 @@ export interface ScanResult {
 }
 
 export interface ProjectVersion {
+    manifestId?: string;
+    modpackConfigs?: { projectId: string; source: string; path: string; sha256: string }[];
     id: string;
     versionNumber: string;
     gameVersion: string;

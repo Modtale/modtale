@@ -101,7 +101,7 @@ describe('Files tab loadability', () => {
         expect(mockedProjectClient.getMetaGameVersions).not.toHaveBeenCalled();
     });
 
-    it('renders the optional layered override bundle picker for modpacks', async () => {
+    it('omits shared overrides for modpacks', async () => {
         await act(async () => {
             root.render(
                 <ToastProvider>
@@ -116,9 +116,9 @@ describe('Files tab loadability', () => {
             );
         });
 
-        await waitForText(container, 'Configs & Overrides');
-        expect(container.textContent).toContain('For world-specific plugin configs, use overrides/Saves/<world>/mods/<plugin-folder>/config.json.');
-        expect(container.textContent).toContain('Config defaults and resources; existing files are preserved by the launcher');
+        expect(container.textContent).not.toContain('Shared files');
+        expect(container.textContent).not.toContain('Configs & Overrides');
+        expect(container.textContent).not.toContain('overrides/Saves');
     });
 
     it('defaults to the latest release game version when prereleases are newer', async () => {

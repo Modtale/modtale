@@ -70,11 +70,10 @@ const HistoryVersionItem = memo(({
                 </div>
                 <button
                     type="button"
-                    disabled={requiresLauncher}
                     onClick={() => onDownload(ver)}
-                    className={`px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${requiresLauncher ? 'cursor-not-allowed bg-slate-100 text-slate-400 dark:bg-white/5 dark:text-slate-600' : 'bg-slate-100 dark:bg-white/5 hover:bg-modtale-accent hover:text-white text-slate-500 dark:text-slate-400'}`}
+                    className={`px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 bg-slate-100 dark:bg-white/5 hover:bg-modtale-accent hover:text-white text-slate-500 dark:text-slate-400`}
                 >
-                    <Download className="w-4 h-4" /> {requiresLauncher ? 'Launcher required' : 'Download'}
+                    <Download className="w-4 h-4" /> {requiresLauncher ? 'Install with launcher' : 'Download'}
                 </button>
             </div>
 

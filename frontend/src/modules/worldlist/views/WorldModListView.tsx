@@ -136,6 +136,7 @@ export const WorldModListView: React.FC = () => {
         return '';
     }, [list?.shareUrl]);
 
+    const requiresLauncher = list?.mods.some(mod => mod.source === 'CURSEFORGE') || false;
     const downloadUrl = list ? worldListDownloadUrl(list.id) : '';
 
     const installWithLauncher = () => {
@@ -145,7 +146,8 @@ export const WorldModListView: React.FC = () => {
             { listId: list.id, shareUrl },
             () => {
                 setInstalling(false);
-                if (downloadUrl) window.location.assign(downloadUrl);
+                if (requiresLauncher) window.location.assign('/launcher');
+                else if (downloadUrl) window.location.assign(downloadUrl);
             }
         );
         window.setTimeout(() => setInstalling(false), 2600);
@@ -189,10 +191,10 @@ export const WorldModListView: React.FC = () => {
                     </div>
 
                     <div className="flex flex-wrap gap-2 md:justify-end">
-                        <a href={downloadUrl} className={secondaryButton}>
+                        {!requiresLauncher && <a href={downloadUrl} className={secondaryButton}>
                             <Download className="h-4 w-4" aria-hidden="true" />
                             Download zip
-                        </a>
+                        </a>}
                         <Link to={SiteRoutes.createModpackFromList(list.id)} className={secondaryButton}>
                             <PackagePlus className="h-4 w-4" aria-hidden="true" />
                             Make modpack
@@ -205,6 +207,7 @@ export const WorldModListView: React.FC = () => {
                 </div>
             </section>
 
+            {requiresLauncher && <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">This list includes CurseForge mods and is available through Modtale Launcher only. The launcher downloads those mods directly to your device.</p>}
             {!!list.configs?.length && (
                 <section className="space-y-3 pt-6">
                     <h2 className="text-lg font-bold">Included configs</h2>

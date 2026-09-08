@@ -1,10 +1,10 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
-import { buildModpackOverrides, configPath, type ModConfig } from '../../../../src/modules/project/utils/modpackConfigs';
+import { buildModpackOverrides, configPath, importModpackConfigs, CONFIG_MANIFEST, type ModConfig } from '../../../../src/modules/project/utils/modpackConfigs';
 import type { VersionFormData } from '../../../../src/modules/project/components/FormShared';
 
-const config = (destination = 'Saves/MyWorld/mods/ExamplePlugin'): ModConfig => ({
+const config = (destination = 'Universe/mods/ExamplePlugin'): ModConfig => ({
     id: 'config-1', projectId: 'mod-1', file: new File(['{"enabled":true}'], 'config.json'), destination
 });
 const data = (configs: ModConfig[], file: File | null = null): VersionFormData => ({
@@ -13,24 +13,37 @@ const data = (configs: ModConfig[], file: File | null = null): VersionFormData =
 });
 
 describe('modpack config attachments', () => {
-    it('packages config contents at the exact world destination consumed by the generator', async () => {
+    it('exports deterministic bytes and round trips ownership, nested paths, and original content', async () => {
+        const state = data([{ ...config(), relativePath: 'nested/config.json' }]);
+        const first = await buildModpackOverrides(state);
+        const second = await buildModpackOverrides(state);
+        expect(new Uint8Array(await first!.arrayBuffer())).toEqual(new Uint8Array(await second!.arrayBuffer()));
+        const zip = await JSZip.loadAsync(await first!.arrayBuffer());
+        const manifest = JSON.parse(await zip.file(CONFIG_MANIFEST)!.async('string'));
+        expect(manifest.configs[0]).toMatchObject({ projectId: 'mod-1', source: 'MODTALE', path: 'overrides/Universe/mods/ExamplePlugin/nested/config.json' });
+        const imported = await importModpackConfigs(first!, state.dependencies);
+        expect(imported.configs[0].relativePath).toBe('nested/config.json');
+        expect(await imported.configs[0].file.text()).toBe('{"enabled":true}');
+    });
+    it('rejects a bundle whose bytes no longer match its manifest', async () => {
+        const file = await buildModpackOverrides(data([config()]));
+        const zip = await JSZip.loadAsync(await file!.arrayBuffer());
+        zip.file('overrides/Universe/mods/ExamplePlugin/config.json', '{}');
+        const changed = new File([await zip.generateAsync({ type: 'arraybuffer' })], 'changed.zip');
+        await expect(importModpackConfigs(changed, data([]).dependencies)).rejects.toThrow('checksum mismatch');
+    });
+
+    it('packages config contents at the universe-relative destination consumed by the generator', async () => {
         const result = await buildModpackOverrides(data([config()]));
         const zip = await JSZip.loadAsync(await result!.arrayBuffer());
-        expect(await zip.file('overrides/Saves/MyWorld/mods/ExamplePlugin/config.json')!.async('string')).toBe('{"enabled":true}');
+        expect(await zip.file('overrides/Universe/mods/ExamplePlugin/config.json')!.async('string')).toBe('{"enabled":true}');
     });
-    it('preserves advanced overrides alongside mod configs', async () => {
-        const existing = new JSZip().file('overrides/Mods/Other/settings.json', '{}');
-        const bundle = new File([await existing.generateAsync({ type: 'arraybuffer' })], 'overrides.zip');
-        const result = await buildModpackOverrides(data([config('Mods/ExamplePlugin')], bundle));
-        const zip = await JSZip.loadAsync(await result!.arrayBuffer());
-        expect(zip.file('overrides/Mods/Other/settings.json')).not.toBeNull();
-        expect(zip.file('overrides/Mods/ExamplePlugin/config.json')).not.toBeNull();
-    });
-    it('rejects collisions including files in the advanced ZIP', async () => {
-        const existing = new JSZip().file('overrides/mods/exampleplugin/CONFIG.JSON', '{}');
-        const bundle = new File([await existing.generateAsync({ type: 'arraybuffer' })], 'overrides.zip');
-        await expect(buildModpackOverrides(data([config('Mods/ExamplePlugin')], bundle))).rejects.toThrow('More than one config');
-        await expect(buildModpackOverrides(data([config(), config()]))).rejects.toThrow('More than one config');
+    it('rejects shared archives and save destinations', async () => {
+        const bundle = new File([''], 'overrides.zip');
+        await expect(buildModpackOverrides(data([config()], bundle))).rejects.toThrow('Shared files and saves');
+        expect(() => configPath(config('Saves/MyWorld/mods/Example'))).toThrow();
+        expect(() => configPath(config('Mods/Example'))).toThrow();
+        await expect(buildModpackOverrides(data([config(), config()]))).rejects.toThrow('Two configs');
     });
     it('omits attachments belonging to removed mods', async () => {
         const state = data([config()]);
