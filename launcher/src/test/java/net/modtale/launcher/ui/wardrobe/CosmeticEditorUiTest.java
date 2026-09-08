@@ -100,6 +100,7 @@ class CosmeticEditorUiTest {
                 assertTrue(fx(() -> button(harness.root(), "Apply").isDisabled()));
                 assertTrue(fx(() -> ((javafx.scene.control.MenuButton) button(harness.root(), "Save")).getItems().get(1).isDisable()));
 
+                verifyPagination(harness, catalog);
                 CosmeticOption hair = selectFirst(harness, catalog, "haircut");
                 chooseColor(harness, catalog, hair, "Blond");
                 JsonNode colored = fx(() -> harness.controller().draftSnapshot());
@@ -149,6 +150,34 @@ class CosmeticEditorUiTest {
                 executor.shutdownNow();
             }
         }
+    }
+
+    private static void verifyPagination(Harness harness, CosmeticCatalogClient catalog) throws Exception {
+        openCategory(harness, catalog, "haircut");
+        int total = catalog.browseAssets("haircut", "", 1, 100).total();
+        await("four full rows", () -> {
+            var grid = (javafx.scene.layout.GridPane) harness.root().lookup("#cosmetic-cards");
+            return cards(harness).size() == Math.min(total, grid.getColumnConstraints().size() * 4);
+        });
+        fx(() -> {
+            var grid = (javafx.scene.layout.GridPane) harness.root().lookup("#cosmetic-cards");
+            harness.root().applyCss(); harness.root().layout();
+            int columns = grid.getColumnConstraints().size();
+            var last = cards(harness).get(columns - 1);
+            assertEquals(grid.getWidth(), last.getBoundsInParent().getMaxX(), 2, "Cards fill the results width");
+            Node pagination = harness.root().lookup("#cosmetic-pagination");
+            assertEquals(total > columns * 4, pagination.isVisible());
+            assertTrue(pagination.getStyleClass().contains("pagination-nav"));
+            return null;
+        });
+        String first = fx(() -> cards(harness).getFirst().getAccessibleText());
+        click(harness, "Next Page");
+        await("next cosmetic page", () -> !cards(harness).getFirst().getAccessibleText().equals(first));
+        click(harness, "Previous Page");
+        await("previous cosmetic page", () -> cards(harness).getFirst().getAccessibleText().equals(first));
+        openCategory(harness, catalog, "ears");
+        assertFalse(fx(() -> harness.root().lookup("#cosmetic-pagination").isManaged()), "Single page has no pagination");
+        openCategory(harness, catalog, "haircut");
     }
 
     private static void showAllCosmetics(Harness harness) throws Exception {
@@ -238,6 +267,7 @@ class CosmeticEditorUiTest {
                 .orElseGet(() -> options.stream().filter(option -> !option.id().equals(current)).findFirst().orElseThrow());
         await("target palette", () -> nodes(harness.root(), Button.class).stream().anyMatch(button -> ("Color " + choice.colorId()).equals(button.getAccessibleText())));
         awaitPreview(harness);
+        await("palette ready", () -> !button(harness.root(), "Color " + choice.colorId()).isDisabled());
         fx(() -> {
             var before = nodes(harness.root(), javafx.scene.SubScene.class).getFirst();
             var swatch = button(harness.root(), "Color " + choice.colorId());
@@ -256,8 +286,13 @@ class CosmeticEditorUiTest {
     }
 
     private static void capture(Harness harness, Path output, String name, int width, int height) throws Exception {
-        fx(() -> { harness.stage().setWidth(width); harness.stage().setHeight(height); harness.scroll().setVvalue(0); return null; });
+        fx(() -> { harness.stage().setWidth(width); harness.stage().setHeight(height); harness.scroll().setVvalue(0); harness.root().applyCss(); harness.root().layout(); return null; });
         await("resize", () -> Math.round(harness.stage().getScene().getWidth()) == width && Math.round(harness.stage().getScene().getHeight()) == height);
+        await("responsive page settled", () -> {
+            var grid = (javafx.scene.layout.GridPane) harness.root().lookup("#cosmetic-cards");
+            return !cards(harness).isEmpty() && cards(harness).size() <= grid.getColumnConstraints().size() * 4
+                    && nodes(harness.root(), Label.class).stream().noneMatch(label -> label.getText().equals("Loading cosmetics…"));
+        });
         await("catalog thumbnail response", () -> cards(harness).stream().allMatch(card -> nodes(card, ImageView.class).stream()
                 .allMatch(view -> view.getImage() != null && view.getImage().getProgress() == 1)));
         WritableImage image = fx(() -> {

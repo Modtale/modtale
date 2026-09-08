@@ -41,7 +41,12 @@ public final class CosmeticEditorController implements AutoCloseable {
     private final VBox categoryRail = new VBox(5);
     private final VBox selectionPanel = new VBox(14);
     private final VBox inspector = new VBox(14);
-    private final FlowPane grid = new FlowPane(12, 12);
+    private final GridPane grid = new GridPane();
+    private final FlowPane pagination = new FlowPane(24, 12);
+    private final HBox pageButtons = new HBox(4);
+    private final TextField jumpPage = new TextField();
+    private final javafx.animation.PauseTransition resizePages = new javafx.animation.PauseTransition(javafx.util.Duration.millis(150));
+    private int columns = 3, totalPages = 1;
     private final FlowPane colors = new FlowPane(7, 7);
     private final ComboBox<String> variant = new ComboBox<>();
     private final Label state = text("Loading the character creator…", "wardrobe-muted");
@@ -56,9 +61,8 @@ public final class CosmeticEditorController implements AutoCloseable {
     private final MenuItem saveOfficial = new MenuItem("Save to Hytale");
     private final MenuButton saveMenu = new MenuButton("Save");
     private final CheckBox ownedOnly = new CheckBox("Owned only");
-    private final Button previous = secondaryButton("Previous");
-    private final Button next = secondaryButton("Next");
-    private final Label pageLabel = text("Page 1", "wardrobe-muted");
+    private final Button previous = pageIcon(LauncherIcons.Glyph.CHEVRON_LEFT, "Previous Page");
+    private final Button next = pageIcon(LauncherIcons.Glyph.CHEVRON_RIGHT, "Next Page");
     private CosmeticCatalogClient catalog;
     private Path assets;
     private OutfitDraft draft;
@@ -115,10 +119,16 @@ public final class CosmeticEditorController implements AutoCloseable {
         ScrollPane categories = new ScrollPane(categoryRail); categories.setFitToWidth(true);
         categories.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER); categories.setPrefViewportHeight(670);
         categories.setMinWidth(165); categories.setPrefWidth(165); categories.getStyleClass().add("cosmetic-category-scroll");
-        grid.setMinWidth(0); grid.setPrefWrapLength(510);
-        previous.setOnAction(e -> { page = Math.max(1, page - 1); browse(); });
-        next.setOnAction(e -> { page++; browse(); });
-        HBox pagination = new HBox(12, previous, pageLabel, next); pagination.setAlignment(Pos.CENTER);
+        grid.setId("cosmetic-cards"); grid.setMinWidth(0); grid.setHgap(12); grid.setVgap(12);
+        resizePages.setOnFinished(e -> browse());
+        grid.widthProperty().addListener((o, before, after) -> {
+            int count = Math.max(1, Math.min(25, (int) ((after.doubleValue() + 12) / 177)));
+            if (columns == count) return;
+            columns = count; page = 1;
+            layoutCards();
+            if (catalog != null) { generation++; resizePages.playFromStart(); }
+        });
+        configurePagination();
         selectionPanel.getChildren().addAll(grid, pagination);
         selectionPanel.setMinWidth(0); HBox.setHgrow(selectionPanel, Priority.ALWAYS);
         inspector.getStyleClass().add("wardrobe-inspector"); inspector.setPrefWidth(310); inspector.setMinWidth(270);
@@ -153,7 +163,6 @@ public final class CosmeticEditorController implements AutoCloseable {
         root.getChildren().addAll(toolbar, state, workspace);
         root.widthProperty().addListener((o, a, b) -> {
             inspector.setPrefWidth(b.doubleValue() < 1100 ? 270 : 310);
-            grid.setPrefWrapLength(Math.max(165, b.doubleValue() - inspector.getPrefWidth() - 201));
         });
         updateActions();
     }
@@ -187,14 +196,15 @@ public final class CosmeticEditorController implements AutoCloseable {
 
     private void browse() {
         if (catalog == null || disposed) return;
-        long ticket = ++generation; String key = category; int requestedPage = page;
+        resizePages.stop();
+        long ticket = ++generation; String key = category; int requestedPage = page; int pageSize = columns * 4;
         boolean filterOwned = ownedOnly.isSelected(); boolean known = permissionsKnown;
         Map<String, Set<String>> permissions = unlocked;
         categoryButtons.forEach((id, button) -> button.pseudoClassStateChanged(SELECTED, id.equals(key)));
         state.setText("Loading cosmetics…");
         CompletableFuture.supplyAsync(() -> {
             try {
-                if (!filterOwned) return catalog.browseAssets(key, "", requestedPage, 12);
+                if (!filterOwned) return catalog.browseAssets(key, "", requestedPage, pageSize);
                 List<CosmeticOption> choices = new ArrayList<>();
                 if (known) {
                     int sourcePage = 1;
@@ -205,8 +215,8 @@ public final class CosmeticEditorController implements AutoCloseable {
                             if (permissions.getOrDefault(key, Set.of()).contains(option.assetId())) choices.add(option);
                     } while (batch.hasNext());
                 }
-                int from = Math.min(choices.size(), (requestedPage - 1) * 12), to = Math.min(choices.size(), from + 12);
-                return new CosmeticCatalogClient.Page(List.copyOf(choices.subList(from, to)), requestedPage, 12, choices.size(), to < choices.size(), true, catalog.source());
+                int from = Math.min(choices.size(), (requestedPage - 1) * pageSize), to = Math.min(choices.size(), from + pageSize);
+                return new CosmeticCatalogClient.Page(List.copyOf(choices.subList(from, to)), requestedPage, pageSize, choices.size(), to < choices.size(), true, catalog.source());
             } catch (IOException e) { throw new UncheckedIOException(e); }
         }, executor).whenComplete((result, error) -> Platform.runLater(() -> {
             if (disposed || ticket != generation) return;
@@ -217,11 +227,76 @@ public final class CosmeticEditorController implements AutoCloseable {
             if (grid.getChildren().isEmpty()) grid.getChildren().add(text(ownedOnly.isSelected() && !permissionsKnown
                     ? "Owned items unavailable."
                     : "No matching items", "wardrobe-muted"));
-            pageLabel.setText("Page " + requestedPage); previous.setDisable(requestedPage <= 1); next.setDisable(!result.hasNext());
+            layoutCards();
+            totalPages = Math.max(1, (result.total() + pageSize - 1) / pageSize);
+            updatePagination();
             String selected = draft == null ? "" : draft.selected(key);
             String assetId = selected.contains(".") ? selected.substring(0, selected.indexOf('.')) : selected;
             showOptions(assetId); updateActions();
         }));
+    }
+
+    private void layoutCards() {
+        grid.getColumnConstraints().clear();
+        for (int i = 0; i < columns; i++) {
+            ColumnConstraints column = new ColumnConstraints();
+            column.setPercentWidth(100.0 / columns); column.setMinWidth(0);
+            grid.getColumnConstraints().add(column);
+        }
+        for (int i = 0; i < grid.getChildren().size(); i++) {
+            GridPane.setColumnIndex(grid.getChildren().get(i), i % columns);
+            GridPane.setRowIndex(grid.getChildren().get(i), i / columns);
+        }
+    }
+
+    private void configurePagination() {
+        pagination.setId("cosmetic-pagination"); pagination.getStyleClass().add("pagination-nav");
+        pagination.setAlignment(Pos.CENTER); pagination.setMaxWidth(Double.MAX_VALUE);
+        HBox shell = new HBox(4, previous, pageButtons, next);
+        shell.getStyleClass().add("pagination-page-shell"); shell.setAlignment(Pos.CENTER);
+        pageButtons.getStyleClass().add("pagination-page-buttons"); pageButtons.setAlignment(Pos.CENTER);
+        previous.setOnAction(e -> goToPage(page - 1)); next.setOnAction(e -> goToPage(page + 1));
+        Label label = text("JUMP", "pagination-jump-label");
+        jumpPage.setPromptText("#"); jumpPage.getStyleClass().add("pagination-jump-input");
+        Button jump = pageIcon(LauncherIcons.Glyph.CORNER_DOWN_LEFT, "Go to page");
+        jump.getStyleClass().add("pagination-jump-button");
+        jump.disableProperty().bind(jumpPage.textProperty().isEmpty());
+        Runnable submit = () -> {
+            try { goToPage(Integer.parseInt(jumpPage.getText().trim())); }
+            catch (NumberFormatException ignored) { }
+            jumpPage.clear();
+        };
+        jump.setOnAction(e -> submit.run()); jumpPage.setOnAction(e -> submit.run());
+        HBox jumpShell = new HBox(12, label, jumpPage, jump);
+        jumpShell.getStyleClass().add("pagination-jump-shell"); jumpShell.setAlignment(Pos.CENTER);
+        pagination.getChildren().setAll(shell, jumpShell); updatePagination();
+    }
+
+    private void updatePagination() {
+        pagination.setVisible(totalPages > 1); pagination.setManaged(totalPages > 1);
+        previous.setDisable(page <= 1); next.setDisable(page >= totalPages);
+        pageButtons.getChildren().clear();
+        int last = 0;
+        for (int target = 1; target <= totalPages; target++) {
+            if (totalPages > 7 && target != 1 && target != totalPages && Math.abs(target - page) > 1) continue;
+            if (last > 0 && target > last + 1) pageButtons.getChildren().add(text("...", "pagination-dots"));
+            int destination = target;
+            Button button = new Button(Integer.toString(target)); button.getStyleClass().add("pagination-button");
+            button.setMinSize(36, 36); button.setPrefSize(36, 36); button.setMaxSize(36, 36);
+            button.setAccessibleText("Page " + target); button.pseudoClassStateChanged(SELECTED, target == page);
+            button.setOnAction(e -> goToPage(destination)); pageButtons.getChildren().add(button); last = target;
+        }
+    }
+
+    private void goToPage(int target) {
+        if (target < 1 || target > totalPages || target == page) return;
+        page = target; browse();
+    }
+
+    private static Button pageIcon(LauncherIcons.Glyph icon, String label) {
+        Button button = new Button(); button.getStyleClass().addAll("pagination-button", "pagination-icon-button");
+        button.setGraphic(LauncherIcons.icon(icon, 16)); button.setAccessibleText(label); button.setTooltip(new Tooltip(label));
+        button.setMinSize(36, 36); button.setPrefSize(36, 36); button.setMaxSize(36, 36); return button;
     }
 
     private Node optionCard(CosmeticOption option) {
@@ -234,6 +309,9 @@ public final class CosmeticEditorController implements AutoCloseable {
         VBox contents = new VBox(8, art, name);
         if (permissionsKnown && !owned(option)) contents.getChildren().add(text("Locked", "wardrobe-card-detail"));
         Button button = new Button(); button.setGraphic(contents); button.getStyleClass().add("wardrobe-card");
+        button.setMinWidth(0); button.setMaxWidth(Double.MAX_VALUE);
+        art.prefWidthProperty().bind(button.widthProperty().subtract(22));
+        name.maxWidthProperty().bind(button.widthProperty().subtract(22));
         button.setUserData(option.assetId());
         button.setAccessibleText("Choose " + option.label()); button.setTooltip(new Tooltip(option.label()));
         button.setOnAction(e -> { draft.choose(category, option.id()); selectedAsset = option.assetId(); changed(); showOptions(option.assetId()); });
@@ -450,5 +528,5 @@ public final class CosmeticEditorController implements AutoCloseable {
         return button;
     }
     private static String message(Throwable t) { while (t instanceof CompletionException && t.getCause() != null) t = t.getCause(); return t.getMessage() == null ? "Please try again." : t.getMessage(); }
-    @Override public void close() { disposed = true; generation++; accountGeneration++; preview.dispose(); }
+    @Override public void close() { disposed = true; resizePages.stop(); generation++; accountGeneration++; preview.dispose(); }
 }
