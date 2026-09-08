@@ -22,7 +22,6 @@ import { ToastProvider } from '@/components/ui/Toast';
 import { MobileProvider } from '@/context/MobileContext';
 import type { User } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
-import { STATUS_PAGE_URL } from '@/utils/status';
 import type { Classification } from '@/data/categories';
 import { normalizeUser } from '@/utils/users';
 import { clearPendingSignInMethod, completeSignInMethod } from '@/modules/auth/api/authClient';
@@ -45,31 +44,6 @@ const SwaggerDocs = lazy(() => import('@/modules/core/views/SwaggerDocs').then((
 const RouteLoading = () => {
     const { pathname, search } = useLocation();
     return <RouteSkeleton pathname={pathname} search={search} />;
-};
-
-const StatusRedirect = () => {
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            window.location.replace(STATUS_PAGE_URL);
-        }
-    }, []);
-
-    return (
-        <main className="min-h-[60vh] flex items-center justify-center bg-slate-50 px-6 dark:bg-modtale-dark">
-            <div className="max-w-md rounded-lg border border-slate-200 bg-white p-6 text-center shadow-sm dark:border-white/10 dark:bg-slate-900">
-                <h1 className="text-xl font-black text-slate-950 dark:text-white">Opening Modtale Status</h1>
-                <p className="mt-2 text-sm font-medium leading-6 text-slate-500 dark:text-slate-400">
-                    Redirecting to {STATUS_PAGE_URL}.
-                </p>
-                <a
-                    href={STATUS_PAGE_URL}
-                    className="mt-5 inline-flex h-10 items-center justify-center rounded-lg bg-modtale-accent px-4 text-sm font-bold text-white transition hover:bg-blue-600"
-                >
-                    Open Status
-                </a>
-            </div>
-        </main>
-    );
 };
 
 const hasLikelyAuthCookie = () => {
@@ -346,8 +320,6 @@ const AppContent: React.FC = () => {
 
                                     <Route path="/terms" element={<TermsOfService />} />
                                     <Route path="/privacy" element={<PrivacyPolicy />} />
-                                    <Route path="/status" element={<StatusRedirect />} />
-
                                     <Route path="/api-docs" element={<ApiDocs />} />
                                     <Route path="/api-docs/swagger" element={<SwaggerDocs />} />
 

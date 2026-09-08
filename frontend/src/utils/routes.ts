@@ -59,8 +59,6 @@ export class SiteRoutes {
 
     static terms() { return '/terms'; }
     static privacy() { return '/privacy'; }
-    static status() { return '/status'; }
-
     static getProjectPrefix(classification?: string) {
         if (classification === 'MODPACK') return 'modpack';
         if (classification === 'SAVE') return 'world';
