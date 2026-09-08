@@ -2,7 +2,6 @@ package net.modtale.launcher.wardrobe;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import javafx.scene.Group;
 import javafx.scene.image.WritableImage;
 import javafx.scene.paint.Color;

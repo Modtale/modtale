@@ -99,31 +99,6 @@ class WardrobeApiClientTest {
         assertThrows(IllegalArgumentException.class, () -> api.browseSkins(2, "invented"));
         assertThrows(IllegalArgumentException.class, () -> api.browseSkins(0, "default"));
     }
-    @Test void capesFollowPublishedNextLinkAndUseCosmeticIdentifierRatherThanRecordHash() throws Exception {
-        html("/capes", "<h2>Cape archive</h2><a href='/cape/" + HASH + "'>Forest Guardian</a><a href='/capes?page=2'>Next ›</a>");
-        html("/capes?page=2", "<h2>Cape archive</h2><a href='/cape/" + HASH + "'>Forest Guardian</a>");
-        html("/cape/" + HASH, "<img src='https://hyvatar.io/render/cape/NPC?cape=Cape_Forest_Guardian.Green.Neck_Piece&amp;size=640'>");
-        List<WardrobeItem> items = api.capes();
-        assertEquals(1, items.size());
-        assertEquals("Cape_Forest_Guardian.Green.Neck_Piece", new ObjectMapper().readTree(items.getFirst().payload()).path("cape").asText());
-        assertEquals(3, requests.size());
-        assertEquals(items, api.capes());
-        assertEquals(3, requests.size(), "Cape catalog should be cached");
-    }
-    @Test void capeCatalogUsesInlineIdentifiersWithoutFetchingEveryDetailPage() throws Exception {
-        html("/capes", "<h2>Cape archive</h2><a href='/cape/" + HASH + "'><img src='https://hyvatar.io/render/cape/NPC?cape=Cape_Forest.Green.Neck&amp;size=256' alt='Cape Forest Green Neck Hytale cape'></a>");
-        var items = api.capes();
-        assertEquals(List.of("/capes"), requests);
-        assertEquals("Forest Green Neck", items.getFirst().name());
-        assertEquals("Cape_Forest.Green.Neck", new ObjectMapper().readTree(items.getFirst().payload()).path("cape").asText());
-    }
-    @Test void untrustedCapePreviewAndChangedHtmlAreErrors() {
-        html("/capes", "<h2>Cape archive</h2><a href='/cape/" + HASH + "'>Cape</a>");
-        html("/cape/" + HASH, "<img src='https://hyvatar.io.evil.test/render/cape/NPC?cape=bad'>");
-        assertThrows(IllegalStateException.class, () -> api.capes());
-        html("/skins?page=1", "<h1>Sign in</h1>");
-        assertThrows(IllegalStateException.class, () -> api.browseSkins(1, "default"));
-    }
     @Test void uuidLookupUsesOfficialSessionAndVerifiesIdentity() throws Exception {
         json("/profile/uuid/" + ID, profile(ID, "Renamed"));
         assertEquals("Renamed", api.profile(UUID.fromString(ID), new LauncherSettings()).username());
@@ -242,7 +217,7 @@ class WardrobeApiClientTest {
         assertThrows(UnsupportedOperationException.class, () -> result.slots().clear());
     }
 
-    @Test void officialOutfitCrudUsesVerifiedMethodsBodiesAndProfileSession() throws Exception {
+    @Test void creatingOfficialOutfitUsesVerifiedBodyAndProfileSession() throws Exception {
         officialSlots(5);
         LauncherSettings settings = settings();
         UUID profile = UUID.fromString(ID);
@@ -255,67 +230,17 @@ class WardrobeApiClientTest {
         assertEquals("New outfit", body.path("name").asText());
         assertTrue(body.path("skinData").isTextual());
         assertEquals(definition, new ObjectMapper().readTree(body.path("skinData").asText()));
-        api.updateSkin(settings, SLOT, "Renamed", definition, profile);
-        assertEquals("PUT", methods.getLast());
-        assertEquals("/player-skins/" + SLOT, requests.getLast());
-        assertEquals("Renamed", new ObjectMapper().readTree(bodies.getLast()).path("name").asText());
-        api.activateSkin(settings, SLOT, profile);
-        assertEquals("PUT", methods.getLast());
-        assertEquals("/player-skins/active", requests.getLast());
-        assertEquals("{\"skinId\":\"" + SLOT + "\"}", bodies.getLast());
-        deletableSlots();
-        api.deleteSkin(settings, SLOT, profile);
-        assertEquals("DELETE", methods.getLast());
-        assertEquals("/player-skins/" + SLOT, requests.getLast());
-        assertEquals("", bodies.getLast());
         assertTrue(headers.stream().allMatch("Bearer official-session"::equals));
     }
 
-    private void deletableSlots() {
-        var root = new ObjectMapper().createObjectNode().put("activeSkin", OTHER_SLOT).put("maxSkins", 5);
-        var skins = root.putArray("skins");
-        for (String id : List.of(SLOT, OTHER_SLOT)) skins.addObject().put("id", id).put("name", "Outfit")
-                .put("skinData", "{\"bodyCharacteristic\":\"Default.01\"}");
-        json("/player-skins", root.toString());
-    }
-
-    @Test void deleteRefreshesSlotsAndRejectsNewlyActiveOrLastOutfit() {
-        for (boolean nowActive : List.of(true, false)) {
-            deletableSlots();
-            var settings = settings();
-            var displayed = api.slots(settings);
-            assertEquals(2, displayed.slots().size());
-            assertNotEquals(SLOT, displayed.activeId());
-            var changed = new ObjectMapper().createObjectNode().put("maxSkins", 5);
-            if (nowActive) changed.put("activeSkin", SLOT);
-            else changed.putNull("activeSkin");
-            var skins = changed.putArray("skins");
-            skins.addObject().put("id", SLOT).put("name", "Adventure")
-                    .put("skinData", "{\"bodyCharacteristic\":\"Default.01\"}");
-            if (nowActive) skins.addObject().put("id", OTHER_SLOT).put("name", "Other")
-                    .put("skinData", "{\"bodyCharacteristic\":\"Default.01\"}");
-            json("/player-skins", changed.toString());
-            requests.clear(); methods.clear();
-            var error = assertThrows(IllegalStateException.class,
-                    () -> api.deleteSkin(settings, SLOT, UUID.fromString(ID)));
-            assertTrue(error.getMessage().contains(nowActive ? "active" : "last"));
-            assertEquals(List.of("/player-skins"), requests, "Deletion must fetch the changed upstream slots");
-            assertEquals(List.of("GET"), methods, "Unsafe deletion must never reach DELETE");
-        }
-    }
-
-    @Test void officialOutfitWritesRejectFullSlotsMissingOwnershipAndInvalidDefinitions() {
+    @Test void officialOutfitCreationRejectsFullSlotsAndInvalidDefinitions() {
         officialSlots(1);
         var definition = new ObjectMapper().createObjectNode().put("bodyCharacteristic", "Default.01");
         var settings = settings();
         var profile = UUID.fromString(ID);
         assertThrows(IllegalStateException.class, () -> api.createSkin(settings, "New", definition, profile));
-        assertThrows(IllegalStateException.class, () -> api.deleteSkin(settings, OTHER_SLOT, profile));
-        assertThrows(IllegalStateException.class, () -> api.activateSkin(settings, OTHER_SLOT, profile));
-        assertThrows(IllegalStateException.class, () -> api.updateSkin(settings, OTHER_SLOT, "New", definition, profile));
         assertTrue(methods.stream().allMatch("GET"::equals));
         requests.clear();
-        assertThrows(IllegalArgumentException.class, () -> api.deleteSkin(settings, "../active", profile));
         assertThrows(IllegalArgumentException.class, () -> api.createSkin(settings, " ", definition, profile));
         assertThrows(IllegalStateException.class, () -> api.createSkin(settings, "New", new ObjectMapper().createObjectNode(), profile));
         assertTrue(requests.isEmpty());
@@ -324,28 +249,18 @@ class WardrobeApiClientTest {
     @Test void allOutfitWritesAbortWhenAccountChangesDuringSlotRead() {
         officialSlots(5);
         var definition = new ObjectMapper().createObjectNode().put("bodyCharacteristic", "Default.01");
-        for (int operation = 0; operation < 4; operation++) {
-            var settings = settings();
-            var profile = UUID.fromString(ID);
-            afterSlots = () -> settings.getHytaleAuthSession().setUuid(OTHER_SLOT);
-            final int action = operation;
-            assertThrows(IllegalStateException.class, () -> {
-                switch (action) {
-                    case 0 -> api.createSkin(settings, "New", definition, profile);
-                    case 1 -> api.updateSkin(settings, SLOT, "New", definition, profile);
-                    case 2 -> api.deleteSkin(settings, SLOT, profile);
-                    case 3 -> api.activateSkin(settings, SLOT, profile);
-                }
-            });
-        }
-        assertEquals(4, requests.size());
+        var settings = settings();
+        var profile = UUID.fromString(ID);
+        afterSlots = () -> settings.getHytaleAuthSession().setUuid(OTHER_SLOT);
+        assertThrows(IllegalStateException.class, () -> api.createSkin(settings, "New", definition, profile));
+        assertEquals(1, requests.size());
         assertTrue(methods.stream().allMatch("GET"::equals));
     }
 
     @Test void outfitWritesAbortBeforeReadWhenAccountChangesDuringTokenRefresh() {
         var settings = settings();
         duringSessionRefresh = () -> settings.getHytaleAuthSession().setUuid(OTHER_SLOT);
-        assertThrows(IllegalStateException.class, () -> api.deleteSkin(settings, SLOT, UUID.fromString(ID)));
+        assertThrows(IllegalStateException.class, () -> api.createSkin(settings, "New", new ObjectMapper().createObjectNode().put("bodyCharacteristic", "Default.01"), UUID.fromString(ID)));
         assertTrue(requests.isEmpty());
     }
 
@@ -365,11 +280,7 @@ class WardrobeApiClientTest {
         var cosmetics = api.unlockedCosmetics(settings());
         assertEquals(Set.of("Cape_Royal_Emissary"), cosmetics.get("cape"));
         assertThrows(UnsupportedOperationException.class, () -> cosmetics.get("cape").clear());
-        json("/my-account/game-profile", "{\"uuid\":\"" + ID + "\",\"entitlements\":[\"game.founder\"]}");
-        assertEquals(Set.of("game.founder"), api.entitlements(settings()));
         assertTrue(headers.stream().allMatch("Bearer official-session"::equals));
-        json("/my-account/game-profile", "{\"uuid\":\"" + OTHER_SLOT + "\",\"entitlements\":[]}");
-        assertThrows(IllegalStateException.class, () -> api.entitlements(settings()));
         for (String response : List.of("null", "[]", "{\"cape\":null}", "{\"cape\":[42]}")) {
             json("/my-account/cosmetics", response);
             assertThrows(IllegalStateException.class, () -> api.unlockedCosmetics(settings()));
@@ -377,13 +288,13 @@ class WardrobeApiClientTest {
     }
 
     @Test void rejectedOfficialWriteDoesNotRetryOrExposeResponseBody() {
-        deletableSlots();
-        replies.put("/player-skins/" + SLOT, new Reply(403, "application/json", "sensitive upstream details"));
+        officialSlots(5);
+        afterSlots = () -> { if (methods.getLast().equals("POST")) replies.put("/player-skins", new Reply(403, "application/json", "sensitive upstream details")); };
         var failure = assertThrows(IllegalStateException.class,
-                () -> api.deleteSkin(settings(), SLOT, UUID.fromString(ID)));
+                () -> api.createSkin(settings(), "New", new ObjectMapper().createObjectNode().put("bodyCharacteristic", "Default.01"), UUID.fromString(ID)));
         assertTrue(failure.getMessage().contains("403"));
         assertFalse(failure.getMessage().contains("sensitive"));
-        assertEquals(List.of("GET", "DELETE"), methods);
+        assertEquals(List.of("GET", "POST"), methods);
     }
 
     private void archivedSkin() {

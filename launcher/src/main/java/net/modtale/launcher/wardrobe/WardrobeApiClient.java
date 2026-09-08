@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.URI;
-import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -48,8 +47,6 @@ public class WardrobeApiClient {
     private final URI hytags;
     private final URI official;
     private final ObjectMapper mapper = new ObjectMapper();
-    private volatile List<WardrobeItem> capeCache;
-    private volatile long capeCacheUntil;
 
     public WardrobeApiClient(HytaleAuthService auth) {
         this(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build(), auth);
@@ -91,32 +88,6 @@ public class WardrobeApiClient {
         writeSkin(settings, expectedProfile, token, "POST", "player-skins", body);
     }
 
-    public void updateSkin(LauncherSettings settings, String id, String name, JsonNode skin, UUID expectedProfile) {
-        validSlotId(id);
-        ObjectNode body = skinBody(name, skin);
-        String token = profileSession(settings, expectedProfile);
-        requireSlot(slots(settings, expectedProfile, token), id);
-        writeSkin(settings, expectedProfile, token, "PUT", "player-skins/" + id, body);
-    }
-
-    public void deleteSkin(LauncherSettings settings, String id, UUID expectedProfile) {
-        validSlotId(id);
-        String token = profileSession(settings, expectedProfile);
-        SkinSlots current = slots(settings, expectedProfile, token);
-        requireSlot(current, id);
-        if (id.equals(current.activeId())) throw failure("Cannot delete the active Hytale outfit");
-        if (current.slots().size() <= 1) throw failure("Cannot delete the last Hytale outfit");
-        writeSkin(settings, expectedProfile, token, "DELETE", "player-skins/" + id, null);
-    }
-
-    public void activateSkin(LauncherSettings settings, String id, UUID expectedProfile) {
-        validSlotId(id);
-        String token = profileSession(settings, expectedProfile);
-        requireSlot(slots(settings, expectedProfile, token), id);
-        writeSkin(settings, expectedProfile, token, "PUT", "player-skins/active",
-                mapper.createObjectNode().put("skinId", id));
-    }
-
     /**
      * PlayerSkinProperty keys (haircut, cape, headAccessory, etc.) map to base catalog Ids,
      * not serialized color/variant selections. Missing membership is not an unlock.
@@ -131,17 +102,6 @@ public class WardrobeApiClient {
         Map<String, Set<String>> result = new LinkedHashMap<>();
         root.fields().forEachRemaining(entry -> result.put(entry.getKey(), stringSet(entry.getValue())));
         return java.util.Collections.unmodifiableMap(result);
-    }
-
-    /** Edition/unlock entitlements from the official game-profile endpoint, not inferred ownership. */
-    public Set<String> entitlements(LauncherSettings settings) {
-        UUID profile = selectedProfile(settings);
-        JsonNode root = json(official.resolve("my-account/game-profile"), profileSession(settings, profile));
-        requireSelectedProfile(settings, profile.toString());
-        if (root == null || !root.isObject() || !profile.toString().equals(root.path("uuid").asText())) {
-            throw failure("Official game profile does not match the selected profile");
-        }
-        return stringSet(root.get("entitlements"));
     }
 
     private static Set<String> stringSet(JsonNode values) {
@@ -191,12 +151,6 @@ public class WardrobeApiClient {
         }
     }
 
-    private static void requireSlot(SkinSlots slots, String id) {
-        if (slots.slots().stream().noneMatch(slot -> slot.id().equals(id))) {
-            throw failure("Outfit slot does not belong to the selected profile");
-        }
-    }
-
     private static UUID selectedProfile(LauncherSettings settings) {
         if (settings == null || settings.getHytaleAuthSession() == null) throw failure("Sign in with Hytale before accessing outfits");
         return UUID.fromString(settings.getHytaleAuthSession().getUuid());
@@ -243,63 +197,6 @@ public class WardrobeApiClient {
             throw failure("HyTags skin catalog format is unavailable or changed");
         }
         return List.copyOf(result.values());
-    }
-
-    /** Traverses only same-origin next-page links published by the cape catalog. */
-    public synchronized List<WardrobeItem> capes() {
-        if (capeCache != null && System.nanoTime() < capeCacheUntil) return capeCache;
-        URI uri = hytags.resolve("capes");
-        Set<URI> visited = new LinkedHashSet<>();
-        Map<String, WardrobeItem> result = new LinkedHashMap<>();
-        while (uri != null) {
-            if (!visited.add(uri) || visited.size() > 50) throw failure("Cape catalog pagination did not terminate");
-            Page document = page(uri);
-            if (!document.text.toString().contains("Cape archive")) throw failure("HyTags cape catalog format changed");
-            URI next = null;
-            for (Link link : document.links) {
-                URI target = localLink(uri, link.href, "/cape/[a-fA-F0-9]{32}");
-                if (target != null) {
-                    String id = target.getPath().substring("/cape/".length());
-                    if (!result.containsKey(id)) {
-                        String name = link.text.toString().trim();
-                        if (name.isBlank()) name = link.imageAlt;
-                        WardrobeItem inline = capePreview(link.image, id, name);
-                        result.put(id, inline == null ? cape(target, id, name) : inline);
-                    }
-                }
-                if (link.text.toString().contains("Next")) {
-                    URI candidate = localLink(uri, link.href, "/capes");
-                    if (candidate != null && candidate.getQuery() != null) next = candidate;
-                }
-            }
-            uri = next;
-        }
-        capeCache = List.copyOf(result.values());
-        capeCacheUntil = System.nanoTime() + Duration.ofMinutes(5).toNanos();
-        return capeCache;
-    }
-
-    private WardrobeItem cape(URI uri, String id, String name) {
-        Page document = page(uri);
-        for (String image : document.images) {
-            WardrobeItem result = capePreview(image, id, name);
-            if (result != null) return result;
-        }
-        throw failure("Cape record has no verified cosmetic identifier: " + id);
-    }
-
-    private WardrobeItem capePreview(String image, String id, String name) {
-        if (image == null || image.isBlank()) return null;
-        URI preview;
-        try { preview = URI.create(image); } catch (IllegalArgumentException e) { return null; }
-        if (!trustedRender(preview) || !preview.getPath().startsWith("/render/cape/")) return null;
-        String cape = query(preview, "cape");
-        if (cape == null || cape.isBlank()) return null;
-        ObjectNode payload = mapper.createObjectNode().put("cape", cape);
-        payload.put("thumbnailUrl", "https://hyvatar.io/render/cape/NPC?size=256&cape=" + encode(cape));
-        payload.set("skin", mapper.createObjectNode().put("cape", cape));
-        String title = name.isBlank() ? cape : name.replaceFirst("(?i) Hytale cape$", "").replaceFirst("(?i)^Cape ", "");
-        return item(WardrobeItem.Kind.CAPE, id, title, payload);
     }
 
     public Profile profile(String username) {
@@ -532,10 +429,6 @@ public class WardrobeApiClient {
                 || !"/".equals(uri.getPath())) throw new IllegalArgumentException("Use the production origin or a loopback test server");
         return uri;
     }
-    private static boolean trustedRender(URI uri) {
-        return "https".equals(uri.getScheme()) && "hyvatar.io".equals(uri.getHost()) && uri.getUserInfo() == null
-                && (uri.getPort() == -1 || uri.getPort() == 443) && uri.getPath().startsWith("/render/");
-    }
     private static URI localLink(URI base, String href, String pathPattern) {
         try {
             URI uri = base.resolve(href);
@@ -543,14 +436,6 @@ public class WardrobeApiClient {
                     || uri.getUserInfo() != null || !uri.getPath().matches(pathPattern)) return null;
             return uri;
         } catch (IllegalArgumentException e) { return null; }
-    }
-    private static String query(URI uri, String name) {
-        if (uri.getRawQuery() == null) return null;
-        for (String part : uri.getRawQuery().split("&")) {
-            String[] pair = part.split("=", 2);
-            if (pair.length == 2 && pair[0].equals(name)) return URLDecoder.decode(pair[1], StandardCharsets.UTF_8);
-        }
-        return null;
     }
     private static String encode(String text) { return URLEncoder.encode(text, StandardCharsets.UTF_8).replace("+", "%20"); }
     private static void validUsername(String name) {
@@ -560,14 +445,12 @@ public class WardrobeApiClient {
 
     private static class Link {
         final String href;
-        String image = "", imageAlt = "";
         boolean current;
         final StringBuilder text = new StringBuilder();
         Link(String href) { this.href = href; }
     }
     private static class Page extends HTMLEditorKit.ParserCallback {
         final List<Link> links = new ArrayList<>();
-        final List<String> images = new ArrayList<>();
         final StringBuilder text = new StringBuilder();
         final List<String[]> options = new ArrayList<>();
         Link current;
@@ -582,17 +465,6 @@ public class WardrobeApiClient {
             }
             if (tag == HTML.Tag.SELECT) select = (String) attrs.getAttribute(HTML.Attribute.NAME);
             if (tag == HTML.Tag.OPTION) { option = (String) attrs.getAttribute(HTML.Attribute.VALUE); label = new StringBuilder(); }
-        }
-        @Override public void handleSimpleTag(HTML.Tag tag, MutableAttributeSet attrs, int pos) {
-            if (tag == HTML.Tag.IMG && attrs.getAttribute(HTML.Attribute.SRC) != null) {
-                String src = attrs.getAttribute(HTML.Attribute.SRC).toString();
-                images.add(src);
-                if (current != null) {
-                    current.image = src;
-                    Object alt = attrs.getAttribute(HTML.Attribute.ALT);
-                    current.imageAlt = alt == null ? "" : alt.toString();
-                }
-            }
         }
         @Override public void handleEndTag(HTML.Tag tag, int pos) {
             if (tag == HTML.Tag.A) current = null;

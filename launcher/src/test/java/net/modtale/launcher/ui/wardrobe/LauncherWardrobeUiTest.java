@@ -223,7 +223,6 @@ class LauncherWardrobeUiTest {
                 notes.add("Public skin catalog: " + items.size() + " items from page " + page + ", sort=" + sort);
                 return items;
             }
-            @Override public List<WardrobeItem> capes() { throw new AssertionError("Capes belong to the installed Customize catalog"); }
             @Override public WardrobeItem currentSkin(LauncherSettings settings) { throw new AssertionError("No account reads in live screenshots"); }
             @Override public void apply(WardrobeItem item, LauncherSettings settings) { throw new AssertionError("No account writes in live screenshots"); }
             @Override public void apply(WardrobeItem item, LauncherSettings settings, UUID target) { throw new AssertionError("No account writes in live screenshots"); }
@@ -422,7 +421,6 @@ class LauncherWardrobeUiTest {
         }); }
         List<WardrobeItem> allItems() { var items = new ArrayList<>(skins); items.addAll(capeItems); return items; }
         @Override public List<WardrobeItem> browseSkins(int page, String sort) { return skins; }
-        @Override public List<WardrobeItem> capes() { return capeItems; }
         @Override public WardrobeItem lookupSkin(String name) { return skins.getFirst(); }
         @Override public WardrobeItem hydrate(WardrobeItem item) { return item; }
         @Override public WardrobeItem currentSkin(LauncherSettings settings) { throw new AssertionError("No fixture account reads"); }

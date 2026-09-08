@@ -88,58 +88,6 @@ public final class WardrobeStore {
         save(new Document(VERSION, state.items().stream().filter(item -> !item.id().equals(id)).toList()));
     }
 
-    /** Versioned JSON item exchange, with the same byte and item limits as imports. */
-    public synchronized String exportItems() throws IOException {
-        byte[] bytes = JSON.writeValueAsBytes(new ItemExchange(VERSION, state.items()));
-        checkSize(bytes.length);
-        return new String(bytes, StandardCharsets.UTF_8);
-    }
-
-    /** Atomically exports the same versioned item document accepted by importItems. */
-    public synchronized void exportItems(Path destination) throws IOException {
-        Objects.requireNonNull(destination, "destination");
-        if (destination.toAbsolutePath().normalize().equals(path.toAbsolutePath().normalize())
-                || (Files.exists(destination) && Files.exists(path) && Files.isSameFile(destination, path))) {
-            throw new IllegalArgumentException("Export destination cannot be the wardrobe state file");
-        }
-        var exchange = new ItemExchange(VERSION, state.items());
-        checkSize(JSON.writeValueAsBytes(exchange).length);
-        AtomicJsonFile.write(destination, JSON.writer(), exchange);
-    }
-
-    public synchronized void importItems(Path source) throws IOException {
-        Objects.requireNonNull(source, "source");
-        try (var input = Files.newInputStream(source)) {
-            byte[] bytes = input.readNBytes(MAX_DOCUMENT_BYTES + 1);
-            checkSize(bytes.length);
-            // Decode strictly so malformed UTF-8 cannot silently change imported cosmetic data.
-            String json = StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString();
-            importItems(json);
-        }
-    }
-
-    /** Merge atomically. Identical UUID/content is idempotent; conflicting content is rejected. */
-    public synchronized void importItems(String json) throws IOException {
-        if (json == null) throw new IllegalArgumentException("json is required");
-        if (json.length() > MAX_DOCUMENT_BYTES) throw new IOException("Import exceeds size limit");
-        byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
-        checkSize(bytes.length);
-        try {
-            ItemExchange exchange = JSON.readValue(bytes, ItemExchange.class);
-            if (exchange == null || exchange.version() != VERSION) throw new IllegalArgumentException("Unsupported import version");
-            validateItems(exchange.items());
-            var merged = new ArrayList<>(state.items());
-            for (WardrobeItem item : exchange.items()) {
-                var existing = merged.stream().filter(value -> value.id().equals(item.id())).findFirst();
-                if (existing.isEmpty()) merged.add(item);
-                else if (!existing.get().equals(item)) throw new IllegalArgumentException("Conflicting item UUID: " + item.id());
-            }
-            save(new Document(VERSION, merged));
-        } catch (IllegalArgumentException | NullPointerException ex) {
-            throw new IOException("Invalid wardrobe import", ex);
-        }
-    }
-
     private void save(Document candidate) throws IOException {
         validate(candidate);
         checkSize(JSON.writeValueAsBytes(candidate).length);
@@ -185,10 +133,6 @@ public final class WardrobeStore {
 
     private static void checkSize(int size) throws IOException {
         if (size > MAX_DOCUMENT_BYTES) throw new IOException("Wardrobe document exceeds size limit");
-    }
-
-    private record ItemExchange(int version, List<WardrobeItem> items) {
-        private ItemExchange { items = List.copyOf(items); }
     }
 
     // Read the retired fields only for compatibility with existing local files; never write them.

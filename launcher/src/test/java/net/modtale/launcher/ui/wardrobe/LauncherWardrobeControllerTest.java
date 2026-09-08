@@ -234,7 +234,6 @@ class LauncherWardrobeControllerTest {
             @Override public String freshSessionToken(LauncherSettings settings) { throw new AssertionError("No real authentication in regression tests"); }
         }); }
         @Override public List<WardrobeItem> browseSkins(int page, String sort) { assertFalse(Platform.isFxApplicationThread()); assertEquals("user_count", sort); return skins.stream().skip((long)(page - 1) * 20).limit(20).toList(); }
-        @Override public List<WardrobeItem> capes() { assertFalse(Platform.isFxApplicationThread()); return List.of(CAPE); }
         @Override public WardrobeItem hydrate(WardrobeItem item) {
             assertFalse(Platform.isFxApplicationThread());
             hydrationStarted.countDown();
