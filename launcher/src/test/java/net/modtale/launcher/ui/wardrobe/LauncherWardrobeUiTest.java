@@ -124,7 +124,7 @@ class LauncherWardrobeUiTest {
             });
             try {
                 await("initial skin catalog", () -> cards(harness).size() == 3);
-                click(harness, "Preview " + gateway.skins.getFirst().name());
+                click(harness, "Preview skin 1");
                 awaitPreview(harness);
                 assertTrue(fx(() -> button(harness.root(), "Apply").isDisabled()));
                 capturePair(harness, output, "skins");
@@ -152,6 +152,7 @@ class LauncherWardrobeUiTest {
                 assertEquals("Fixture Ember Favorite", saved.name());
                 assertTrue(saved.favorite());
                 assertEquals("Fixture Adventures", saved.collection());
+                assertNamelessBrowser(harness);
 
                 click(harness, "Saved looks");
                 await("saved collection", () -> cards(harness).size() == 4);
@@ -178,6 +179,11 @@ class LauncherWardrobeUiTest {
                 click(harness, "Preview Fixture Ember Favorite");
                 awaitPreview(harness);
                 capturePair(harness, output, "saved");
+                click(harness, "Skins");
+                await("return to skin browser", () -> cards(harness).size() == 3);
+                assertNamelessBrowser(harness);
+                click(harness, "Preview skin 1");
+                assertNamelessBrowser(harness);
 
                 assertEquals(0, gateway.applyCalls.get());
                 Files.writeString(output.resolve("wardrobe-fixtures.txt"), """
@@ -332,6 +338,23 @@ class LauncherWardrobeUiTest {
 
     private static void awaitPreview(Harness harness) throws Exception {
         await("fixture preview", () -> ((Label) harness.root().lookup("#wardrobe-preview-status")).getText().startsWith("Static PNG"));
+    }
+
+    private static void assertNamelessBrowser(Harness harness) throws Exception {
+        fx(() -> {
+            for (Button card : cards(harness)) {
+                assertTrue(card.getAccessibleText().startsWith("Preview skin "));
+                assertNull(card.getTooltip());
+                assertTrue(nodes(card, Label.class).stream()
+                        .filter(label -> label.getStyleClass().contains("wardrobe-card-name")
+                                || label.getStyleClass().contains("wardrobe-card-detail"))
+                        .allMatch(label -> label.getText().isEmpty()));
+            }
+            assertTrue(nodes(harness.root(), Label.class).stream()
+                    .filter(label -> label.getStyleClass().contains("wardrobe-selected-title"))
+                    .allMatch(label -> label.getText().isEmpty()));
+            return null;
+        });
     }
 
     private static void click(Harness harness, String label) throws Exception {

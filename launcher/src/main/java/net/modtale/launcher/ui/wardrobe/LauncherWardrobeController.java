@@ -153,6 +153,11 @@ public final class LauncherWardrobeController implements AutoCloseable {
 
     private void selectTab(Tab value) {
         request++; tab = value; page = 1; totalPages = 1; search.clear();
+        if (selected != null) {
+            if (value == Tab.SAVED) selected = store.items().stream()
+                    .filter(item -> item.id().equals(selected.id())).findFirst().orElse(selected);
+            selectedName.setText(displayedLookName(selected));
+        }
         root.getChildren().removeAll(columns, editor.view());
         if (value == Tab.CUSTOMIZE) { root.getChildren().add(editor.view()); editor.refresh(); return; }
         root.getChildren().add(columns);
@@ -258,7 +263,8 @@ public final class LauncherWardrobeController implements AutoCloseable {
     }
 
     private Node card(WardrobeItem entry) {
-        WardrobeItem item = store.items().stream().filter(saved -> saved.id().equals(entry.id())).findFirst().orElse(entry);
+        WardrobeItem item = tab == Tab.SAVED
+                ? store.items().stream().filter(saved -> saved.id().equals(entry.id())).findFirst().orElse(entry) : entry;
         ImageView image = new ImageView(); image.setFitHeight(150); image.setFitWidth(158); image.setPreserveRatio(true);
         String url = thumbnailResolver.apply(item);
         if (!url.isBlank()) image.setImage(new Image(url, 190, 190, true, true, true));
@@ -276,10 +282,10 @@ public final class LauncherWardrobeController implements AutoCloseable {
             });
         }
         visual.setPrefHeight(170); visual.setMinWidth(0); visual.setMaxWidth(Double.MAX_VALUE);
-        String displayName = lookName(item);
+        String displayName = displayedLookName(item);
         Label name = label(displayName, "wardrobe-card-name"); hideWhenEmpty(name); name.setMinWidth(0); name.setMaxWidth(Double.MAX_VALUE);
         VBox contents = new VBox(8, visual, name);
-        if (!item.collection().isBlank()) contents.getChildren().add(label(item.collection(), "wardrobe-card-detail"));
+        if (tab == Tab.SAVED && !item.collection().isBlank()) contents.getChildren().add(label(item.collection(), "wardrobe-card-detail"));
         Button button = new Button(); button.setGraphic(contents); button.getStyleClass().add("wardrobe-card");
         button.setMinWidth(0); button.setMaxWidth(Double.MAX_VALUE);
         GridPane.setHgrow(button, Priority.ALWAYS); GridPane.setFillWidth(button, true);
@@ -291,12 +297,12 @@ public final class LauncherWardrobeController implements AutoCloseable {
         button.setAccessibleText(displayName.isBlank() ? "Preview skin " + ((page - 1) * cardColumns * 4 + entries.indexOf(entry) + 1) : "Preview " + displayName);
         button.pseudoClassStateChanged(SELECTED, selected != null && selected.id().equals(item.id()));
         button.setOnAction(e -> select(item));
-        if (item.favorite()) name.setText("♥  " + displayName);
+        if (tab == Tab.SAVED && item.favorite()) name.setText("♥  " + displayName);
         return button;
     }
 
     private void select(WardrobeItem item) {
-        selected = item; previewProfile = activeProfile(); selectedName.setText(lookName(item));
+        selected = item; previewProfile = activeProfile(); selectedName.setText(displayedLookName(item));
         selectedDetail.setText("");
         JsonNode payload = payload(item);
         if (item.kind() == WardrobeItem.Kind.SKIN && payload.path("skinId").asText("").isBlank()
@@ -367,7 +373,10 @@ public final class LauncherWardrobeController implements AutoCloseable {
                         try { store.saveItem(hydrated); } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
                         return hydrated;
                     }, hydrated -> {
-                        if (selected != null && selected.id().equals(item.id())) { selected = hydrated; selectedName.setText(lookName(hydrated)); }
+                        if (selected != null && selected.id().equals(item.id())) {
+                            if (tab == Tab.SAVED) selected = hydrated;
+                            selectedName.setText(displayedLookName(selected));
+                        }
                         if (tab == Tab.SAVED) load(); updateSelectionActions();
                         feedback.showToast("Look saved", "Ready whenever you are.");
                     });
@@ -378,6 +387,8 @@ public final class LauncherWardrobeController implements AutoCloseable {
             } catch (Exception e) { feedback.showToast("Could not save look", message(e)); }
         });
     }
+
+    private String displayedLookName(WardrobeItem item) { return tab == Tab.SKINS ? "" : lookName(item); }
 
     private static String lookName(WardrobeItem item) {
         return item.kind() == WardrobeItem.Kind.SKIN && item.name().matches("(?i)Skin #[0-9a-f]{8,32}") ? "" : item.name();
