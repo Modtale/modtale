@@ -1,4 +1,4 @@
-import { ContentSkeleton } from '@/components/ui/Skeleton';
+import { LoadingSurface, skeletonUser } from '@/modules/user/skeletons/fixtures';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { UserPlus, ChevronDown, Check, Shield, Trash2 } from 'lucide-react';
@@ -126,7 +126,13 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
         }
     };
 
-    if (loading) return <ContentSkeleton />;
+    const visibleMembers = loading
+        ? (org.organizationMembers ?? Array.from({ length: 3 }, (_, index) => ({ userId: `loading-member-${index}` })))
+            .map(member => ({ ...skeletonUser, id: member.userId }))
+        : members;
+    const visibleInvites = loading
+        ? (org.pendingOrgInvites ?? []).map(invite => ({ ...skeletonUser, id: invite.userId }))
+        : invites;
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
@@ -210,10 +216,10 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
             <div className={`relative z-10 ${theme.colors.bgSurface} border ${theme.colors.border} rounded-2xl overflow-hidden shadow-sm`}>
                 <div className={`px-6 py-5 border-b ${theme.colors.border} flex justify-between items-center`}>
                     <h3 className={`font-bold ${theme.colors.textPrimary}`}>Active Members</h3>
-                    <span className={`text-xs font-bold ${theme.colors.bgSurfaceAlt} px-2 py-1 rounded-lg ${theme.colors.textSecondary}`}>{members.length}</span>
+                    <div className={`text-xs font-bold ${theme.colors.bgSurfaceAlt} px-2 py-1 rounded-lg ${theme.colors.textSecondary}`}>{loading ? (org.organizationMembers?.length ?? <LoadingSurface loading label="Loading member count">0</LoadingSurface>) : members.length}</div>
                 </div>
                 <div className={`divide-y ${theme.colors.borderFaint}`}>
-                    {members.map(member => {
+                    {visibleMembers.map(member => {
                         const membership = org.organizationMembers?.find(m => m.userId === member.id);
                         const role = org.organizationRoles?.find(r => r.id === membership?.roleId);
                         const isMe = member.id === currentUser.id;
@@ -222,102 +228,106 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
                         const myRole = org.organizationRoles?.find(r => r.id === myMember?.roleId);
 
                         return (
-                            <div key={member.id} className={`p-5 flex items-center justify-between ${theme.colors.bgSurfaceHover} transition-colors group`}>
-                                <div className="flex items-center gap-4">
-                                    <div className={`w-10 h-10 rounded-full overflow-hidden ${theme.colors.bgSurfaceAlt} border ${theme.colors.borderFaint}`}>
-                                        {member.avatarUrl ? <img src={member.avatarUrl} alt="" className="w-full h-full object-cover" /> : <div className={`w-full h-full flex items-center justify-center font-bold text-slate-400`}>{member.username.charAt(0).toUpperCase()}</div>}
-                                    </div>
-                                    <div>
-                                        <div className={`font-bold ${theme.colors.textPrimary} text-sm`}>{member.username}</div>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            {role ? (
-                                                <div className={`flex items-center gap-1.5 border ${theme.colors.borderFaint} ${theme.colors.bgSurfaceAlt} px-2 py-0.5 rounded-md`}>
-                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: role.color }} />
-                                                    <span className={`text-[10px] font-bold uppercase tracking-wider ${theme.colors.textSecondary}`}>{role.name}</span>
-                                                </div>
-                                            ) : (
-                                                <span className={`text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${theme.colors.bgSurfaceAlt} ${theme.colors.borderFaint} ${theme.colors.textSecondary}`}>Legacy Member</span>
-                                            )}
-                                            {isMe && <span className={`text-[10px] ${theme.colors.textMuted} font-medium italic`}>(You)</span>}
+                            <LoadingSurface key={member.id} loading={loading} label="Loading member">
+                                <div className={`p-5 flex items-center justify-between ${theme.colors.bgSurfaceHover} transition-colors group`}>
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-10 h-10 rounded-full overflow-hidden ${theme.colors.bgSurfaceAlt} border ${theme.colors.borderFaint}`}>
+                                            {member.avatarUrl ? <img src={member.avatarUrl} alt="" className="w-full h-full object-cover" /> : <div className={`w-full h-full flex items-center justify-center font-bold text-slate-400`}>{member.username.charAt(0).toUpperCase()}</div>}
                                         </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                    {canManageRoles && !isMe && (
-                                        <div className="relative modtale-dropdown-container">
-                                            <button
-                                                onClick={() => setMemberRoleDropdownOpen(memberRoleDropdownOpen === member.id ? null : member.id)}
-                                                disabled={isOwner && !myRole?.isOwner}
-                                                className={`flex items-center justify-between min-w-[140px] ${theme.colors.bgBase} border ${theme.colors.border} rounded-lg pl-3 pr-2 py-1.5 outline-none hover:border-modtale-accent transition-colors ${isOwner && !myRole?.isOwner ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer shadow-sm'}`}
-                                            >
-                                                <div className="flex items-center gap-2 truncate">
-                                                    {role && <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: role.color }} />}
-                                                    <span className={`text-xs font-bold ${theme.colors.textSecondary} truncate`}>{role ? role.name : 'Select Role'}</span>
-                                                </div>
-                                                <ChevronDown className={`w-3 h-3 ${theme.colors.textMuted} ml-2 flex-shrink-0 transition-transform ${memberRoleDropdownOpen === member.id ? 'rotate-180' : ''}`} />
-                                            </button>
-
-                                            {memberRoleDropdownOpen === member.id && (
-                                                <div className={`absolute right-0 top-full mt-2 w-48 ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl shadow-xl z-[100] overflow-hidden animate-in fade-in zoom-in-95`}>
-                                                    <div className="max-h-48 overflow-y-auto py-1">
-                                                        {org.organizationRoles?.filter(r => !r.isOwner || isOwner || myRole?.isOwner).map(r => (
-                                                            <button key={r.id} type="button" onClick={() => { handleRoleUpdate(member.id, r.id); setMemberRoleDropdownOpen(null); }} className={`w-full flex items-center justify-between px-3 py-2 ${theme.colors.bgSurfaceHover} transition-colors text-left`}>
-                                                                <div className="flex items-center gap-2 truncate">
-                                                                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{backgroundColor: r.color}} />
-                                                                    <span className={`font-bold text-xs ${theme.colors.textPrimary} truncate`}>{r.name}</span>
-                                                                </div>
-                                                                {membership?.roleId === r.id && <Check className="w-3 h-3 text-modtale-accent flex-shrink-0" />}
-                                                            </button>
-                                                        ))}
+                                        <div>
+                                            <div className={`font-bold ${theme.colors.textPrimary} text-sm`}>{member.username}</div>
+                                            <div data-skeleton-keep={membership ? true : undefined} className="flex items-center gap-2 mt-1">
+                                                {role ? (
+                                                    <div className={`flex items-center gap-1.5 border ${theme.colors.borderFaint} ${theme.colors.bgSurfaceAlt} px-2 py-0.5 rounded-md`}>
+                                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: role.color }} />
+                                                        <span className={`text-[10px] font-bold uppercase tracking-wider ${theme.colors.textSecondary}`}>{role.name}</span>
                                                     </div>
-                                                </div>
-                                            )}
+                                                ) : (
+                                                    <span className={`text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${theme.colors.bgSurfaceAlt} ${theme.colors.borderFaint} ${theme.colors.textSecondary}`}>Legacy Member</span>
+                                                )}
+                                                {isMe && <span className={`text-[10px] ${theme.colors.textMuted} font-medium italic`}>(You)</span>}
+                                            </div>
                                         </div>
-                                    )}
-                                    {(canRemove || isMe) && (
-                                        <button onClick={() => !isOwner && setMemberToRemove(member)} disabled={isOwner} className={`p-2 rounded-xl transition-all ${isOwner ? 'text-slate-300 cursor-not-allowed' : `${theme.colors.textMuted} hover:${theme.colors.dangerText} hover:${theme.colors.dangerBg}`}`} title={isMe ? "Leave Organization" : "Remove Member"}>
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    )}
+                                    </div>
+
+                                    <div data-skeleton-keep className="flex items-center gap-3">
+                                        {canManageRoles && !isMe && (
+                                            <div className="relative modtale-dropdown-container">
+                                                <button
+                                                    onClick={() => setMemberRoleDropdownOpen(memberRoleDropdownOpen === member.id ? null : member.id)}
+                                                    disabled={isOwner && !myRole?.isOwner}
+                                                    className={`flex items-center justify-between min-w-[140px] ${theme.colors.bgBase} border ${theme.colors.border} rounded-lg pl-3 pr-2 py-1.5 outline-none hover:border-modtale-accent transition-colors ${isOwner && !myRole?.isOwner ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer shadow-sm'}`}
+                                                >
+                                                    <div className="flex items-center gap-2 truncate">
+                                                        {role && <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: role.color }} />}
+                                                        <span className={`text-xs font-bold ${theme.colors.textSecondary} truncate`}>{role ? role.name : 'Select Role'}</span>
+                                                    </div>
+                                                    <ChevronDown className={`w-3 h-3 ${theme.colors.textMuted} ml-2 flex-shrink-0 transition-transform ${memberRoleDropdownOpen === member.id ? 'rotate-180' : ''}`} />
+                                                </button>
+
+                                                {memberRoleDropdownOpen === member.id && (
+                                                    <div className={`absolute right-0 top-full mt-2 w-48 ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl shadow-xl z-[100] overflow-hidden animate-in fade-in zoom-in-95`}>
+                                                        <div className="max-h-48 overflow-y-auto py-1">
+                                                            {org.organizationRoles?.filter(r => !r.isOwner || isOwner || myRole?.isOwner).map(r => (
+                                                                <button key={r.id} type="button" onClick={() => { handleRoleUpdate(member.id, r.id); setMemberRoleDropdownOpen(null); }} className={`w-full flex items-center justify-between px-3 py-2 ${theme.colors.bgSurfaceHover} transition-colors text-left`}>
+                                                                    <div className="flex items-center gap-2 truncate">
+                                                                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{backgroundColor: r.color}} />
+                                                                        <span className={`font-bold text-xs ${theme.colors.textPrimary} truncate`}>{r.name}</span>
+                                                                    </div>
+                                                                    {membership?.roleId === r.id && <Check className="w-3 h-3 text-modtale-accent flex-shrink-0" />}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                        {(canRemove || isMe) && (
+                                            <button onClick={() => !isOwner && setMemberToRemove(member)} disabled={isOwner} className={`p-2 rounded-xl transition-all ${isOwner ? 'text-slate-300 cursor-not-allowed' : `${theme.colors.textMuted} hover:${theme.colors.dangerText} hover:${theme.colors.dangerBg}`}`} title={isMe ? "Leave Organization" : "Remove Member"}>
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
+                            </LoadingSurface>
                         );
                     })}
                 </div>
             </div>
 
-            {invites.length > 0 && (
+            {visibleInvites.length > 0 && (
                 <div className={`relative z-0 ${theme.colors.bgSurface} border ${theme.colors.border} rounded-2xl overflow-hidden shadow-sm`}>
                     <div className={`px-6 py-5 border-b ${theme.colors.border} flex justify-between items-center`}>
                         <h3 className={`font-bold ${theme.colors.textPrimary}`}>Pending Invites</h3>
-                        <span className={`text-xs font-bold ${theme.colors.bgSurfaceAlt} px-2 py-1 rounded-lg ${theme.colors.textSecondary}`}>{invites.length}</span>
+                        <span className={`text-xs font-bold ${theme.colors.bgSurfaceAlt} px-2 py-1 rounded-lg ${theme.colors.textSecondary}`}>{visibleInvites.length}</span>
                     </div>
                     <div className={`divide-y ${theme.colors.borderFaint}`}>
-                        {invites.map(inviteUser => {
+                        {visibleInvites.map(inviteUser => {
                             const inviteData = org.pendingOrgInvites?.find(i => i.userId === inviteUser.id);
                             const inviteRole = org.organizationRoles?.find(r => r.id === inviteData?.roleId);
 
                             return (
-                                <div key={inviteUser.id} className={`p-5 flex items-center justify-between ${theme.colors.bgSurfaceHover} transition-colors`}>
-                                    <div className="flex items-center gap-4">
-                                        <div className={`w-10 h-10 rounded-full overflow-hidden ${theme.colors.bgSurfaceAlt} border ${theme.colors.borderFaint} opacity-70 grayscale`}>
-                                            <img src={inviteUser.avatarUrl} alt="" className="w-full h-full object-cover" />
-                                        </div>
-                                        <div>
-                                            <div className={`font-bold ${theme.colors.textPrimary} text-sm`}>{inviteUser.username}</div>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <span className={`text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${theme.colors.warningBg} ${theme.colors.warningText} ${theme.colors.warningBorder}`}>Pending</span>
-                                                {inviteRole && <span className={`text-[10px] ${theme.colors.textMuted} font-medium`}>As {inviteRole.name}</span>}
+                                <LoadingSurface key={inviteUser.id} loading={loading} label="Loading invited member">
+                                    <div className={`p-5 flex items-center justify-between ${theme.colors.bgSurfaceHover} transition-colors`}>
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-10 h-10 rounded-full overflow-hidden ${theme.colors.bgSurfaceAlt} border ${theme.colors.borderFaint} opacity-70 grayscale`}>
+                                                <img src={inviteUser.avatarUrl} alt="" className="w-full h-full object-cover" />
+                                            </div>
+                                            <div>
+                                                <div className={`font-bold ${theme.colors.textPrimary} text-sm`}>{inviteUser.username}</div>
+                                                <div data-skeleton-keep className="flex items-center gap-2 mt-1">
+                                                    <span className={`text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border ${theme.colors.warningBg} ${theme.colors.warningText} ${theme.colors.warningBorder}`}>Pending</span>
+                                                    {inviteRole && <span className={`text-[10px] ${theme.colors.textMuted} font-medium`}>As {inviteRole.name}</span>}
+                                                </div>
                                             </div>
                                         </div>
+                                        {canInvite && (
+                                            <button data-skeleton-keep onClick={() => handleCancelInvite(inviteUser.id)} className={`text-xs font-bold ${theme.colors.dangerText} ${theme.colors.dangerBg} hover:opacity-80 px-3 py-1.5 rounded-lg border ${theme.colors.dangerBorder} transition-colors`}>
+                                                Cancel
+                                            </button>
+                                        )}
                                     </div>
-                                    {canInvite && (
-                                        <button onClick={() => handleCancelInvite(inviteUser.id)} className={`text-xs font-bold ${theme.colors.dangerText} ${theme.colors.dangerBg} hover:opacity-80 px-3 py-1.5 rounded-lg border ${theme.colors.dangerBorder} transition-colors`}>
-                                            Cancel
-                                        </button>
-                                    )}
-                                </div>
+                                </LoadingSurface>
                             );
                         })}
                     </div>

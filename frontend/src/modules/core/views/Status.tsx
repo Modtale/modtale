@@ -1,3 +1,4 @@
+import { LoadingChartFrame } from '@/modules/admin/components/LoadingChartFrame';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/utils/api';
 import {
@@ -18,7 +19,7 @@ import {
     XCircle
 } from 'lucide-react';
 import { LineChart } from '@/components/ui/charts/LineChart';
-import { ContentSkeleton } from '@/components/ui/Skeleton';
+import { SkeletonSurface } from '@/components/ui/Skeleton';
 import { DiscordBrandIcon } from '@/components/ui/icons/BrandIcons';
 
 type StatusState = 'operational' | 'degraded' | 'outage';
@@ -359,7 +360,7 @@ const IncidentTimeline = ({ incident, compact = false, embedded = false }: { inc
 };
 
 export const Status: React.FC = () => {
-    const [data, setData] = useState<StatusResponse | null>(null);
+    const [loadedData, setData] = useState<StatusResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -401,6 +402,14 @@ export const Status: React.FC = () => {
         const interval = window.setInterval(() => fetchStatus(range, true), 60000);
         return () => window.clearInterval(interval);
     }, [fetchStatus, range]);
+
+    const pending = loading && !loadedData;
+    const Surface = pending ? SkeletonSurface : React.Fragment;
+    const data: StatusResponse | null = loadedData || (pending ? {
+        overall: 'operational', timestamp: Date.UTC(2026, 0, 1, 12),
+        services: Object.entries(SERVICE_META).map(([id, meta]) => ({ id, name: meta.label, status: 'operational', latency: 123 })),
+        history: Array.from({ length: 24 }, (_, index) => ({ time: Date.UTC(2026, 0, 1, index), api: 0, db: 0, storage: 0 })),
+    } : null);
 
     const history = useMemo(() => (
         [...(data?.history || [])].sort((a, b) => a.time - b.time)
@@ -454,18 +463,8 @@ export const Status: React.FC = () => {
         },
     ]), [history, range]);
 
-    if (loading && !data) {
-        return (
-            <main className="min-h-screen bg-slate-50 dark:bg-slate-950">
-                <div className="flex min-h-[70vh] items-center justify-center">
-                    <ContentSkeleton label="Checking systems" />
-                </div>
-            </main>
-        );
-    }
-
     return (
-        <main className="min-h-screen bg-slate-50 dark:bg-slate-950">
+        <Surface><main className="min-h-screen bg-slate-50 dark:bg-slate-950">
             <div className="mx-auto max-w-[112rem] px-6 py-8 sm:px-12 sm:py-12 md:px-16 lg:px-20 xl:px-28">
                 <section className="mb-8 grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.7fr)] lg:items-stretch">
                     <div className={`relative overflow-hidden ${SURFACE_CARD_CLASS} p-6 sm:p-8`}>
@@ -552,8 +551,8 @@ export const Status: React.FC = () => {
                         <div className={`${GLASS_CARD_CLASS} p-5`}>
                             <div className="mb-4 flex items-center justify-between gap-3">
                                 <div>
-                                    <h2 className="text-lg font-black text-slate-950 dark:text-white">Active Incidents</h2>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400">Current service impact</p>
+                                    <h2 data-skeleton-keep className="text-lg font-black text-slate-950 dark:text-white">Active Incidents</h2>
+                                    <p data-skeleton-keep className="text-sm text-slate-500 dark:text-slate-400">Current service impact</p>
                                 </div>
                                 <StatusMark status={overallStatus} className="h-6 w-6" />
                             </div>
@@ -612,8 +611,8 @@ export const Status: React.FC = () => {
                                     <DiscordBrandIcon className="h-5 w-5" />
                                 </div>
                                 <div>
-                                    <h2 className="text-lg font-black text-slate-950 dark:text-white">Discord Status</h2>
-                                    <p className="text-sm text-slate-600 dark:text-slate-300">Live service health is mirrored in one continuously updated message.</p>
+                                    <h2 data-skeleton-keep className="text-lg font-black text-slate-950 dark:text-white">Discord Status</h2>
+                                    <p data-skeleton-keep className="text-sm text-slate-600 dark:text-slate-300">Live service health is mirrored in one continuously updated message.</p>
                                 </div>
                             </div>
                             <a
@@ -642,9 +641,9 @@ export const Status: React.FC = () => {
                                     <div>
                                         <div className="mb-2 flex items-center gap-3">
                                             <AlertTriangle className="h-5 w-5 text-amber-500" />
-                                            <h2 className="text-2xl font-black text-slate-950 dark:text-white">Current Status Updates</h2>
+                                            <h2 data-skeleton-keep className="text-2xl font-black text-slate-950 dark:text-white">Current Status Updates</h2>
                                         </div>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">Admin timeline updates as service impact moves from investigation to resolution.</p>
+                                        <p data-skeleton-keep className="text-sm text-slate-500 dark:text-slate-400">Admin timeline updates as service impact moves from investigation to resolution.</p>
                                     </div>
                                     <StatusPill status={overallStatus} />
                                 </div>
@@ -661,8 +660,8 @@ export const Status: React.FC = () => {
                                 <div className="mb-5 flex items-start gap-3">
                                     <Clock3 className="mt-1 h-5 w-5 text-violet-500" />
                                     <div>
-                                        <h2 className="text-2xl font-black text-slate-950 dark:text-white">Scheduled Maintenance</h2>
-                                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Planned maintenance windows.</p>
+                                        <h2 data-skeleton-keep className="text-2xl font-black text-slate-950 dark:text-white">Scheduled Maintenance</h2>
+                                        <p data-skeleton-keep className="mt-1 text-sm text-slate-500 dark:text-slate-400">Planned maintenance windows.</p>
                                     </div>
                                 </div>
                                 <div className="space-y-5">
@@ -720,10 +719,10 @@ export const Status: React.FC = () => {
                 <section className={`mb-8 ${GLASS_CARD_CLASS} p-5 sm:p-6`}>
                     <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div>
-                            <h2 className="text-2xl font-black text-slate-950 dark:text-white">Availability History</h2>
-                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Green means operational service states, amber means degraded or brief outage states, red means sustained outage states.</p>
+                            <h2 data-skeleton-keep className="text-2xl font-black text-slate-950 dark:text-white">Availability History</h2>
+                            <p data-skeleton-keep className="mt-1 text-sm text-slate-500 dark:text-slate-400">Green means operational service states, amber means degraded or brief outage states, red means sustained outage states.</p>
                         </div>
-                        <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-white/10 dark:bg-slate-950/40" role="group" aria-label="Status history range">
+                        <div data-skeleton-keep className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-white/10 dark:bg-slate-950/40" role="group" aria-label="Status history range">
                             {(['24h', '30d'] as StatusRange[]).map((option) => (
                                 <button
                                     key={option}
@@ -758,23 +757,23 @@ export const Status: React.FC = () => {
                 <section className={`mb-8 ${GLASS_CARD_CLASS} p-5 sm:p-6`}>
                     <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                         <div>
-                            <h2 className="text-2xl font-black text-slate-950 dark:text-white">Response Latency</h2>
+                            <h2 data-skeleton-keep className="text-2xl font-black text-slate-950 dark:text-white">Response Latency</h2>
                             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                                 Average across selected range: {formatLatency(averageLatency || 0)}
                             </p>
                         </div>
                     </div>
-                    <div className="h-[28rem] min-h-[22rem] w-full">
+                    <LoadingChartFrame pending={pending} className="h-[28rem] min-h-[22rem] w-full">
                         <LineChart datasets={chartDatasets} yAxisFormatter={(value) => formatLatency(value)} />
-                    </div>
+                    </LoadingChartFrame>
                 </section>
 
                 <section className={`${GLASS_CARD_CLASS} p-5 sm:p-6`}>
                     <div className="mb-5 flex items-start gap-3">
                         <CheckCircle2 className="mt-1 h-5 w-5 text-emerald-500" />
                         <div>
-                            <h2 className="text-2xl font-black text-slate-950 dark:text-white">Past Incidents</h2>
-                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Recent resolved or canceled events.</p>
+                            <h2 data-skeleton-keep className="text-2xl font-black text-slate-950 dark:text-white">Past Incidents</h2>
+                            <p data-skeleton-keep className="mt-1 text-sm text-slate-500 dark:text-slate-400">Recent resolved or canceled events.</p>
                         </div>
                     </div>
                     {incidentHistory.length ? (
@@ -790,6 +789,6 @@ export const Status: React.FC = () => {
                     )}
                 </section>
             </div>
-        </main>
+        </main></Surface>
     );
 };

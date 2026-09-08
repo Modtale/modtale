@@ -1,4 +1,4 @@
-import { PageSkeleton } from '@/components/ui/Skeleton';
+import { skeletonUser } from '../skeletons/fixtures';
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { api } from '@/utils/api';
@@ -38,6 +38,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({
         }
         return null;
     });
+
+    const profileMatchesRoute = !!profileUser && (profileUser.id === userId || matchesHandle(profileUser.username));
 
     const [orgMembers, setOrgMembers] = useState<User[]>([]);
     const [memberOrgs, setMemberOrgs] = useState<User[]>([]);
@@ -146,7 +148,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
     }, [fetchProjects, profileUser?.id]);
 
     useEffect(() => {
-        if (profileUser && !loadingProjects) {
+        if (profileUser && profileMatchesRoute && !loadingProjects) {
             const canonicalPath = SiteRoutes.creator(profileUser.id, profileUser.username);
             const currentPrefixMatch = location.pathname.match(/^\/(user|creator)\/[^/]+/i);
 
@@ -161,7 +163,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                 }
             }
         }
-    }, [profileUser, loadingProjects, totalItems, location.pathname, location.search, location.hash, navigate]);
+    }, [profileUser, profileMatchesRoute, loadingProjects, totalItems, location.pathname, location.search, location.hash, navigate]);
 
     const handleToggleFollow = async () => {
         if (!currentUser) {
@@ -227,7 +229,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({
         return rangeWithDots;
     };
 
-    if (loadingUser) return <PageSkeleton profile />;
+    if (loadingUser) return <UserProfileSkeleton onBack={onBack} isLoggedIn={!!currentUser}
+        isSelf={!!currentUser && (currentUser.id === userId || matchesHandle(currentUser.username))} />;
     if (notFound) return <NotFound />;
     if (!profileUser) return <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center"><h2 className="text-2xl font-black text-slate-900 dark:text-white">User not found</h2><button onClick={onBack} className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200">Go Back</button></div>;
 
@@ -255,6 +258,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({
             <ProfileLayout
                 user={profileUser}
                 stats={stats}
+                loadingStats={loadingProjects}
                 isFollowing={actualIsFollowing}
                 onToggleFollow={handleToggleFollow}
                 isSelf={isSelf}
@@ -340,14 +344,8 @@ export const UserProfile: React.FC<UserProfileProps> = ({
                         Published Work
                     </h2>
 
-                    {loadingProjects && page === 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-[1800px]:grid-cols-4 gap-4 md:gap-6 mt-4">
-                            {[...Array(itemsPerPage)].map((_, i) => (
-                                <div key={i}>
-                                    <ProjectCardSkeleton />
-                                </div>
-                            ))}
-                        </div>
+                    {loadingProjects ? (
+                        <PublishedWorkSkeleton count={itemsPerPage} />
                     ) : projects.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-[1800px]:grid-cols-4 gap-4 md:gap-6 mt-4">
                             {projects.map((project) => (
@@ -396,3 +394,24 @@ export const UserProfile: React.FC<UserProfileProps> = ({
         </div>
     );
 };
+
+export function PublishedWorkSkeleton({ count = 12 }: { count?: number }) {
+    return <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-[1800px]:grid-cols-4 gap-4 md:gap-6 mt-4">
+        {Array.from({ length: count }, (_, index) => <ProjectCardSkeleton key={index} />)}
+    </div>;
+}
+
+export function UserProfileSkeleton({ onBack, isLoggedIn = false, isSelf = false, accountType }: {
+    onBack?: () => void; isLoggedIn?: boolean; isSelf?: boolean; accountType?: User['accountType'];
+}) {
+    return <div className="min-h-screen bg-slate-50 dark:bg-modtale-dark pb-20">
+        <ProfileLayout loading user={{ ...skeletonUser, accountType, bio: 'Creator biography and published work.' }}
+            stats={{ downloads: 0, favorites: 0, followers: 0, projects: 0 }}
+            onBack={onBack} isLoggedIn={isLoggedIn} isSelf={isSelf} onReport={isSelf ? undefined : () => {}}>
+            <div className="w-full">
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Published Work</h2>
+                <PublishedWorkSkeleton />
+            </div>
+        </ProfileLayout>
+    </div>;
+}

@@ -1,4 +1,7 @@
-import { ContentSkeleton, PageSkeleton } from '@/components/ui/Skeleton';
+import { ProjectPageSkeleton } from '../components/ProjectPageSkeleton';
+import { ProjectGallerySkeleton } from '../components/ProjectGallerySkeleton';
+import { DownloadModalSkeleton } from '../components/dialogs/DownloadModal';
+import { HistoryModalSkeleton } from '../components/dialogs/HistoryModal';
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -575,7 +578,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     }, []);
 
     if (isNotFound) return <NotFound />;
-    if (loading || !project) return <PageSkeleton />;
+    if (loading || !project) return <ProjectPageSkeleton project={project} wiki={isWikiRoute} />;
 
     const canEdit = project.canEdit ?? Boolean(
         currentUser && (
@@ -635,20 +638,13 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             </Helmet>
 
             {statusModal && <StatusModal {...statusModal} onClose={() => setStatusModal(null)} />}
-            <Suspense fallback={null}>
+            <Suspense fallback={isDownloadOpen ? <DownloadModalSkeleton onClose={() => navigate(projectUrl)} /> : isHistoryOpen ? <HistoryModalSkeleton onClose={() => navigate(projectUrl)} /> : null}>
                 {isShareOpen && <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={window.location.href} title={project.title} author={project.author} />}
                 {isReportOpen && <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetId={project.id} targetType="PROJECT" targetTitle={project.title} />}
                 {showPostDownloadModal && <PostDownloadModal isOpen={showPostDownloadModal} onClose={() => setShowPostDownloadModal(false)} classification={project.classification!} title={project.title} channel={lastDownloadChannel} isBundle={lastDownloadWasBundle} fileName={lastDownloadedFileName} tags={project.tags} />}
 
-                {(isHistoryOpen || isDownloadOpen) && downloadModalPending && (
-                    <div className={theme.components.modalOverlay}>
-                        <div className={`${theme.components.modalContent} max-w-md`}>
-                            <div className="flex items-center justify-center p-12">
-                                <ContentSkeleton rows={3} />
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {isHistoryOpen && versionPayloadPending && <HistoryModalSkeleton onClose={() => navigate(projectUrl)} />}
+                {isDownloadOpen && downloadModalPending && <DownloadModalSkeleton onClose={() => navigate(projectUrl)} />}
                 {isHistoryOpen && !versionPayloadPending && (
                     <HistoryModal
                         show={isHistoryOpen}
@@ -751,11 +747,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                         onClick={(e) => e.stopPropagation()}
                     >
                         {galleryPayloadPending ? (
-                            <div className={`${theme.components.modalContent} mx-auto max-w-md`}>
-                                <div className="flex items-center justify-center p-12">
-                                    <ContentSkeleton rows={3} />
-                                </div>
-                            </div>
+                            <ProjectGallerySkeleton isInline onClose={() => navigate(projectUrl)} />
                         ) : galleryItems.length > 0 ? (
                             <>
                                 <button

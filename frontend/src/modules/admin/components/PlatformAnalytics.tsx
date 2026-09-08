@@ -1,3 +1,5 @@
+import { LoadingChartFrame } from '@/modules/admin/components/LoadingChartFrame';
+import { SkeletonSurface } from '@/components/ui/Skeleton';
 import React, { useEffect, useState } from 'react';
 import { Eye, Download, TrendingUp, TrendingDown, PackagePlus, UserPlus, Activity } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
@@ -9,10 +11,10 @@ import { sliceData, calculateWoW, calculateRollingAverage } from '@/utils/analyt
 const SummaryCard = ({ title, value, subValue, trend, icon: Icon, color, isPercent }: any) => (
     <div className="bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm hover:shadow-md transition-all relative overflow-hidden group backdrop-blur-md flex flex-col justify-between p-6">
         <div className={`absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity ${color}`}>
-            <Icon className="w-32 h-32 transform translate-x-8 -translate-y-8" />
+            <Icon data-skeleton-keep className={`w-32 h-32 transform translate-x-8 -translate-y-8 ${color}`} />
         </div>
         <div className="relative z-10 flex items-start justify-between mb-2">
-            <div className={`p-3 rounded-2xl ${color} bg-opacity-10 text-current shadow-inner`}>
+            <div data-skeleton-keep className={`p-3 rounded-2xl ${color} bg-opacity-10 text-current shadow-inner`}>
                 <Icon className="w-6 h-6" />
             </div>
             {trend !== undefined && (
@@ -23,7 +25,7 @@ const SummaryCard = ({ title, value, subValue, trend, icon: Icon, color, isPerce
             )}
         </div>
         <div className="relative z-10 mt-4">
-            <h3 className="text-slate-500 dark:text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">{title}</h3>
+            <h3 data-skeleton-keep className="text-slate-500 dark:text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">{title}</h3>
             <div className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-normal leading-none">
                 {value}{isPercent && <span className="text-2xl text-slate-400 ml-1">%</span>}
             </div>
@@ -35,7 +37,7 @@ const SummaryCard = ({ title, value, subValue, trend, icon: Icon, color, isPerce
 export function PlatformAnalytics() {
     const [loading, setLoading] = useState(true);
     const [range, setRange] = useState('30d');
-    const [data, setData] = useState<any>(null);
+    const [loadedData, setData] = useState<any>(null);
     const { isHidden, toggleHandler } = useChartVisibility();
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -55,27 +57,17 @@ export function PlatformAnalytics() {
         fetchData();
     }, [range]);
 
-    if (loading) return (
-        <div className="w-full space-y-8">
-            <div className="flex justify-between items-end mb-8">
-                <div>
-                    <div className="h-10 w-72 bg-slate-200 dark:bg-white/10 rounded-xl mb-3 skeleton"></div>
-                    <div className="h-4 w-48 bg-slate-200 dark:bg-white/10 rounded-lg skeleton"></div>
-                </div>
-                <div className="h-12 w-48 bg-slate-200 dark:bg-white/10 rounded-2xl skeleton"></div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[...Array(4)].map((_, i) => (
-                    <div key={i} className="h-40 bg-slate-200/50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 skeleton"></div>
-                ))}
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {[...Array(4)].map((_, i) => (
-                    <div key={i} className="h-[500px] bg-slate-200/50 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 skeleton"></div>
-                ))}
-            </div>
-        </div>
-    );
+    // Render the same cards, axes and legends while the API is pending.
+    const data = loadedData || (loading ? {
+        totalDownloads: 1234, previousTotalDownloads: 1000,
+        totalViews: 5678, previousTotalViews: 5000,
+        totalNewUsers: 123, previousTotalNewUsers: 100,
+        totalNewProjects: 123, previousTotalNewProjects: 100,
+        ...Object.fromEntries(['downloadsChart', 'apiDownloadsChart', 'viewsChart', 'newProjectsChart', 'newUsersChart', 'newOrgsChart'].map(key => [key,
+            Array.from({ length: 65 }, (_, i) => ({ date: new Date(Date.UTC(2026, 0, i + 1)).toISOString().slice(0, 10), count: 0 }))
+        ])),
+    } : null);
+    const Surface = loading ? SkeletonSurface : React.Fragment;
 
     if (!data) {
         if (!errorMessage) return null;
@@ -137,6 +129,7 @@ export function PlatformAnalytics() {
     const activeRangeIndex = ranges.indexOf(range);
 
     return (
+        <Surface>
         <div className="relative animate-in fade-in duration-500">
             {errorMessage && (
                 <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
@@ -145,10 +138,10 @@ export function PlatformAnalytics() {
             )}
             <div className="flex flex-col md:flex-row justify-between md:items-end gap-6 mb-8">
                 <div>
-                    <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-normal">Platform Analytics</h1>
-                    <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Monitor platform-wide statistics and growth.</p>
+                    <h1 data-skeleton-keep className="text-3xl font-black text-slate-900 dark:text-white tracking-normal">Platform Analytics</h1>
+                    <p data-skeleton-keep className="text-slate-500 dark:text-slate-400 font-medium mt-1">Monitor platform-wide statistics and growth.</p>
                 </div>
-                <div className="relative flex bg-white/60 dark:bg-black/20 p-1 rounded-xl shadow-inner border border-slate-200 dark:border-white/10 shrink-0 w-fit">
+                <div data-skeleton-keep className="relative flex bg-white/60 dark:bg-black/20 p-1 rounded-xl shadow-inner border border-slate-200 dark:border-white/10 shrink-0 w-fit">
                     <div
                         className="absolute top-1 bottom-1 w-14 rounded-lg transition-transform duration-300 ease-out bg-modtale-accent shadow-sm shadow-modtale-accent/30 border border-transparent"
                         style={{ transform: `translateX(${activeRangeIndex * 100}%)` }}
@@ -197,58 +190,59 @@ export function PlatformAnalytics() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm flex flex-col h-[500px] backdrop-blur-md">
-                        <div className="flex items-center gap-4 mb-4 shrink-0 px-6 pt-6">
+                        <div data-skeleton-keep className="flex items-center gap-4 mb-4 shrink-0 px-6 pt-6">
                             <div className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm text-blue-500"><Download className="w-5 h-5" /></div>
                             <div>
-                                <h3 className="font-bold text-lg text-slate-900 dark:text-white leading-tight">Downloads over Time</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Platform vs API daily downloads.</p>
+                                <h3 data-skeleton-keep className="font-bold text-lg text-slate-900 dark:text-white leading-tight">Downloads over Time</h3>
+                                <p data-skeleton-keep className="text-xs text-slate-500 dark:text-slate-400 font-medium">Platform vs API daily downloads.</p>
                             </div>
                         </div>
-                        <div className="flex-1 min-h-0 px-6 pb-6">
+                        <LoadingChartFrame pending={loading} className="flex-1 min-h-0 px-6 pb-6">
                             <LineChart datasets={chartDatasets.downloads} onToggle={toggleHandler('downloads')} />
-                        </div>
+                        </LoadingChartFrame>
                     </div>
 
                     <div className="bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm flex flex-col h-[500px] backdrop-blur-md">
-                        <div className="flex items-center gap-4 mb-4 shrink-0 px-6 pt-6">
+                        <div data-skeleton-keep className="flex items-center gap-4 mb-4 shrink-0 px-6 pt-6">
                             <div className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm text-purple-500"><Eye className="w-5 h-5" /></div>
                             <div>
-                                <h3 className="font-bold text-lg text-slate-900 dark:text-white leading-tight">Views over Time</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Platform-wide daily page views.</p>
+                                <h3 data-skeleton-keep className="font-bold text-lg text-slate-900 dark:text-white leading-tight">Views over Time</h3>
+                                <p data-skeleton-keep className="text-xs text-slate-500 dark:text-slate-400 font-medium">Platform-wide daily page views.</p>
                             </div>
                         </div>
-                        <div className="flex-1 min-h-0 px-6 pb-6">
+                        <LoadingChartFrame pending={loading} className="flex-1 min-h-0 px-6 pb-6">
                             <LineChart datasets={chartDatasets.views} onToggle={toggleHandler('views')} />
-                        </div>
+                        </LoadingChartFrame>
                     </div>
 
                     <div className="bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm flex flex-col h-[500px] backdrop-blur-md">
-                        <div className="flex items-center gap-4 mb-4 shrink-0 px-6 pt-6">
+                        <div data-skeleton-keep className="flex items-center gap-4 mb-4 shrink-0 px-6 pt-6">
                             <div className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm text-emerald-500"><PackagePlus className="w-5 h-5" /></div>
                             <div>
-                                <h3 className="font-bold text-lg text-slate-900 dark:text-white leading-tight">New Creations</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Daily net users, orgs, and projects.</p>
+                                <h3 data-skeleton-keep className="font-bold text-lg text-slate-900 dark:text-white leading-tight">New Creations</h3>
+                                <p data-skeleton-keep className="text-xs text-slate-500 dark:text-slate-400 font-medium">Daily net users, orgs, and projects.</p>
                             </div>
                         </div>
-                        <div className="flex-1 min-h-0 px-6 pb-6">
+                        <LoadingChartFrame pending={loading} className="flex-1 min-h-0 px-6 pb-6">
                             <LineChart datasets={chartDatasets.newProjects} onToggle={toggleHandler('newCreations')} />
-                        </div>
+                        </LoadingChartFrame>
                     </div>
 
                     <div className="bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm flex flex-col h-[500px] backdrop-blur-md">
-                        <div className="flex items-center gap-4 mb-4 shrink-0 px-6 pt-6">
+                        <div data-skeleton-keep className="flex items-center gap-4 mb-4 shrink-0 px-6 pt-6">
                             <div className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm text-modtale-accent"><Activity className="w-5 h-5" /></div>
                             <div>
-                                <h3 className="font-bold text-lg text-slate-900 dark:text-white leading-tight">Momentum (WoW %)</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Platform week-over-week growth.</p>
+                                <h3 data-skeleton-keep className="font-bold text-lg text-slate-900 dark:text-white leading-tight">Momentum (WoW %)</h3>
+                                <p data-skeleton-keep className="text-xs text-slate-500 dark:text-slate-400 font-medium">Platform week-over-week growth.</p>
                             </div>
                         </div>
-                        <div className="flex-1 min-h-0 px-6 pb-6">
+                        <LoadingChartFrame pending={loading} className="flex-1 min-h-0 px-6 pb-6">
                             <LineChart datasets={chartDatasets.growth} onToggle={toggleHandler('momentum')} yAxisFormatter={(val) => `${val > 0 ? '+' : ''}${Math.round(val)}%`} />
-                        </div>
+                        </LoadingChartFrame>
                     </div>
                 </div>
             </div>
         </div>
+        </Surface>
     );
 }
