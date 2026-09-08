@@ -82,14 +82,7 @@ public final class LauncherHytaleAuthGate {
         signInButton.setMaxWidth(Double.MAX_VALUE);
         signInButton.setOnAction(event -> signInHytale());
 
-        Label note = new Label("A Modtale account is optional. It is only needed for account-backed features such as notifications, favorites, shared lists, and creating modpacks.");
-        note.getStyleClass().add("auth-status");
-        note.setWrapText(true);
-        note.setMaxWidth(360);
-        note.setAlignment(Pos.CENTER);
-        note.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
-
-        VBox card = new VBox(16, logo, title, statusLabel, signInButton, note);
+        VBox card = new VBox(16, logo, title, statusLabel, signInButton);
         card.getStyleClass().add("auth-card");
         card.setAlignment(Pos.CENTER);
         gate.getChildren().add(card);
