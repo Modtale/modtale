@@ -25,6 +25,7 @@ export type VersionFormData = {
     changelog: string;
     file: File | null;
     replaceExisting?: boolean;
+    modConfigs?: import('../utils/modpackConfigs').ModConfig[];
 };
 
 export const Label = ({ children, required, className }: { children: React.ReactNode, required?: boolean, className?: string }) => (

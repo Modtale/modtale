@@ -31,6 +31,7 @@ import { ThemedInput } from '../components/FormShared';
 import type { MetadataFormData, VersionFormData } from '../components/FormShared';
 import type { ProjectRole } from '@/types';
 import { Permission, PROJECT_PERMISSION_GROUPS } from '@/modules/permissions/permissions';
+import { buildModpackOverrides } from '../utils/modpackConfigs';
 import { VersionFields } from '../components/VersionFields';
 import { worldListClient } from '@/modules/worldlist/api/worldListClient';
 import { skippedWorldListItems, worldListToProjectDependencies, worldListToOverrideFile } from '@/modules/worldlist/utils/modpackSeed';
@@ -493,7 +494,8 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             const formData = new FormData();
             formData.append('versionNumber', versionData.versionNumber);
             versionData.gameVersions.forEach(version => formData.append('gameVersions', version));
-            if (versionData.file) formData.append('file', versionData.file);
+            const uploadFile = isModpack ? await buildModpackOverrides(versionData) : versionData.file;
+            if (uploadFile) formData.append('file', uploadFile);
             appendDependenciesToFormData(formData, versionData.dependencies || []);
             (versionData.incompatibleProjectIds || []).forEach(projectId => formData.append('incompatibleProjectIds', projectId));
             if (versionData.changelog) formData.append('changelog', versionData.changelog);

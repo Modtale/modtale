@@ -23,6 +23,7 @@ interface DependencySelectorProps {
     currentProjectId?: string;
     isModpack?: boolean;
     disabled?: boolean;
+    renderDependencyDetails?: (dependency: ProjectDependency) => React.ReactNode;
 }
 
 const createUuid = () => {
@@ -235,6 +236,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
     previousDependencies,
     currentProjectId,
     isModpack = false,
+    renderDependencyDetails,
     disabled
 }) => {
     const [search, setSearch] = useState('');
@@ -929,7 +931,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                             const isExternal = dependency ? isExternalDependency(dependency) : false;
                             const depType = dependency ? getDependencyType(dependency) : 'REQUIRED';
                             return (
-                                <div key={dependency?.id || id} className={`flex items-center justify-between ${theme.colors.bgBase} p-3 rounded-xl border ${theme.colors.border} text-sm shadow-sm group gap-3`}>
+                                <div key={dependency?.id || id} className={`flex flex-wrap items-center justify-between ${theme.colors.bgBase} p-3 rounded-xl border ${theme.colors.border} text-sm shadow-sm group gap-3`}>
                                     <div className="flex items-center gap-3 overflow-hidden min-w-0">
                                         {!isIncompatibilityMode && (
                                             <div className={`p-1 shrink-0 rounded-lg ${depType === 'OPTIONAL' ? `${theme.colors.bgSurfaceAlt} ${theme.colors.textMuted}` : depType === 'EMBEDDED' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-amber-100 text-amber-600 dark:bg-amber-900/20'}`}>
@@ -972,6 +974,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                                         )}
                                         <button type="button" disabled={disabled} onClick={() => removeSelected(index)} className={`${theme.colors.textMuted} p-2 rounded-lg transition-colors ${disabled ? 'cursor-not-allowed opacity-50' : `hover:${theme.colors.dangerText} hover:${theme.colors.dangerBg}`}`}><X className="w-4 h-4" /></button>
                                     </div>
+                                    {dependency && renderDependencyDetails?.(dependency)}
                                 </div>
                             );
                         })}
