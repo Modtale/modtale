@@ -2,7 +2,6 @@ package net.modtale.launcher.ui.wardrobe;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.File;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Supplier;
@@ -14,7 +13,6 @@ import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
-import javafx.stage.FileChooser;
 import net.modtale.launcher.hytale.HytaleAuthSession;
 import net.modtale.launcher.settings.LauncherSettings;
 import net.modtale.launcher.ui.common.LauncherIcons;
@@ -88,10 +86,6 @@ public final class LauncherWardrobeController implements AutoCloseable {
         root.setUserData(LauncherView.WARDROBE);
         root.getStyleClass().add("wardrobe-page");
         root.setMinWidth(0);
-        Label title = label("Wardrobe", "page-title");
-        HBox header = new HBox(16, title, spacer(), iconButton("Import", LauncherIcons.Glyph.DOWNLOAD, this::importLooks),
-                iconButton("Export", LauncherIcons.Glyph.SHARE_2, this::exportLooks));
-        header.setAlignment(Pos.CENTER_LEFT);
         HBox tabBar = new HBox(6); tabBar.getStyleClass().add("wardrobe-tabs");
         ToggleGroup group = new ToggleGroup();
         String[] names = {"Customize", "Skins", "Saved looks"};
@@ -136,7 +130,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
         customize.setMaxWidth(Double.MAX_VALUE);
         inspector.getChildren().addAll(previewNode, selectedName, selectedDetail, save, customize, apply);
         columns.setAlignment(Pos.TOP_LEFT); columns.getChildren().addAll(catalog, inspector);
-        root.getChildren().addAll(header, tabBar, columns);
+        root.getChildren().addAll(tabBar, columns);
         root.widthProperty().addListener((o, a, b) -> {
             // Keep the fitting room usable at the launcher's compact window size.
             double width = b.doubleValue();
@@ -311,20 +305,6 @@ public final class LauncherWardrobeController implements AutoCloseable {
         });
     }
 
-    private void importLooks() {
-        FileChooser chooser = chooser("Import wardrobe"); File file = chooser.showOpenDialog(root.getScene().getWindow());
-        if (file != null) feedback.runAsync("Importing wardrobe", () -> { try {
-            store.importItems(file.toPath()); return true;
-        } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); } }, done -> { selectTab(Tab.SAVED); tabs.get(Tab.SAVED).setSelected(true); });
-    }
-    private void exportLooks() {
-        FileChooser chooser = chooser("Export wardrobe"); chooser.setInitialFileName("modtale-wardrobe.json");
-        File file = chooser.showSaveDialog(root.getScene().getWindow());
-        if (file != null) feedback.runAsync("Exporting wardrobe", () -> { try { store.exportItems(file.toPath()); return true; }
-        catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); } }, done -> feedback.showToast("Wardrobe saved", "Your collection has been exported."));
-    }
-    private static FileChooser chooser(String title) { FileChooser c = new FileChooser(); c.setTitle(title); c.getExtensionFilters().add(new FileChooser.ExtensionFilter("Wardrobe JSON", "*.json")); return c; }
-
     private String activeProfile() { HytaleAuthSession session = settings.get().getHytaleAuthSession(); return session == null ? "" : session.getUuid(); }
     private String activeUsername() { HytaleAuthSession s = settings.get().getHytaleAuthSession(); return s == null || s.getUsername().isBlank() ? "NPC" : s.getUsername(); }
     private void setStatus(String text) { status.setText(text); status.setVisible(!text.isBlank()); }
@@ -341,7 +321,6 @@ public final class LauncherWardrobeController implements AutoCloseable {
     private static String message(Throwable e) { while (e.getCause() != null && e instanceof CompletionException) e = e.getCause(); return e.getMessage() == null ? "Please try again." : e.getMessage(); }
     private static Label label(String text, String style) { Label l = new Label(text); l.getStyleClass().add(style); return l; }
     private static void hideWhenEmpty(Label label) { label.visibleProperty().bind(label.textProperty().isNotEmpty()); label.managedProperty().bind(label.visibleProperty()); }
-    private static Region spacer() { Region r = new Region(); HBox.setHgrow(r, Priority.ALWAYS); return r; }
     private static Button iconButton(String title, LauncherIcons.Glyph glyph, Runnable action) { Button b = secondaryButton(title); b.setGraphic(LauncherIcons.icon(glyph, 15)); b.setOnAction(e -> action.run()); return b; }
     @Override public void close() { disposed = true; request++; preview.dispose(); editor.close(); }
 }
