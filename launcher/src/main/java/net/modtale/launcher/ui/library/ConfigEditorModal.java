@@ -45,9 +45,18 @@ final class ConfigEditorModal {
     }
 
     void show(Path globalMods, Path world, String worldName) {
-        Label title = new Label("Configs · " + worldName);
+        show(worldName, () -> files.discover(globalMods, world));
+    }
+
+    void show(List<ConfigFile> selectedFiles, String modName) {
+        List<ConfigFile> selected = List.copyOf(selectedFiles);
+        show(modName, () -> selected);
+    }
+
+    private void show(String name, DiskWork<List<ConfigFile>> discover) {
+        Label title = new Label("Config · " + name);
         title.getStyleClass().add("config-editor-title");
-        Label hint = new Label("Close Hytale before editing. JSON is validated; other formats are saved as text. A backup is kept beside each saved file. Configs are saved in launcher settings and sync when signed in. Mod ownership uses manifest IDs; custom or missing mod folders appear as Unattributed.");
+        Label hint = new Label("Close Hytale before editing. JSON is validated; other formats are saved as text. A backup is kept beside each saved file. Configs are saved in launcher settings and sync when signed in.");
         hint.setWrapText(true);
         hint.getStyleClass().add("library-muted-text");
         search.setPromptText("Search config files");
@@ -100,7 +109,7 @@ final class ConfigEditorModal {
         list.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, file) -> {
             if (file != null) load(file);
         });
-        work("Finding configs…", () -> files.discover(globalMods, world), found -> {
+        work("Finding configs…", discover, found -> {
             entries = found;
             filter();
             status.setText(found.size() + " config files");
