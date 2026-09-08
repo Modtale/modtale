@@ -117,10 +117,10 @@ public final class CosmeticEditorController implements AutoCloseable {
         ownedOnly.setOnAction(e -> { page = 1; browse(); });
         HBox searchRow = new HBox(10, search, button("Search", LauncherIcons.Glyph.SEARCH, () -> { page = 1; browse(); }));
         searchRow.setAlignment(Pos.CENTER_LEFT);
-        categoryRail.setMinWidth(145); categoryRail.setPrefWidth(160); categoryRail.getStyleClass().add("cosmetic-category-rail");
+        categoryRail.setMinWidth(0); categoryRail.setPrefWidth(160); categoryRail.getStyleClass().add("cosmetic-category-rail");
         ScrollPane categories = new ScrollPane(categoryRail); categories.setFitToWidth(true);
         categories.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER); categories.setPrefViewportHeight(670);
-        categories.setMinWidth(145); categories.setPrefWidth(165); categories.getStyleClass().add("cosmetic-category-scroll");
+        categories.setMinWidth(165); categories.setPrefWidth(165); categories.getStyleClass().add("cosmetic-category-scroll");
         grid.setMinWidth(0); grid.setPrefWrapLength(510);
         previous.setOnAction(e -> { page = Math.max(1, page - 1); browse(); });
         next.setOnAction(e -> { page++; browse(); });

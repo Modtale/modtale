@@ -9554,8 +9554,15 @@
 .wardrobe-dialog .text-field { -fx-background-color: #0b1627; -fx-text-fill: #e2e8f0; -fx-padding: 10; }
 .wardrobe-dialog .button { -fx-background-color: #21334c; -fx-text-fill: #e2e8f0; -fx-background-radius: 8; -fx-padding: 9 14; }
 .wardrobe-dialog .button:default { -fx-background-color: #2563eb; -fx-text-fill: white; }
-.cosmetic-category-scroll, .cosmetic-category-scroll > .viewport { -fx-background-color: transparent; -fx-padding: 0; }
-.cosmetic-category-rail { -fx-padding: 12 8 12 0; }
+.cosmetic-category-scroll {
+    -fx-background-color: linear-gradient(to bottom, #152238, #101b2d);
+    -fx-border-color: #293950;
+    -fx-background-radius: 18;
+    -fx-border-radius: 18;
+    -fx-padding: 10 8;
+}
+.cosmetic-category-scroll > .viewport { -fx-background-color: transparent; }
+.cosmetic-category-rail { -fx-padding: 0; }
 .cosmetic-category { -fx-background-color: transparent; -fx-text-fill: #94a3b8; -fx-padding: 11 12; -fx-background-radius: 8; -fx-font-size: 12; -fx-cursor: hand; }
 .cosmetic-category:hover { -fx-background-color: #16243a; -fx-text-fill: #e2e8f0; }
 .cosmetic-category:selected { -fx-background-color: #1b3156; -fx-text-fill: #93c5fd; -fx-font-weight: 800; }
