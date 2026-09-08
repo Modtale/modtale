@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Download, List, X, ChevronDown, ChevronRight, Check, Box, Link as LinkIcon, AlertCircle, Bell, Search, ArrowUpRight, MessageSquare, Send, Save, PieChart, TrendingUp, Eye, ArrowBigUp, ArrowBigDown, Settings, Layers } from 'lucide-react';
+import { Download, List, X, ChevronDown, ChevronRight, Check, Box, AlertCircle, Bell, Search, ArrowUpRight, MessageSquare, Send, Save, PieChart, TrendingUp, Eye, ArrowBigUp, ArrowBigDown, Settings, Layers, Plus } from 'lucide-react';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { api, BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
@@ -46,8 +46,7 @@ const getPreviewVersionNumber = (project: Project, versionCache: Record<string, 
     return versionCache[project.id] || 'latest';
 };
 
-export const InlineDependencyUI = ({ randomProject, projects }: { randomProject?: Project; projects?: Project[] }) => {
-    const previewProjects = useMemo(() => getDependencyPreviewProjects(projects, randomProject), [projects, randomProject]);
+const usePreviewVersions = (previewProjects: Project[]) => {
     const [versionCache, setVersionCache] = useState<Record<string, string>>({});
 
     useEffect(() => {
@@ -85,6 +84,13 @@ export const InlineDependencyUI = ({ randomProject, projects }: { randomProject?
             isCancelled = true;
         };
     }, [previewProjects, versionCache]);
+
+    return versionCache;
+};
+
+export const InlineDependencyUI = ({ randomProject, projects }: { randomProject?: Project; projects?: Project[] }) => {
+    const previewProjects = useMemo(() => getDependencyPreviewProjects(projects, randomProject), [projects, randomProject]);
+    const versionCache = usePreviewVersions(previewProjects);
 
     const previewDependencies = useMemo<ProjectDependency[]>(() => (
         previewProjects.map((project, index) => ({
@@ -131,94 +137,110 @@ export const InlineDependencyUI = ({ randomProject, projects }: { randomProject?
     );
 };
 
-const ModpackProjectRow = ({
-    title,
-    version,
-    source,
-    tone,
-}: {
-    title: string;
-    version: string;
-    source: string;
-    tone: 'local' | 'external' | 'warning';
-}) => {
-    const toneClass = tone === 'external'
-        ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/20'
-        : tone === 'warning'
-            ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20'
-            : 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20';
-
-    return (
-        <div className="flex items-center gap-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/65 dark:bg-black/15 p-3 shadow-sm">
-            <div className={`h-9 w-9 shrink-0 rounded-lg border flex items-center justify-center ${toneClass}`}>
-                {tone === 'warning' ? <AlertCircle className="h-4 w-4" /> : tone === 'external' ? <ArrowUpRight className="h-4 w-4" /> : <Check className="h-4 w-4" />}
-            </div>
-            <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-black text-slate-900 dark:text-white">{title}</div>
-                <div className="mt-0.5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    <span>{source}</span>
-                    <span className="font-mono normal-case tracking-normal">v{version}</span>
-                </div>
-            </div>
-        </div>
-    );
+type ModpackPreviewProps = {
+    randomProject?: Project;
+    projects?: Project[];
+    loading?: boolean;
 };
 
-export const InlineModpackBuilderUI = ({ randomProject }: { randomProject?: Project }) => {
-    const highlightedProject = randomProject?.title || 'Skylands Expansion';
+export const InlineModpackBuilderUI = ({ randomProject, projects, loading = false }: ModpackPreviewProps) => {
+    const previewProjects = useMemo(() => {
+        const source = projects?.length ? projects : randomProject ? [randomProject] : [];
+        return Array.from(new Map(source
+            .filter(project => project?.id && project?.title && project.classification !== 'MODPACK' && project.allowModpacks !== false)
+            .map(project => [project.id, project])).values()).slice(0, 8);
+    }, [projects, randomProject]);
+    const [query, setQuery] = useState('');
+    const [selection, setSelection] = useState<Record<string, boolean>>({});
+    const isSelected = (project: Project, index: number) => selection[project.id] ?? index < 3;
+    const selectedProjects = previewProjects.filter(isSelected);
+    const matchingProjects = useMemo(() => previewProjects.filter(project =>
+        `${project.title} ${project.author || ''}`.toLowerCase().includes(query.trim().toLowerCase())
+    ).slice(0, 3), [previewProjects, query]);
+    const versionCache = usePreviewVersions(matchingProjects);
 
     return (
-        <div className={`${GLASS_CARD} w-full overflow-hidden`}>
-            <div className={`${GLASS_HEADER} p-4 sm:p-5 flex items-center justify-between gap-4`}>
-                <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-10 w-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
-                        <Layers className="h-5 w-5" />
+        <div className={`${GLASS_CARD} relative w-full overflow-hidden`}>
+            <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-400 to-emerald-400" />
+            <div className="p-5 sm:p-6">
+                <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-500/20">
+                        <Layers className="h-5 w-5" aria-hidden="true" />
                     </div>
-                    <div className="min-w-0">
-                        <h3 className="truncate text-base sm:text-lg font-black text-slate-900 dark:text-white">Modpack Builder</h3>
-                        <p className="truncate text-xs font-bold text-slate-500 dark:text-slate-400">Vanilla+ Adventure Pack</p>
+                    <div className="min-w-0 flex-1">
+                        <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-300">Interactive preview</p>
+                        <h3 className="text-lg font-black text-slate-900 dark:text-white">Modpack Builder</h3>
+                    </div>
+                    <span className="shrink-0 rounded-full border border-slate-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:border-white/10 dark:text-slate-400">Draft</span>
+                </div>
+
+                <div className="my-5 flex items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50/50 p-4 dark:border-blue-400/15 dark:from-blue-500/10 dark:to-indigo-500/5">
+                    <div>
+                        <p className="text-sm font-bold text-slate-900 dark:text-white">Your next adventure</p>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">A little inspiration. Make it yours.</p>
+                    </div>
+                    <div className="shrink-0 text-right" aria-live="polite" aria-atomic="true">
+                        <span className="block text-2xl font-black tabular-nums text-blue-600 dark:text-blue-300">{selectedProjects.length}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{selectedProjects.length === 1 ? 'project' : 'projects'}</span>
                     </div>
                 </div>
-                <span className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
-                    6 projects
-                </span>
-            </div>
 
-            <div className="p-4 sm:p-5 space-y-4">
-                <div className="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-black/20 px-3 py-2.5">
-                    <Search className="h-4 w-4 text-slate-400" />
-                    <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Add a Hytale project or CurseForge URL</span>
+                <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white/70 px-3 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/20 dark:border-white/10 dark:bg-black/15">
+                    <Search className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+                    <input
+                        type="search"
+                        aria-label="Search preview projects"
+                        placeholder="Find a project for your pack…"
+                        value={query}
+                        onChange={event => setQuery(event.target.value)}
+                        className="min-w-0 w-full border-0 bg-transparent py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white"
+                    />
+                </label>
+                <div className="mb-2 mt-5 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    <span>Discover projects</span>
+                    <span>From Modtale</span>
                 </div>
-
-                <div className="space-y-2">
-                    <ModpackProjectRow title="Hytale Core Library" version="1.2.0" source="Modtale" tone="local" />
-                    <ModpackProjectRow title={highlightedProject} version={randomProject?.versions?.[0]?.versionNumber || '1.0.0'} source="Modtale" tone="local" />
-                    <ModpackProjectRow title="WorldEdit Hytale Tools" version="latest" source="CurseForge reference" tone="external" />
-                </div>
-
-                <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 dark:border-amber-500/20 dark:bg-amber-500/10">
-                    <div className="flex items-start gap-3">
-                        <LinkIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" />
-                        <div className="min-w-0 flex-1">
-                            <div className="text-sm font-black text-amber-900 dark:text-amber-100">Add 2 required dependencies?</div>
-                            <div className="mt-1 text-xs font-medium leading-relaxed text-amber-800 dark:text-amber-200/90">QuestAPI and Terrain Shapes are required by selected projects.</div>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                                <button type="button" className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-black text-white shadow-sm">Add selected</button>
-                                <button type="button" className="rounded-lg border border-amber-300 bg-white/70 px-3 py-1.5 text-xs font-black text-amber-800 dark:border-amber-400/30 dark:bg-white/10 dark:text-amber-100">Skip</button>
+                <div className="min-h-[228px]" aria-busy={loading && !previewProjects.length}>
+                    {loading && !previewProjects.length ? (
+                        <div role="status" className="space-y-3 py-2">
+                            <span className="sr-only">Loading projects</span>
+                            {[0, 1, 2].map(index => <div key={index} className="h-16 animate-pulse rounded-xl bg-slate-200/60 dark:bg-white/5" aria-hidden="true" />)}
+                        </div>
+                    ) : matchingProjects.length ? matchingProjects.map(project => {
+                        const selected = isSelected(project, previewProjects.indexOf(project));
+                        const version = getPreviewVersionNumber(project, versionCache);
+                        return (
+                            <div key={project.id} className="group flex items-center gap-3 border-b border-slate-200/70 py-3 last:border-0 dark:border-white/5">
+                                <Link to={SiteRoutes.project(project)} className="flex min-w-0 flex-1 items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-slate-800">
+                                        <OptimizedImage src={project.imageUrl || '/assets/favicon.svg'} alt="" baseWidth={48} className="h-full w-full object-cover" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm font-bold text-slate-900 transition-colors group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-300">{project.title}</p>
+                                        <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{project.author ? `by ${project.author}` : toTitleCase(project.classification)}<span className="mx-1.5 opacity-40">/</span><span className="font-mono text-[10px]">{version === 'latest' ? 'Latest release' : `v${version}`}</span></p>
+                                    </div>
+                                </Link>
+                                <button
+                                    type="button"
+                                    aria-label={`${selected ? 'Remove' : 'Add'} ${project.title}${selected ? ' from' : ' to'} preview pack`}
+                                    aria-pressed={selected}
+                                    onClick={() => setSelection(current => ({ ...current, [project.id]: !selected }))}
+                                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${selected ? 'border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:border-blue-400/25 dark:bg-blue-500/15 dark:text-blue-300 dark:hover:bg-blue-500/25' : 'border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-500 dark:border-white/10'}`}
+                                >
+                                    {selected ? <Check className="h-4 w-4" aria-hidden="true" /> : <Plus className="h-4 w-4" aria-hidden="true" />}
+                                </button>
                             </div>
-                        </div>
-                    </div>
+                        );
+                    }) : (
+                        <p role="status" className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">{query ? 'No matching projects. Try another name.' : 'Projects are unavailable right now. Explore the catalog below.'}</p>
+                    )}
                 </div>
-
-                <div className="rounded-xl border border-red-200 bg-red-50/80 p-3 dark:border-red-500/20 dark:bg-red-500/10">
-                    <div className="flex items-start gap-3">
-                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-300" />
-                        <div className="min-w-0">
-                            <div className="text-sm font-black text-red-900 dark:text-red-100">WeatherFX conflicts with Clear Skies</div>
-                            <div className="mt-1 text-xs font-medium leading-relaxed text-red-700 dark:text-red-200/90">Resolve before publishing this pack.</div>
-                        </div>
-                    </div>
-                </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/70 px-5 py-4 dark:border-white/10 dark:bg-black/10 sm:px-6">
+                <p className="text-xs text-slate-500 dark:text-slate-400">Try adding or removing a project.</p>
+                <Link to={SiteRoutes.browse()} className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-500 dark:text-blue-300">
+                    Explore projects <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </Link>
             </div>
         </div>
     );
@@ -857,7 +879,7 @@ export const NewReleasesSection = ({
     );
 };
 
-export const ModpackPreviewSection = ({ randomProject }: { randomProject?: Project }) => {
+export const ModpackPreviewSection = ({ randomProject, projects, loading }: ModpackPreviewProps) => {
     return (
         <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
             <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
@@ -873,7 +895,7 @@ export const ModpackPreviewSection = ({ randomProject }: { randomProject?: Proje
             </div>
             <div className="flex-1 w-full max-w-xl relative overflow-visible">
                 <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/5 via-transparent to-emerald-500/5 dark:from-blue-500/10 dark:via-transparent dark:to-emerald-500/10 rounded-3xl blur-2xl pointer-events-none" />
-                <InlineModpackBuilderUI randomProject={randomProject} />
+                <InlineModpackBuilderUI randomProject={randomProject} projects={projects} loading={loading} />
             </div>
         </div>
     );

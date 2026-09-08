@@ -1211,7 +1211,7 @@ export const Home: React.FC<{
                     </FeatureShowcaseSection>
 
                     <FeatureShowcaseSection glowFrom="rgba(59, 130, 246, 0.1)" glowTo="rgba(16, 185, 129, 0.08)" align="right">
-                        <ModpackPreviewSection randomProject={previewProject} />
+                        <ModpackPreviewSection randomProject={previewProject} projects={combinedProjectPool} loading={isTrendingProjectsLoading || isNewestProjectsLoading} />
                     </FeatureShowcaseSection>
 
                     <FeatureShowcaseSection glowFrom="rgba(168, 85, 247, 0.1)" glowTo="rgba(236, 72, 153, 0.08)" align="left">
