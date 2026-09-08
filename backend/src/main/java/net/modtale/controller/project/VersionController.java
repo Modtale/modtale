@@ -181,6 +181,7 @@ public class VersionController {
             @PathVariable String version,
             @RequestParam(value = "gameVersion", required = false) String gameVersion,
             @RequestParam(value = "deps", required = false) List<String> deps,
+            @RequestHeader(value = CLIENT_HEADER, required = false) String client,
             Authentication authentication
     ) {
         return ResponseEntity.ok(versionApplicationService.createBundleDownloadUrl(
@@ -188,7 +189,8 @@ public class VersionController {
                 version,
                 gameVersion,
                 deps,
-                accountService.getCurrentUser(authentication)
+                accountService.getCurrentUser(authentication),
+                isLauncherClient(client)
         ));
     }
 
@@ -204,7 +206,8 @@ public class VersionController {
                 request.getHeader("Referer"),
                 request.getRemoteAddr(),
                 request.getHeader("X-Forwarded-For"),
-                accountService.getCurrentUser(authentication)
+                accountService.getCurrentUser(authentication),
+                isLauncherClient(request.getHeader(CLIENT_HEADER))
         );
         return asDownloadResponse(payload);
     }

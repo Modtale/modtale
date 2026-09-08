@@ -98,7 +98,15 @@ public class WorldModListService {
     }
 
     public Download download(String id) throws IOException {
-        WorldModList list = touch(findActive(id), true, true);
+        return download(id, false);
+    }
+
+    public Download download(String id, boolean launcherClient) throws IOException {
+        WorldModList list = findActive(id);
+        if (!launcherClient && list.getMods().stream().anyMatch(item -> item.getSource() == ProjectDependency.Source.CURSEFORGE)) {
+            throw new InvalidProjectRequestException("This mod list contains CurseForge projects and can only be installed with Modtale Launcher.");
+        }
+        list = touch(list, true, true);
         return new Download(filename(list), archiveService.generateZip(list));
     }
 

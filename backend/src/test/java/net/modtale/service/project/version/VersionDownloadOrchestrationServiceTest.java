@@ -124,6 +124,62 @@ class VersionDownloadOrchestrationServiceTest {
         DownloadUrlResponse response = service.createDownloadUrl("pack-1", "1.0.0", null, user, true);
 
         assertEquals("/download/launcher-token", response.downloadUrl());
+        assertThrows(InvalidVersionRequestException.class,
+                () -> service.createBundleDownloadUrl("pack-1", "1.0.0", null, null, user));
+        if (pack.getClassification() == ProjectClassification.MODPACK) assertThrows(InvalidVersionRequestException.class, () -> service.createBundleDownloadUrl("pack-1", "1.0.0", null, null, user, true));
+        else assertEquals("/download-bundle/launcher-token", service.createBundleDownloadUrl("pack-1", "1.0.0", null, null, user, true).downloadUrl());
+    }
+
+    @Test
+    void allowsPluginDownloadButRejectsExplicitCurseForgeBundleSelection() {
+        User user = new User();
+        user.setId("user-1");
+        Project pack = project("pack-1", "Sky Pack", ProjectClassification.PLUGIN);
+        ProjectVersion version = version("version-1", "1.0.0", "modpacks/pack.zip");
+        version.setDependencies(List.of(ProjectDependency.curseForge(
+                "1450386", "Simple Compost", "1.0.0",
+                "https://www.curseforge.com/hytale/mods/simple-compost",
+                ProjectDependency.DependencyType.REQUIRED
+        )));
+
+        when(projectService.getProjectById("pack-1", user)).thenReturn(pack);
+        when(projectVersionAccessService.requireByVersionNumber(
+                org.mockito.Mockito.eq(pack), org.mockito.Mockito.eq("1.0.0"),
+                org.mockito.Mockito.isNull(), org.mockito.Mockito.any())).thenReturn(version);
+        when(downloadTokenService.generateToken("pack-1", "1.0.0", null, null, "user-1"))
+                .thenReturn("launcher-token");
+        when(downloadTokenService.getTokenValiditySeconds()).thenReturn(300);
+
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> service.createDownloadUrl("pack-1", "1.0.0", null, user));
+        DownloadUrlResponse response = service.createDownloadUrl("pack-1", "1.0.0", null, user, true);
+
+        assertEquals("/download/launcher-token", response.downloadUrl());
+        assertThrows(InvalidVersionRequestException.class,
+                () -> service.createBundleDownloadUrl("pack-1", "1.0.0", null, List.of(version.getDependencies().getFirst().getProjectId()), user));
+        if (pack.getClassification() == ProjectClassification.MODPACK) assertThrows(InvalidVersionRequestException.class, () -> service.createBundleDownloadUrl("pack-1", "1.0.0", null, null, user, true));
+        else assertEquals("/download-bundle/launcher-token", service.createBundleDownloadUrl("pack-1", "1.0.0", null, null, user, true).downloadUrl());
+    }
+
+    @Test
+    void bundlesWithSelectedDependenciesThatRequireCurseForgeAreLauncherOnly() {
+        User user = new User();
+        Project main = project("main", "Main", ProjectClassification.PLUGIN);
+        Project child = project("child", "Child", ProjectClassification.PLUGIN);
+        ProjectVersion mainVersion = version("main-v", "1.0.0", "main.jar");
+        ProjectVersion childVersion = version("child-v", "1.0.0", "child.jar");
+        ProjectDependency childReference = new ProjectDependency();
+        childReference.setProjectId("child"); childReference.setVersionNumber("1.0.0");
+        mainVersion.setDependencies(List.of(childReference));
+        childVersion.setDependencies(List.of(ProjectDependency.curseForge("1", "External", "1.0.0",
+                "https://www.curseforge.com/hytale/mods/example/files/1", ProjectDependency.DependencyType.REQUIRED)));
+        child.setVersions(List.of(childVersion));
+        when(projectService.getProjectById("main", user)).thenReturn(main);
+        when(projectService.getRawProjectById("child")).thenReturn(child);
+        when(projectVersionAccessService.requireByVersionNumber(org.mockito.Mockito.eq(main), org.mockito.Mockito.eq("1.0.0"),
+                org.mockito.Mockito.isNull(), org.mockito.Mockito.any())).thenReturn(mainVersion);
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> service.createBundleDownloadUrl("main", "1.0.0", null, List.of("child"), user));
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> service.createBundleDownloadUrl("main", "1.0.0", null, List.of(), user));
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> service.createBundleDownloadUrl("main", "1.0.0", null, List.of("child"), user, true));
     }
 
     @Test
@@ -152,6 +208,10 @@ class VersionDownloadOrchestrationServiceTest {
                 "launcher-token", true, null, null, null, user, true);
 
         assertArrayEquals(new byte[]{9, 8, 7}, payload.bytes());
+        assertThrows(InvalidVersionRequestException.class,
+                () -> service.downloadBundle("web-token", true, null, null, null, user));
+        when(downloadService.generateBundleZip(pack, version, null, user)).thenReturn(new byte[]{1, 2});
+        assertThrows(InvalidVersionRequestException.class, () -> service.downloadBundle("launcher-token", true, null, null, null, user, true));
     }
 
     @Test

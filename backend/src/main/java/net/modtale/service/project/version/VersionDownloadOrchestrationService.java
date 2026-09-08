@@ -2,6 +2,8 @@ package net.modtale.service.project.version;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import net.modtale.config.properties.AppFrontendProperties;
 import net.modtale.exception.InvalidDownloadTokenException;
 import net.modtale.exception.InvalidVersionRequestException;
@@ -88,10 +90,24 @@ public class VersionDownloadOrchestrationService {
             List<String> dependencies,
             User currentUser
     ) {
+        return createBundleDownloadUrl(projectId, versionNumber, gameVersion, dependencies, currentUser, false);
+    }
+
+    public BundleDownloadUrlResponse createBundleDownloadUrl(
+            String projectId,
+            String versionNumber,
+            String gameVersion,
+            List<String> dependencies,
+            User currentUser,
+            boolean launcherClient
+    ) {
         Project project = getProjectOrThrow(projectId, currentUser,
                 "We couldn't find that project, so no bundle download link could be generated.");
-        getVersionOrThrow(project, versionNumber, gameVersion,
+        ProjectVersion version = getVersionOrThrow(project, versionNumber, gameVersion,
                 "We couldn't find the requested version for that bundle download.");
+        ensureDownloadable(project, version, launcherClient);
+        requireNonModpackBundle(project);
+        ensureBundleDownloadable(version, dependencies, launcherClient, new HashSet<>());
         String token = downloadTokenService.generateToken(projectId, versionNumber, gameVersion, dependencies, currentUserId(currentUser));
         return new BundleDownloadUrlResponse("/download-bundle/" + token, downloadTokenService.getTokenValiditySeconds());
     }
@@ -149,6 +165,18 @@ public class VersionDownloadOrchestrationService {
             String forwardedFor,
             User currentUser
     ) throws IOException {
+        return downloadBundle(token, apiRole, referer, remoteAddress, forwardedFor, currentUser, false);
+    }
+
+    public VersionDownloadPayload downloadBundle(
+            String token,
+            boolean apiRole,
+            String referer,
+            String remoteAddress,
+            String forwardedFor,
+            User currentUser,
+            boolean launcherClient
+    ) throws IOException {
         DownloadTokenService.DownloadToken downloadToken = validateToken(token,
                 "This bundle download link is invalid, expired, or has already been used.");
         DownloadContext context = resolveDownloadContext(downloadToken, apiRole, referer, remoteAddress, forwardedFor, currentUser);
@@ -157,10 +185,12 @@ public class VersionDownloadOrchestrationService {
         ensureReadable(project, context.currentUser());
         ProjectVersion targetVersion = getVersionOrThrow(project, downloadToken.getVersion(), downloadToken.getGameVersion(),
                 "We couldn't find the version requested by this bundle download link.");
-
-        trackDownload(project, targetVersion.getId(), context);
+        ensureDownloadable(project, targetVersion, launcherClient);
 
         List<String> selectedDependencies = downloadToken.getSelectedDependencies();
+        requireNonModpackBundle(project);
+        ensureBundleDownloadable(targetVersion, selectedDependencies, launcherClient, new HashSet<>());
+        trackDownload(project, targetVersion.getId(), context);
         if (targetVersion.getDependencies() != null) {
             targetVersion.getDependencies().forEach(dep -> {
                 if (dep.isExternal()) {
@@ -245,14 +275,38 @@ public class VersionDownloadOrchestrationService {
     }
 
     private void ensureDownloadable(Project project, ProjectVersion version, boolean launcherClient) {
-        if (!launcherClient
-                && project.getClassification() == ProjectClassification.MODPACK
+        if (!launcherClient && project.getClassification() == ProjectClassification.MODPACK
                 && version.getDependencies() != null
                 && version.getDependencies().stream()
                         .anyMatch(dependency -> dependency.getSource() == ProjectDependency.Source.CURSEFORGE)) {
             throw new InvalidVersionRequestException(
-                    "This modpack contains CurseForge projects and can only be installed with Modtale Launcher."
+                    "This version includes CurseForge dependencies and can only be installed with Modtale Launcher."
             );
+        }
+    }
+
+    private void requireNonModpackBundle(Project project) {
+        if (project.getClassification() == ProjectClassification.MODPACK) throw new InvalidVersionRequestException("Modpacks download as one complete package. Use the version download endpoint without a dependency selection.");
+    }
+
+    private void ensureBundleDownloadable(ProjectVersion version, List<String> selected, boolean launcherClient, Set<String> visited) {
+        if (launcherClient || version.getDependencies() == null) return;
+        for (ProjectDependency dependency : version.getDependencies()) {
+            if (dependency.getSource() == ProjectDependency.Source.CURSEFORGE && selected != null && selected.contains(dependency.getProjectId())) {
+                throw new InvalidVersionRequestException("CurseForge dependencies can only be downloaded through the launcher.");
+            }
+            if (dependency.isExternal() || dependency.isEmbedded()
+                    || (selected != null && !selected.contains(dependency.getProjectId()))) continue;
+            String key = dependency.getProjectId() + ":" + dependency.getVersionNumber();
+            if (!visited.add(key)) continue;
+            Project project = projectService.getRawProjectById(dependency.getProjectId());
+            if (project == null || project.getVersions() == null) continue;
+            ProjectVersion child = project.getVersions().stream()
+                    .filter(candidate -> java.util.Objects.equals(candidate.getVersionNumber(), dependency.getVersionNumber()))
+                    .findFirst().orElse(null);
+            if (child == null) continue;
+            ensureDownloadable(project, child, false);
+            ensureBundleDownloadable(child, null, false, visited);
         }
     }
 

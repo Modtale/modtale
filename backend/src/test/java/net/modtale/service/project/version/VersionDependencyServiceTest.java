@@ -30,6 +30,15 @@ class VersionDependencyServiceTest {
     }
 
     @Test
+    void modpackRequestsRejectAnyExplicitDependencyType() {
+        for (ProjectDependency.DependencyType type : ProjectDependency.DependencyType.values()) {
+            DependencyReferenceRequest request = dependency("one", "1.0.0");
+            request.setDependencyType(type);
+            assertThrows(InvalidVersionRequestException.class, () -> service.resolveRequestedDependencies(List.of(request), true, false));
+        }
+    }
+
+    @Test
     void resolveRequestedDependenciesBuildsDependencyModelsAndFlags() {
         when(projectService.getRawProjectById("dep-1")).thenReturn(project("dep-1", "Dependency One", ProjectStatus.PUBLISHED, "1.0.0"));
         when(projectService.getRawProjectById("dep-2")).thenReturn(project("dep-2", "Dependency Two", ProjectStatus.PUBLISHED, "2.0.0"));
@@ -63,7 +72,7 @@ class VersionDependencyServiceTest {
     }
 
     @Test
-    void resolveRequestedDependenciesPreservesOptionalTypesForModpacks() {
+    void resolveRequestedDependenciesDefaultsAllModpackEntriesToRequired() {
         when(projectService.getRawProjectById("first-mod"))
                 .thenReturn(project("first-mod", "First Mod", ProjectStatus.PUBLISHED, "1.0.0"));
         when(projectService.getRawProjectById("second-mod"))
@@ -71,7 +80,7 @@ class VersionDependencyServiceTest {
         DependencyReferenceRequest first = dependency(
                 "first-mod",
                 "1.0.0",
-                ProjectDependency.DependencyType.OPTIONAL
+                ProjectDependency.DependencyType.REQUIRED
         );
         DependencyReferenceRequest second = dependency(
                 "second-mod",
@@ -85,7 +94,7 @@ class VersionDependencyServiceTest {
                 false
         );
 
-        assertEquals(ProjectDependency.DependencyType.OPTIONAL,
+        assertEquals(ProjectDependency.DependencyType.REQUIRED,
                 resolved.dependencies().getFirst().getDependencyType());
         assertEquals(ProjectDependency.DependencyType.REQUIRED,
                 resolved.dependencies().get(1).getDependencyType());
@@ -171,20 +180,15 @@ class VersionDependencyServiceTest {
     }
 
     @Test
-    void rejectsCurseForgeProjectsInModpacks() {
+    void acceptsPinnedCurseForgeProjectsInModpacks() {
         DependencyReferenceRequest curseForge = curseForgeDependency(
                 "https://www.curseforge.com/hytale/mods/simple-compost/files/8227810"
         );
         when(projectService.getRawProjectById("dep-1"))
                 .thenReturn(project("dep-1", "Dependency One", ProjectStatus.PUBLISHED, "1.0.0"));
-
-        InvalidVersionRequestException error = assertThrows(
-                InvalidVersionRequestException.class,
-                () -> service.resolveRequestedDependencies(
-                        List.of(curseForge, dependency("dep-1", "1.0.0")), true, false)
-        );
-
-        assertTrue(error.getMessage().contains("CurseForge"));
+        var result = service.resolveRequestedDependencies(List.of(curseForge, dependency("dep-1", "1.0.0")), true, false);
+        assertEquals(2, result.dependencies().size());
+        assertEquals(ProjectDependency.Source.CURSEFORGE, result.dependencies().getFirst().getSource());
     }
 
     @Test
@@ -225,7 +229,7 @@ class VersionDependencyServiceTest {
         DependencyReferenceRequest request = new DependencyReferenceRequest();
         request.setProjectId(projectId);
         request.setVersionNumber(versionNumber);
-        request.setDependencyType(dependencyType);
+        if (dependencyType != ProjectDependency.DependencyType.REQUIRED) request.setDependencyType(dependencyType);
         return request;
     }
 

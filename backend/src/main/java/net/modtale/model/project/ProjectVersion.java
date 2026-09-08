@@ -3,6 +3,9 @@ package net.modtale.model.project;
 import java.util.List;
 
 public class ProjectVersion {
+    private List<net.modtale.model.project.ModpackConfigReference> modpackConfigs;
+    public List<net.modtale.model.project.ModpackConfigReference> getModpackConfigs() { return modpackConfigs; }
+    public void setModpackConfigs(List<net.modtale.model.project.ModpackConfigReference> value) { modpackConfigs = value; }
     private String id;
     private String versionNumber;
     private List<String> gameVersions;

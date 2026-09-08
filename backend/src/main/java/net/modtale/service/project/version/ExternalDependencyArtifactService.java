@@ -172,6 +172,10 @@ public class ExternalDependencyArtifactService {
     private DownloadedFile downloadFile(String rawUrl, boolean fullFile) {
         URI uri = requirePublicHttpsUri(rawUrl);
         for (int redirect = 0; redirect <= MAX_REDIRECTS; redirect++) {
+            // Check every redirect before issuing a request, including range probes.
+            if (isHost(uri.getHost(), "curseforge.com") || isHost(uri.getHost(), "forgecdn.net")) {
+                throw new InvalidVersionRequestException("CurseForge files must be downloaded by the launcher. Add a CurseForge file reference instead.");
+            }
             HttpRequest.Builder requestBuilder = HttpRequest.newBuilder(uri)
                     .timeout(Duration.ofSeconds(30))
                     .header("User-Agent", USER_AGENT)

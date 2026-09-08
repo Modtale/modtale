@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -53,8 +54,8 @@ public class WorldModListController {
     }
 
     @GetMapping("/lists/{id}/download")
-    public ResponseEntity<Resource> download(@PathVariable String id) throws IOException {
-        WorldModListService.Download download = service.download(id);
+    public ResponseEntity<Resource> download(@PathVariable String id, @RequestHeader(value = "X-Modtale-Client", required = false) String client) throws IOException {
+        WorldModListService.Download download = service.download(id, "launcher".equalsIgnoreCase(client));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + download.filename() + "\"")
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)

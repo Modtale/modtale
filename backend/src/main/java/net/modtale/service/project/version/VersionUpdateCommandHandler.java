@@ -74,6 +74,10 @@ public class VersionUpdateCommandHandler {
             VersionDependencyService.ResolvedDependencies resolvedDependencies =
                     versionMutationOrchestrationService.resolveRequestedDependencies(dependencies, modpack, true);
             List<ProjectDependency> resolvedProjectDependencies = resolvedDependencies.dependencies();
+            if (modpack && version.getModpackConfigs() != null) {
+                try { net.modtale.service.storage.ModpackOverrideArchive.validateOwners(version.getModpackConfigs(), resolvedProjectDependencies); }
+                catch (java.io.IOException ex) { throw new net.modtale.exception.InvalidVersionRequestException("This mod has attached configs. Upload a new version to change its config ownership."); }
+            }
             if (modpack) {
                 versionMutationOrchestrationService.invalidateCachedModpackArtifact(version, resolvedProjectDependencies);
             }

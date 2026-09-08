@@ -67,7 +67,7 @@ final class ModpackArchiveService {
             byte[] cachedArchive = archiveSupport.download(version.getFileUrl());
             if (cachedArchive != null && cachedArchive.length > 0) {
                 try {
-                    ModpackArchiveValidator.validate(cachedArchive);
+                    ModpackArchiveValidator.validate(cachedArchive, version.getModpackConfigs() != null && !version.getModpackConfigs().isEmpty());
                     return cachedArchive;
                 } catch (IOException ex) {
                     logger.warn("Cached modpack archive failed format or integrity validation for project={} version={}. Rebuilding archive.",
@@ -96,6 +96,13 @@ final class ModpackArchiveService {
             writeJsonEntry(zip, LEGACY_MANIFEST, legacyManifest(pack, version));
             writeJsonEntry(zip, MANIFEST, authorManifest(pack, version));
             writeJsonEntry(zip, LOCKFILE, lockfile(pack, version, preparedDependencies, overrides));
+            if (version.getModpackConfigs() != null && !version.getModpackConfigs().isEmpty()) {
+                Map<String, Object> configManifest = new LinkedHashMap<>();
+                configManifest.put("format", "modtale-configs");
+                configManifest.put("formatVersion", 1);
+                configManifest.put("configs", version.getModpackConfigs());
+                writeJsonEntry(zip, ModpackOverrideArchive.CONFIG_MANIFEST, configManifest);
+            }
             for (PreparedDependency prepared : preparedDependencies) {
                 if (prepared.bytes() != null) {
                     writeBinaryEntry(zip, prepared.path(), prepared.bytes());
@@ -119,7 +126,12 @@ final class ModpackArchiveService {
         } catch (StorageDownloadException ex) {
             throw new IOException("Cannot download the modpack override bundle.", ex);
         }
-        return ModpackOverrideArchive.read(new ByteArrayInputStream(archive));
+        var bundle = ModpackOverrideArchive.readBundle(new ByteArrayInputStream(archive));
+        ModpackOverrideArchive.validateOwners(bundle.configs(), version.getDependencies());
+        if (version.getModpackConfigs() != null && !version.getModpackConfigs().equals(bundle.configs())) {
+            throw new IOException("Config ownership does not match the saved version.");
+        }
+        return bundle.files();
     }
 
     private List<PreparedDependency> prepareDependencies(ProjectVersion version) throws IOException {
@@ -240,7 +252,8 @@ final class ModpackArchiveService {
     ) {
         Map<String, Object> lock = new LinkedHashMap<>();
         lock.put("format", "modtale-lock");
-        lock.put("lockVersion", 1);
+        boolean hasConfigOwners = version.getModpackConfigs() != null && !version.getModpackConfigs().isEmpty();
+        lock.put("lockVersion", hasConfigOwners ? 2 : 1);
         lock.put("game", "hytale");
         lock.put("pack", packIdentity(pack, version));
         lock.put("gameVersions", version.getGameVersions() == null ? List.of() : version.getGameVersions());
@@ -298,6 +311,18 @@ final class ModpackArchiveService {
         for (ModpackOverrideArchive.OverrideFile override : overrides) {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("path", override.path());
+            if (hasConfigOwners) {
+                item.put("destination", override.path().substring("overrides/".length()));
+                item.put("installPolicy", "SEED_ONLY");
+                var owner = version.getModpackConfigs().stream().filter(config -> config.path().equals(override.path())).findFirst();
+                Map<String, Object> ownerIdentity = null;
+                if (owner.isPresent()) {
+                    ownerIdentity = new LinkedHashMap<>();
+                    ownerIdentity.put("projectId", owner.get().projectId());
+                    ownerIdentity.put("source", owner.get().source());
+                }
+                item.put("owner", ownerIdentity);
+            }
             item.put("size", override.bytes().length);
             item.put("hashes", Map.of("sha256", sha256(override.bytes())));
             overrideEntries.add(item);
@@ -321,7 +346,7 @@ final class ModpackArchiveService {
         item.put("title", nullToEmpty(dependency.getProjectTitle()));
         item.put("version", nullToEmpty(dependency.getVersionNumber()));
         item.put("source", dependency.getSource().name());
-        item.put("dependencyType", dependency.getDependencyType().name());
+        item.put("dependencyType", "REQUIRED");
         return item;
     }
 

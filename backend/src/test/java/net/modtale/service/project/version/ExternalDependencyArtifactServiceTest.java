@@ -28,6 +28,37 @@ class ExternalDependencyArtifactServiceTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void rejectsRedirectToCurseForgeBeforeRequestingBinaryBytes() throws Exception {
+        java.net.http.HttpResponse<java.io.InputStream> response = mock(java.net.http.HttpResponse.class);
+        when(response.statusCode()).thenReturn(302);
+        when(response.body()).thenReturn(new java.io.ByteArrayInputStream(new byte[0]));
+        when(response.headers()).thenReturn(java.net.http.HttpHeaders.of(
+                Map.of("location", List.of("https://mediafilez.forgecdn.net/files/8227/810/mod.jar")), (key, value) -> true));
+        when(httpClient.send(org.mockito.ArgumentMatchers.any(java.net.http.HttpRequest.class),
+                org.mockito.ArgumentMatchers.<java.net.http.HttpResponse.BodyHandler<java.io.InputStream>>any())).thenReturn(response);
+        ProjectDependency dependency = new ProjectDependency();
+        dependency.setSource(ProjectDependency.Source.GITHUB);
+        dependency.setExternalFileUrl("https://github.com/example/mod/releases/download/1/mod.jar");
+        InvalidVersionRequestException error = assertThrows(InvalidVersionRequestException.class,
+                () -> service.prepareExternalArtifacts(List.of(dependency)));
+        assertEquals("CurseForge files must be downloaded by the launcher. Add a CurseForge file reference instead.", error.getMessage());
+        org.mockito.Mockito.verify(httpClient, org.mockito.Mockito.times(1)).send(
+                org.mockito.ArgumentMatchers.any(java.net.http.HttpRequest.class), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void websiteSourceCannotProbeCurseForgeBinaries() {
+        for (String url : List.of("https://www.curseforge.com/files/mod.jar", "https://mediafilez.forgecdn.net/files/8227/810/mod.jar")) {
+            ProjectDependency dependency = new ProjectDependency();
+            dependency.setSource(ProjectDependency.Source.WEBSITE);
+            dependency.setExternalFileUrl(url);
+            assertThrows(InvalidVersionRequestException.class, () -> service.prepareExternalArtifacts(List.of(dependency)));
+        }
+        verifyNoInteractions(httpClient);
+    }
+
+    @Test
     void curseForgeDependencyStaysAReferenceAndClearsLegacyCachedArtifact() {
         ProjectDependency dependency = curseForgeDependency(
                 "https://www.curseforge.com/hytale/mods/simple-compost/files/8227810"
