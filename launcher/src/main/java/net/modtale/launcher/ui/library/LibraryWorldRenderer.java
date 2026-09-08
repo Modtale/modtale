@@ -10,6 +10,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
+import java.util.function.BiConsumer;
+import net.modtale.launcher.config.HytaleConfigFiles.ConfigFile;
 import javafx.collections.FXCollections;
 import javafx.css.PseudoClass;
 import javafx.geometry.Pos;
@@ -54,7 +56,7 @@ final class LibraryWorldRenderer {
     private final LibraryProjectRenderer.WorldToggleHandler toggleWorldMods;
     private final Consumer<HytaleWorld> shareWorldSnapshot;
     private final Consumer<HytaleWorld> createModpackFromWorld;
-    private final Consumer<HytaleWorld> editConfigs;
+    private final BiConsumer<String, List<ConfigFile>> editConfigs;
     private final Runnable refreshLibrary;
     private final Runnable checkUpdates;
 
@@ -69,7 +71,7 @@ final class LibraryWorldRenderer {
             LibraryProjectRenderer.WorldToggleHandler toggleWorldMods,
             Consumer<HytaleWorld> shareWorldSnapshot,
             Consumer<HytaleWorld> createModpackFromWorld,
-            Consumer<HytaleWorld> editConfigs,
+            BiConsumer<String, List<ConfigFile>> editConfigs,
             Runnable refreshLibrary,
             Runnable checkUpdates
     ) {
@@ -89,12 +91,16 @@ final class LibraryWorldRenderer {
     }
 
     List<Node> worldDetail(LibraryWorldModel model) {
+        return worldDetail(model, List.of());
+    }
+
+    List<Node> worldDetail(LibraryWorldModel model, List<ConfigFile> configs) {
         if (model == null || model.world() == null) {
             return List.of(emptyState("No world selected", "Create a Hytale world, then refresh the launcher."));
         }
         List<Node> sections = new ArrayList<>();
         sections.add(worldHeader(model));
-        sections.add(installedProjectsSection(model));
+        sections.add(installedProjectsSection(model, configs));
         return sections;
     }
 
@@ -155,24 +161,19 @@ final class LibraryWorldRenderer {
         pack.setMinWidth(Region.USE_PREF_SIZE);
         pack.setTooltip(new Tooltip("Start a Modtale modpack from this world's enabled mods"));
         pack.setOnAction(event -> createModpackFromWorld.accept(model.world()));
-        Button configs = secondaryButton("Configs");
-        configs.getStyleClass().add("small");
-        configs.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.FILE_CODE, 14));
-        configs.setTooltip(new Tooltip("Edit this world's mod configs"));
-        configs.setOnAction(event -> editConfigs.accept(model.world()));
-        actions.getChildren().addAll(refresh, updates, actionDivider, configs, share, pack);
+        actions.getChildren().addAll(refresh, updates, actionDivider, share, pack);
 
         row.getChildren().addAll(icon, copy, actions);
         section.getChildren().add(row);
         return section;
     }
 
-    private Node installedProjectsSection(LibraryWorldModel model) {
+    private Node installedProjectsSection(LibraryWorldModel model, List<ConfigFile> configs) {
         return installedProjectsSection(
                 model.world(),
                 model.projects(),
                 "No installed projects",
-                "Install mods from Browse to manage them per world."
+                "Install mods from Browse to manage them per world.", configs
         );
     }
 
@@ -180,7 +181,7 @@ final class LibraryWorldRenderer {
             HytaleWorld world,
             List<LibraryWorldProjectModel> projects,
             String emptyTitle,
-            String emptySubtitle
+            String emptySubtitle, List<ConfigFile> configs
     ) {
         if (projects.isEmpty()) {
             return emptyState(emptyTitle, emptySubtitle);
@@ -188,12 +189,12 @@ final class LibraryWorldRenderer {
         VBox rows = new VBox(10);
         rows.getStyleClass().add("library-world-project-list");
         for (LibraryWorldProjectModel project : projects) {
-            rows.getChildren().add(projectRow(world, project));
+            rows.getChildren().add(projectRow(world, project, configs));
         }
         return rows;
     }
 
-    private Node projectRow(HytaleWorld world, LibraryWorldProjectModel model) {
+    private Node projectRow(HytaleWorld world, LibraryWorldProjectModel model, List<ConfigFile> configs) {
         VBox shell = new VBox(10);
         shell.getStyleClass().add("library-world-project-row");
 
@@ -219,7 +220,7 @@ final class LibraryWorldRenderer {
         VBox copy = projectCopy(model);
         HBox.setHgrow(copy, Priority.ALWAYS);
 
-        HBox actions = projectActions(model);
+        HBox actions = projectActions(model, configs);
         row.getChildren().addAll(toggle, icon, copy, actions);
         shell.getChildren().add(row);
 
@@ -228,7 +229,7 @@ final class LibraryWorldRenderer {
             shell.getChildren().add(versionControls);
         }
 
-        Node contentsCard = contentsCard(model);
+        Node contentsCard = contentsCard(model, configs);
         if (contentsCard != null) {
             contentsCard.hoverProperty().addListener((observable, previous, hovered) ->
                     shell.pseudoClassStateChanged(CONTENTS_HOVERED, hovered));
@@ -273,12 +274,16 @@ final class LibraryWorldRenderer {
         return copy;
     }
 
-    private HBox projectActions(LibraryWorldProjectModel model) {
+    private HBox projectActions(LibraryWorldProjectModel model, List<ConfigFile> configs) {
         InstalledProject installed = model.installed();
         boolean modtaleProject = LibraryProjectSupport.isModtaleProject(installed);
         HBox actions = new HBox(6);
         actions.getStyleClass().add("library-world-project-actions");
         actions.setAlignment(Pos.CENTER_RIGHT);
+
+        if (!ProjectClassification.isModpack(model.display().classification())) {
+            addConfigButton(actions, model.display().title(), model.modIds(), configs);
+        }
 
         if (modtaleProject && model.update() != null) {
             Button update = primaryButton("Update");
@@ -373,7 +378,7 @@ final class LibraryWorldRenderer {
         return controls;
     }
 
-    private Node contentsCard(LibraryWorldProjectModel model) {
+    private Node contentsCard(LibraryWorldProjectModel model, List<ConfigFile> configs) {
         if (!model.display().contentsVisible()) {
             return null;
         }
@@ -426,13 +431,13 @@ final class LibraryWorldRenderer {
             return card;
         }
         for (LibraryWorldContentItem item : model.contents()) {
-            contents.getChildren().add(compactContentRow(item));
+            contents.getChildren().add(compactContentRow(item, configs));
         }
         card.getChildren().add(contents);
         return card;
     }
 
-    private Node compactContentRow(LibraryWorldContentItem item) {
+    private Node compactContentRow(LibraryWorldContentItem item, List<ConfigFile> configs) {
         HBox row = new HBox(9);
         row.getStyleClass().addAll("library-world-content-row", "library-world-content-row-compact");
         row.setAlignment(Pos.CENTER_LEFT);
@@ -448,8 +453,23 @@ final class LibraryWorldRenderer {
 
         Label status = new Label("Included");
         status.getStyleClass().add("library-version-pill");
-        row.getChildren().addAll(icon, copy, status);
+        row.getChildren().addAll(icon, copy);
+        addConfigButton(row, item.title(), item.modIds(), configs);
+        row.getChildren().add(status);
         return row;
+    }
+
+    private void addConfigButton(HBox actions, String title, List<String> modIds, List<ConfigFile> configs) {
+        List<ConfigFile> matching = configs.stream()
+                .filter(file -> !file.pluginId().isBlank() && modIds.contains(file.pluginId())).toList();
+        if (matching.isEmpty()) return;
+        Button config = secondaryButton("Config");
+        config.getStyleClass().add("small");
+        config.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.FILE_CODE, 14));
+        config.setAccessibleText("Config for " + title);
+        config.setTooltip(new Tooltip("Edit configs for " + title));
+        config.setOnAction(event -> editConfigs.accept(title, matching));
+        actions.getChildren().add(config);
     }
 
     private StackPane projectIcon(LibraryWorldProjectModel model, double size) {

@@ -60,6 +60,8 @@ import net.modtale.launcher.ui.common.LauncherExternalLinks;
 import net.modtale.launcher.ui.common.LauncherIcons;
 import net.modtale.launcher.ui.common.LauncherView;
 import net.modtale.launcher.ui.common.StatusModal;
+import net.modtale.launcher.config.HytaleConfigFiles;
+import net.modtale.launcher.config.HytaleConfigFiles.ConfigFile;
 import net.modtale.launcher.ui.feedback.LauncherFeedback;
 import net.modtale.launcher.ui.settings.LauncherSettingsController;
 
@@ -94,6 +96,9 @@ public final class LauncherLibraryController {
     private List<HytaleWorld> worlds = List.of();
     private List<HytaleInstalledMod> installedMods = List.of();
     private String selectedWorldKey = "";
+    private final Map<String, List<ConfigFile>> worldConfigs = new LinkedHashMap<>();
+    private final Set<String> loadingWorldConfigs = new LinkedHashSet<>();
+    private long configScanGeneration;
     private Node libraryView;
     private Node updatesView;
     private StackPane installLoadingOverlay;
@@ -148,14 +153,13 @@ public final class LauncherLibraryController {
         );
     }
 
-    private void editConfigs(HytaleWorld world) {
+    private void editConfigs(String modName, List<ConfigFile> configs) {
         StackPane host = overlayHost.get();
         if (host == null) return;
         new ConfigEditorModal(host, executor, () -> {
             renderLibrary();
             accountController.syncLocalSettings();
-        }).show(
-                settings().hytaleModsDirectory(), world.directory(), world.name());
+        }).show(configs, modName);
     }
 
     public Node libraryView() {
@@ -405,6 +409,9 @@ public final class LauncherLibraryController {
     }
 
     private void renderLibrary() {
+        worldConfigs.clear();
+        loadingWorldConfigs.clear();
+        configScanGeneration++;
         try {
             worlds = worldManager.loadWorlds(settingsController.settings());
             installedMods = worldManager.loadInstalledMods(settingsController.settings());
@@ -587,7 +594,31 @@ public final class LauncherLibraryController {
             }
             return;
         }
-        projectDetail.getChildren().setAll(worldRenderer.worldDetail(worldModel(selected.get())));
+        HytaleWorld world = selected.get();
+        projectDetail.getChildren().setAll(worldRenderer.worldDetail(worldModel(world),
+                worldConfigs.getOrDefault(worldKey(world), List.of())));
+        loadWorldConfigs(world);
+    }
+
+    private void loadWorldConfigs(HytaleWorld world) {
+        String key = worldKey(world);
+        if (worldConfigs.containsKey(key) || !loadingWorldConfigs.add(key)) return;
+        long generation = configScanGeneration;
+        Path globalMods = settings().hytaleModsDirectory();
+        feedback.runAsync("Finding generated mod configs...", () -> {
+            try { return new HytaleConfigFiles().discover(globalMods, world.directory()); }
+            catch (java.io.IOException ex) { throw new ModtaleApiException("Could not find mod configs", ex); }
+        }, found -> {
+            if (generation != configScanGeneration) return;
+            loadingWorldConfigs.remove(key);
+            worldConfigs.put(key, found);
+            if (key.equals(selectedWorldKey)) renderWorldDetail();
+        }, error -> {
+            if (generation != configScanGeneration) return;
+            loadingWorldConfigs.remove(key);
+            worldConfigs.put(key, List.of());
+            feedback.log("Could not find generated configs: " + error.getMessage());
+        });
     }
 
     private LibraryWorldModel worldModel(HytaleWorld world) {
