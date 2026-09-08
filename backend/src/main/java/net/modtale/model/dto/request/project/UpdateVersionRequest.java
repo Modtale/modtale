@@ -6,7 +6,7 @@ import java.util.List;
 import net.modtale.model.project.ProjectVersion;
 
 public class UpdateVersionRequest {
-    private List<@NotBlank(message = "Dependency entries cannot be blank.") String> modIds;
+    private List<DependencyReferenceRequest> dependencies;
     private List<@NotBlank(message = "Incompatible project entries cannot be blank.") String> incompatibleProjectIds;
     private List<@NotBlank(message = "Game version entries cannot be blank.") String> gameVersions;
 
@@ -15,12 +15,12 @@ public class UpdateVersionRequest {
 
     private ProjectVersion.Channel channel;
 
-    public List<String> getModIds() {
-        return modIds;
+    public List<DependencyReferenceRequest> getDependencies() {
+        return dependencies;
     }
 
-    public void setModIds(List<String> modIds) {
-        this.modIds = modIds;
+    public void setDependencies(List<DependencyReferenceRequest> dependencies) {
+        this.dependencies = dependencies;
     }
 
     public List<String> getIncompatibleProjectIds() {

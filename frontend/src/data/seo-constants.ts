@@ -44,7 +44,6 @@ export const UTILITY_NOINDEX_EXACT_PATHS = new Set([
     '/mfa',
     '/terms',
     '/privacy',
-    '/status',
     '/api-docs',
     '/api-docs/swagger',
     '/admin',
@@ -88,7 +87,7 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
             {
                 href: '/plugins',
                 label: 'Hytale Plugins',
-                description: 'Find server-side Hytale plugins and gameplay scripts.',
+                description: 'Find Hytale plugins and gameplay scripts.',
             },
             {
                 href: '/modpacks',
@@ -111,46 +110,55 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
             },
         ],
     },
-    '/status': {
-        title: 'System Status | Modtale',
-        h1: 'Modtale System Status',
-        description: 'Live Modtale status for API, database, and storage availability, with service latency, uptime history, and Discord incident updates.',
-        keywords: 'modtale status, modtale uptime, modtale api status, modtale incidents',
-        intro: 'Track Modtale service availability across the API, database, and storage systems.',
+    '/launcher': {
+        title: 'Modtale Launcher | Native Hytale Mod Manager',
+        h1: 'Modtale Launcher',
+        description: 'Download the Modtale Launcher for Windows, macOS, and Linux. Install, update, and manage Hytale projects with a native launcher built for Modtale releases.',
+        keywords: 'modtale launcher, hytale launcher, hytale mod manager, hytale mods launcher, download hytale mods, modtale download',
+        intro: 'The Modtale Launcher is a native desktop app for browsing Modtale projects, installing compatible Hytale releases, resolving dependencies, and keeping your local library ready to play.',
         contentBlocks: [
             {
-                title: 'Live Service Health',
-                body: 'The Modtale status page reports the current health of the core services that power browsing, publishing, and downloads.',
+                title: 'Desktop Launcher Packages',
+                body: 'Download a self-contained Modtale Launcher package for your desktop platform and manage Hytale mods, plugins, worlds, assets, and modpacks from one app.',
             },
             {
-                title: 'Availability History',
-                body: 'Status history helps the team and community spot degraded periods, latency spikes, and service recovery.',
+                title: 'Install Compatible Project Releases',
+                body: 'The launcher works with Modtale project metadata to help players choose compatible builds, review dependencies, and install projects into the right local Hytale folder.',
             },
             {
-                title: 'Discord Incident Updates',
-                body: 'Operational changes can be mirrored into Discord so the community can follow important incidents where they already gather.',
+                title: 'Built Alongside the Modtale Platform',
+                body: 'Launcher releases are published from the same open-source Modtale project, with package formats for Windows, macOS, and Linux.',
             },
         ],
         relatedLinks: [
             {
-                href: '/api-docs',
-                label: 'API Docs',
-                description: 'Review public API behavior and response shapes.',
+                href: '/mods',
+                label: 'Browse Hytale Projects',
+                description: 'Explore projects before opening them in the launcher.',
             },
             {
-                href: '/mods',
-                label: 'Browse Mods',
-                description: 'Return to project discovery.',
+                href: '/modpacks',
+                label: 'Hytale Modpacks',
+                description: 'Find curated collections that benefit from dependency-aware installs.',
+            },
+            {
+                href: '/upload',
+                label: 'Publish a Project',
+                description: 'Share your Hytale work with players on Modtale.',
             },
         ],
         faq: [
             {
-                question: 'What does Modtale monitor?',
-                answer: 'Modtale monitors API responsiveness, database connectivity, and storage connectivity for the core web experience.',
+                question: 'Does the Modtale Launcher need Java installed?',
+                answer: 'No. The native launcher packages embed their own runtime, so players do not need to install a separate JDK or JRE.',
             },
             {
-                question: 'Where are incident updates posted?',
-                answer: 'The status page shows live health, and configured status changes can also be posted to the Modtale Discord server.',
+                question: 'Which desktop platforms does the Modtale Launcher support?',
+                answer: 'Modtale publishes launcher packages for Windows, macOS, and Linux. The launcher page detects your platform and links to the best available release asset when GitHub release metadata is available.',
+            },
+            {
+                question: 'What does the launcher manage?',
+                answer: 'The launcher can browse Modtale projects, install compatible project releases, help with dependencies, check installed projects for updates, and connect to Hytale launch flows.',
             },
         ],
     },
@@ -211,7 +219,7 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
         h1: 'Hytale Plugins',
         description: 'Browse Hytale plugins for servers and communities. Find admin tools, gameplay extensions, economy systems, minigames, moderation helpers, and reusable plugin libraries.',
         keywords: 'hytale plugins, hytale plugin, hytale server plugins, java plugins, hytale admin tools, hytale modding plugins, server automation',
-        intro: 'Browse Hytale plugins built for server operators, creators, and communities. Discover gameplay extensions, admin tooling, utility libraries, and server-side Java plugin projects from the Modtale ecosystem.',
+        intro: 'Browse Hytale plugins built for players, creators, and communities. Discover gameplay extensions, admin tooling, utility libraries, and Java plugin projects from the Modtale ecosystem.',
         contentBlocks: [
             {
                 title: 'Hytale Plugins for Real Server Needs',
@@ -246,11 +254,11 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
         faq: [
             {
                 question: 'What is a Hytale plugin?',
-                answer: 'A Hytale plugin is a server-focused extension, typically packaged as a Java plugin, that adds new multiplayer features, moderation tools, game systems, or automation to a Hytale server environment.',
+                answer: 'A Hytale plugin is an extension, typically packaged as a Java plugin, that adds gameplay features, moderation tools, game systems, or automation to Hytale.',
             },
             {
                 question: 'How are Hytale plugins different from general Hytale mods?',
-                answer: 'Plugins usually focus on server behavior, administration, and shared gameplay systems, while broader Hytale mods can also include asset packs, worlds, standalone content releases, or client-facing gameplay changes.',
+                answer: 'Plugins are code extensions for gameplay, administration, and shared systems, while the broader mod label also includes asset packs, worlds, data assets, and standalone content releases.',
             },
             {
                 question: 'Can I use Modtale to publish Hytale plugins?',
@@ -287,7 +295,7 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
             {
                 href: '/plugins',
                 label: 'Hytale Plugins',
-                description: 'Find server-side releases that can appear inside curated packs.',
+                description: 'Find plugin releases that can appear inside curated packs.',
             },
         ],
         faq: [
@@ -423,7 +431,7 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
             {
                 href: '/plugins',
                 label: 'Hytale Plugins',
-                description: 'Pair data assets with server-side gameplay systems.',
+                description: 'Pair data assets with Hytale gameplay systems.',
             },
             {
                 href: '/mods',

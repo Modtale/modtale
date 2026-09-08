@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Download, List, X, ChevronDown, ChevronRight, Check, Box, Link as LinkIcon, AlertCircle, Bell, Search, ArrowUpRight, MessageSquare, Send, Save, PieChart, TrendingUp, Eye, ArrowBigUp, ArrowBigDown, Settings } from 'lucide-react';
+import { Download, List, X, ChevronDown, ChevronRight, Check, Box, Link as LinkIcon, AlertCircle, Bell, Search, ArrowUpRight, MessageSquare, Send, Save, PieChart, TrendingUp, Eye, ArrowBigUp, ArrowBigDown, Settings, Layers } from 'lucide-react';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { api, BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
@@ -128,6 +128,99 @@ export const InlineDependencyUI = ({ randomProject, projects }: { randomProject?
             initialMetaCache={initialMetaCache}
             initialSelected={initialSelected}
         />
+    );
+};
+
+const ModpackProjectRow = ({
+    title,
+    version,
+    source,
+    tone,
+}: {
+    title: string;
+    version: string;
+    source: string;
+    tone: 'local' | 'external' | 'warning';
+}) => {
+    const toneClass = tone === 'external'
+        ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/20'
+        : tone === 'warning'
+            ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20'
+            : 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20';
+
+    return (
+        <div className="flex items-center gap-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/65 dark:bg-black/15 p-3 shadow-sm">
+            <div className={`h-9 w-9 shrink-0 rounded-lg border flex items-center justify-center ${toneClass}`}>
+                {tone === 'warning' ? <AlertCircle className="h-4 w-4" /> : tone === 'external' ? <ArrowUpRight className="h-4 w-4" /> : <Check className="h-4 w-4" />}
+            </div>
+            <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-black text-slate-900 dark:text-white">{title}</div>
+                <div className="mt-0.5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    <span>{source}</span>
+                    <span className="font-mono normal-case tracking-normal">v{version}</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export const InlineModpackBuilderUI = ({ randomProject }: { randomProject?: Project }) => {
+    const highlightedProject = randomProject?.title || 'Skylands Expansion';
+
+    return (
+        <div className={`${GLASS_CARD} w-full overflow-hidden`}>
+            <div className={`${GLASS_HEADER} p-4 sm:p-5 flex items-center justify-between gap-4`}>
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-10 w-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
+                        <Layers className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                        <h3 className="truncate text-base sm:text-lg font-black text-slate-900 dark:text-white">Modpack Builder</h3>
+                        <p className="truncate text-xs font-bold text-slate-500 dark:text-slate-400">Vanilla+ Adventure Pack</p>
+                    </div>
+                </div>
+                <span className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">
+                    6 projects
+                </span>
+            </div>
+
+            <div className="p-4 sm:p-5 space-y-4">
+                <div className="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-black/20 px-3 py-2.5">
+                    <Search className="h-4 w-4 text-slate-400" />
+                    <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">Add a Hytale project or CurseForge URL</span>
+                </div>
+
+                <div className="space-y-2">
+                    <ModpackProjectRow title="Hytale Core Library" version="1.2.0" source="Modtale" tone="local" />
+                    <ModpackProjectRow title={highlightedProject} version={randomProject?.versions?.[0]?.versionNumber || '1.0.0'} source="Modtale" tone="local" />
+                    <ModpackProjectRow title="WorldEdit Hytale Tools" version="latest" source="CurseForge reference" tone="external" />
+                </div>
+
+                <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 dark:border-amber-500/20 dark:bg-amber-500/10">
+                    <div className="flex items-start gap-3">
+                        <LinkIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" />
+                        <div className="min-w-0 flex-1">
+                            <div className="text-sm font-black text-amber-900 dark:text-amber-100">Add 2 required dependencies?</div>
+                            <div className="mt-1 text-xs font-medium leading-relaxed text-amber-800 dark:text-amber-200/90">QuestAPI and Terrain Shapes are required by selected projects.</div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                <button type="button" className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-black text-white shadow-sm">Add selected</button>
+                                <button type="button" className="rounded-lg border border-amber-300 bg-white/70 px-3 py-1.5 text-xs font-black text-amber-800 dark:border-amber-400/30 dark:bg-white/10 dark:text-amber-100">Skip</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="rounded-xl border border-red-200 bg-red-50/80 p-3 dark:border-red-500/20 dark:bg-red-500/10">
+                    <div className="flex items-start gap-3">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-300" />
+                        <div className="min-w-0">
+                            <div className="text-sm font-black text-red-900 dark:text-red-100">WeatherFX conflicts with Clear Skies</div>
+                            <div className="mt-1 text-xs font-medium leading-relaxed text-red-700 dark:text-red-200/90">Resolve before publishing this pack.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 };
 
@@ -303,7 +396,7 @@ const PreviewSummaryCard = ({ title, value, subValue, trend, icon: Icon, color, 
         </div>
         <div className="relative z-10 mt-3">
             <h3 className="text-slate-500 dark:text-slate-400 text-[9px] font-black uppercase tracking-widest mb-0.5">{title}</h3>
-            <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">
+            <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-normal leading-none">
                 {value}{isPercent && <span className="text-lg text-slate-400 ml-0.5">%</span>}
             </div>
                                             {subValue && <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 font-medium">{subValue}</div>}
@@ -489,7 +582,7 @@ const InlineCommentThreadUI = ({ project, currentUser }: { project?: Project; cu
                     </div>
 
                     <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                        The latest release fixed the dedicated server crash and made setup much smoother.
+                        The latest release fixed the world startup crash and made setup much smoother.
                     </p>
 
                     <div className="mt-3 flex gap-3 relative">
@@ -622,7 +715,7 @@ const CompactFeaturedModCard = ({ project }: { project: Project }) => {
                 </div>
 
                 <div className="mt-6 flex-1 relative z-20 pointer-events-none">
-                    <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight">
+                    <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-normal">
                         {project.title}
                     </h3>
                     <div className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate mt-0.5">
@@ -678,7 +771,7 @@ export const TrendingProjectsSection = ({
         <section className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end pb-0 gap-4 relative">
                 <div className="space-y-1 flex-1">
-                    <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                    <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                         Trending
                     </h2>
                 </div>
@@ -730,7 +823,7 @@ export const NewReleasesSection = ({
         <section className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end pb-0 gap-4 relative">
                 <div className="space-y-1 flex-1">
-                    <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                    <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                         New Releases
                     </h2>
                 </div>
@@ -764,11 +857,33 @@ export const NewReleasesSection = ({
     );
 };
 
+export const ModpackPreviewSection = ({ randomProject }: { randomProject?: Project }) => {
+    return (
+        <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
+                    Modpacks, Upgraded
+                </h2>
+                <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-emerald-500 dark:from-blue-400 dark:to-emerald-400">
+                    Curated packs with dependency intelligence.
+                </p>
+                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                    Build complete Hytale experiences with required dependency prompts, incompatibility warnings, and CurseForge references when a project is not on Modtale yet.
+                </p>
+            </div>
+            <div className="flex-1 w-full max-w-xl relative overflow-visible">
+                <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/5 via-transparent to-emerald-500/5 dark:from-blue-500/10 dark:via-transparent dark:to-emerald-500/10 rounded-3xl blur-2xl pointer-events-none" />
+                <InlineModpackBuilderUI randomProject={randomProject} />
+            </div>
+        </div>
+    );
+};
+
 export const DirectDownloadsSection = () => {
     return (
         <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
             <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
-                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Direct Downloads
                 </h2>
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500 dark:from-purple-400 dark:to-pink-400">
@@ -786,11 +901,66 @@ export const DirectDownloadsSection = () => {
     );
 };
 
+export const LauncherPreviewSection = () => {
+    return (
+        <div className="flex flex-col items-center gap-10 text-center">
+            <div className="max-w-3xl space-y-5">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
+                    Modtale Launcher
+                </h2>
+                <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-emerald-500 dark:from-blue-400 dark:to-emerald-400">
+                    Native installs, updates, and Hytale launch flows.
+                </p>
+                <p className="mx-auto max-w-2xl text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed [text-wrap:balance]">
+                    Download a desktop launcher that can browse Modtale, install compatible project releases, prompt for dependencies, and keep your local Hytale library organized.
+                </p>
+                <div className="flex justify-center">
+                    <Link
+                        to={SiteRoutes.launcher()}
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-6 py-3.5 text-sm font-black text-white shadow-[0_8px_28px_rgba(37,99,235,0.24)] transition-all hover:-translate-y-0.5 hover:bg-blue-500 hover:shadow-[0_14px_34px_rgba(37,99,235,0.28)]"
+                    >
+                        <Download className="h-4 w-4" aria-hidden="true" />
+                        Get the Launcher
+                        <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                    </Link>
+                </div>
+            </div>
+
+            <div className="relative w-full max-w-6xl overflow-visible">
+                <div className="absolute inset-x-6 top-8 bottom-0 bg-gradient-to-r from-blue-500/10 via-emerald-500/10 to-violet-500/10 blur-2xl pointer-events-none" />
+                <div className={`${GLASS_CARD} relative overflow-hidden p-2 sm:p-3`}>
+                    <div className="flex h-9 items-center gap-2 border-b border-slate-200 px-3 dark:border-white/10">
+                        <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
+                        <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                        <span className="ml-2 text-[10px] font-black uppercase tracking-wider text-slate-400">Launcher preview</span>
+                    </div>
+                    <img
+                        src="/assets/launcher/project.png"
+                        alt="Modtale Launcher browsing a project page"
+                        className="mt-2 aspect-video w-full rounded-xl bg-slate-100 object-cover shadow-sm dark:bg-slate-900"
+                        loading="lazy"
+                        decoding="async"
+                    />
+                </div>
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    {['Browse projects', 'Resolve dependencies', 'Check updates'].map((item) => (
+                        <div key={item} className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white/70 px-4 py-3 text-sm font-black text-slate-700 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200">
+                            <Check className="h-4 w-4 text-emerald-500" aria-hidden="true" />
+                            {item}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export const SmartDependenciesSection = ({ randomProject, previewProjects }: { randomProject?: Project; previewProjects?: Project[] }) => {
     return (
         <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
             <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
-                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Smart Dependencies
                 </h2>
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500 dark:from-emerald-400 dark:to-teal-400">
@@ -812,7 +982,7 @@ export const ProjectAnalyticsSection = ({ showConversionRate = true }: { showCon
     return (
         <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
             <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
-                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Project Analytics
                 </h2>
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-indigo-500 dark:from-blue-400 dark:to-indigo-400">
@@ -834,7 +1004,7 @@ export const CommunityThreadsSection = ({ project, currentUser }: { project?: Pr
     return (
         <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
             <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
-                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Comment Threads
                 </h2>
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-violet-500 to-purple-500 dark:from-violet-400 dark:to-purple-400">
@@ -856,7 +1026,7 @@ export const RealTimeAlertsSection = () => {
     return (
         <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
             <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
-                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Push Notifications
                 </h2>
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-500 dark:from-amber-400 dark:to-orange-400">
@@ -878,7 +1048,7 @@ export const AccountPreferencesSection = () => {
     return (
         <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
             <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
-                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Notification Control
                 </h2>
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-slate-500 to-slate-400 dark:from-slate-400 dark:to-slate-500">

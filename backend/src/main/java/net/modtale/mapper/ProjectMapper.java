@@ -134,6 +134,9 @@ public class ProjectMapper {
         if (project == null) return null;
         return new ProjectCommentsDTO(project.getComments() != null
                 ? project.getComments().stream()
+                        .sorted(java.util.Comparator.comparing(Comment::isPinned).reversed()
+                                .thenComparing(Comment::getDate,
+                                        java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
                         .map(comment -> toCommentDTO(comment, currentUserId))
                         .collect(Collectors.toList())
                 : new ArrayList<>());
@@ -246,7 +249,6 @@ public class ProjectMapper {
         if (!isSummary) {
             dto.setAbout(project.getAbout());
             dto.setChildProjectIds(project.getChildProjectIds());
-            dto.setModIds(project.getModIds());
 
             dto.setProjectRoles(project.getProjectRoles());
             dto.setTeamMembers(project.getTeamMembers());
@@ -255,6 +257,9 @@ public class ProjectMapper {
             dto.setGalleryImageCaptions(project.getGalleryImageCaptions());
             dto.setComments(project.getComments() != null
                     ? project.getComments().stream()
+                            .sorted(java.util.Comparator.comparing(Comment::isPinned).reversed()
+                                    .thenComparing(Comment::getDate,
+                                            java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
                             .map(comment -> toCommentDTO(comment, currentUserId))
                             .collect(Collectors.toList())
                     : new ArrayList<>());
@@ -279,6 +284,7 @@ public class ProjectMapper {
                 comment.getContent(),
                 comment.getDate(),
                 comment.getUpdatedAt(),
+                comment.isPinned(),
                 comment.getUpvotes() != null ? comment.getUpvotes().size() : 0,
                 comment.getDownvotes() != null ? comment.getDownvotes().size() : 0,
                 resolveVote(comment.getUpvotes(), comment.getDownvotes(), currentUserId),
@@ -419,11 +425,20 @@ public class ProjectMapper {
     public static ProjectDependencyDTO toDependencyDTO(ProjectDependency dependency) {
         if (dependency == null) return null;
         return new ProjectDependencyDTO(
-                dependency.getModId(),
-                dependency.getModTitle(),
+                dependency.getId(),
+                dependency.getProjectId(),
+                dependency.getProjectTitle(),
                 dependency.getVersionNumber(),
+                dependency.getDependencyType(),
+                dependency.getSource(),
+                dependency.getExternalId(),
+                dependency.getExternalUrl(),
+                dependency.getExternalFileUrl(),
+                dependency.getExternalFileName(),
+                dependency.getCachedFileUrl(),
+                dependency.isHytaleProjectConfirmed(),
                 dependency.getIcon(),
-                dependency.getTitle() != null ? dependency.getTitle() : dependency.getModTitle(),
+                dependency.getTitle() != null ? dependency.getTitle() : dependency.getProjectTitle(),
                 dependency.getClassification(),
                 dependency.getSlug(),
                 dependency.isOptional(),

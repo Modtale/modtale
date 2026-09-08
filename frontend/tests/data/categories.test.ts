@@ -21,11 +21,11 @@ describe('category data', () => {
     it('lists supported project types and license options', () => {
         expect(PROJECT_TYPES.map(type => type.id)).toEqual([
             'All',
+            'MODPACK',
             'PLUGIN',
-            'DATA',
-            'ART',
             'SAVE',
-            'MODPACK'
+            'ART',
+            'DATA'
         ]);
         expect(LICENSES.some(license => license.id === 'MIT')).toBe(true);
         expect(LICENSES.some(license => license.id === 'CC-BY-NC-SA-4.0')).toBe(true);

@@ -141,6 +141,44 @@ class ProjectMediaServiceTest {
     }
 
     @Test
+    void reorderGalleryPersistsTheRequestedOrder() {
+        Project project = new Project();
+        project.setId("project-1");
+        project.setGalleryImages(new ArrayList<>(List.of("a.png", "b.png", "c.png")));
+        User user = user("user-1");
+
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.hasProjectPermission(project, user, "PROJECT_GALLERY_ADD")).thenReturn(true);
+        when(projectRepository.save(project)).thenReturn(project);
+
+        Project updated = service.reorderGallery("project-1", List.of("c.png", "a.png", "b.png"), user);
+
+        assertEquals(project, updated);
+        assertEquals(List.of("c.png", "a.png", "b.png"), project.getGalleryImages());
+        verify(projectRepository).save(project);
+        verify(projectService).evictProjectCache(project);
+    }
+
+    @Test
+    void reorderGalleryRejectsMissingOrDuplicateItems() {
+        Project project = new Project();
+        project.setId("project-1");
+        project.setGalleryImages(new ArrayList<>(List.of("a.png", "b.png", "c.png")));
+        User user = user("user-1");
+
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.hasProjectPermission(project, user, "PROJECT_GALLERY_ADD")).thenReturn(true);
+
+        InvalidProjectRequestException error = assertThrows(
+                InvalidProjectRequestException.class,
+                () -> service.reorderGallery("project-1", List.of("a.png", "a.png", "b.png"), user)
+        );
+
+        assertEquals("Gallery order must contain every current gallery item exactly once.", error.getMessage());
+        verify(projectRepository, never()).save(project);
+    }
+
+    @Test
     void removeGalleryImageDeletesTheStoredAssetAndEvictsProjectCache() {
         Project project = new Project();
         project.setId("project-1");

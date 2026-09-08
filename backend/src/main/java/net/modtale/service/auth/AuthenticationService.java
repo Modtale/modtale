@@ -156,7 +156,9 @@ public class AuthenticationService {
             if (System.currentTimeMillis() > expiry) return null;
 
             String expectedSignature = hmacSha256(userId + ":" + expiry, securityProperties.preAuthSecret());
-            if (!expectedSignature.equals(providedSignature)) return null;
+            if (!java.security.MessageDigest.isEqual(
+                    expectedSignature.getBytes(StandardCharsets.UTF_8),
+                    providedSignature.getBytes(StandardCharsets.UTF_8))) return null;
 
             User user = userRepository.findById(userId).orElse(null);
             if (user != null && user.isDeleted()) return null;

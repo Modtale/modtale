@@ -167,6 +167,23 @@ public class ProjectMediaService {
         return cacheTarget;
     }
 
+    public Project reorderGallery(String id, List<String> imageUrls, User user) {
+        Project project = projectAccessService.requireProjectPermission(id, user, "PROJECT_GALLERY_ADD",
+                "You do not have permission to reorder this project gallery.");
+        projectMutationGuard.ensureEditable(project);
+
+        List<String> currentItems = new ArrayList<>(galleryItems(project));
+        List<String> requestedItems = imageUrls == null ? List.of() : new ArrayList<>(imageUrls);
+        if (currentItems.size() != requestedItems.size()
+                || !currentItems.containsAll(requestedItems)
+                || !requestedItems.containsAll(currentItems)) {
+            throw new InvalidProjectRequestException("Gallery order must contain every current gallery item exactly once.");
+        }
+
+        project.setGalleryImages(requestedItems);
+        return saveAndEvict(project);
+    }
+
     private Project saveAndEvict(Project project) {
         Project saved = projectRepository.save(project);
         Project cacheTarget = saved != null ? saved : project;

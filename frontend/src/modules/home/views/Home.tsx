@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Search, Upload, Code, ArrowRight, Newspaper } from 'lucide-react';
-import '@fontsource-variable/inter/index.css';
+import { Search, Upload, Code, MonitorDown, ArrowRight, Newspaper } from 'lucide-react';
 import { GitHubBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { api } from '@/utils/api';
 import { NEWS_POSTS, getNewsPostPath } from '@/data/news';
@@ -16,7 +15,9 @@ import { MarqueeColumn } from '../components/HeroMarquee';
 import {
     TrendingProjectsSection,
     NewReleasesSection,
+    ModpackPreviewSection,
     DirectDownloadsSection,
+    LauncherPreviewSection,
     SmartDependenciesSection,
     ProjectAnalyticsSection,
     CommunityThreadsSection,
@@ -666,7 +667,6 @@ export const Home: React.FC<{
     return (
         <div
             className="min-h-screen bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-slate-300 relative selection:bg-blue-500 selection:text-white overflow-x-hidden transition-colors duration-300"
-            style={{ fontFamily: '"Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}
         >
             <Helmet>
                 <title>{homeSeo.title}</title>
@@ -1110,7 +1110,7 @@ export const Home: React.FC<{
                                     />
                                 </div>
 
-                                <h1 className={`text-4xl sm:text-5xl ${shouldUseSplitHeroLayout ? 'lg:text-6xl 2xl:text-[5.5rem] 2xl:mb-8' : ''} font-black text-slate-900 dark:text-white tracking-tighter leading-[1.05] mb-3 sm:mb-6 ${shouldUseSplitHeroLayout ? 'lg:self-start' : ''}`}>
+                                <h1 className={`text-4xl sm:text-5xl ${shouldUseSplitHeroLayout ? 'lg:text-6xl 2xl:text-[5.5rem] 2xl:mb-8' : ''} font-black text-slate-900 dark:text-white tracking-normal leading-[1.05] mb-3 sm:mb-6 ${shouldUseSplitHeroLayout ? 'lg:self-start' : ''}`}>
                                     The Hytale<br />
                                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-500 to-blue-500 dark:from-blue-400 dark:via-indigo-400 dark:to-blue-300">
                                         Community<br />Repository
@@ -1136,26 +1136,33 @@ export const Home: React.FC<{
                                         <Upload className="w-5 h-5 mr-2 sm:mr-3 text-slate-400 dark:text-slate-500" aria-hidden="true" />
                                         Publish Work
                                     </Link>
+                                    <Link
+                                        to={SiteRoutes.launcher()}
+                                        className="flex items-center justify-center px-6 sm:px-7 h-14 sm:h-16 text-base sm:text-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all w-full sm:w-auto shadow-sm hover:shadow-md hover:-translate-y-0.5 transform-gpu whitespace-nowrap"
+                                    >
+                                        <MonitorDown className="w-5 h-5 mr-2 sm:mr-3 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+                                        Launcher
+                                    </Link>
                                 </nav>
                             </div>
 
                             <div className={`${GLASS_CARD} home-hero-stats flex flex-row items-center justify-between sm:justify-start gap-2 sm:gap-10 2xl:gap-14 w-full sm:w-fit p-3.5 sm:p-6 lg:p-8 shadow-sm lg:-ml-1.5 contain-content`}>
                                 <div className="home-hero-stat-group flex flex-col items-center lg:items-start flex-1 sm:flex-none">
-                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-normal">
                                         {formatMetric(stats.totalProjects)}
                                     </span>
                                     <span className="home-hero-stat-label text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Projects</span>
                                 </div>
                                 <div className="home-hero-stat-divider w-px h-8 sm:h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
                                 <div className="home-hero-stat-group flex flex-col items-center lg:items-start flex-1 sm:flex-none">
-                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-normal">
                                         {formatMetric(stats.totalDownloads)}
                                     </span>
                                     <span className="home-hero-stat-label text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Downloads</span>
                                 </div>
                                 <div className="home-hero-stat-divider w-px h-8 sm:h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
                                 <div className="home-hero-stat-group flex flex-col items-center lg:items-start flex-1 sm:flex-none">
-                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-normal">
                                         {formatMetric(stats.totalUsers)}
                                     </span>
                                     <span className="home-hero-stat-label text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Creators</span>
@@ -1210,8 +1217,16 @@ export const Home: React.FC<{
                         </div>
                     </FeatureShowcaseSection>
 
+                    <FeatureShowcaseSection glowFrom="rgba(59, 130, 246, 0.1)" glowTo="rgba(16, 185, 129, 0.08)" align="right">
+                        <ModpackPreviewSection randomProject={previewProject} />
+                    </FeatureShowcaseSection>
+
                     <FeatureShowcaseSection glowFrom="rgba(168, 85, 247, 0.1)" glowTo="rgba(236, 72, 153, 0.08)" align="left">
                         <DirectDownloadsSection />
+                    </FeatureShowcaseSection>
+
+                    <FeatureShowcaseSection glowFrom="rgba(37, 99, 235, 0.1)" glowTo="rgba(16, 185, 129, 0.08)" align="right">
+                        <LauncherPreviewSection />
                     </FeatureShowcaseSection>
 
                     <FeatureShowcaseSection glowFrom="rgba(16, 185, 129, 0.1)" glowTo="rgba(20, 184, 166, 0.08)" align="right">
@@ -1269,7 +1284,7 @@ export const Home: React.FC<{
                                 />
                             </div>
 
-                            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white mb-6 sm:mb-8 tracking-tighter leading-[1.05]">
+                            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white mb-6 sm:mb-8 tracking-normal leading-[1.05]">
                                 Built by the community,<br />
                                 <span className="text-modtale-accent">
                                     for the community.

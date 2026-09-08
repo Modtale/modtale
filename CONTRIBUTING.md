@@ -48,11 +48,22 @@ Mock sign-in accounts use the password `password`. See [mock-db/README.md](mock-
 
 ### PR Preview Deployments
 
-Every pull request to `develop` gets a Cloud Run preview backed by a preview-only Mongo database seeded from the sanitized mock template database. PR previews run untrusted PR code against preview-only infrastructure with no production/dev secrets, no real object-storage credentials, no OAuth credentials, no Warden credentials, and no production domains.
+A repository owner, member, or collaborator can request a Cloud Run preview for a fork pull request with a `/deploy-preview` comment. Same-repository pull requests skip this preview infrastructure. Each preview uses a preview-only Mongo database seeded from the sanitized mock template database. PR previews run untrusted PR code against preview-only infrastructure with no production/dev secrets, no real object-storage credentials, no OAuth credentials, no Warden credentials, and no production domains.
 
 Preview services are named per PR and are deleted when the PR closes. The preview workflow must keep using the trusted base branch workflow/build config for deployment orchestration; PR code can affect the application being built, but it must not receive GitHub or production cloud credentials.
 
 The preview project must use dedicated no-production-access service accounts for both Cloud Build (`GCP_PREVIEW_BUILD_SERVICE_ACCOUNT`) and Cloud Run (`GCP_PREVIEW_RUNTIME_SERVICE_ACCOUNT`). The preview Mongo secret must point only at a preview/mock Mongo environment, never dev or prod.
+
+### Run checks before submitting
+
+```bash
+(cd backend && ./gradlew test)
+(cd frontend && npm ci && npm run check && npm test && npm run build)
+(cd launcher && ./gradlew test)
+node --test .github/tests/*.test.mjs mock-db/tests/*.test.mjs
+```
+
+Launcher tests do not require building the platform installers. `./gradlew build` also packages the launcher and requires the host's packaging tools.
 
 ## 3. Git Workflow & Branching
 
