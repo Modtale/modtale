@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Search, Upload, Code, MonitorDown, ArrowRight, Newspaper } from 'lucide-react';
+import { Search, Upload, Code, ArrowRight, Newspaper } from 'lucide-react';
 import { GitHubBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { api } from '@/utils/api';
 import { NEWS_POSTS, getNewsPostPath } from '@/data/news';
@@ -1135,13 +1135,6 @@ export const Home: React.FC<{
                                     >
                                         <Upload className="w-5 h-5 mr-2 sm:mr-3 text-slate-400 dark:text-slate-500" aria-hidden="true" />
                                         Publish Work
-                                    </Link>
-                                    <Link
-                                        to={SiteRoutes.launcher()}
-                                        className="flex items-center justify-center px-6 sm:px-7 h-14 sm:h-16 text-base sm:text-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white font-bold rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all w-full sm:w-auto shadow-sm hover:shadow-md hover:-translate-y-0.5 transform-gpu whitespace-nowrap"
-                                    >
-                                        <MonitorDown className="w-5 h-5 mr-2 sm:mr-3 text-slate-400 dark:text-slate-500" aria-hidden="true" />
-                                        Launcher
                                     </Link>
                                 </nav>
                             </div>
