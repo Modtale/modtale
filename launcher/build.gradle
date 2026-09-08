@@ -26,6 +26,8 @@ dependencies {
     implementation 'com.twelvemonkeys.imageio:imageio-webp:3.15.0'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.2'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.22.2'
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.22.2'
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.22.2'
     implementation 'com.vladsch.flexmark:flexmark:0.64.8'
     implementation 'com.vladsch.flexmark:flexmark-ext-autolink:0.64.8'
     implementation 'com.vladsch.flexmark:flexmark-ext-gfm-strikethrough:0.64.8'

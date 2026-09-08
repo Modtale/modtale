@@ -9584,3 +9584,24 @@
 }
 
 .cosmetic-save-menu > .label { -fx-text-fill: #cbd5e1; }
+
+.mod-settings-modal { -fx-font-family: "Inter"; }
+.mod-settings-muted { -fx-text-fill: #94a3b8; -fx-font-size: 12px; -fx-font-family: "Inter SemiBold"; }
+.mod-settings-body { -fx-padding: 24px; }
+.mod-settings-sidebar { -fx-padding: 0; }
+.mod-settings-nav {
+    -fx-background-color: transparent; -fx-text-fill: #94a3b8;
+    -fx-alignment: center-left; -fx-padding: 12px 14px; -fx-background-radius: 10px;
+    -fx-font-family: "Inter ExtraBold"; -fx-font-weight: 800; -fx-font-size: 13px; -fx-cursor: hand;
+}
+.mod-settings-nav:hover { -fx-background-color: rgba(255,255,255,0.05); -fx-text-fill: #e2e8f0; }
+.mod-settings-nav.active { -fx-background-color: rgba(37,99,235,0.14); -fx-text-fill: #60a5fa; }
+.mod-settings-scroll, .mod-settings-scroll > .viewport { -fx-background-color: transparent; -fx-padding: 0; }
+.mod-settings-content { -fx-padding: 0 12px 8px 0; }
+.mod-settings-card {
+    -fx-background-color: rgba(2,6,23,0.28); -fx-background-radius: 14px;
+    -fx-border-color: rgba(255,255,255,0.08); -fx-border-radius: 14px;
+}
+.mod-settings-row { -fx-padding: 15px 18px; -fx-border-color: transparent transparent rgba(255,255,255,0.06) transparent; }
+.mod-settings-error { -fx-text-fill: #fda4af; -fx-font-size: 12px; }
+.mod-settings-footer { -fx-padding: 18px 24px; -fx-border-color: rgba(255,255,255,0.10) transparent transparent transparent; }

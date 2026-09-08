@@ -4,190 +4,239 @@ import static net.modtale.launcher.ui.common.LauncherUi.primaryButton;
 import static net.modtale.launcher.ui.common.LauncherUi.secondaryButton;
 
 import java.nio.file.Path;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import javafx.application.Platform;
-import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.*;
+import net.modtale.launcher.ui.common.LauncherIcons;
+import net.modtale.launcher.config.ConfigSettingsDocument;
+import net.modtale.launcher.config.ConfigSettingsDocument.Setting;
 import net.modtale.launcher.config.HytaleConfigFiles;
 import net.modtale.launcher.config.HytaleConfigFiles.ConfigFile;
-import net.modtale.launcher.config.HytaleConfigFiles.Snapshot;
 
-/** World-scoped editor. Disk work stays off the JavaFX application thread. */
 final class ConfigEditorModal {
     private final HytaleConfigFiles files = new HytaleConfigFiles();
     private final Executor executor;
     private final StackPane host;
     private final Runnable onSaved;
     private final StackPane overlay = new StackPane();
-    private final ListView<ConfigFile> list = new ListView<>();
+    private final VBox navigation = new VBox(5);
+    private final VBox form = new VBox(0);
+    private final VBox content = new VBox(18);
     private final TextField search = new TextField();
-    private final TextArea editor = new TextArea();
+    private final Label heading = new Label();
+    private final Label subtitle = new Label();
     private final Label status = new Label();
-    private final Label pathLabel = new Label("Select a config file");
-    private final Button save = primaryButton("Save");
-    private final Button reload = secondaryButton("Reload");
-    private final Button discard = secondaryButton("Discard edits");
-    private List<ConfigFile> entries = List.of();
-    private Snapshot snapshot;
+    private final Button save = primaryButton("Save changes");
+    private final Button reset = secondaryButton("Reset changes");
+    private final List<ConfigSettingsDocument> documents = new ArrayList<>();
+    private final Set<Setting> invalid = new HashSet<>();
+    private final List<Row> rows = new ArrayList<>();
+    private String category = "All settings";
     private boolean busy;
+    private int unavailable;
 
     ConfigEditorModal(StackPane host, Executor executor, Runnable onSaved) {
-        this.host = host;
-        this.executor = executor;
-        this.onSaved = onSaved;
+        this.host = host; this.executor = executor; this.onSaved = onSaved;
     }
 
-    void show(Path globalMods, Path world, String worldName) {
-        show(worldName, () -> files.discover(globalMods, world));
+    void show(Path globalMods, Path world, String name) {
+        show(name, () -> files.discover(globalMods, world));
     }
-
     void show(List<ConfigFile> selectedFiles, String modName) {
-        List<ConfigFile> selected = List.copyOf(selectedFiles);
+        var selected = List.copyOf(selectedFiles);
         show(modName, () -> selected);
     }
-
     private void show(String name, DiskWork<List<ConfigFile>> discover) {
-        Label title = new Label("Config · " + name);
-        title.getStyleClass().add("config-editor-title");
-        Label hint = new Label("Close Hytale before editing. JSON is validated; other formats are saved as text. A backup is kept beside each saved file. Configs are saved in launcher settings and sync when signed in.");
-        hint.setWrapText(true);
-        hint.getStyleClass().add("library-muted-text");
-        search.setPromptText("Search config files");
-        search.setAccessibleText("Search config files");
-        list.setAccessibleText("Config files");
-        list.setPlaceholder(new Label("No configs found.\nRun the world with its mods enabled first."));
-        list.setPrefWidth(280);
-        VBox browser = new VBox(8, search, list);
-        VBox.setVgrow(list, Priority.ALWAYS);
-        pathLabel.setWrapText(true);
-        editor.setAccessibleText("Config contents");
-        editor.setWrapText(false);
-        editor.setStyle("-fx-font-family: monospace; -fx-font-size: 13px;");
-        VBox content = new VBox(8, pathLabel, editor);
-        VBox.setVgrow(editor, Priority.ALWAYS);
-        SplitPane split = new SplitPane(browser, content);
-        split.setDividerPositions(0.32);
-        VBox.setVgrow(split, Priority.ALWAYS);
-        status.setWrapText(true);
-        status.setMaxWidth(Double.MAX_VALUE);
-        HBox.setHgrow(status, Priority.ALWAYS);
-        Button close = secondaryButton("Close");
+        Label title = new Label(name);
+        HBox identity = new HBox(12, LauncherIcons.icon(LauncherIcons.Glyph.SLIDERS, 22), title);
+        identity.setAlignment(Pos.CENTER_LEFT);
+        identity.getStyleClass().add("post-download-modal-title");
+        HBox.setHgrow(identity, Priority.ALWAYS);
+        Button close = secondaryButton("Done");
         close.setOnAction(event -> close());
-        save.setOnAction(event -> save());
-        reload.setOnAction(event -> { if (snapshot != null) load(snapshot.file()); });
-        discard.setOnAction(event -> {
-            if (snapshot != null) editor.setText(snapshot.text());
-            status.setText("Edits discarded.");
+        HBox header = new HBox(20, identity, close);
+        header.setAlignment(Pos.CENTER_LEFT);
+        header.getStyleClass().add("post-download-modal-header");
+
+        search.setPromptText("Search settings…");
+        search.setAccessibleText("Search settings");
+        search.getStyleClass().add("input");
+        search.textProperty().addListener((obs, old, value) -> filter());
+        ScrollPane categoryScroll = new ScrollPane(navigation);
+        categoryScroll.setFitToWidth(true); categoryScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        categoryScroll.getStyleClass().add("mod-settings-scroll");
+        VBox.setVgrow(categoryScroll, Priority.ALWAYS);
+        VBox sidebar = new VBox(categoryScroll);
+        sidebar.getStyleClass().add("mod-settings-sidebar");
+        sidebar.setPrefWidth(205); sidebar.setMinWidth(180); sidebar.setMaxWidth(220);
+        heading.getStyleClass().add("settings-section-title");
+        subtitle.getStyleClass().add("mod-settings-muted");
+        subtitle.setWrapText(true);
+        form.getStyleClass().add("mod-settings-card");
+        content.getChildren().addAll(new VBox(5, heading, subtitle), form);
+        content.getStyleClass().add("mod-settings-content");
+        ScrollPane scroll = new ScrollPane(content);
+        scroll.setFitToWidth(true); scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scroll.getStyleClass().add("mod-settings-scroll");
+        VBox right = new VBox(18, search, scroll);
+        right.setMinWidth(0); VBox.setVgrow(scroll, Priority.ALWAYS);
+        HBox.setHgrow(right, Priority.ALWAYS);
+        HBox body = new HBox(24, sidebar, right);
+        body.getStyleClass().add("mod-settings-body");
+        VBox.setVgrow(body, Priority.ALWAYS);
+        reset.setOnAction(event -> {
+            documents.forEach(ConfigSettingsDocument::reset); invalid.clear(); buildRows(); filter();
+            status.setText("Changes reset."); updateControls();
         });
-        HBox footer = new HBox(8, status, discard, reload, close, save);
-        VBox modal = new VBox(14, title, hint, split, footer);
-        modal.getStyleClass().addAll("post-download-modal", "config-editor-modal");
-        modal.setPadding(new Insets(22));
-        modal.setPrefSize(1000, 650);
-        modal.setMaxSize(1100, 750);
-        modal.setMinSize(0, 0);
+        save.setOnAction(event -> save());
+        status.getStyleClass().add("mod-settings-muted");
+        status.setWrapText(true); status.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(status, Priority.ALWAYS);
+        HBox footer = new HBox(12, status, reset, save);
+        footer.setAlignment(Pos.CENTER_LEFT); footer.getStyleClass().add("mod-settings-footer");
+        VBox modal = new VBox(header, body, footer);
+        modal.getStyleClass().addAll("post-download-modal", "mod-settings-modal");
+        modal.setPrefSize(1040, 720); modal.setMaxSize(1120, 800); modal.setMinSize(0, 0);
         overlay.getStyleClass().add("post-download-modal-overlay");
-        overlay.setPadding(new Insets(24));
-        overlay.getChildren().add(modal);
+        overlay.setPadding(new Insets(24)); overlay.getChildren().add(modal);
         overlay.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.ESCAPE) { close(); event.consume(); }
             if (event.isShortcutDown() && event.getCode() == KeyCode.S) { save(); event.consume(); }
         });
         host.getChildren().add(overlay);
-        editor.textProperty().addListener((observable, oldValue, newValue) -> {
-            if (!busy && snapshot != null) status.setText(dirty() ? "Unsaved changes" : "Ready");
-            updateControls();
-        });
-        search.textProperty().addListener((observable, oldValue, newValue) -> filter());
-        list.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, file) -> {
-            if (file != null) load(file);
-        });
-        work("Finding configs…", discover, found -> {
-            entries = found;
-            filter();
-            status.setText(found.size() + " config files");
-        });
+        work("Loading settings…", () -> {
+            var loaded = new ArrayList<ConfigSettingsDocument>();
+            for (var file : discover.run()) {
+                try {
+                    var document = new ConfigSettingsDocument(files.read(file));
+                    if (loaded.stream().mapToInt(doc -> doc.settings().size()).sum() + document.settings().size() > 1500)
+                        throw new java.io.IOException("Too many settings");
+                    loaded.add(document);
+                }
+                catch (java.io.IOException ex) { unavailable++; }
+            }
+            return loaded;
+        }, loaded -> {
+            documents.addAll(loaded); buildRows(); buildNavigation(); filter();
+            status.setText(unavailable > 0 ? "Some settings cannot be edited here yet." : "Close Hytale before making changes.");
+        }, "Settings couldn't be loaded. Try refreshing the library.");
     }
 
+    private void buildRows() {
+        rows.clear(); form.getChildren().clear();
+        Map<String, Long> repeatedNames = documents.stream().flatMap(doc -> doc.settings().stream())
+                .collect(java.util.stream.Collectors.groupingBy(Setting::name, java.util.stream.Collectors.counting()));
+        for (var document : documents) for (Setting setting : document.settings()) {
+            Label title = new Label(setting.name());
+            title.getStyleClass().add("settings-card-title"); title.setWrapText(true);
+            VBox copy = new VBox(5, title); copy.setAlignment(Pos.CENTER_LEFT);
+            copy.setMinWidth(0); HBox.setHgrow(copy, Priority.ALWAYS);
+            if (repeatedNames.getOrDefault(setting.name(), 0L) > 1) {
+                String scope = document.snapshot().file().label().startsWith("Global") ? "All worlds" : "This world";
+                Label context = new Label(setting.context().isBlank() ? scope : setting.context() + " · " + scope);
+                context.getStyleClass().add("library-muted-text"); context.setWrapText(true);
+                copy.getChildren().add(context);
+            }
+            Node control;
+            Label error = new Label(); error.getStyleClass().add("mod-settings-error");
+            error.setVisible(false); error.setManaged(false);
+            if (setting.toggle()) {
+                LibraryToggleBox toggle = new LibraryToggleBox();
+                toggle.setSelected(Boolean.parseBoolean(setting.value()));
+                toggle.setAccessibleText(setting.name());
+                toggle.setTooltip(new Tooltip(setting.name()));
+                toggle.setOnAction(() -> {
+                    setting.set(Boolean.toString(toggle.isSelected())); changed();
+                });
+                control = toggle;
+            } else {
+                TextField input = new TextField(setting.value());
+                input.getStyleClass().add("input"); input.setAccessibleText(setting.name());
+                input.setPrefWidth(setting.number() ? 145 : 245); input.setMaxWidth(setting.number() ? 145 : 245);
+                input.textProperty().addListener((obs, old, value) -> {
+                    try {
+                        setting.set(value); invalid.remove(setting); error.setVisible(false); error.setManaged(false);
+                    } catch (IllegalArgumentException ex) {
+                        invalid.add(setting); error.setText(ex.getMessage()); error.setVisible(true); error.setManaged(true);
+                    }
+                    changed();
+                });
+                control = input;
+            }
+            HBox line = new HBox(22, copy, control); line.setAlignment(Pos.CENTER_LEFT);
+            VBox row = new VBox(7, line, error); row.getStyleClass().add("mod-settings-row");
+            rows.add(new Row(setting, row)); form.getChildren().add(row);
+        }
+    }
+    private void buildNavigation() {
+        navigation.getChildren().clear();
+        LinkedHashSet<String> categories = new LinkedHashSet<>(); categories.add("All settings");
+        rows.stream().map(row -> row.setting.category()).distinct().sorted().forEach(categories::add);
+        for (String name : categories) {
+            long count = rows.stream().filter(row -> name.equals("All settings") || name.equals(row.setting.category())).count();
+            Button button = new Button(name + "   " + count);
+            button.setAccessibleText(name); button.setMaxWidth(Double.MAX_VALUE); button.setWrapText(true);
+            button.getStyleClass().add("mod-settings-nav");
+            if (category.equals(name)) button.getStyleClass().add("active");
+            button.setOnAction(event -> { category = name; buildNavigation(); filter(); });
+            navigation.getChildren().add(button);
+        }
+    }
     private void filter() {
-        if (dirty() || busy) return;
-        String query = search.getText().toLowerCase(Locale.ROOT);
-        list.setItems(FXCollections.observableArrayList(entries.stream()
-                .filter(file -> file.label().toLowerCase(Locale.ROOT).contains(query)).toList()));
+        String query = search.getText().trim().toLowerCase(Locale.ROOT);
+        int shown = 0;
+        for (Row row : rows) {
+            boolean matches = (query.isEmpty() ? category.equals("All settings") || category.equals(row.setting.category()) :
+                    (row.setting.name() + " " + row.setting.context() + " " + row.setting.category()).toLowerCase(Locale.ROOT).contains(query));
+            row.node.setVisible(matches); row.node.setManaged(matches); if (matches) shown++;
+        }
+        heading.setText(query.isEmpty() ? category : "Search results");
+        subtitle.setText(rows.isEmpty() ? "No editable settings are available for this mod yet." : "No matching settings. Try another search.");
+        subtitle.setVisible(shown == 0); subtitle.setManaged(shown == 0);
+        form.setVisible(shown > 0); form.setManaged(shown > 0);
     }
-
-    private void load(ConfigFile file) {
-        if (dirty() || busy) return;
-        // Clear the prior snapshot so a failed read can never save to the previous selection.
-        snapshot = null;
-        editor.clear();
-        pathLabel.setText(file.label());
-        work("Loading…", () -> files.read(file), loaded -> {
-            snapshot = loaded;
-            editor.setText(loaded.text());
-            status.setText("Ready");
-            editor.requestFocus();
-        });
-    }
-
-    private void save() {
-        if (busy || !dirty()) return;
-        Snapshot original = snapshot;
-        String text = editor.getText();
-        work("Saving…", () -> files.save(original, text), saved -> {
-            snapshot = saved;
-            status.setText("Saved. Backup created beside the config.");
-            onSaved.run();
-        });
-    }
-
-    private boolean dirty() {
-        return snapshot != null && !editor.getText().equals(snapshot.text());
-    }
-
+    private boolean dirty() { return documents.stream().anyMatch(ConfigSettingsDocument::dirty); }
+    private void changed() { status.setText(invalid.isEmpty() ? "Unsaved changes" : "Check the highlighted values."); updateControls(); }
     private void updateControls() {
-        boolean dirty = dirty();
-        list.setDisable(busy || dirty);
-        search.setDisable(busy || dirty);
-        editor.setDisable(busy || snapshot == null);
-        save.setDisable(busy || !dirty);
-        reload.setDisable(busy || dirty || snapshot == null);
-        discard.setDisable(busy || !dirty);
+        form.setDisable(busy); search.setDisable(busy); navigation.setDisable(busy);
+        save.setDisable(busy || !dirty() || !invalid.isEmpty());
+        reset.setDisable(busy || (!dirty() && invalid.isEmpty()));
     }
-
     private void close() {
-        if (busy || dirty()) {
-            status.setText(busy ? "Wait for the current operation to finish." : "Save or discard your edits before closing or changing files.");
-            return;
+        if (busy || dirty() || !invalid.isEmpty()) {
+            status.setText(busy ? "Please wait…" : "Save or reset your changes before closing."); return;
         }
         host.getChildren().remove(overlay);
     }
-
-    private <T> void work(String message, DiskWork<T> action, Consumer<T> success) {
-        busy = true;
-        status.setText(message);
-        updateControls();
+    private void save() {
+        if (busy || !dirty() || !invalid.isEmpty()) return;
+        work("Saving changes…", () -> {
+            var changed = documents.stream().filter(ConfigSettingsDocument::dirty).toList();
+            for (var doc : changed) if (!files.read(doc.snapshot().file()).text().equals(doc.snapshot().text()))
+                throw new java.io.IOException("Settings changed outside the launcher");
+            for (var doc : changed) doc.saved(files.save(doc.snapshot(), doc.serialize()));
+            return true;
+        }, done -> { status.setText("Changes saved. Ready for your next game."); onSaved.run(); },
+                "Couldn't save all changes. Close Hytale and reopen settings if they changed elsewhere.");
+    }
+    private <T> void work(String message, DiskWork<T> action, Consumer<T> success, String failure) {
+        busy = true; status.setText(message); updateControls();
         CompletableFuture.supplyAsync(() -> {
-            try { return action.run(); }
-            catch (Exception ex) { throw new java.util.concurrent.CompletionException(ex); }
+            try { return action.run(); } catch (Exception ex) { throw new java.util.concurrent.CompletionException(ex); }
         }, executor).whenComplete((result, error) -> Platform.runLater(() -> {
             busy = false;
-            if (error != null) {
-                Throwable cause = error.getCause() == null ? error : error.getCause();
-                status.setText(cause.getMessage() == null ? "Could not access this config." : cause.getMessage());
-            } else {
-                success.accept(result);
-            }
+            if (error != null) status.setText(failure); else success.accept(result);
             updateControls();
         }));
     }
-
+    private record Row(Setting setting, VBox node) {}
     private interface DiskWork<T> { T run() throws Exception; }
 }
