@@ -44,7 +44,6 @@ export const UTILITY_NOINDEX_EXACT_PATHS = new Set([
     '/mfa',
     '/terms',
     '/privacy',
-    '/status',
     '/api-docs',
     '/api-docs/swagger',
     '/admin',
@@ -160,49 +159,6 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
             {
                 question: 'What does the launcher manage?',
                 answer: 'The launcher can browse Modtale projects, install compatible project releases, help with dependencies, check installed projects for updates, and connect to Hytale launch flows.',
-            },
-        ],
-    },
-    '/status': {
-        title: 'System Status | Modtale',
-        h1: 'Modtale System Status',
-        description: 'Live Modtale status for API, database, and storage availability, with service latency, uptime history, and a continuously updated Discord mirror.',
-        keywords: 'modtale status, modtale uptime, modtale api status, modtale incidents',
-        intro: 'Track Modtale service availability across the API, database, and storage systems.',
-        contentBlocks: [
-            {
-                title: 'Live Service Health',
-                body: 'The Modtale status page reports the current health of the core services that power browsing, publishing, and downloads.',
-            },
-            {
-                title: 'Availability History',
-                body: 'Status history helps the team and community spot degraded periods, latency spikes, and service recovery.',
-            },
-            {
-                title: 'Live Discord Status',
-                body: 'The latest service health and availability history are mirrored into one continuously updated Discord message.',
-            },
-        ],
-        relatedLinks: [
-            {
-                href: '/api-docs',
-                label: 'API Docs',
-                description: 'Review public API behavior and response shapes.',
-            },
-            {
-                href: '/mods',
-                label: 'Browse Mods',
-                description: 'Return to project discovery.',
-            },
-        ],
-        faq: [
-            {
-                question: 'What does Modtale monitor?',
-                answer: 'Modtale monitors API responsiveness, database connectivity, and storage connectivity for the core web experience.',
-            },
-            {
-                question: 'Where are incident updates posted?',
-                answer: 'The status page shows live health, which is also mirrored in one continuously updated message in the Modtale Discord server.',
             },
         ],
     },
