@@ -530,10 +530,14 @@ final class LibraryWorldRenderer {
             image.fitWidthProperty().bind(shell.widthProperty().subtract(4));
             image.fitHeightProperty().bind(shell.heightProperty().subtract(4));
             image.setPreserveRatio(true);
+            if (fallbackGlyph == LauncherIcons.Glyph.GLOBE) {
+                LibraryWorldIcon.cropToSquare(image);
+            }
             image.setSmooth(true);
             image.setMouseTransparent(true);
             image.setClip(roundedClip(shell, clipRadius));
-            imageLoader.loadInto(image, iconUrl, mediaSize * 3, mediaSize * 3, true);
+            double renderScale = fallbackGlyph == LauncherIcons.Glyph.GLOBE ? 6 : 3;
+            imageLoader.loadInto(image, iconUrl, mediaSize * renderScale, mediaSize * renderScale, true);
             shell.getChildren().add(image);
             return shell;
         }

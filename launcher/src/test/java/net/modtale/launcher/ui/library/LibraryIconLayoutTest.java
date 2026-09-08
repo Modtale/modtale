@@ -22,6 +22,16 @@ class LibraryIconLayoutTest {
     }
 
     @Test
+    void worldPreviewsCropLandscapeAndPortraitImagesToCenteredSquares() {
+        ImageView view = new ImageView();
+        LibraryWorldIcon.cropToSquare(view);
+        view.setImage(new javafx.scene.image.WritableImage(240, 120));
+        assertEquals(new javafx.geometry.Rectangle2D(60, 0, 120, 120), view.getViewport());
+        view.setImage(new javafx.scene.image.WritableImage(120, 240));
+        assertEquals(new javafx.geometry.Rectangle2D(0, 60, 120, 120), view.getViewport());
+    }
+
+    @Test
     void imagesStayInsideBordersAfterCssOverridesIconSize() throws Exception {
         FutureTask<Void> task = new FutureTask<>(() -> {
             String asset = getClass().getResource("/net/modtale/launcher/ui/nativefx/assets/project-placeholder.png").toExternalForm();

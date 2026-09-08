@@ -251,11 +251,11 @@ final class PostDownloadWorldModal {
             ImageView image = new ImageView();
             image.setFitWidth(WORLD_ICON_IMAGE_SIZE);
             image.setFitHeight(WORLD_ICON_IMAGE_SIZE);
-            image.setPreserveRatio(false);
+            LibraryWorldIcon.cropToSquare(image);
             image.setSmooth(true);
             image.setMouseTransparent(true);
             image.setClip(roundedClip(WORLD_ICON_IMAGE_SIZE, 10));
-            imageLoader.loadInto(image, preview, WORLD_ICON_IMAGE_SIZE, WORLD_ICON_IMAGE_SIZE);
+            imageLoader.loadInto(image, preview, WORLD_ICON_IMAGE_SIZE * 6, WORLD_ICON_IMAGE_SIZE * 6, true);
             shell.getChildren().add(image);
         } else {
             shell.getChildren().add(LauncherIcons.icon(LauncherIcons.Glyph.GLOBE, 16));
