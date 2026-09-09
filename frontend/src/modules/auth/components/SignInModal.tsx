@@ -184,6 +184,12 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
 
                     {mode !== 'forgot-password' && (
                         <>
+                            <div className="relative mb-6 flex items-center gap-3">
+                                <div className="flex-1 border-t border-slate-200 dark:border-white/10"></div>
+                                <span className="text-sm text-slate-500 dark:text-slate-400 font-medium">sign in with</span>
+                                <div className="flex-1 border-t border-slate-200 dark:border-white/10"></div>
+                            </div>
+
                             <div className="space-y-3 mb-6">
                                 <button
                                     type="button"
