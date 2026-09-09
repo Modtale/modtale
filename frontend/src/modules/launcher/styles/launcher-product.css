@@ -1,0 +1,264 @@
+.launcher-demo-media { border-radius: 14px; overflow: hidden; background: #101827; border: 1px solid #ffffff12; }
+.launcher-demo-media img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; }
+
+.launcher-product {
+    --lp-bg: #f8fafc;
+    --lp-ink: #0f172a;
+    --lp-muted: #64748b;
+    --lp-line: #e2e8f0;
+    --lp-accent: #2563eb;
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    color: var(--lp-ink);
+    background: var(--lp-bg);
+}
+.dark .launcher-product {
+    --lp-bg: #080d19;
+    --lp-ink: #f8fafc;
+    --lp-muted: #94a3b8;
+    --lp-line: #ffffff1f;
+    --lp-accent: #60a5fa;
+}
+.launcher-product-hero {
+    position: relative;
+    isolation: isolate;
+    /* The shared sticky navigation is h-24 (6rem). */
+    height: calc(100svh - 6rem);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: clamp(16px, 3svh, 36px);
+    padding: clamp(20px, 4svh, 56px) 28px;
+    overflow: hidden;
+    border-bottom: 1px solid var(--lp-line);
+    text-align: center;
+}
+.launcher-product-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0 -10%;
+    z-index: -2;
+    pointer-events: none;
+    background:
+        radial-gradient(ellipse 35% 38% at 27% 28%, #3b82f62e, transparent 100%),
+        radial-gradient(ellipse 32% 40% at 76% 38%, #6366f12b, transparent 100%),
+        radial-gradient(ellipse 45% 24% at 50% 62%, #38bdf81a, transparent 100%);
+}
+.dark .launcher-product-hero::before {
+    background:
+        radial-gradient(ellipse 35% 38% at 27% 28%, #2563eb45, transparent 100%),
+        radial-gradient(ellipse 32% 40% at 76% 38%, #6366f138, transparent 100%),
+        radial-gradient(ellipse 45% 24% at 50% 62%, #38bdf81c, transparent 100%);
+}
+.launcher-product-hero::after {
+    content: '';
+    position: absolute;
+    inset: 0 -10%;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+        repeating-linear-gradient(30deg, transparent 0 79px, #3b82f615 79px 80px),
+        repeating-linear-gradient(150deg, transparent 0 79px, #3b82f615 79px 80px);
+    mask-image: radial-gradient(ellipse 64% 55% at 50% 35%, #000 15%, transparent 100%);
+}
+.dark .launcher-product-hero::after {
+    background-image:
+        repeating-linear-gradient(30deg, transparent 0 79px, #93c5fd12 79px 80px),
+        repeating-linear-gradient(150deg, transparent 0 79px, #93c5fd12 79px 80px);
+}
+.launcher-product-brand img { width: clamp(230px, 37svh, 560px); max-width: 100%; height: auto; margin: 0 auto; }
+.launcher-product h1 {
+    margin: 12px 0 0;
+    font-size: clamp(48px, 8svh, 112px);
+    font-weight: 900;
+    line-height: 1.05;
+    letter-spacing: -.035em;
+}
+.launcher-product h1, .launcher-feature h2 span {
+    color: transparent;
+    background: linear-gradient(110deg, #2563eb, #6366f1);
+    background-clip: text;
+}
+.dark .launcher-product h1, .dark .launcher-feature h2 span {
+    background-image: linear-gradient(110deg, #60a5fa, #a5b4fc);
+}
+.launcher-product-lead { margin: clamp(12px, 2svh, 22px) 0 clamp(16px, 2svh, 28px); color: var(--lp-muted); font-size: clamp(17px, 2vw, 21px); font-weight: 500; }
+.launcher-download { display: flex; flex-direction: column; align-items: center; gap: 13px; scroll-margin-top: 100px; }
+.launcher-platforms { display: flex; justify-content: center; gap: 20px; }
+.launcher-platforms button { padding: 5px 0; color: var(--lp-muted); font-size: 13px; border-bottom: 1px solid transparent; }
+.launcher-platforms button[aria-pressed=true] { color: var(--lp-accent); border-color: currentColor; }
+.launcher-platforms button:hover, .launcher-release-link:hover { color: var(--lp-accent); }
+.launcher-release-link { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; color: var(--lp-muted); font-size: 12px; overflow-wrap: anywhere; }
+.launcher-product-cover {
+    height: 100%;
+    width: auto;
+    max-width: min(100%, 1060px);
+    max-height: min(662.5px, calc((100vw - 56px) * .625));
+    align-self: center;
+    min-height: 0;
+    aspect-ratio: 16 / 10;
+    margin: 0 auto;
+    border: 1px solid var(--lp-line);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 28px 80px #02061725, 0 0 90px #3b82f61a;
+    background: #0f172a;
+}
+.launcher-product-cover img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.launcher-product-features { margin: 0; }
+.launcher-feature { position: relative; isolation: isolate; border-bottom: 1px solid var(--lp-line); }
+.launcher-feature:nth-child(even) { background: #eef2f8; }
+.dark .launcher-feature:nth-child(even) { background: #0e1625; }
+.launcher-feature-inner { max-width: 1680px; margin: auto; display: grid; grid-template-columns: minmax(240px, .65fr) minmax(0, 2fr); align-items: center; gap: 64px; padding: 96px 48px; }
+.launcher-feature-reverse .launcher-feature-inner { grid-template-columns: minmax(0, 2fr) minmax(240px, .65fr); }
+.launcher-feature-reverse .launcher-feature-copy { grid-column: 2; grid-row: 1; }
+.launcher-feature-reverse .launcher-demo-media { grid-column: 1; grid-row: 1; }
+.launcher-feature-copy { grid-column: 1; grid-row: 1; max-width: 380px; }
+.launcher-feature .launcher-demo-media { grid-column: 2; grid-row: 1; }
+.launcher-feature-reverse .launcher-demo-media { grid-column: 1; }
+.launcher-feature h2 { margin: 0; font-size: clamp(34px, 3.7vw, 52px); line-height: 1.12; font-weight: 900; letter-spacing: -.03em; }
+.launcher-feature p { margin: 22px 0 0; color: var(--lp-muted); font-size: 18px; line-height: 1.75; }
+.launcher-product .launcher-demo-media { border: 1px solid var(--lp-line); border-radius: 14px; background: #0f172a; box-shadow: 0 20px 65px #02061712; min-width: 0; }
+.launcher-feature::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(ellipse at 65% 50%, #3b82f60a, transparent 65%); }
+.launcher-feature-reverse::before { background: radial-gradient(ellipse at 30% 50%, #6366f10b, transparent 65%); }
+.launcher-product :is(a, button):focus-visible { outline: 2px solid var(--lp-accent); outline-offset: 5px; }
+@media (max-width: 1000px) {
+    .launcher-feature-inner { gap: 36px; padding: 72px 32px; }
+    .launcher-feature p { font-size: 16px; }
+}
+@media (max-width: 760px) {
+    .launcher-product-hero { padding: 24px 20px; gap: 20px; }
+    .launcher-product-cover { border-radius: 10px; }
+    .launcher-feature-inner, .launcher-feature-reverse .launcher-feature-inner { grid-template-columns: minmax(0, 1fr); gap: 32px; padding: 64px 20px; }
+    .launcher-feature .launcher-feature-copy, .launcher-feature .launcher-demo-media { grid-column: 1; grid-row: auto; }
+    .launcher-feature-copy { max-width: 430px; margin: auto; text-align: center; }
+    .launcher-feature h2 { font-size: clamp(34px, 7vw, 44px); }
+    .launcher-feature p { margin-top: 16px; }
+    .launcher-product .launcher-demo-media { border-radius: 10px; }
+}
+
+.launcher-open-source {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-top: 1px solid var(--lp-line);
+    background: linear-gradient(180deg, #f8fafc, #f1f5f9 65%, #eaf0f7);
+}
+.dark .launcher-open-source { background: linear-gradient(180deg, #09101c, #070d17 65%, #060b14); }
+.launcher-open-source::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(ellipse at 15% 20%, #3b82f616, transparent 55%), radial-gradient(ellipse at 85% 85%, #10b98110, transparent 50%);
+}
+.launcher-open-source::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(circle at 1px 1px, #94a3b819 1px, transparent 0);
+    background-size: 22px 22px;
+    mask-image: radial-gradient(ellipse at center, #000, transparent 85%);
+}
+.launcher-open-source-content { max-width: 960px; margin: auto; padding: 110px 24px 125px; text-align: center; }
+.launcher-open-source-brand img { width: 253px; max-width: 70%; height: auto; margin: 0 auto 38px; }
+.launcher-open-source h2 { font-size: clamp(34px, 4.5vw, 60px); line-height: 1.08; font-weight: 900; letter-spacing: -.025em; }
+.launcher-open-source h2 span { color: var(--lp-accent); }
+.launcher-open-source p { max-width: 570px; margin: 26px auto 34px; font-size: 18px; line-height: 1.75; color: var(--lp-muted); }
+.launcher-source-button { display: inline-flex; align-items: center; justify-content: center; gap: 12px; min-height: 60px; padding: 14px 30px; border: 1px solid var(--lp-line); border-radius: 16px; background: #fff; font-size: 17px; font-weight: 700; box-shadow: 0 4px 24px #0206170f; transition: background-color .2s, box-shadow .2s; }
+.dark .launcher-source-button { background: #1e293bcc; box-shadow: 0 4px 24px #0003; }
+.launcher-source-button:hover { background: #eff6ff; box-shadow: 0 8px 32px #2563eb18; }
+.dark .launcher-source-button:hover { background: #293950; }
+@media (max-width: 760px) {
+    .launcher-open-source-content { padding: 76px 22px 85px; }
+    .launcher-open-source-brand img { width: 210px; margin-bottom: 28px; }
+    .launcher-open-source p { font-size: 16px; }
+}
+
+@media (max-height: 650px) and (min-width: 761px) {
+    .launcher-product-hero { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 24px; padding: 24px 32px 0; }
+    .launcher-product-cover { width: min(100%, 1000px); height: auto; max-height: none; align-self: start; }
+    .launcher-product-brand img { width: 280px; }
+    .launcher-product h1 { font-size: 56px; }
+}
+@media (max-height: 550px) {
+    .launcher-hero-copy { max-height: 100%; overflow: auto; }
+}
+
+/* A centered product reveal keeps the launcher distinct from the home page. */
+@media (min-width: 1100px) and (min-height: 651px) {
+    .launcher-product-hero {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1fr);
+        gap: clamp(48px, 6svh, 80px);
+        padding: clamp(56px, 7svh, 100px) 64px 0;
+        text-align: center;
+    }
+    .launcher-product-brand img { width: clamp(440px, 52svh, 660px); margin: auto; }
+    .launcher-product h1 { font-size: clamp(96px, 11.5svh, 148px); margin-top: 20px; }
+    .launcher-product-lead { margin: 32px 0 36px; font-size: clamp(21px, 1.6vw, 25px); }
+    .launcher-download { align-items: center; gap: 14px; }
+    .launcher-product-cover {
+        width: min(100%, 1440px); height: auto; max-width: 1440px; max-height: none;
+        align-self: start; border-radius: 18px;
+        box-shadow: 0 40px 100px #02061755, 0 0 100px #3b82f626;
+    }
+    .launcher-product-hero::before { background: radial-gradient(ellipse at 50% 85%, #3b82f64a, transparent 62%), radial-gradient(ellipse at 25% 30%, #6366f11f, transparent 50%); }
+}
+
+/* Each walkthrough has a quiet stage, with a larger opening and closing beat. */
+.launcher-feature { --stage-color: 59, 130, 246; }
+.launcher-feature[data-feature="world-library"] { --stage-color: 45, 162, 170; }
+.launcher-feature[data-feature="curseforge-mods"] { --stage-color: 230, 133, 85; }
+.launcher-feature[data-feature="mod-configs"] { --stage-color: 99, 102, 241; }
+.launcher-feature[data-feature="account-sync"] { --stage-color: 56, 154, 225; }
+.launcher-feature[data-feature="wardrobe"] { --stage-color: 155, 112, 225; }
+.launcher-feature::before, .launcher-feature-reverse::before {
+    background: radial-gradient(ellipse at 72% 50%, rgba(var(--stage-color), .15), transparent 66%);
+}
+.launcher-feature-reverse::before { background: radial-gradient(ellipse at 28% 50%, rgba(var(--stage-color), .15), transparent 66%); }
+.launcher-feature::after {
+    content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background-image: linear-gradient(rgba(var(--stage-color), .065) 1px, transparent 1px), linear-gradient(90deg, rgba(var(--stage-color), .065) 1px, transparent 1px);
+    background-size: 80px 80px;
+    mask-image: radial-gradient(ellipse at 65% 60%, black, transparent 68%);
+}
+.launcher-feature-copy::before { content: ''; display: block; width: 48px; height: 3px; margin-bottom: 28px; border-radius: 3px; background: rgb(var(--stage-color)); }
+.launcher-product .launcher-demo-media { box-shadow: 0 32px 80px #02061730, 0 0 0 7px rgba(var(--stage-color), .045), 0 0 90px rgba(var(--stage-color), .09); }
+.launcher-feature-showcase .launcher-feature-inner { grid-template-columns: minmax(0, 1fr); gap: 48px; padding-top: 104px; padding-bottom: 112px; }
+.launcher-feature-showcase .launcher-feature-copy { grid-column: 1; grid-row: 1; max-width: 680px; margin: auto; text-align: center; }
+.launcher-feature-showcase .launcher-feature-copy::before { margin-left: auto; margin-right: auto; }
+.launcher-feature-showcase h2 { font-size: clamp(40px, 4.5vw, 68px); }
+.launcher-feature-showcase h2 br { display: none; }
+.launcher-feature-showcase h2 span::before { content: ' '; }
+.launcher-feature-showcase p { max-width: 530px; margin: 22px auto 0; }
+.launcher-feature-showcase .launcher-demo-media { grid-column: 1; grid-row: 2; width: 100%; max-width: 1280px; margin: auto; }
+.launcher-feature-showcase::before { background: radial-gradient(ellipse at 50% 65%, rgba(var(--stage-color), .2), transparent 68%); }
+@media (max-width: 1000px) {
+    .launcher-feature-inner, .launcher-feature-reverse .launcher-feature-inner { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+    .launcher-feature .launcher-feature-copy { grid-column: 1; grid-row: 1; max-width: 550px; margin: auto; text-align: center; }
+    .launcher-feature .launcher-demo-media { grid-column: 1; grid-row: 2; }
+    .launcher-feature-copy::before { margin-left: auto; margin-right: auto; }
+}
+@media (max-width: 760px) {
+    .launcher-feature-showcase .launcher-feature-inner { padding: 72px 20px; gap: 36px; }
+    .launcher-feature-showcase h2 { font-size: 40px; }
+    .launcher-feature-copy::before { margin-bottom: 22px; }
+    .launcher-product-brand img { width: clamp(220px, 30svh, 350px); }
+    .launcher-product h1 { font-size: clamp(44px, 7svh, 72px); }
+    .launcher-product-hero { padding-top: 36px; gap: 30px; }
+}
+
+.launcher-hero-copy > .launcher-download { margin-top: clamp(28px, 4svh, 48px); }
+
+/* Scroll reveals the full Play tab before handing off to the walkthroughs. */
+@media (prefers-reduced-motion: no-preference) {
+    .launcher-product { overflow: clip; }
+    .launcher-hero-scroll { --hero-scroll: 0px; --hero-copy-opacity: 1; height: calc(100svh - 6rem + var(--hero-travel, 0px)); }
+    .launcher-hero-scroll .launcher-product-hero { position: sticky; top: 6rem; }
+    .launcher-hero-scroll .launcher-product-cover { transform: translateY(calc(-1 * var(--hero-scroll))); will-change: transform; position: relative; z-index: 1; }
+    .launcher-hero-scroll .launcher-hero-copy { opacity: var(--hero-copy-opacity); transform: translateY(calc(-.25 * var(--hero-scroll))); }
+}

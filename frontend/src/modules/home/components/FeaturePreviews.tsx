@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Download, List, X, ChevronDown, ChevronRight, Check, Box, AlertCircle, Bell, Search, ArrowUpRight, MessageSquare, Send, Save, PieChart, TrendingUp, Eye, ArrowBigUp, ArrowBigDown, Settings, Layers, Plus } from 'lucide-react';
+import { LauncherDemo } from '@/modules/launcher/components/LauncherDemo';
+import '@/modules/launcher/styles/launcher-product.css';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { api, BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
@@ -923,60 +925,21 @@ export const DirectDownloadsSection = () => {
     );
 };
 
-export const LauncherPreviewSection = () => {
-    return (
-        <div className="flex flex-col items-center gap-10 text-center">
-            <div className="max-w-3xl space-y-5">
-                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
-                    Modtale Launcher
-                </h2>
-                <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-emerald-500 dark:from-blue-400 dark:to-emerald-400">
-                    Native installs, updates, and Hytale launch flows.
-                </p>
-                <p className="mx-auto max-w-2xl text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed [text-wrap:balance]">
-                    Download a desktop launcher that can browse Modtale, install compatible project releases, prompt for dependencies, and keep your local Hytale library organized.
-                </p>
-                <div className="flex justify-center">
-                    <Link
-                        to={SiteRoutes.launcher()}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-600 px-6 py-3.5 text-sm font-black text-white shadow-[0_8px_28px_rgba(37,99,235,0.24)] transition-all hover:-translate-y-0.5 hover:bg-blue-500 hover:shadow-[0_14px_34px_rgba(37,99,235,0.28)]"
-                    >
-                        <Download className="h-4 w-4" aria-hidden="true" />
-                        Get the Launcher
-                        <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
-                    </Link>
-                </div>
-            </div>
-
-            <div className="relative w-full max-w-6xl overflow-visible">
-                <div className="absolute inset-x-6 top-8 bottom-0 bg-gradient-to-r from-blue-500/10 via-emerald-500/10 to-violet-500/10 blur-2xl pointer-events-none" />
-                <div className={`${GLASS_CARD} relative overflow-hidden p-2 sm:p-3`}>
-                    <div className="flex h-9 items-center gap-2 border-b border-slate-200 px-3 dark:border-white/10">
-                        <span className="h-2.5 w-2.5 rounded-full bg-red-400" />
-                        <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
-                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                        <span className="ml-2 text-[10px] font-black uppercase tracking-wider text-slate-400">Launcher preview</span>
-                    </div>
-                    <img
-                        src="/assets/launcher/project.png"
-                        alt="Modtale Launcher browsing a project page"
-                        className="mt-2 aspect-video w-full rounded-xl bg-slate-100 object-cover shadow-sm dark:bg-slate-900"
-                        loading="lazy"
-                        decoding="async"
-                    />
-                </div>
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    {['Browse projects', 'Resolve dependencies', 'Check updates'].map((item) => (
-                        <div key={item} className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white/70 px-4 py-3 text-sm font-black text-slate-700 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-200">
-                            <Check className="h-4 w-4 text-emerald-500" aria-hidden="true" />
-                            {item}
-                        </div>
-                    ))}
-                </div>
-            </div>
+export const LauncherPreviewSection = () => (
+    <div className="grid items-center gap-10 lg:grid-cols-[.8fr_1.2fr] lg:gap-16">
+        <div className="max-w-xl">
+            <p className="mb-5 text-sm font-bold text-blue-600 dark:text-blue-400">Modtale Launcher</p>
+            <h2 className="text-4xl font-black leading-tight tracking-tight text-slate-900 sm:text-5xl dark:text-white">One library.<br />A world of possibilities.</h2>
+            <p className="mt-6 text-lg leading-relaxed text-slate-500 dark:text-slate-400">Your building world and your next big adventure don’t need the same mods. Pick what belongs in each save, with everything together in the Modtale Launcher.</p>
+            <Link to={SiteRoutes.launcher()} className="mt-7 inline-flex items-center gap-3 rounded-xl bg-blue-600 px-6 py-3.5 text-sm font-bold text-white transition-colors hover:bg-blue-500">Explore the launcher <ArrowUpRight size={18} /></Link>
+            <p className="mt-5 text-sm text-slate-500 dark:text-slate-400">Browse mods. Build your setup. Make it yours.</p>
         </div>
-    );
-};
+        <figure className="min-w-0">
+            <LauncherDemo clip="world-library" alt="The real Modtale Launcher switching between Hytale worlds with different enabled mods" />
+            <figcaption className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">A different mod selection for every world.</figcaption>
+        </figure>
+    </div>
+);
 
 export const SmartDependenciesSection = ({ randomProject, previewProjects }: { randomProject?: Project; previewProjects?: Project[] }) => {
     return (

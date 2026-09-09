@@ -470,8 +470,10 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
         }
         setLoadingProjectVersions(true);
         try {
-            const fullProject = project.versions ? project : await projectClient.getProject(project.id);
-            setSelectedProject({ ...fullProject, versions: fullProject.versions || [] });
+            const versions = project.versions?.length
+                ? project.versions
+                : await projectClient.getProjectVersions(project.id);
+            setSelectedProject({ ...project, versions });
         } catch {
             setSelectedProject({ ...project, versions: project.versions || [] });        } finally {
             setLoadingProjectVersions(false);
