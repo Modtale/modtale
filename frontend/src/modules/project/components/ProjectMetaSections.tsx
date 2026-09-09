@@ -32,16 +32,16 @@ const getSourceLabel = (source?: string) => {
 const SupportedVersionGroup = ({ group }: { group: VersionGroup }) => {
     const [isOpen, setIsOpen] = React.useState(false);
     const contentId = React.useId();
-    const rowClass = "flex w-full min-h-11 items-center gap-3 px-3 py-2.5 text-left";
+    const rowClass = "flex w-full min-h-8 items-center gap-2 px-2.5 py-1.5 text-left";
     const contents = (
         <>
             <span className="min-w-0 flex-1 break-all text-xs font-bold text-slate-700 dark:text-slate-300">{group.grouped ? group.label : group.versions[0]}</span>
             <span className="shrink-0 text-[10px] tabular-nums text-slate-500 dark:text-slate-400">
                 {group.versions.length} {group.versions.length === 1 ? 'version' : 'versions'}
             </span>
-            <span className="w-3 shrink-0" aria-hidden="true">
-                {group.grouped && <ChevronRight className={`h-3 w-3 transition-transform motion-reduce:transition-none ${isOpen ? 'rotate-90' : ''}`} />}
-            </span>
+            {group.grouped && <span className="w-3 shrink-0" aria-hidden="true">
+                <ChevronRight className={`h-3 w-3 transition-transform motion-reduce:transition-none ${isOpen ? 'rotate-90' : ''}`} />
+            </span>}
         </>
     );
 

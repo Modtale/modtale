@@ -6627,8 +6627,8 @@
     -fx-border-width: 1px 0 0 0;
 }
 .project-detail-version-row {
-    -fx-min-height: 44px;
-    -fx-padding: 10px 12px;
+    -fx-min-height: 32px;
+    -fx-padding: 6px 10px;
     -fx-background-color: transparent;
     -fx-border-color: transparent;
     -fx-border-width: 0;
@@ -6643,7 +6643,7 @@
     -fx-border-color: #38bdf8;
     -fx-border-width: 1px;
     -fx-border-radius: 6px;
-    -fx-padding: 9px 11px;
+    -fx-padding: 5px 9px;
 }
 .project-detail-version-name {
     -fx-text-fill: #cbd5e1;

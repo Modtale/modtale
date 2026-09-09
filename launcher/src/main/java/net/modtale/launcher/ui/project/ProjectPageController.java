@@ -1894,10 +1894,11 @@ public final class ProjectPageController {
             indicator.setMinWidth(12);
             indicator.setPrefWidth(12);
             indicator.setMaxWidth(12);
-            HBox row = new HBox(12, name, count, indicator);
+            HBox row = new HBox(8, name, count);
             row.setAlignment(Pos.CENTER_LEFT);
             row.setMaxWidth(Double.MAX_VALUE);
             if (group.grouped()) {
+                row.getChildren().add(indicator);
                 Node arrow = LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_RIGHT, 12);
                 indicator.getChildren().add(arrow);
                 VBox children = new VBox(8);
@@ -1915,7 +1916,7 @@ public final class ProjectPageController {
                 toggle.getStyleClass().add("project-detail-version-row");
                 toggle.setMaxWidth(Double.MAX_VALUE);
                 toggle.setGraphic(row);
-                row.prefWidthProperty().bind(toggle.widthProperty().subtract(24));
+                row.prefWidthProperty().bind(toggle.widthProperty().subtract(20));
                 toggle.setAccessibleText("Expand " + group.label() + " versions");
                 toggle.selectedProperty().addListener((observable, previous, expanded) -> {
                     children.setVisible(expanded);
