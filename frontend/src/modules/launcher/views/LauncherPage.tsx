@@ -182,7 +182,6 @@ export const LauncherPage: React.FC = () => {
             shell.style.setProperty('--hero-travel', `${distance}px`);
             const offset = Math.max(0, Math.min(distance, 96 - shell.getBoundingClientRect().top));
             shell.style.setProperty('--hero-scroll', `${offset}px`);
-            shell.style.setProperty('--hero-copy-opacity', `${Math.max(0, 1 - offset / 160)}`);
         };
         const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };
         update();
