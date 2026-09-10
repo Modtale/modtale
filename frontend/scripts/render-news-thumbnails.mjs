@@ -24,7 +24,7 @@ for(const kind of ['modpacks','launcher']){
   }
   body+=`<rect width="570" height="630" fill="url(#fade)"/><image x="58" y="68" width="405" height="61" href="${logo}"/><text x="56" y="326" font-family="Inter" font-weight="900" font-size="84" letter-spacing="-4" fill="#f8fafc">Modpacks</text><text x="55" y="440" font-family="Inter" font-weight="900" font-size="115" letter-spacing="-4" fill="#79a8ff">v2</text>`;
  }else{
-  const screen=await data(path.join(out,'world-library.jpg'),'image/jpeg');
+  const screen=await data(path.join(out,'launcher-play.jpg'),'image/jpeg');
   body+=`<rect x="567" y="170" width="652" height="413" rx="18" fill="#040916"/><rect x="558" y="156" width="652" height="413" rx="18" fill="#15233b" stroke="url(#edge)" stroke-width="3"/><clipPath id="appscreen"><rect x="564" y="162" width="640" height="400" rx="12"/></clipPath><image x="564" y="162" width="640" height="400" href="${screen}" clip-path="url(#appscreen)"/><image x="58" y="68" width="405" height="61" href="${logo}"/><text x="56" y="334" font-family="Inter" font-weight="900" font-size="88" letter-spacing="-4" fill="#f8fafc">Launcher</text><text x="60" y="393" font-family="Inter" font-weight="700" font-size="27" fill="#9ec4ff">Hytale, made yours.</text>`;
  }
  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1260" viewBox="0 0 1200 630">${body}</svg>`;

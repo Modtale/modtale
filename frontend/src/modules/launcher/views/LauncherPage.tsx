@@ -6,6 +6,7 @@ import { ROUTE_SEO } from '@/data/seo-constants';
 import { SiteRoutes } from '@/utils/routes';
 import { LauncherDemo, type LauncherDemoClip } from '../components/LauncherDemo';
 import '../styles/launcher-product.css';
+import mediaVersions from '@/data/newsMediaVersions.json';
 import { fetchLauncherRelease, launcherChannelForHostname, launcherReleasesUrl, type GitHubRelease, type GitHubReleaseAsset } from '../utils/launcherReleases';
 
 type LauncherPlatform = 'windows' | 'mac' | 'linux' | 'unknown';
@@ -149,6 +150,13 @@ const demos: Array<{ clip: LauncherDemoClip; title: string; accent: string; desc
         alt: 'Opening a mod’s configuration in the launcher and editing its settings',
     },
     {
+        clip: 'mod-updates',
+        title: 'Keep your favorites',
+        accent: 'up to date.',
+        description: 'Find available updates, install the latest release, and keep playing with your worlds ready.',
+        alt: 'Updating Hexcode from its update-ready prompt and confirming the new version is enabled in the library',
+    },
+    {
         clip: 'account-sync',
         title: 'Your setup.',
         accent: 'Ready to follow.',
@@ -272,7 +280,7 @@ export const LauncherPage: React.FC = () => {
                     </div>
                 </div>
                 <figure className="launcher-product-cover">
-                    <img src="/assets/news/launcher-play.jpg" alt="The Modtale Launcher Play tab with community projects, friends, and Hytale news" width="2560" height="1600" fetchPriority="high" />
+                    <img src={`/assets/news/launcher-play.jpg?v=${mediaVersions['launcher-play']}`} alt="The Modtale Launcher Play tab with community projects, friends, and Hytale news" width="2560" height="1600" fetchPriority="high" />
                 </figure>
             </header>
             </div>
