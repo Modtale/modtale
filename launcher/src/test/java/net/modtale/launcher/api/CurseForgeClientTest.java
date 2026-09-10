@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class CurseForgeClientTest {
     HttpServer server;
     CurseForgeClient client;
-    List<String> requests = new ArrayList<>();
+    List<String> requests = new java.util.concurrent.CopyOnWriteArrayList<>();
     boolean paginatedSearch;
     String file = """
         {"id":123,"modId":42,"gameId":70216,"isAvailable":true,"fileName":"example.jar",
@@ -29,6 +29,7 @@ class CurseForgeClientTest {
                     "pagination":{"totalCount":125}}
                     """;
                 case "/mods/42/files/123" -> "{\"data\":" + file + "}";
+                case "/mods/42/files/123/changelog" -> "{\"data\":\"<p>Fixed crafting.</p>\"}";
                 case "/mods/42" -> """
                     {"data":{"id":42,"gameId":70216,"isAvailable":true,"name":"Example","authors":[{"name":"Creator"}],
                     "links":{"websiteUrl":"https://www.curseforge.com/hytale/mods/example"},
@@ -87,6 +88,16 @@ class CurseForgeClientTest {
         assertEquals("example.jar", result.fileName());
         assertEquals("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", result.hashes().get("sha1"));
         assertTrue(result.downloadUrl().startsWith("https://edge.forgecdn.net/"));
+    }
+    @Test void loadsActualFileChangelogsAndPreservesReleaseNames() {
+        var version = new net.modtale.launcher.model.project.ProjectVersion("123", "Example-1.2.jar",
+                List.of("0.6.0"), null, 1, null, null, List.of(), "RELEASE");
+        var notes = client.changelogs(42, List.of(version));
+        assertEquals(1, notes.size());
+        assertEquals("123", notes.getFirst().id());
+        assertEquals("Example-1.2.jar", notes.getFirst().versionNumber());
+        assertEquals("<p>Fixed crafting.</p>", notes.getFirst().changelog());
+        assertTrue(requests.contains("/mods/42/files/123/changelog"));
     }
     @Test void largePagesBatchWithoutGapsAndKeepSelectedPageSize() {
         paginatedSearch = true;

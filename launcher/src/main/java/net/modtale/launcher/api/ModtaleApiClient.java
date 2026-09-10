@@ -355,7 +355,8 @@ public class ModtaleApiClient {
     }
 
     public List<ProjectVersionChangelog> getProjectVersionChangelogs(String idOrSlug) {
-        if (curseForgeId(idOrSlug) != null) return List.of();
+        Long curseForgeId = curseForgeId(idOrSlug);
+        if (curseForgeId != null) return curseForgeClient.changelogs(curseForgeId, getCurseForgeProject(curseForgeId).versions());
         return get("/projects/" + encodePath(idOrSlug) + "/versions/changelogs", new TypeReference<>() {});
     }
 

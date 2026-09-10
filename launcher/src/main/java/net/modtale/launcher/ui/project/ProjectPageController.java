@@ -2868,11 +2868,17 @@ public final class ProjectPageController {
         HBox.setHgrow(meta, Priority.ALWAYS);
         HBox versionLine = new HBox(10);
         versionLine.setAlignment(Pos.CENTER_LEFT);
-        Label version = new Label("v" + value(entry.versionNumber(), "Unknown"));
+        Label version = new Label((isCurseForge(currentProject, currentDetail) ? "" : "v")
+                + value(entry.versionNumber(), "Unknown"));
+        version.setMinWidth(0);
+        version.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(version, Priority.ALWAYS);
         version.getStyleClass().add("project-changelog-version");
         versionLine.getChildren().add(version);
         if (!isRelease(entry.channel())) {
-            versionLine.getChildren().add(channelBadge(entry.channel()));
+            Label badge = channelBadge(entry.channel());
+            badge.setMinWidth(Region.USE_PREF_SIZE);
+            versionLine.getChildren().add(badge);
         }
         meta.getChildren().add(versionLine);
 
@@ -2893,6 +2899,7 @@ public final class ProjectPageController {
         }
 
         Button download = secondaryButton("Download");
+        download.setMinWidth(Region.USE_PREF_SIZE);
         download.getStyleClass().add("project-changelog-download");
         download.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 15));
         download.setOnAction(event -> {
@@ -2961,7 +2968,8 @@ public final class ProjectPageController {
         boolean isExpanded = expandedChangelogIds.contains(entry.stableId());
         VBox body = new VBox(0);
         body.getStyleClass().add("project-changelog-markdown-wrap");
-        Node markdown = markdownRenderer.render(changelog);
+        Node markdown = isCurseForge(currentProject, currentDetail)
+                ? markdownRenderer.renderCurseForgeDescription(changelog) : markdownRenderer.render(changelog);
         if (isLong && !isExpanded) {
             StackPane clamp = new StackPane(markdown);
             clamp.getStyleClass().add("project-changelog-markdown-clamp");

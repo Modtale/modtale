@@ -128,6 +128,30 @@ final class CurseForgeClient {
         return new DownloadUrlResponse(url, 0, file.path("fileName").asText(), file.path("fileLength").asLong(), hashes, "CURSEFORGE");
     }
 
+    List<ProjectVersionChangelog> changelogs(long projectId, List<ProjectVersion> versions) {
+        positive(projectId);
+        try (var workers = java.util.concurrent.Executors.newFixedThreadPool(4)) {
+            var pending = versions.stream().map(version -> workers.submit(() -> {
+                long fileId = Long.parseLong(version.id());
+                positive(fileId);
+                String notes = get("mods/" + projectId + "/files/" + fileId + "/changelog", Duration.ofHours(1)).asText("");
+                return new ProjectVersionChangelog(version.id(), version.versionNumber(), notes);
+            })).toList();
+            List<ProjectVersionChangelog> result = new ArrayList<>();
+            for (var request : pending) {
+                try {
+                    result.add(request.get());
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new ModtaleApiException("Loading CurseForge changelogs was interrupted.");
+                } catch (java.util.concurrent.ExecutionException e) {
+                    throw new ModtaleApiException("Could not load CurseForge release notes. Please try again.");
+                }
+            }
+            return List.copyOf(result);
+        }
+    }
+
     private JsonNode metadata(long id) {
         positive(id);
         JsonNode p = get("mods/" + id, Duration.ofMinutes(30));
