@@ -112,7 +112,6 @@ public final class ProjectBrowseController {
     private final Map<ProjectBrowseSort, Node> sortOptionChecks = new LinkedHashMap<>();
     private final List<Runnable> controlStateListeners = new ArrayList<>();
 
-    private Button tagToggleButton;
     private Button filterToggleButton;
     private Button sortButton;
     private Label sortButtonLabel;
@@ -172,7 +171,7 @@ public final class ProjectBrowseController {
         this.filterOptions = new ProjectBrowseFilterOptions(
                 this::searchProjects,
                 this::refreshBrowseControls,
-                tags::clear
+                tags
         );
         this.downloadTimeframes = new ProjectBrowseDownloadTimeframeSelector(
                 filterOptions::selectDateRange,
@@ -265,7 +264,6 @@ public final class ProjectBrowseController {
             searchField.clear();
             sortCombo.setValue(ProjectBrowseSort.defaultSort());
             filterOptions.reset(false);
-            tags.popover().setVisible(false);
             filterOptions.popover().setVisible(false);
         });
         searchDebounce.stop();
@@ -385,14 +383,12 @@ public final class ProjectBrowseController {
         controlRow.getStyleClass().add("browse-control-group");
         controlRow.setAlignment(Pos.CENTER_RIGHT);
         controlRow.setMinWidth(Region.USE_PREF_SIZE);
-        tagToggleButton = popoverToggle("Tags", LauncherIcons.Glyph.TAG, tags.popover());
         filterToggleButton = popoverToggle("Filters", LauncherIcons.Glyph.FILTER, filterOptions.popover());
         sortButton = sortControl();
         controlRow.getChildren().addAll(
                 sourceSelector.view(),
                 pageSizeCombo,
                 viewStyles.view(),
-                tagToggleButton,
                 filterToggleButton,
                 downloadTimeframes.view(),
                 sortButton
@@ -422,7 +418,7 @@ public final class ProjectBrowseController {
         content.getChildren().addAll(filters, projectResults, paginationNav);
 
         configureSortDropdown();
-        StackPane root = new StackPane(content, tags.popover(), filterOptions.popover(), sortDropdown);
+        StackPane root = new StackPane(content, filterOptions.popover(), sortDropdown);
         browseRoot = root;
         root.setUserData(LauncherView.DISCOVER);
         root.getStyleClass().addAll("view", "browse-view");
@@ -476,7 +472,6 @@ public final class ProjectBrowseController {
             }
         });
         pageSizeCombo.setOnAction(event -> {
-            tags.popover().setVisible(false);
             filterOptions.popover().setVisible(false);
             hideSortDropdown();
             searchProjects();
@@ -630,7 +625,6 @@ public final class ProjectBrowseController {
             hideSortDropdown();
             return;
         }
-        tags.popover().setVisible(false);
         filterOptions.popover().setVisible(false);
         sortDropdown.setVisible(true);
         sortDropdown.toFront();
@@ -674,7 +668,6 @@ public final class ProjectBrowseController {
         button.setMinWidth(width);
         button.setOnAction(event -> {
             boolean nextVisible = !popover.isVisible();
-            tags.popover().setVisible(false);
             filterOptions.popover().setVisible(false);
             hideSortDropdown();
             popover.setVisible(nextVisible);
@@ -712,22 +705,20 @@ public final class ProjectBrowseController {
         double maxX = Math.max(8, browseRoot.getWidth() - width - 8);
         double x = rightAligned ? anchorMax.getX() - width : anchorMin.getX();
         double y = anchorMax.getY() + 8;
+        if (popover == filterOptions.popover()) {
+            popover.setMaxHeight(Math.max(120, browseRoot.getHeight() - y - 8));
+            popover.autosize();
+        }
         popover.relocate(clamp(x, 8, maxX), y);
     }
 
     private void hideFilterDropdownsOnOutsidePress(MouseEvent event) {
-        boolean tagsVisible = tags.popover().isVisible();
         boolean filtersVisible = filterOptions.popover().isVisible();
         boolean sortVisible = sortDropdown.isVisible();
-        if (!tagsVisible && !filtersVisible && !sortVisible) {
+        if (!filtersVisible && !sortVisible) {
             return;
         }
         EventTarget target = event.getTarget();
-        if (tagsVisible
-                && !eventTargetInside(target, tags.popover())
-                && !eventTargetInside(target, tagToggleButton)) {
-            tags.popover().setVisible(false);
-        }
         if (filtersVisible
                 && !eventTargetInside(target, filterOptions.popover())
                 && !eventTargetInside(target, filterToggleButton)) {
@@ -760,10 +751,6 @@ public final class ProjectBrowseController {
     }
 
     private void updateBrowseControlBadges() {
-        if (tagToggleButton != null) {
-            tagToggleButton.setText(tags.isEmpty() ? "Tags" : "Tags " + tags.selectedCount());
-            pseudo(tagToggleButton, "selected", !tags.isEmpty() || tags.popover().isVisible());
-        }
         if (filterToggleButton != null) {
             int count = filterOptions.activeFilterCount();
             filterToggleButton.setText(count == 0 ? "Filters" : "Filters " + count);
@@ -780,11 +767,9 @@ public final class ProjectBrowseController {
         updateBrowseControlBadges();
         refreshSortDropdown();
         if (categoryPills != null) setVisibleManaged(categoryPills, true);
-        if (tagToggleButton != null) setVisibleManaged(tagToggleButton, !curseForge);
         if (filterToggleButton != null) setVisibleManaged(filterToggleButton, !curseForge);
         if (sortButton != null) setVisibleManaged(sortButton, !curseForge);
         if (curseForge) {
-            tags.popover().setVisible(false);
             filterOptions.popover().setVisible(false);
         }
     }
