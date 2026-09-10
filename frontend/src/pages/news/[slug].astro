@@ -8,9 +8,11 @@ import {
     getNewsPostBySlug,
     getNewsPostUrl,
 } from '../../data/news';
-import { BACKEND_URL } from '@/utils/api';
 
 const { slug } = Astro.params;
+if (slug === 'fresh-feature-showcase' || slug === 'launcher-and-modpacks') {
+    return Astro.redirect('/news', 301);
+}
 const post = getNewsPostBySlug(slug);
 
 if (!post) {
@@ -20,23 +22,8 @@ if (!post) {
 const path = Astro.url.pathname;
 const canonicalUrl = getNewsPostUrl(post);
 
-const fetchNewsProjects = async () => {
-    try {
-        const response = await fetch(`${BACKEND_URL}/api/v1/projects?size=10&sort=trending&view=marquee`, {
-            headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=86400' },
-            signal: AbortSignal.timeout(1500),
-        });
-        if (!response.ok) return [];
-        const data = await response.json();
-        return Array.isArray(data?.content) ? data.content : [];
-    } catch {
-        return [];
-    }
-};
+const initialData = {};
 
-const initialData = {
-    newsProjects: await fetchNewsProjects(),
-};
 
 const articleSchema = {
     '@context': 'https://schema.org',
@@ -73,8 +60,8 @@ const articleSchema = {
     keywords={post.tags.join(', ')}
     image={getAbsoluteUrl(post.socialImage)}
     imageAlt={post.socialImageAlt}
-    imageWidth="1200"
-    imageHeight="630"
+    imageWidth="2400"
+    imageHeight="1260"
     imageType="image/png"
     ogType="article"
     publishedTime={post.publishedAt}

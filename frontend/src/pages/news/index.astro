@@ -8,7 +8,6 @@ import {
     getAbsoluteUrl,
     getNewsPostUrl,
 } from '../../data/news';
-import { BACKEND_URL } from '@/utils/api';
 
 const [featuredPost] = NEWS_POSTS;
 const title = 'Modtale News | Product Updates and Creator Notes';
@@ -16,23 +15,8 @@ const description = 'Read Modtale product updates, creator notes, feature tours,
 const image = getAbsoluteUrl(featuredPost.socialImage);
 const path = Astro.url.pathname;
 
-const fetchNewsProjects = async () => {
-    try {
-        const response = await fetch(`${BACKEND_URL}/api/v1/projects?size=10&sort=trending&view=marquee`, {
-            headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=86400' },
-            signal: AbortSignal.timeout(1500),
-        });
-        if (!response.ok) return [];
-        const data = await response.json();
-        return Array.isArray(data?.content) ? data.content : [];
-    } catch {
-        return [];
-    }
-};
+const initialData = {};
 
-const initialData = {
-    newsProjects: await fetchNewsProjects(),
-};
 
 const jsonLd = [
     {
@@ -68,8 +52,8 @@ const jsonLd = [
     description={description}
     image={image}
     imageAlt="Modtale news feature preview"
-    imageWidth="1200"
-    imageHeight="630"
+    imageWidth="2400"
+    imageHeight="1260"
     imageType="image/png"
     jsonLd={jsonLd}
     canonicalOverride={getAbsoluteUrl(NEWS_INDEX_PATH)}

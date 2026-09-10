@@ -1,3 +1,5 @@
+import mediaVersions from './newsMediaVersions.json';
+
 export interface NewsPost {
     slug: string;
     title: string;
@@ -20,38 +22,60 @@ export const NEWS_RSS_PATH = '/rss.xml';
 
 export const NEWS_POSTS: NewsPost[] = [
     {
-        slug: 'fresh-feature-showcase',
-        title: 'Freshly Added: A Visual Tour of Modtale Features',
-        description: 'See the newest-feeling Modtale workflows in motion: discovery, project pages, creator tools, API docs, embeds, and RSS.',
-        excerpt: 'A visual update tour of the real Modtale features that help players discover projects and help creators publish, explain, and share their work.',
-        publishedAt: '2026-06-16T12:00:00-04:00',
-        updatedAt: '2026-06-16T12:00:00-04:00',
+        slug: 'modtale-launcher',
+        title: 'Meet the Modtale Launcher',
+        description:
+            'A native home for your Hytale projects, worlds, and next adventure.',
+        excerpt:
+            'Discover real projects, give each world its own mod selection, and make room for a little more you. Modtale comes to your desktop.',
+        publishedAt: '2026-09-07T12:00:00-04:00',
+        updatedAt: '2026-09-07T12:00:00-04:00',
         author: 'Modtale Team',
-        tags: ['Product Update', 'Hytale Mods', 'Creator Tools', 'RSS'],
-        readingTime: '5 min read',
-        heroImage: '/assets/news/fresh-feature-showcase-hero.svg',
-        heroAlt: 'Modtale feature showcase with branded project cards, creator analytics, and RSS previews.',
-        socialImage: '/assets/news/fresh-feature-showcase-og.png',
-        socialImageAlt: 'Modtale feature showcase social preview.',
+        tags: ['Product Update', 'Launcher', 'Hytale'],
+        readingTime: '7 min read',
+        heroImage: `/assets/news/launcher-thumbnail.png?v=${mediaVersions['launcher-thumbnail']}`,
+        heroAlt:
+            'Modtale Launcher showing its Play page, on a blue background.',
+        socialImage: `/assets/news/launcher-thumbnail.png?v=${mediaVersions['launcher-thumbnail']}`,
+        socialImageAlt:
+            'Modtale Launcher showing its Play page, on a blue background.',
+    },
+    {
+        slug: 'modpacks-v2',
+        title: 'Modpacks v2: from your world to theirs',
+        description:
+            'Build and share Hytale modpacks with chosen versions, per-mod configs, and projects from Modtale and CurseForge.',
+        excerpt:
+            'Build packs on the website, attach configs to individual mods, include CurseForge projects, and turn a shared setup into a release.',
+        publishedAt: '2026-09-07T11:00:00-04:00',
+        updatedAt: '2026-09-08T20:30:00-04:00',
+        author: 'Modtale Team',
+        tags: ['Product Update', 'Modpacks', 'Hytale'],
+        readingTime: '7 min read',
+        heroImage: `/assets/news/modpacks-thumbnail.png?v=${mediaVersions['modpacks-thumbnail']}`,
+        heroAlt:
+            'Modtale Modpacks v2 beside a field of blue hexagons filled with real mod icons, including LevelingCore, Ev0s Smokable Herbs, and Hexcode.',
+        socialImage: `/assets/news/modpacks-thumbnail.png?v=${mediaVersions['modpacks-thumbnail']}`,
+        socialImageAlt:
+            'Modtale Modpacks v2 beside a field of blue hexagons filled with real mod icons, including LevelingCore, Ev0s Smokable Herbs, and Hexcode.',
     },
 ];
 
-export const getNewsPostPath = (post: NewsPost) => `${NEWS_INDEX_PATH}/${post.slug}`;
+export const getNewsPostPath = (post: NewsPost) =>
+    `${NEWS_INDEX_PATH}/${post.slug}`;
 
 export const getAbsoluteUrl = (path: string) => {
     if (path.startsWith('http')) return path;
     return `${SITE_URL}${path.startsWith('/') ? path : `/${path}`}`;
 };
 
-export const getNewsPostUrl = (post: NewsPost) => getAbsoluteUrl(getNewsPostPath(post));
+export const getNewsPostUrl = (post: NewsPost) =>
+    getAbsoluteUrl(getNewsPostPath(post));
 
-export const getNewsPostBySlug = (slug: string | undefined) => (
-    NEWS_POSTS.find((post) => post.slug === slug)
-);
+export const getNewsPostBySlug = (slug: string | undefined) =>
+    NEWS_POSTS.find((post) => post.slug === slug);
 
-export const getLatestNewsPostDate = () => (
-    NEWS_POSTS
-        .map((post) => new Date(post.updatedAt).getTime())
+export const getLatestNewsPostDate = () =>
+    NEWS_POSTS.map((post) => new Date(post.updatedAt).getTime())
         .filter((timestamp) => Number.isFinite(timestamp))
-        .sort((a, b) => b - a)[0]
-);
+        .sort((a, b) => b - a)[0];

@@ -257,8 +257,8 @@
 /* Scroll reveals the full Play tab before handing off to the walkthroughs. */
 @media (prefers-reduced-motion: no-preference) {
     .launcher-product { overflow: clip; }
-    .launcher-hero-scroll { --hero-scroll: 0px; height: calc(100svh - 6rem + var(--hero-travel, 0px)); }
+    .launcher-hero-scroll { --hero-scroll: 0px; --hero-copy-opacity: 1; height: calc(100svh - 6rem + var(--hero-travel, 0px)); }
     .launcher-hero-scroll .launcher-product-hero { position: sticky; top: 6rem; }
     .launcher-hero-scroll .launcher-product-cover { transform: translateY(calc(-1 * var(--hero-scroll))); will-change: transform; position: relative; z-index: 1; }
-    .launcher-hero-scroll .launcher-hero-copy { transform: translateY(calc(-.25 * var(--hero-scroll))); }
+    .launcher-hero-scroll .launcher-hero-copy { opacity: var(--hero-copy-opacity); transform: translateY(calc(-.25 * var(--hero-scroll))); }
 }

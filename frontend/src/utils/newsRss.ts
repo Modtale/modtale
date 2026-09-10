@@ -36,7 +36,7 @@ export const buildNewsRssXml = (siteUrl = SITE_URL) => {
 
         const encodedContent = `
 <figure>
-  <img src="${escapeXml(imageUrl)}" alt="${escapeXml(post.socialImageAlt)}" width="1200" height="630" />
+  <img src="${escapeXml(imageUrl)}" alt="${escapeXml(post.socialImageAlt)}" width="2400" height="1260" />
 </figure>
 <p>${escapeXml(post.excerpt)}</p>
 <p><a href="${escapeXml(postUrl)}">Read the full post on Modtale</a></p>`.trim();
@@ -49,7 +49,7 @@ export const buildNewsRssXml = (siteUrl = SITE_URL) => {
       <pubDate>${new Date(post.publishedAt).toUTCString()}</pubDate>
       <dc:creator>${escapeXml(post.author)}</dc:creator>
 ${categories}
-      <media:content url="${escapeXml(imageUrl)}" medium="image" width="1200" height="630" />
+      <media:content url="${escapeXml(imageUrl)}" medium="image" width="2400" height="1260" />
       <content:encoded>${cdata(encodedContent)}</content:encoded>
     </item>`;
     }).join('\n');
