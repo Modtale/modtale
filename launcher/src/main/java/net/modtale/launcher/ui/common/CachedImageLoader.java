@@ -96,6 +96,20 @@ public final class CachedImageLoader {
         });
     }
 
+    public static void showFallbackUntilLoaded(javafx.scene.Node fallback, ImageView foreground) {
+        foreground.imageProperty().addListener((observable, previous, image) -> bindFallback(fallback, image));
+        bindFallback(fallback, foreground.getImage());
+    }
+
+    private static void bindFallback(javafx.scene.Node fallback, Image image) {
+        fallback.visibleProperty().unbind();
+        if (image == null) {
+            fallback.setVisible(true);
+        } else {
+            fallback.visibleProperty().bind(image.progressProperty().lessThan(1).or(image.errorProperty()));
+        }
+    }
+
     public void clearMemory() {
         memoryImages.clear();
         downloads.clear();

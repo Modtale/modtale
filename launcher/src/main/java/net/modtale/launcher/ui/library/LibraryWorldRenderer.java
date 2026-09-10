@@ -42,7 +42,7 @@ import net.modtale.launcher.ui.common.LauncherIcons;
 
 final class LibraryWorldRenderer {
 
-    private static final double PROJECT_ICON_SIZE = 64;
+    private static final double PROJECT_ICON_SIZE = 80;
     private static final double CONTENT_ICON_SIZE = 34;
     private static final PseudoClass CONTENTS_HOVERED = PseudoClass.getPseudoClass("contents-hovered");
 
@@ -108,13 +108,14 @@ final class LibraryWorldRenderer {
         VBox section = new VBox(12);
         section.getStyleClass().addAll("library-detail-hero", "library-world-detail-hero");
 
-        HBox row = new HBox(12);
+        HBox row = new HBox(16);
+        row.setAlignment(Pos.CENTER_LEFT);
         row.getStyleClass().add("library-detail-heading");
         StackPane icon = imageIcon(
                 model.world().previewImage(),
                 model.world().name(),
                 LauncherIcons.Glyph.GLOBE,
-                44,
+                56,
                 "library-detail-icon",
                 false
         );
@@ -124,6 +125,7 @@ final class LibraryWorldRenderer {
         copy.setAlignment(Pos.CENTER_LEFT);
         Label title = new Label(model.world().name());
         title.getStyleClass().addAll("library-detail-title", "library-world-detail-title");
+        title.setTooltip(new Tooltip(model.world().name()));
         title.setMaxWidth(Double.MAX_VALUE);
         copy.setMinWidth(0);
         Label summary = new Label(model.enabledProjectCount() + " of " + model.totalProjectCount() + " projects enabled");
@@ -149,9 +151,6 @@ final class LibraryWorldRenderer {
         updates.setAccessibleText("Check for updates");
         updates.setTooltip(new Tooltip("Check for updates"));
         updates.setOnAction(event -> checkUpdates.run());
-        Region actionDivider = new Region();
-        actionDivider.getStyleClass().add("library-action-divider");
-        actionDivider.setMouseTransparent(true);
         Button share = secondaryButton("Share");
         share.getStyleClass().addAll("small", "library-compact-icon-action");
         share.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.SHARE_2, 14));
@@ -165,11 +164,31 @@ final class LibraryWorldRenderer {
         pack.setMinWidth(Region.USE_PREF_SIZE);
         pack.setTooltip(new Tooltip("Start a Modtale modpack from this world's enabled mods"));
         pack.setOnAction(event -> createModpackFromWorld.accept(model.world()));
-        actions.getChildren().addAll(refresh, updates, actionDivider, share, pack);
+        HBox tools = new HBox(2, refresh, updates, share);
+        tools.setAlignment(Pos.CENTER);
+        tools.getStyleClass().add("library-world-tools");
+        tools.setMinHeight(40);
+        tools.setPrefHeight(40);
+        tools.setMaxHeight(40);
+        pack.setMinHeight(40);
+        pack.setPrefHeight(40);
+        pack.setMaxHeight(40);
+        actions.getChildren().addAll(tools, pack);
+        actions.setMinWidth(Region.USE_PREF_SIZE);
 
         row.getChildren().addAll(icon, copy);
         actions.setAlignment(Pos.CENTER_LEFT);
         section.getChildren().addAll(row, actions);
+        section.widthProperty().addListener((observable, previous, width) -> {
+            boolean inline = width.doubleValue() >= 720;
+            if (inline && !row.getChildren().contains(actions)) {
+                section.getChildren().remove(actions);
+                row.getChildren().add(actions);
+            } else if (!inline && row.getChildren().contains(actions)) {
+                row.getChildren().remove(actions);
+                section.getChildren().add(actions);
+            }
+        });
         return section;
     }
 
@@ -205,14 +224,7 @@ final class LibraryWorldRenderer {
 
         StackPane icon = projectIcon(model, PROJECT_ICON_SIZE);
         VBox copy = projectCopy(model);
-        var iconSize = new javafx.beans.property.SimpleDoubleProperty(PROJECT_ICON_SIZE);
-        HBox row = new HBox(12) {
-            @Override
-            protected void layoutChildren() {
-                iconSize.set(Math.max(46, copy.prefHeight(-1)) + 4);
-                super.layoutChildren();
-            }
-        };
+        HBox row = new HBox(12);
         row.getStyleClass().add("library-world-project-main");
         row.setAlignment(Pos.CENTER_LEFT);
 
@@ -230,6 +242,7 @@ final class LibraryWorldRenderer {
             toggle.setOnAction(() -> toggleWorldMods.setEnabled(world, model.modIds(), toggle.isSelected()));
         }
 
+        var iconSize = new javafx.beans.property.SimpleDoubleProperty(PROJECT_ICON_SIZE);
         icon.minWidthProperty().bind(iconSize);
         icon.prefWidthProperty().bind(iconSize);
         icon.maxWidthProperty().bind(iconSize);
@@ -260,6 +273,7 @@ final class LibraryWorldRenderer {
         InstalledProject installed = model.installed();
         LibraryWorldProjectDisplay display = model.display();
         VBox copy = new VBox(5);
+        copy.setAlignment(Pos.CENTER_LEFT);
         Label title = new Label(display.title());
         title.getStyleClass().add("library-world-project-title");
 
@@ -544,16 +558,20 @@ final class LibraryWorldRenderer {
         double mediaSize = Math.max(1, size - borderWidth * 2);
         double clipRadius = (borderWidth == 4 ? 16 : 8) - borderWidth;
 
+        Node fallback;
         if (imageLoader != null && useProjectFallback) {
-            ImageView fallback = new ImageView();
-            fallback.fitWidthProperty().bind(shell.widthProperty().subtract(borderWidth * 2));
-            fallback.fitHeightProperty().bind(shell.heightProperty().subtract(borderWidth * 2));
-            fallback.setPreserveRatio(true);
-            fallback.setSmooth(true);
-            fallback.setClip(roundedClip(shell, clipRadius, borderWidth));
-            imageLoader.loadInto(fallback, null, mediaSize * 3, mediaSize * 3, true);
-            shell.getChildren().add(fallback);
+            ImageView placeholder = new ImageView();
+            placeholder.fitWidthProperty().bind(shell.widthProperty().subtract(borderWidth * 2));
+            placeholder.fitHeightProperty().bind(shell.heightProperty().subtract(borderWidth * 2));
+            placeholder.setPreserveRatio(true);
+            placeholder.setSmooth(true);
+            placeholder.setClip(roundedClip(shell, clipRadius, borderWidth));
+            imageLoader.loadInto(placeholder, null, mediaSize * 3, mediaSize * 3, true);
+            fallback = placeholder;
+        } else {
+            fallback = LauncherIcons.icon(fallbackGlyph, Math.max(15, size * 0.42));
         }
+        shell.getChildren().add(fallback);
 
         if (imageLoader != null && iconUrl != null && !iconUrl.isBlank()) {
             ImageView image = new ImageView();
@@ -568,12 +586,11 @@ final class LibraryWorldRenderer {
             image.setClip(roundedClip(shell, clipRadius, borderWidth));
             double renderScale = fallbackGlyph == LauncherIcons.Glyph.GLOBE ? 6 : 3;
             imageLoader.loadInto(image, iconUrl, mediaSize * renderScale, mediaSize * renderScale, true);
+            CachedImageLoader.showFallbackUntilLoaded(fallback, image);
             shell.getChildren().add(image);
             return shell;
         }
 
-        Node fallback = LauncherIcons.icon(fallbackGlyph, Math.max(15, size * 0.42));
-        shell.getChildren().add(fallback);
         if (fallbackGlyph == LauncherIcons.Glyph.BOX && title != null && !title.isBlank()) {
             shell.setAccessibleText(title.substring(0, 1).toUpperCase(Locale.ROOT));
         }

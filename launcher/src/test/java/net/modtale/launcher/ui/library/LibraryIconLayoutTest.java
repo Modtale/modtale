@@ -22,17 +22,16 @@ class LibraryIconLayoutTest {
     }
 
     @Test
-    void modIconMatchesTextOnFirstLayoutAndAfterRowRefresh() throws Exception {
+    void modIconsStayAtTheSameLargerSizeOnFirstLayoutAndAfterRowRefresh() throws Exception {
         FutureTask<Void> task = new FutureTask<>(() -> {
+            String asset = getClass().getResource(
+                    "/net/modtale/launcher/ui/nativefx/assets/project-placeholder.png").toExternalForm();
             LibraryWorldRenderer renderer = new LibraryWorldRenderer(
-                    null, null, null, null, null, null, null, null, null, null, null, null, null);
+                    new CachedImageLoader(url -> asset, Runnable::run),
+                    null, null, null, null, null, null, null, null, null, null, null, null);
             var installed = new net.modtale.launcher.model.install.InstalledProject(
                     "mod", "mod", "Example mod", "PLUGIN", "1.0", "v1", "2026.09",
                     null, null, null, null, null);
-            var display = new LibraryWorldProjectDisplay("Example mod", "Example author", "PLUGIN",
-                    "", "1.0", "", false, false, false);
-            var model = new LibraryWorldProjectModel(installed, null, null, null, false,
-                    java.util.List.of(), 0, 0, java.util.List.of(), display);
             var method = LibraryWorldRenderer.class.getDeclaredMethod("projectRow",
                     net.modtale.launcher.hytale.HytaleWorldManager.HytaleWorld.class,
                     LibraryWorldProjectModel.class, java.util.List.class);
@@ -42,6 +41,11 @@ class LibraryIconLayoutTest {
             scene.getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
             root.resize(900, 160);
             for (int refresh = 0; refresh < 3; refresh++) {
+                var display = new LibraryWorldProjectDisplay("Example mod",
+                        refresh == 0 ? "" : "Example author", "PLUGIN",
+                        refresh == 0 ? "" : asset, "1.0", "", false, false, false);
+                var model = new LibraryWorldProjectModel(installed, null, null, null, false,
+                        java.util.List.of(), 0, 0, java.util.List.of(), display);
                 var row = (javafx.scene.Node) method.invoke(renderer, null, model, java.util.List.of());
                 root.getChildren().setAll(row);
                 root.applyCss();
@@ -51,16 +55,69 @@ class LibraryIconLayoutTest {
                     root.applyCss();
                     root.layout();
                     var icon = (StackPane) row.lookup(".library-project-icon");
-                    var copy = (javafx.scene.layout.VBox) row.lookup(".library-world-project-title").getParent();
-                    assertEquals(Math.max(46, copy.prefHeight(-1)), icon.getWidth(), 1,
+                    assertEquals(80, icon.getWidth(), 0.01,
                             "Icon must start at its final size: refresh=" + refresh + ", pulse=" + pulse);
                     assertEquals(icon.getWidth(), icon.getHeight(), 0.01);
+                    for (var child : icon.getChildren()) {
+                        ImageView image = (ImageView) child;
+                        assertEquals(72, image.getFitWidth(), 0.01);
+                        assertEquals(72, image.getFitHeight(), 0.01);
+                        org.junit.jupiter.api.Assertions.assertTrue(image.isPreserveRatio());
+                    }
                 }
             }
             return null;
         });
         Platform.runLater(task);
         task.get(30, TimeUnit.SECONDS);
+    }
+
+    @Test
+    void loadedTransparentProjectIconsRenderWithoutPlaceholderOrBackground() throws Exception {
+        var file = java.nio.file.Files.createTempFile("transparent-project-icon-", ".png");
+        try {
+            var source = new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            source.setRGB(1, 1, 0xffff0000);
+            javax.imageio.ImageIO.write(source, "png", file.toFile());
+            FutureTask<Void> task = new FutureTask<>(() -> {
+                String asset = file.toUri().toString();
+                String placeholder = getClass().getResource(
+                        "/net/modtale/launcher/ui/nativefx/assets/project-placeholder.png").toExternalForm();
+                java.util.function.Function<String, String> resolver = url -> url == null ? placeholder : url;
+                var renderer = new LibraryWorldRenderer(new CachedImageLoader(resolver, Runnable::run),
+                        null, null, null, null, null, null, null, null, null, null, null, null);
+                var method = LibraryWorldRenderer.class.getDeclaredMethod("imageIcon", String.class,
+                        String.class, LauncherIcons.Glyph.class, double.class, String.class, boolean.class);
+                method.setAccessible(true);
+                var library = (StackPane) method.invoke(renderer, asset, "Transparent",
+                        LauncherIcons.Glyph.BOX, 80.0, "library-project-icon", true);
+                var project = new net.modtale.launcher.model.project.ProjectSummary(
+                        "id", "slug", "Transparent", "", "", "", asset, "", "PLUGIN", 0, 0, "", java.util.List.of());
+                var browse = new net.modtale.launcher.ui.browse.card.ProjectCardMedia(resolver, Runnable::run)
+                        .projectIcon(project, 80, 4);
+                for (StackPane icon : new StackPane[] {library, browse}) {
+                    StackPane root = new StackPane(icon);
+                    Scene scene = new Scene(root, 100, 100);
+                    scene.getStylesheets().add(getClass().getResource(
+                            "/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
+                    root.resize(100, 100);
+                    root.applyCss();
+                    root.layout();
+                    icon.setEffect(null);
+                    var parameters = new javafx.scene.SnapshotParameters();
+                    parameters.setFill(javafx.scene.paint.Color.TRANSPARENT);
+                    var pixels = icon.snapshot(parameters, null);
+                    assertEquals(0, pixels.getPixelReader().getArgb(
+                            (int) pixels.getWidth() / 2, (int) pixels.getHeight() / 2),
+                            "Transparent source pixels must remain transparent through the styled renderer");
+                }
+                return null;
+            });
+            Platform.runLater(task);
+            task.get(30, TimeUnit.SECONDS);
+        } finally {
+            java.nio.file.Files.deleteIfExists(file);
+        }
     }
 
     @Test

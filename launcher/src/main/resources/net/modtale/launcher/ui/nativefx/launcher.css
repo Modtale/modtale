@@ -7462,12 +7462,6 @@
     -fx-background-color: linear-gradient(to bottom right, #2563eb, #0ea5e9);
 }
 
-.project-icon-backdrop {
-    -fx-background-color: rgba(15, 23, 42, 0.46);
-    -fx-background-radius: 12px;
-    -fx-opacity: 1;
-}
-
 .project-icon-media .label {
     -fx-text-fill: white;
     -fx-font-size: 29px;
@@ -8596,14 +8590,14 @@
     -fx-pref-height: 42px;
     -fx-max-height: 42px;
     -fx-background-radius: 8px;
-    -fx-background-color: rgba(37, 99, 235, 0.13);
+    -fx-background-color: transparent;
     -fx-border-width: 2px;
     -fx-border-radius: 8px;
     -fx-border-color: #1e293b;
 }
 
 .library-mod-icon {
-    -fx-background-color: #0b1220;
+    -fx-background-color: transparent;
     -fx-background-radius: 16px;
     -fx-border-radius: 16px;
     -fx-border-width: 4px;
@@ -8630,12 +8624,12 @@
 }
 
 .library-world-detail-icon {
-    -fx-min-width: 44px;
-    -fx-pref-width: 44px;
-    -fx-max-width: 44px;
-    -fx-min-height: 44px;
-    -fx-pref-height: 44px;
-    -fx-max-height: 44px;
+    -fx-min-width: 56px;
+    -fx-pref-width: 56px;
+    -fx-max-width: 56px;
+    -fx-min-height: 56px;
+    -fx-pref-height: 56px;
+    -fx-max-height: 56px;
     -fx-background-radius: 9px;
     -fx-border-radius: 9px;
     -fx-background-color: rgba(37, 99, 235, 0.16);
@@ -8669,7 +8663,7 @@
 }
 
 .library-world-detail-title {
-    -fx-font-size: 30px;
+    -fx-font-size: 26px;
     -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
@@ -9718,4 +9712,12 @@
 
 .play-news-card:focused {
     -fx-border-color: #93c5fd;
+}
+
+.library-world-tools {
+    -fx-padding: 3px;
+    -fx-background-color: #172133;
+    -fx-background-radius: 10px;
+    -fx-border-radius: 10px;
+    -fx-border-color: rgba(148, 163, 184, 0.12);
 }

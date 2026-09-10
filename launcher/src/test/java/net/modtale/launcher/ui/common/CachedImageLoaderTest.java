@@ -61,6 +61,29 @@ class CachedImageLoaderTest {
         }
     }
 
+    @Test
+    void transparentImageHidesFallbackAndMissingOrFailedImageRestoresIt() {
+        var fallback = new javafx.scene.image.ImageView();
+        var foreground = new javafx.scene.image.ImageView();
+        CachedImageLoader.showFallbackUntilLoaded(fallback, foreground);
+        assertTrue(fallback.isVisible());
+        var transparent = new javafx.scene.image.WritableImage(4, 4);
+        foreground.setImage(transparent);
+        assertFalse(fallback.isVisible());
+        assertEquals(0, foreground.getImage().getPixelReader().getArgb(0, 0));
+        foreground.setImage(new javafx.scene.image.Image(new java.io.ByteArrayInputStream(new byte[] {0})));
+        assertTrue(foreground.getImage().isError());
+        assertTrue(fallback.isVisible());
+        foreground.setImage(transparent);
+        assertFalse(fallback.isVisible());
+        foreground.setImage(null);
+        assertTrue(fallback.isVisible());
+        foreground.setImage(transparent);
+        var cachedFallback = new javafx.scene.image.ImageView();
+        CachedImageLoader.showFallbackUntilLoaded(cachedFallback, foreground);
+        assertFalse(cachedFallback.isVisible());
+    }
+
     private Path fixture(String name, String destination) throws Exception {
         Path path = directory.resolve(destination);
         try (InputStream input = getClass().getResourceAsStream("/images/" + name)) {
