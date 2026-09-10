@@ -2800,6 +2800,7 @@ public final class ProjectPageController {
         header.setAlignment(Pos.CENTER_LEFT);
 
         VBox copy = new VBox(5);
+        copy.setAlignment(Pos.CENTER_LEFT);
         copy.setMinWidth(0);
         HBox titleRow = new HBox(8);
         titleRow.setAlignment(Pos.CENTER_LEFT);
