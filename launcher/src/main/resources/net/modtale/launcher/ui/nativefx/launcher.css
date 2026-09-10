@@ -9721,3 +9721,12 @@
     -fx-border-radius: 10px;
     -fx-border-color: rgba(148, 163, 184, 0.12);
 }
+
+.library-world-list-icon {
+    -fx-min-width: 64px;
+    -fx-pref-width: 64px;
+    -fx-max-width: 64px;
+    -fx-min-height: 64px;
+    -fx-pref-height: 64px;
+    -fx-max-height: 64px;
+}

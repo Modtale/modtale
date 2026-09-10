@@ -19,8 +19,8 @@ import net.modtale.launcher.ui.common.LauncherIcons;
 
 final class LibraryWorldListRenderer {
 
-    private static final double WORLD_ICON_SIZE = 42;
-    private static final double WORLD_ICON_MEDIA_SIZE = WORLD_ICON_SIZE - 4;
+    private static final double WORLD_ICON_SIZE = 64;
+    private static final double WORLD_ICON_MEDIA_SIZE = WORLD_ICON_SIZE - 8;
 
     private final CachedImageLoader imageLoader;
     private final Consumer<HytaleWorld> selectWorld;
@@ -48,6 +48,7 @@ final class LibraryWorldListRenderer {
         StackPane icon = worldIcon(world);
 
         VBox copy = new VBox(4);
+        copy.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
         Label title = new Label(world.name());
         title.getStyleClass().add("library-project-title");
         Label meta = new Label(item.meta());
@@ -68,7 +69,7 @@ final class LibraryWorldListRenderer {
 
     private StackPane worldIcon(HytaleWorld world) {
         StackPane shell = new StackPane();
-        shell.getStyleClass().add("library-project-icon");
+        shell.getStyleClass().addAll("library-project-icon", "library-mod-icon", "library-world-list-icon");
         shell.setMinSize(WORLD_ICON_SIZE, WORLD_ICON_SIZE);
         shell.setPrefSize(WORLD_ICON_SIZE, WORLD_ICON_SIZE);
         shell.setMaxSize(WORLD_ICON_SIZE, WORLD_ICON_SIZE);
@@ -81,11 +82,11 @@ final class LibraryWorldListRenderer {
             LibraryWorldIcon.cropToSquare(image);
             image.setSmooth(true);
             image.setMouseTransparent(true);
-            image.setClip(roundedClip(WORLD_ICON_MEDIA_SIZE, 6));
+            image.setClip(roundedClip(WORLD_ICON_MEDIA_SIZE, 14));
             imageLoader.loadInto(image, preview, WORLD_ICON_MEDIA_SIZE * 6, WORLD_ICON_MEDIA_SIZE * 6, true);
             shell.getChildren().add(image);
         } else {
-            shell.getChildren().add(LauncherIcons.icon(LauncherIcons.Glyph.GLOBE, 18));
+            shell.getChildren().add(LauncherIcons.icon(LauncherIcons.Glyph.GLOBE, 24));
         }
         return shell;
     }
