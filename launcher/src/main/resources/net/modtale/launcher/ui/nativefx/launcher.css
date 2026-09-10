@@ -9839,3 +9839,75 @@
 .root:scrolling .library-world-project-row:hover > .library-world-project-main > .library-world-project-copy > .library-world-project-title {
     -fx-text-fill: #ffffff;
 }
+
+/* Settings shares Library's category/detail layout. */
+.settings-page-title {
+    -fx-font-family: "Inter Black";
+    -fx-font-size: 30px;
+    -fx-text-fill: #f8fafc;
+}
+.settings-navigation { -fx-spacing: 10px; }
+.settings-navigation-title {
+    -fx-font-family: "Inter Bold";
+    -fx-font-size: 14px;
+    -fx-text-fill: #94a3b8;
+    -fx-padding: 0 8px 10px 8px;
+}
+.settings-category {
+    -fx-alignment: center-left;
+    -fx-graphic-text-gap: 14px;
+    -fx-padding: 14px;
+    -fx-background-color: transparent;
+    -fx-background-radius: 18px;
+    -fx-border-color: transparent;
+    -fx-border-radius: 18px;
+    -fx-font-family: "Inter Bold";
+    -fx-font-size: 15px;
+    -fx-text-fill: #cbd5e1;
+    -fx-cursor: hand;
+}
+.settings-category:hover {
+    -fx-background-color: #1e293b;
+    -fx-text-fill: #60a5fa;
+}
+.settings-category:selected {
+    -fx-background-color: rgba(37,99,235,0.20);
+    -fx-border-color: rgba(96,165,250,0.55);
+    -fx-text-fill: #60a5fa;
+}
+.settings-category:focused { -fx-border-color: #93c5fd; }
+.settings-detail { -fx-padding: 28px; -fx-min-height: 480px; }
+.settings-detail .settings-section {
+    -fx-padding: 0;
+    -fx-background-color: transparent;
+    -fx-border-width: 0;
+    -fx-effect: null;
+    -fx-spacing: 28px;
+}
+.settings-detail .settings-section-header {
+    -fx-padding: 0 0 24px 0;
+    -fx-border-color: transparent transparent rgba(255,255,255,0.10) transparent;
+}
+.settings-detail .settings-section-title { -fx-font-size: 24px; }
+.settings-detail .settings-section-header > .settings-icon {
+    -fx-min-width: 60px; -fx-pref-width: 60px; -fx-max-width: 60px;
+    -fx-min-height: 60px; -fx-pref-height: 60px; -fx-max-height: 60px;
+    -fx-background-radius: 18px; -fx-border-radius: 18px;
+}
+.settings-detail .field-label { -fx-font-size: 13px; }
+.settings-detail .input, .settings-detail .select { -fx-min-height: 46px; }
+.settings-detail .toggle-card {
+    -fx-padding: 18px;
+    -fx-background-radius: 16px;
+    -fx-border-radius: 16px;
+}
+.settings-detail .settings-action-card {
+    -fx-padding: 22px;
+    -fx-spacing: 18px;
+    -fx-background-color: #161f30;
+    -fx-background-radius: 20px;
+    -fx-border-radius: 20px;
+}
+.settings-detail .settings-card-title { -fx-font-size: 18px; }
+.settings-detail .toggle-card { -fx-alignment: center-left; }
+.settings-detail .native-check { -fx-wrap-text: true; }

@@ -27,6 +27,29 @@ class LauncherSettingsControllerPersistenceTest {
     }
 
     @Test
+    void categoryNavigationRetainsUnsavedEditsAndAlwaysKeepsOneSelection() throws Exception {
+        onFx(() -> {
+            var controller = new LauncherSettingsController(new SettingsStore(root.resolve("navigation.json")),
+                    new ModtaleApiClient("http://localhost"), () -> null, () -> LauncherView.SETTINGS);
+            javafx.scene.Parent view = (javafx.scene.Parent) controller.view();
+            javafx.scene.Scene scene = new javafx.scene.Scene(view, 1200, 800);
+            scene.getStylesheets().add(getClass().getResource(
+                    "/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
+            view.applyCss();
+            view.layout();
+            var buttons = view.lookupAll(".settings-category").stream()
+                    .map(node -> (javafx.scene.control.ToggleButton) node).toList();
+            assertEquals(4, buttons.size());
+            controller.form().gameVersionField().setText("0.6.0");
+            buttons.forEach(button -> { button.fire(); button.fire(); });
+            assertEquals(1, buttons.stream().filter(javafx.scene.control.ToggleButton::isSelected).count());
+            assertEquals("0.6.0", controller.form().gameVersionField().getText());
+            controller.saveFromFields(false);
+            assertEquals("0.6.0", controller.settings().getGameVersion());
+        });
+    }
+
+    @Test
     void earlySavePreservesExplicitPathsBeforeViewsReloadControls() throws Exception {
         onFx(() -> {
             SettingsStore store = new SettingsStore(root.resolve("settings.json"));
