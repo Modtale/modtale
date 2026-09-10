@@ -60,6 +60,18 @@ class LibraryCardInteractionTest {
                     LibraryWorldProjectModel.class, List.class);
             method.setAccessible(true);
             VBox card = (VBox) method.invoke(renderer, null, model("id", "MODTALE"), List.of());
+            var surface = (javafx.scene.layout.Region) card.lookup(".library-world-project-surface");
+            assertNotNull(surface);
+            assertFalse(surface.isManaged(), "The shadow must not add another content row");
+            assertTrue(surface.isMouseTransparent(), "The shadow must not intercept card actions");
+            assertTrue(surface.isCache());
+            assertFalse(card.isCache(), "Moving content must not invalidate an ancestor bitmap each pulse");
+            for (double width : List.of(900.0, 600.0)) {
+                card.resize(width, 150);
+                card.layout();
+                assertEquals(width, surface.getWidth());
+                assertEquals(150, surface.getHeight());
+            }
             assertNotNull(card.getOnMouseEntered());
             assertNotNull(card.getOnMouseExited());
             click(card.lookup(".library-world-project-title"), MouseButton.PRIMARY);

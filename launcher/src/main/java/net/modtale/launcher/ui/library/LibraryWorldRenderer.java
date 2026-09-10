@@ -235,6 +235,18 @@ final class LibraryWorldRenderer {
     private Node projectRow(HytaleWorld world, LibraryWorldProjectModel model, List<ConfigFile> configs) {
         VBox shell = new VBox(10);
         shell.getStyleClass().add("library-world-project-row");
+        // Keep the expensive shadow separate from the independently moving icon.
+        Region surface = new Region();
+        surface.getStyleClass().add("library-world-project-surface");
+        surface.setManaged(false);
+        surface.setMouseTransparent(true);
+        surface.prefWidthProperty().bind(shell.widthProperty());
+        surface.prefHeightProperty().bind(shell.heightProperty());
+        surface.setCache(true);
+        surface.setCacheHint(javafx.scene.CacheHint.SPEED);
+        shell.widthProperty().addListener((o, before, after) -> surface.resize(shell.getWidth(), shell.getHeight()));
+        shell.heightProperty().addListener((o, before, after) -> surface.resize(shell.getWidth(), shell.getHeight()));
+        shell.getChildren().add(surface);
 
         StackPane icon = projectIcon(model, PROJECT_ICON_SIZE);
         VBox copy = projectCopy(model);
@@ -280,7 +292,7 @@ final class LibraryWorldRenderer {
                     shell.pseudoClassStateChanged(CONTENTS_HOVERED, hovered));
             shell.getChildren().add(contentsCard);
         }
-        ProjectCardInteraction.addHoverAnimation(shell, icon);
+        ProjectCardInteraction.addHoverAnimationWithIndependentContent(shell, icon);
         ProjectSummary target = navigationTarget(model);
         if (target != null) {
             shell.setCursor(Cursor.HAND);
@@ -367,14 +379,7 @@ final class LibraryWorldRenderer {
         if (!display.version().isBlank()) {
             badges.getChildren().add(versionMetadata(display.version(), "Project version", "version"));
         }
-        if (!installed.gameVersion().isBlank()) {
-            if (!display.version().isBlank()) {
-                Label divider = new Label("·");
-                divider.getStyleClass().add("library-version-divider");
-                badges.getChildren().add(divider);
-            }
-            badges.getChildren().add(versionMetadata(installed.gameVersion(), "Game build", "build"));
-        }
+        addCompatibilityMetadata(badges, display.hytaleCompatibility());
         if (model.update() != null) {
             badges.getChildren().add(badge("Update ready", "game"));
         }
@@ -571,7 +576,10 @@ final class LibraryWorldRenderer {
         title.getStyleClass().add("library-child-title");
         Label meta = new Label(item.meta().isBlank() ? "Included in modpack" : item.meta());
         meta.getStyleClass().add("library-child-meta");
-        copy.getChildren().addAll(title, meta);
+        HBox metadata = new HBox(10, meta);
+        metadata.setAlignment(Pos.CENTER_LEFT);
+        addCompatibilityMetadata(metadata, item.hytaleCompatibility());
+        copy.getChildren().addAll(title, metadata);
         HBox.setHgrow(copy, Priority.ALWAYS);
 
         Label status = new Label("Included");
@@ -697,6 +705,19 @@ final class LibraryWorldRenderer {
                 || !installed.bundledProjects().isEmpty()
                 || !installed.dependencyProjectIds().isEmpty()
                 || !installed.externalDependencies().isEmpty();
+    }
+
+    private void addCompatibilityMetadata(HBox row, List<String> requirements) {
+        for (String requirement : requirements) {
+            if (requirement.isBlank()) continue;
+            if (!row.getChildren().isEmpty()) {
+                Label divider = new Label("·");
+                divider.getStyleClass().add("library-version-divider");
+                row.getChildren().add(divider);
+            }
+            row.getChildren().add(versionMetadata(LibraryManifestCompatibility.label(requirement),
+                    "Compatible Hytale versions (manifest)", "build"));
+        }
     }
 
     private Label versionMetadata(String value, String description, String tone) {

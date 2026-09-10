@@ -9800,3 +9800,30 @@
     -fx-pref-height: 64px;
     -fx-max-height: 64px;
 }
+
+/* Library hover: rasterize the static shadow independently of moving content. */
+.library-view .library-world-project-row,
+.library-view .library-world-project-row:hover,
+.library-view .library-world-project-row:contents-hovered,
+.library-view .library-world-project-row:contents-hovered:hover,
+.root:scrolling .library-view .library-world-project-row:hover {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-effect: null;
+}
+.library-world-project-surface {
+    -fx-background-color: #0f172a;
+    -fx-background-radius: 16px;
+    -fx-border-radius: 16px;
+    -fx-border-color: rgba(255, 255, 255, 0.10), transparent;
+    -fx-border-width: 1px, 3px;
+    -fx-border-insets: 0, 0;
+    -fx-effect: dropshadow(one-pass-box, rgba(2, 6, 23, 0.20), 14, 0.10, 0, 5);
+}
+.library-world-project-row:hover > .library-world-project-surface {
+    -fx-border-color: transparent, #3b82f6;
+}
+.library-world-project-row:contents-hovered > .library-world-project-surface,
+.root:scrolling .library-world-project-row:hover > .library-world-project-surface {
+    -fx-border-color: rgba(255, 255, 255, 0.10), transparent;
+}

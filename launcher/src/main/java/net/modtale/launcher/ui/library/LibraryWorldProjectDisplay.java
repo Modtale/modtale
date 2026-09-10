@@ -1,5 +1,6 @@
 package net.modtale.launcher.ui.library;
 
+import java.util.List;
 import net.modtale.launcher.model.install.InstalledProject;
 import net.modtale.launcher.model.project.ProjectMeta;
 
@@ -12,9 +13,21 @@ record LibraryWorldProjectDisplay(
         String metaNote,
         boolean localFile,
         boolean unlockVisible,
-        boolean contentsVisible
+        boolean contentsVisible,
+        List<String> hytaleCompatibility
 ) {
+    LibraryWorldProjectDisplay(String title, String author, String classification, String icon, String version,
+            String metaNote, boolean localFile, boolean unlockVisible, boolean contentsVisible) {
+        this(title, author, classification, icon, version, metaNote, localFile, unlockVisible, contentsVisible, List.of());
+    }
+
+    LibraryWorldProjectDisplay withCompatibility(List<String> requirements) {
+        return new LibraryWorldProjectDisplay(title, author, classification, icon, version, metaNote,
+                localFile, unlockVisible, contentsVisible, requirements);
+    }
+
     LibraryWorldProjectDisplay {
+        hytaleCompatibility = hytaleCompatibility == null ? List.of() : List.copyOf(hytaleCompatibility);
         title = value(title, "Untitled Project");
         author = value(author);
         classification = value(classification, "PLUGIN");

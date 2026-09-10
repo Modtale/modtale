@@ -2215,12 +2215,18 @@ public final class ProjectPageController {
             Label label = new Label(license);
             label.getStyleClass().add("project-detail-simple-value");
             label.setWrapText(true);
+            label.setMaxWidth(Double.MAX_VALUE);
+            label.setAlignment(Pos.CENTER);
+            HBox.setHgrow(label, Priority.ALWAYS);
             HBox value = new HBox(label);
             value.setAlignment(Pos.CENTER_LEFT);
             return section("License", LauncherIcons.Glyph.SCALE, value);
         }
         Button link = new Button(license, LauncherIcons.icon(LauncherIcons.Glyph.EXTERNAL_LINK, 13));
         link.getStyleClass().add("project-detail-simple-link");
+        link.setMaxWidth(Double.MAX_VALUE);
+        link.setAlignment(Pos.CENTER);
+        HBox.setHgrow(link, Priority.ALWAYS);
         link.setOnAction(event -> openUrlInBrowser(url));
         HBox value = new HBox(link);
         value.setAlignment(Pos.CENTER_LEFT);

@@ -67,6 +67,7 @@ import net.modtale.launcher.ui.settings.LauncherSettingsController;
 
 public final class LauncherLibraryController {
 
+    private final LibraryManifestCompatibility manifestCompatibility = new LibraryManifestCompatibility();
     private final ModtaleApiClient apiClient;
     private final ModInstaller installer;
     private final WorldModListInstaller worldModListInstaller;
@@ -668,6 +669,7 @@ public final class LauncherLibraryController {
                 modIds,
                 installed.isModpack() ? contentItems(installed, config) : List.of(),
                 LibraryWorldProjectDisplay.root(installed, projectMetadata.get(installed.projectId()))
+                        .withCompatibility(manifestCompatibility.forProject(installed))
         );
     }
 
@@ -779,8 +781,14 @@ public final class LauncherLibraryController {
                 enabledCount(config, modIds),
                 modIds.size(),
                 true,
-                reference == null ? "" : reference.source()
+                reference == null ? "" : reference.source(),
+                manifestRequirements(mod.file())
         );
+    }
+
+    private List<String> manifestRequirements(Path file) {
+        String requirement = manifestCompatibility.read(file);
+        return requirement.isBlank() ? List.of() : List.of(requirement);
     }
 
     private LibraryWorldContentItem referenceContentItem(InstalledProjectReference reference, HytaleWorldConfig config) {

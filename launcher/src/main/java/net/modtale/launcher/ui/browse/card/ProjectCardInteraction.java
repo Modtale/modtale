@@ -16,6 +16,7 @@ import net.modtale.launcher.model.project.ProjectSummary;
 
 public final class ProjectCardInteraction {
 
+    private static final String INDEPENDENT_CONTENT_PROPERTY = "net.modtale.launcher.independentAnimatedContent";
     private static final String ANIMATION_CACHE_ENABLED_PROPERTY = "net.modtale.launcher.animationCacheEnabled";
     private static final String ANIMATION_CACHE_HINT_PROPERTY = "net.modtale.launcher.animationCacheHint";
     private static final Interpolator HOVER_EASE = Interpolator.SPLINE(0.16, 1.0, 0.30, 1.0);
@@ -35,6 +36,13 @@ public final class ProjectCardInteraction {
     }
 
     public static void addHoverAnimation(Region card, Node floatingIcon) {
+        addHoverAnimation(card, floatingIcon, null);
+    }
+
+    public static void addHoverAnimationWithIndependentContent(Region card, Node floatingIcon) {
+        // A moving child invalidates a cached ancestor on every animation pulse.
+        card.getProperties().put(INDEPENDENT_CONTENT_PROPERTY, true);
+        card.setCache(false);
         addHoverAnimation(card, floatingIcon, null);
     }
 
@@ -182,6 +190,7 @@ public final class ProjectCardInteraction {
     }
 
     private static void prepareAnimationCache(Node node) {
+        if (Boolean.TRUE.equals(node.getProperties().get(INDEPENDENT_CONTENT_PROPERTY))) return;
         if (!node.getProperties().containsKey(ANIMATION_CACHE_ENABLED_PROPERTY)) {
             node.getProperties().put(ANIMATION_CACHE_ENABLED_PROPERTY, node.isCache());
             node.getProperties().put(ANIMATION_CACHE_HINT_PROPERTY, node.getCacheHint());
@@ -191,7 +200,7 @@ public final class ProjectCardInteraction {
     }
 
     private static void cacheAnimatedNode(Node node) {
-        if (node == null) return;
+        if (node == null || Boolean.TRUE.equals(node.getProperties().get(INDEPENDENT_CONTENT_PROPERTY))) return;
         node.setCache(true);
         node.setCacheHint(CacheHint.SPEED);
     }
