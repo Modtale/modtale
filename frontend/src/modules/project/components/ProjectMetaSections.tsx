@@ -39,9 +39,9 @@ const SupportedVersionGroup = ({ group }: { group: VersionGroup }) => {
             <span className="shrink-0 text-[10px] tabular-nums text-slate-500 dark:text-slate-400">
                 {group.versions.length} {group.versions.length === 1 ? 'version' : 'versions'}
             </span>
-            {group.grouped && <span className="w-3 shrink-0" aria-hidden="true">
-                <ChevronRight className={`h-3 w-3 transition-transform motion-reduce:transition-none ${isOpen ? 'rotate-90' : ''}`} />
-            </span>}
+            <span className="w-3 shrink-0" aria-hidden="true">
+                {group.grouped && <ChevronRight className={`h-3 w-3 transition-transform motion-reduce:transition-none ${isOpen ? 'rotate-90' : ''}`} />}
+            </span>
         </>
     );
 

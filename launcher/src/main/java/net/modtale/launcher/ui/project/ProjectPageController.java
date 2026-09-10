@@ -1894,11 +1894,10 @@ public final class ProjectPageController {
             indicator.setMinWidth(12);
             indicator.setPrefWidth(12);
             indicator.setMaxWidth(12);
-            HBox row = new HBox(8, name, count);
+            HBox row = new HBox(8, name, count, indicator);
             row.setAlignment(Pos.CENTER_LEFT);
             row.setMaxWidth(Double.MAX_VALUE);
             if (group.grouped()) {
-                row.getChildren().add(indicator);
                 Node arrow = LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_RIGHT, 12);
                 indicator.getChildren().add(arrow);
                 VBox children = new VBox(8);
@@ -2207,12 +2206,20 @@ public final class ProjectPageController {
     private Node licenseSection(ProjectDetail detail) {
         String license = textLicense(detail);
         String url = detail == null ? "" : value(detail.links().get("LICENSE"), "");
-        if (url.isBlank()) return simpleSection("License", LauncherIcons.Glyph.SCALE, license);
+        if (url.isBlank()) {
+            Label label = new Label(license);
+            label.getStyleClass().add("project-detail-simple-value");
+            label.setWrapText(true);
+            HBox value = new HBox(label);
+            value.setAlignment(Pos.CENTER_LEFT);
+            return section("License", LauncherIcons.Glyph.SCALE, value);
+        }
         Button link = new Button(license, LauncherIcons.icon(LauncherIcons.Glyph.EXTERNAL_LINK, 13));
         link.getStyleClass().add("project-detail-simple-link");
-        link.setMaxWidth(Double.MAX_VALUE);
         link.setOnAction(event -> openUrlInBrowser(url));
-        return section("License", LauncherIcons.Glyph.SCALE, link);
+        HBox value = new HBox(link);
+        value.setAlignment(Pos.CENTER_LEFT);
+        return section("License", LauncherIcons.Glyph.SCALE, value);
     }
 
     private Node projectIdSection(ProjectSummary summary, ProjectDetail detail) {
