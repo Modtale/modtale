@@ -20,7 +20,7 @@ class ManifestVersionLabelTest {
         {"2026.03.26-89796e57b", "2026.03.26-89796e57b"}, {"Early Access", "Early Access"},
         {"future-format:stable", "future-format:stable"}, {">=0.5.0 ||", ">=0.5.0 ||"},
         {">=0.5.0 nonsense <0.6.0", ">=0.5.0 nonsense <0.6.0"},
-        {">=0.5.0, <0.6.0", "0.5.x"}, {"0.5.* || 0.5.x", "0.5.x"}
+        {">=0.5.0, <0.6.0", "0.5.x"}, {">=0.5 <0.7", "0.5.x & 0.6.x"}, {"<=0.5", "Before 0.6.0"}, {">0.5", "0.6.0 and newer"}, {">=2 <3", "2.x"}, {"0.5.* || 0.5.x", "0.5.x"}
     }; }
     @org.junit.jupiter.api.Test void resolvesEndpointsFromCurrentCatalog() {
         var versions = java.util.List.of("0.5.1", "0.5.5", "0.6.0", "2026.03.26-89796e57b");

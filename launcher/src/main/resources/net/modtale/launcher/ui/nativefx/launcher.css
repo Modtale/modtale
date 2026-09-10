@@ -8528,7 +8528,7 @@
     -fx-border-width: 1px;
     -fx-border-color: rgba(255, 255, 255, 0.10);
     -fx-background-color: rgba(15, 23, 42, 0.95);
-    -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.20), 24, 0.12, 0, 8);
+    -fx-effect: null;
     -fx-padding: 24px;
     -fx-spacing: 20px;
 }
@@ -8646,14 +8646,14 @@
 }
 
 .library-world-detail-icon {
-    -fx-min-width: 56px;
-    -fx-pref-width: 56px;
-    -fx-max-width: 56px;
-    -fx-min-height: 56px;
-    -fx-pref-height: 56px;
-    -fx-max-height: 56px;
-    -fx-background-radius: 9px;
-    -fx-border-radius: 9px;
+    -fx-min-width: 88px;
+    -fx-pref-width: 88px;
+    -fx-max-width: 88px;
+    -fx-min-height: 88px;
+    -fx-pref-height: 88px;
+    -fx-max-height: 88px;
+    -fx-background-radius: 16px;
+    -fx-border-radius: 16px;
     -fx-background-color: rgba(37, 99, 235, 0.16);
 }
 
@@ -8694,7 +8694,7 @@
 }
 
 .library-world-detail-title {
-    -fx-font-size: 26px;
+    -fx-font-size: 30px;
     -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
@@ -9826,4 +9826,8 @@
 .library-world-project-row:contents-hovered > .library-world-project-surface,
 .root:scrolling .library-world-project-row:hover > .library-world-project-surface {
     -fx-border-color: rgba(255, 255, 255, 0.10), transparent;
+}
+
+.library-world-detail-summary {
+    -fx-font-size: 14px;
 }

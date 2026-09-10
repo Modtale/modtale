@@ -35,7 +35,7 @@ final class ManifestVersionLabel {
     }
     static String format(String raw) {
         if (raw == null || raw.isBlank()) return "";
-        String value = raw.trim().replaceAll("\\s+", " ");
+        String value = normalizePartialBounds(raw.trim().replaceAll("\\s+", " "));
         if (value.startsWith("||") || value.endsWith("||")) return value;
         if (value.contains("||")) return String.join(" & ", Arrays.stream(value.split("\\s*\\|\\|\\s*", -1))
                 .map(ManifestVersionLabel::format).distinct().toList());
@@ -92,6 +92,27 @@ final class ManifestVersionLabel {
         }
         return lo != null && hi != null && lo.compareTo(hi) <= 0 ? range(lo,hi,inclusive)
                 : String.join(" & ", terms.stream().map(ManifestVersionLabel::words).toList());
+    }
+    private static String normalizePartialBounds(String value) {
+        var partial = Pattern.compile("(>=|<=|>|<)\\s*v?(\\d+)(?:\\.(\\d+))?(?:\\.[xX*])?(?=$|[ ,&|])").matcher(value);
+        StringBuffer result = new StringBuffer();
+        while (partial.find()) {
+            try {
+                int major = Integer.parseInt(partial.group(2));
+                int minor = partial.group(3) == null ? 0 : Integer.parseInt(partial.group(3));
+                String op = partial.group(1);
+                if (op.equals(">") || op.equals("<=")) {
+                    if (partial.group(3) == null) major = Math.addExact(major, 1);
+                    else minor = Math.addExact(minor, 1);
+                    op = op.equals(">") ? ">=" : "<";
+                }
+                partial.appendReplacement(result, op + major + "." + minor + ".0");
+            } catch (ArithmeticException | NumberFormatException ignored) {
+                partial.appendReplacement(result, java.util.regex.Matcher.quoteReplacement(partial.group()));
+            }
+        }
+        partial.appendTail(result);
+        return result.toString();
     }
     private static String words(String[] term) {
         return switch(term[0]) {

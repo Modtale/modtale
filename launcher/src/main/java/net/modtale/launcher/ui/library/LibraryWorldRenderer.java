@@ -132,7 +132,7 @@ final class LibraryWorldRenderer {
                 model.world().previewImage(),
                 model.world().name(),
                 LauncherIcons.Glyph.GLOBE,
-                56,
+                88,
                 "library-detail-icon",
                 false
         );
@@ -146,7 +146,7 @@ final class LibraryWorldRenderer {
         title.setMaxWidth(Double.MAX_VALUE);
         copy.setMinWidth(0);
         Label summary = new Label(model.enabledProjectCount() + " of " + model.totalProjectCount() + " projects enabled");
-        summary.getStyleClass().add("library-project-meta");
+        summary.getStyleClass().addAll("library-project-meta", "library-world-detail-summary");
         copy.setSpacing(6);
         copy.getChildren().addAll(title, summary);
         HBox.setHgrow(copy, Priority.ALWAYS);
