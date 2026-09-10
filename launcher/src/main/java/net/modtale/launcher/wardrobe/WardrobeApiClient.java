@@ -69,6 +69,12 @@ public class WardrobeApiClient {
 
     public record Profile(UUID uuid, String username, String skin) {}
 
+    public static final class MissingArchivedSkinException extends IllegalStateException {
+        private MissingArchivedSkinException() {
+            super("Profile has no current archived skin identifier");
+        }
+    }
+
     public record SkinSlot(String id, String name, String skinData) {}
     public record SkinSlots(String activeId, int max, List<SkinSlot> slots) {
         public SkinSlots { slots = List.copyOf(slots); }
@@ -216,7 +222,7 @@ public class WardrobeApiClient {
             payload.put("username", profile.username()).put("playerUuid", profile.uuid().toString());
             return new WardrobeItem(saved.id(), saved.kind(), profile.username(), false, "", payload.toString());
         }
-        throw failure("Profile has no current archived skin identifier");
+        throw new MissingArchivedSkinException();
     }
 
     public WardrobeItem lookupSkinHash(String hash) {

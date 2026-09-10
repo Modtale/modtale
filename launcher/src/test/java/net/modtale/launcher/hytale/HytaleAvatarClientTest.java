@@ -28,8 +28,20 @@ class HytaleAvatarClientTest {
         assertEquals(2, calls.get());
     }
 
+    @Test void unarchivedSecondProfileUsesItsOwnProviderRender() {
+        var names = new java.util.ArrayList<String>();
+        var client = new HytaleAvatarClient(username -> {
+            names.add(username);
+            return username.equals("Villagers") ? SKIN : "";
+        }, Runnable::run);
+        assertTrue(client.avatarUrl("Villagers").join().endsWith(SKIN));
+        assertEquals("https://hyvatar.io/render/Wtrlmn?size=256", client.avatarUrl("Wtrlmn").join());
+        assertEquals(client.avatarUrl("Wtrlmn").join(), client.avatarUrl("wtrlmn").join());
+        assertEquals(java.util.List.of("Villagers", "Wtrlmn"), names);
+    }
+
     @Test void rejectsMissingOrInvalidSkinIdentifiers() {
-        var client = new HytaleAvatarClient(username -> "", Runnable::run);
+        var client = new HytaleAvatarClient(username -> "invalid-hash", Runnable::run);
         assertThrows(CompletionException.class, () -> client.avatarUrl("ItsNeil").join());
         assertThrows(CompletionException.class, () -> client.avatarUrl("../unknown").join());
     }

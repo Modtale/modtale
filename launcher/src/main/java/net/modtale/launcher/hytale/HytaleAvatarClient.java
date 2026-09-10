@@ -21,6 +21,8 @@ public final class HytaleAvatarClient {
         this.skinIdLookup = username -> {
             try {
                 return mapper.readTree(wardrobe.lookupSkin(username).payload()).path("skinId").asText();
+            } catch (WardrobeApiClient.MissingArchivedSkinException missing) {
+                return "";
             } catch (java.io.IOException error) {
                 throw new IllegalStateException("Invalid avatar skin response", error);
             }
@@ -44,6 +46,10 @@ public final class HytaleAvatarClient {
                     && now - previous.createdAt() < CACHE_MILLIS) return previous;
             return new Entry(now, CompletableFuture.supplyAsync(() -> {
                 String skinId = skinIdLookup.apply(name);
+                if ("".equals(skinId)) {
+                    // A profile can have a provider render without an archived skin hash.
+                    return "https://hyvatar.io/render/" + name + "?size=256";
+                }
                 if (skinId == null || !skinId.matches("[a-fA-F0-9]{32}")) {
                     throw new IllegalStateException("No saved avatar skin available");
                 }

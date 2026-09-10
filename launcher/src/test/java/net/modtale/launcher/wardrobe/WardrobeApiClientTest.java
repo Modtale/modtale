@@ -130,6 +130,14 @@ class WardrobeApiClientTest {
         assertEquals(0, tokenCalls);
         assertTrue(headers.stream().allMatch(Objects::isNull));
     }
+    @Test void profileWithoutAnArchiveHasADistinctFailureFromLookupErrors() {
+        json("/api/username/Wtrlmn", "{\"username\":\"Wtrlmn\",\"uuid\":\"" + ID + "\",\"skin\":[]}");
+        html("/username/Wtrlmn", "<html><body>No archived skins</body></html>");
+        assertThrows(WardrobeApiClient.MissingArchivedSkinException.class, () -> api.lookupSkin("Wtrlmn"));
+        assertEquals(0, tokenCalls);
+        assertTrue(headers.stream().allMatch(Objects::isNull));
+    }
+
     @Test void malformedOrWrongProfilesFailInsteadOfProducingEmptySkins() {
         for (String body : List.of("{}", "null", "[]", "not-json", profile(ID, "OtherName"),
                 "{\"uuid\":\"bad\",\"username\":\"KayNeko\"}",
