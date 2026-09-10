@@ -198,6 +198,7 @@ final class NativeDownloadModal {
         header.setAlignment(Pos.CENTER_LEFT);
 
         VBox copy = new VBox(4);
+        copy.setAlignment(Pos.CENTER_LEFT);
         copy.setMinWidth(0);
         HBox.setHgrow(copy, Priority.ALWAYS);
         HBox title = new HBox(9);
