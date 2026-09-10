@@ -505,22 +505,24 @@ public class HytaleAuthService {
         }
     }
 
-    private void handleCallback(HttpExchange exchange, CompletableFuture<String> codeFuture, OAuthState expectedState) throws IOException {
+    static void handleCallback(HttpExchange exchange, CompletableFuture<String> codeFuture, OAuthState expectedState) throws IOException {
         Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
         String code = query.get("code");
         String error = query.get("error");
         String returnedState = query.get("state");
 
         String html;
+        String authorizedCode = null;
+        HytaleApiException authorizationFailure = null;
         if (error != null && !error.isBlank()) {
-            codeFuture.completeExceptionally(new HytaleApiException("Hytale authorization failed: " + error));
+            authorizationFailure = new HytaleApiException("Hytale authorization failed: " + error);
             html = page("Authorization failed", "Return to Modtale and try signing in again.");
         } else if (code != null && !code.isBlank()) {
             if (expectedState.matches(returnedState)) {
-                codeFuture.complete(code);
+                authorizedCode = code;
                 html = page("Authorization successful", "You can close this window and return to Modtale.");
             } else {
-                codeFuture.completeExceptionally(new HytaleApiException("Hytale authorization returned an unexpected state."));
+                authorizationFailure = new HytaleApiException("Hytale authorization returned an unexpected state.");
                 html = page("Authorization failed", "Return to Modtale and try signing in again.");
             }
         } else {
@@ -528,10 +530,24 @@ public class HytaleAuthService {
         }
 
         byte[] body = html.getBytes(StandardCharsets.UTF_8);
-        exchange.getResponseHeaders().set("Content-Type", "text/html; charset=utf-8");
-        exchange.sendResponseHeaders(200, body.length);
-        try (OutputStream output = exchange.getResponseBody()) {
-            output.write(body);
+        try {
+            exchange.getResponseHeaders().set("Content-Type", "text/html; charset=utf-8");
+            exchange.sendResponseHeaders(200, body.length);
+            try (OutputStream output = exchange.getResponseBody()) {
+                output.write(body);
+            }
+        } finally {
+            try {
+                exchange.close();
+            } finally {
+                // Completion lets the waiting login stop the server immediately. Finish the
+                // response first, but retain the authorization result if the browser disconnects.
+                if (authorizationFailure != null) {
+                    codeFuture.completeExceptionally(authorizationFailure);
+                } else if (authorizedCode != null) {
+                    codeFuture.complete(authorizedCode);
+                }
+            }
         }
     }
 
