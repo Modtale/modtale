@@ -8894,7 +8894,8 @@
     -fx-text-fill: #64748b;
 }
 
-.library-badge-row .library-badge-modpack {
+.library-badge-row .library-badge-modpack,
+.library-badge-curseforge {
     -fx-padding: 2px 6px;
     -fx-background-radius: 4px;
     -fx-border-radius: 4px;
@@ -8906,6 +8907,11 @@
     -fx-text-fill: #a7f3d0;
     -fx-border-color: rgba(45, 212, 191, 0.25);
     -fx-background-color: rgba(20, 184, 166, 0.13);
+}
+
+.library-badge-curseforge {
+    -fx-text-fill: #e9b49a;
+    -fx-background-color: rgba(241, 100, 54, 0.13);
 }
 
 .library-badge-unlocked,

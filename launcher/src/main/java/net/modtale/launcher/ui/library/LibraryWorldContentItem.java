@@ -12,8 +12,14 @@ record LibraryWorldContentItem(
         List<String> modIds,
         int enabledCount,
         int totalCount,
-        boolean toggleable
+        boolean toggleable,
+        String source
 ) {
+    LibraryWorldContentItem(String id, String title, String meta, String classification, String icon,
+            String author, List<String> modIds, int enabledCount, int totalCount, boolean toggleable) {
+        this(id, title, meta, classification, icon, author, modIds, enabledCount, totalCount, toggleable, "");
+    }
+
     LibraryWorldContentItem {
         id = value(id);
         title = value(title, "Installed content");
@@ -21,6 +27,7 @@ record LibraryWorldContentItem(
         classification = value(classification);
         icon = value(icon);
         author = value(author);
+        source = value(source);
         modIds = modIds == null
                 ? List.of()
                 : modIds.stream()

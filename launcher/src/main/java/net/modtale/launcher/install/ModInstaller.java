@@ -211,7 +211,7 @@ public class ModInstaller {
             configOwners.addAll(externalConfigOwners);
             List<net.modtale.launcher.model.worldlist.WorldListConfig> universeConfigs;
             try { universeConfigs = isModpack ? archiveInstaller.readUniverseConfigs(mainDownload.path(), configOwners, externalModIds) : List.of(); }
-            catch (IOException ex) { throw new ModtaleApiException("Could not read universe config defaults.", ex); }
+            catch (IOException ex) { throw new ModtaleApiException("Could not read world config defaults.", ex); }
             InstalledProject installedProject = new InstalledProject(
                     project.id(),
                     project.slug(),

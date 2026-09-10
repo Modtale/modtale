@@ -91,7 +91,7 @@ public class ArchiveInstaller {
                 JsonNode owner = entry.path("owner");
                 String key = owner.path("source").asText() + ":" + owner.path("projectId").asText();
                 if (!declared.contains(key) || !"SEED_ONLY".equals(entry.path("installPolicy").asText())
-                        || !path.equals("overrides/" + entry.path("destination").asText())) throw new IOException("Invalid universe config ownership.");
+                        || !path.equals("overrides/" + entry.path("destination").asText())) throw new IOException("Invalid world config ownership.");
                 if (!installedOwners.contains(key)) continue;
                 Path file = resolveLockedSource(root, path, paths);
                 verifyIntegrity(file, entry);
@@ -201,7 +201,7 @@ public class ArchiveInstaller {
         for (JsonNode entry : overrides) {
             String archivePath = requiredText(entry, "path");
             if (!ownedConfigs || !archivePath.startsWith("overrides/Universe/mods/") || entry.path("owner").isNull() || !entry.has("owner")) {
-                throw new IOException("Only mod-associated universe configs are supported. Saves and shared overrides cannot be installed.");
+                throw new IOException("Only mod-associated world configs are supported. Saves and shared overrides cannot be installed.");
             }
             if (ownedConfigs) {
                 if (!"SEED_ONLY".equals(entry.path("installPolicy").asText()) || !entry.has("owner")

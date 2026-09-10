@@ -777,7 +777,8 @@ public final class LauncherLibraryController {
                 modIds,
                 enabledCount(config, modIds),
                 modIds.size(),
-                true
+                true,
+                reference == null ? "" : reference.source()
         );
     }
 
@@ -801,7 +802,8 @@ public final class LauncherLibraryController {
                 modIds,
                 enabledCount(config, modIds),
                 modIds.size(),
-                !modIds.isEmpty()
+                !modIds.isEmpty(),
+                reference.source()
         );
     }
 
@@ -1244,7 +1246,7 @@ public final class LauncherLibraryController {
                     var configs = installed.universeConfigs().stream().filter(config -> config.appliesTo(ids, entirePack)).toList();
                     if (!configs.isEmpty()) {
                         try { net.modtale.launcher.install.WorldListConfigInstaller.install(configs, "WORLD", world.directory().resolve("mods"), 32 * 1024 * 1024); }
-                        catch (java.io.IOException ex) { throw new ModtaleApiException("Could not apply universe config defaults.", ex); }
+                        catch (java.io.IOException ex) { throw new ModtaleApiException("Could not apply world config defaults.", ex); }
                     }
                 }
             }

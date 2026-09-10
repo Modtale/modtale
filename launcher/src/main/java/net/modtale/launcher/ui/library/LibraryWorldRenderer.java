@@ -291,6 +291,9 @@ final class LibraryWorldRenderer {
         if (installed.isModpack()) {
             badges.getChildren().add(badge("Modpack", "modpack"));
         }
+        if (InstalledProject.SOURCE_CURSEFORGE.equalsIgnoreCase(installed.source())) {
+            badges.getChildren().add(badge("CurseForge", "curseforge"));
+        }
         copy.getChildren().add(title);
         if (!subtitleText.isBlank()) {
             copy.getChildren().add(subtitle);
@@ -481,6 +484,9 @@ final class LibraryWorldRenderer {
         Label status = new Label("Included");
         status.getStyleClass().add("library-version-pill");
         row.getChildren().addAll(icon, copy);
+        if (InstalledProject.SOURCE_CURSEFORGE.equalsIgnoreCase(item.source())) {
+            row.getChildren().add(badge("CurseForge", "curseforge"));
+        }
         addConfigButton(row, item.title(), item.modIds(), configs);
         row.getChildren().add(status);
         return row;
