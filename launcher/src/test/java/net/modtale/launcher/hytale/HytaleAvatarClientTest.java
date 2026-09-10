@@ -23,7 +23,7 @@ class HytaleAvatarClientTest {
             if (calls.incrementAndGet() == 1) throw new IllegalStateException("Unavailable");
             return SKIN;
         }, Runnable::run);
-        assertThrows(CompletionException.class, () -> client.avatarUrl("ItsNeil").join());
+        assertEquals("https://hyvatar.io/render/ItsNeil?size=256", client.avatarUrl("ItsNeil").join());
         assertTrue(client.avatarUrl("ItsNeil").join().endsWith(SKIN));
         assertEquals(2, calls.get());
     }
@@ -40,9 +40,9 @@ class HytaleAvatarClientTest {
         assertEquals(java.util.List.of("Villagers", "Wtrlmn"), names);
     }
 
-    @Test void rejectsMissingOrInvalidSkinIdentifiers() {
+    @Test void invalidArchiveFallsBackButInvalidUsernameIsRejected() {
         var client = new HytaleAvatarClient(username -> "invalid-hash", Runnable::run);
-        assertThrows(CompletionException.class, () -> client.avatarUrl("ItsNeil").join());
+        assertEquals("https://hyvatar.io/render/ItsNeil?size=256", client.avatarUrl("ItsNeil").join());
         assertThrows(CompletionException.class, () -> client.avatarUrl("../unknown").join());
     }
 }

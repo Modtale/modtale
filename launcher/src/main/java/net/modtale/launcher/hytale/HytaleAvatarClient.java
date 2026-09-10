@@ -35,6 +35,14 @@ public final class HytaleAvatarClient {
         this.executor = executor;
     }
 
+    public static String usernameAvatarUrl(String username) {
+        String name = username == null ? "" : username.trim();
+        if (!name.matches("[a-zA-Z0-9_]{3,16}")) {
+            throw new IllegalArgumentException("Invalid avatar username");
+        }
+        return "https://hyvatar.io/render/" + name + "?size=256";
+    }
+
     public CompletableFuture<String> avatarUrl(String username) {
         String name = username == null ? "" : username.trim();
         if (!name.matches("[a-zA-Z0-9_]{3,16}")) {
@@ -48,7 +56,7 @@ public final class HytaleAvatarClient {
                 String skinId = skinIdLookup.apply(name);
                 if ("".equals(skinId)) {
                     // A profile can have a provider render without an archived skin hash.
-                    return "https://hyvatar.io/render/" + name + "?size=256";
+                    return usernameAvatarUrl(name);
                 }
                 if (skinId == null || !skinId.matches("[a-fA-F0-9]{32}")) {
                     throw new IllegalStateException("No saved avatar skin available");
@@ -56,6 +64,8 @@ public final class HytaleAvatarClient {
                 return "https://hyvatar.io/render/NPC?size=256&skin_id=" + skinId.toLowerCase(Locale.ROOT);
             }, executor));
         });
-        return entry.url();
+        // Archive discovery can fail while the public username renderer remains available.
+        // Keep the failed lookup in the entry so the next request retries discovery.
+        return entry.url().exceptionally(error -> usernameAvatarUrl(name));
     }
 }

@@ -1309,12 +1309,10 @@ public final class LauncherPlayController {
         avatar.getChildren().add(image);
         avatarClient.avatarUrl(username).whenComplete((url, error) -> Platform.runLater(() -> {
             if (error == null && avatar.getChildren().contains(image)) {
-                Image loaded = cachedImage(url, size, size, true, true);
-                image.setImage(loaded);
-                Node initial = avatar.getChildren().getFirst();
-                initial.visibleProperty().bind(Bindings.createBooleanBinding(
-                        () -> loaded.getProgress() < 1 || loaded.isError(),
-                        loaded.progressProperty(), loaded.errorProperty()));
+                HytaleProfileAvatarImages.load(image, avatar.getChildren().getFirst(), url,
+                        net.modtale.launcher.hytale.HytaleAvatarClient.usernameAvatarUrl(username),
+                        source -> cachedImage(source, size, size, true, true),
+                        () -> avatar.getChildren().contains(image));
             }
         }));
     }
