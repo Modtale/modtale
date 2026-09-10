@@ -331,9 +331,9 @@ class ModInstallerTest {
     }
 
     @Test
-    void liveNyoCfModpackDependencyDownloadsAndInstallsThroughTheLauncher() throws Exception {
-        assumeTrue("true".equalsIgnoreCase(System.getenv("NYOCF_LIVE_TESTS")),
-                "Set NYOCF_LIVE_TESTS=true to run the nyoCF launcher install contract.");
+    void liveCurseForgeModpackDependencyDownloadsAndInstallsThroughTheLauncher() throws Exception {
+        assumeTrue("true".equalsIgnoreCase(System.getenv("CURSEFORGE_LIVE_TESTS")),
+                "Set CURSEFORGE_LIVE_TESTS=true to run the CurseForge launcher install contract.");
         byte[] pack = zip(entry("mods/main.jar", "main"));
         startServer();
         server.createContext("/api/v1/projects/pack/versions/1.0.0/download-url", exchange ->
@@ -373,8 +373,8 @@ class ModInstallerTest {
 
     @Test
     void liveCurseForgeBrowseProjectAndDirectInstallWorkThroughTheLauncher() throws Exception {
-        assumeTrue("true".equalsIgnoreCase(System.getenv("NYOCF_LIVE_TESTS")),
-                "Set NYOCF_LIVE_TESTS=true to run the nyoCF launcher install contract.");
+        assumeTrue("true".equalsIgnoreCase(System.getenv("CURSEFORGE_LIVE_TESTS")),
+                "Set CURSEFORGE_LIVE_TESTS=true to run the CurseForge launcher install contract.");
         ModtaleApiClient client = new ModtaleApiClient(ModtaleApiClient.DEFAULT_API_BASE_URL);
 
         var browse = client.searchCurseForgeMods(new ProjectSearchQuery(

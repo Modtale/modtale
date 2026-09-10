@@ -24,8 +24,6 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Labeled;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
-import javafx.scene.control.Tooltip;
-import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
@@ -1046,16 +1044,6 @@ public final class LauncherShell {
         startupProtocolHandled = true;
         showView(LauncherView.LIBRARY);
         libraryController.installWorldModList(request.installListId());
-    }
-
-    private void addNav(HBox bar, LauncherView view, String label, LauncherIcons.Glyph icon) {
-        Button button = new Button(label);
-        button.getStyleClass().add("nav-btn");
-        applyNavbarTitleFont(button);
-        button.setGraphic(LauncherIcons.icon(icon, 16));
-        button.setOnAction(event -> showView(view));
-        navButtons.put(view, button);
-        bar.getChildren().add(button);
     }
 
     private void addLocalizedNav(HBox bar, LauncherView view, String key, LauncherIcons.Glyph icon) {

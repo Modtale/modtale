@@ -9,9 +9,6 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.time.Year;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -102,8 +99,6 @@ public final class LauncherPlayController {
     private static final double PLAY_BUTTON_FONT_SIZE = 22;
     private static final int CATALOG_SHELF_LIMIT = 20;
     private static final double CATALOG_SECTION_GAP = 8;
-    private static final DateTimeFormatter BLOG_DATE = DateTimeFormatter.ofPattern("MMM d").withZone(ZoneId.systemDefault());
-    private static final DateTimeFormatter BLOG_DATE_WITH_YEAR = DateTimeFormatter.ofPattern("MMM d, yyyy").withZone(ZoneId.systemDefault());
 
     private final ModtaleApiClient apiClient;
     private final ProjectCardFactory projectCardFactory;
@@ -1344,12 +1339,6 @@ public final class LauncherPlayController {
         node.setMaxSize(size, size);
     }
 
-    private void sizeRegion(Region node, double width, double height) {
-        node.setMinSize(width, height);
-        node.setPrefSize(width, height);
-        node.setMaxSize(width, height);
-    }
-
     private Image cachedImage(String imageUrl, double requestedWidth, double requestedHeight, boolean preserveRatio, boolean resize) {
         if (imageUrl == null || imageUrl.isBlank()) {
             return null;
@@ -1371,17 +1360,6 @@ public final class LauncherPlayController {
     private String initialFor(String value) {
         String text = value(value, "H");
         return text.substring(0, 1).toUpperCase();
-    }
-
-    private String formatBlogDate(Instant publishedAt) {
-        if (publishedAt == null || publishedAt.equals(Instant.EPOCH)) {
-            return "Hytale Blog";
-        }
-        int postYear = publishedAt.atZone(ZoneId.systemDefault()).getYear();
-        if (postYear == Year.now().getValue()) {
-            return BLOG_DATE.format(publishedAt);
-        }
-        return BLOG_DATE_WITH_YEAR.format(publishedAt);
     }
 
     private void toggleIdentityMenu(Node owner) {

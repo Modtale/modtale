@@ -285,25 +285,6 @@ public class ArchiveInstaller {
         return source;
     }
 
-    private static Path resolveInstanceDestination(Path instanceDirectory, String relativePath) throws IOException {
-        if (relativePath.contains("\\") || relativePath.matches("^[A-Za-z]:.*") || Path.of(relativePath).isAbsolute()) {
-            throw new IOException("Unsafe override destination: " + relativePath);
-        }
-        Path normalizedRoot = instanceDirectory.toRealPath();
-        Path destination = normalizedRoot.resolve(relativePath).normalize();
-        if (!destination.startsWith(normalizedRoot)) {
-            throw new IOException("Override escapes the Hytale instance: " + relativePath);
-        }
-        Path current = normalizedRoot;
-        for (Path segment : normalizedRoot.relativize(destination)) {
-            current = current.resolve(segment);
-            if (Files.isSymbolicLink(current)) {
-                throw new IOException("Override destination contains a symbolic link: " + relativePath);
-            }
-        }
-        return destination;
-    }
-
     private static void verifyIntegrity(Path source, JsonNode entry) throws IOException {
         long expectedSize = entry.path("size").asLong(-1);
         if (expectedSize < 0 || Files.size(source) != expectedSize) {

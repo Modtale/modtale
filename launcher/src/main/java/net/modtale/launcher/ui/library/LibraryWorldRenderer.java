@@ -42,7 +42,6 @@ import net.modtale.launcher.model.install.UpdateCandidate;
 import net.modtale.launcher.model.project.ProjectClassification;
 import net.modtale.launcher.model.project.ProjectDetail;
 import net.modtale.launcher.model.project.ProjectMeta;
-import net.modtale.launcher.model.project.ProjectVersion;
 import net.modtale.launcher.ui.common.CachedImageLoader;
 import net.modtale.launcher.ui.common.LauncherIcons;
 
@@ -701,13 +700,6 @@ final class LibraryWorldRenderer {
     private String projectMetaLine(LibraryWorldProjectModel model) {
         String author = model.display().author();
         return author.isBlank() ? "" : "by " + author;
-    }
-
-    private boolean hasUnlockableContents(InstalledProject installed) {
-        return installed.isModpack()
-                || !installed.bundledProjects().isEmpty()
-                || !installed.dependencyProjectIds().isEmpty()
-                || !installed.externalDependencies().isEmpty();
     }
 
     private void addCompatibilityMetadata(HBox row, List<String> requirements) {

@@ -238,7 +238,7 @@ public final class ProjectBrowseController {
             return "Browse " + viewOption.label().toLowerCase(Locale.ROOT) + " with the same filters as the web catalog.";
         }
         return sourceSelector.source() == ProjectBrowseSource.CURSEFORGE
-                ? "Browse Hytale mods indexed by nyoCF and install exact provider-hosted files."
+                ? "Browse CurseForge mods and install exact provider-hosted files."
                 : "Browse the Modtale catalog and install compatible Hytale projects.";
     }
 

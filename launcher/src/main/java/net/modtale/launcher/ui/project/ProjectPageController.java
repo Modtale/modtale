@@ -4,7 +4,6 @@ import static net.modtale.launcher.ui.browse.card.ProjectCardFormatter.number;
 import static net.modtale.launcher.ui.browse.card.ProjectCardFormatter.timeAgo;
 import static net.modtale.launcher.ui.common.LauncherUi.primaryButton;
 import static net.modtale.launcher.ui.common.LauncherUi.secondaryButton;
-import static net.modtale.launcher.ui.common.LauncherUi.setVisibleManaged;
 import static net.modtale.launcher.ui.common.LauncherUi.value;
 
 import java.io.IOException;
@@ -17,7 +16,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -70,8 +68,6 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
 import net.modtale.launcher.ui.common.LauncherSkeleton;
 import net.modtale.launcher.ui.common.LauncherSkeletonContent;
 import net.modtale.launcher.api.ModtaleApiClient;
@@ -2199,13 +2195,6 @@ public final class ProjectPageController {
                 "",
                 List.of()
         ));
-    }
-
-    private Node simpleSection(String title, LauncherIcons.Glyph icon, String value) {
-        Label label = new Label(value);
-        label.getStyleClass().add("project-detail-simple-value");
-        label.setWrapText(true);
-        return section(title, icon, label);
     }
 
     private Node licenseSection(ProjectDetail detail) {
