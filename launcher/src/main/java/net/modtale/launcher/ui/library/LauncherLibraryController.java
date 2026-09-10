@@ -67,6 +67,7 @@ import net.modtale.launcher.ui.settings.LauncherSettingsController;
 
 public final class LauncherLibraryController {
 
+    private boolean gameVersionsRequested;
     private final LibraryManifestCompatibility manifestCompatibility = new LibraryManifestCompatibility();
     private final ModtaleApiClient apiClient;
     private final ModInstaller installer;
@@ -530,6 +531,15 @@ public final class LauncherLibraryController {
     private void ensureProjectMetadataLoaded() {
         if (executor == null || apiClient == null) {
             return;
+        }
+        if (!gameVersionsRequested) {
+            gameVersionsRequested = true;
+            CompletableFuture.supplyAsync(apiClient::getGameVersions, executor).whenComplete((versions, error) -> Platform.runLater(() -> {
+                if (error == null && versions != null) {
+                    worldRenderer.setKnownGameVersions(versions);
+                    renderWorldDetail();
+                }
+            }));
         }
         List<String> missing = metadataProjectIds().stream()
                 .filter(id -> !projectMetadata.containsKey(id))

@@ -10,7 +10,9 @@ public enum ProjectBrowseSort {
     DOWNLOADS("downloads", "Downloads", "Most Downloaded"),
     FAVORITES("favorites", "Favorites", "Most Favorited"),
     NEWEST("newest", "Newest", "New Releases"),
-    UPDATED("updated", "Updated", "Recently Updated");
+    UPDATED("updated", "Updated", "Recently Updated"),
+    NAME("name", "Name", "Name"),
+    AUTHOR("author", "Author", "Author");
 
     private final String apiValue;
     private final String label;
@@ -20,6 +22,21 @@ public enum ProjectBrowseSort {
         this.apiValue = apiValue;
         this.label = label;
         this.title = title;
+    }
+
+    public static java.util.List<ProjectBrowseSort> curseForgeSorts() {
+        return java.util.List.of(RELEVANCE, POPULAR, UPDATED, NEWEST, DOWNLOADS, NAME, AUTHOR);
+    }
+
+    public String curseForgeLabel() {
+        return switch (this) {
+            case RELEVANCE -> "Relevancy";
+            case POPULAR -> "Popularity";
+            case UPDATED -> "Latest Update";
+            case NEWEST -> "Creation Date";
+            case DOWNLOADS -> "Total Downloads";
+            default -> label;
+        };
     }
 
     public String apiValue() {
@@ -40,7 +57,7 @@ public enum ProjectBrowseSort {
             case TRENDING -> BrowseOptions.BrowseViewOption.TRENDING;
             case NEWEST -> BrowseOptions.BrowseViewOption.NEW;
             case UPDATED -> BrowseOptions.BrowseViewOption.UPDATED;
-            case RELEVANCE, DOWNLOADS, FAVORITES -> BrowseOptions.BrowseViewOption.ALL;
+            case RELEVANCE, DOWNLOADS, FAVORITES, NAME, AUTHOR -> BrowseOptions.BrowseViewOption.ALL;
         };
     }
 

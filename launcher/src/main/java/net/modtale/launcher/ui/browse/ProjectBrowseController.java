@@ -204,7 +204,7 @@ public final class ProjectBrowseController {
     }
 
     public void selectBrowseSort(ProjectBrowseSort sort) {
-        selectSort(sort == null ? ProjectBrowseSort.DOWNLOADS : sort);
+        selectSort(sort == null ? ProjectBrowseSort.defaultSort() : sort);
     }
 
     public void addControlStateListener(Runnable listener) {
@@ -214,6 +214,7 @@ public final class ProjectBrowseController {
     }
 
     public String title() {
+        if (isCurseForgeSource()) return selectedSort().curseForgeLabel();
         if (!tags.isEmpty()) {
             return tags.title();
         }
@@ -496,9 +497,7 @@ public final class ProjectBrowseController {
     private void selectSource(ProjectBrowseSource source) {
         searchState.reset();
         activeBrowseView = BrowseOptions.BrowseViewOption.defaultOption();
-        if (source == ProjectBrowseSource.MODTALE) {
-            withSuppressedSearch(() -> sortCombo.setValue(ProjectBrowseSort.RELEVANCE));
-        }
+        withSuppressedSearch(() -> sortCombo.setValue(ProjectBrowseSort.RELEVANCE));
         categories.showCurseForgeOptions(source == ProjectBrowseSource.CURSEFORGE);
         updateSortOptions();
         refreshBrowseControls();
@@ -583,15 +582,10 @@ public final class ProjectBrowseController {
 
     private void updateSortOptions() {
         if (sourceSelector.source() == ProjectBrowseSource.CURSEFORGE) {
-            sortDropdown.getChildren().setAll(
-                    sortDropdownItem(ProjectBrowseSort.DOWNLOADS),
-                    sortDropdownItem(ProjectBrowseSort.UPDATED),
-                    sortDropdownItem(ProjectBrowseSort.NEWEST)
-            );
-            if (selectedSort() != ProjectBrowseSort.DOWNLOADS
-                    && selectedSort() != ProjectBrowseSort.UPDATED
-                    && selectedSort() != ProjectBrowseSort.NEWEST) {
-                sortCombo.setValue(ProjectBrowseSort.DOWNLOADS);
+            sortDropdown.getChildren().setAll(ProjectBrowseSort.curseForgeSorts().stream()
+                    .map(this::sortDropdownItem).toList());
+            if (!ProjectBrowseSort.curseForgeSorts().contains(selectedSort())) {
+                sortCombo.setValue(ProjectBrowseSort.RELEVANCE);
             }
         } else {
             sortDropdown.getChildren().setAll(
@@ -604,7 +598,7 @@ public final class ProjectBrowseController {
     private Button sortDropdownItem(ProjectBrowseSort sort) {
         Button item = new Button();
         item.getStyleClass().add("sort-dropdown-item");
-        Label label = new Label(sort.label());
+        Label label = new Label(isCurseForgeSource() ? sort.curseForgeLabel() : sort.label());
         label.getStyleClass().add("sort-dropdown-item-label");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -651,7 +645,7 @@ public final class ProjectBrowseController {
     private void refreshSortDropdown() {
         ProjectBrowseSort selected = selectedSort();
         if (sortButtonLabel != null) {
-            sortButtonLabel.setText(selected.label());
+            sortButtonLabel.setText(isCurseForgeSource() ? selected.curseForgeLabel() : selected.label());
         }
         if (sortButton != null) {
             pseudo(sortButton, "selected", sortDropdown.isVisible());
@@ -768,7 +762,7 @@ public final class ProjectBrowseController {
         refreshSortDropdown();
         if (categoryPills != null) setVisibleManaged(categoryPills, true);
         if (filterToggleButton != null) setVisibleManaged(filterToggleButton, !curseForge);
-        if (sortButton != null) setVisibleManaged(sortButton, !curseForge);
+        if (sortButton != null) setVisibleManaged(sortButton, true);
         if (curseForge) {
             filterOptions.popover().setVisible(false);
         }

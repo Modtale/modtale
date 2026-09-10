@@ -85,6 +85,6 @@ final class LibraryManifestCompatibility {
     }
 
     static String label(String requirement) {
-        return "Hytale " + ("*".equals(requirement) ? "any version" : requirement);
+        return ManifestVersionLabel.format(requirement);
     }
 }

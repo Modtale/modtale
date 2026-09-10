@@ -46,8 +46,8 @@ class LibraryCompatibilityMetadataTest {
                 var model = (LibraryWorldProjectModel) makeModel.invoke(controller, installed, config);
                 Node node = (Node) copy.invoke(renderer, model);
                 Label compatibility = (Label) node.lookup(".library-version-metadata-build");
-                assertEquals("Hytale >=0.6.0-pre.0 <0.7.0", compatibility.getText());
-                assertTrue(compatibility.getTooltip().getText().contains("manifest"));
+                assertEquals("0.6.x", compatibility.getText());
+                assertTrue(compatibility.getTooltip().getText().contains("Manifest"));
                 assertEquals("mod-1.2.3.jar", ((Label) node.lookup(".library-version-metadata-version")).getText());
             }
             var childModel = LauncherLibraryController.class.getDeclaredMethod("manifestContentItem",
@@ -58,7 +58,7 @@ class LibraryCompatibilityMetadataTest {
             var childRow = LibraryWorldRenderer.class.getDeclaredMethod("compactContentRow", LibraryWorldContentItem.class, List.class);
             childRow.setAccessible(true);
             Node node = (Node) childRow.invoke(renderer, child, List.of());
-            assertEquals("Hytale >=0.6.0-pre.0 <0.7.0", ((Label) node.lookup(".library-version-metadata-build")).getText());
+            assertEquals("0.6.x", ((Label) node.lookup(".library-version-metadata-build")).getText());
 
             Files.delete(mod.resolve("manifest.json"));
             var model = (LibraryWorldProjectModel) makeModel.invoke(controller,

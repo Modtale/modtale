@@ -50,11 +50,11 @@ class LauncherBrowseMenuTest {
             source.getItems().stream().filter(item -> item.getText().equals("CurseForge"))
                     .findFirst().orElseThrow().fire();
             var menu = new LauncherBrowseMenu(controller, () -> layer, currentView::get);
-            for (var sort : List.of(ProjectBrowseSort.DOWNLOADS, ProjectBrowseSort.UPDATED,
-                    ProjectBrowseSort.NEWEST, ProjectBrowseSort.DOWNLOADS)) {
+            assertEquals(ProjectBrowseSort.RELEVANCE, controller.selectedBrowseSort());
+            for (var sort : ProjectBrowseSort.curseForgeSorts()) {
                 currentView.set(LauncherView.WARDROBE);
                 var item = (Button) menu.panel().getChildren().stream()
-                        .filter(node -> node instanceof Button button && button.getText().equals(sort.title()))
+                        .filter(node -> node instanceof Button button && button.getText().equals(sort.curseForgeLabel()))
                         .findFirst().orElseThrow();
                 item.fire();
                 assertEquals(LauncherView.DISCOVER, currentView.get());
@@ -62,7 +62,7 @@ class LauncherBrowseMenuTest {
                 assertEquals(sort.browseView(), controller.activeBrowseView());
                 assertTrue(controller.isCurseForgeSource());
             }
-            assertEquals(4, searches.stream().filter(s -> s.equals("Searching CurseForge projects...")).count());
+            assertEquals(7, searches.stream().filter(s -> s.equals("Searching CurseForge projects...")).count());
             return null;
         });
         Platform.runLater(test);

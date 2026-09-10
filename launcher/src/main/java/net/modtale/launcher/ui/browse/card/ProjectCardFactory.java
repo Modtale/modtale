@@ -243,11 +243,10 @@ public final class ProjectCardFactory {
         Button install = installButton(project, onInstall);
         install.getStyleClass().add("icon-only-button");
         install.setText("");
-        install.setMinWidth(42);
-        install.setPrefWidth(42);
+        squareInstallButton(install, 42);
         install.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 16));
 
-        card.getChildren().addAll(icon, copy, install, LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_RIGHT, 16));
+        card.getChildren().addAll(icon, copy, install);
         ProjectCardInteraction.addHoverAnimation(card, icon);
         return card;
     }
@@ -292,8 +291,7 @@ public final class ProjectCardFactory {
         if (tight) {
             install.getStyleClass().add("icon-only-button");
             install.setText("");
-            install.setMinWidth(38);
-            install.setPrefWidth(38);
+            squareInstallButton(install, CARD_STAT_HEIGHT);
         }
         install.setMinHeight(CARD_STAT_HEIGHT);
         install.setPrefHeight(CARD_STAT_HEIGHT);
@@ -411,6 +409,16 @@ public final class ProjectCardFactory {
             onInstall.accept(project);
         });
         return install;
+    }
+
+    private void squareInstallButton(Button button, double size) {
+        button.setMinSize(size, size);
+        button.setPrefSize(size, size);
+        button.setMaxSize(size, size);
+        button.setPadding(javafx.geometry.Insets.EMPTY);
+        button.setAlignment(Pos.CENTER);
+        button.setContentDisplay(javafx.scene.control.ContentDisplay.GRAPHIC_ONLY);
+        button.setGraphicTextGap(0);
     }
 
     private Optional<ProjectVersion> latestCompatible(ProjectSummary project, String gameVersion) {

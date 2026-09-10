@@ -30,8 +30,7 @@ class LibraryManifestCompatibilityTest {
     void preservesExactVersionsBoundsAndPrereleases(String requirement) throws Exception {
         Path jar = archive("mod.jar", "{\"ServerVersion\":\"" + requirement + "\"}");
         assertEquals(requirement, new LibraryManifestCompatibility().read(jar));
-        assertEquals("Hytale " + (requirement.equals("*") ? "any version" : requirement),
-                LibraryManifestCompatibility.label(requirement));
+
     }
 
     @ParameterizedTest

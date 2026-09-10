@@ -52,6 +52,9 @@ final class LibraryWorldRenderer {
     private static final double CONTENT_ICON_SIZE = 34;
     private static final PseudoClass CONTENTS_HOVERED = PseudoClass.getPseudoClass("contents-hovered");
 
+    private List<String> knownGameVersions = List.of();
+    void setKnownGameVersions(List<String> versions) { knownGameVersions = List.copyOf(versions); }
+
     private Consumer<ProjectSummary> openProject = ignored -> {};
     private Consumer<ProjectSummary> openCreator = ignored -> {};
 
@@ -715,8 +718,9 @@ final class LibraryWorldRenderer {
                 divider.getStyleClass().add("library-version-divider");
                 row.getChildren().add(divider);
             }
-            row.getChildren().add(versionMetadata(LibraryManifestCompatibility.label(requirement),
-                    "Compatible Hytale versions (manifest)", "build"));
+            Label compatibility = versionMetadata(ManifestVersionLabel.format(requirement, knownGameVersions), "Compatible versions", "build");
+            compatibility.setTooltip(new Tooltip("Manifest ServerVersion: " + requirement));
+            row.getChildren().add(compatibility);
         }
     }
 

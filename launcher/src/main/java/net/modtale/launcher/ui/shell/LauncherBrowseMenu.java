@@ -150,11 +150,7 @@ public final class LauncherBrowseMenu {
     private void rebuildPanel(VBox menuPanel) {
         menuPanel.getChildren().clear();
         if (browseController.isCurseForgeSource()) {
-            List<ProjectBrowseSort> sorts = List.of(
-                    ProjectBrowseSort.DOWNLOADS,
-                    ProjectBrowseSort.UPDATED,
-                    ProjectBrowseSort.NEWEST
-            );
+            List<ProjectBrowseSort> sorts = ProjectBrowseSort.curseForgeSorts();
             sorts.forEach(sort -> menuPanel.getChildren().add(sortMenuItem(sort)));
             return;
         }
@@ -172,7 +168,7 @@ public final class LauncherBrowseMenu {
     }
 
     private Button sortMenuItem(ProjectBrowseSort sort) {
-        Button item = new Button(sort.title().isBlank() ? sort.label() : sort.title());
+        Button item = new Button(sort.curseForgeLabel());
         item.getStyleClass().add("browse-dropdown-item");
         item.setGraphic(LauncherIcons.icon(sortIcon(sort), 16));
         item.setAlignment(Pos.CENTER_LEFT);

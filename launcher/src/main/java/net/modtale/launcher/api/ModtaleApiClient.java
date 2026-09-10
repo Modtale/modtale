@@ -43,7 +43,7 @@ public class ModtaleApiClient {
     private final CookieManager cookieManager;
     private final ModtaleApiTransport transport;
     private final ModtaleDownloadClient downloadClient;
-    private final NyoCfClient nyoCfClient;
+    private final CurseForgeClient curseForgeClient;
     private final CurseForgeCommentsClient curseForgeCommentsClient;
     private final LauncherSessionStore sessionStore;
     private volatile URI apiBaseUri;
@@ -95,7 +95,7 @@ public class ModtaleApiClient {
         this.cookieManager = cookieManager;
         this.transport = new ModtaleApiTransport(httpClient, responseCache, this::csrfToken);
         this.downloadClient = new ModtaleDownloadClient(httpClient, this::apiBaseUri);
-        this.nyoCfClient = new NyoCfClient(httpClient, responseCache);
+        this.curseForgeClient = new CurseForgeClient(httpClient, responseCache);
         this.curseForgeCommentsClient = curseForgeCommentsClient == null
                 ? new CurseForgeCommentsClient(httpClient) : curseForgeCommentsClient;
         this.sessionStore = sessionStore;
@@ -192,19 +192,19 @@ public class ModtaleApiClient {
     }
 
     public ProjectPage searchCurseForgeMods(ProjectSearchQuery query) {
-        return nyoCfClient.search(query);
+        return curseForgeClient.search(query);
     }
 
     public ProjectSummary enrichCurseForgeBrowseBanner(ProjectSummary summary) {
-        return nyoCfClient.enrichBrowseBanner(summary);
+        return curseForgeClient.enrichBrowseBanner(summary);
     }
 
     public ProjectDetail getCurseForgeProject(long projectId) {
-        return nyoCfClient.project(projectId);
+        return curseForgeClient.project(projectId);
     }
 
     public DownloadUrlResponse getCurseForgeDownloadUrl(long projectId, long fileId) {
-        return nyoCfClient.download(projectId, fileId);
+        return curseForgeClient.download(projectId, fileId);
     }
 
     public ArtifactIdentity.Response identifyArtifacts(List<ArtifactIdentity.Artifact> artifacts) {
@@ -230,7 +230,7 @@ public class ModtaleApiClient {
 
     public ProjectMeta getProjectMeta(String idOrSlug) {
         Long curseForgeId = curseForgeId(idOrSlug);
-        if (curseForgeId != null) return nyoCfClient.projectMeta(curseForgeId);
+        if (curseForgeId != null) return curseForgeClient.projectMeta(curseForgeId);
         return get("/projects/" + encodePath(idOrSlug) + "/meta", ProjectMeta.class);
     }
 

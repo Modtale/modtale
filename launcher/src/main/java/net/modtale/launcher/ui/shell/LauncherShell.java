@@ -933,9 +933,7 @@ public final class LauncherShell {
                 browseController.isCurseForgeSource() ? "CURSEFORGE" : "BROWSE"));
 
         if (browseController.isCurseForgeSource()) {
-            addCurseForgeRailButton(browseRailCard, ProjectBrowseSort.DOWNLOADS);
-            addCurseForgeRailButton(browseRailCard, ProjectBrowseSort.UPDATED);
-            addCurseForgeRailButton(browseRailCard, ProjectBrowseSort.NEWEST);
+            ProjectBrowseSort.curseForgeSorts().forEach(sort -> addCurseForgeRailButton(browseRailCard, sort));
         } else {
             for (BrowseOptions.BrowseViewOption view : BrowseOptions.BROWSE_VIEWS) {
                 addRailButton(browseRailCard, view, view.label(), view.icon(), false,
@@ -946,7 +944,7 @@ public final class LauncherShell {
     }
 
     private void addCurseForgeRailButton(VBox card, ProjectBrowseSort sort) {
-        String label = sort.title().isBlank() ? sort.label() : sort.title();
+        String label = sort.curseForgeLabel();
         Button button = new Button(label);
         button.getStyleClass().add("rail-link");
         button.setMaxWidth(Double.MAX_VALUE);
