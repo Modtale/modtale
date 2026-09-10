@@ -83,6 +83,64 @@ describe('GalleryCarousel', () => {
         expect(container.querySelector('button[aria-label="Next gallery thumbnail"]')).toBeNull();
     });
 
+    it('keeps elapsed progress across callback updates and resumes only the remaining time', async () => {
+        vi.useFakeTimers();
+        const render = () => root.render(<GalleryCarouselViewer images={['/one.png', '/two.png']}
+            title="Skyforge" onActiveIndexChange={() => {}} />);
+        const progress = () => Number((container.querySelector('[data-gallery-progress]') as HTMLElement)
+            .style.transform.match(/scaleX\(([^)]+)\)/)?.[1]);
+        await act(async () => { render(); });
+        await act(async () => { vi.advanceTimersByTime(2000); });
+        expect(progress()).toBeCloseTo(0.25, 2);
+        await act(async () => { render(); });
+        expect(progress()).toBeCloseTo(0.25, 2);
+        await act(async () => { vi.advanceTimersByTime(2000); });
+        expect(progress()).toBeCloseTo(0.5, 2);
+        await act(async () => { (container.querySelector('[aria-label="Pause slideshow"]') as HTMLButtonElement).click(); });
+        await act(async () => { vi.advanceTimersByTime(16000); });
+        expect(progress()).toBeCloseTo(0.5, 2);
+        expect(container.querySelector('img[alt="Skyforge gallery image 1"]')).not.toBeNull();
+        await act(async () => { (container.querySelector('[aria-label="Resume slideshow"]') as HTMLButtonElement).click(); });
+        expect(progress()).toBeCloseTo(0.5, 2);
+        await act(async () => { vi.advanceTimersByTime(4000); });
+        expect(container.querySelector('img[alt="Skyforge gallery image 2"]')).not.toBeNull();
+        expect(progress()).toBe(0);
+    });
+
+    it('resets a new slide without losing manual pause through a video slide', async () => {
+        vi.useFakeTimers();
+        await act(async () => {
+            root.render(<GalleryCarousel images={['/one.png', 'https://youtu.be/dQw4w9WgXcQ', '/three.png']} title="Skyforge" />);
+        });
+        await act(async () => { vi.advanceTimersByTime(2000); });
+        await act(async () => { (container.querySelector('[aria-label="Pause slideshow"]') as HTMLButtonElement).click(); });
+        await act(async () => { (container.querySelector('[aria-label="Next gallery image"]') as HTMLButtonElement).click(); });
+        expect(container.querySelector('iframe')).not.toBeNull();
+        await act(async () => { vi.advanceTimersByTime(16000); });
+        await act(async () => { (container.querySelector('[aria-label="Next gallery image"]') as HTMLButtonElement).click(); });
+        expect(container.querySelector('[aria-label="Resume slideshow"]')).not.toBeNull();
+        expect((container.querySelector('[data-gallery-progress]') as HTMLElement).style.transform).toBe('scaleX(0)');
+        await act(async () => { vi.advanceTimersByTime(16000); });
+        expect(container.querySelector('img[alt="Skyforge gallery image 3"]')).not.toBeNull();
+        await act(async () => { (container.querySelector('[aria-label="Resume slideshow"]') as HTMLButtonElement).click(); });
+        await act(async () => { vi.advanceTimersByTime(8000); });
+        expect(container.querySelector('img[alt="Skyforge gallery image 1"]')).not.toBeNull();
+    });
+
+    it('starts a full image interval after leaving an automatically paused video', async () => {
+        vi.useFakeTimers();
+        await act(async () => {
+            root.render(<GalleryCarousel images={['https://youtu.be/dQw4w9WgXcQ', '/two.png']} title="Skyforge" />);
+        });
+        await act(async () => { vi.advanceTimersByTime(32000); });
+        await act(async () => { (container.querySelector('[aria-label="Next gallery image"]') as HTMLButtonElement).click(); });
+        await act(async () => { vi.advanceTimersByTime(4000); });
+        expect(container.querySelector('img[alt="Skyforge gallery image 2"]')).not.toBeNull();
+        expect((container.querySelector('[data-gallery-progress]') as HTMLElement).style.transform).toBe('scaleX(0.5)');
+        await act(async () => { vi.advanceTimersByTime(4000); });
+        expect(container.querySelector('iframe')).not.toBeNull();
+    });
+
     it('renders captions from the gallery caption map', async () => {
         await act(async () => {
             root.render(<GalleryCarousel images={['/one.png']} captions={{ '/one.png': 'First build screenshot' }} title="Skyforge" />);

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, PlayCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pause, Play, PlayCircle } from 'lucide-react';
 
 import { BACKEND_URL } from '@/utils/api';
 import { getCloudflareUrl } from '@/utils/images';
@@ -58,7 +58,11 @@ export const GalleryCarouselViewer: React.FC<GalleryCarouselViewerProps> = ({
     emptyFallback = null
 }) => {
     const [localActiveIndex, setLocalActiveIndex] = useState(() => Math.max(0, defaultActiveIndex));
+    const [manuallyPaused, setManuallyPaused] = useState(false);
     const thumbnailRefs = useRef<Array<HTMLButtonElement | null>>([]);
+    const progressRef = useRef<HTMLDivElement>(null);
+    const elapsedRef = useRef(0);
+    const timedSlideRef = useRef('');
 
     const resolvedImages = useMemo(
         () => resolveGalleryImages(images, captions).map((image) => ({
@@ -73,7 +77,8 @@ export const GalleryCarouselViewer: React.FC<GalleryCarouselViewerProps> = ({
     const rawActiveIndex = isControlled ? activeIndex : localActiveIndex;
     const safeActiveIndex = clampIndex(rawActiveIndex, imageCount);
     const activeImage = resolvedImages[safeActiveIndex] || resolvedImages[0];
-    const shouldAutoAdvance = autoAdvance && activeImage?.type !== 'youtube';
+    const shouldAutoAdvance = autoAdvance && !manuallyPaused && activeImage?.type !== 'youtube';
+    const timedSlide = `${safeActiveIndex}:${activeImage?.url || ''}`;
 
     const setActiveIndex = useCallback((nextValue: number | ((current: number) => number)) => {
         const nextIndex = clampIndex(
@@ -90,6 +95,10 @@ export const GalleryCarouselViewer: React.FC<GalleryCarouselViewerProps> = ({
         onActiveIndexChange?.(nextIndex);
     }, [imageCount, isControlled, onActiveIndexChange, safeActiveIndex]);
 
+    // Callback/metadata updates must not restart the current slide's clock.
+    const changeIndexRef = useRef(setActiveIndex);
+    useEffect(() => { changeIndexRef.current = setActiveIndex; }, [setActiveIndex]);
+
     useEffect(() => {
         if (imageCount === 0 || rawActiveIndex === safeActiveIndex) return;
 
@@ -102,14 +111,41 @@ export const GalleryCarouselViewer: React.FC<GalleryCarouselViewerProps> = ({
     }, [imageCount, isControlled, onActiveIndexChange, rawActiveIndex, safeActiveIndex]);
 
     useEffect(() => {
+        if (timedSlideRef.current !== timedSlide) {
+            timedSlideRef.current = timedSlide;
+            elapsedRef.current = 0;
+        }
+        const paint = (elapsed: number) => {
+            if (progressRef.current) {
+                progressRef.current.style.transform = `scaleX(${Math.min(elapsed / AUTO_ADVANCE_MS, 1)})`;
+            }
+        };
+        paint(elapsedRef.current);
         if (!shouldAutoAdvance || imageCount <= 1) return;
 
-        const timer = window.setTimeout(() => {
-            setActiveIndex((prev) => (prev + 1) % imageCount);
-        }, AUTO_ADVANCE_MS);
+        const startedAt = performance.now();
+        let completed = false;
+        let frame: number;
+        const tick = (now: number) => {
+            const elapsed = elapsedRef.current + Math.max(0, now - startedAt);
+            paint(elapsed);
+            if (elapsed >= AUTO_ADVANCE_MS) {
+                completed = true;
+                changeIndexRef.current((prev) => (prev + 1) % imageCount);
+            } else {
+                frame = window.requestAnimationFrame(tick);
+            }
+        };
+        frame = window.requestAnimationFrame(tick);
 
-        return () => window.clearTimeout(timer);
-    }, [imageCount, safeActiveIndex, setActiveIndex, shouldAutoAdvance]);
+        return () => {
+            window.cancelAnimationFrame(frame);
+            if (!completed) {
+                elapsedRef.current = Math.min(AUTO_ADVANCE_MS,
+                    elapsedRef.current + Math.max(0, performance.now() - startedAt));
+            }
+        };
+    }, [imageCount, timedSlide, shouldAutoAdvance]);
 
     useEffect(() => {
         if (imageCount <= 1) return;
@@ -222,12 +258,25 @@ export const GalleryCarouselViewer: React.FC<GalleryCarouselViewerProps> = ({
                         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-blue-950/80 px-3 py-1 text-xs font-black tracking-wider text-white shadow-lg sm:hidden">
                             {safeActiveIndex + 1} / {imageCount}
                         </div>
-                        {shouldAutoAdvance && (
+                        {autoAdvance && (
+                            <button
+                                type="button"
+                                aria-label={manuallyPaused ? 'Resume slideshow' : 'Pause slideshow'}
+                                onClick={() => setManuallyPaused((paused) => !paused)}
+                                title={activeImage.type === 'youtube' ? 'Slideshow pauses while this video is selected' : undefined}
+                                className="absolute left-3 top-3 flex items-center gap-2 rounded-lg border border-blue-200/50 bg-blue-950/85 px-3 py-2 text-xs font-bold text-white hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-modtale-accent sm:left-4 sm:top-4"
+                            >
+                                {manuallyPaused ? <Play className="h-4 w-4" aria-hidden="true" /> : <Pause className="h-4 w-4" aria-hidden="true" />}
+                                {manuallyPaused ? 'Resume' : 'Pause'}
+                            </button>
+                        )}
+                        {autoAdvance && (
                             <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-950/40" aria-hidden="true">
                                 <div
-                                    key={`${activeImage.url}-${safeActiveIndex}`}
+                                    ref={progressRef}
+                                    data-gallery-progress="true"
                                     className="h-full origin-left bg-modtale-accent"
-                                    style={{ animation: `gallery-carousel-progress ${AUTO_ADVANCE_MS}ms linear forwards` }}
+                                    style={{ transform: 'scaleX(0)', willChange: 'transform' }}
                                 />
                             </div>
                         )}

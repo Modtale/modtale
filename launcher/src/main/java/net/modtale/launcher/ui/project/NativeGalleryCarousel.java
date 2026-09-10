@@ -5,10 +5,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
-import javafx.animation.Interpolator;
-import javafx.animation.KeyFrame;
-import javafx.animation.KeyValue;
-import javafx.animation.Timeline;
+import java.util.function.LongSupplier;
+import javafx.animation.AnimationTimer;
 import javafx.css.PseudoClass;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -29,7 +27,6 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.transform.Scale;
-import javafx.util.Duration;
 import net.modtale.launcher.ui.common.CachedImageLoader;
 import net.modtale.launcher.ui.common.LauncherIcons;
 
@@ -44,7 +41,7 @@ final class NativeGalleryCarousel {
     private static final double THUMBNAIL_HEIGHT = 80;
     private static final double THUMBNAIL_REQUESTED_WIDTH = 256;
     private static final double THUMBNAIL_REQUESTED_HEIGHT = 144;
-    private static final Duration AUTO_ADVANCE_DURATION = Duration.seconds(8);
+    private static final long AUTO_ADVANCE_NANOS = 8_000_000_000L;
     private static final PseudoClass SELECTED = PseudoClass.getPseudoClass("selected");
     private static final String THUMBNAIL_LOADED_PROPERTY = NativeGalleryCarousel.class.getName() + ".thumbnailLoaded";
 
@@ -55,10 +52,16 @@ final class NativeGalleryCarousel {
 
     private final CachedImageLoader imageLoader;
     private final Consumer<String> openUrl;
+    private final LongSupplier nanoTime;
 
     NativeGalleryCarousel(CachedImageLoader imageLoader, Consumer<String> openUrl) {
+        this(imageLoader, openUrl, System::nanoTime);
+    }
+
+    NativeGalleryCarousel(CachedImageLoader imageLoader, Consumer<String> openUrl, LongSupplier nanoTime) {
         this.imageLoader = imageLoader;
         this.openUrl = openUrl;
+        this.nanoTime = nanoTime;
     }
 
     Node render(List<ImageItem> images, int initialIndex, Variant variant) {
@@ -78,9 +81,19 @@ final class NativeGalleryCarousel {
         private final ScrollPane thumbnailScroller = new ScrollPane(thumbnails);
         private final Region progressFill = new Region();
         private final Scale progressScale = new Scale(0, 1, 0, 0);
+        private final Button playback = new Button();
+        private final GalleryPlaybackClock clock = new GalleryPlaybackClock(AUTO_ADVANCE_NANOS);
         private final List<ImageView> thumbnailViews;
         private final List<Button> thumbnailButtons;
-        private Timeline progressTimeline;
+        private final AnimationTimer progressTimer = new AnimationTimer() {
+            @Override
+            public void handle(long now) {
+                double progress = clock.progress(nanoTime.getAsLong());
+                progressScale.setX(progress);
+                if (progress >= 1) show(index + 1);
+            }
+        };
+        private boolean manuallyPaused;
         private int index;
         private int selectedThumbnail = -1;
 
@@ -131,6 +144,14 @@ final class NativeGalleryCarousel {
             StackPane.setAlignment(next, Pos.CENTER_RIGHT);
             StackPane.setMargin(next, new Insets(0, 16, 0, 0));
 
+            playback.getStyleClass().add("project-gallery-carousel-playback");
+            playback.setOnAction(event -> {
+                manuallyPaused = !manuallyPaused;
+                syncPlayback();
+            });
+            StackPane.setAlignment(playback, Pos.TOP_LEFT);
+            StackPane.setMargin(playback, new Insets(16));
+
             StackPane progressTrack = progressTrack();
             StackPane.setAlignment(progressTrack, Pos.BOTTOM_CENTER);
 
@@ -139,7 +160,7 @@ final class NativeGalleryCarousel {
             caption.setMaxWidth(Double.MAX_VALUE);
 
             if (images.size() > 1) {
-                media.getChildren().addAll(previous, next, progressTrack);
+                media.getChildren().addAll(previous, next, playback, progressTrack);
             }
             root.getChildren().add(media);
             root.getChildren().add(caption);
@@ -158,11 +179,7 @@ final class NativeGalleryCarousel {
                 }
             });
             root.sceneProperty().addListener((observable, previousScene, currentScene) -> {
-                if (currentScene == null) {
-                    stopProgressTimeline();
-                } else {
-                    restartProgressTimeline();
-                }
+                syncPlayback();
             });
         }
 
@@ -285,7 +302,7 @@ final class NativeGalleryCarousel {
                 image.setImage(null);
                 caption.setText("");
                 setCaptionVisible(false);
-                stopProgressTimeline();
+                syncPlayback();
                 return;
             }
             ImageItem item = images.get(index);
@@ -310,7 +327,9 @@ final class NativeGalleryCarousel {
                 image.setCursor(Cursor.DEFAULT);
                 image.setOnMouseClicked(null);
             }
-            restartProgressTimeline();
+            clock.reset(nanoTime.getAsLong());
+            progressScale.setX(0);
+            syncPlayback();
         }
 
         private void setCaptionVisible(boolean visible) {
@@ -366,26 +385,18 @@ final class NativeGalleryCarousel {
             imageLoader.loadInto(thumbnail, images.get(itemIndex).previewUrl(), THUMBNAIL_REQUESTED_WIDTH, THUMBNAIL_REQUESTED_HEIGHT, true);
         }
 
-        private void restartProgressTimeline() {
-            if (images.size() <= 1 || root.getScene() == null || images.get(index).youtube()) {
-                if (progressTimeline != null) progressTimeline.stop();
-                progressScale.setX(0);
-                return;
-            }
-            if (progressTimeline == null) {
-                progressTimeline = new Timeline(
-                        new KeyFrame(Duration.ZERO, new KeyValue(progressScale.xProperty(), 0)),
-                        new KeyFrame(AUTO_ADVANCE_DURATION, event -> show(index + 1),
-                                new KeyValue(progressScale.xProperty(), 1, Interpolator.LINEAR))
-                );
-            }
-            progressTimeline.playFromStart();
-        }
-
-        private void stopProgressTimeline() {
-            if (progressTimeline != null) {
-                progressTimeline.stop();
-            }
+        private void syncPlayback() {
+            boolean video = !images.isEmpty() && images.get(index).youtube();
+            boolean running = images.size() > 1 && root.getScene() != null && !video && !manuallyPaused;
+            long now = nanoTime.getAsLong();
+            clock.setRunning(running, now);
+            progressScale.setX(clock.progress(now));
+            playback.setText(manuallyPaused ? "Resume" : "Pause");
+            playback.setAccessibleText(manuallyPaused ? "Resume slideshow" : "Pause slideshow");
+            playback.setTooltip(new Tooltip(video ? "Slideshow pauses while this video is selected"
+                    : playback.getAccessibleText()));
+            if (running) progressTimer.start();
+            else progressTimer.stop();
         }
 
         private double requestedWidth() {
