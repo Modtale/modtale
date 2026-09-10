@@ -485,7 +485,10 @@ public final class ProjectPageController {
         Node page = creatorProfileView.render(currentCreator, currentCreatorProjects, currentCreatorRelations, loading, compactLayout);
         if (page instanceof Region pageRegion) {
             syncProjectDocumentHeight(pageRegion);
-            pageRegion.prefHeightProperty().addListener((observable, previous, height) ->
+            pageRegion.needsLayoutProperty().addListener((observable, previous, needsLayout) -> {
+                if (needsLayout) Platform.runLater(() -> syncProjectDocumentHeight(pageRegion));
+            });
+            pageRegion.widthProperty().addListener((observable, previous, width) ->
                     Platform.runLater(() -> syncProjectDocumentHeight(pageRegion)));
         }
         content.getChildren().setAll(page);

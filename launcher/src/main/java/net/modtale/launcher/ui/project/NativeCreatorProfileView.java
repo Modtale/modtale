@@ -125,13 +125,9 @@ final class NativeCreatorProfileView {
                 : LauncherLayout.launcherPageInsets(64, 80));
 
         page.getChildren().addAll(hero, card, body);
-        page.minHeightProperty().bind(Bindings.createDoubleBinding(
-                () -> hero.getPrefHeight() + PROFILE_CARD_LIFT + preferredHeightAtPageWidth(card, page.getWidth())
-                        + (compact ? 36 : 64) + preferredHeightAtPageWidth(body, page.getWidth()) + 80,
-                hero.prefHeightProperty(), page.widthProperty(),
-                card.layoutBoundsProperty(), body.layoutBoundsProperty()
-        ));
-        page.prefHeightProperty().bind(page.minHeightProperty());
+        // Let VBox measure its complete width-dependent subtree, including project cards
+        // whose preferred sizes change after CSS and image loading.
+        page.setMinHeight(Region.USE_PREF_SIZE);
         return page;
     }
 
