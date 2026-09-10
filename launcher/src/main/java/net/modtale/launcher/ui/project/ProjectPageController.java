@@ -1202,6 +1202,8 @@ public final class ProjectPageController {
     }
 
     private void syncProjectDocumentHeight(Region page) {
+        // Layout callbacks from a replaced loading/profile page must not resize the current document.
+        if (page.getParent() != content) return;
         double height = page.getPrefHeight();
         if (!Double.isFinite(height) || height <= 0) {
             height = page.prefHeight(content.getWidth() > 0 ? content.getWidth() : -1);

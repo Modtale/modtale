@@ -2,6 +2,10 @@ package net.modtale.launcher.ui.project;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import javafx.geometry.Insets;
+import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
 import javafx.scene.image.WritableImage;
 import javafx.scene.layout.StackPane;
 import net.modtale.launcher.model.user.CreatorProfile;
@@ -42,6 +46,45 @@ class NativeCreatorProfileViewTest {
         image.setImage(new WritableImage(300, 900));
         assertEquals(400.0 / 3, image.getBoundsInLocal().getWidth(), 0.001);
         assertEquals(400, image.getBoundsInLocal().getHeight(), 0.001);
+    }
+
+    @Test
+    void growingBiographyKeepsStatsInsideTheCardsBottomPadding() {
+        var card = NativeCreatorProfileView.profileCardContainer();
+        card.setPadding(new Insets(40));
+        Region biography = new Region();
+        biography.setPrefSize(300, 40);
+        Region stats = new Region();
+        stats.setPrefSize(300, 60);
+        VBox copy = new VBox(biography, stats);
+        card.getChildren().add(copy);
+        double shortHeight = card.prefHeight(500);
+        biography.setPrefHeight(240);
+        double longHeight = card.prefHeight(500);
+        assertEquals(shortHeight + 200, longHeight, 0.001);
+        assertEquals(longHeight, card.minHeight(500), 0.001);
+        card.resize(500, longHeight);
+        card.layout();
+        copy.layout();
+        double statsBottom = copy.getLayoutY() + stats.getLayoutY() + stats.getHeight();
+        assertEquals(40, card.getHeight() - statsBottom, 0.001);
+    }
+
+    @Test
+    void documentHeightIncludesEveryWrappedProjectRowAtTheAvailableWidth() {
+        FlowPane projects = new FlowPane(24, 24);
+        for (int i = 0; i < 6; i++) {
+            Region tile = new Region();
+            tile.setMinSize(300, 200);
+            tile.setPrefSize(300, 200);
+            projects.getChildren().add(tile);
+        }
+        VBox body = new VBox(projects);
+        VBox.setMargin(body, new Insets(64, 112, 80, 112));
+        assertEquals(648, NativeCreatorProfileView.preferredHeightAtPageWidth(body, 900), 0.001);
+        assertEquals(424, NativeCreatorProfileView.preferredHeightAtPageWidth(body, 1200), 0.001);
+        projects.setTranslateY(300);
+        assertEquals(648, NativeCreatorProfileView.preferredHeightAtPageWidth(body, 900), 0.001);
     }
 
     private static CreatorProfile.ConnectedAccount account(String provider, String id, String username, String url) {

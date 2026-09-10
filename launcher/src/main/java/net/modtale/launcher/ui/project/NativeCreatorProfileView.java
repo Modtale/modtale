@@ -45,7 +45,6 @@ final class NativeCreatorProfileView {
 
     private static final double CONTENT_MAX_WIDTH = 1568;
     private static final double BANNER_FALLBACK_HEIGHT = 360;
-    private static final double PROFILE_CARD_HEIGHT = 316;
     private static final double PROFILE_CARD_LIFT = -32;
     private static final double AVATAR_SIZE = 224;
     private static final double PROJECT_GRID_GAP = 24;
@@ -117,7 +116,7 @@ final class NativeCreatorProfileView {
         ));
         hero.minHeightProperty().bind(hero.prefHeightProperty());
 
-        Node card = loading ? loadingCard() : profileCard(profile, projects);
+        Region card = loading ? loadingCard() : profileCard(profile, projects);
         VBox.setMargin(card, LauncherLayout.launcherPageInsets(PROFILE_CARD_LIFT, 0));
 
         VBox body = profileBody(profile, projects, relatedProfiles, loading, compact);
@@ -127,10 +126,10 @@ final class NativeCreatorProfileView {
 
         page.getChildren().addAll(hero, card, body);
         page.minHeightProperty().bind(Bindings.createDoubleBinding(
-                () -> hero.getPrefHeight() + PROFILE_CARD_LIFT + PROFILE_CARD_HEIGHT
-                        + (compact ? 36 : 64) + body.prefHeight(-1) + 80,
-                hero.prefHeightProperty(),
-                body.heightProperty()
+                () -> hero.getPrefHeight() + PROFILE_CARD_LIFT + preferredHeightAtPageWidth(card, page.getWidth())
+                        + (compact ? 36 : 64) + preferredHeightAtPageWidth(body, page.getWidth()) + 80,
+                hero.prefHeightProperty(), page.widthProperty(),
+                card.layoutBoundsProperty(), body.layoutBoundsProperty()
         ));
         page.prefHeightProperty().bind(page.minHeightProperty());
         return page;
@@ -203,20 +202,30 @@ final class NativeCreatorProfileView {
                 new ProjectPage(List.of(LauncherSkeletonContent.project()), 1, 1, 0, true)));
     }
 
-    private HBox profileCard(CreatorProfile profile, ProjectPage projects) {
+    static HBox profileCardContainer() {
         HBox card = new HBox(40);
         card.getStyleClass().add("creator-profile-card");
         card.setAlignment(Pos.TOP_LEFT);
         card.setMaxWidth(Double.MAX_VALUE);
-        card.setMinHeight(PROFILE_CARD_HEIGHT);
-        card.setPrefHeight(PROFILE_CARD_HEIGHT);
+        card.setMinHeight(Region.USE_PREF_SIZE);
+        return card;
+    }
+
+    static double preferredHeightAtPageWidth(Region child, double pageWidth) {
+        Insets margin = VBox.getMargin(child);
+        double horizontalMargin = margin == null ? 0 : margin.getLeft() + margin.getRight();
+        double width = pageWidth > horizontalMargin ? pageWidth - horizontalMargin : -1;
+        return child.prefHeight(width);
+    }
+
+    private HBox profileCard(CreatorProfile profile, ProjectPage projects) {
+        HBox card = profileCardContainer();
 
         StackPane avatar = avatar(profile);
         HBox.setMargin(avatar, new Insets(-96, 0, 0, 8));
 
         VBox copy = new VBox(0);
         copy.getStyleClass().add("creator-profile-copy");
-        copy.setTranslateY(-15);
         copy.setMinWidth(0);
         HBox.setHgrow(copy, Priority.ALWAYS);
         copy.getChildren().addAll(
