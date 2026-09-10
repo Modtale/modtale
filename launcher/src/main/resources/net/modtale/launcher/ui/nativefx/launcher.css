@@ -9146,15 +9146,41 @@
     -fx-padding: 16px;
     -fx-background-radius: 16px;
     -fx-border-radius: 16px;
-    -fx-background-color: #1e293b;
+    -fx-background-color: #0f172a;
+    -fx-border-color: rgba(255, 255, 255, 0.10), transparent;
+    -fx-border-width: 1px, 3px;
+    -fx-border-insets: 0, 0;
+    -fx-effect: dropshadow(one-pass-box, rgba(2, 6, 23, 0.20), 14, 0.10, 0, 5);
 }
 
 .library-view .library-world-project-row:hover {
-    -fx-border-color: rgba(96, 165, 250, 0.45);
+    -fx-border-color: transparent, #3b82f6;
+    -fx-effect: dropshadow(one-pass-box, rgba(2, 6, 23, 0.28), 18, 0.12, 0, 7);
+}
+
+.library-view .library-world-project-row:contents-hovered,
+.library-view .library-world-project-row:contents-hovered:hover,
+.root:scrolling .library-view .library-world-project-row:hover {
+    -fx-background-color: #0f172a;
+    -fx-border-color: rgba(255, 255, 255, 0.10), transparent;
+    -fx-effect: dropshadow(one-pass-box, rgba(2, 6, 23, 0.20), 14, 0.10, 0, 5);
+}
+
+.library-view .library-world-project-main {
+    -fx-spacing: 18px;
+}
+
+.library-view .library-world-project-copy {
+    -fx-spacing: 8px;
 }
 
 .library-view .library-world-project-title {
-    -fx-font-size: 15px;
+    -fx-font-size: 20px;
+}
+
+.library-view .library-world-project-meta {
+    -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
+    -fx-font-size: 14px;
 }
 
 .library-view .library-world-tab-status {

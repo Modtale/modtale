@@ -273,6 +273,7 @@ final class LibraryWorldRenderer {
         InstalledProject installed = model.installed();
         LibraryWorldProjectDisplay display = model.display();
         VBox copy = new VBox(5);
+        copy.getStyleClass().add("library-world-project-copy");
         copy.setAlignment(Pos.CENTER_LEFT);
         Label title = new Label(display.title());
         title.getStyleClass().add("library-world-project-title");
