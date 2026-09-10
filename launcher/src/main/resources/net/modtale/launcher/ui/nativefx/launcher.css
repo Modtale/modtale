@@ -1972,7 +1972,7 @@
     -fx-padding: 0 0 0 10px;
 }
 
-.game-version-dropdown-group-row {
+.game-version-dropdown-group-row:selected {
     -fx-padding: 0 10px 0 0;
 }
 

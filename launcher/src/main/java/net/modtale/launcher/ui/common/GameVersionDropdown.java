@@ -280,6 +280,8 @@ public final class GameVersionDropdown extends VBox {
         check.getStyleClass().add("game-version-dropdown-check");
         check.setVisible(selected);
         StackPane slot = new StackPane(check);
+        slot.setManaged(selected);
+        slot.setVisible(selected);
         slot.setMinWidth(14);
         slot.setPrefWidth(14);
         slot.setMaxWidth(14);
