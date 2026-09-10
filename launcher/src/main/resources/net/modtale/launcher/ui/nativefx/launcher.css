@@ -1,3 +1,7 @@
+.root {
+    -fx-font-family: "Inter";
+}
+
 .app-root {
     -fx-background-color: #0B1120;
     -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
@@ -9091,6 +9095,12 @@
 .library-world-project-list,
 .library-world-content-list {
     -fx-fill-width: true;
+}
+
+.library-group-title {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 14px;
+    -fx-padding: 2px 2px 0;
 }
 
 .library-world-project-row {

@@ -402,7 +402,8 @@ public final class LauncherShell {
         navigation.activate(nextView);
         boolean webMode = nextView == LauncherView.PROJECT;
         boolean discoverMode = nextView == LauncherView.DISCOVER;
-        boolean launcherPage = nextView == LauncherView.PLAY || nextView == LauncherView.LIBRARY || nextView == LauncherView.WARDROBE;
+        boolean launcherPage = nextView == LauncherView.PLAY || nextView == LauncherView.LIBRARY
+                || nextView == LauncherView.WARDROBE || nextView == LauncherView.SETTINGS;
         boolean documentMode = usesDocumentHeight(nextView);
         boolean playPage = nextView == LauncherView.PLAY;
         toggleStyleClass(sceneLayer, "play-screen", playPage);

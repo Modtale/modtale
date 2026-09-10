@@ -15,6 +15,7 @@ import net.modtale.launcher.config.HytaleConfigFiles.ConfigFile;
 import javafx.collections.FXCollections;
 import javafx.css.PseudoClass;
 import javafx.geometry.Pos;
+import javafx.geometry.Insets;
 import javafx.scene.Node;
 import javafx.scene.Cursor;
 import javafx.scene.control.ButtonBase;
@@ -27,6 +28,7 @@ import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
+import javafx.scene.control.TextField;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -52,6 +54,7 @@ final class LibraryWorldRenderer {
     private static final PseudoClass CONTENTS_HOVERED = PseudoClass.getPseudoClass("contents-hovered");
 
     private List<String> knownGameVersions = List.of();
+    private String librarySearch = "";
     void setKnownGameVersions(List<String> versions) { knownGameVersions = List.copyOf(versions); }
 
     private Consumer<ProjectSummary> openProject = ignored -> {};
@@ -209,12 +212,59 @@ final class LibraryWorldRenderer {
     }
 
     private Node installedProjectsSection(LibraryWorldModel model, List<ConfigFile> configs) {
-        return installedProjectsSection(
-                model.world(),
-                model.projects(),
-                "No installed projects",
-                "Install mods from Browse to manage them per world.", configs
-        );
+        TextField search = new TextField(librarySearch);
+        search.setPromptText("Search installed mods...");
+        search.setAccessibleText("Search installed mods");
+        search.getStyleClass().addAll("input", "quick-search");
+        search.setMaxWidth(Double.MAX_VALUE);
+        StackPane searchShell = new StackPane(search);
+        searchShell.getStyleClass().add("search-shell");
+        Node searchIcon = LauncherIcons.icon(LauncherIcons.Glyph.SEARCH, 16);
+        searchIcon.getStyleClass().add("search-icon");
+        searchIcon.setMouseTransparent(true);
+        StackPane.setAlignment(searchIcon, Pos.CENTER_LEFT);
+        StackPane.setMargin(searchIcon, new Insets(0, 0, 0, 13));
+        Button clear = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.X, 12));
+        clear.getStyleClass().add("search-clear-button");
+        clear.setAccessibleText("Clear library search");
+        clear.setTooltip(new Tooltip("Clear search"));
+        clear.visibleProperty().bind(search.textProperty().isNotEmpty());
+        clear.managedProperty().bind(clear.visibleProperty());
+        clear.setOnAction(event -> { search.clear(); search.requestFocus(); });
+        StackPane.setAlignment(clear, Pos.CENTER_RIGHT);
+        StackPane.setMargin(clear, new Insets(0, 9, 0, 0));
+        searchShell.getChildren().addAll(searchIcon, clear);
+        VBox results = new VBox(18);
+        Runnable render = () -> {
+            results.getChildren().clear();
+            if (model.projects().isEmpty()) {
+                results.getChildren().add(emptyState("No installed projects", "Install mods from Browse to manage them per world."));
+                return;
+            }
+            List<LibraryWorldProjectModel> visible = LibraryProjectFilter.matching(model.projects(), librarySearch);
+            for (boolean enabled : new boolean[] {true, false}) {
+                List<LibraryWorldProjectModel> group = visible.stream()
+                        .filter(project -> (project.enabledCount() > 0) == enabled).toList();
+                Label subtitle = new Label(enabled ? "Enabled" : "Disabled");
+                subtitle.getStyleClass().addAll("library-section-title", "library-group-title");
+                VBox section = new VBox(10, subtitle);
+                if (group.isEmpty()) {
+                    Label empty = new Label(librarySearch.isBlank()
+                            ? (enabled ? "No enabled mods" : "No disabled mods") : "No matching mods");
+                    empty.getStyleClass().add("library-project-meta");
+                    section.getChildren().add(empty);
+                } else {
+                    section.getChildren().add(installedProjectsSection(model.world(), group, "", "", configs));
+                }
+                results.getChildren().add(section);
+            }
+        };
+        search.textProperty().addListener((observable, before, after) -> {
+            librarySearch = after;
+            render.run();
+        });
+        render.run();
+        return new VBox(18, searchShell, results);
     }
 
     private Node installedProjectsSection(
