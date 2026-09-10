@@ -51,7 +51,7 @@ final class LauncherPreferenceSyncDialog {
         StatusModal.Result result = StatusModal.builder(host)
                 .type(StatusModal.Type.INFO)
                 .title("Different launcher settings found")
-                .message("Your Modtale account has different launcher settings or configs. Close Hytale before loading them. Existing configs will be backed up before replacement.")
+                .message("Close Hytale before loading. Your current configs will be backed up.")
                 .secondaryLabel("Use this device")
                 .actionLabel("Load from Modtale")
                 .content(dialog.summaryCard())
