@@ -1,8 +1,6 @@
 package net.modtale.launcher.ui.library;
 
 import javafx.scene.Node;
-import javafx.scene.control.Label;
-import javafx.beans.binding.Bindings;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -34,17 +32,7 @@ final class LibraryShellView {
         content.getStyleClass().add("library-content");
         VBox projectsPane = new VBox(14);
         projectsPane.getStyleClass().add("library-projects-pane");
-        Label title = new Label("Worlds");
-        title.getStyleClass().add("library-navigation-title");
-        Label count = new Label();
-        count.textProperty().bind(Bindings.createStringBinding(
-                () -> Long.toString(projectList.getChildren().stream()
-                        .filter(node -> node.getStyleClass().contains("library-world-tab")).count()),
-                projectList.getChildren()));
-        count.getStyleClass().add("library-count-pill");
-        HBox header = new HBox(10, title, count);
-        header.getStyleClass().add("library-pane-header");
-        projectsPane.getChildren().addAll(header, projectList);
+        projectsPane.getChildren().add(projectList);
         VBox.setVgrow(projectList, Priority.ALWAYS);
 
         projectDetail.getStyleClass().add("library-detail-pane");

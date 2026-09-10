@@ -189,13 +189,11 @@ class LauncherPageLayoutTest {
                 assertTrue(detail.localToScene(detail.getBoundsInLocal()).getMaxX() <= width + 1);
                 var title = (Label) row.lookup(".library-project-title");
                 assertTrue(title.getWidth() < row.getWidth());
-                assertEquals("2", ((Label) view.lookup(".library-count-pill")).getText());
                 snapshot(host, "library-" + width);
             }
             row.fire();
             assertEquals(world, selected.get());
             worlds.getChildren().removeLast();
-            assertEquals("1", ((Label) view.lookup(".library-count-pill")).getText());
         });
     }
 
