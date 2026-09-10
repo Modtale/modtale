@@ -25,7 +25,7 @@ public enum ProjectBrowseSort {
     }
 
     public static java.util.List<ProjectBrowseSort> curseForgeSorts() {
-        return java.util.List.of(RELEVANCE, POPULAR, UPDATED, NEWEST, DOWNLOADS, NAME, AUTHOR);
+        return java.util.List.of(NAME, AUTHOR, RELEVANCE, POPULAR, UPDATED, NEWEST, DOWNLOADS);
     }
 
     public String curseForgeLabel() {
