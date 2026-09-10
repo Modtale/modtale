@@ -548,7 +548,7 @@ final class LibraryWorldRenderer {
     ) {
         StackPane shell = new StackPane();
         shell.getStyleClass().add(styleClass);
-        double borderWidth = styleClass.equals("library-project-icon") ? 4 : 2;
+        double borderWidth = styleClass.equals("library-project-icon") || styleClass.equals("library-detail-icon") ? 4 : 2;
         if (borderWidth == 4) {
             shell.getStyleClass().add("library-mod-icon");
         }
@@ -556,7 +556,7 @@ final class LibraryWorldRenderer {
         shell.setPrefSize(size, size);
         shell.setMaxSize(size, size);
         double mediaSize = Math.max(1, size - borderWidth * 2);
-        double clipRadius = (borderWidth == 4 ? 16 : 8) - borderWidth;
+        double clipRadius = (borderWidth == 4 ? 16 : 8) - borderWidth / 2;
 
         Node fallback;
         if (imageLoader != null && useProjectFallback) {
@@ -565,7 +565,7 @@ final class LibraryWorldRenderer {
             placeholder.fitHeightProperty().bind(shell.heightProperty().subtract(borderWidth * 2));
             placeholder.setPreserveRatio(true);
             placeholder.setSmooth(true);
-            placeholder.setClip(roundedClip(shell, clipRadius, borderWidth));
+            placeholder.setClip(roundedClip(placeholder, clipRadius));
             imageLoader.loadInto(placeholder, null, mediaSize * 3, mediaSize * 3, true);
             fallback = placeholder;
         } else {
@@ -583,7 +583,7 @@ final class LibraryWorldRenderer {
             }
             image.setSmooth(true);
             image.setMouseTransparent(true);
-            image.setClip(roundedClip(shell, clipRadius, borderWidth));
+            image.setClip(roundedClip(image, clipRadius));
             double renderScale = fallbackGlyph == LauncherIcons.Glyph.GLOBE ? 6 : 3;
             imageLoader.loadInto(image, iconUrl, mediaSize * renderScale, mediaSize * renderScale, true);
             CachedImageLoader.showFallbackUntilLoaded(fallback, image);
@@ -597,10 +597,12 @@ final class LibraryWorldRenderer {
         return shell;
     }
 
-    private Rectangle roundedClip(StackPane shell, double radius, double borderWidth) {
+    private Rectangle roundedClip(ImageView image, double radius) {
         Rectangle clip = new Rectangle();
-        clip.widthProperty().bind(shell.widthProperty().subtract(borderWidth * 2));
-        clip.heightProperty().bind(shell.heightProperty().subtract(borderWidth * 2));
+        clip.widthProperty().bind(javafx.beans.binding.Bindings.createDoubleBinding(
+                () -> image.getLayoutBounds().getWidth(), image.layoutBoundsProperty()));
+        clip.heightProperty().bind(javafx.beans.binding.Bindings.createDoubleBinding(
+                () -> image.getLayoutBounds().getHeight(), image.layoutBoundsProperty()));
         clip.setArcWidth(radius * 2);
         clip.setArcHeight(radius * 2);
         return clip;

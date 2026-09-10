@@ -8596,15 +8596,6 @@
     -fx-border-color: #1e293b;
 }
 
-.library-mod-icon {
-    -fx-background-color: transparent;
-    -fx-background-radius: 16px;
-    -fx-border-radius: 16px;
-    -fx-border-width: 4px;
-    -fx-border-color: #334155;
-    -fx-effect: dropshadow(one-pass-box, rgba(2, 6, 23, 0.24), 12, 0.12, 0, 5);
-}
-
 .library-project-icon .svg-icon,
 .library-detail-icon .svg-icon,
 .library-child-icon .svg-icon {
@@ -8633,6 +8624,15 @@
     -fx-background-radius: 9px;
     -fx-border-radius: 9px;
     -fx-background-color: rgba(37, 99, 235, 0.16);
+}
+
+.library-mod-icon {
+    -fx-background-color: transparent;
+    -fx-background-radius: 16px;
+    -fx-border-radius: 16px;
+    -fx-border-width: 4px;
+    -fx-border-color: #334155;
+    -fx-effect: dropshadow(one-pass-box, rgba(2, 6, 23, 0.24), 12, 0.12, 0, 5);
 }
 
 .library-child-icon {
