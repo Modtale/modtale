@@ -1222,14 +1222,7 @@ public final class LauncherPlayController {
         title.getStyleClass().add("play-news-title");
         title.setWrapText(true);
         title.setMinHeight(Region.USE_PREF_SIZE);
-        Label date = new Label(formatBlogDate(post.publishedAt()));
-        date.getStyleClass().add("play-news-date");
-
-        Label source = new Label(post.source());
-        source.getStyleClass().addAll("play-news-source", "Modtale".equals(post.source()) ? "modtale" : "hytale");
-        HBox metadata = new HBox(10, source, date);
-        metadata.setAlignment(Pos.CENTER_LEFT);
-        VBox copy = new VBox(10, metadata, title);
+        VBox copy = new VBox(title);
         copy.getStyleClass().add("play-news-copy");
         row.getChildren().addAll(thumbnail, copy);
         return row;
