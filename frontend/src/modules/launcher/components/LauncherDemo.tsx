@@ -40,8 +40,6 @@ export const LauncherDemo = ({ clip, alt, still = false }: { clip: LauncherDemoC
     useEffect(() => {
         const element = video.current;
         if (!element) return;
-        element.defaultPlaybackRate = 1.15;
-        element.playbackRate = 1.15;
         if (active && loaded) void element.play().catch(() => setReady(false));
         else element.pause();
     }, [active, loaded, clip]);

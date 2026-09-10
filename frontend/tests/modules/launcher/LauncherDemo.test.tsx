@@ -34,7 +34,7 @@ it('loads and plays only on screen, pauses off screen, and retains the decoded s
     expect(play).not.toHaveBeenCalled();
     await visible(true);
     expect(video.src).toContain('world-library.mp4');
-    expect(video.playbackRate).toBe(1.15);
+    expect(video.playbackRate).toBe(1);
     expect(video.muted).toBe(true); expect(video.loop).toBe(true); expect(video.controls).toBe(false);
     expect(play).toHaveBeenCalled();
     pause.mockClear(); await visible(false);
