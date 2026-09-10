@@ -15,3 +15,13 @@ describe('news RSS utils', () => {
         expect(xml).toContain('<content:encoded><![CDATA[');
     });
 });
+
+describe('news RSS environment links', () => {
+    it('keeps preview articles and images on the preview site with stable item identifiers', () => {
+        const xml = buildNewsRssXml('https://dev.modtale.net');
+        expect(xml).toContain('<link>https://dev.modtale.net/news/fresh-feature-showcase</link>');
+        expect(xml).toContain('url="https://dev.modtale.net/assets/news/fresh-feature-showcase-og.png"');
+        expect(xml).toContain('href="https://dev.modtale.net/rss.xml" rel="self"');
+        expect(xml).toContain('<guid isPermaLink="true">https://modtale.net/news/fresh-feature-showcase</guid>');
+    });
+});

@@ -3,8 +3,8 @@ import {
     NEWS_POSTS,
     NEWS_RSS_PATH,
     SITE_URL,
-    getAbsoluteUrl,
     getNewsPostUrl,
+    getNewsPostPath,
     getLatestNewsPostDate,
 } from '@/data/news';
 
@@ -17,15 +17,16 @@ const escapeXml = (value: string) => value
 
 const cdata = (value: string) => `<![CDATA[${value.replace(/]]>/g, ']]]]><![CDATA[>')}]]>`;
 
-export const buildNewsRssXml = () => {
+export const buildNewsRssXml = (siteUrl = SITE_URL) => {
+    const absoluteUrl = (path: string) => new URL(path, siteUrl).href;
     const lastUpdated = getLatestNewsPostDate();
     const lastBuildDate = typeof lastUpdated === 'number' && Number.isFinite(lastUpdated)
         ? new Date(lastUpdated).toUTCString()
         : new Date().toUTCString();
 
     const items = NEWS_POSTS.map((post) => {
-        const postUrl = getNewsPostUrl(post);
-        const imageUrl = getAbsoluteUrl(post.socialImage);
+        const postUrl = absoluteUrl(getNewsPostPath(post));
+        const imageUrl = absoluteUrl(post.socialImage);
         const categories = post.tags
             .map((tag) => `      <category>${escapeXml(tag)}</category>`)
             .join('\n');
@@ -40,7 +41,7 @@ export const buildNewsRssXml = () => {
         return `    <item>
       <title>${escapeXml(post.title)}</title>
       <link>${escapeXml(postUrl)}</link>
-      <guid isPermaLink="true">${escapeXml(postUrl)}</guid>
+      <guid isPermaLink="true">${escapeXml(getNewsPostUrl(post))}</guid>
       <description>${escapeXml(post.description)}</description>
       <pubDate>${new Date(post.publishedAt).toUTCString()}</pubDate>
       <dc:creator>${escapeXml(post.author)}</dc:creator>
@@ -54,15 +55,15 @@ ${categories}
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss/">
   <channel>
     <title>Modtale News</title>
-    <link>${escapeXml(getAbsoluteUrl(NEWS_INDEX_PATH))}</link>
+    <link>${escapeXml(absoluteUrl(NEWS_INDEX_PATH))}</link>
     <description>Product updates, creator notes, and feature tours from Modtale.</description>
     <language>en-us</language>
     <lastBuildDate>${lastBuildDate}</lastBuildDate>
-    <atom:link href="${escapeXml(getAbsoluteUrl(NEWS_RSS_PATH))}" rel="self" type="application/rss+xml" />
+    <atom:link href="${escapeXml(absoluteUrl(NEWS_RSS_PATH))}" rel="self" type="application/rss+xml" />
     <image>
-      <url>${escapeXml(`${SITE_URL}/assets/favicon.png`)}</url>
+      <url>${escapeXml(absoluteUrl("/assets/favicon.png"))}</url>
       <title>Modtale News</title>
-      <link>${escapeXml(getAbsoluteUrl(NEWS_INDEX_PATH))}</link>
+      <link>${escapeXml(absoluteUrl(NEWS_INDEX_PATH))}</link>
     </image>
 ${items}
   </channel>
@@ -78,6 +79,6 @@ export const buildNewsRssHeadResponse = () => new Response(null, {
     headers: NEWS_RSS_HEADERS,
 });
 
-export const buildNewsRssResponse = () => new Response(buildNewsRssXml(), {
+export const buildNewsRssResponse = (siteUrl = SITE_URL) => new Response(buildNewsRssXml(siteUrl), {
     headers: NEWS_RSS_HEADERS,
 });
