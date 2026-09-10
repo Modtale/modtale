@@ -32,7 +32,7 @@ const getSourceLabel = (source?: string) => {
 const SupportedVersionGroup = ({ group }: { group: VersionGroup }) => {
     const [isOpen, setIsOpen] = React.useState(false);
     const contentId = React.useId();
-    const rowClass = "flex w-full min-h-8 items-center gap-2 px-2.5 py-1.5 text-left";
+    const rowClass = "flex w-full min-h-7 items-center gap-2 px-2.5 py-1 text-left";
     const contents = (
         <>
             <span className="min-w-0 flex-1 break-all text-xs font-bold text-slate-700 dark:text-slate-300">{group.grouped ? group.label : group.versions[0]}</span>

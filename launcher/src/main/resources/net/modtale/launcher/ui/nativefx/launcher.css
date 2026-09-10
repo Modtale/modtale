@@ -6621,6 +6621,7 @@
 
 .project-detail-version-groups {
     -fx-fill-width: true;
+    -fx-padding: 0;
     -fx-background-color: rgba(255, 255, 255, 0.03);
     -fx-border-color: rgba(255, 255, 255, 0.10);
     -fx-border-radius: 8px;
@@ -6631,8 +6632,8 @@
     -fx-border-width: 1px 0 0 0;
 }
 .project-detail-version-row {
-    -fx-min-height: 32px;
-    -fx-padding: 6px 10px;
+    -fx-min-height: 28px;
+    -fx-padding: 4px 10px;
     -fx-background-color: transparent;
     -fx-border-color: transparent;
     -fx-border-width: 0;
@@ -6647,7 +6648,7 @@
     -fx-border-color: #38bdf8;
     -fx-border-width: 1px;
     -fx-border-radius: 6px;
-    -fx-padding: 5px 9px;
+    -fx-padding: 3px 9px;
 }
 .project-detail-version-name {
     -fx-text-fill: #cbd5e1;
