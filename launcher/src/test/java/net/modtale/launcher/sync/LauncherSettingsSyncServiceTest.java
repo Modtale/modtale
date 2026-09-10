@@ -27,6 +27,13 @@ import org.junit.jupiter.api.io.TempDir;
 class LauncherSettingsSyncServiceTest {
     @TempDir Path directory;
 
+    @Test void savedReleaseUsesItsOwnSupportedDownloadVersion() {
+        var version = new net.modtale.launcher.model.project.ProjectVersion("release-id", "1.10.2",
+                java.util.List.of("0.5.3", "0.5.1"), null, 0, null, null, java.util.List.of(), "RELEASE");
+        assertEquals("0.5.3", LauncherSettingsSyncService.downloadGameVersion(version, "0.5.5"));
+        assertEquals("0.5.1", LauncherSettingsSyncService.downloadGameVersion(version, "0.5.1"));
+    }
+
     @BeforeAll static void toolkit() {
         try { Platform.startup(() -> Platform.setImplicitExit(false)); }
         catch (IllegalStateException alreadyStarted) { }

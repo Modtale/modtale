@@ -223,7 +223,7 @@ public final class LauncherSettingsSyncService {
             try {
                 ProjectDetail project = apiClient.getProject(projectSnapshot.getProjectId());
                 ProjectVersion version = resolveVersion(project, projectSnapshot, settings);
-                InstallResult result = installer.install(project, version, installOptions(settings, projectSnapshot));
+                InstallResult result = installer.install(project, version, installOptions(settings, projectSnapshot, version));
                 settings.upsertInstalledProject(result.installedProject().withModpackUnlocked(projectSnapshot.isModpackUnlocked()));
                 settingsStore.save(settings);
                 installed++;
@@ -291,12 +291,14 @@ public final class LauncherSettingsSyncService {
 
     private InstallOptions installOptions(
             LauncherSettings settings,
-            LauncherSettingsSnapshot.InstalledProjectSnapshot installed
+            LauncherSettingsSnapshot.InstalledProjectSnapshot installed,
+            ProjectVersion version
     ) {
+        String downloadGameVersion = downloadGameVersion(version, effectiveGameVersion(settings, installed));
         if (installed.getBundledProjects() != null && !installed.getBundledProjects().isEmpty()) {
             return new InstallOptions(
                     settings.hytaleModsDirectory(),
-                    effectiveGameVersion(settings, installed),
+                    downloadGameVersion,
                     true,
                     true,
                     installed.getBundledProjects().stream()
@@ -307,12 +309,17 @@ public final class LauncherSettingsSyncService {
         }
         return new InstallOptions(
                 settings.hytaleModsDirectory(),
-                effectiveGameVersion(settings, installed),
+                downloadGameVersion,
                 settings.isIncludeDependencies(),
                 settings.isIncludeOptionalDependencies(),
                 null,
                 settings.hytaleUserDataDirectory()
         );
+    }
+
+    static String downloadGameVersion(ProjectVersion version, String preferred) {
+        if (version.gameVersions().isEmpty() || version.gameVersions().contains(preferred)) return preferred;
+        return version.gameVersions().getFirst();
     }
 
     private String effectiveGameVersion(
