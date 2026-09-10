@@ -510,8 +510,8 @@ final class LibraryWorldRenderer {
         List<ConfigFile> matching = configs.stream()
                 .filter(file -> !file.pluginId().isBlank() && modIds.contains(file.pluginId())).toList();
         if (matching.isEmpty()) return;
-        Button config = secondaryButton("Config");
-        config.getStyleClass().add("small");
+        Button config = new Button("Config");
+        config.getStyleClass().addAll("library-icon-action", "library-text-action");
         config.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.FILE_CODE, 14));
         config.setAccessibleText("Config for " + title);
         config.setTooltip(new Tooltip("Edit configs for " + title));

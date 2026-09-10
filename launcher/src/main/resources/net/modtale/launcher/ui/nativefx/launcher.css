@@ -8810,6 +8810,18 @@
     -fx-cursor: hand;
 }
 
+.library-text-action {
+    -fx-min-width: -1;
+    -fx-pref-width: -1;
+    -fx-max-width: -1;
+    -fx-padding: 0 10px;
+    -fx-content-display: left;
+    -fx-graphic-text-gap: 6px;
+    -fx-text-fill: #cbd5e1;
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+}
+
 .library-icon-action .svg-icon {
     -fx-stroke: #94a3b8;
 }
