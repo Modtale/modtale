@@ -33,7 +33,7 @@ public final class LocalAvatarRenderer {
     private final Map<String,BufferedImage> imageCache = new HashMap<>();
     private final Map<String,Group> skeleton = new HashMap<>();
     private final Rig rig = new Rig();
-    private long bytesRead, pixels;
+    private long bytesRead, pixels, renderedPixels;
     private int nodeCount;
 
     private LocalAvatarRenderer(ZipFile zip, CosmeticCatalogClient catalog) { this.zip=zip; this.catalog=catalog; }
@@ -159,7 +159,8 @@ public final class LocalAvatarRenderer {
                 {-x,y,-z, x,y,-z, x,y,z, -x,y,z},
                 {-x,-y,z, x,-y,z, x,-y,-z, -x,-y,-z}};
         TriangleMesh mesh=new TriangleMesh();
-        double width=material.getDiffuseMap().getWidth(),height=material.getDiffuseMap().getHeight();
+        AvatarTexture atlas=(AvatarTexture)material.getDiffuseMap();
+        double width=atlas.atlasWidth,height=atlas.atlasHeight;
         for(int f=0;f<faces.length;f++) {
             if(!onlyFace.isEmpty()&&!onlyFace.equals(faces[f]))continue;
             JsonNode layout=shape.path("textureLayout").get(onlyFace.isEmpty()?faces[f]:"front");
@@ -194,7 +195,14 @@ public final class LocalAvatarRenderer {
     private PhongMaterial material(Part part) throws IOException {
         BufferedImage source=image(common(part.texture));
         BufferedImage gradient=part.gradient.isBlank()?null:image(common(part.gradient));
-        WritableImage texture=new WritableImage(source.getWidth(),source.getHeight());
+        // Replicate authored texels before JavaFX's linear sampling to narrow blurred edges.
+        // Keep atlas coordinates in source pixels, including facial animation offsets.
+        int scale=Math.max(1,Math.min(4,1024/Math.max(source.getWidth(),source.getHeight())));
+        long sourcePixels=(long)source.getWidth()*source.getHeight();
+        while(scale>1 && renderedPixels+sourcePixels*scale*scale>32_000_000)scale--;
+        renderedPixels+=sourcePixels*scale*scale;
+        if(renderedPixels>32_000_000)throw new IOException("Avatar render texture budget exceeded");
+        AvatarTexture texture=new AvatarTexture(source.getWidth(),source.getHeight(),scale);
         for(int y=0;y<source.getHeight();y++) {
             checkCancelled();
             for(int x=0;x<source.getWidth();x++) {
@@ -207,10 +215,19 @@ public final class LocalAvatarRenderer {
                         pixel=(pixel&0xff000000)|(color&0x00ffffff);
                     }
                 }
-                texture.getPixelWriter().setArgb(x,y,pixel);
+                for(int dy=0;dy<scale;dy++)for(int dx=0;dx<scale;dx++)
+                    texture.getPixelWriter().setArgb(x*scale+dx,y*scale+dy,pixel);
             }
         }
         PhongMaterial material=new PhongMaterial(Color.WHITE);material.setSpecularColor(Color.BLACK);material.setDiffuseMap(texture);return material;
+    }
+
+    private static final class AvatarTexture extends WritableImage {
+        final int atlasWidth, atlasHeight;
+        AvatarTexture(int width,int height,int scale) {
+            super(width*scale,height*scale);
+            atlasWidth=width;atlasHeight=height;
+        }
     }
 
     private BufferedImage image(String path) throws IOException {
@@ -288,7 +305,8 @@ public final class LocalAvatarRenderer {
             visible=view!=null && view.isVisible();
             uv=view==null?null:((TriangleMesh)view.getMesh()).getTexCoords().toArray(null);
             var texture=view==null?null:((PhongMaterial)view.getMaterial()).getDiffuseMap();
-            width=texture==null?1:texture.getWidth(); height=texture==null?1:texture.getHeight();
+            width=texture==null?1:((AvatarTexture)texture).atlasWidth;
+            height=texture==null?1:((AvatarTexture)texture).atlasHeight;
         }
         void reset() {
             frame.getTransforms().setAll(original);

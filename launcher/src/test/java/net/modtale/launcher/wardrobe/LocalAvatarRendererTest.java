@@ -37,7 +37,14 @@ class LocalAvatarRendererTest {
         assertNotNull(body);
         var map=((PhongMaterial)body.getMaterial()).getDiffuseMap();
         assertEquals(0xffaa3300,map.getPixelReader().getArgb(0,0));
-        assertEquals(0,map.getPixelReader().getArgb(1,0)>>>24);
+        assertEquals(8,map.getWidth());
+        assertEquals(8,map.getHeight());
+        for(int y=0;y<4;y++)for(int x=0;x<4;x++)
+            assertEquals(0xffaa3300,map.getPixelReader().getArgb(x,y));
+        assertEquals(0,map.getPixelReader().getArgb(4,0)>>>24);
+        assertArrayEquals(new float[]{0,0,1,0,1,1,0,1},
+                ((TriangleMesh)body.getMesh()).getTexCoords().toArray(null),
+                "Replicated textures must retain the full authored face UV coverage");
         MeshView cape=find(model,"cape:Cloth:mesh");
         var origin=cape.localToScene(0,0,0);
         // Body pivot y=10 plus shape center y=4 plus cape child y=2. Attachment export position 999 is ignored.
