@@ -96,8 +96,12 @@ describe('GalleryCarousel', () => {
         expect(progress()).toBeCloseTo(0.25, 2);
         await act(async () => { vi.advanceTimersByTime(2000); });
         expect(progress()).toBeCloseTo(0.5, 2);
+        expect(container.querySelector('[aria-label="Pause slideshow"]')?.textContent).toBe('');
         await act(async () => { (container.querySelector('[aria-label="Pause slideshow"]') as HTMLButtonElement).click(); });
-        await act(async () => { vi.advanceTimersByTime(16000); });
+        expect(container.querySelector('[aria-label="Resume slideshow"] svg')).not.toBeNull();
+        await act(async () => { vi.advanceTimersByTime(750); });
+        expect(container.querySelector('[aria-label="Resume slideshow"] svg')).toBeNull();
+        await act(async () => { vi.advanceTimersByTime(15250); });
         expect(progress()).toBeCloseTo(0.5, 2);
         expect(container.querySelector('img[alt="Skyforge gallery image 1"]')).not.toBeNull();
         await act(async () => { (container.querySelector('[aria-label="Resume slideshow"]') as HTMLButtonElement).click(); });

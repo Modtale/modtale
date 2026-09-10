@@ -59,6 +59,16 @@ export const GalleryCarouselViewer: React.FC<GalleryCarouselViewerProps> = ({
 }) => {
     const [localActiveIndex, setLocalActiveIndex] = useState(() => Math.max(0, defaultActiveIndex));
     const [manuallyPaused, setManuallyPaused] = useState(false);
+    const [playbackFeedback, setPlaybackFeedback] = useState<{paused: boolean, id: number} | null>(null);
+    const togglePlayback = () => {
+        setManuallyPaused(!manuallyPaused);
+        setPlaybackFeedback({paused: !manuallyPaused, id: performance.now()});
+    };
+    useEffect(() => {
+        if (!playbackFeedback) return;
+        const timer = window.setTimeout(() => setPlaybackFeedback(null), 750);
+        return () => window.clearTimeout(timer);
+    }, [playbackFeedback]);
     const thumbnailRefs = useRef<Array<HTMLButtonElement | null>>([]);
     const progressRef = useRef<HTMLDivElement>(null);
     const elapsedRef = useRef(0);
@@ -237,6 +247,21 @@ export const GalleryCarouselViewer: React.FC<GalleryCarouselViewerProps> = ({
                     />
                 )}
 
+                {showControls && autoAdvance && activeImage.type !== 'youtube' && (
+                    <button
+                        type="button"
+                        aria-label={manuallyPaused ? 'Resume slideshow' : 'Pause slideshow'}
+                        onClick={togglePlayback}
+                        className="absolute inset-0 flex items-center justify-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-modtale-accent"
+                    >
+                        {playbackFeedback && (
+                            <span key={playbackFeedback.id} aria-hidden="true" className="pointer-events-none flex h-16 w-16 items-center justify-center rounded-full bg-black/60 text-white" style={{animation: 'gallery-playback-feedback 750ms ease-out forwards'}}>
+                                {playbackFeedback.paused ? <Pause className="h-8 w-8" /> : <Play className="h-8 w-8" />}
+                            </span>
+                        )}
+                    </button>
+                )}
+                <style>{`@keyframes gallery-playback-feedback { 0%, 30% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.15); } }`}</style>
                 {showControls && (
                     <>
                         <button
@@ -258,18 +283,6 @@ export const GalleryCarouselViewer: React.FC<GalleryCarouselViewerProps> = ({
                         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-blue-950/80 px-3 py-1 text-xs font-black tracking-wider text-white shadow-lg sm:hidden">
                             {safeActiveIndex + 1} / {imageCount}
                         </div>
-                        {autoAdvance && (
-                            <button
-                                type="button"
-                                aria-label={manuallyPaused ? 'Resume slideshow' : 'Pause slideshow'}
-                                onClick={() => setManuallyPaused((paused) => !paused)}
-                                title={activeImage.type === 'youtube' ? 'Slideshow pauses while this video is selected' : undefined}
-                                className="absolute left-3 top-3 flex items-center gap-2 rounded-lg border border-blue-200/50 bg-blue-950/85 px-3 py-2 text-xs font-bold text-white hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-modtale-accent sm:left-4 sm:top-4"
-                            >
-                                {manuallyPaused ? <Play className="h-4 w-4" aria-hidden="true" /> : <Pause className="h-4 w-4" aria-hidden="true" />}
-                                {manuallyPaused ? 'Resume' : 'Pause'}
-                            </button>
-                        )}
                         {autoAdvance && (
                             <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-950/40" aria-hidden="true">
                                 <div

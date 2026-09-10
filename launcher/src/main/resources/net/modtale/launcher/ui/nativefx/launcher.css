@@ -5343,20 +5343,20 @@
     -fx-stroke: #ffffff;
 }
 
-.project-gallery-carousel-playback {
-    -fx-padding: 8px 12px;
-    -fx-background-radius: 8px;
-    -fx-border-radius: 8px;
-    -fx-border-color: rgba(191, 219, 254, 0.50);
-    -fx-background-color: rgba(23, 37, 84, 0.85);
-    -fx-text-fill: #ffffff;
-    -fx-font-size: 12px;
-    -fx-font-weight: bold;
+.project-gallery-carousel-playback,
+.project-gallery-carousel-playback:hover,
+.project-gallery-carousel-playback:pressed {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
     -fx-cursor: hand;
 }
-
-.project-gallery-carousel-playback:hover {
-    -fx-background-color: rgba(30, 58, 138, 0.96);
+.project-gallery-playback-feedback {
+    -fx-background-color: rgba(0, 0, 0, 0.6);
+    -fx-background-radius: 32;
+}
+.project-gallery-playback-feedback .svg-icon {
+    -fx-stroke: white;
 }
 
 .project-gallery-carousel-progress-track {

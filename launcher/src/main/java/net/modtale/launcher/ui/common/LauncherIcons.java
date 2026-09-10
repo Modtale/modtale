@@ -12,6 +12,8 @@ import javafx.scene.shape.StrokeLineJoin;
 public final class LauncherIcons {
 
     public enum Glyph {
+        PAUSE("M6 4h4v16H6Z M14 4h4v16h-4Z"),
+        PLAY("m7 3 14 9-14 9Z"),
         ALIGN_JUSTIFY("M3 6h18 M3 12h18 M3 18h18"),
         ARROW_BIG_DOWN("M15 5H9v6H4.16a1 1 0 0 0-.82 1.57l8.84 9.58a1 1 0 0 0 1.48 0l8.84-9.58A1 1 0 0 0 21.84 11H17V5a2 2 0 0 0-2-2Z"),
         ARROW_BIG_UP("M9 19h6v-6h4.84a1 1 0 0 0 .82-1.57l-8.84-9.58a1 1 0 0 0-1.48 0L2.34 11.43A1 1 0 0 0 3.16 13H8v6a2 2 0 0 0 2 2Z"),

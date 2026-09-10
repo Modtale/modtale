@@ -7,6 +7,10 @@ import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import javafx.animation.AnimationTimer;
+import javafx.animation.FadeTransition;
+import javafx.animation.ScaleTransition;
+import javafx.animation.Interpolator;
+import javafx.util.Duration;
 import javafx.css.PseudoClass;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -82,6 +86,9 @@ final class NativeGalleryCarousel {
         private final Region progressFill = new Region();
         private final Scale progressScale = new Scale(0, 1, 0, 0);
         private final Button playback = new Button();
+        private final StackPane playbackFeedback = new StackPane();
+        private final FadeTransition feedbackFade = new FadeTransition(Duration.millis(525), playbackFeedback);
+        private final ScaleTransition feedbackScale = new ScaleTransition(Duration.millis(525), playbackFeedback);
         private final GalleryPlaybackClock clock = new GalleryPlaybackClock(AUTO_ADVANCE_NANOS);
         private final List<ImageView> thumbnailViews;
         private final List<Button> thumbnailButtons;
@@ -148,9 +155,32 @@ final class NativeGalleryCarousel {
             playback.setOnAction(event -> {
                 manuallyPaused = !manuallyPaused;
                 syncPlayback();
+                playbackFeedback.getChildren().setAll(LauncherIcons.icon(
+                        manuallyPaused ? LauncherIcons.Glyph.PAUSE : LauncherIcons.Glyph.PLAY, 30));
+                feedbackFade.stop();
+                feedbackScale.stop();
+                playbackFeedback.setOpacity(1);
+                playbackFeedback.setScaleX(1);
+                playbackFeedback.setScaleY(1);
+                feedbackFade.playFromStart();
+                feedbackScale.playFromStart();
             });
-            StackPane.setAlignment(playback, Pos.TOP_LEFT);
-            StackPane.setMargin(playback, new Insets(16));
+            playback.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+            playbackFeedback.getStyleClass().add("project-gallery-playback-feedback");
+            playbackFeedback.setMaxSize(64, 64);
+            playbackFeedback.setMouseTransparent(true);
+            playbackFeedback.setOpacity(0);
+            feedbackFade.setDelay(Duration.millis(225));
+            feedbackFade.setFromValue(1);
+            feedbackFade.setToValue(0);
+            feedbackFade.setInterpolator(Interpolator.EASE_OUT);
+            feedbackScale.setDelay(Duration.millis(225));
+            feedbackScale.setFromX(1);
+            feedbackScale.setFromY(1);
+            feedbackScale.setToX(1.15);
+            feedbackScale.setToY(1.15);
+            feedbackScale.setInterpolator(Interpolator.EASE_OUT);
+            playback.setGraphic(playbackFeedback);
 
             StackPane progressTrack = progressTrack();
             StackPane.setAlignment(progressTrack, Pos.BOTTOM_CENTER);
@@ -160,7 +190,7 @@ final class NativeGalleryCarousel {
             caption.setMaxWidth(Double.MAX_VALUE);
 
             if (images.size() > 1) {
-                media.getChildren().addAll(previous, next, playback, progressTrack);
+                media.getChildren().addAll(playback, previous, next, progressTrack);
             }
             root.getChildren().add(media);
             root.getChildren().add(caption);
@@ -391,7 +421,8 @@ final class NativeGalleryCarousel {
             long now = nanoTime.getAsLong();
             clock.setRunning(running, now);
             progressScale.setX(clock.progress(now));
-            playback.setText(manuallyPaused ? "Resume" : "Pause");
+            playback.setVisible(!video);
+            playback.setManaged(!video);
             playback.setAccessibleText(manuallyPaused ? "Resume slideshow" : "Pause slideshow");
             playback.setTooltip(new Tooltip(video ? "Slideshow pauses while this video is selected"
                     : playback.getAccessibleText()));
