@@ -18,6 +18,7 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 
 public final class GameVersionDropdown extends VBox {
@@ -249,12 +250,7 @@ public final class GameVersionDropdown extends VBox {
         expand.setOnAction(event -> toggleGroupExpanded(group.label()));
         expand.getGraphic().setRotate(expandedGroups.contains(group.label()) ? 90 : 0);
 
-        row.getChildren().addAll(select, expand);
-        if (selected) {
-            Node check = LauncherIcons.icon(LauncherIcons.Glyph.CHECK, 14);
-            check.getStyleClass().add("game-version-dropdown-check");
-            row.getChildren().add(check);
-        }
+        row.getChildren().addAll(select, expand, selectionIndicator(selected));
         return row;
     }
 
@@ -275,12 +271,19 @@ public final class GameVersionDropdown extends VBox {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         content.getChildren().add(spacer);
-        if (selected) {
-            Node check = LauncherIcons.icon(LauncherIcons.Glyph.CHECK, 14);
-            check.getStyleClass().add("game-version-dropdown-check");
-            content.getChildren().add(check);
-        }
+        content.getChildren().add(selectionIndicator(selected));
         return content;
+    }
+
+    private StackPane selectionIndicator(boolean selected) {
+        Node check = LauncherIcons.icon(LauncherIcons.Glyph.CHECK, 14);
+        check.getStyleClass().add("game-version-dropdown-check");
+        check.setVisible(selected);
+        StackPane slot = new StackPane(check);
+        slot.setMinWidth(14);
+        slot.setPrefWidth(14);
+        slot.setMaxWidth(14);
+        return slot;
     }
 
     private void toggleVersion(String version) {

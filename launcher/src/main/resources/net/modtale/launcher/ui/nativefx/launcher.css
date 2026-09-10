@@ -1972,6 +1972,10 @@
     -fx-padding: 0 0 0 10px;
 }
 
+.game-version-dropdown-group-row {
+    -fx-padding: 0 10px 0 0;
+}
+
 .game-version-dropdown-expand {
     -fx-min-width: 34px;
     -fx-pref-width: 34px;
