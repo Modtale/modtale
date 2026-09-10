@@ -53,4 +53,20 @@ class VersionSelectorTest {
     private static ProjectVersion version(String number, String releaseDate, String channel, String gameVersion) {
         return new ProjectVersion(number, number, List.of(gameVersion), null, 0, releaseDate, "", List.of(), channel);
     }
+
+    @Test
+    void selectsLaterPatchWithModtaleLocalReleaseDates() {
+        ProjectVersion older = version("0.9.0", "2026-07-01T12:00:00.123456789", "BETA", "0.5.7");
+        ProjectVersion newer = version("0.9.0-Patch-1", "2026-07-02T12:00:00.123456789", "BETA", "0.5.7");
+
+        assertEquals(newer, VersionSelector.latestCompatible(List.of(older, newer), "0.5.7").orElseThrow());
+    }
+
+    @Test
+    void comparesLocalAndOffsetReleaseDatesOnTheSameTimeline() {
+        ProjectVersion older = version("2.0", "2026-07-01T12:00:00+02:00", "RELEASE", "0.5.7");
+        ProjectVersion newer = version("1.0", "2026-07-01T11:00:00", "RELEASE", "0.5.7");
+
+        assertEquals(newer, VersionSelector.latestCompatible(List.of(older, newer), "0.5.7").orElseThrow());
+    }
 }

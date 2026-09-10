@@ -41,9 +41,12 @@ public final class TransferLoadingModal extends StackPane {
         title.getStyleClass().add("status-modal-title");
         title.setWrapText(true);
         title.setAlignment(Pos.CENTER);
+        title.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
         detail.getStyleClass().add("status-modal-message");
         detail.setWrapText(true);
         detail.setMaxWidth(360);
+        detail.setAlignment(Pos.CENTER);
+        detail.setTextAlignment(javafx.scene.text.TextAlignment.CENTER);
         VBox card = new VBox(18, emblem, title, detail);
         card.setAlignment(Pos.CENTER);
         card.getStyleClass().add("install-loading-card");
