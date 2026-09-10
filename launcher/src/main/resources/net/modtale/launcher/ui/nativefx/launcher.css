@@ -9831,3 +9831,11 @@
 .library-world-detail-summary {
     -fx-font-size: 14px;
 }
+
+.library-world-project-row:hover > .library-world-project-main > .library-world-project-copy > .library-world-project-title {
+    -fx-text-fill: #60a5fa;
+}
+.library-world-project-row:contents-hovered > .library-world-project-main > .library-world-project-copy > .library-world-project-title,
+.root:scrolling .library-world-project-row:hover > .library-world-project-main > .library-world-project-copy > .library-world-project-title {
+    -fx-text-fill: #ffffff;
+}
