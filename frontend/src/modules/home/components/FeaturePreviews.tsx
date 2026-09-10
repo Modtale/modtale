@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Download, List, X, ChevronDown, ChevronRight, Check, Box, AlertCircle, Bell, Search, ArrowUpRight, MessageSquare, Send, Save, PieChart, TrendingUp, Eye, ArrowBigUp, ArrowBigDown, Settings, Layers, Plus } from 'lucide-react';
+import { Download, List, X, ChevronDown, ChevronRight, Check, Box, AlertCircle, Bell, Search, ArrowUpRight, MessageSquare, Send, Save, PieChart, TrendingUp, Eye, ArrowBigUp, ArrowBigDown, Settings } from 'lucide-react';
 import { LauncherDemo } from '@/modules/launcher/components/LauncherDemo';
 import '@/modules/launcher/styles/launcher-product.css';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
@@ -15,6 +15,9 @@ import { LineChart } from '@/components/ui/charts/LineChart';
 import { useChartVisibility } from '@/components/ui/charts/chartVisibility';
 import { FeaturedModCard } from './HeroMarquee';
 import { getCommentRoleBadge } from '@/modules/project/utils/commentRoles';
+import { ModConfigFields } from '@/modules/project/components/ModConfigFields';
+import type { ModConfig } from '@/modules/project/utils/modpackConfigs';
+import { DependencySelector } from '@/modules/project/components/DependencySelector';
 import { DependencyModal } from '@/modules/project/components/dialogs/DependencyModal';
 import { DownloadModal } from '@/modules/project/components/dialogs/DownloadModal';
 import { HistoryModal } from '@/modules/project/components/dialogs/HistoryModal';
@@ -146,104 +149,71 @@ type ModpackPreviewProps = {
 };
 
 export const InlineModpackBuilderUI = ({ randomProject, projects, loading = false }: ModpackPreviewProps) => {
-    const previewProjects = useMemo(() => {
-        const source = projects?.length ? projects : randomProject ? [randomProject] : [];
-        return Array.from(new Map(source
+    const candidates = useMemo(() => Array.from(new Map(
+        (projects?.length ? projects : randomProject ? [randomProject] : [])
             .filter(project => project?.id && project?.title && project.classification !== 'MODPACK' && project.allowModpacks !== false)
-            .map(project => [project.id, project])).values()).slice(0, 8);
-    }, [projects, randomProject]);
-    const [query, setQuery] = useState('');
-    const [selection, setSelection] = useState<Record<string, boolean>>({});
-    const isSelected = (project: Project, index: number) => selection[project.id] ?? index < 3;
-    const selectedProjects = previewProjects.filter(isSelected);
-    const matchingProjects = useMemo(() => previewProjects.filter(project =>
-        `${project.title} ${project.author || ''}`.toLowerCase().includes(query.trim().toLowerCase())
-    ).slice(0, 3), [previewProjects, query]);
-    const versionCache = usePreviewVersions(matchingProjects);
+            .map(project => [project.id, project])
+    ).values()).slice(0, 3), [projects, randomProject]);
+    const [dependencies, setDependencies] = useState<ProjectDependency[]>([]);
+    const [configs, setConfigs] = useState<Record<string, ModConfig[]>>({});
+    const [preparing, setPreparing] = useState(true);
+    const initialized = useRef(false);
+
+    useEffect(() => {
+        if (initialized.current || (!candidates.length && loading)) return;
+        let cancelled = false;
+        const prepare = async () => {
+            const entries = await Promise.all(candidates.map(async project => {
+                try {
+                    const versions = project.versions?.length ? project.versions :
+                        (await api.get<{ versions?: Project['versions'] }>(`/projects/${project.id}/versions`, {
+                            timeout: DEPENDENCY_PREVIEW_VERSION_TIMEOUT_MS
+                        })).data.versions;
+                    if (!versions?.length) return null;
+                    return {
+                        projectId: project.id, projectTitle: project.title,
+                        versionNumber: getPreviewVersionNumberFromVersions(versions),
+                        source: 'MODTALE', dependencyType: 'REQUIRED',
+                        isOptional: false, isEmbedded: false
+                    } as ProjectDependency;
+                } catch {
+                    return null;
+                }
+            }));
+            if (cancelled) return;
+            setDependencies(entries.filter((entry): entry is ProjectDependency => entry !== null));
+            initialized.current = true;
+            setPreparing(false);
+        };
+        void prepare();
+        return () => { cancelled = true; };
+    }, [candidates, loading]);
 
     return (
-        <div className={`${GLASS_CARD} relative w-full overflow-hidden`}>
-            <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-400 to-emerald-400" />
-            <div className="p-5 sm:p-6">
-                <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-500/20">
-                        <Layers className="h-5 w-5" aria-hidden="true" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-blue-600 dark:text-blue-300">Interactive preview</p>
-                        <h3 className="text-lg font-black text-slate-900 dark:text-white">Modpack Builder</h3>
-                    </div>
-                    <span className="shrink-0 rounded-full border border-slate-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:border-white/10 dark:text-slate-400">Draft</span>
+        <div className="relative">
+            {preparing ? (
+                <div className={`${GLASS_CARD} p-6 space-y-4`} role="status">
+                    <span className="sr-only">Loading projects</span>
+                    {[0, 1, 2].map(index => <div key={index} className="h-20 animate-pulse rounded-xl bg-slate-200/60 dark:bg-white/5" />)}
                 </div>
-
-                <div className="my-5 flex items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50/50 p-4 dark:border-blue-400/15 dark:from-blue-500/10 dark:to-indigo-500/5">
-                    <div>
-                        <p className="text-sm font-bold text-slate-900 dark:text-white">Your next adventure</p>
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">A little inspiration. Make it yours.</p>
-                    </div>
-                    <div className="shrink-0 text-right" aria-live="polite" aria-atomic="true">
-                        <span className="block text-2xl font-black tabular-nums text-blue-600 dark:text-blue-300">{selectedProjects.length}</span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">{selectedProjects.length === 1 ? 'project' : 'projects'}</span>
-                    </div>
-                </div>
-
-                <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white/70 px-3 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-500/20 dark:border-white/10 dark:bg-black/15">
-                    <Search className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
-                    <input
-                        type="search"
-                        aria-label="Search preview projects"
-                        placeholder="Find a project for your pack…"
-                        value={query}
-                        onChange={event => setQuery(event.target.value)}
-                        className="min-w-0 w-full border-0 bg-transparent py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:ring-0 dark:text-white"
-                    />
-                </label>
-                <div className="mb-2 mt-5 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                    <span>Discover projects</span>
-                    <span>From Modtale</span>
-                </div>
-                <div className="min-h-[228px]" aria-busy={loading && !previewProjects.length}>
-                    {loading && !previewProjects.length ? (
-                        <div role="status" className="space-y-3 py-2">
-                            <span className="sr-only">Loading projects</span>
-                            {[0, 1, 2].map(index => <div key={index} className="h-16 animate-pulse rounded-xl bg-slate-200/60 dark:bg-white/5" aria-hidden="true" />)}
-                        </div>
-                    ) : matchingProjects.length ? matchingProjects.map(project => {
-                        const selected = isSelected(project, previewProjects.indexOf(project));
-                        const version = getPreviewVersionNumber(project, versionCache);
-                        return (
-                            <div key={project.id} className="group flex items-center gap-3 border-b border-slate-200/70 py-3 last:border-0 dark:border-white/5">
-                                <Link to={SiteRoutes.project(project)} className="flex min-w-0 flex-1 items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
-                                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-100 dark:border-white/10 dark:bg-slate-800">
-                                        <OptimizedImage src={project.imageUrl || '/assets/favicon.svg'} alt="" baseWidth={48} className="h-full w-full object-cover" />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm font-bold text-slate-900 transition-colors group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-300">{project.title}</p>
-                                        <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">{project.author ? `by ${project.author}` : toTitleCase(project.classification)}<span className="mx-1.5 opacity-40">/</span><span className="font-mono text-[10px]">{version === 'latest' ? 'Latest release' : `v${version}`}</span></p>
-                                    </div>
-                                </Link>
-                                <button
-                                    type="button"
-                                    aria-label={`${selected ? 'Remove' : 'Add'} ${project.title}${selected ? ' from' : ' to'} preview pack`}
-                                    aria-pressed={selected}
-                                    onClick={() => setSelection(current => ({ ...current, [project.id]: !selected }))}
-                                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${selected ? 'border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:border-blue-400/25 dark:bg-blue-500/15 dark:text-blue-300 dark:hover:bg-blue-500/25' : 'border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-500 dark:border-white/10'}`}
-                                >
-                                    {selected ? <Check className="h-4 w-4" aria-hidden="true" /> : <Plus className="h-4 w-4" aria-hidden="true" />}
-                                </button>
-                            </div>
-                        );
-                    }) : (
-                        <p role="status" className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">{query ? 'No matching projects. Try another name.' : 'Projects are unavailable right now. Explore the catalog below.'}</p>
+            ) : (
+                <DependencySelector
+                    selectedDeps={dependencies}
+                    onChange={setDependencies}
+                    isModpack
+                    label="Modpack Contents"
+                    renderDependencyDetails={dependency => (
+                        <ModConfigFields
+                            projectId={dependency.projectId}
+                            title={dependency.projectTitle}
+                            source={dependency.source}
+                            versionNumber={dependency.versionNumber}
+                            configs={configs[dependency.projectId] || []}
+                            onChange={next => setConfigs(current => ({ ...current, [dependency.projectId]: next }))}
+                        />
                     )}
-                </div>
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/70 px-5 py-4 dark:border-white/10 dark:bg-black/10 sm:px-6">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Try adding or removing a project.</p>
-                <Link to={SiteRoutes.browse()} className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-500 dark:text-blue-300">
-                    Explore projects <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
-                </Link>
-            </div>
+                />
+            )}
         </div>
     );
 };
@@ -886,14 +856,14 @@ export const ModpackPreviewSection = ({ randomProject, projects, loading }: Modp
         <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
             <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
                 <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
-                    Modpacks, Upgraded
+                    Modpacks v2
                 </h2>
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-emerald-500 dark:from-blue-400 dark:to-emerald-400">
                     Curated packs with dependency intelligence.
                 </p>
-                <p className="text-lg sm:text-xl text-slate-500 dark:text-slate-400 font-medium leading-relaxed max-w-xl">
+                <FeatureBodyText>
                     Build complete Hytale experiences with required dependency prompts, incompatibility warnings, and CurseForge references when a project is not on Modtale yet.
-                </p>
+                </FeatureBodyText>
             </div>
             <div className="flex-1 w-full max-w-xl relative overflow-visible">
                 <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/5 via-transparent to-emerald-500/5 dark:from-blue-500/10 dark:via-transparent dark:to-emerald-500/10 rounded-3xl blur-2xl pointer-events-none" />
@@ -926,18 +896,25 @@ export const DirectDownloadsSection = () => {
 };
 
 export const LauncherPreviewSection = () => (
-    <div className="grid items-center gap-10 lg:grid-cols-[.8fr_1.2fr] lg:gap-16">
-        <div className="max-w-xl">
-            <p className="mb-5 text-sm font-bold text-blue-600 dark:text-blue-400">Modtale Launcher</p>
-            <h2 className="text-4xl font-black leading-tight tracking-tight text-slate-900 sm:text-5xl dark:text-white">One library.<br />A world of possibilities.</h2>
-            <p className="mt-6 text-lg leading-relaxed text-slate-500 dark:text-slate-400">Your building world and your next big adventure don’t need the same mods. Pick what belongs in each save, with everything together in the Modtale Launcher.</p>
-            <Link to={SiteRoutes.launcher()} className="mt-7 inline-flex items-center gap-3 rounded-xl bg-blue-600 px-6 py-3.5 text-sm font-bold text-white transition-colors hover:bg-blue-500">Explore the launcher <ArrowUpRight size={18} /></Link>
-            <p className="mt-5 text-sm text-slate-500 dark:text-slate-400">Browse mods. Build your setup. Make it yours.</p>
+    <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
+        <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
+            <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
+                Modtale Launcher
+            </h2>
+            <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-indigo-500 dark:from-blue-400 dark:to-indigo-400">
+                One library. A world of possibilities.
+            </p>
+            <FeatureBodyText>
+                Your building world and your next big adventure don’t need the same mods. Pick what belongs in each save, with everything together in the Modtale Launcher.
+            </FeatureBodyText>
+            <Link to={SiteRoutes.launcher()} className="inline-flex items-center gap-2 font-bold text-blue-600 hover:text-blue-500 dark:text-blue-400">
+                Explore the launcher <ArrowUpRight size={18} />
+            </Link>
         </div>
-        <figure className="min-w-0">
+        <div className="flex-1 w-full max-w-xl relative overflow-visible">
+            <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/5 via-transparent to-indigo-500/5 dark:from-blue-500/10 dark:via-transparent dark:to-indigo-500/10 rounded-3xl blur-2xl pointer-events-none" />
             <LauncherDemo clip="world-library" alt="The real Modtale Launcher switching between Hytale worlds with different enabled mods" />
-            <figcaption className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">A different mod selection for every world.</figcaption>
-        </figure>
+        </div>
     </div>
 );
 
