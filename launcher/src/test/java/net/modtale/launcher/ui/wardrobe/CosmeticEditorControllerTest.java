@@ -57,6 +57,27 @@ class CosmeticEditorControllerTest {
         fx(() -> { Platform.setImplicitExit(false); return null; });
     }
 
+    @Test void openingLoadsCurrentLookAndPreservesUnappliedEdits() throws Exception {
+        try (Harness h = new Harness()) {
+            fx(() -> { h.controller.loadCurrentOnOpen(); return null; });
+            await(() -> h.controller.draftSnapshot().equals(json(FRESH)));
+            fx(() -> { h.controller.edit(new WardrobeItem(PLAYER, WardrobeItem.Kind.SKIN,
+                    "Saved look", false, "", "{\"skin\":" + STALE + "}")); return null; });
+            await(() -> h.controller.draftSnapshot().equals(json(STALE)));
+            fx(() -> { h.controller.loadCurrentOnOpen(); return null; });
+            await(() -> h.controller.draftSnapshot().equals(json(FRESH)));
+            assertEquals(2, h.gateway.currentLoads.get());
+            fx(() -> {
+                h.controller.editCape("Cape_UserEdit.Green");
+                h.controller.loadCurrentOnOpen();
+                assertEquals("Cape_UserEdit.Green", h.controller.draftSnapshot().path("cape").asText());
+                return null;
+            });
+            assertEquals(2, h.gateway.currentLoads.get());
+            assertTrue(h.gateway.mutations.isEmpty());
+        }
+    }
+
     @Test void lateCurrentSkinAndHydrationCannotReplaceCapeEdits() throws Exception {
         for (boolean hydrate : List.of(false, true)) {
             try (Harness h = new Harness()) {
@@ -191,6 +212,7 @@ class CosmeticEditorControllerTest {
                             String actual, List<WardrobeItem> backups) {}
     private static final class Gateway extends WardrobeApiClient {
         final Path directory;
+        final java.util.concurrent.atomic.AtomicInteger currentLoads = new java.util.concurrent.atomic.AtomicInteger();
         volatile boolean delayLoads;
         final CountDownLatch loadStarted = new CountDownLatch(1), releaseLoad = new CountDownLatch(1);
         final BlockingQueue<Mutation> mutations = new LinkedBlockingQueue<>();
@@ -214,6 +236,7 @@ class CosmeticEditorControllerTest {
         }
         @Override public WardrobeItem hydrate(WardrobeItem item) { delayLoad(); return item; }
         @Override public WardrobeItem currentSkin(LauncherSettings settings) {
+            currentLoads.incrementAndGet();
             delayLoad();
             return new WardrobeItem(PLAYER, WardrobeItem.Kind.SKIN, "Current", false, "", "{\"skin\":" + FRESH + "}");
         }

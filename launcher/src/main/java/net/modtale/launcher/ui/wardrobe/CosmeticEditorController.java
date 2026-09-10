@@ -369,6 +369,11 @@ public final class CosmeticEditorController implements AutoCloseable {
         });
     }
 
+    void loadCurrentOnOpen() {
+        if (disposed || (draft != null && draft.dirty()) || pendingCape != null) return;
+        loadCurrent();
+    }
+
     private void loadCurrent() {
         if (activeProfile().isBlank()) return;
         if (draft != null && draft.dirty() && !confirm("Replace your draft?", "Load your current Hytale look and discard the unapplied edits?")) return;

@@ -79,6 +79,11 @@ public final class LauncherWardrobeController implements AutoCloseable {
     public Node view() { return root; }
     CosmeticEditorController editorForTesting() { return editor; }
 
+    public void open() {
+        refresh();
+        editor.loadCurrentOnOpen();
+    }
+
     public void refresh() {
         updateSelectionActions();
         if (tab == Tab.CUSTOMIZE) { editor.refresh(); return; }

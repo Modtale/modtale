@@ -412,7 +412,7 @@ public final class LauncherShell {
         setVisibleManaged(railNode, discoverMode);
         setVisibleManaged(mainToolbar, !webMode && !discoverMode && !launcherPage);
         if (nextView == LauncherView.WARDROBE && wardrobeController != null) {
-            wardrobeController.refresh();
+            wardrobeController.open();
         } else if (nextView == LauncherView.NOTIFICATIONS) {
             notificationsController.refresh();
         } else if (nextView == LauncherView.LIBRARY) {
