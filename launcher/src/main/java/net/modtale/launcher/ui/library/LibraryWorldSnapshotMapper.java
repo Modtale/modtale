@@ -244,14 +244,14 @@ final class LibraryWorldSnapshotMapper {
         if (file == null || file.isBlank()) {
             return "";
         }
-        return normalizedFileKey(Path.of(file));
+        return LibraryFileIdentity.key(file);
     }
 
     private static String normalizedFileKey(Path file) {
         if (file == null) {
             return "";
         }
-        return file.toAbsolutePath().normalize().toString();
+        return LibraryFileIdentity.key(file);
     }
 
     private static String worldListSource(String source) {

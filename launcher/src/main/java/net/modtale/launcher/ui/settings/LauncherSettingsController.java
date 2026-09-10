@@ -25,6 +25,7 @@ import net.modtale.launcher.cache.LauncherCacheService;
 import net.modtale.launcher.i18n.LauncherI18n;
 import net.modtale.launcher.settings.LauncherSettings;
 import net.modtale.launcher.settings.SettingsStore;
+import net.modtale.launcher.model.install.InstalledProject;
 import net.modtale.launcher.ui.common.LauncherIcons;
 import net.modtale.launcher.ui.common.LauncherExternalLinks;
 import net.modtale.launcher.ui.common.LauncherView;
@@ -61,6 +62,7 @@ public final class LauncherSettingsController {
         this.currentView = currentView;
         settings = settingsStore.load();
         I18N.setLocale(settings.getLocale());
+        form.reloadFrom(settings);
     }
 
     public void attachFeedback(LauncherFeedback feedback) {
@@ -128,6 +130,17 @@ public final class LauncherSettingsController {
     public void saveCurrentSettings() {
         settingsStore.save(settings);
         notifySaveListeners();
+    }
+
+    public void saveReconciledInstalledProjects(List<InstalledProject> projects) {
+        var retainedIds = projects.stream().map(InstalledProject::projectId)
+                .collect(java.util.stream.Collectors.toSet());
+        // Remove superseded identities before the registry's recovery merge can restore them.
+        settings.getInstalledProjects().stream()
+                .map(InstalledProject::projectId)
+                .filter(id -> !retainedIds.contains(id)).forEach(settingsStore::removeInstalledProject);
+        settings.setInstalledProjects(projects);
+        saveCurrentSettings();
     }
 
     public void removeInstalledProjectRecord(String projectId) {

@@ -448,11 +448,10 @@ public final class LauncherLibraryController {
                 settingsController.settings().getInstalledProjects(),
                 installedMods
         );
-        if (recovery.recoveredCount() <= 0) {
+        if (recovery.projects().equals(settingsController.settings().getInstalledProjects())) {
             return;
         }
-        settingsController.settings().setInstalledProjects(recovery.projects());
-        settingsController.saveCurrentSettings();
+        settingsController.saveReconciledInstalledProjects(recovery.projects());
         feedback.log("Recovered " + recovery.recoveredCount() + " installed mod"
                 + LibraryProjectSupport.plural(recovery.recoveredCount()) + " from the Hytale Mods folder.");
     }
@@ -492,8 +491,7 @@ public final class LauncherLibraryController {
                     LibraryArtifactIdentityReconciler.Result result = LibraryArtifactIdentityReconciler.reconcile(
                             settingsController.settings().getInstalledProjects(), response.matches());
                     if (result.resolvedCount() > 0) {
-                        settingsController.settings().setInstalledProjects(result.projects());
-                        settingsController.saveCurrentSettings();
+                        settingsController.saveReconciledInstalledProjects(result.projects());
                         feedback.log("Linked " + result.resolvedCount() + " installed mod" +
                                 LibraryProjectSupport.plural(result.resolvedCount()) + " to a managed project.");
                         renderLibrary();
@@ -511,16 +509,16 @@ public final class LauncherLibraryController {
         } catch (java.io.IOException ignored) {
             // Manifest and explicit provider URLs still provide safe identity evidence.
         }
-        return new ArtifactIdentity.Artifact(mod.file().toAbsolutePath().normalize().toString(), sha256,
+        return new ArtifactIdentity.Artifact(LibraryFileIdentity.key(mod.file()), sha256,
                 curseForgeFingerprint, mod.id(), mod.version(), mod.website());
     }
 
     private static String identitySignature(HytaleInstalledMod mod) {
         try {
-            return mod.file().toAbsolutePath().normalize() + ":" + java.nio.file.Files.size(mod.file()) + ":"
+            return LibraryFileIdentity.key(mod.file()) + ":" + java.nio.file.Files.size(mod.file()) + ":"
                     + java.nio.file.Files.getLastModifiedTime(mod.file()).toMillis();
         } catch (java.io.IOException ignored) {
-            return mod.file().toAbsolutePath().normalize().toString();
+            return LibraryFileIdentity.key(mod.file());
         }
     }
 
@@ -695,11 +693,10 @@ public final class LauncherLibraryController {
     private List<String> worldModIds(InstalledProject installed) {
         Set<String> manifestIds = new LinkedHashSet<>();
         Set<String> files = installed.files().stream()
-                .map(file -> java.nio.file.Path.of(file).toAbsolutePath().normalize())
-                .map(java.nio.file.Path::toString)
+                .map(LibraryFileIdentity::key)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
         for (HytaleInstalledMod mod : installedMods) {
-            String path = mod.file().toAbsolutePath().normalize().toString();
+            String path = LibraryFileIdentity.key(mod.file());
             if (files.contains(path) && mod.id() != null && !mod.id().isBlank()) {
                 manifestIds.add(mod.id());
             }
@@ -1399,14 +1396,14 @@ public final class LauncherLibraryController {
         if (file == null || file.isBlank()) {
             return "";
         }
-        return normalizedFileKey(Path.of(file));
+        return LibraryFileIdentity.key(file);
     }
 
     private static String normalizedFileKey(Path file) {
         if (file == null) {
             return "";
         }
-        return file.toAbsolutePath().normalize().toString();
+        return LibraryFileIdentity.key(file);
     }
 
     private static String encodeQuery(String value) {
