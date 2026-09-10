@@ -524,7 +524,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                             }
                         `}</style>
                         <div className="sort-override-wrapper flex-1 lg:flex-none h-10">
-                            <SortDropdown value={sortBy} onChange={(val) => onSortChange(val)} isMobile={isMobile} />
+                            <SortDropdown value={sortBy} onChange={(val) => onSortChange(val)} onOpen={() => { if (isFilterOpen) onToggleFilterMenu(); }} isMobile={isMobile} />
                         </div>
                     </div>
                 </div>
