@@ -139,7 +139,10 @@ final class NativeCreatorProfileView {
     private StackPane hero(CreatorProfile profile) {
         StackPane hero = new StackPane();
         hero.getStyleClass().add("creator-profile-hero");
+        hero.setMinWidth(0);
         hero.setMaxWidth(Double.MAX_VALUE);
+        hero.setPrefHeight(BANNER_FALLBACK_HEIGHT);
+        hero.setMaxHeight(Double.MAX_VALUE);
 
         StackPane media = new StackPane();
         media.getStyleClass().add("creator-profile-banner");
@@ -149,9 +152,8 @@ final class NativeCreatorProfileView {
             media.getChildren().add(fallbackBanner());
         } else {
             media.getStyleClass().add("letterboxed");
-            media.setClip(rectangleClip(media));
-            ImageView image = coverImage(bannerUrl, media, 2400, 800);
-            image.getStyleClass().add("creator-profile-banner-image");
+            ImageView image = bannerImage(hero);
+            imageLoader.loadInto(image, bannerUrl, 1920, 640, true);
             media.getChildren().add(image);
         }
 
@@ -173,6 +175,16 @@ final class NativeCreatorProfileView {
 
         hero.getChildren().addAll(media, fade, backLayer);
         return hero;
+    }
+
+    static ImageView bannerImage(Region banner) {
+        ImageView image = new ImageView();
+        image.getStyleClass().add("creator-profile-banner-image");
+        image.setPreserveRatio(true);
+        image.setSmooth(true);
+        image.fitWidthProperty().bind(banner.widthProperty());
+        image.fitHeightProperty().bind(banner.heightProperty());
+        return image;
     }
 
     static double bannerHeight(double width) {
