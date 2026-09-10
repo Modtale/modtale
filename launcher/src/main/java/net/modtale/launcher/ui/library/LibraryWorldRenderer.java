@@ -16,6 +16,12 @@ import javafx.collections.FXCollections;
 import javafx.css.PseudoClass;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.Cursor;
+import javafx.scene.control.ButtonBase;
+import javafx.scene.control.ComboBoxBase;
+import javafx.scene.input.MouseButton;
+import net.modtale.launcher.ui.browse.card.ProjectCardInteraction;
+import net.modtale.launcher.model.project.ProjectSummary;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.ComboBox;
@@ -45,6 +51,14 @@ final class LibraryWorldRenderer {
     private static final double PROJECT_ICON_SIZE = 80;
     private static final double CONTENT_ICON_SIZE = 34;
     private static final PseudoClass CONTENTS_HOVERED = PseudoClass.getPseudoClass("contents-hovered");
+
+    private Consumer<ProjectSummary> openProject = ignored -> {};
+    private Consumer<ProjectSummary> openCreator = ignored -> {};
+
+    void setNavigationActions(Consumer<ProjectSummary> openProject, Consumer<ProjectSummary> openCreator) {
+        this.openProject = openProject;
+        this.openCreator = openCreator;
+    }
 
     private final CachedImageLoader imageLoader;
     private final Consumer<UpdateCandidate> updateProject;
@@ -266,7 +280,55 @@ final class LibraryWorldRenderer {
                     shell.pseudoClassStateChanged(CONTENTS_HOVERED, hovered));
             shell.getChildren().add(contentsCard);
         }
+        ProjectCardInteraction.addHoverAnimation(shell, icon);
+        ProjectSummary target = navigationTarget(model);
+        if (target != null) {
+            shell.setCursor(Cursor.HAND);
+            shell.setOnMouseClicked(event -> {
+                if (event.getButton() == MouseButton.PRIMARY && event.isStillSincePress()
+                        && !isNestedControl(event.getTarget(), shell)) {
+                    openProject.accept(target);
+                    event.consume();
+                }
+            });
+        }
         return shell;
+    }
+
+    static boolean isNestedControl(Object target, Node card) {
+        Node node = target instanceof Node picked ? picked : null;
+        while (node != null && node != card) {
+            if (node instanceof ButtonBase || node instanceof ComboBoxBase<?> || node instanceof LibraryToggleBox
+                    || node.getStyleClass().contains("author-link")
+                    || node.getStyleClass().contains("library-world-version-row")
+                    || node.getStyleClass().contains("library-world-content-card")) {
+                return true;
+            }
+            node = node.getParent();
+        }
+        return false;
+    }
+
+    static ProjectSummary navigationTarget(LibraryWorldProjectModel model) {
+        InstalledProject installed = model.installed();
+        boolean curseForge = InstalledProject.SOURCE_CURSEFORGE.equalsIgnoreCase(installed.source())
+                || installed.projectId().startsWith("curseforge:");
+        if (installed.projectId().isBlank() || installed.projectId().startsWith("local:")
+                || InstalledProject.SOURCE_LOCAL.equalsIgnoreCase(installed.source())
+                || (!curseForge && !LibraryProjectSupport.isModtaleProject(installed))) {
+            return null;
+        }
+        String id = installed.projectId();
+        if (curseForge && !id.startsWith("curseforge:")) id = "curseforge:" + id;
+        ProjectDetail detail = model.detail();
+        ProjectMeta meta = model.meta();
+        return new ProjectSummary(id,
+                curseForge ? id : first(detail == null ? "" : detail.slug(), meta == null ? "" : meta.slug(), installed.slug()),
+                model.display().title(), meta == null ? "" : meta.description(),
+                detail == null ? "" : detail.authorId(),
+                first(detail == null ? "" : detail.author(), meta == null ? "" : meta.author(), model.display().author()),
+                model.display().icon(), null, model.display().classification(), 0, 0, null, List.of(),
+                curseForge ? InstalledProject.SOURCE_CURSEFORGE : InstalledProject.SOURCE_MODTALE, null, null);
     }
 
     private VBox projectCopy(LibraryWorldProjectModel model) {
@@ -279,8 +341,24 @@ final class LibraryWorldRenderer {
         title.getStyleClass().add("library-world-project-title");
 
         String subtitleText = projectMetaLine(model);
-        Label subtitle = new Label(subtitleText);
-        subtitle.getStyleClass().add("library-world-project-meta");
+        HBox subtitle = new HBox(4);
+        subtitle.setAlignment(Pos.CENTER_LEFT);
+        Label by = new Label("by");
+        by.getStyleClass().add("library-world-project-meta");
+        Label author = new Label(display.author());
+        author.getStyleClass().add("library-world-project-meta");
+        ProjectSummary creatorTarget = navigationTarget(model);
+        if (creatorTarget != null && !display.author().isBlank()) {
+            author.getStyleClass().add("author-link");
+            author.setCursor(Cursor.HAND);
+            author.setOnMouseClicked(event -> {
+                if (event.getButton() == MouseButton.PRIMARY && event.isStillSincePress()) {
+                    openCreator.accept(creatorTarget);
+                    event.consume();
+                }
+            });
+        }
+        subtitle.getChildren().addAll(by, author);
 
         HBox badges = new HBox(10);
         badges.setAlignment(Pos.CENTER_LEFT);

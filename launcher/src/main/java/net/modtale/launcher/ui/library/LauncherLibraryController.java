@@ -153,6 +153,10 @@ public final class LauncherLibraryController {
         );
     }
 
+    public void setNavigationActions(Consumer<ProjectSummary> openProject, Consumer<ProjectSummary> openCreator) {
+        worldRenderer.setNavigationActions(openProject, openCreator);
+    }
+
     private void editConfigs(String modName, List<ConfigFile> configs) {
         StackPane host = overlayHost.get();
         if (host == null) return;

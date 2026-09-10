@@ -137,6 +137,7 @@ public final class LauncherRuntime {
                 projectActions::toggleFavorite,
                 services.scrollSupport()
         );
+        libraryController.setNavigationActions(projectPageController::openProject, projectPageController::openCreator);
         projectActions.attachOverlay(() -> sceneRoot() instanceof StackPane stack ? stack : null);
         projectActions.setViewHistoryAction(projectPageController::openProjectChangelog);
         LauncherPlayController playController = new LauncherPlayController(
