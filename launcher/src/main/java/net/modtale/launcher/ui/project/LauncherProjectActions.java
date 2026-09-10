@@ -89,12 +89,6 @@ public final class LauncherProjectActions {
         if (summary == null) {
             return;
         }
-        if (summary.isCurseForge() && !Boolean.TRUE.equals(summary.distributionAllowed())) {
-            feedback.showToast("Install on CurseForge",
-                    "The author has disabled third-party distribution, so this file must be installed through CurseForge.");
-            LauncherExternalLinks.open(summary.websiteUrl(), feedback::showToast);
-            return;
-        }
         if (downloadModal == null) {
             libraryController.installSelectedProject(summary);
             return;

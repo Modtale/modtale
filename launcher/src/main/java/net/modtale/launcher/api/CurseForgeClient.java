@@ -28,19 +28,30 @@ final class CurseForgeClient {
     }
 
     ProjectPage search(ProjectSearchQuery query) {
-        int size = Math.min(50, query.size());
+        int size = Math.max(1, query.size());
         long offset = (long) query.page() * size;
         if (offset >= 10000) return new ProjectPage(List.of(), (int) Math.ceil(10000.0 / size), 10000, query.page(), true);
-        String path = "mods/search?gameId=70216&pageSize=" + size + "&index=" + offset
-                + "&sortField=" + sortField(query.sort()) + "&sortOrder="
+        String filters = "&sortField=" + sortField(query.sort()) + "&sortOrder="
                 + (List.of("name", "author").contains(query.sort()) ? "asc" : "desc");
-        if (query.search() != null && !query.search().isBlank()) path += "&searchFilter=" + encode(query.search());
-        if (query.gameVersion() != null && !query.gameVersion().isBlank()) path += "&gameVersion=" + encode(query.gameVersion());
+        if (query.search() != null && !query.search().isBlank()) filters += "&searchFilter=" + encode(query.search());
+        if (query.gameVersion() != null && !query.gameVersion().isBlank()) filters += "&gameVersion=" + encode(query.gameVersion());
         Integer classId = CLASSES.get(query.classification() == null ? "" : query.classification());
-        if (classId != null) path += "&classId=" + classId;
-        JsonNode response = transport.get(base.resolve(path), JsonNode.class, Duration.ofMinutes(5));
+        if (classId != null) filters += "&classId=" + classId;
+        List<JsonNode> items = new ArrayList<>();
+        long total = 10000;
+        long nextOffset = offset;
+        while (nextOffset < Math.min(offset + size, total)) {
+            int batchSize = (int) Math.min(50, Math.min(offset + size, total) - nextOffset);
+            String path = "mods/search?gameId=70216&pageSize=" + batchSize + "&index=" + nextOffset + filters;
+            JsonNode response = transport.get(base.resolve(path), JsonNode.class, Duration.ofMinutes(5));
+            JsonNode batch = response.path("data");
+            total = Math.min(10000, response.path("pagination").path("totalCount").asLong(nextOffset + batch.size()));
+            batch.forEach(items::add);
+            nextOffset += batch.size();
+            if (batch.size() < batchSize) break;
+        }
         List<ProjectSummary> projects = new ArrayList<>();
-        for (JsonNode item : response.path("data")) {
+        for (JsonNode item : items) {
             if (item.path("gameId").asLong() != 70216 || item.path("id").asLong() <= 0) continue;
             String id = "curseforge:" + item.path("id").asLong();
             String website = item.path("links").path("websiteUrl").asText("");
@@ -54,7 +65,6 @@ final class CurseForgeClient {
                     List.copyOf(versions), "CURSEFORGE", website,
                     !item.hasNonNull("allowModDistribution") || item.path("allowModDistribution").asBoolean()));
         }
-        long total = Math.min(10000, response.path("pagination").path("totalCount").asLong(projects.size()));
         int pages = (int) Math.ceil(total / (double) size);
         return new ProjectPage(List.copyOf(projects), pages, total, query.page(), query.page() + 1 >= pages);
     }

@@ -50,7 +50,7 @@ class LauncherBrowseMenuTest {
             source.getItems().stream().filter(item -> item.getText().equals("CurseForge"))
                     .findFirst().orElseThrow().fire();
             var menu = new LauncherBrowseMenu(controller, () -> layer, currentView::get);
-            assertEquals(ProjectBrowseSort.RELEVANCE, controller.selectedBrowseSort());
+            assertEquals(ProjectBrowseSort.DOWNLOADS, controller.selectedBrowseSort());
             for (var sort : ProjectBrowseSort.curseForgeSorts()) {
                 currentView.set(LauncherView.WARDROBE);
                 var item = (Button) menu.panel().getChildren().stream()

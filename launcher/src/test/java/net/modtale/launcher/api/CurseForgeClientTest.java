@@ -12,6 +12,7 @@ class CurseForgeClientTest {
     HttpServer server;
     CurseForgeClient client;
     List<String> requests = new ArrayList<>();
+    boolean paginatedSearch;
     String file = """
         {"id":123,"modId":42,"gameId":70216,"isAvailable":true,"fileName":"example.jar",
         "fileLength":100,"downloadUrl":"https://edge.forgecdn.net/files/1/example.jar",
@@ -37,6 +38,20 @@ class CurseForgeClientTest {
                 case "/mods/42/files" -> "{\"data\":[]}";
                 default -> "{\"data\":null}";
             };
+            if (paginatedSearch && exchange.getRequestURI().getPath().equals("/mods/search")) {
+                Map<String, String> params = new HashMap<>();
+                for (String part : exchange.getRequestURI().getQuery().split("&")) {
+                    String[] pair = part.split("=", 2);
+                    params.put(pair[0], pair[1]);
+                }
+                int index = Integer.parseInt(params.get("index"));
+                int size = Integer.parseInt(params.get("pageSize"));
+                var rows = new ArrayList<String>();
+                for (int i = index; i < Math.min(index + size, 205); i++) {
+                    rows.add("{\"id\":" + (i + 1) + ",\"gameId\":70216,\"name\":\"Project " + i + "\"}");
+                }
+                data = "{\"data\":[" + String.join(",", rows) + "],\"pagination\":{\"totalCount\":205}}";
+            }
             byte[] bytes = data.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
             exchange.sendResponseHeaders(200, bytes.length);
@@ -72,6 +87,22 @@ class CurseForgeClientTest {
         assertEquals("example.jar", result.fileName());
         assertEquals("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", result.hashes().get("sha1"));
         assertTrue(result.downloadUrl().startsWith("https://edge.forgecdn.net/"));
+    }
+    @Test void largePagesBatchWithoutGapsAndKeepSelectedPageSize() {
+        paginatedSearch = true;
+        var page = client.search(new ProjectSearchQuery("", "", "", "downloads", 1, 96, "", null, null, "", null, null));
+        assertEquals(96, page.content().size());
+        assertEquals("Project 96", page.content().getFirst().title());
+        assertEquals("Project 191", page.content().getLast().title());
+        assertEquals(3, page.totalPages());
+        assertFalse(page.last());
+        assertTrue(requests.get(0).contains("pageSize=50&index=96"));
+        assertTrue(requests.get(1).contains("pageSize=46&index=146"));
+        var last = client.search(new ProjectSearchQuery("", "", "", "downloads", 2, 96, "", null, null, "", null, null));
+        assertEquals(13, last.content().size());
+        assertEquals("Project 192", last.content().getFirst().title());
+        assertEquals("Project 204", last.content().getLast().title());
+        assertTrue(last.last());
     }
     @Test void rejectsMismatchedOrUnavailableFilesAndUntrustedDownloadUrls() {
         file = file.replace("\"modId\":42", "\"modId\":43");

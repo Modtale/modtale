@@ -396,14 +396,11 @@ public final class ProjectCardFactory {
     }
 
     private Button installButton(ProjectSummary project, Consumer<ProjectSummary> onInstall) {
-        boolean providerHandoff = project.isCurseForge() && !Boolean.TRUE.equals(project.distributionAllowed());
-        Button install = new Button(providerHandoff ? "Get on CurseForge" : "Install");
+        Button install = new Button("Install");
         install.getStyleClass().addAll("btn", "primary", "small", "project-install-button");
-        install.setGraphic(LauncherIcons.icon(
-                providerHandoff ? LauncherIcons.Glyph.EXTERNAL_LINK : LauncherIcons.Glyph.DOWNLOAD, 16));
-        install.setTooltip(new Tooltip(providerHandoff
-                ? "The author requires downloads through CurseForge"
-                : project.isCurseForge() ? "Install this verified CurseForge file" : "Install this project"));
+        install.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 16));
+        install.setTooltip(new Tooltip(project.isCurseForge()
+                ? "Install this verified CurseForge file" : "Install this project"));
         install.setOnAction(event -> {
             event.consume();
             onInstall.accept(project);

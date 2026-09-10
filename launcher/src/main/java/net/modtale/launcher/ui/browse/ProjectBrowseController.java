@@ -497,7 +497,8 @@ public final class ProjectBrowseController {
     private void selectSource(ProjectBrowseSource source) {
         searchState.reset();
         activeBrowseView = BrowseOptions.BrowseViewOption.defaultOption();
-        withSuppressedSearch(() -> sortCombo.setValue(ProjectBrowseSort.RELEVANCE));
+        withSuppressedSearch(() -> sortCombo.setValue(source == ProjectBrowseSource.CURSEFORGE
+                ? ProjectBrowseSort.DOWNLOADS : ProjectBrowseSort.RELEVANCE));
         categories.showCurseForgeOptions(source == ProjectBrowseSource.CURSEFORGE);
         updateSortOptions();
         refreshBrowseControls();
@@ -585,7 +586,7 @@ public final class ProjectBrowseController {
             sortDropdown.getChildren().setAll(ProjectBrowseSort.curseForgeSorts().stream()
                     .map(this::sortDropdownItem).toList());
             if (!ProjectBrowseSort.curseForgeSorts().contains(selectedSort())) {
-                sortCombo.setValue(ProjectBrowseSort.RELEVANCE);
+                sortCombo.setValue(ProjectBrowseSort.DOWNLOADS);
             }
         } else {
             sortDropdown.getChildren().setAll(
