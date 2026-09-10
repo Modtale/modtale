@@ -4222,7 +4222,7 @@
 }
 
 .post-download-modal-body {
-    -fx-padding: 24px;
+    -fx-padding: 10px 24px 24px;
     -fx-background-color: #0f172a;
 }
 
@@ -4294,17 +4294,17 @@
 }
 
 .post-download-modal-world-icon {
-    -fx-min-width: 48px;
-    -fx-pref-width: 48px;
-    -fx-max-width: 48px;
-    -fx-min-height: 48px;
-    -fx-pref-height: 48px;
-    -fx-max-height: 48px;
-    -fx-padding: 2px;
+    -fx-min-width: 56px;
+    -fx-pref-width: 56px;
+    -fx-max-width: 56px;
+    -fx-min-height: 56px;
+    -fx-pref-height: 56px;
+    -fx-max-height: 56px;
+    -fx-padding: 3px;
     -fx-background-radius: 12px;
     -fx-border-radius: 12px;
-    -fx-border-width: 1px;
-    -fx-border-color: rgba(255, 255, 255, 0.10);
+    -fx-border-width: 2px;
+    -fx-border-color: rgba(148, 163, 184, 0.35);
     -fx-background-color: #0f172a;
     -fx-effect: dropshadow(one-pass-box, rgba(2, 6, 23, 0.16), 5, 0.08, 0, 1);
 }

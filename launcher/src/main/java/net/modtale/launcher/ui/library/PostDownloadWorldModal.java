@@ -35,7 +35,7 @@ final class PostDownloadWorldModal {
 
     private static final double MODAL_WIDTH = 512;
     private static final double MODAL_MAX_HEIGHT = 720;
-    private static final double WORLD_ICON_IMAGE_SIZE = 44;
+    private static final double WORLD_ICON_IMAGE_SIZE = 50;
     private static final PseudoClass SELECTED = PseudoClass.getPseudoClass("selected");
     private static final PseudoClass INDETERMINATE = PseudoClass.getPseudoClass("indeterminate");
 
@@ -53,7 +53,6 @@ final class PostDownloadWorldModal {
     private List<WorldOption> worlds = List.of();
     private Button applyButton;
     private Button toggleAllButton;
-    private Label selectedCount;
 
     PostDownloadWorldModal(Supplier<StackPane> host, Consumer<Selection> apply, CachedImageLoader imageLoader) {
         this.host = host == null ? () -> null : host;
@@ -183,20 +182,14 @@ final class PostDownloadWorldModal {
     private HBox summaryRow() {
         HBox row = new HBox(12);
         row.getStyleClass().add("post-download-modal-summary");
-        row.setAlignment(Pos.CENTER_LEFT);
-
-        selectedCount = new Label();
-        selectedCount.getStyleClass().add("post-download-modal-muted");
-        selectedCount.setMinWidth(0);
-        selectedCount.setMaxWidth(Double.MAX_VALUE);
-        HBox.setHgrow(selectedCount, Priority.ALWAYS);
+        row.setAlignment(Pos.CENTER_RIGHT);
 
         toggleAllButton = new Button();
         toggleAllButton.getStyleClass().add("post-download-modal-toggle-all");
         toggleAllButton.setMinWidth(Region.USE_PREF_SIZE);
         toggleAllButton.setMaxWidth(Region.USE_PREF_SIZE);
         toggleAllButton.setOnAction(event -> toggleAll());
-        row.getChildren().addAll(selectedCount, toggleAllButton);
+        row.getChildren().add(toggleAllButton);
         return row;
     }
 
@@ -220,6 +213,7 @@ final class PostDownloadWorldModal {
         StackPane icon = worldIcon(option.world());
 
         VBox copy = new VBox(3);
+        copy.setAlignment(Pos.CENTER_LEFT);
         Label name = new Label(option.world().name());
         name.getStyleClass().add("post-download-modal-world-title");
         Label meta = new Label(option.enabledCount() + "/" + option.totalCount() + " already enabled - " + option.meta());
@@ -350,10 +344,6 @@ final class PostDownloadWorldModal {
         if (applyButton != null) {
             applyButton.setDisable(selectedWorldKeys.isEmpty());
             applyButton.setGraphic(applyButtonContent());
-        }
-        if (selectedCount != null) {
-            int count = selectedWorldKeys.size();
-            selectedCount.setText(count + " world" + LibraryProjectSupport.plural(count) + " selected");
         }
         if (toggleAllButton != null) {
             toggleAllButton.setText(selectedWorldKeys.size() == worlds.size() ? "Deselect All" : "Select All");

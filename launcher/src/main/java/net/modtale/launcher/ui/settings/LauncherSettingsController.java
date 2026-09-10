@@ -279,6 +279,7 @@ public final class LauncherSettingsController {
         header.setAlignment(Pos.CENTER_LEFT);
         StackPane icon = settingsIcon(glyph);
         VBox copy = new VBox(4);
+        copy.setAlignment(Pos.CENTER_LEFT);
         Label titleLabel = new Label();
         I18N.bind(titleLabel, titleKey);
         titleLabel.getStyleClass().add("settings-section-title");
@@ -298,6 +299,7 @@ public final class LauncherSettingsController {
         heading.setAlignment(Pos.CENTER_LEFT);
         StackPane icon = settingsIcon(glyph);
         VBox copy = new VBox(3);
+        copy.setAlignment(Pos.CENTER_LEFT);
         Label titleLabel = new Label();
         I18N.bind(titleLabel, titleKey);
         titleLabel.getStyleClass().add("settings-card-title");
