@@ -52,6 +52,7 @@
     "@vitest/coverage-v8": "^4.1.11",
     "baseline-browser-mapping": "^2.11.20",
     "jsdom": "^30.0.1",
+    "sharp": "^0.35.4",
     "typescript": "^6.0.3",
     "vitest": "^4.1.11"
   },

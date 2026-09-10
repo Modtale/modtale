@@ -1,10 +1,15 @@
 {
-  "browse-projects": "239958e36060",
-  "world-library": "711c82fc5937",
-  "curseforge-mods": "1f605fbe46bd",
-  "mod-configs": "087f35c2e172",
-  "account-sync": "4ad2db62741d",
-  "wardrobe": "e895481c379f",
-  "pack-contents": "20954564cf26",
-  "pack-unlock": "cad0eca54541"
+  "browse-projects": "50cef9aa8ac9",
+  "world-library": "ca2757a3a19f",
+  "curseforge-mods": "e72b0f66a6e6",
+  "mod-configs": "f1ae9b0464a8",
+  "account-sync": "21719536c8ef",
+  "wardrobe": "8ddfd6b2a687",
+  "pack-contents": "45c9334f93d6",
+  "pack-unlock": "cbbb188b5dd1",
+  "modpack-creation": "f715d1ac3ba9",
+  "modpack-curseforge": "abd9be6058d7",
+  "modlist-to-pack": "29b5631e1462",
+  "modpack-configs": "af0744a77b69",
+  "launcher-play": "e7b581d06491"
 }
