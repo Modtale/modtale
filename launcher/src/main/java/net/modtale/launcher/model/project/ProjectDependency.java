@@ -1,13 +1,14 @@
 package net.modtale.launcher.model.project;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record ProjectDependency(
         String id,
-        String projectId,
-        String projectTitle,
+        @JsonAlias("modId") String projectId,
+        @JsonAlias("modTitle") String projectTitle,
         String versionNumber,
         String dependencyType,
         String source,
@@ -17,13 +18,21 @@ public record ProjectDependency(
         String externalFileName,
         String cachedFileUrl,
         boolean hytaleProjectConfirmed,
-        String icon,
+        @JsonAlias("imageUrl") String icon,
         String title,
         String classification,
         String slug,
         @JsonProperty("isOptional") Boolean optional,
         @JsonProperty("isEmbedded") Boolean embedded
 ) {
+    public ProjectDependency {
+        if (source != null) source = source.trim();
+        if ((source == null || source.isBlank()) && projectId != null
+                && projectId.startsWith("curseforge:")) {
+            source = "CURSEFORGE";
+        }
+    }
+
     public ProjectDependency(
             String id,
             String projectId,
@@ -52,7 +61,7 @@ public record ProjectDependency(
     }
 
     public boolean isExternal() {
-        return source != null && !DependencySource.MODTALE.matches(source);
+        return source != null && !source.isBlank() && !DependencySource.MODTALE.matches(source);
     }
 
     public boolean isCurseForge() {

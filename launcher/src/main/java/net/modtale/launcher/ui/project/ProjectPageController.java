@@ -1988,8 +1988,7 @@ public final class ProjectPageController {
 
     private void requestDependencyMetadata(ProjectSummary summary, ProjectDetail detail) {
         List<String> missing = latestDependencies(summary, detail).stream()
-                .filter(dependency -> dependency != null && !dependency.isExternal())
-                .map(ProjectDependency::projectId)
+                .map(ProjectDependencyMetadata::lookupKey)
                 .filter(id -> !isBlank(id))
                 .filter(id -> !dependencyMetaCache.containsKey(id) && requestedDependencyMetaIds.add(id))
                 .distinct()
@@ -1997,7 +1996,8 @@ public final class ProjectPageController {
         if (missing.isEmpty()) {
             return;
         }
-        CompletableFuture.supplyAsync(() -> apiClient.getProjectMetaBatch(missing), executor)
+        CompletableFuture.supplyAsync(() -> ProjectDependencyMetadata.load(
+                        missing, apiClient::getProjectMetaBatch, apiClient::getProjectMeta), executor)
                 .whenComplete((result, error) -> Platform.runLater(() -> {
                     boolean changed = false;
                     if (error == null && result != null) {
@@ -2334,31 +2334,15 @@ public final class ProjectPageController {
     }
 
     private String dependencyTitle(ProjectDependency dependency) {
-        ProjectMeta meta = dependencyMeta(dependency);
-        return first(
-                meta == null ? null : meta.title(),
-                dependency.title(),
-                dependency.projectTitle(),
-                dependency.projectId(),
-                dependency.externalId(),
-                dependency.id(),
-                "External dependency"
-        );
+        return ProjectDependencyMetadata.title(dependency, dependencyMeta(dependency));
     }
 
     private String dependencyIconUrl(ProjectDependency dependency) {
-        if (dependency == null || dependency.isExternal()) {
-            return "";
-        }
-        ProjectMeta meta = dependencyMeta(dependency);
-        return first(meta == null ? null : meta.icon(), dependency.icon());
+        return dependency == null ? "" : ProjectDependencyMetadata.icon(dependency, dependencyMeta(dependency));
     }
 
     private ProjectMeta dependencyMeta(ProjectDependency dependency) {
-        if (dependency == null || isBlank(dependency.projectId())) {
-            return null;
-        }
-        return dependencyMetaCache.get(dependency.projectId());
+        return dependencyMetaCache.get(ProjectDependencyMetadata.lookupKey(dependency));
     }
 
     private static ProjectMeta dependencyFallbackMeta(String projectId) {
@@ -2366,14 +2350,7 @@ public final class ProjectPageController {
     }
 
     private String dependencyNoticeTitle(ProjectDependency dependency) {
-        return first(
-                dependency.projectTitle(),
-                dependency.projectId(),
-                dependency.title(),
-                dependency.externalId(),
-                dependency.id(),
-                "External dependency"
-        );
+        return dependencyTitle(dependency);
     }
 
     private String dependencyTypeLabel(ProjectDependency dependency) {
