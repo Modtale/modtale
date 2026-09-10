@@ -50,6 +50,7 @@ import net.modtale.launcher.model.project.GameVersionCatalog;
 import net.modtale.launcher.model.project.ProjectPage;
 import net.modtale.launcher.model.project.ProjectSummary;
 import net.modtale.launcher.ui.browse.card.ProjectCardFactory;
+import net.modtale.launcher.ui.browse.card.ProjectCardViewStyle;
 import net.modtale.launcher.ui.browse.controls.BrowseOptions;
 import net.modtale.launcher.ui.browse.controls.ProjectBrowseCategories;
 import net.modtale.launcher.ui.browse.controls.ProjectBrowseDownloadTimeframeSelector;
@@ -167,7 +168,7 @@ public final class ProjectBrowseController {
                 favoriteResolver, gameVersion, onInstall, onOpenPage, onOpenCreator, onToggleFavorite);
         this.categories = new ProjectBrowseCategories(scrollSupport, this::searchProjects);
         this.tags = new ProjectBrowseTags(this::searchProjects, this::refreshBrowseControls);
-        this.viewStyles = new ProjectBrowseViewStyleSelector(this::searchProjects);
+        this.viewStyles = new ProjectBrowseViewStyleSelector(this::handleViewStyleChange);
         this.filterOptions = new ProjectBrowseFilterOptions(
                 this::searchProjects,
                 this::refreshBrowseControls,
@@ -288,6 +289,14 @@ public final class ProjectBrowseController {
                     }
                     filterOptions.replaceGameVersionCatalog(catalog);
                 }));
+    }
+
+    private void handleViewStyleChange() {
+        if (viewStyles.style() == ProjectCardViewStyle.COMPACT
+                && selectedPageSize() < 48) {
+            withSuppressedSearch(() -> pageSizeCombo.setValue(48));
+        }
+        searchProjects();
     }
 
     public void searchProjects() {

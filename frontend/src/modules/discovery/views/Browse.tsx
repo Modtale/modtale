@@ -134,12 +134,16 @@ export const Browse: React.FC<BrowseViewProps> = ({
     const handleViewStyleChange = useCallback((style: BrowseViewStyle) => {
         setViewStyle(style);
         if (typeof window !== 'undefined') localStorage.setItem(BROWSE_VIEW_STYLE_STORAGE_KEY, style);
+        if (style === 'compact' && itemsPerPage < COMPACT_ITEMS_PER_PAGE) {
+            setItemsPerPage(COMPACT_ITEMS_PER_PAGE);
+            if (typeof window !== 'undefined') localStorage.setItem(BROWSE_ITEMS_PER_PAGE_STORAGE_KEY, String(COMPACT_ITEMS_PER_PAGE));
+        }
         setSearchParams(prev => {
             const next = new URLSearchParams(prev);
             next.delete('page');
             return next;
         });
-    }, [setSearchParams]);
+    }, [itemsPerPage, setItemsPerPage, setSearchParams]);
 
     const handleItemsPerPageChange = useCallback((nextSize: number) => {
         if (nextSize === itemsPerPage || !isBrowseItemsPerPage(nextSize)) {
