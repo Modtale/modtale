@@ -42,6 +42,11 @@ class ProjectBrowseTagsTest {
             ScrollPane options = (ScrollPane) popover.getChildren().getFirst();
             assertSame(tags.section(), ((VBox) options.getContent()).getChildren().getFirst());
             assertTrue(popover.getHeight() <= 450);
+            TextField search = (TextField) tags.section().getChildren().get(1);
+            assertFalse(search.isVisible(), "Tags start collapsed");
+            Button expand = (Button) tags.section().lookup(".filter-toggle-button");
+            expand.fire();
+            assertTrue(search.isVisible());
             Button first = tags.section().lookupAll(".tag-chip").stream().map(Button.class::cast)
                     .filter(b -> b.getText().equals(BrowseOptions.GLOBAL_TAGS.get(0))).findFirst().orElseThrow();
             Button second = tags.section().lookupAll(".tag-chip").stream().map(Button.class::cast)
@@ -52,7 +57,11 @@ class ProjectBrowseTagsTest {
             assertEquals(2, tags.selectedCount());
             assertEquals(1, filters.activeFilterCount(), "Tags count as one category");
             String selected = tags.selectedQuery();
-            TextField search = (TextField) tags.section().getChildren().get(1);
+            assertEquals("Tags (2)", expand.getText());
+            expand.fire();
+            assertFalse(search.isManaged());
+            assertEquals(selected, tags.selectedQuery());
+            expand.fire();
             search.setText("no-such-tag");
             assertFalse(first.isManaged());
             assertEquals(selected, tags.selectedQuery());
@@ -62,7 +71,8 @@ class ProjectBrowseTagsTest {
             assertTrue(search.getText().isEmpty());
             assertTrue(first.isManaged());
             first.fire();
-            ((Button) popover.lookup(".filter-toggle-button")).fire();
+            ((Button) popover.lookupAll(".filter-toggle-button").stream()
+                    .filter(node -> node != expand).findFirst().orElseThrow()).fire();
             assertEquals(2, filters.activeFilterCount());
             int beforeReset = searches.get();
             ((Button) popover.lookup(".filter-reset-button")).fire();

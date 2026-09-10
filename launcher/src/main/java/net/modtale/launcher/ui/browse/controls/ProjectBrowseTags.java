@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.Set;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
-import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.input.ScrollEvent;
@@ -26,7 +25,9 @@ public final class ProjectBrowseTags {
     private final Set<String> selectedTags = new LinkedHashSet<>();
     private final VBox section = new VBox(12);
     private final TextField search = new TextField();
-    private final Label heading = new Label("Tags");
+    private final Button heading = new Button("Tags");
+    private final ScrollPane tagScroll = new ScrollPane();
+    private boolean expanded;
 
     public ProjectBrowseTags(Runnable onSearch, Runnable onChange) {
         this.onSearch = onSearch;
@@ -72,7 +73,13 @@ public final class ProjectBrowseTags {
         HBox header = new HBox(12);
         header.getStyleClass().add("tag-popover-header");
         header.setAlignment(Pos.CENTER_LEFT);
-        heading.getStyleClass().add("filter-label");
+        heading.getStyleClass().add("filter-toggle-button");
+        heading.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(heading, Priority.ALWAYS);
+        heading.setOnAction(event -> {
+            expanded = !expanded;
+            updateExpansion();
+        });
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         Button clear = new Button("Clear Tags");
@@ -99,7 +106,7 @@ public final class ProjectBrowseTags {
             tags.getChildren().add(button);
         }
 
-        ScrollPane tagScroll = new ScrollPane(tags);
+        tagScroll.setContent(tags);
         tagScroll.getStyleClass().add("tag-scroll");
         tagScroll.setFitToWidth(true);
         tagScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
@@ -119,6 +126,18 @@ public final class ProjectBrowseTags {
             });
         });
         section.getChildren().setAll(header, search, tagScroll);
+        updateExpansion();
+    }
+
+    private void updateExpansion() {
+        search.setVisible(expanded);
+        search.setManaged(expanded);
+        tagScroll.setVisible(expanded);
+        tagScroll.setManaged(expanded);
+        heading.setGraphic(net.modtale.launcher.ui.common.LauncherIcons.icon(
+                expanded ? net.modtale.launcher.ui.common.LauncherIcons.Glyph.CHEVRON_DOWN
+                        : net.modtale.launcher.ui.common.LauncherIcons.Glyph.CHEVRON_RIGHT, 12));
+        heading.setAccessibleHelp(expanded ? "Collapse tag choices" : "Expand tag choices");
     }
 
     private void updateButtons() {
