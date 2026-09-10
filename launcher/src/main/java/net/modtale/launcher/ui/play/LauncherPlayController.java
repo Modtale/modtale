@@ -7,7 +7,6 @@ import static net.modtale.launcher.ui.common.LauncherUi.value;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.Year;
@@ -118,7 +117,6 @@ public final class LauncherPlayController {
     private static final double CATALOG_HEADER_HEIGHT = 30;
     private static final double PLAY_DOCK_BOTTOM_MARGIN = 96;
     private static final double PLAY_DOCK_CLEARANCE = 24;
-    private static final int HYVATAR_RENDER_SIZE = 256;
     private static final DateTimeFormatter BLOG_DATE = DateTimeFormatter.ofPattern("MMM d").withZone(ZoneId.systemDefault());
     private static final DateTimeFormatter BLOG_DATE_WITH_YEAR = DateTimeFormatter.ofPattern("MMM d, yyyy").withZone(ZoneId.systemDefault());
 
@@ -149,6 +147,7 @@ public final class LauncherPlayController {
     private final CatalogShelf newReleasesShelf = new CatalogShelf(ProjectBrowseSort.NEWEST);
     private final CatalogShelf trendingShelf = new CatalogShelf(ProjectBrowseSort.TRENDING);
     private final ModtaleNewsClient modtaleNews = new ModtaleNewsClient();
+    private final net.modtale.launcher.hytale.HytaleAvatarClient avatarClient;
     private final Map<String, Image> imageCache = new ConcurrentHashMap<>();
 
     private volatile Process hytaleProcess;
@@ -202,6 +201,7 @@ public final class LauncherPlayController {
         this.settingsController = settingsController;
         this.feedback = feedback;
         this.executor = executor;
+        this.avatarClient = new net.modtale.launcher.hytale.HytaleAvatarClient(hytaleAuthService, executor);
         this.favoriteResolver = favoriteResolver == null ? id -> false : favoriteResolver;
         this.gameVersion = gameVersion == null ? () -> "" : gameVersion;
         this.onInstall = onInstall == null ? project -> {
@@ -1401,7 +1401,27 @@ public final class LauncherPlayController {
     }
 
     private void updateHytaleProfileAvatar(StackPane avatar, String username, double size) {
-        updateImageAvatar(avatar, username, size, PROFILE_AVATAR_RADIUS, hyvatarUrl(username));
+        updateImageAvatar(avatar, username, size, PROFILE_AVATAR_RADIUS, "");
+        ImageView image = new ImageView();
+        image.setFitWidth(size);
+        image.setFitHeight(size);
+        image.setPreserveRatio(true);
+        image.setSmooth(true);
+        Rectangle clip = new Rectangle(size, size);
+        clip.setArcWidth(PROFILE_AVATAR_RADIUS * 2);
+        clip.setArcHeight(PROFILE_AVATAR_RADIUS * 2);
+        image.setClip(clip);
+        avatar.getChildren().add(image);
+        avatarClient.avatarUrl(username).whenComplete((url, error) -> Platform.runLater(() -> {
+            if (error == null && avatar.getChildren().contains(image)) {
+                Image loaded = cachedImage(url, size, size, true, true);
+                image.setImage(loaded);
+                Node initial = avatar.getChildren().getFirst();
+                initial.visibleProperty().bind(Bindings.createBooleanBinding(
+                        () -> loaded.getProgress() < 1 || loaded.isError(),
+                        loaded.progressProperty(), loaded.errorProperty()));
+            }
+        }));
     }
 
     private void updateImageAvatar(StackPane avatar, String name, double size, double radius, String imageUrl) {
@@ -1453,11 +1473,6 @@ public final class LauncherPlayController {
             });
             return image;
         });
-    }
-
-    private String hyvatarUrl(String username) {
-        String encoded = URLEncoder.encode(value(username, "Hytale"), StandardCharsets.UTF_8).replace("+", "%20");
-        return "https://hyvatar.io/render/" + encoded + "?size=" + HYVATAR_RENDER_SIZE;
     }
 
     private String initialFor(String value) {
