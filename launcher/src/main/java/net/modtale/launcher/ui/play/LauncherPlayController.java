@@ -748,6 +748,8 @@ public final class LauncherPlayController {
         header.setAlignment(Pos.CENTER_LEFT);
         Label label = new Label(title);
         label.getStyleClass().add("play-sidebar-section-title");
+        label.setMaxHeight(Double.MAX_VALUE);
+        label.setAlignment(Pos.CENTER_LEFT);
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         Button button = new Button(null, LauncherIcons.icon(glyph, 15));

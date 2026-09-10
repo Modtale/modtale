@@ -9754,6 +9754,7 @@
 
 .play-news-header .play-sidebar-section-title {
     -fx-font-size: 16px;
+    -fx-translate-y: 1px;
 }
 
 .play-news-header {
