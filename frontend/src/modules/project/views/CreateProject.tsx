@@ -10,8 +10,6 @@ import { SiteRoutes } from '@/utils/routes';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { SignInModal } from '@/modules/auth/components/SignInModal';
-import { loadCurseForgeImport, type CurseForgeImport } from '../api/curseForgeImport';
-import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import { worldListClient } from '@/modules/worldlist/api/worldListClient';
 
 interface CreateProjectProps {
@@ -35,29 +33,6 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
     const [classification, setClassification] = useState<Classification | null>(null);
     const [title, setTitle] = useState('');
     const [summary, setSummary] = useState('');
-    const [importReference, setImportReference] = useState('');
-    const [imported, setImported] = useState<CurseForgeImport | null>(null);
-    const [isImporting, setIsImporting] = useState(false);
-    const [importError, setImportError] = useState('');
-
-    const handleImport = async (event: React.FormEvent) => {
-        event.preventDefault();
-        if (!currentUser?.emailVerified || isImporting) return;
-        setIsImporting(true);
-        setImportError('');
-        try {
-            const seed = await loadCurseForgeImport(importReference);
-            setImported(seed);
-            setTitle(seed.title);
-            setSummary(seed.summary);
-            setClassification(seed.classification);
-            setStep(1);
-        } catch (error) {
-            setImportError(error instanceof Error ? error.message : 'Could not import this project. Please try again.');
-        } finally {
-            setIsImporting(false);
-        }
-    };
 
     const [owner, setOwner] = useState<string>(currentUser?.id || '');
     const [myOrgs, setMyOrgs] = useState<User[]>([]);
@@ -162,7 +137,6 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
             });
             return;
         }
-        setImported(null);
         setClassification(typeId as Classification);
         setStep(1);
     };
@@ -203,11 +177,6 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
             formData.append('classification', classification);
             formData.append('description', summary);
             formData.append('owner', effectiveOwner);
-            if (imported) {
-                formData.append('about', imported.about);
-                formData.append('curseForgeUrl', imported.sourceUrl);
-                if (imported.imageUrl) formData.append('imageUrl', imported.imageUrl);
-            }
 
             const uploadConfig = {
                 headers: { 'Content-Type': 'multipart/form-data' }
@@ -235,7 +204,6 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
         const Icon = type.icon;
         return (
             <button
-                disabled={isImporting}
                 onClick={() => handleClassificationSelect(type.id as string)}
                 style={style}
                 className={`relative p-8 rounded-3xl border-2 border-slate-300 dark:border-white/20 text-left transition-all duration-300 group overflow-hidden flex flex-col justify-center aspect-[4/3] bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shadow-xl hover:border-modtale-accent dark:hover:border-modtale-accent hover:ring-2 hover:ring-modtale-accent hover:shadow-2xl hover:-translate-y-1 ${className}`}
@@ -304,26 +272,6 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
                                     <ProjectTypeCard key={type.id} type={type} className="w-full" />
                                 ))}
                             </div>
-
-                            {!seedListId && (
-                                <details className="group max-w-xl mx-auto mt-10 text-sm text-slate-500 dark:text-slate-400">
-                                    <summary className="inline-flex items-center gap-2 cursor-pointer list-none rounded-md px-2 py-1 hover:text-slate-900 dark:hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-modtale-accent [&::-webkit-details-marker]:hidden">
-                                        Import from CurseForge
-                                        <ChevronDown className="w-4 h-4 transition-transform group-open:rotate-180" />
-                                    </summary>
-                                    <form onSubmit={handleImport} className="mt-4 space-y-3 text-left">
-                                        <p>Use your existing mod’s details as a starting point.</p>
-                                        <label htmlFor="curseforge-reference" className="sr-only">CurseForge project URL or ID</label>
-                                        <div className="flex flex-col sm:flex-row gap-2">
-                                            <input id="curseforge-reference" value={importReference} onChange={event => setImportReference(event.target.value)} disabled={isImporting} placeholder="CurseForge project URL or ID" className="min-w-0 flex-1 rounded-lg border border-slate-300 dark:border-white/20 bg-transparent px-3 py-2 text-slate-900 dark:text-white" />
-                                            <button type="submit" disabled={isImporting || !importReference.trim() || !currentUser?.emailVerified} className="rounded-lg border border-slate-300 dark:border-white/20 px-4 py-2 font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 disabled:opacity-50">
-                                                {isImporting ? 'Importing…' : 'Import details'}
-                                            </button>
-                                        </div>
-                                        {importError && <p role="alert" className="text-red-600 dark:text-red-400">{importError}</p>}
-                                    </form>
-                                </details>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -346,33 +294,11 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
                     <div className="flex flex-col items-center">
                         <div className="w-full max-w-2xl flex flex-col">
                             <div className="text-center mb-10">
-                                <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-none">{imported ? 'Review your import.' : "Let's give it a name."}</h1>
+                                <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-none">Let's give it a name.</h1>
                                 <p className="text-slate-500 dark:text-slate-400 font-bold mt-10 uppercase tracking-widest text-xs">You can always change this later.</p>
                             </div>
 
                             <div className="space-y-6 bg-white/60 dark:bg-slate-900/60 backdrop-blur-3xl p-8 md:p-12 rounded-3xl border border-slate-200 dark:border-white/10 shadow-2xl shadow-modtale-accent/5 animate-in fade-in zoom-in-95 duration-500">
-                                {imported && (
-                                    <div className="space-y-4 text-sm text-slate-600 dark:text-slate-300">
-                                        <div className="flex items-center gap-4">
-                                            {imported.imageUrl && <img src={imported.imageUrl} alt="Imported project icon" className="w-16 h-16 rounded-xl object-cover" />}
-                                            <a href={imported.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-modtale-accent underline">View original on CurseForge</a>
-                                        </div>
-                                        {imported.warnings.map(warning => <p key={warning} role="status">{warning}</p>)}
-                                        <label className="block font-bold">Project type
-                                            <select value={classification || ''} onChange={event => setClassification(event.target.value as Classification)} className="block mt-2 w-full rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-slate-900 px-4 py-3">
-                                                {PROJECT_TYPES.filter(type => type.id !== 'All' && type.id !== 'MODPACK').map(type => <option key={type.id} value={type.id}>{type.label}</option>)}
-                                            </select>
-                                        </label>
-                                        <details>
-                                            <summary className="cursor-pointer font-bold">Review full description</summary>
-                                            <div className="mt-3 max-h-80 overflow-auto"><MarkdownRenderer content={imported.about} /></div>
-                                            <label className="block mt-3">Edit description
-                                                <textarea value={imported.about} maxLength={50000} onChange={event => setImported({ ...imported, about: event.target.value })} className="block mt-2 w-full min-h-40 rounded-xl border border-slate-300 dark:border-white/20 bg-transparent p-3" />
-                                            </label>
-                                        </details>
-                                        <p>Review these details, then continue editing your draft before publishing.</p>
-                                    </div>
-                                )}
                                 {myOrgs.length > 0 && (
                                     <div className="relative z-50" ref={ownerDropdownRef}>
                                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">Project Owner</label>
