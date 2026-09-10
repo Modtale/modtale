@@ -3,7 +3,6 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
     Filter,
-    Tag,
     ChevronDown,
     ChevronRight,
     Check,
@@ -186,8 +185,6 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                                                                            selectedVersion, setSelectedVersion, minFavorites, setMinFavorites, minDownloads, setMinDownloads, openSourceOnly, setOpenSourceOnly, filterDate, setFilterDate,
                                                                            isMobile, viewStyle, onViewStyleChange, itemsPerPage, onItemsPerPageChange, isScrolled
                                                                        }) => {
-    const [isTagsOpen, setIsTagsOpen] = useState(false);
-    const tagRef = useRef<HTMLDivElement>(null);
     const filterRef = useRef<HTMLDivElement>(null);
     const [customDl, setCustomDl] = useState('');
     const [customFav, setCustomFav] = useState('');
@@ -204,7 +201,6 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
 
     useEffect(() => {
         const handleClick = (e: MouseEvent) => {
-            if (tagRef.current && !tagRef.current.contains(e.target as Node)) setIsTagsOpen(false);
             if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
                 const mobileModal = document.getElementById('mobile-filter-modal');
                 if (isMobile && isFilterOpen && mobileModal && mobileModal.contains(e.target as Node)) return;
@@ -310,11 +306,22 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
         setSelectedDateObj(null);
         setShowCalendar(false);
     };
-    const displayFilterCount = [selectedVersions.length > 0, openSourceOnly, minFavorites > 0, minDownloads > 0, (filterDate !== null && !isDownloadSort)].filter(Boolean).length;
+    const displayFilterCount = [selectedTags.length > 0, selectedVersions.length > 0, openSourceOnly, minFavorites > 0, minDownloads > 0, (filterDate !== null && !isDownloadSort)].filter(Boolean).length;
     const resultCountLabel = totalItems === 1 ? '1 result' : `${totalItems.toLocaleString()} results`;
 
     const filterMenuBody = (
         <div className="space-y-5">
+            <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Tags</span>
+                    {selectedTags.length > 0 && <button type="button" onClick={onClearTags} className="text-xs text-modtale-accent hover:underline font-bold">Clear tags</button>}
+                </div>
+                <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto" role="group" aria-label="Tags">
+                    {GLOBAL_TAGS.map(tag => (
+                        <button key={tag} type="button" aria-pressed={selectedTags.includes(tag)} onClick={() => onToggleTag(tag)} className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1.5 ${selectedTags.includes(tag) ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 shadow-sm'}`}>{tag} {selectedTags.includes(tag) && <Check className="w-3 h-3" />}</button>
+                    ))}
+                </div>
+            </div>
             <div className="space-y-2">
                 <div className="flex items-center justify-between mb-1.5">
                     <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase block">Game Version</label>
@@ -443,7 +450,6 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                             <DropdownSelect
                                 value={String(itemsPerPage)}
                                 onChange={(value) => onItemsPerPageChange(Number(value))}
-                                onOpen={() => setIsTagsOpen(false)}
                                 options={BROWSE_ITEMS_PER_PAGE_OPTIONS.map(size => ({
                                     value: String(size),
                                     label: String(size)
@@ -460,25 +466,6 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                                 optionClassName="w-full px-2 py-2 text-sm font-bold flex justify-center items-center transition-colors text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5"
                             />
                         )}
-                        <div className="relative flex-1 lg:flex-none h-10" ref={tagRef}>
-                            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsTagsOpen(!isTagsOpen); if(isFilterOpen) onToggleFilterMenu(); }} className={`w-full lg:w-auto h-full flex items-center justify-center lg:justify-start gap-1.5 border rounded-xl px-3 text-xs font-bold transition-all whitespace-nowrap ${selectedTags.length > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
-                                <div className="flex items-center gap-1.5 pointer-events-none"><Tag className="w-3.5 h-3.5" /> <span>Tags</span></div>
-                                {selectedTags.length > 0 && <span className="bg-white/20 px-1.5 rounded text-[10px] pointer-events-none">{selectedTags.length}</span>}
-                            </button>
-                            {isTagsOpen && (
-                                <div className="absolute left-0 lg:left-auto top-full mt-2 w-[280px] sm:w-[320px] lg:w-72 max-w-[calc(100vw-2rem)] max-h-[70vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl z-[200] p-4 animate-in fade-in slide-in-from-top-2">
-                                    <div className="flex justify-between items-center mb-3">
-                                        <span className="font-bold text-sm text-slate-900 dark:text-white">Filter by Tag</span>
-                                        {selectedTags.length > 0 && <button type="button" onClick={onClearTags} className="text-xs text-red-500 hover:underline font-bold">Clear All</button>}
-                                    </div>
-                                    <div className="flex flex-wrap gap-2 max-h-60 overflow-y-auto pr-2">
-                                        {GLOBAL_TAGS.map(tag => (
-                                            <button key={tag} type="button" onClick={() => onToggleTag(tag)} className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors flex items-center gap-1.5 ${selectedTags.includes(tag) ? 'bg-modtale-accent text-white border-transparent shadow-sm' : 'bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 shadow-sm'}`}>{tag} {selectedTags.includes(tag) && <Check className="w-3 h-3" />}</button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
                         <div className="relative flex-1 lg:flex-none h-10" ref={filterRef}>
                             <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFilterMenu(); }} className={`w-full h-full flex items-center justify-center lg:justify-start gap-1.5 border rounded-xl px-3 text-xs font-bold transition-all whitespace-nowrap ${isFilterOpen || displayFilterCount > 0 ? 'bg-modtale-accent text-white border-transparent shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/[0.02] shadow-sm'}`}>
                                 <div className="flex items-center gap-1.5 pointer-events-none"><Filter className="w-3.5 h-3.5" /> <span>Filters</span></div>
@@ -536,7 +523,7 @@ export const BrowseFilters: React.FC<BrowseFiltersProps> = React.memo(({
                             }
                         `}</style>
                         <div className="sort-override-wrapper flex-1 lg:flex-none h-10">
-                            <SortDropdown value={sortBy} onChange={(val) => onSortChange(val)} onOpen={() => setIsTagsOpen(false)} isMobile={isMobile} />
+                            <SortDropdown value={sortBy} onChange={(val) => onSortChange(val)} isMobile={isMobile} />
                         </div>
                     </div>
                 </div>
