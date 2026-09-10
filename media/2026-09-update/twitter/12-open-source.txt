@@ -1,0 +1,5 @@
+Looking for open-source Hytale projects?
+
+Open Filters, switch on Open Source, and explore projects by their declared license. A small addition since June, with a whole lot to discover.
+
+https://modtale.net/mods?openSource=true

@@ -1,0 +1,84 @@
+{
+  "name": "project-galleries",
+  "reviewed_loaded": true,
+  "poster_shot": 1,
+  "shots": [
+    {
+      "source": "gallery-01.png",
+      "seconds": 2.2,
+      "crop": [
+        0,
+        0,
+        1920,
+        1200
+      ],
+      "pan": 0,
+      "target": [
+        858,
+        884
+      ],
+      "kind": "navigation"
+    },
+    {
+      "source": "gallery-02.png",
+      "seconds": 2.9,
+      "crop": [
+        320,
+        160,
+        1280,
+        800
+      ],
+      "pan": 0.9,
+      "target": [
+        1497,
+        546
+      ],
+      "kind": "reading"
+    },
+    {
+      "source": "gallery-03.png",
+      "seconds": 2.2,
+      "crop": [
+        320,
+        160,
+        1280,
+        800
+      ],
+      "pan": 0,
+      "target": [
+        949,
+        925
+      ],
+      "kind": "reading"
+    },
+    {
+      "source": "gallery-04.png",
+      "seconds": 2.3,
+      "crop": [
+        320,
+        160,
+        1280,
+        800
+      ],
+      "pan": 0,
+      "target": [
+        1504,
+        253
+      ],
+      "kind": "reading"
+    },
+    {
+      "source": "gallery-05.png",
+      "seconds": 2.7,
+      "crop": [
+        0,
+        0,
+        1920,
+        1200
+      ],
+      "pan": 1.05,
+      "target": null,
+      "kind": "result"
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+[
+  {
+    "at": 0,
+    "duration": 3,
+    "source": "launcher-play.jpg",
+    "sourceStart": 0,
+    "title": "Meet your next Hytale setup."
+  },
+  {
+    "at": 3,
+    "duration": 5,
+    "source": "modpack-creation.mp4",
+    "sourceStart": 5,
+    "title": "Build a pack right on Modtale."
+  },
+  {
+    "at": 8,
+    "duration": 4,
+    "source": "browse-projects.mp4",
+    "sourceStart": 12,
+    "title": "From project to your worlds."
+  },
+  {
+    "at": 12,
+    "duration": 4,
+    "source": "world-library.mp4",
+    "sourceStart": 7,
+    "title": "Your worlds. Your mod choices."
+  },
+  {
+    "at": 16,
+    "duration": 4,
+    "source": "curseforge-mods.mp4",
+    "sourceStart": 15,
+    "title": "More mods. One library."
+  },
+  {
+    "at": 20,
+    "duration": 3.5,
+    "source": "mod-configs.mp4",
+    "sourceStart": 6,
+    "title": "Tune your setup."
+  },
+  {
+    "at": 23.5,
+    "duration": 5,
+    "source": "account-sync.mp4",
+    "sourceStart": 11,
+    "title": "Bring your setup with you."
+  },
+  {
+    "at": 28.5,
+    "duration": 4,
+    "source": "wardrobe.mp4",
+    "sourceStart": 5,
+    "title": "Make it a little more you."
+  },
+  {
+    "at": 32.5,
+    "duration": 3.5,
+    "source": "launcher-play.jpg",
+    "sourceStart": 0,
+    "title": "Make your next world yours."
+  }
+]

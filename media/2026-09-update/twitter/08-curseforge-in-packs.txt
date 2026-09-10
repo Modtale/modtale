@@ -1,0 +1,5 @@
+Mix Modtale and CurseForge projects in one pack.
+
+Paste a CurseForge file link, review the release, and add it beside your Modtale picks. Packs with CurseForge files install through the launcher.
+
+https://modtale.net/news/modpacks-v2

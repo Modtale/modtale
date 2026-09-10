@@ -1,0 +1,5 @@
+Your worlds don't all need the same mods.
+
+Search your library, enable a mod in one world, and leave it disabled in another. Enabled and Disabled sections keep each setup easy to follow.
+
+https://modtale.net/launcher

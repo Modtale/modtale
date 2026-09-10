@@ -1,0 +1,366 @@
+{
+  "videos": [
+    {
+      "file": "twitter/01-update-overview.mp4",
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1280,
+          "height": 1024,
+          "sample_aspect_ratio": "1:1",
+          "pix_fmt": "yuv420p",
+          "avg_frame_rate": "60/1"
+        }
+      ],
+      "format": {
+        "duration": "15.000000",
+        "size": "1282842"
+      },
+      "sha256": "e90ea16f77a3220492cf62179c84c8c55520862bf5fc1e4019ae99c876aa70e0",
+      "fullDecode": "passed"
+    },
+    {
+      "file": "twitter/02-build-a-pack.mp4",
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1280,
+          "height": 1024,
+          "sample_aspect_ratio": "1:1",
+          "pix_fmt": "yuv420p",
+          "avg_frame_rate": "60/1"
+        }
+      ],
+      "format": {
+        "duration": "28.450000",
+        "size": "1730002"
+      },
+      "sha256": "ac5b0721e8d62144558485f721c4174cc8be13d4dcd5b2998082f51f470e024b",
+      "fullDecode": "passed"
+    },
+    {
+      "file": "twitter/03-download-to-worlds.mp4",
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1280,
+          "height": 1024,
+          "sample_aspect_ratio": "1:1",
+          "pix_fmt": "yuv420p",
+          "avg_frame_rate": "60/1"
+        }
+      ],
+      "format": {
+        "duration": "20.450000",
+        "size": "1777145"
+      },
+      "sha256": "c0ea8b5c809485a950c7e129c9aa8446494558536d78c666e00b15d5ceca6667",
+      "fullDecode": "passed"
+    },
+    {
+      "file": "twitter/04-library-search.mp4",
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1280,
+          "height": 1024,
+          "sample_aspect_ratio": "1:1",
+          "pix_fmt": "yuv420p",
+          "avg_frame_rate": "60/1"
+        }
+      ],
+      "format": {
+        "duration": "16.300000",
+        "size": "848474"
+      },
+      "sha256": "12abb822840b1a32cfa5cf7aca90c601ceb46ce4702e8f7e8f9c631311626cdd",
+      "fullDecode": "passed"
+    },
+    {
+      "file": "twitter/05-curseforge-browse.mp4",
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1280,
+          "height": 1024,
+          "sample_aspect_ratio": "1:1",
+          "pix_fmt": "yuv420p",
+          "avg_frame_rate": "60/1"
+        }
+      ],
+      "format": {
+        "duration": "26.800000",
+        "size": "3153563"
+      },
+      "sha256": "ea15da0b51cb00a511a74abcde812f76c5a07bbc1a1806f8089de91f0b1e45a1",
+      "fullDecode": "passed"
+    },
+    {
+      "file": "twitter/06-configs.mp4",
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1280,
+          "height": 1024,
+          "sample_aspect_ratio": "1:1",
+          "pix_fmt": "yuv420p",
+          "avg_frame_rate": "60/1"
+        }
+      ],
+      "format": {
+        "duration": "12.700000",
+        "size": "832091"
+      },
+      "sha256": "fa27b6d2f38925a106ce5b4035926f343da8d1abd01abd60fe094ae3bf323982",
+      "fullDecode": "passed"
+    },
+    {
+      "file": "twitter/07-mod-updates.mp4",
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1280,
+          "height": 1024,
+          "sample_aspect_ratio": "1:1",
+          "pix_fmt": "yuv420p",
+          "avg_frame_rate": "60/1"
+        }
+      ],
+      "format": {
+        "duration": "13.500000",
+        "size": "656964"
+      },
+      "sha256": "8ecff693433be5488eaa47aaff60284cff68fe83357bb527b9e18a6fb5c0e96d",
+      "fullDecode": "passed"
+    },
+    {
+      "file": "twitter/08-curseforge-in-packs.mp4",
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1280,
+          "height": 1024,
+          "sample_aspect_ratio": "1:1",
+          "pix_fmt": "yuv420p",
+          "avg_frame_rate": "60/1"
+        }
+      ],
+      "format": {
+        "duration": "13.350000",
+        "size": "1046475"
+      },
+      "sha256": "ef64c72bc50a0bdcb52e6eccd9462b0050459e4c5b7cdc796cfca0e1b474485f",
+      "fullDecode": "passed"
+    },
+    {
+      "file": "twitter/09-shared-list-to-pack.mp4",
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1280,
+          "height": 1024,
+          "sample_aspect_ratio": "1:1",
+          "pix_fmt": "yuv420p",
+          "avg_frame_rate": "60/1"
+        }
+      ],
+      "format": {
+        "duration": "14.150000",
+        "size": "969237"
+      },
+      "sha256": "6746faf6d2b94c83269b627754f8c1bc0fcaf53999b18b285412a05117228aee",
+      "fullDecode": "passed"
+    },
+    {
+      "file": "twitter/10-sync.mp4",
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1280,
+          "height": 1024,
+          "sample_aspect_ratio": "1:1",
+          "pix_fmt": "yuv420p",
+          "avg_frame_rate": "60/1"
+        }
+      ],
+      "format": {
+        "duration": "22.533008",
+        "size": "933185"
+      },
+      "sha256": "a71dd20bb658cd529090fe291700587fc7db351d9b11d75ed2d0e72b8435b310",
+      "fullDecode": "passed"
+    },
+    {
+      "file": "twitter/11-wardrobe.mp4",
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1280,
+          "height": 1024,
+          "sample_aspect_ratio": "1:1",
+          "pix_fmt": "yuv420p",
+          "avg_frame_rate": "60/1"
+        }
+      ],
+      "format": {
+        "duration": "16.300000",
+        "size": "1677735"
+      },
+      "sha256": "968ef74abe81ccebc2330dc40fd61693b0dc2bd719aa6d7a988b20b0ed4ecc81",
+      "fullDecode": "passed"
+    },
+    {
+      "file": "twitter/12-open-source.mp4",
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1280,
+          "height": 1024,
+          "sample_aspect_ratio": "1:1",
+          "pix_fmt": "yuv420p",
+          "avg_frame_rate": "60/1"
+        }
+      ],
+      "format": {
+        "duration": "9.850000",
+        "size": "955326"
+      },
+      "sha256": "2a9821d89887dabd670e1cbb5f174d4ad6f6c337e5ee18c3a7c9a451bfb844bf",
+      "fullDecode": "passed"
+    },
+    {
+      "file": "twitter/13-project-galleries.mp4",
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1280,
+          "height": 1024,
+          "sample_aspect_ratio": "1:1",
+          "pix_fmt": "yuv420p",
+          "avg_frame_rate": "60/1"
+        }
+      ],
+      "format": {
+        "duration": "12.300000",
+        "size": "1235289"
+      },
+      "sha256": "efc8508e703774b09452bcd8a7b3303b4e10bd45562312debd0ee429a1ef5a76",
+      "fullDecode": "passed"
+    },
+    {
+      "file": "discord/combined-overview.mp4",
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 1280,
+          "height": 1024,
+          "sample_aspect_ratio": "1:1",
+          "pix_fmt": "yuv420p",
+          "avg_frame_rate": "60/1"
+        }
+      ],
+      "format": {
+        "duration": "36.000000",
+        "size": "2800775"
+      },
+      "sha256": "4b7138207afdfbcf707924b87a7b3b63202cdea6bdd4214476db4cb413a48f5a",
+      "fullDecode": "passed"
+    }
+  ],
+  "tweets": [
+    {
+      "id": "01-update-overview",
+      "weightedLength": 201,
+      "remaining": 79
+    },
+    {
+      "id": "02-build-a-pack",
+      "weightedLength": 179,
+      "remaining": 101
+    },
+    {
+      "id": "03-download-to-worlds",
+      "weightedLength": 211,
+      "remaining": 69
+    },
+    {
+      "id": "04-library-search",
+      "weightedLength": 211,
+      "remaining": 69
+    },
+    {
+      "id": "05-curseforge-browse",
+      "weightedLength": 191,
+      "remaining": 89
+    },
+    {
+      "id": "06-configs",
+      "weightedLength": 212,
+      "remaining": 68
+    },
+    {
+      "id": "07-mod-updates",
+      "weightedLength": 183,
+      "remaining": 97
+    },
+    {
+      "id": "08-curseforge-in-packs",
+      "weightedLength": 220,
+      "remaining": 60
+    },
+    {
+      "id": "09-shared-list-to-pack",
+      "weightedLength": 210,
+      "remaining": 70
+    },
+    {
+      "id": "10-sync",
+      "weightedLength": 224,
+      "remaining": 56
+    },
+    {
+      "id": "11-wardrobe",
+      "weightedLength": 223,
+      "remaining": 57
+    },
+    {
+      "id": "12-open-source",
+      "weightedLength": 210,
+      "remaining": 70
+    },
+    {
+      "id": "13-project-galleries",
+      "weightedLength": 226,
+      "remaining": 54
+    }
+  ],
+  "articleAssets": "all local references exist"
+}

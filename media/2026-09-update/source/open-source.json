@@ -1,0 +1,68 @@
+{
+  "name": "open-source",
+  "reviewed_loaded": true,
+  "poster_shot": 2,
+  "shots": [
+    {
+      "source": "opensource-01.png",
+      "seconds": 2.2,
+      "crop": [
+        0,
+        0,
+        1920,
+        1200
+      ],
+      "pan": 0,
+      "target": [
+        1580,
+        138
+      ],
+      "kind": "navigation"
+    },
+    {
+      "source": "opensource-02.png",
+      "seconds": 2.85,
+      "crop": [
+        930,
+        55,
+        960,
+        600
+      ],
+      "pan": 0.9,
+      "target": [
+        1470,
+        365
+      ],
+      "kind": "reading"
+    },
+    {
+      "source": "opensource-03.png",
+      "seconds": 2.0,
+      "crop": [
+        930,
+        55,
+        960,
+        600
+      ],
+      "pan": 0,
+      "target": [
+        1567,
+        138
+      ],
+      "kind": "navigation"
+    },
+    {
+      "source": "opensource-04.png",
+      "seconds": 2.8,
+      "crop": [
+        0,
+        0,
+        1920,
+        1200
+      ],
+      "pan": 1.05,
+      "target": null,
+      "kind": "result"
+    }
+  ]
+}

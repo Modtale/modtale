@@ -1,0 +1,528 @@
+014a7bca 2026-09-10 Finish refreshed launcher walkthroughs and Play artwork
+fbfb2850 2026-09-10 Group and search library mods with consistent launcher fonts
+df82c047 2026-09-10 Refresh launcher and modpack walkthrough pacing and thumbnails
+7f36f3b4 2026-09-10 Recognize patch release dates and center sync progress text
+9abf44ac 2026-09-10 Use the real modpack editor in homepage previews and unify feature layouts
+ecf365f2 2026-09-10 Remove unused launcher provider integration and obsolete helpers
+56bf718c 2026-09-10 Rebuild Settings with Library-style category navigation and detail cards
+7880a2fa 2026-09-10 Remove product notes footer promotion
+aa32d288 2026-09-10 Refresh launcher and modpack demos with current UI and new thumbnails
+dcd1900d 2026-09-10 Keep transfer styling consistent and avoid Linux browser launch freezes
+0db40261 2026-09-10 Add animated transfer feedback and finish legacy pack restores
+68328167 2026-09-10 Remove CurseForge import from the upload page
+7fd2bd8d 2026-09-10 Restore saved releases using supported game version filters
+16dbd3a4 2026-09-10 Load CurseForge release notes and preserve file display names
+6d766b7e 2026-09-10 Fix CurseForge downloads, sort defaults and large result pages
+b91b94e8 2026-09-10 Order CurseForge sort choices by label length
+e27bf6dd 2026-09-10 Match library card title hover color to Browse
+db6da935 2026-09-10 Smooth library hover rendering and balance world headers
+3ad06fcc 2026-09-10 Unify CurseForge discovery and clarify library compatibility
+32de0755 2026-09-10 Show manifest compatibility and improve library card rendering
+760acf72 2026-09-10 Recover profile avatars when archived skin lookup fails
+b2a7f06f 2026-09-10 Open library projects and creators with Browse card interactions
+81207c62 2026-09-10 Tighten world selection and center heading content
+908e76de 2026-09-10 Center the changelog heading beside the close button
+9f5663e3 2026-09-10 Align News heading with its refresh button
+32c7c585 2026-09-10 Center the download heading beside the close button
+f8a09b82 2026-09-10 Improve game version contrast on the download button
+17c714da 2026-09-10 Pause galleries by clicking with fading playback feedback
+1a9d1e01 2026-09-10 Measure complete profile content after layout changes
+437ccabd 2026-09-10 Preserve dependency references across backend schema versions
+80dc98c7 2026-09-10 Smooth gallery progress and add pause controls
+f869d9d0 2026-09-10 Collapse tag choices inside native browse filters
+a637de6e 2026-09-10 Resolve dependency metadata across project reference formats
+0562dda1 2026-09-10 Collapse tag choices inside the filter menu
+6e30566f 2026-09-10 Size profile headers and scroll documents from their content
+bacd5fa5 2026-09-10 Include tags in the native browse filters
+234ebe8a 2026-09-10 Render profile avatars when no archived skin is available
+f68fa9da 2026-09-10 Move browse tags into the filter menu
+6c1fb7a2 2026-09-10 Match library rows to project list card styling
+f586943d 2026-09-10 Match native profile banners to project page image sizing
+9107eac5 2026-09-10 Align sidebar version counts and license values
+e1b62391 2026-09-10 Tighten supported version spacing on desktop and web
+675073bf 2026-09-10 Finish the Hytale callback response before completing authorization
+7ffc69d8 2026-09-10 Remove source and date labels from launcher news cards
+0d46c8b6 2026-09-09 Refresh launcher previews with current worlds and wardrobe
+1484a820 2026-09-09 Shorten the launcher sync prompt
+68a58e3e 2026-09-09 Remove partial selection counts from version groups
+aa5b0e9d 2026-09-09 Shift the version arrow only when selected
+809a18c4 2026-09-09 Align version selection checkmarks and submenu arrows
+5e923bab 2026-09-09 Match Config controls to adjacent library actions
+570d317b 2026-09-09 Enlarge and frame library world list icons
+d36d8c74 2026-09-09 Keep mod metadata across equivalent paths and preserve configured folders
+cc4fa655 2026-09-09 Remove the Worlds heading from the library
+0509d9fe 2026-09-09 Match library image corners and world icon borders
+d661f20a 2026-09-09 Preserve transparent icons and use consistent library sizing
+65e84936 2026-09-09 Play demos at their edited speed
+0e7759aa 2026-09-09 Clarify world selection and identify CurseForge library mods
+b5c0e414 2026-09-09 Load the current look when opening the wardrobe
+f4190023 2026-09-09 Tighten playback pacing across product walkthroughs
+0714ef22 2026-09-09 Refresh launcher Play and Library layouts
+49d5bba0 2026-09-09 Sharpen wardrobe avatar textures while preserving atlas coordinates
+57517255 2026-09-09 Resolve launcher avatars from saved character skins
+986f47f2 2026-09-09 Raise results per page to 48 when selecting compact cards
+ae23c63e 2026-09-09 Keep public RSS links on HTTPS behind the proxy
+12f93e3a 2026-09-09 Include Modtale articles in the launcher news feed
+781c0157 2026-09-09 Add Modtale RSS fetching and merged launcher news
+a378ddf2 2026-09-09 Keep RSS article and image links on the serving site
+90c20cbc 2026-09-09 Keep launcher hero controls visible on scroll
+dae6c978 2026-09-08 Refresh the launcher page and homepage with product demos
+6e8b9733 2026-09-08 Tighten supported version row spacing
+b5f12a1c 2026-09-08 Add sign in with label above login providers
+a40feb9f 2026-09-08 Use download icons for version switch buttons
+24350fb2 2026-09-08 Install complete modpacks and apply configs when enabling mods
+482892c4 2026-09-08 Simplify modpack authoring and web dependency downloads
+817d8c7e 2026-09-08 Enforce owned modpack configs and CurseForge download rules
+5ca1eca3 2026-09-08 Only release the launcher when launcher files change
+71c3f2b5 2026-09-08 Keep saved look names out of the skin browser
+d8998319 2026-09-08 Add per-mod config attachments to modpack versions
+3437ce27 2026-09-08 Simplify world selection summary
+f8451bd7 2026-09-08 Import CurseForge project details as a new draft
+6345686e 2026-09-08 Keep generated mod data out of settings and sync
+f9ac663f 2026-09-08 Group cosmetic categories and focus previews on the edited area
+fdea4714 2026-09-08 Prevent launcher test hangs from exhausting Actions runners
+1181a063 2026-09-08 Make CurseForge Browse shortcuts navigate and search reliably
+40856213 2026-09-08 Persist library and browse metadata in the local cache
+16c109ae 2026-09-08 Populate CurseForge metadata in the launcher library
+05147d20 2026-09-08 Refresh the homepage modpack demo with real project data
+3afea6a2 2026-09-08 Remove the Launcher button from the home hero
+5884d6b8 2026-09-08 Render saved outfit thumbnails from local Hytale assets
+6391f4c2 2026-09-08 Renew rejected Hytale sessions for wardrobe reads
+05198d16 2026-09-07 Use a shared page selector across wardrobe tabs
+93cbc1e8 2026-09-07 Use develop launcher downloads on the development site
+414a5b51 2026-09-07 Stabilize library mod icon sizing and thicken borders
+8674e72c 2026-09-07 Style the owned cosmetics checkbox to match Modtale
+f5db679a 2026-09-07 Hide skin inspector reset and external preview controls
+47993114 2026-09-07 Save wardrobe looks locally using the shared status modal
+f9d37932 2026-09-07 Simplify launcher README for contributors
+c8184b26 2026-09-07 Match cosmetic pagination to Browse and fill responsive grid pages
+6595325d 2026-09-07 Add stable and develop launcher update channels
+ea86d146 2026-09-07 Default wardrobe animation to Idle and remove Pause
+931083b0 2026-09-07 Remove the cosmetic heading and search row
+2552c122 2026-09-07 Frame cosmetic categories in a matching sidebar card
+e828f90b 2026-09-07 Fix wardrobe account requests and open Customize by default
+bf1a747c 2026-09-07 Crop world previews to square icons
+c6d22431 2026-09-07 Load sharper world previews in the library
+b7151f54 2026-09-07 Enlarge library mod icons and load sharper images
+c999e8c0 2026-09-07 Keep library mod images inside their borders after styling
+d273808d 2026-09-07 Replace raw mod configs with launcher settings forms
+78d9e0eb 2026-09-07 Remove optional account notice from launcher sign-in
+5373f988 2026-09-07 Remove redundant Hytale account prompts after sign-in
+e8b7414a 2026-09-07 Remove code orphaned by the wardrobe UI cleanup
+74d7561b 2026-09-07 Keep cosmetic controls and preview visible while updating
+9a6542e2 2026-09-07 Simplify outfit actions and loop preview animations
+7fc70c1c 2026-09-07 Remove the Hytale outfits section from the editor
+8a9606b1 2026-09-07 Open generated configs from each mod in the library
+06fb5e7a 2026-09-07 Simplify the cosmetic editor toolbar
+d2184b50 2026-09-07 Add project-style borders to library icons
+9c197370 2026-09-07 Match wardrobe tabs to navbar button styling
+e2ec786b 2026-09-07 Simplify skin browsing and fill responsive grid rows
+6a859027 2026-09-07 Remove the wardrobe page header and import export buttons
+e5f1b9df 2026-09-07 Remove launcher skeleton comparison capture harness
+04b830ad 2026-09-07 Remove approved skeleton comparison fixtures
+dd3d4f98 2026-09-07 Remove legacy main-site status page
+9dcd0b3b 2026-09-07 Remove approved skeleton comparison fixtures
+5056810d 2026-09-07 Soften launcher catalog edge fade
+a9180462 2026-09-07 Refine web skeleton loading states
+b7f652ce 2026-09-07 Refine launcher skeleton loading states
+15e23959 2026-09-07 Add gallery reordering and launcher shell updates
+c3cd1020 2026-09-07 Soften launcher catalog edge fade
+e8b6fd14 2026-09-07 Show linked ModStats activity in the project sidebar
+b9e1f24b 2026-09-07 Add the launcher wardrobe and cosmetic editor
+150633c1 2026-09-07 Prevent redirect loops between organization and member profiles
+7b41f471 2026-09-07 Match config folders to Hytale manifest identities
+f1e46c02 2026-09-07 Match launcher supported versions to the unified web list
+8edf8b5f 2026-09-07 Keep exact release labels for individual supported versions
+0f1950ae 2026-09-07 Unify supported versions in a consistent expandable list
+e4807342 2026-09-07 Sync Hytale configs with launcher profile settings
+209d9d71 2026-09-07 Add minimalist content skeletons throughout the launcher
+66f3dd0f 2026-09-07 Add restrained loading skeletons throughout the web UI
+3eddb8b9 2026-09-07 Include selected config files in shared mod lists
+f721f32a 2026-09-07 Center download bundle button contents
+271e9357 2026-09-07 Add mobile spacing below creator profile cards
+7e5c4452 2026-09-07 Keep theme animation centered on the clicked button
+75ffdbfa 2026-09-07 Add a Hytale config editor to the launcher library
+eda56ecf 2026-09-07 Credit Hyvatar in launcher settings
+86e5dbce 2026-09-07 Preserve Hytale modpack configs and save data
+143e7683 2026-09-07 Render WebP description images in the launcher
+bf08ba5b 2026-09-07 Keep Modpacks first across launcher project menus
+95ac657d 2026-09-07 Fix launcher project page fallback icon
+d78a441c 2026-09-07 Fix launcher project fallback icon
+0f1a8951 2026-09-07 Round Library icon fallback corners
+ffbd6c6b 2026-09-07 Keep bulk upload modal open during upload
+e46972b3 2026-09-07 Refine bulk upload modal layout
+c7517cb0 2026-09-07 Show gallery upload progress
+b9511f17 2026-09-07 Fix launcher project favicon fallback
+fe2e8b98 2026-09-07 Show bulk gallery uploads in a modal
+3b45ddc2 2026-09-07 Allow any gallery image aspect ratio
+c8159ac8 2026-09-07 Remove gallery reorder helper text
+7f33a52c 2026-09-07 Use favicon for launcher app icons
+35ac9f63 2026-09-07 Open CurseForge authors on their profile pages
+390c95db 2026-09-07 Fix launcher fallback favicon
+80967fc3 2026-09-07 Remove unavailable world list imports
+771ec3a9 2026-09-07 Remove unavailable world list imports
+bf719241 2026-09-07 Use Modtale favicon for missing project icons
+4302fa95 2026-09-07 Show browse label on initial render
+10de35e3 2026-09-07 Keep browse label consistent
+e5f0d279 2026-09-07 Polish provider picker sizing and contrast
+9df9bf4b 2026-09-07 Replace provider toggle with compact picker
+3bb11848 2026-09-07 Add spacing below browse rail title
+649f2690 2026-09-07 Redesign provider selector for compact layout
+61108959 2026-09-07 Make provider selector more compact
+0e3a20cd 2026-09-07 Add batch gallery uploads and reordering
+ba2ba875 2026-09-07 Reset Modtale browse sort to relevance
+4ff0253d 2026-09-07 Fix ordered list marker clipping
+55aeebe6 2026-09-07 Pause launcher carousel on YouTube videos
+9eca759c 2026-09-07 Use CurseForge sorts in browse sidebar
+99608a74 2026-09-07 Pause gallery auto-advance on YouTube videos
+48e6163a 2026-09-07 Make CurseForge browse menu useful
+e4a4638f 2026-09-07 Preserve natural size for inline description images
+67b5b19e 2026-09-07 Reduce launcher gallery render overhead
+99b1d5e0 2026-09-07 Allow YouTube embeds in content security policy
+7fd59243 2026-09-06 Document audit findings, validation, and current contributor workflows
+ad5e8bfb 2026-09-06 Restore sessions without readable cookies and tighten host checks
+1492db4f 2026-09-06 Share scroll locks across dialogs and preserve existing page styles
+623269c2 2026-09-06 Align security assertions and give browser import tests bounded startup time
+38c07012 2026-09-06 Render CurseForge descriptions with full HTML structure
+b121f139 2026-09-06 Disable legacy MFA-bypassing login and preserve stable account identity
+000b33ca 2026-09-06 Bound project prefetch memory, concurrency, and cache age
+ec0893e2 2026-09-06 Restrict and bound social preview image fetches
+069bf893 2026-09-06 Consume download tokens atomically and tolerate null status snapshots
+669b4623 2026-09-06 Remove public signing defaults and hide internal server error details
+f5b74264 2026-09-06 Fix CurseForge HTML heading styling
+4b3ab7c5 2026-09-06 Close download responses and discard incomplete transfers
+50b6cee9 2026-09-06 Protect session mutations with CSRF tokens in every environment
+74f5b07d 2026-09-06 Preserve text around CurseForge description images
+5460d85a 2026-09-06 Keep PR test coverage and validate repository scripts in CI
+c9470d10 2026-09-06 Hide favorites on CurseForge mod pages
+281c1717 2026-09-06 Validate all mock fixtures before replacing template collections
+908958cf 2026-09-06 Reject modpack override traversal and symbolic-link destinations
+89d8e8b2 2026-09-06 Load CurseForge browse banners asynchronously
+4182b66e 2026-09-06 Remove browse category spacing gap
+1d5d51ed 2026-09-06 Handle cookie and OAuth error text without unsafe decoding
+dfbbdff4 2026-09-06 Save launcher JSON through a shared atomic file writer
+96c49b41 2026-09-06 Run frontend tests without modifying installed Vitest files
+c228e9a7 2026-09-06 Limit credentialed CORS to trusted frontend origins
+e29f8cdd 2026-09-06 Reject invalid API credentials without falling back to browser sessions
+4ad42666 2026-09-06 Avoid CurseForge metadata fetches during browse
+e9e72f04 2026-09-06 Limit CurseForge banner enrichment to page results
+231ea7e4 2026-09-06 Constrain browse workspace to navbar bounds
+d6a87a7b 2026-09-06 Bound browse content to navbar edges
+47feb700 2026-09-04 Replace provider dropdown with direct switch
+ba62fa87 2026-09-04 Keep launcher browse content horizontally anchored
+6ba71735 2026-09-04 Show CurseForge pinned comments first
+e0a89f0c 2026-09-03 Replace live project test with stable coverage
+0fa99725 2026-09-03 Validate BetterMap comments in launcher
+03f4bffd 2026-09-03 Avoid conflicting status history index creation
+8a169328 2026-09-03 Load CurseForge comments directly in launcher
+b178db12 2026-09-03 Import CurseForge comments read-only
+678c0592 2026-09-03 Keep Browse within navbar bounds
+cbf78318 2026-09-03 Add pinned project comments
+affcebeb 2026-09-03 Unify project card byline typography
+ab75233e 2026-09-03 Stabilize creator banner layout
+f18b7b20 2026-09-03 Add CurseForge discussions and pinned comments
+45b5246e 2026-09-03 Bring launcher Markdown rendering to web parity
+d9ec0e77 2026-09-03 Treat CurseForge Early Access as oldest
+8d4fe8cd 2026-09-03 Keep project statistics fully readable
+eeb58637 2026-09-03 Align Browse results with navbar bounds
+0eecee80 2026-09-03 Refine Play catalog edge treatment
+41b5c760 2026-09-03 Use a plain marker for missing status history
+bfcd4ef5 2026-09-03 Keep status colors in availability bars
+56075b0b 2026-09-03 Remove emoji from Discord status mirror
+aeb0c5ec 2026-09-03 Fix status mirror service startup
+d6fdf064 2026-09-03 Maintain a single Discord status mirror
+e5af583b 2026-09-03 Simplify download version labels
+58509a2b 2026-09-03 Add CurseForge browse category pill
+31c934ab 2026-09-03 Use CurseForge galleries for project banners
+d051efc1 2026-09-03 Route CurseForge modpacks through launcher
+327bc39d 2026-09-03 Require launcher for CurseForge modpacks
+f1aee4ea 2026-09-03 Restore library action group divider
+9ce2d2a2 2026-09-03 Scope included mods hover to inner card
+0f800704 2026-09-03 Separate project card banners from content
+abe73590 2026-09-03 Align launcher content and auto-hide scrollbars
+cf539d5a 2026-09-03 Unify service status and availability history
+3b053456 2026-09-03 Remove status last-check tile
+6c1bc6fb 2026-09-03 Simplify status page chrome
+a37edccc 2026-09-03 Make status history persistence resilient
+4ceb4c21 2026-09-03 Add native launcher localization foundation
+99c196ef 2026-09-03 Build web localization foundation
+3904cbcf 2026-09-03 Keep project layout stable without banners
+2a907a4f 2026-09-03 Make Modtale accounts optional in launcher
+dac8f50d 2026-09-03 Match launcher typography to web
+2dc6c131 2026-09-03 Match web scrolling across display scales
+56a1f7fe 2026-09-03 Match launcher scrolling to web
+9b16ed2a 2026-09-03 Match launcher banner scrolling to web
+2ab95110 2026-09-03 Extend launcher viewport to bottom edge
+a594b58e 2026-09-03 Align launcher scrollbar to window edge
+e52b5cba 2026-09-03 Make launcher CurseForge integration direct
+88ab99a6 2026-09-03 Honor native cursor sizing on Linux
+a804d992 2026-09-03 Expand modpack contents from header
+6016fb17 2026-09-03 Remove version controls from play menu
+92748693 2026-09-03 Simplify launcher play control
+f4da37ab 2026-09-03 Add contextual launcher tooltips
+89a89198 2026-09-03 Polish library action rail
+e13408a9 2026-09-03 Consolidate library world actions
+f783ab05 2026-09-03 Refine library world layout
+f20a0ee5 2026-09-03 Simplify library action layout
+7d06d11a 2026-09-03 Allow browsing projects without a Modtale account
+3d6db6f3 2026-09-03 Make launcher toasts compact and content-aware
+58862d30 2026-09-03 Add native browser fallbacks for launcher links
+53a49d7f 2026-09-03 Substantially brighten Hytale sign-in button
+80526b58 2026-09-03 Reduce launcher runtime overhead and improve diagnostics
+86f13b51 2026-09-03 Bring CurseForge browsing and project views to parity
+fa5385ee 2026-09-03 Reconcile and manage CurseForge launcher installs
+9e063b83 2026-09-03 Make nyoCF the canonical CurseForge integration
+82765938 2026-09-03 Align modpacks with Hytale's unified runtime
+f267dba3 2026-09-03 Port HytaleModding wiki to launcher
+d7d0a0be 2026-09-03 Make scroll regression tests headless-safe
+3f9058ff 2026-09-03 Make launcher scrolling native and fluid
+0ae3cd79 2026-09-03 Substantially brighten Hytale sign-in button
+8b697fa6 2026-09-03 Remove unavailable Cloudflare DNS automation
+9a113b48 2026-09-03 Complete status domain provisioning
+7d45b697 2026-09-03 Deploy and harden detached status service
+5f383695 2026-09-03 Stabilize CurseForge metadata lookups
+81e901a3 2026-09-03 Persist verified CurseForge metadata
+b3ea7235 2026-09-03 Add secure layered modpack overrides
+9f725e28 2026-09-03 Add client and server modpack exports
+3a7b7e25 2026-09-03 Add environment-aware modpack entries
+83325aca 2026-09-03 Add reproducible modpack lockfiles
+03e99965 2026-09-03 Fix CurseForge client injection
+f854e81e 2026-09-03 Harden CurseForge modpack references
+48c2c79e 2026-09-03 Bring launcher pages up to web parity
+89dcde74 2026-09-03 Stabilize lazy import CI test
+be64237f 2026-09-03 Update launcher dependencies
+4af2f9e7 2026-09-03 Trigger dependency validation
+2a918e68 2026-09-03 Update project dependencies
+de98fb2b 2026-09-03 Increase Hytale sign-in button contrast
+8308e3e4 2026-09-02 Improve Hytale sign-in button contrast
+6c98548a 2026-09-01 Optimize admin verification queue
+8e78d7ff 2026-08-31 Add data-driven profile badges
+43f2f40e 2026-08-31 Route deployment alerts to admin webhook
+b5271f8f 2026-08-25 Require canonical project notification metadata
+a1a2d524 2026-08-25 Fix project invite acceptance pipeline
+0572598e 2026-08-25 Restore project team API routes
+0425e42c 2026-08-20 Fix game version catalog ordering
+a896a963 2026-08-15 Add project and global version hash lookups
+f76ef501 2026-08-12 Harden launcher update selection
+5299415b 2026-08-12 Harden modpack dependency archives
+b98db86d 2026-08-12 Improve social links, API docs, and prefab support
+a28bc2f6 2026-08-12 Reduce Cloud Build compilation work
+58af3c23 2026-08-12 Reduce cache and deployment overhead
+14e9cd35 2026-08-12 Keep production services warm
+d85f0da5 2026-08-12 Reduce deployment infrastructure costs
+fccfa984 2026-07-27 Fix duplicate project embed images
+c296f9be 2026-07-27 Fix duplicate project embed images
+b7e09e20 2026-07-23 Fix an issue preventing people from viewing their drafts in some cases
+0b3e171c 2026-07-19 Update README.md
+252b7cec 2026-07-19 Add Hytale OAuth
+bf4c4491 2026-07-19 Add Hytale OAuth
+23cbd9f8 2026-07-13 Fix admin permissions not being correctly assigned with authenticating with OAuth
+0b906b41 2026-07-13 Prevent weird mfa edge case
+1359b697 2026-07-05 Fix cards overflowing on mobile
+e5459752 2026-07-01 Allow removing password sign in if you have an OAuth linked
+e531269e 2026-07-01 Fix mock db deployments with temporary thing
+ec9b5678 2026-07-01 Replace legacy admin system with proper fine grained admin permissions
+b4c2b171 2026-06-30 Improve SEO on project pages
+375c691b 2026-06-28 Fix annoying styling issues for real
+f10e3796 2026-06-27 Fix annoying styling issues
+b4fdec38 2026-06-27 Fix backend startup and render budget
+996cd445 2026-06-27 Fix backend startup and render budget
+cd63a032 2026-06-27 Fix deployment issues
+d610b9af 2026-06-27 Fix native download modal game version default
+26ddaf2a 2026-06-27 Fix some download modal issues
+a7ad0f32 2026-06-27 Sort game versions properly
+40a0a0eb 2026-06-26 Fix some deployment issues
+0bc96477 2026-06-26 Make "supported versions" in the project page sidebar collapse
+dbf386ab 2026-06-26 Hide Comments button on narrow displays
+e1cab63c 2026-06-26 Fix the navbar pfp getting squished
+9af59f7a 2026-06-26 Forgot to add this
+156a86b4 2026-06-26 Improve wiki bundle loading and render path
+d3bf6b72 2026-06-26 Detach status service from main site
+929392d9 2026-06-26 Fix status Discord webhook routing
+6393058c 2026-06-26 Make the status page less dramatic
+38791da1 2026-06-26 Hide the results per page dropdown on mobile
+fe3387d7 2026-06-26 Fix modpack dependency update fallout
+8ab37b26 2026-06-26 Update project dependencies
+bb303ba5 2026-06-26 Replace 'api %' with net new projects
+45611384 2026-06-22 When looking at a draft project, hide the project visibility settings
+d3ad7d29 2026-06-21 Get rid of placeholder seeding in the mock database
+6af8e544 2026-06-21 Update gitignore
+3739d058 2026-06-21 Fix branch preview R2 token provisioning
+c29e70d4 2026-06-21 Make preview seeding manifest-driven
+79a086a0 2026-06-21 Reuse branch preview R2 credentials
+0ef05c1c 2026-06-21 Make branch preview artifact seeding reliable
+ac22ea7a 2026-06-21 Fix reloads on the project page
+26a24e01 2026-06-21 Fix preview R2 download credentials
+d664e237 2026-06-21 Make branch preview logs discoverable
+f6ea21df 2026-06-21 Refresh incomplete template seed imports
+d544f847 2026-06-21 Attempt to redeploy
+95644979 2026-06-21 Fix same-repo PR workflow skips
+c530112a 2026-06-21 Fix some seeding issues
+deea96ec 2026-06-21 Handle linux files separately
+9de05b1b 2026-06-21 Fix some seeding issues
+f22cfa91 2026-06-20 Add log4j
+1d5619c6 2026-06-20 Harden some banner related stuff
+ddf5c733 2026-06-20 Fix weird auth issue
+3155c483 2026-06-20 Attempt to rebuild
+2e1e6e85 2026-06-20 Build all Linux launcher packages in CI
+eef97527 2026-06-20 Attempt to rebuild
+5efcb667 2026-06-20 Attempt to redeploy
+b25e5c35 2026-06-20 Load branch R2 runtime credentials in current step
+f76a7edf 2026-06-20 Attempt to redeploy
+84879e37 2026-06-20 Use account-owned Cloudflare token endpoints
+9fedb6c4 2026-06-20 Attempt to redeploy
+d23ea831 2026-06-20 Use maintainer command for PR previews
+b9085e28 2026-06-20 Require maintainer approval for PR previews
+8c9db3d5 2026-06-20 Improve mock DB Mongo connection diagnostics
+5370577c 2026-06-20 Skip PR previews for same-repo branches
+bf731987 2026-06-20 Attempt to redeploy
+185f1299 2026-06-20 Use configured Cloud Run runtime accounts
+01f02e77 2026-06-20 Attempt to redeploy
+5c9c9689 2026-06-20 Read Warden URL from GCP secret
+14bb7f08 2026-06-20 Restore streamed Cloud Build logs
+858938b5 2026-06-20 Fix trusted Cloud Build service account
+2efd09cb 2026-06-20 Attempt to redeploy
+0b712d0b 2026-06-20 Add preview seeding action workflows
+02224822 2026-06-20 Semi-actions rewrite
+c2a39d9c 2026-06-20 Add logging to DataSeeder
+cf210c60 2026-06-20 Attempt 2 at R2 seeding
+c80b41f2 2026-06-20 Seed users properly
+2fc55f9a 2026-06-20 Seed R2
+1706be95 2026-06-20 Fix MacOS build
+f0c3e9b5 2026-06-20 Run launcher tests in actions
+97fe6a70 2026-06-20 Launcher github actions
+5c12ea24 2026-06-20 Modtale Launcher
+a4a5514c 2026-06-20 Fix deploy
+77e6b7a6 2026-06-20 Make lighthouse not required to pass tests
+97fc09a2 2026-06-20 Allow 'inaccurate license' as a report type
+62038dc8 2026-06-20 Allow setting a custom license as open source
+95d3663a 2026-06-20 Allow selecting by 0.5.x (for example) in the download modal
+fac0b2c1 2026-06-20 Allow filtering for open source projects
+51ab5784 2026-06-19 I should really start running tests *before* I commit
+8d230d1c 2026-06-19 Lighthouse maxxing
+5ae68164 2026-06-19 Fix DataSeeder
+e1dff424 2026-06-18 Link properly
+50e66cc3 2026-06-18 Fix runner
+edbfffd2 2026-06-18 Force mock db to generate
+f57a1ad6 2026-06-18 Force mock db to generate
+a23735ec 2026-06-18 Only generate the mock if the database storage changes
+660d4a99 2026-06-18 Generate a mock DB for contributors
+e0405dae 2026-06-18 Fix tests
+421a5a75 2026-06-18 Rewrite and re-expose status page
+ddc4124b 2026-06-17 Throwing some shit at the wall tbh
+b4e9c342 2026-06-16 Pass tests
+fa05a4e4 2026-06-16 Lighthouse actions
+cc292746 2026-06-16 Fix project pages refreshing sometimes
+38d6577a 2026-06-16 Make the orgder of navbar and category selector line up
+63e3d05b 2026-06-16 Make dependency demo not hardcoded data
+f6622bc7 2026-06-16 Fix 'reset filters' button
+330eb302 2026-06-16 Some refinements to analytics UI
+137921ca 2026-06-16 First column scrolls faster
+67cf2396 2026-06-16 Draw the marquee from popular sort and pad the list of projects out more after the initial load
+8205169d 2026-06-16 Fix full-screen project card previews
+cf2502b0 2026-06-16 If a stored version contains 'pre', mark it as pre-release
+df602c48 2026-06-16 If a stored version contains 'pre', mark it as pre-release
+96fb0ae5 2026-06-15 Update ToS and Privacy Policy
+3c8eaf0e 2026-06-15 Remove unused gallery carousel marker from settings tab
+69f5657a 2026-06-15 Make arrow keys work on gallery properly
+b1b4aeb7 2026-06-15 Share Gallery carousel for normal gallery popup too
+2fa9dd0c 2026-06-15 Fix project pages not fully hydrating sometimes
+a8703144 2026-06-15 Allow uploading a mod of the same game version and mod version (replaces that existing version)
+ac5ba5b2 2026-06-15 Allow embedding the gallery carousel using markdown
+ecd31271 2026-06-15 Make it easy to embed gallery images into your description
+5351ca2e 2026-06-15 Allow embedding youtube videos into the gallery
+329b63cb 2026-06-15 Properly hydrate dependencies in the sidebar
+76592452 2026-06-15 Implement gallery carousel and image descriptions
+c530e5c3 2026-06-15 More optimizations for HytaleModding wiki
+5963e0ea 2026-06-15 Remove gradients from bar graphs
+4b0a4ce4 2026-06-15 Fix banners being stuttery on project pages when scrolling
+38ac9ecd 2026-06-15 Pass the tests
+750e8234 2026-06-15 Refine HytaleModding loading strategy
+511ede67 2026-06-15 Mobile UI for HytaleModding wiki
+f8fc4fcf 2026-06-15 Slim project endpoints even further
+cfb3242c 2026-06-15 Add 'last used' hint on auth
+64f80451 2026-06-15 Untracked files strike again
+08dd48f4 2026-06-15 Make sure modals always escape to center themselves on the display
+6868573c 2026-06-15 Refine selecting multiple game versions at once in the filtering
+23a34154 2026-06-15 Allow selecting how many results you want per page
+69815519 2026-06-15 Default to the latest release version, not version of any type
+3c1fac75 2026-06-15 Revert to 'any' when reset filters is pressed
+e9648217 2026-06-14 Fix compile
+bf29e97d 2026-06-14 Don't gate public endpoints
+b65879a0 2026-06-13 Improve reliability of actions
+32807b1a 2026-06-13 Move 'My Favorites' tab to the bottom
+e18f8873 2026-06-12 Restore some favorites functionality
+235d86ac 2026-06-12 API key fixing part 2
+d639cd97 2026-06-12 Redeploy the backend pls
+5238608d 2026-06-12 Fix some API key issues
+ef0b49fc 2026-06-12 redeploy the frontend actions pls
+1e3a2d59 2026-06-12 Add CC BY-NC-SA 4.0
+62a418ce 2026-06-12 Fix custom license selection
+2b9dfec8 2026-06-12 Simplify the browse page
+2d157bf0 2026-06-12 Reuse project card skeletons for the marquee
+ccffd161 2026-06-12 Make body text always roughly the same length
+8370f01f 2026-06-12 Make external sources even more clear
+8015926d 2026-06-12 Put mods in the root
+ef1f38ef 2026-06-12 Fix deployment
+22537aae 2026-06-12 Fix tests
+aec88159 2026-06-12 Modpack/dependencies v2
+89c75a96 2026-06-12 Expand backend tests
+08b74410 2026-06-12 Remove invalid annotations for enums
+705b2b79 2026-06-12 Fix tests
+c18e2247 2026-06-12 More skeletons
+d7b60fad 2026-06-12 Refactor
+313ee582 2026-06-12 Separate changelogs into their own DTO
+cd66829c 2026-06-12 Use lightweight DTOs wherever possible
+96a48b9f 2026-06-11 Respect username slugs
+ccea5129 2026-06-11 Speed up project detail pages and enforce slugs harder
+7d928a4b 2026-06-11 Speed up project detail pages and enforce slugs harder
+8fefc57d 2026-06-11 Optimize more endpoints
+5325bf3c 2026-06-11 More project endpoint tweaks
+ea5102db 2026-06-11 Fix deployment
+9218da8c 2026-06-11 Recompute ranking if favorite count changes
+302aab28 2026-06-11 Make the projects endpoint as fast as I can
+32e0c5de 2026-06-11 Optimize ranking scoring
+37ce7756 2026-06-11 Only render the marquee when appropriate
+8972520f 2026-06-11 Optimize the marquee as best I can
+2019bf37 2026-06-11 Revert StatusModal
+fcf4b13e 2026-06-11 Fix tests
+be70b102 2026-06-11 Fix annoying error
+1839eec2 2026-06-11 Fix buttons being invisible for some reason
+faf278c7 2026-06-11 Purge magic numbers/strings
+9fca021d 2026-06-11 Revert StatusModal styling
+b8b42a29 2026-06-11 Allow marking a mod as incompatible
+c6877fd1 2026-06-11 Make some fixes to changes detection
+99182694 2026-06-11 Starting to work on optimizing the Browse page
+357ebd10 2026-06-11 Use the actual component rather than a mock one when possible
+0b4682ff 2026-06-11 Never have download modal come up empty
+00320ee3 2026-06-11 Fix some compile warnings
+21c7e8ef 2026-06-11 Enhance actions workflows
+3de349ba 2026-06-11 Show endpoints before schemas
+ae466def 2026-06-11 'All Projects', not 'Mods'
+50c9ff80 2026-06-11 Don't allow navigating to categories that aren't pages
+a102d8f8 2026-06-11 Make sure all the pages use the right padding
+ee530c9e 2026-06-11 Adjustments for small desktop displays
+dfd89827 2026-06-11 Move metadata below the description on mobile
+d6da08b5 2026-06-11 Small tweaks for mobile
+bad81d28 2026-06-11 Small tweaks for mobile
+673a4074 2026-06-11 Show pre-releases in the download feature preview
+decf4d18 2026-06-11 Only apply a fade to project cards if no banner is set
+7a7e52de 2026-06-11 Make analytics feature preview less cramped on mobile
+bba6def0 2026-06-10 Respect text alignment
+74855175 2026-06-10 Don't scan draft uploads for malware until they are submitted for moderation
+6fd3b831 2026-06-10 Make the home page feel less empty
+c0693e0f 2026-06-10 Commenter doesn't get a badge
+e343a27d 2026-06-10 Never allow lazy imports to cause problems again
+66b12e6e 2026-06-10 Fix hydration mismatch
+7b592725 2026-06-10 More home page tweaks
+a2d45296 2026-06-10 Rewrite the audit logs page
+794f3040 2026-06-10 Handle auth payload properly
+0364dd22 2026-06-10 'modding projects'
+7259055c 2026-06-10 Reduce the number of steps needed to update a mod
+29b86d76 2026-06-10 Increase contrast on version upload form
+9fa9f20d 2026-06-10 Prevent lazy imports from being a problem in the future
+a964880b 2026-06-10 Fix some text that was too low contrast
+ed4f90aa 2026-06-10 Use user's roles for their 'developer replies'
+681778c5 2026-06-10 Grab a random user for the comment demo
+11c40038 2026-06-10 Some tweaks
+748e814b 2026-06-10 Facelift the home page

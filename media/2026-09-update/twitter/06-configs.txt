@@ -1,0 +1,5 @@
+Less digging through folders. More time tuning your world.
+
+Open supported mod configs right from the Modtale Launcher library, change a setting, and save it with the right world in view.
+
+https://modtale.net/launcher

@@ -1,0 +1,15 @@
+## Meet Modpacks v2 + the Modtale Launcher
+
+A good Hytale setup deserves an easier way to build it, play it, and share it.
+
+**Build with Modpacks v2.** Choose specific mod releases, attach config defaults to each mod, include CurseForge files, and turn a shared mod list into the start of a pack.
+
+**Make yourself at home in the launcher.** Browse Modtale and CurseForge, download mods into the worlds you choose, search your library, toggle mods, install updates, and edit supported configs. Bring your Modtale setup onto another computer with account sync, then make your character your own in the Wardrobe.
+
+Watch the quick tour above, then explore the details:
+
+• Launcher: https://modtale.net/news/modtale-launcher
+• Modpacks v2: https://modtale.net/news/modpacks-v2
+• Get the launcher: https://modtale.net/launcher
+
+What are you putting in your next world?

@@ -1,0 +1,37 @@
+[
+  {
+    "at": 0,
+    "duration": 3,
+    "source": "browse-projects.mp4",
+    "sourceStart": 0,
+    "title": "Meet the Modtale Launcher."
+  },
+  {
+    "at": 3,
+    "duration": 3,
+    "source": "modpack-creation.mp4",
+    "sourceStart": 20,
+    "title": "Meet Modpacks v2."
+  },
+  {
+    "at": 6,
+    "duration": 3,
+    "source": "world-library.mp4",
+    "sourceStart": 8,
+    "title": "Give every world its own setup."
+  },
+  {
+    "at": 9,
+    "duration": 3,
+    "source": "wardrobe.mp4",
+    "sourceStart": 7,
+    "title": "And make it a little more you."
+  },
+  {
+    "at": 12,
+    "duration": 3,
+    "source": "launcher-play.jpg",
+    "sourceStart": 0,
+    "title": "Two updates. One Modtale."
+  }
+]
