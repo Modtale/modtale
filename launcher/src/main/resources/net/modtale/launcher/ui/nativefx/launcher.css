@@ -7716,7 +7716,7 @@
 }
 
 .play-view {
-    -fx-min-height: 720px;
+    -fx-min-height: 0;
     -fx-pref-height: 720px;
     -fx-padding: 0;
     -fx-alignment: center;
@@ -7725,39 +7725,42 @@
 
 .play-shell {
     -fx-padding: 0;
-    -fx-alignment: center-left;
-    -fx-spacing: 18px;
+    -fx-alignment: top-left;
+    -fx-spacing: 24px;
 }
 
 .play-stage {
-    -fx-pref-height: 720px;
+    -fx-pref-height: -1;
     -fx-background-color: transparent;
+    -fx-padding: 0 8px 24px 0;
+    -fx-spacing: 24px;
 }
 
 .play-catalog-stage {
     -fx-padding: 0;
-    -fx-spacing: 14px;
+    -fx-spacing: 28px;
     -fx-alignment: top-left;
 }
 
 .play-catalog-section {
-    -fx-spacing: 8px;
+    -fx-spacing: 20px;
     -fx-alignment: top-left;
 }
 
 .play-catalog-header {
-    -fx-min-height: 30px;
-    -fx-pref-height: 30px;
+    -fx-min-height: 40px;
+    -fx-pref-height: 40px;
     -fx-alignment: center-left;
+    -fx-padding: 0 4px;
 }
 
 .play-catalog-title {
     -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-text-fill: #ffffff;
-    -fx-font-size: 19px;
+    -fx-font-size: 24px;
     -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
-    -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.34), 12, 0.16, 0, 4);
+    -fx-effect: none;
 }
 
 .play-catalog-title .text {
@@ -7767,13 +7770,13 @@
 .play-catalog-browse-all {
     -fx-min-height: 30px;
     -fx-pref-height: 30px;
-    -fx-padding: 0 11px;
+    -fx-padding: 6px 0;
     -fx-background-radius: 10px;
     -fx-border-radius: 10px;
-    -fx-background-color: rgba(255, 255, 255, 0.04);
+    -fx-background-color: transparent;
     -fx-border-width: 1px;
-    -fx-border-color: rgba(255, 255, 255, 0.08);
-    -fx-text-fill: #cbd5e1;
+    -fx-border-color: transparent;
+    -fx-text-fill: #94a3b8;
     -fx-font-size: 12px;
     -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
@@ -7795,78 +7798,14 @@
 }
 
 .play-catalog-body {
-    -fx-min-height: 308px;
-    -fx-pref-height: 308px;
-}
-
-.play-catalog-edge-fade {
-    -fx-background-color: linear-gradient(
-        to right,
-        rgba(11, 17, 32, 0) 0%,
-        rgba(11, 17, 32, 0.16) 36%,
-        rgba(11, 17, 32, 0.72) 76%,
-        #0b1120 100%
-    );
+    -fx-min-height: 0;
+    -fx-pref-height: -1;
 }
 
 .play-catalog-card-row {
-    -fx-padding: 8px 0 0 0;
-    -fx-spacing: 18px;
+    -fx-padding: 0;
+    -fx-spacing: 20px;
     -fx-alignment: top-left;
-}
-
-.play-catalog-scroll {
-    -fx-background: transparent;
-    -fx-background-color: transparent;
-    -fx-background-insets: 0;
-    -fx-padding: 0;
-}
-
-.play-catalog-scroll > .viewport {
-    -fx-background-color: transparent;
-}
-
-.play-catalog-scroll .scroll-bar:horizontal {
-    -fx-pref-height: 8px;
-    -fx-max-height: 8px;
-    -fx-padding: 2px 0 0 0;
-    -fx-background-color: transparent;
-}
-
-.play-catalog-scroll .scroll-bar:vertical {
-    -fx-pref-width: 0;
-    -fx-max-width: 0;
-    -fx-opacity: 0;
-}
-
-.play-catalog-scroll .scroll-bar .track,
-.play-catalog-scroll .scroll-bar .track-background {
-    -fx-background-color: rgba(148, 163, 184, 0.13);
-    -fx-background-radius: 999px;
-}
-
-.play-catalog-scroll .scroll-bar .thumb {
-    -fx-background-color: rgba(148, 163, 184, 0.42);
-    -fx-background-radius: 999px;
-    -fx-background-insets: 0;
-}
-
-.play-catalog-scroll .scroll-bar .thumb:hover {
-    -fx-background-color: rgba(191, 219, 254, 0.78);
-}
-
-.play-catalog-scroll .scroll-bar .increment-button,
-.play-catalog-scroll .scroll-bar .decrement-button {
-    -fx-pref-width: 0;
-    -fx-max-width: 0;
-    -fx-padding: 0;
-    -fx-background-color: transparent;
-}
-
-.play-catalog-scroll .scroll-bar .increment-arrow,
-.play-catalog-scroll .scroll-bar .decrement-arrow {
-    -fx-padding: 0;
-    -fx-shape: "";
 }
 
 .play-catalog-message {
@@ -7884,12 +7823,10 @@
     -fx-alignment: center;
 }
 
-.play-dock {
-    -fx-alignment: center;
-}
-
 .play-sidebar-frame {
     -fx-alignment: top-right;
+    -fx-border-width: 0 0 0 1px;
+    -fx-border-color: rgba(255, 255, 255, 0.08);
 }
 
 .play-sidebar-scroll {
@@ -7949,25 +7886,25 @@
 }
 
 .play-sidebar {
-    -fx-padding: 16px 16px 18px 16px;
+    -fx-padding: 16px;
     -fx-spacing: 14px;
-    -fx-background-radius: 18px;
-    -fx-border-radius: 18px;
+    -fx-background-radius: 0;
+    -fx-border-radius: 0;
     -fx-border-width: 1px;
-    -fx-border-color: rgba(96, 165, 250, 0.18);
-    -fx-background-color: linear-gradient(to bottom right, rgba(15, 23, 42, 0.70), rgba(8, 13, 25, 0.90));
+    -fx-border-color: transparent;
+    -fx-background-color: transparent;
     -fx-effect: none;
 }
 
 .play-sidebar:hover {
-    -fx-border-color: rgba(96, 165, 250, 0.34);
+    -fx-border-color: transparent;
 }
 
 .play-sidebar-section {
-    -fx-spacing: 11px;
-    -fx-padding: 0 0 15px 0;
+    -fx-spacing: 14px;
+    -fx-padding: 0 0 20px 0;
     -fx-border-width: 0 0 1px 0;
-    -fx-border-color: rgba(96, 165, 250, 0.12);
+    -fx-border-color: rgba(255, 255, 255, 0.08);
 }
 
 .play-sidebar-section.last {
@@ -8341,13 +8278,14 @@
 .play-news-card {
     -fx-cursor: hand;
     -fx-min-height: 142px;
-    -fx-padding: 8px;
-    -fx-background-radius: 13px;
-    -fx-border-radius: 13px;
+    -fx-padding: 0;
+    -fx-background-radius: 16px;
+    -fx-border-radius: 16px;
     -fx-border-width: 1px;
-    -fx-border-color: rgba(148, 163, 184, 0.11);
-    -fx-background-color: rgba(15, 23, 42, 0.48);
+    -fx-border-color: rgba(255, 255, 255, 0.10);
+    -fx-background-color: #0f172a;
     -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.12), 10, 0.10, 0, 4);
+    -fx-spacing: 0;
 }
 
 .play-news-card:hover {
@@ -8357,9 +8295,9 @@
 }
 
 .play-news-thumbnail {
-    -fx-background-radius: 11px;
+    -fx-background-radius: 16px 16px 0 0;
     -fx-border-radius: 11px;
-    -fx-border-width: 1px;
+    -fx-border-width: 0;
     -fx-border-color: rgba(191, 219, 254, 0.14);
     -fx-background-color: linear-gradient(to bottom right, #0b1220, #172554, #1e293b);
 }
@@ -8377,7 +8315,7 @@
 
 .play-news-title {
     -fx-text-fill: #f8fafc;
-    -fx-font-size: 13px;
+    -fx-font-size: 14px;
     -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
@@ -8417,12 +8355,12 @@
     -fx-min-height: 60px;
     -fx-pref-height: 60px;
     -fx-cursor: hand;
-    -fx-background-radius: 15px;
-    -fx-border-radius: 15px;
+    -fx-background-radius: 16px;
+    -fx-border-radius: 16px;
     -fx-border-width: 1px;
     -fx-border-color: rgba(96, 165, 250, 0.76);
     -fx-background-color: #2563eb;
-    -fx-effect: none;
+    -fx-effect: dropshadow(gaussian, rgba(37, 99, 235, 0.28), 24, 0.08, 0, 8);
 }
 
 .play-launch-main {
@@ -8547,6 +8485,7 @@
 
 .library-view {
     -fx-padding: 12px 0 38px 0;
+    -fx-spacing: 24px;
 }
 
 .library-updates-view {
@@ -8559,19 +8498,21 @@
 
 .library-projects-pane,
 .library-detail-pane {
-    -fx-background-radius: 8px;
-    -fx-border-radius: 8px;
+    -fx-background-radius: 24px;
+    -fx-border-radius: 24px;
     -fx-border-width: 1px;
-    -fx-border-color: rgba(255, 255, 255, 0.09);
-    -fx-background-color: rgba(15, 23, 42, 0.72);
+    -fx-border-color: rgba(255, 255, 255, 0.10);
+    -fx-background-color: rgba(15, 23, 42, 0.95);
     -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.20), 24, 0.12, 0, 8);
+    -fx-padding: 24px;
+    -fx-spacing: 20px;
 }
 
 .library-projects-pane {
-    -fx-min-width: 300px;
-    -fx-pref-width: 340px;
-    -fx-max-width: 380px;
-    -fx-padding: 16px;
+    -fx-min-width: 260px;
+    -fx-pref-width: 300px;
+    -fx-max-width: 320px;
+    -fx-padding: 20px;
 }
 
 .library-detail-pane {
@@ -8607,11 +8548,11 @@
 .library-project-row {
     -fx-cursor: hand;
     -fx-content-display: graphic-only;
-    -fx-padding: 10px;
-    -fx-background-radius: 8px;
-    -fx-border-radius: 8px;
-    -fx-border-color: rgba(255, 255, 255, 0.08);
-    -fx-background-color: rgba(2, 6, 23, 0.26);
+    -fx-padding: 14px 12px;
+    -fx-background-radius: 16px;
+    -fx-border-radius: 16px;
+    -fx-border-color: rgba(255, 255, 255, 0.06);
+    -fx-background-color: rgba(30, 41, 59, 0.5);
 }
 
 .library-project-row:hover {
@@ -8620,8 +8561,8 @@
 }
 
 .library-project-row:selected {
-    -fx-border-color: rgba(96, 165, 250, 0.72);
-    -fx-background-color: rgba(37, 99, 235, 0.20);
+    -fx-border-color: rgba(96, 165, 250, 0.65);
+    -fx-background-color: linear-gradient(to bottom right, rgba(37, 99, 235, 0.25), rgba(99, 102, 241, 0.12));
 }
 
 .library-project-row:update {
@@ -8662,7 +8603,12 @@
 }
 
 .library-mod-icon {
+    -fx-background-color: #0b1220;
+    -fx-background-radius: 16px;
+    -fx-border-radius: 16px;
     -fx-border-width: 4px;
+    -fx-border-color: #334155;
+    -fx-effect: dropshadow(one-pass-box, rgba(2, 6, 23, 0.24), 12, 0.12, 0, 5);
 }
 
 .library-project-icon .svg-icon,
@@ -8723,7 +8669,7 @@
 }
 
 .library-world-detail-title {
-    -fx-font-size: 20px;
+    -fx-font-size: 30px;
     -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
 }
@@ -8757,7 +8703,7 @@
 
 .library-detail-hero,
 .library-detail-section {
-    -fx-padding: 14px;
+    -fx-padding: 0 0 24px 0;
     -fx-background-radius: 8px;
     -fx-border-radius: 8px;
     -fx-border-width: 1px;
@@ -8934,6 +8880,28 @@
     -fx-background-color: rgba(14, 165, 233, 0.14);
 }
 
+.library-version-metadata {
+    -fx-font-size: 11px;
+    -fx-font-family: "Inter Medium";
+    -fx-text-fill: #94a3b8;
+}
+
+.library-version-metadata-version {
+    -fx-text-fill: #cbd5e1;
+}
+
+.library-version-divider {
+    -fx-text-fill: #64748b;
+}
+
+.library-badge-row .library-badge-modpack {
+    -fx-padding: 2px 6px;
+    -fx-background-radius: 4px;
+    -fx-border-radius: 4px;
+    -fx-border-color: transparent;
+    -fx-font-size: 10px;
+}
+
 .library-badge-modpack {
     -fx-text-fill: #a7f3d0;
     -fx-border-color: rgba(45, 212, 191, 0.25);
@@ -8964,7 +8932,7 @@
 }
 
 .library-fact-label {
-    -fx-text-fill: #64748b;
+    -fx-text-fill: #94a3b8;
     -fx-font-size: 10px;
     -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 900;
@@ -9130,6 +9098,56 @@
     -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
     -fx-font-weight: 800;
     -fx-padding: 8px 10px 2px 58px;
+}
+
+.launcher-page-title {
+    -fx-font-family: "Inter Black";
+    -fx-font-size: 40px;
+    -fx-text-fill: #f8fafc;
+}
+
+.play-stage-scroll,
+.play-stage-scroll > .viewport {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+
+
+.library-world-detail-hero .library-actions {
+    -fx-alignment: center-left;
+}
+
+.library-navigation-title {
+    -fx-font-family: "Inter Black";
+    -fx-font-size: 18px;
+    -fx-text-fill: #f8fafc;
+}
+
+.library-view .library-world-project-row {
+    -fx-padding: 16px;
+    -fx-background-radius: 16px;
+    -fx-border-radius: 16px;
+    -fx-background-color: #1e293b;
+}
+
+.library-view .library-world-project-row:hover {
+    -fx-border-color: rgba(96, 165, 250, 0.45);
+}
+
+.library-view .library-world-project-title {
+    -fx-font-size: 15px;
+}
+
+.library-view .library-world-tab-status {
+    -fx-text-fill: #93c5fd;
+    -fx-font-size: 10px;
+}
+
+.play-view .button:focused,
+.library-view .button:focused {
+    -fx-border-color: #93c5fd;
 }
 
 .auth-gate {
@@ -9655,3 +9673,43 @@
 .cosmetic-group:hover { -fx-background-color: #16243a; -fx-text-fill: #e2e8f0; }
 .cosmetic-group:selected { -fx-background-color: #101d36; -fx-text-fill: #60a5fa; }
 .cosmetic-subcategories { -fx-padding: 0 0 7 9; }
+
+.play-launch-bar {
+    -fx-padding: 22px 0 8px 0;
+    -fx-background-color: transparent;
+    -fx-background-radius: 16px;
+    -fx-border-radius: 0;
+    -fx-border-width: 1px 0 0 0;
+    -fx-border-color: rgba(255, 255, 255, 0.07);
+}
+
+.play-news-header .play-sidebar-section-title {
+    -fx-font-size: 16px;
+}
+
+.play-news-header {
+    -fx-min-height: 40px;
+    -fx-pref-height: 40px;
+}
+
+.play-news-copy {
+    -fx-padding: 12px;
+}
+
+.play-news-source {
+    -fx-padding: 4px 8px;
+    -fx-background-radius: 6px;
+    -fx-font-family: "Inter ExtraBold";
+    -fx-font-size: 10px;
+    -fx-text-fill: #bfdbfe;
+    -fx-background-color: rgba(37, 99, 235, 0.18);
+}
+
+.play-news-source.hytale {
+    -fx-text-fill: #c7d2fe;
+    -fx-background-color: rgba(99, 102, 241, 0.18);
+}
+
+.play-news-card:focused {
+    -fx-border-color: #93c5fd;
+}

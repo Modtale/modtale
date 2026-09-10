@@ -234,9 +234,11 @@ public final class ProjectCardFactory {
         title.setTextOverrun(OverrunStyle.ELLIPSIS);
         copy.getChildren().addAll(title, authorLine(project, "by", "compact-byline", onOpenCreator));
 
-        VBox stats = new VBox(4, statLabel(LauncherIcons.Glyph.DOWNLOAD, number(project.downloadCount())),
+        HBox stats = new HBox(12, statLabel(LauncherIcons.Glyph.DOWNLOAD, number(project.downloadCount())),
                 favoriteStat(project, favorite, onToggleFavorite));
         stats.getStyleClass().add("compact-stats");
+        stats.setAlignment(Pos.CENTER_LEFT);
+        copy.getChildren().add(stats);
 
         Button install = installButton(project, onInstall);
         install.getStyleClass().add("icon-only-button");
@@ -245,7 +247,7 @@ public final class ProjectCardFactory {
         install.setPrefWidth(42);
         install.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 16));
 
-        card.getChildren().addAll(icon, copy, stats, install, LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_RIGHT, 16));
+        card.getChildren().addAll(icon, copy, install, LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_RIGHT, 16));
         ProjectCardInteraction.addHoverAnimation(card, icon);
         return card;
     }

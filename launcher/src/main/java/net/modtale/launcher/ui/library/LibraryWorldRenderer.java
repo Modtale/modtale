@@ -125,7 +125,11 @@ final class LibraryWorldRenderer {
         Label title = new Label(model.world().name());
         title.getStyleClass().addAll("library-detail-title", "library-world-detail-title");
         title.setMaxWidth(Double.MAX_VALUE);
-        copy.getChildren().add(title);
+        copy.setMinWidth(0);
+        Label summary = new Label(model.enabledProjectCount() + " of " + model.totalProjectCount() + " projects enabled");
+        summary.getStyleClass().add("library-project-meta");
+        copy.setSpacing(6);
+        copy.getChildren().addAll(title, summary);
         HBox.setHgrow(copy, Priority.ALWAYS);
 
         HBox actions = new HBox(8);
@@ -163,8 +167,9 @@ final class LibraryWorldRenderer {
         pack.setOnAction(event -> createModpackFromWorld.accept(model.world()));
         actions.getChildren().addAll(refresh, updates, actionDivider, share, pack);
 
-        row.getChildren().addAll(icon, copy, actions);
-        section.getChildren().add(row);
+        row.getChildren().addAll(icon, copy);
+        actions.setAlignment(Pos.CENTER_LEFT);
+        section.getChildren().addAll(row, actions);
         return section;
     }
 
@@ -204,7 +209,7 @@ final class LibraryWorldRenderer {
         HBox row = new HBox(12) {
             @Override
             protected void layoutChildren() {
-                iconSize.set(Math.max(46, copy.prefHeight(-1)));
+                iconSize.set(Math.max(46, copy.prefHeight(-1)) + 4);
                 super.layoutChildren();
             }
         };
@@ -262,13 +267,20 @@ final class LibraryWorldRenderer {
         Label subtitle = new Label(subtitleText);
         subtitle.getStyleClass().add("library-world-project-meta");
 
-        HBox badges = new HBox(7);
+        HBox badges = new HBox(10);
+        badges.setAlignment(Pos.CENTER_LEFT);
+        badges.setMinWidth(0);
         badges.getStyleClass().add("library-badge-row");
         if (!display.version().isBlank()) {
-            badges.getChildren().add(badge(display.version(), "version"));
+            badges.getChildren().add(versionMetadata(display.version(), "Project version", "version"));
         }
         if (!installed.gameVersion().isBlank()) {
-            badges.getChildren().add(badge(installed.gameVersion(), "game"));
+            if (!display.version().isBlank()) {
+                Label divider = new Label("·");
+                divider.getStyleClass().add("library-version-divider");
+                badges.getChildren().add(divider);
+            }
+            badges.getChildren().add(versionMetadata(installed.gameVersion(), "Game build", "build"));
         }
         if (model.update() != null) {
             badges.getChildren().add(badge("Update ready", "game"));
@@ -524,7 +536,7 @@ final class LibraryWorldRenderer {
         shell.setPrefSize(size, size);
         shell.setMaxSize(size, size);
         double mediaSize = Math.max(1, size - borderWidth * 2);
-        double clipRadius = 8 - borderWidth;
+        double clipRadius = (borderWidth == 4 ? 16 : 8) - borderWidth;
 
         if (imageLoader != null && useProjectFallback) {
             ImageView fallback = new ImageView();
@@ -581,6 +593,15 @@ final class LibraryWorldRenderer {
                 || !installed.bundledProjects().isEmpty()
                 || !installed.dependencyProjectIds().isEmpty()
                 || !installed.externalDependencies().isEmpty();
+    }
+
+    private Label versionMetadata(String value, String description, String tone) {
+        Label label = new Label(value);
+        label.getStyleClass().addAll("library-version-metadata", "library-version-metadata-" + tone);
+        label.setMinWidth(0);
+        label.setTooltip(new Tooltip(description + ": " + value));
+        label.setAccessibleText(description + ": " + value);
+        return label;
     }
 
     private Node badge(String text, String tone) {

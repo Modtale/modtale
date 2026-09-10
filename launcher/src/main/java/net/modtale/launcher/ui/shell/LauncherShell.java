@@ -510,42 +510,19 @@ public final class LauncherShell {
     }
 
     private Node navbar() {
-        HBox bar = new HBox(8);
-        bar.getStyleClass().add("navbar");
-        bar.setAlignment(Pos.CENTER_LEFT);
-        bar.setPadding(LauncherLayout.NAVBAR_INSETS);
-
-        ImageView logo = new ImageView(new Image(Objects.requireNonNull(getClass()
-                .getResource("/net/modtale/launcher/ui/nativefx/assets/logo_light.png")).toExternalForm(), true));
-        logo.setFitHeight(36);
-        logo.setPreserveRatio(true);
-        Button brand = new Button(null, logo);
-        brand.getStyleClass().add("brand");
-        brand.setMinWidth(142);
-        brand.setAlignment(Pos.CENTER_LEFT);
-        brand.setMnemonicParsing(false);
-        brand.accessibleTextProperty().bind(I18N.binding("nav.goToPlay"));
-        brand.setTooltip(I18N.tooltip("nav.goToPlay"));
-        brand.setOnAction(event -> showView(LauncherView.PLAY));
-        configureBrandLogoHoverAnimation(brand, logo);
-
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        bar.getChildren().addAll(brand, spacer);
-        addLocalizedNav(bar, LauncherView.PLAY, "nav.play", LauncherIcons.Glyph.ZAP);
-        addLocalizedNav(bar, LauncherView.LIBRARY, "nav.library", LauncherIcons.Glyph.SAVE);
-        addLocalizedNav(bar, LauncherView.WARDROBE, "nav.wardrobe", LauncherIcons.Glyph.PALETTE);
+        Button brand = LauncherNavbar.brand(() -> showView(LauncherView.PLAY));
+        configureBrandLogoHoverAnimation(brand, (ImageView) brand.getGraphic());
+        HBox navigation = new HBox();
+        addLocalizedNav(navigation, LauncherView.PLAY, "nav.play", LauncherIcons.Glyph.ZAP);
+        addLocalizedNav(navigation, LauncherView.LIBRARY, "nav.library", LauncherIcons.Glyph.SAVE);
+        addLocalizedNav(navigation, LauncherView.WARDROBE, "nav.wardrobe", LauncherIcons.Glyph.PALETTE);
         Button browseButton = browseMenu.button();
         navButtons.put(LauncherView.DISCOVER, browseButton);
-        bar.getChildren().add(browseButton);
-        Region separator = new Region();
-        separator.getStyleClass().add("nav-divider");
-        bar.getChildren().add(separator);
-        bar.getChildren().add(notificationsMenu.button());
-        bar.getChildren().add(accountMenu.button());
-        if (undecoratedWindow) {
-            configureWindowDrag(bar);
-        }
+        List<Button> buttons = new ArrayList<>(navigation.getChildren().stream().map(Button.class::cast).toList());
+        navigation.getChildren().clear();
+        buttons.add(browseButton);
+        HBox bar = LauncherNavbar.build(brand, buttons, notificationsMenu.button(), accountMenu.button());
+        if (undecoratedWindow) configureWindowDrag(bar);
         return bar;
     }
 
@@ -1084,12 +1061,7 @@ public final class LauncherShell {
     }
 
     private void addLocalizedNav(HBox bar, LauncherView view, String key, LauncherIcons.Glyph icon) {
-        Button button = new Button();
-        I18N.bind(button, key);
-        button.getStyleClass().add("nav-btn");
-        applyNavbarTitleFont(button);
-        button.setGraphic(LauncherIcons.icon(icon, 16));
-        button.setOnAction(event -> showView(view));
+        Button button = LauncherNavbar.navigation(key, icon, () -> showView(view));
         navButtons.put(view, button);
         bar.getChildren().add(button);
     }

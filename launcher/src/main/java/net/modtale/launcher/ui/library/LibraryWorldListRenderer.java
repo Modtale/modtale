@@ -52,13 +52,17 @@ final class LibraryWorldListRenderer {
         title.getStyleClass().add("library-project-title");
         Label meta = new Label(item.meta());
         meta.getStyleClass().add("library-project-meta");
+        copy.setMinWidth(0);
+        title.setMaxWidth(Double.MAX_VALUE);
+        meta.setMaxWidth(Double.MAX_VALUE);
         copy.getChildren().addAll(title, meta);
         HBox.setHgrow(copy, Priority.ALWAYS);
 
         Label status = new Label(item.enabledProjectCount() + " of " + item.totalProjectCount() + " enabled");
         status.getStyleClass().add("library-world-tab-status");
 
-        row.getChildren().addAll(icon, copy, status);
+        copy.getChildren().add(status);
+        row.getChildren().addAll(icon, copy);
         return row;
     }
 
