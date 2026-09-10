@@ -58,7 +58,9 @@ import net.modtale.launcher.api.ModtaleApiClient;
 import net.modtale.launcher.api.ProjectSearchQuery;
 import net.modtale.launcher.discord.DiscordRichPresenceService;
 import net.modtale.launcher.hytale.HytaleApiClient;
-import net.modtale.launcher.hytale.HytaleBlogPost;
+import net.modtale.launcher.news.LauncherNewsPost;
+import net.modtale.launcher.news.LauncherNewsFeed;
+import net.modtale.launcher.news.ModtaleNewsClient;
 import net.modtale.launcher.hytale.HytaleApiException;
 import net.modtale.launcher.hytale.HytaleAuthService;
 import net.modtale.launcher.hytale.HytaleAuthSession;
@@ -146,6 +148,7 @@ public final class LauncherPlayController {
     private final VBox newsList = new VBox(12);
     private final CatalogShelf newReleasesShelf = new CatalogShelf(ProjectBrowseSort.NEWEST);
     private final CatalogShelf trendingShelf = new CatalogShelf(ProjectBrowseSort.TRENDING);
+    private final ModtaleNewsClient modtaleNews = new ModtaleNewsClient();
     private final Map<String, Image> imageCache = new ConcurrentHashMap<>();
 
     private volatile Process hytaleProcess;
@@ -157,7 +160,7 @@ public final class LauncherPlayController {
     private boolean blogPostsLoaded;
     private boolean blogPostsComplete;
     private boolean blogFillCheckScheduled;
-    private List<HytaleBlogPost> blogPosts = List.of();
+    private List<LauncherNewsPost> blogPosts = List.of();
     private int renderedBlogPosts;
     private long versionLoadRetryAfterMillis;
     private long versionRetryScheduledAtMillis;
@@ -1237,31 +1240,33 @@ public final class LauncherPlayController {
         blogPostsLoading = true;
         blogPostsComplete = false;
         renderNewsLoading();
-        CompletableFuture.supplyAsync(hytaleAuthService::getAllBlogPosts, executor)
-                .whenComplete((posts, error) -> Platform.runLater(() -> {
+        LauncherNewsFeed.load(modtaleNews::fetch,
+                () -> hytaleAuthService.getAllBlogPosts().stream().map(post -> new LauncherNewsPost(
+                        post.title(), post.url(), post.imageUrl(), post.publishedAt(), "Hytale")).toList(), executor)
+                .thenAccept(result -> Platform.runLater(() -> {
                     blogPostsLoading = false;
-                    if (error != null) {
-                        newsList.getChildren().setAll(messageRow("Could not load the Hytale blog."));
-                        return;
-                    }
                     blogPostsLoaded = true;
-                    renderInitialBlogPosts(posts == null ? List.of() : posts);
+                    renderInitialBlogPosts(result.posts());
+                    if (!result.failedSources().isEmpty()) {
+                        newsList.getChildren().addFirst(messageRow(
+                                "Could not load " + String.join(" and ", result.failedSources()) + " news."));
+                    }
                 }));
     }
 
     private void renderNewsLoading() {
         newsList.getChildren().clear();
         for (int i = 0; i < 3; i++) newsList.getChildren().add(LauncherSkeleton.of(
-                blogPostRow(new HytaleBlogPost("The latest news from Hytale", "", "", java.time.Instant.parse(LauncherSkeletonContent.DATE)))));
+                blogPostRow(new LauncherNewsPost("The latest news from Hytale", "", "", java.time.Instant.parse(LauncherSkeletonContent.DATE), "Hytale"))));
     }
 
-    private void renderInitialBlogPosts(List<HytaleBlogPost> posts) {
+    private void renderInitialBlogPosts(List<LauncherNewsPost> posts) {
         blogPosts = posts;
         renderedBlogPosts = 0;
         blogPostsComplete = posts.isEmpty();
         newsList.getChildren().clear();
         if (posts.isEmpty()) {
-            newsList.getChildren().add(messageRow("No Hytale blog posts found."));
+            newsList.getChildren().add(messageRow("No news articles found."));
             return;
         }
         appendNextBlogPosts();
@@ -1310,7 +1315,7 @@ public final class LauncherPlayController {
             return;
         }
         blogPostsComplete = true;
-        newsList.getChildren().add(messageRow("End of Hytale RSS feed."));
+        newsList.getChildren().add(messageRow("End of news feed."));
     }
 
     private void scheduleBlogFillCheck() {
@@ -1324,7 +1329,7 @@ public final class LauncherPlayController {
         });
     }
 
-    private Node blogPostRow(HytaleBlogPost post) {
+    private Node blogPostRow(LauncherNewsPost post) {
         VBox row = new VBox(7);
         row.getStyleClass().add("play-news-card");
         row.setAlignment(Pos.TOP_LEFT);
@@ -1332,17 +1337,17 @@ public final class LauncherPlayController {
 
         StackPane thumbnail = newsThumbnail(post);
 
-        Label title = new Label(value(post.title(), "Hytale Blog"));
+        Label title = new Label(value(post.title(), "News"));
         title.getStyleClass().add("play-news-title");
         title.setWrapText(true);
-        Label date = new Label(formatBlogDate(post.publishedAt()));
+        Label date = new Label(post.source() + " · " + formatBlogDate(post.publishedAt()));
         date.getStyleClass().add("play-news-date");
 
         row.getChildren().addAll(thumbnail, title, date);
         return row;
     }
 
-    private StackPane newsThumbnail(HytaleBlogPost post) {
+    private StackPane newsThumbnail(LauncherNewsPost post) {
         Label initial = new Label(initialFor(post.title()));
         initial.getStyleClass().add("play-news-initial");
         StackPane thumbnail = new StackPane(initial);
