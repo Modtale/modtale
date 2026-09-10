@@ -104,8 +104,6 @@ public final class LauncherLibraryController {
     private Node libraryView;
     private Node updatesView;
     private StackPane installLoadingOverlay;
-    private Label installLoadingTitle;
-    private Label installLoadingSubtitle;
     private String identityResolutionSignature = "";
     private boolean identityResolutionInFlight;
 
@@ -349,52 +347,13 @@ public final class LauncherLibraryController {
             Platform.runLater(() -> showInstallLoadingOverlay(title, subtitle));
             return;
         }
-        StackPane hostPane = overlayHost.get();
-        if (hostPane == null) {
-            return;
-        }
-        if (installLoadingOverlay == null) {
-            installLoadingOverlay = installLoadingShell();
-            hostPane.getChildren().add(installLoadingOverlay);
-        } else if (installLoadingOverlay.getParent() == null) {
-            hostPane.getChildren().add(installLoadingOverlay);
-        }
-        installLoadingTitle.setText(value(title, "Installing"));
-        installLoadingSubtitle.setText(value(subtitle, "Preparing the next step."));
-        installLoadingOverlay.toFront();
+        StackPane host = overlayHost.get();
+        if (host == null) return;
+        hideInstallLoadingOverlay();
+        installLoadingOverlay = new net.modtale.launcher.ui.common.TransferLoadingModal(
+                value(title, "Installing"), "Downloading your mods and getting everything ready.");
+        host.getChildren().add(installLoadingOverlay);
         installLoadingOverlay.requestFocus();
-    }
-
-    private StackPane installLoadingShell() {
-        StackPane shell = new StackPane();
-        shell.getStyleClass().add("install-loading-overlay");
-        shell.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        shell.setFocusTraversable(true);
-        shell.setOnMouseClicked(event -> event.consume());
-
-        ProgressIndicator spinner = new ProgressIndicator();
-        spinner.getStyleClass().add("install-loading-spinner");
-        spinner.setMaxSize(54, 54);
-        spinner.setMinSize(54, 54);
-
-        installLoadingTitle = new Label("Installing");
-        installLoadingTitle.getStyleClass().add("install-loading-title");
-        installLoadingSubtitle = new Label("Downloading and installing files. World selection will appear next.");
-        installLoadingSubtitle.getStyleClass().add("install-loading-subtitle");
-        installLoadingSubtitle.setWrapText(true);
-
-        VBox copy = new VBox(6, installLoadingTitle, installLoadingSubtitle);
-        copy.getStyleClass().add("install-loading-copy");
-        copy.setAlignment(Pos.CENTER);
-
-        VBox card = new VBox(18, spinner, copy);
-        card.getStyleClass().add("install-loading-card");
-        card.setAlignment(Pos.CENTER);
-        card.setMaxWidth(420);
-        card.setMaxHeight(Region.USE_PREF_SIZE);
-
-        shell.getChildren().add(card);
-        return shell;
     }
 
     private void hideInstallLoadingOverlay() {
@@ -402,16 +361,8 @@ public final class LauncherLibraryController {
             Platform.runLater(this::hideInstallLoadingOverlay);
             return;
         }
-        if (installLoadingOverlay == null) {
-            return;
-        }
-        Parent parent = installLoadingOverlay.getParent();
-        if (parent instanceof StackPane stack) {
-            stack.getChildren().remove(installLoadingOverlay);
-        }
+        if (installLoadingOverlay instanceof net.modtale.launcher.ui.common.TransferLoadingModal modal) modal.dismiss();
         installLoadingOverlay = null;
-        installLoadingTitle = null;
-        installLoadingSubtitle = null;
     }
 
     private void renderLibrary() {

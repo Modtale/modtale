@@ -238,6 +238,17 @@ public class ArchiveInstaller {
             return;
         }
         JsonNode manifest = OBJECT_MAPPER.readTree(manifestFile.toFile());
+        boolean originalFormat = manifest.isObject() && !manifest.has("formatVersion") && !manifest.has("game")
+                && !manifest.path("name").asText("").isBlank() && manifest.path("files").isArray();
+        if (originalFormat) {
+            for (JsonNode file : manifest.path("files")) {
+                if (!file.isObject() || file.path("id").asText("").isBlank()
+                        || file.path("version").asText("").isBlank()) {
+                    throw new IOException("Invalid original Modtale modpack entry.");
+                }
+            }
+            return;
+        }
         if (!manifest.isObject() || manifest.path("formatVersion").asInt(-1) != 1
                 || !"hytale".equalsIgnoreCase(manifest.path("game").asText())
                 || !manifest.path("files").isArray()) {

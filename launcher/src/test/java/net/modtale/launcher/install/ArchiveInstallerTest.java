@@ -99,6 +99,21 @@ class ArchiveInstallerTest {
     }
 
     @Test
+    void installsOriginalModtalePackWithoutFormatFields() throws IOException {
+        Path archive = tempDir.resolve("original.zip");
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(archive))) {
+            add(zip, "modpack.json", """
+                    {"name":"More Weapons, More Armor!","files":[
+                      {"id":"df3549aa-3d2f-4d8d-9ccc-1f503915f9d9","version":"0.2.2"}]}
+                    """);
+            add(zip, "asset-packs/Weapons.zip", "weapons");
+        }
+        Path mods = tempDir.resolve("original-mods");
+        assertEquals(1, new ArchiveInstaller().installModpackArchive(archive, mods).size());
+        assertEquals("weapons", Files.readString(mods.resolve("Weapons.zip")));
+    }
+
+    @Test
     void rejectsModpackArchiveEntriesThatEscapeTheStagingDirectory() throws IOException {
         Path archive = tempDir.resolve("bad-modpack.zip");
         try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(archive))) {

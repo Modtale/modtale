@@ -37,7 +37,7 @@ final class LauncherPreferenceSyncDialog {
         this.updatedAt = updatedAt == null ? "" : updatedAt.trim();
     }
 
-    static boolean showAndWait(
+    static StatusModal.Result showAndWait(
             Supplier<StackPane> host,
             int remoteProjects,
             int localProjects,
@@ -56,7 +56,7 @@ final class LauncherPreferenceSyncDialog {
                 .actionLabel("Load from Modtale")
                 .content(dialog.summaryCard())
                 .showAndWait();
-        return result == StatusModal.Result.PRIMARY;
+        return result;
     }
 
     private VBox summaryCard() {

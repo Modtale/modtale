@@ -140,16 +140,17 @@ public final class LauncherSettingsSyncService {
 
         lastKnownRemoteHash = remote.effectiveHash();
         lastKnownRemoteInstalledProjectsHash = remote.installedProjectsHash();
-        if (promptLoadRemote(remote, local)) {
+        var choice = promptLoadRemote(remote, local);
+        if (choice == net.modtale.launcher.ui.common.StatusModal.Result.PRIMARY) {
             restoreSnapshot(remote);
             return true;
-        } else {
+        } else if (choice == net.modtale.launcher.ui.common.StatusModal.Result.SECONDARY) {
             uploadSnapshot(local, true);
         }
         return false;
     }
 
-    private boolean promptLoadRemote(LauncherSettingsSnapshot remote, LauncherSettingsSnapshot local) {
+    private net.modtale.launcher.ui.common.StatusModal.Result promptLoadRemote(LauncherSettingsSnapshot remote, LauncherSettingsSnapshot local) {
         return LauncherPreferenceSyncDialog.showAndWait(
                 overlayHost,
                 remote.installedProjects().size(),
@@ -160,21 +161,26 @@ public final class LauncherSettingsSyncService {
 
     private void restoreSnapshot(LauncherSettingsSnapshot snapshot) {
         checking.set(true);
+        var progress = new net.modtale.launcher.ui.common.TransferLoadingModal(
+                "Syncing your launcher", "Restoring settings and configs");
+        if (overlayHost.get() != null) overlayHost.get().getChildren().add(progress);
         feedback.runAsync("Loading launcher settings and configs from Modtale...",
-                () -> restore(snapshot),
+                () -> restore(snapshot, progress),
                 result -> {
                     LauncherSettingsSnapshot local = LauncherSettingsSnapshot.fromSettings(settingsController.settings());
                     lastKnownRemoteHash = local.computeHash();
                     lastKnownRemoteInstalledProjectsHash = local.installedProjectsHash();
+                    progress.update("Syncing your launcher", "Refreshing your Library");
                     settingsController.reloadFromStore();
+                    progress.dismiss();
                     checking.set(false);
                     feedback.log("Loaded launcher preferences from Modtale.");
                     feedback.showToast("Preferences loaded", result.message());
                     drainLocalChanges();
-                }, error -> { checking.set(false); });
+                }, error -> { progress.dismiss(); checking.set(false); });
     }
 
-    private RestoreResult restore(LauncherSettingsSnapshot snapshot) {
+    private RestoreResult restore(LauncherSettingsSnapshot snapshot, net.modtale.launcher.ui.common.TransferLoadingModal progress) {
         LauncherSettings settings = settingsController.settings();
         int restoredConfigs;
         try {
@@ -223,6 +229,8 @@ public final class LauncherSettingsSyncService {
             try {
                 ProjectDetail project = apiClient.getProject(projectSnapshot.getProjectId());
                 ProjectVersion version = resolveVersion(project, projectSnapshot, settings);
+                progress.update("Restoring your mods", "Downloading " + project.title()
+                        + " • " + (installed + 1) + " of " + snapshot.installedProjects().size());
                 InstallResult result = installer.install(project, version, installOptions(settings, projectSnapshot, version));
                 settings.upsertInstalledProject(result.installedProject().withModpackUnlocked(projectSnapshot.isModpackUnlocked()));
                 settingsStore.save(settings);
