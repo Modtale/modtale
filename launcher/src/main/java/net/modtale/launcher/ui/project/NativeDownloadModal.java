@@ -340,7 +340,7 @@ final class NativeDownloadModal {
         box.getChildren().addAll(headline, versionLabel);
         if (shouldShowEntryGameVersion()) {
             Label forVersion = new Label("For " + entry.gameVersion());
-            forVersion.getStyleClass().add("download-modal-file-date");
+            forVersion.getStyleClass().add("download-modal-latest-game-version");
             box.getChildren().add(forVersion);
         }
         List<String> others = otherCompatibleVersions(version, entry.gameVersion());

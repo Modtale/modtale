@@ -3827,6 +3827,16 @@
     -fx-font-weight: 600;
 }
 
+.download-modal-latest-game-version {
+    -fx-text-fill: rgba(239, 246, 255, 0.95);
+    -fx-font-size: 11px;
+    -fx-font-weight: 600;
+}
+
+.download-modal-latest-game-version .text {
+    -fx-fill: rgba(239, 246, 255, 0.95);
+}
+
 .download-modal-also-supports {
     -fx-text-fill: rgba(239, 246, 255, 0.95);
     -fx-font-size: 11px;
