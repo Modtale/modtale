@@ -18,7 +18,10 @@ const escapeXml = (value: string) => value
 const cdata = (value: string) => `<![CDATA[${value.replace(/]]>/g, ']]]]><![CDATA[>')}]]>`;
 
 export const buildNewsRssXml = (siteUrl = SITE_URL) => {
-    const absoluteUrl = (path: string) => new URL(path, siteUrl).href;
+    const origin = new URL(siteUrl);
+    const localHost = ['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname);
+    if (!localHost) origin.protocol = 'https:';
+    const absoluteUrl = (path: string) => new URL(path, origin).href;
     const lastUpdated = getLatestNewsPostDate();
     const lastBuildDate = typeof lastUpdated === 'number' && Number.isFinite(lastUpdated)
         ? new Date(lastUpdated).toUTCString()

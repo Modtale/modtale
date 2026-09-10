@@ -25,3 +25,17 @@ describe('news RSS environment links', () => {
         expect(xml).toContain('<guid isPermaLink="true">https://modtale.net/news/fresh-feature-showcase</guid>');
     });
 });
+
+
+describe('news RSS proxy origins', () => {
+    it('uses HTTPS when TLS terminates before the frontend server', () => {
+        const xml = buildNewsRssXml('http://dev.modtale.net');
+        expect(xml).toContain('<link>https://dev.modtale.net/news/fresh-feature-showcase</link>');
+        expect(xml).not.toContain('http://dev.modtale.net');
+    });
+
+    it('preserves HTTP and the port for a local frontend', () => {
+        expect(buildNewsRssXml('http://localhost:5173'))
+            .toContain('<link>http://localhost:5173/news/fresh-feature-showcase</link>');
+    });
+});
