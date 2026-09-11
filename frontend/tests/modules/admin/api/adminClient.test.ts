@@ -18,6 +18,16 @@ describe('adminClient', () => {
         vi.clearAllMocks();
     });
 
+    it('binds project decisions to the reviewed project and selected version', async () => {
+        mockedApi.post.mockResolvedValue({ data: null } as any);
+        await adminClient.publishProject('project', 'snapshot', 'selected');
+        expect(mockedApi.post).toHaveBeenCalledWith('/admin/projects/project/publish', null,
+            { headers: { 'If-Match': 'snapshot' }, params: { versionId: 'selected' } });
+        await adminClient.rejectProject('project', 'reason', 'snapshot');
+        expect(mockedApi.post).toHaveBeenCalledWith('/admin/projects/project/reject', { reason: 'reason' },
+            { headers: { 'If-Match': 'snapshot' } });
+    });
+
     it('passes file paths as query params when loading admin file content', async () => {
         mockedApi.get.mockResolvedValue({ data: 'contents' } as any);
 

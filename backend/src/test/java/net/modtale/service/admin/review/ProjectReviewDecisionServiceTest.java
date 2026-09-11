@@ -57,13 +57,13 @@ class ProjectReviewDecisionServiceTest {
         var persistence=mock(VersionReviewPersistence.class);
         when(persistence.apply(any(),any())).thenReturn(true);
         ProjectReviewTransitionService transitionService = new ProjectReviewTransitionService(
-                projectRepository,
                 projectService,
                 lifecycleService,
                 mock(ScoringService.class),
                 securityIssueAnalysisService,
                 projectVersionAccessService,
-                persistence
+                persistence,
+                mock(ProjectReviewPersistence.class)
         );
         ProjectReviewEffectService effectService = new ProjectReviewEffectService(
                 userRepository,

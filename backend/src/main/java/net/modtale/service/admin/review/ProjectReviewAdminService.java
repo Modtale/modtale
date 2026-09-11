@@ -28,8 +28,8 @@ public class ProjectReviewAdminService {
         return projectReviewQueryService.getProjectReviewDetails(id);
     }
 
-    public void publishProject(User adminUser, String id) {
-        projectReviewDecisionService.publishProject(adminUser, id);
+    public void publishProject(User adminUser, String id, String reviewToken, String versionId) {
+        projectReviewDecisionService.publishProject(adminUser, id, reviewToken, versionId);
     }
 
     public void approveVersion(User adminUser, String id, String versionId, String reviewToken) {
@@ -40,7 +40,7 @@ public class ProjectReviewAdminService {
         projectReviewDecisionService.rejectVersion(adminUser, id, versionId, reason, reviewToken);
     }
 
-    public void rejectProject(User adminUser, String id, String reason) {
-        projectReviewDecisionService.rejectProject(adminUser, id, reason);
+    public void rejectProject(User adminUser, String id, String reason, String reviewToken) {
+        projectReviewDecisionService.rejectProject(adminUser, id, reason, reviewToken);
     }
 }

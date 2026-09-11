@@ -22,8 +22,9 @@ class ProjectPublicationSecurityTest {
             var access=mock(AccessControlService.class);
             var projects=mock(ProjectAccessService.class);
             var analysis=mock(SecurityIssueAnalysisService.class);
-            var service=new ProjectPublicationService(repository,mock(ProjectService.class),mock(ProjectNotificationService.class),
-                    mock(WebhookService.class),mock(TrackingService.class),mock(ScoringService.class),access,projects,analysis);
+            var persistence=mock(net.modtale.service.admin.review.ProjectReviewPersistence.class);
+            var service=new ProjectPublicationService(mock(ProjectService.class),mock(ProjectNotificationService.class),
+                    mock(WebhookService.class),mock(TrackingService.class),mock(ScoringService.class),access,projects,analysis,persistence);
             var project=new Project();project.setId("project");project.setStatus(status);project.setCreatedAt("2026-01-01T00:00:00");
             var pending=new ProjectVersion();pending.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
             var scheduled=new ProjectVersion();scheduled.setReviewStatus(ProjectVersion.ReviewStatus.SCHEDULED);
@@ -33,7 +34,11 @@ class ProjectPublicationSecurityTest {
             when(projects.requireProject("project")).thenReturn(project);
             when(access.hasProjectPermission(project,owner,"PROJECT_STATUS_PUBLISH")).thenReturn(true);
             when(repository.save(project)).thenReturn(project);
+            when(persistence.capture(eq("project"),anyString())).thenReturn(
+                    new net.modtale.service.admin.review.ProjectReviewPersistence.Snapshot(new org.bson.Document(),project));
+            when(persistence.apply(any(),isNull())).thenReturn(true);
             service.publishProject("project",owner);
+            verifyNoInteractions(repository);
             assertEquals(ProjectStatus.PUBLISHED,project.getStatus());
             assertEquals(ProjectVersion.ReviewStatus.PENDING,pending.getReviewStatus(),status.name());
             assertEquals(ProjectVersion.ReviewStatus.SCHEDULED,scheduled.getReviewStatus(),status.name());

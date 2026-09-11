@@ -312,6 +312,7 @@ export interface GalleryImage {
 }
 
 export interface Project {
+    reviewToken?: string;
     id: string;
     slug?: string;
     title: string;

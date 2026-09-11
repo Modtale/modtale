@@ -196,7 +196,8 @@ public class ProjectMapper {
                 project.getProjectRoles(),
                 project.getTeamMembers(),
                 project.getTeamInvites(),
-                toAdminVersionSummaryDTOs(project.getVersions())
+                toAdminVersionSummaryDTOs(project.getVersions()),
+                net.modtale.service.admin.review.ProjectReviewSnapshot.token(project)
         );
     }
 

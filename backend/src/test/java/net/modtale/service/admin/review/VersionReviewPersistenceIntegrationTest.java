@@ -41,6 +41,40 @@ class VersionReviewPersistenceIntegrationTest {
         var sibling=new ProjectVersion();sibling.setId("version-b");sibling.setVersionNumber("2.0");
         project.setVersions(List.of(version,sibling));mongo.insert(project);
     }
+    @Test void projectPublicationPreservesUnreviewedVersionsAndUnknownFields() {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)), new Update()
+                .set("versions.0.legacyMarker", "preserve").set("unmodeledProjectField", "preserve"), Project.class);
+        var project = mongo.findById(id, Project.class);
+        var projectPersistence = new ProjectReviewPersistence(mongo);
+        var snapshot = projectPersistence.capture(id, ProjectReviewSnapshot.token(project));
+        snapshot.project().setStatus(ProjectStatus.PUBLISHED);
+        snapshot.project().getVersions().getFirst().setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        assertTrue(projectPersistence.apply(snapshot, "version-a"));
+        var saved = mongo.findById(id, Project.class);
+        assertEquals(ProjectStatus.PUBLISHED, saved.getStatus());
+        assertEquals(ProjectVersion.ReviewStatus.APPROVED, saved.getVersions().getFirst().getReviewStatus());
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, saved.getVersions().get(1).getReviewStatus());
+        var raw = mongo.getCollection("projects").find().first();
+        assertEquals("preserve", raw.getString("unmodeledProjectField"));
+        assertEquals("preserve", raw.getList("versions", Document.class).getFirst().getString("legacyMarker"));
+    }
+    @Test void concurrentProjectChangePreventsPublication() {
+        var project = mongo.findById(id, Project.class);
+        var projectPersistence = new ProjectReviewPersistence(mongo);
+        var snapshot = projectPersistence.capture(id, ProjectReviewSnapshot.token(project));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)), new Update().set("title", "changed"), Project.class);
+        snapshot.project().setStatus(ProjectStatus.PUBLISHED);
+        snapshot.project().getVersions().getFirst().setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        assertFalse(projectPersistence.apply(snapshot, "version-a"));
+        assertEquals("changed", mongo.findById(id, Project.class).getTitle());
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, mongo.findById(id, Project.class).getVersions().getFirst().getReviewStatus());
+    }
+    @Test void changedVersionInvalidatesProjectReviewInBrowser() {
+        var project = mongo.findById(id, Project.class);
+        String token = ProjectReviewSnapshot.token(project);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)), new Update().set("versions.0.hash", "f".repeat(64)), Project.class);
+        assertThrows(ResponseStatusException.class, () -> new ProjectReviewPersistence(mongo).capture(id, token));
+    }
     @AfterEach void cleanup() {if(client!=null) {client.getDatabase(database).drop();client.close();}}
     @Test void conditionalApprovalPreservesConcurrentSiblingAndProjectChanges() {
         mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update().set("versions.0.legacyMarker","preserve"),Project.class);

@@ -72,9 +72,9 @@ public class ProjectManagementController {
 
     @PostMapping("/projects/{id}/publish")
     @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_REVIEW_DECIDE', authentication)")
-    public ResponseEntity<Void> publishProject(@PathVariable String id) {
+    public ResponseEntity<Void> publishProject(@PathVariable String id, @RequestHeader("If-Match") String reviewToken, @RequestParam(required = false) String versionId) {
         User currentUser = accountService.requireCurrentUser("publishing projects");
-        projectReviewAdminService.publishProject(currentUser, id);
+        projectReviewAdminService.publishProject(currentUser, id, reviewToken, versionId);
         return ResponseEntity.ok().build();
     }
 
@@ -96,9 +96,9 @@ public class ProjectManagementController {
 
     @PostMapping("/projects/{id}/reject")
     @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_REVIEW_DECIDE', authentication)")
-    public ResponseEntity<Void> rejectProject(@PathVariable String id, @Valid @RequestBody RejectReasonRequest requestPayload) {
+    public ResponseEntity<Void> rejectProject(@PathVariable String id, @Valid @RequestBody RejectReasonRequest requestPayload, @RequestHeader("If-Match") String reviewToken) {
         User currentUser = accountService.requireCurrentUser("rejecting projects");
-        projectReviewAdminService.rejectProject(currentUser, id, requestPayload.getReason());
+        projectReviewAdminService.rejectProject(currentUser, id, requestPayload.getReason(), reviewToken);
         return ResponseEntity.ok().build();
     }
 

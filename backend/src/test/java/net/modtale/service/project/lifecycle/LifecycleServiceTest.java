@@ -46,6 +46,7 @@ import static org.mockito.Mockito.when;
 class LifecycleServiceTest {
 
     private LifecycleService lifecycleService;
+    private net.modtale.service.admin.review.ProjectReviewPersistence reviewPersistence;
     private ProjectRepository projectRepository;
     private ProjectService projectService;
     private ValidationService validationService;
@@ -96,8 +97,12 @@ class LifecycleServiceTest {
                 versionMutationOrchestrationService,
                 new AppLimitProperties(10, 5, 10, 5, 5, 5, 20, 10)
         );
+        reviewPersistence = mock(net.modtale.service.admin.review.ProjectReviewPersistence.class);
+        when(reviewPersistence.capture(anyString(), anyString())).thenAnswer(invocation ->
+                new net.modtale.service.admin.review.ProjectReviewPersistence.Snapshot(new org.bson.Document(),
+                        projectService.getRawProjectById(invocation.getArgument(0))));
+        when(reviewPersistence.apply(any(), any())).thenReturn(true);
         ProjectPublicationService projectPublicationService = new ProjectPublicationService(
-                projectRepository,
                 projectService,
                 projectNotificationService,
                 webhookService,
@@ -105,7 +110,8 @@ class LifecycleServiceTest {
                 mock(ScoringService.class),
                 accessControlService,
                 projectAccessService,
-                securityIssueAnalysisService
+                securityIssueAnalysisService,
+                reviewPersistence
         );
         lifecycleService = new LifecycleService(
                 projectDraftWorkflowService,
@@ -266,7 +272,7 @@ class LifecycleServiceTest {
     }
 
     @Test
-    void publishProjectApprovesVersionsAndBroadcastsFirstPublication() {
+    void publishProjectApprovesOnlySelectedVersionAndBroadcastsFirstPublication() {
         User admin = user("user-1", "ItsNeil17", User.AccountType.USER, true);
         Project project = editableProject("project-1", ProjectClassification.DATA, ProjectStatus.PENDING);
         project.setCreatedAt(null);
@@ -277,13 +283,18 @@ class LifecycleServiceTest {
         scheduled.setScheduledPublishDate("2026-06-09T12:00:00");
         ProjectVersion approved = version("1.1.0");
         approved.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
-        project.setVersions(new ArrayList<>(List.of(scheduled, approved)));
+        ProjectVersion uninspected = version("1.2.0");
+        uninspected.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
+        project.setVersions(new ArrayList<>(List.of(scheduled, approved, uninspected)));
 
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
         when(accessControlService.canApproveProjectReviews(admin)).thenReturn(true);
         when(projectRepository.save(project)).thenReturn(project);
 
-        lifecycleService.publishProject("project-1", admin);
+        var snapshot = new net.modtale.service.admin.review.ProjectReviewPersistence.Snapshot(new org.bson.Document(), project);
+        when(reviewPersistence.capture("project-1", "review-token")).thenReturn(snapshot);
+        when(reviewPersistence.apply(snapshot, scheduled.getId())).thenReturn(true);
+        lifecycleService.publishProject("project-1", admin, "review-token", scheduled.getId());
 
         assertEquals(ProjectStatus.PUBLISHED, project.getStatus());
         assertNotNull(project.getCreatedAt());
@@ -294,12 +305,33 @@ class LifecycleServiceTest {
         assertNull(scheduled.getScheduledPublishDate());
         assertEquals(ProjectVersion.ReviewStatus.APPROVED, approved.getReviewStatus());
 
-        verify(securityIssueAnalysisService).pruneApprovedScanResults(project);
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, uninspected.getReviewStatus());
+        verify(securityIssueAnalysisService).markIssuesAcceptedForApprovedVersion(scheduled);
+        verify(projectRepository, never()).save(project);
         verify(projectService).evictProjectCache(project);
         verify(projectNotificationService).notifyNewProject(project);
         verify(webhookService).triggerWebhook(project);
         verify(webhookService).triggerDiscordWebhook(project);
         verify(trackingService).logNewProject("project-1");
+    }
+
+    @Test
+    void unboundOrConcurrentPublicationDoesNotBroadcastOrSave() {
+        User admin = user("admin", "Moderator", User.AccountType.USER, true);
+        Project project = editableProject("project-1", ProjectClassification.DATA, ProjectStatus.PENDING);
+        ProjectVersion selected = version("1.0"); project.setVersions(List.of(selected));
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.canApproveProjectReviews(admin)).thenReturn(true);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> lifecycleService.publishProject("project-1", admin));
+        var snapshot = new net.modtale.service.admin.review.ProjectReviewPersistence.Snapshot(new org.bson.Document(), project);
+        when(reviewPersistence.capture("project-1", "token")).thenReturn(snapshot);
+        when(reviewPersistence.apply(snapshot, selected.getId())).thenReturn(false);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> lifecycleService.publishProject("project-1", admin, "token", selected.getId()));
+        verify(projectRepository, never()).save(any());
+        verify(projectNotificationService, never()).notifyNewProject(any());
+        verify(webhookService, never()).triggerWebhook(any());
     }
 
     @Test

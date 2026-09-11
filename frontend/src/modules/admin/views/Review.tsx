@@ -183,13 +183,13 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             setStatus({ type: 'error', title: 'Permission Required', msg: 'You do not have permission to approve projects or versions.' });
             return;
         }
-        if (!isNewProject && !pendingVersion?.reviewToken) {
+        if (isNewProject ? !mod.reviewToken : !pendingVersion?.reviewToken) {
             setStatus({ type: 'error', title: 'Refresh Required', msg: 'Refresh this review to load its current evidence before deciding.' });
             return;
         }
         try {
             if (isNewProject) {
-                await adminClient.publishProject(mod.id);
+                await adminClient.publishProject(mod.id, mod.reviewToken, pendingVersion?.id);
             } else {
                 await adminClient.approveVersion(mod.id, pendingVersion.id, pendingVersion.reviewToken);
             }
@@ -208,13 +208,13 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             setStatus({ type: 'error', title: 'Permission Required', msg: 'You do not have permission to reject projects or versions.' });
             return;
         }
-        if (!isNewProject && !pendingVersion?.reviewToken) {
+        if (isNewProject ? !mod.reviewToken : !pendingVersion?.reviewToken) {
             setStatus({ type: 'error', title: 'Refresh Required', msg: 'Refresh this review to load its current evidence before deciding.' });
             return;
         }
         try {
             if (isNewProject) {
-                await adminClient.rejectProject(mod.id, reason);
+                await adminClient.rejectProject(mod.id, reason, mod.reviewToken);
             } else {
                 await adminClient.rejectVersion(mod.id, pendingVersion.id, reason, pendingVersion.reviewToken);
             }
@@ -927,7 +927,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                 </h2>
                                 <p className="text-slate-500 dark:text-slate-400 font-medium mb-10 text-lg leading-relaxed">
                                     You are about to approve <strong>v{pendingVersion.versionNumber}</strong>.
-                                    {isNewProject ? " This will make the project publicly visible." : " This update will be pushed to users immediately."}
+                                    {isNewProject ? (pendingVersion ? ` This will publish the project and version ${pendingVersion.versionNumber}.` : " This will make the project publicly visible.") : " This update will be pushed to users immediately."}
                                 </p>
 
                                 <div className="flex flex-col gap-4">

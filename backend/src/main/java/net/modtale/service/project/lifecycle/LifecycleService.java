@@ -52,6 +52,10 @@ public class LifecycleService {
         projectPublicationService.privateProject(id, user);
     }
 
+    public void publishProject(String id, User user, String reviewToken, String versionId) {
+        projectPublicationService.publishProject(id, user, reviewToken, versionId);
+    }
+
     public void publishProject(String id, User user) {
         projectPublicationService.publishProject(id, user);
     }

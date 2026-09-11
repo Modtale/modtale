@@ -7,8 +7,8 @@ export const adminClient = {
     getStructure: async (projectId: string, version: string) => (await api.get(`/admin/projects/${encodeURIComponent(projectId)}/versions/${encodeURIComponent(version)}/structure`)).data,
     getFileContent: async (projectId: string, version: string, path: string) => (await api.get(`/admin/projects/${encodeURIComponent(projectId)}/versions/${encodeURIComponent(version)}/file`, { params: { path } })).data,
     scanVersion: async (projectId: string, versionId: string) => (await api.post(`/admin/projects/${projectId}/versions/${versionId}/scan`)).data,
-    publishProject: async (projectId: string) => (await api.post(`/admin/projects/${projectId}/publish`)).data,
-    rejectProject: async (projectId: string, reason: string) => (await api.post(`/admin/projects/${projectId}/reject`, { reason })).data,
+    publishProject: async (projectId: string, reviewToken?: string, versionId?: string) => (await api.post(`/admin/projects/${projectId}/publish`, null, { headers: { 'If-Match': reviewToken }, params: { versionId } })).data,
+    rejectProject: async (projectId: string, reason: string, reviewToken?: string) => (await api.post(`/admin/projects/${projectId}/reject`, { reason }, { headers: { 'If-Match': reviewToken } })).data,
     approveVersion: async (projectId: string, versionId: string, reviewToken?: string) => (await api.post(`/admin/projects/${projectId}/versions/${versionId}/approve`, null, { headers: { 'If-Match': reviewToken } })).data,
     rejectVersion: async (projectId: string, versionId: string, reason: string, reviewToken?: string) => (await api.post(`/admin/projects/${projectId}/versions/${versionId}/reject`, { reason }, { headers: { 'If-Match': reviewToken } })).data,
 

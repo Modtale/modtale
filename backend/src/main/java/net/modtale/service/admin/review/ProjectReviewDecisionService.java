@@ -17,8 +17,8 @@ public class ProjectReviewDecisionService {
         this.projectReviewEffectService = projectReviewEffectService;
     }
 
-    public void publishProject(User adminUser, String id) {
-        projectReviewTransitionService.publishProject(adminUser, id);
+    public void publishProject(User adminUser, String id, String reviewToken, String versionId) {
+        projectReviewTransitionService.publishProject(adminUser, id, reviewToken, versionId);
         projectReviewEffectService.onProjectPublished(adminUser, id);
     }
 
@@ -34,9 +34,9 @@ public class ProjectReviewDecisionService {
         projectReviewEffectService.onVersionRejected(adminUser, id, versionId, decision);
     }
 
-    public void rejectProject(User adminUser, String id, String reason) {
+    public void rejectProject(User adminUser, String id, String reason, String reviewToken) {
         ProjectReviewTransitionService.ProjectRejectionDecision decision =
-                projectReviewTransitionService.rejectProject(id, reason);
+                projectReviewTransitionService.rejectProject(id, reason, reviewToken);
         projectReviewEffectService.onProjectRejected(adminUser, id, decision);
     }
 }

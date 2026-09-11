@@ -6,7 +6,6 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
-import net.modtale.repository.project.ProjectRepository;
 import net.modtale.service.analytics.ScoringService;
 import net.modtale.service.project.access.ProjectVersionAccessService;
 import net.modtale.service.project.lifecycle.LifecycleService;
@@ -17,8 +16,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class ProjectReviewTransitionService {
 
+    private final ProjectReviewPersistence projectReviewPersistence;
     private final VersionReviewPersistence reviewPersistence;
-    private final ProjectRepository projectRepository;
     private final ProjectService projectService;
     private final LifecycleService lifecycleService;
     private final ScoringService scoringService;
@@ -26,16 +25,16 @@ public class ProjectReviewTransitionService {
     private final ProjectVersionAccessService projectVersionAccessService;
 
     public ProjectReviewTransitionService(
-            ProjectRepository projectRepository,
             ProjectService projectService,
             LifecycleService lifecycleService,
             ScoringService scoringService,
             SecurityIssueAnalysisService securityIssueAnalysisService,
             ProjectVersionAccessService projectVersionAccessService,
-            VersionReviewPersistence reviewPersistence
+            VersionReviewPersistence reviewPersistence,
+            ProjectReviewPersistence projectReviewPersistence
     ) {
+        this.projectReviewPersistence = projectReviewPersistence;
         this.reviewPersistence = reviewPersistence;
-        this.projectRepository = projectRepository;
         this.projectService = projectService;
         this.lifecycleService = lifecycleService;
         this.scoringService = scoringService;
@@ -43,8 +42,8 @@ public class ProjectReviewTransitionService {
         this.projectVersionAccessService = projectVersionAccessService;
     }
 
-    public void publishProject(User adminUser, String id) {
-        lifecycleService.publishProject(id, adminUser);
+    public void publishProject(User adminUser, String id, String reviewToken, String versionId) {
+        lifecycleService.publishProject(id, adminUser, reviewToken, versionId);
     }
 
     public VersionReviewDecision approveVersion(String id, String versionId, String reviewToken) {
@@ -81,11 +80,14 @@ public class ProjectReviewTransitionService {
         return new VersionReviewDecision(project, version, reason);
     }
 
-    public ProjectRejectionDecision rejectProject(String id, String reason) {
-        Project project = requireProject(id);
+    public ProjectRejectionDecision rejectProject(String id, String reason, String reviewToken) {
+        var snapshot = projectReviewPersistence.capture(id, reviewToken);
+        Project project = snapshot.project();
+        if (project.getStatus() != ProjectStatus.PENDING) throw ProjectReviewSnapshot.conflict();
         project.setStatus(ProjectStatus.DRAFT);
         scoringService.markProjectRankingDirty(project);
-        projectRepository.save(project);
+        project.setUpdatedAt(LocalDateTime.now().toString());
+        if (!projectReviewPersistence.apply(snapshot, null)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(project);
         return new ProjectRejectionDecision(project, reason);
     }

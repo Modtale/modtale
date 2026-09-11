@@ -33,9 +33,9 @@ class ProjectManagementControllerTest {
         admin.setId("admin-1");
         when(accountService.requireCurrentUser("publishing projects")).thenReturn(admin);
 
-        var response = controller.publishProject("project-1");
+        var response = controller.publishProject("project-1", "review-token", "version-1");
 
         assertEquals(200, response.getStatusCode().value());
-        verify(projectReviewAdminService).publishProject(admin, "project-1");
+        verify(projectReviewAdminService).publishProject(admin, "project-1", "review-token", "version-1");
     }
 }
