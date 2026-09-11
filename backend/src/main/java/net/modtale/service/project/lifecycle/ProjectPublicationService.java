@@ -127,7 +127,7 @@ public class ProjectPublicationService {
         project.setUpdatedAt(LocalDateTime.now().toString());
         scoringService.markProjectRankingDirty(project);
 
-        if (project.getVersions() != null) {
+        if (!isRestoration && canApproveReviews && project.getVersions() != null) {
             project.getVersions().forEach(version -> {
                 if (version.getReviewStatus() == ProjectVersion.ReviewStatus.PENDING
                         || version.getReviewStatus() == ProjectVersion.ReviewStatus.SCHEDULED) {
