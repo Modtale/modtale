@@ -3,6 +3,7 @@ import { Shield, List, FileText, Box, User as UserIcon, Check, ArrowLeft, Copy, 
 import { API_BASE_URL, BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
 import { adminClient } from '../api/adminClient';
 import { SourceInspector } from './SourceInspector';
+import { ArtifactChanges } from './ArtifactChanges';
 import { SiteRoutes } from '@/utils/routes';
 import type { ScanIssue, ProjectVersion, ScanReviewTarget } from '@/types';
 import { ModalPortal } from '@/components/ui/ModalPortal';
@@ -237,7 +238,8 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             {inspectorData && (
                 <SourceInspector
                     modId={mod.id}
-                    versionId={pendingVersion.id}
+                    versionId={mod.versions.find((candidate: ProjectVersion) => candidate.versionNumber === inspectorData.version)?.id || ''}
+                    canRescan={canRescan}
                     version={inspectorData.version}
                     structure={inspectorData.structure}
                     issues={inspectorData.issues}
@@ -555,11 +557,13 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                     </div>
                                 )}
 
+                                {pendingVersion && <ArtifactChanges projectId={mod.id} version={pendingVersion.versionNumber}
+                                    onInspect={(version, path) => openInspector(version, version === pendingVersion.versionNumber ? scanIssues : [], path)} />}
                                 {scanResult?.securityEvidence && (
                                     <div className="rounded-2xl border border-slate-200 dark:border-white/10 p-5 space-y-3">
                                         <div className="flex items-center justify-between gap-3">
                                             <h4 className="font-bold dark:text-white">Artifact evidence</h4>
-                                            <span className="text-xs font-medium text-slate-500">{scanResult.securityEvidence.policyVersion}</span>
+                                            <span className="text-xs font-medium text-slate-500 break-all">{scanResult.securityEvidence.policyVersion}</span>
                                         </div>
                                         <p className="text-sm text-slate-600 dark:text-slate-300">
                                             {scanResult.securityEvidence.complete ? 'Archive inspection completed.' : 'Inspection has gaps; clearance is withheld.'}

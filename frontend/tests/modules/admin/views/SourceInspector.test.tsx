@@ -29,6 +29,13 @@ describe('SourceInspector evidence display', () => {
         expect(container.querySelector('code')?.textContent).toBe('Current file evidence');
         expect(container.textContent).not.toContain('Stale file evidence');
     });
+    it('exposes rescan only with permission and targets the inspected version', async () => {
+        await act(async () => root.render(<SourceInspector {...props} />));
+        expect(container.querySelector('button[title="Rescan File"]')).toBeNull();
+        await act(async () => root.render(<SourceInspector {...props} version="0.9" versionId="older-version" canRescan />));
+        await act(async () => container.querySelector<HTMLButtonElement>('button[title="Rescan File"]')!.click());
+        expect(adminClient.scanVersion).toHaveBeenCalledWith('project', 'older-version');
+    });
     it('maps source line references to bytecode markers instead of text line numbers', async () => {
         vi.mocked(adminClient.getFileContent).mockResolvedValue('// JVM bytecode of the uploaded class.\nMETHOD\n  LINENUMBER 42 L0\n  RETURN');
         await act(async () => root.render(<SourceInspector {...props} initialFile="Example.class" initialLine={42} />));

@@ -9,6 +9,7 @@ import { ModalPortal } from '@/components/ui/ModalPortal';
 interface SourceInspectorProps {
     modId: string;
     versionId: string;
+    canRescan?: boolean;
     version: string;
     structure: string[];
     issues?: ScanIssue[];
@@ -185,7 +186,7 @@ const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number;
     );
 };
 
-export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, versionId, version, structure, issues = [], initialFile, initialLine, initialLineEnd, onClose }) => {
+export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, versionId, canRescan = false, version, structure, issues = [], initialFile, initialLine, initialLineEnd, onClose }) => {
     const requestGeneration = useRef(0);
     useEffect(() => () => { requestGeneration.current++; }, [modId, version]);
     const [inspectorFile, setInspectorFile] = useState<string | null>(null);
@@ -282,6 +283,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
     };
 
     const handleRescan = async () => {
+        if (!canRescan || !versionId) return;
         setIsScanning(true);
         try {
             await adminClient.scanVersion(modId, versionId);
@@ -393,14 +395,14 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                     )}
                 </div>
                 <div className="flex items-center gap-2">
-                    <button
+                    {canRescan && versionId && <button
                         onClick={handleRescan}
                         disabled={isScanning}
                         className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors"
                         title="Rescan File"
                     >
                         <RefreshCw className={`w-5 h-5 ${isScanning ? 'animate-spin' : ''}`} />
-                    </button>
+                    </button>}
                     <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white">
                         <X className="w-5 h-5" />
                     </button>

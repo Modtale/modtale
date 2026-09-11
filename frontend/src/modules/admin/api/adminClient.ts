@@ -3,6 +3,7 @@ import type { AdminVerificationQueueItem } from '@/types';
 
 export const adminClient = {
     getProjectMeta: async (projectId: string) => (await api.get(`/projects/${projectId}/meta`)).data,
+    getArtifactChanges: async (projectId: string, version: string): Promise<import('../views/ArtifactChanges').ArtifactChangeSummary> => (await api.get(`/admin/projects/${encodeURIComponent(projectId)}/versions/${encodeURIComponent(version)}/changes`)).data,
     getStructure: async (projectId: string, version: string) => (await api.get(`/admin/projects/${encodeURIComponent(projectId)}/versions/${encodeURIComponent(version)}/structure`)).data,
     getFileContent: async (projectId: string, version: string, path: string) => (await api.get(`/admin/projects/${encodeURIComponent(projectId)}/versions/${encodeURIComponent(version)}/file`, { params: { path } })).data,
     scanVersion: async (projectId: string, versionId: string) => (await api.post(`/admin/projects/${projectId}/versions/${versionId}/scan`)).data,

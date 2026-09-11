@@ -96,7 +96,7 @@ public class WardenClientService {
         return buildDegradedResult(filename, lastError);
     }
 
-    public record InspectionResponse(String artifactSha256, List<String> paths, String content, String format) {}
+    public record InspectionResponse(String artifactSha256, List<String> paths, String content, String format, java.util.Map<String, String> entryHashes, String policyVersion) {}
 
     public InspectionResponse inspectFile(byte[] bytes, String filename, String path) {
         if (!wardenProperties.enabled()) throw new IllegalStateException("Artifact inspection is unavailable");
