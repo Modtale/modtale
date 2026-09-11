@@ -14,6 +14,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
         pattern = "net\\.modtale\\.status\\..*"
 ))
 @ConfigurationPropertiesScan
+@EnableCaching
 @EnableMethodSecurity
 public class ModtaleApplication {
     public static void main(String[] args) {

@@ -398,6 +398,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                         onChange={(deps) => onChange({ ...data, dependencies: (deps as ProjectDependency[]).map(dep => ({ ...dep, dependencyType: 'REQUIRED' })), modConfigs: (data.modConfigs || []).filter(config => deps.some(dep => configOwnerKey(dep.projectId, dep.source) === configOwnerKey(config.projectId, config.source))) })}
                         targetGameVersion={data.gameVersions?.[0]}
                         label="Add Projects"
+                        previousDependencies={previousDependencies}
                         isModpack={true}
                         renderDependencyDetails={hideFilePicker ? undefined : dependency => <ModConfigFields
                             projectId={dependency.projectId}
