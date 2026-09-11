@@ -1,90 +1,70 @@
 package net.modtale.service.project.version;
 
-import java.util.ArrayList;
-import java.util.List;
-import net.modtale.model.project.Project;
-import net.modtale.model.project.ProjectVersion;
-import net.modtale.repository.project.ProjectRepository;
+import java.util.*;
+import net.modtale.model.project.*;
 import net.modtale.service.communication.ProjectNotificationService;
-import net.modtale.service.project.lifecycle.ScheduledReleaseExecutionService;
-import net.modtale.service.project.lifecycle.ScheduledReleaseQueryService;
+import net.modtale.service.project.lifecycle.*;
 import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.security.issue.SecurityIssueAnalysisService;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import net.modtale.service.security.scan.ScanEvidenceFixtures;
+import org.junit.jupiter.api.*;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Query;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import org.springframework.data.mongodb.core.query.*;
+import org.mockito.ArgumentCaptor;
+import com.mongodb.client.result.UpdateResult;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 class VersionPublishingServiceTest {
-
+    private MongoTemplate mongo;
+    private ProjectNotificationService notifications;
     private VersionPublishingService service;
-    private MongoTemplate mongoTemplate;
-    private ProjectRepository projectRepository;
-    private ProjectService projectService;
-    private ProjectNotificationService projectNotificationService;
-    private SecurityIssueAnalysisService securityIssueAnalysisService;
-
-    @BeforeEach
-    void setUp() {
-        mongoTemplate = mock(MongoTemplate.class);
-        projectRepository = mock(ProjectRepository.class);
-        projectService = mock(ProjectService.class);
-        projectNotificationService = mock(ProjectNotificationService.class);
-        securityIssueAnalysisService = mock(SecurityIssueAnalysisService.class);
-
-        ScheduledReleaseQueryService queryService = new ScheduledReleaseQueryService(mongoTemplate);
-        ScheduledReleaseExecutionService executionService = new ScheduledReleaseExecutionService(
-                projectRepository,
-                projectService,
-                projectNotificationService,
-                securityIssueAnalysisService
-        );
-        service = new VersionPublishingService(queryService, executionService);
+    @BeforeEach void setup() {
+        mongo = mock(MongoTemplate.class);
+        notifications = mock(ProjectNotificationService.class);
+        service = new VersionPublishingService(new ScheduledReleaseQueryService(mongo),
+                new ScheduledReleaseExecutionService(mongo, mock(ProjectService.class), notifications, mock(SecurityIssueAnalysisService.class)));
+        when(mongo.updateFirst(any(Query.class), any(Update.class), eq(Project.class))).thenReturn(UpdateResult.acknowledged(1, 1L, null));
     }
-
-    @Test
-    void processScheduledReleasesPublishesOnlyDueVersions() {
-        Project project = new Project();
-        project.setId("project-1");
-        ProjectVersion dueVersion = version("1.0.0", "2000-01-01T00:00:00");
-        ProjectVersion futureVersion = version("2.0.0", "2999-01-01T00:00:00");
-        project.setVersions(new ArrayList<>(List.of(dueVersion, futureVersion)));
-
-        when(mongoTemplate.find(any(Query.class), eq(Project.class))).thenReturn(List.of(project));
-
+    @Test void publishesOnlyDueVersionsWithVerifiedClearance() {
+        Project project = project(true);
+        var future = version("2.0", "2999-01-01T00:00:00", true);
+        project.setVersions(List.of(project.getVersions().getFirst(), future));
+        when(mongo.find(any(Query.class), eq(Project.class))).thenReturn(List.of(project));
         service.processScheduledReleases();
-
-        assertEquals(ProjectVersion.ReviewStatus.APPROVED, dueVersion.getReviewStatus());
-        assertNull(dueVersion.getScheduledPublishDate());
-        assertEquals(ProjectVersion.ReviewStatus.SCHEDULED, futureVersion.getReviewStatus());
-        assertEquals("2999-01-01T00:00:00", futureVersion.getScheduledPublishDate());
-        assertNotNull(project.getUpdatedAt());
-
-        verify(securityIssueAnalysisService).pruneApprovedScanResults(project);
-        verify(projectRepository).save(project);
-        verify(projectService).evictProjectCache(project);
-        verify(projectNotificationService).notifyUpdates(project, "1.0.0");
-        verify(projectNotificationService).notifyDependents(project, "1.0.0");
-        verify(projectNotificationService, never()).notifyUpdates(project, "2.0.0");
-        verify(projectNotificationService, never()).notifyDependents(project, "2.0.0");
+        verify(notifications).notifyUpdates(project, "1.0");
+        verify(notifications, never()).notifyUpdates(project, "2.0");
+        ArgumentCaptor<Query> query = ArgumentCaptor.forClass(Query.class);
+        verify(mongo).updateFirst(query.capture(), any(Update.class), eq(Project.class));
+        String filter = query.getValue().getQueryObject().toString();
+        assertTrue(filter.contains("SCHEDULED"));
+        assertTrue(filter.contains("scanResult.scanAttempt"));
+        assertTrue(filter.contains("artifactSha256"));
     }
-
-    private static ProjectVersion version(String versionNumber, String scheduledPublishDate) {
-        ProjectVersion version = new ProjectVersion();
-        version.setId("version-" + versionNumber);
-        version.setVersionNumber(versionNumber);
-        version.setReviewStatus(ProjectVersion.ReviewStatus.SCHEDULED);
-        version.setScheduledPublishDate(scheduledPublishDate);
-        return version;
+    @Test void refusesLegacyScheduledApprovalWithoutEvidence() {
+        Project project = project(false);
+        when(mongo.find(any(Query.class), eq(Project.class))).thenReturn(List.of(project));
+        service.processScheduledReleases();
+        verifyNoInteractions(notifications);
+        ArgumentCaptor<Update> update = ArgumentCaptor.forClass(Update.class);
+        verify(mongo).updateFirst(any(Query.class), update.capture(), eq(Project.class));
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, ((org.bson.Document)update.getValue().getUpdateObject().get("$set")).get("versions.$.reviewStatus"));
+    }
+    @Test void concurrentRescanOrRejectionPreventsReleaseAndNotification() {
+        Project project = project(true);
+        when(mongo.find(any(Query.class), eq(Project.class))).thenReturn(List.of(project));
+        when(mongo.updateFirst(any(Query.class), any(Update.class), eq(Project.class))).thenReturn(UpdateResult.acknowledged(0, 0L, null));
+        service.processScheduledReleases();
+        verifyNoInteractions(notifications);
+    }
+    private Project project(boolean verified) {
+        Project p = new Project(); p.setId("project"); p.setVersions(List.of(version("1.0", "2000-01-01T00:00:00", verified))); return p;
+    }
+    private ProjectVersion version(String number, String date, boolean verified) {
+        ProjectVersion v = new ProjectVersion(); v.setId(number); v.setVersionNumber(number);
+        v.setReviewStatus(ProjectVersion.ReviewStatus.SCHEDULED); v.setScheduledPublishDate(date);
+        if (verified) { v.setScanResult(ScanEvidenceFixtures.complete(true)); v.setHash(v.getScanResult().getSecurityEvidence().artifactSha256()); }
+        return v;
     }
 }

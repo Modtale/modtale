@@ -131,8 +131,11 @@ final class SecurityIssueEvaluationService {
                 scanResult.setStatus(ScanStatus.INFECTED);
             } else if ("REVIEW".equalsIgnoreCase(scanResult.getVerdict())) {
                 scanResult.setStatus(ScanStatus.SUSPICIOUS);
-            } else {
+            } else if ("AUTO_APPROVE".equalsIgnoreCase(scanResult.getVerdict())) {
                 scanResult.setStatus(ScanStatus.CLEAN);
+            } else {
+                scanResult.setStatus(ScanStatus.SUSPICIOUS);
+                scanResult.setVerdict("REVIEW");
             }
         }
     }

@@ -47,46 +47,24 @@ public class ScanRoutingService {
             SecurityIssueAnalysisService.ClassificationStats classification,
             boolean isManualRescan
     ) {
-        String verdict = scanResult.getVerdict() == null ? "" : scanResult.getVerdict().toUpperCase();
-        ScanStatus status = scanResult.getStatus();
-
-        boolean block = "BLOCK".equals(verdict) || status == ScanStatus.INFECTED;
-        boolean explicitReview = "REVIEW".equals(verdict)
-                || status == ScanStatus.SUSPICIOUS
-                || status == ScanStatus.FLAGGED
-                || "UPSTREAM_UNAVAILABLE".equalsIgnoreCase(scanResult.getScanState())
-                || hasRecoverableScannerErrors(scanResult);
-
-        boolean knownOnly = classification.knownOnly();
-        boolean hasEscalation = classification.escalatedIssueCount() > 0;
-
-        if (isManualRescan) {
-            if (block || (explicitReview && (!knownOnly || hasEscalation))) {
-                return new RoutingDecision(RoutingAction.REQUIRE_REVIEW, 0);
-            }
-            return new RoutingDecision(RoutingAction.APPROVE_NOW, 0);
-        }
-
-        if (block) {
+        if (!hasCompleteEvidence(scanResult)) return new RoutingDecision(RoutingAction.REQUIRE_REVIEW, 0);
+        String verdict = scanResult.getVerdict();
+        if ("BLOCK".equals(verdict) || scanResult.getStatus() == ScanStatus.INFECTED) {
             return new RoutingDecision(RoutingAction.REQUIRE_REVIEW, 0);
         }
+        boolean cleared = "AUTO_APPROVE".equals(verdict) && scanResult.getStatus() == ScanStatus.CLEAN
+                && scanResult.getSecurityEvidence().clearanceGranted();
+        boolean reused = scanResult.getReusedReviewVersion() != null;
+        if (!cleared && !reused) return new RoutingDecision(RoutingAction.REQUIRE_REVIEW, 0);
+        if (isManualRescan) return new RoutingDecision(RoutingAction.APPROVE_NOW, 0);
+        long delay = reused
+                ? randomDelay(securityProperties.knownRiskDelayMinutesMin(), securityProperties.knownRiskDelayMinutesMax())
+                : randomDelay(securityProperties.autoApproveDelayMinutesMin(), securityProperties.autoApproveDelayMinutesMax());
+        return new RoutingDecision(RoutingAction.SCHEDULE, Math.max(holdDelayFromWarden(scanResult), delay));
+    }
 
-        if (explicitReview) {
-            if (knownOnly && !hasEscalation && !"UPSTREAM_UNAVAILABLE".equalsIgnoreCase(scanResult.getScanState())) {
-                return new RoutingDecision(
-                        RoutingAction.SCHEDULE,
-                        randomDelay(securityProperties.knownRiskDelayMinutesMin(), securityProperties.knownRiskDelayMinutesMax())
-                );
-            }
-            return new RoutingDecision(RoutingAction.REQUIRE_REVIEW, 0);
-        }
-
-        long holdDelayMinutes = holdDelayFromWarden(scanResult);
-        long randomizedDelay = randomDelay(
-                securityProperties.autoApproveDelayMinutesMin(),
-                securityProperties.autoApproveDelayMinutesMax()
-        );
-        return new RoutingDecision(RoutingAction.SCHEDULE, Math.max(holdDelayMinutes, randomizedDelay));
+    public boolean hasCompleteEvidence(ScanResult result) {
+        return ArtifactClearancePolicy.complete(result);
     }
 
     public long scanTimeoutMillis() {

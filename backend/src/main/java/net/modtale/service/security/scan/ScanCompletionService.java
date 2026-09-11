@@ -71,10 +71,15 @@ public class ScanCompletionService {
             return;
         }
 
+        if (scanResult.getSecurityEvidence() == null || !java.util.Objects.equals(targetVersion.getHash(),
+                scanResult.getSecurityEvidence().artifactSha256())) {
+            scanResult.setArtifactVerified(false);
+        }
         SecurityIssueAnalysisService.BaselineIndex baselines =
                 securityIssueAnalysisService.collectApprovedIssueBaselines(project, versionId);
         SecurityIssueAnalysisService.ClassificationStats classification =
                 securityIssueAnalysisService.annotateAgainstBaselines(scanResult, baselines);
+        new ArtifactReviewReuseService().annotate(project, versionId, scanResult);
         ScanRoutingService.RoutingDecision routingDecision =
                 scanRoutingService.decideRouting(scanResult, classification, isManualRescan);
 

@@ -62,6 +62,9 @@ public class SecurityIssueApprovalService {
         scanResult.setKnownIssueCount(issues.size());
         scanResult.setNewIssueCount(0);
         scanResult.setEscalatedIssueCount(0);
+        version.setApprovedSecurityEvidence(scanResult.getSecurityEvidence());
+        version.setSecurityApprovedAt(scanResult.getReusedReviewApprovedAt() > 0
+                ? scanResult.getReusedReviewApprovedAt() : Instant.now().toEpochMilli());
         version.setApprovedIssueBaselines(approvedIssueBaselines);
         version.setScanResult(null);
     }

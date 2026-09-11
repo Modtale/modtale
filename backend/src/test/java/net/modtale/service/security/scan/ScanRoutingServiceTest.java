@@ -56,21 +56,20 @@ class ScanRoutingServiceTest {
     }
 
     @Test
-    void decideRoutingSchedulesKnownOnlyReviewButApprovesCleanManualRescans() {
+    void familiarWarningsDoNotAuthorizeReleaseButVerifiedClearanceDoes() {
         ScanResult review = scan("REVIEW", ScanStatus.SUSPICIOUS, null);
-        ScanResult clean = scan("ALLOW", ScanStatus.CLEAN, null);
+        ScanResult clean = ScanEvidenceFixtures.complete(true);
 
         ScanRoutingService.RoutingDecision reviewDecision = service.decideRouting(review, stats(true, 0), false);
         ScanRoutingService.RoutingDecision manualDecision = service.decideRouting(clean, stats(false, 0), true);
 
-        assertEquals(ScanRoutingService.RoutingAction.SCHEDULE, reviewDecision.action());
-        assertTrue(reviewDecision.delayMinutes() >= 15 && reviewDecision.delayMinutes() <= 20);
+        assertEquals(ScanRoutingService.RoutingAction.REQUIRE_REVIEW, reviewDecision.action());
         assertEquals(ScanRoutingService.RoutingAction.APPROVE_NOW, manualDecision.action());
     }
 
     @Test
     void decideRoutingSchedulesCleanScansUsingWardenHoldWhenItIsLongerThanRandomDelay() {
-        ScanResult clean = scan("ALLOW", ScanStatus.CLEAN, null);
+        ScanResult clean = ScanEvidenceFixtures.complete(true);
         clean.setHoldUntilTimestamp(System.currentTimeMillis() + 30 * 60_000L);
 
         ScanRoutingService.RoutingDecision decision = service.decideRouting(clean, stats(false, 0), false);
@@ -110,6 +109,23 @@ class ScanRoutingServiceTest {
     void exposesTimeoutAndRetrySettingsWithMinimums() {
         assertEquals(25 * 60_000L, service.scanTimeoutMillis());
         assertEquals(2, service.scanMaxRetries());
+    }
+
+    @Test
+    void malformedAndIncompleteEvidenceAlwaysRequiresReviewIncludingManualRescans() {
+        for (boolean manual : new boolean[]{false, true}) {
+            for (String state : new String[]{"", "INCOMPLETE", "UPSTREAM_DISABLED", "UPSTREAM_UNAVAILABLE", "QUEUED"}) {
+                ScanResult result = ScanEvidenceFixtures.complete(true);
+                result.setScanState(state);
+                assertEquals(ScanRoutingService.RoutingAction.REQUIRE_REVIEW, service.decideRouting(result, stats(true, 0), manual).action());
+            }
+            ScanResult result = ScanEvidenceFixtures.complete(true);
+            result.getSummary().setRecoverableErrors(1);
+            assertEquals(ScanRoutingService.RoutingAction.REQUIRE_REVIEW, service.decideRouting(result, stats(true, 0), manual).action());
+            result = ScanEvidenceFixtures.complete(true);
+            result.setArtifactVerified(false);
+            assertEquals(ScanRoutingService.RoutingAction.REQUIRE_REVIEW, service.decideRouting(result, stats(true, 0), manual).action());
+        }
     }
 
     private static ScanResult scan(String verdict, ScanStatus status, String state) {

@@ -41,7 +41,7 @@ public class ScanPersistenceService {
                 .set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.PENDING)
                 .set("updatedAt", LocalDateTime.now().toString());
 
-        return mongoTemplate.updateFirst(buildVersionAttemptQuery(projectId, versionId, attempt), update, Project.class)
+        return mongoTemplate.updateFirst(buildVersionAttemptQuery(projectId, versionId, attempt, "QUEUED"), update, Project.class)
                 .getModifiedCount() > 0;
     }
 
@@ -71,7 +71,8 @@ public class ScanPersistenceService {
             }
         }
 
-        return mongoTemplate.updateFirst(buildVersionAttemptQuery(projectId, versionId, expectedAttempt), update, Project.class)
+        String expectedHash = scanResult.getSecurityEvidence() == null ? null : scanResult.getSecurityEvidence().artifactSha256();
+        return mongoTemplate.updateFirst(buildVersionAttemptQueryBound(projectId, versionId, expectedAttempt, expectedHash, "SCANNING"), update, Project.class)
                 .getModifiedCount() > 0;
     }
 
@@ -83,7 +84,7 @@ public class ScanPersistenceService {
                 .set("updatedAt", LocalDateTime.now().toString());
 
         return mongoTemplate.updateFirst(
-                buildVersionAttemptQuery(projectId, versionId, currentAttempt),
+                buildVersionAttemptQuery(projectId, versionId, currentAttempt, "SCANNING", "QUEUED", null),
                 retryUpdate,
                 Project.class
         ).getModifiedCount() > 0;
@@ -96,7 +97,7 @@ public class ScanPersistenceService {
                 .set("versions.$.scheduledPublishDate", null)
                 .set("updatedAt", LocalDateTime.now().toString());
 
-        boolean modified = mongoTemplate.updateFirst(buildVersionAttemptQuery(projectId, versionId, expectedAttempt), update, Project.class)
+        boolean modified = mongoTemplate.updateFirst(buildVersionAttemptQuery(projectId, versionId, expectedAttempt, "SCANNING", "QUEUED", null), update, Project.class)
                 .getModifiedCount() > 0;
 
         Project project = projectRepository.findById(projectId).orElse(null);
@@ -112,6 +113,12 @@ public class ScanPersistenceService {
     }
 
     private Query buildVersionAttemptQuery(String projectId, String versionId, int attempt) {
+        return buildVersionAttemptQuery(projectId, versionId, attempt, "SCANNING");
+    }
+    private Query buildVersionAttemptQuery(String projectId, String versionId, int attempt, String... states) {
+        return buildVersionAttemptQueryBound(projectId, versionId, attempt, null, states);
+    }
+    private Query buildVersionAttemptQueryBound(String projectId, String versionId, int attempt, String expectedHash, String... states) {
         Criteria attemptCriteria;
         if (attempt <= 1) {
             attemptCriteria = new Criteria().orOperator(
@@ -123,12 +130,12 @@ public class ScanPersistenceService {
             attemptCriteria = Criteria.where("scanResult.scanAttempt").is(attempt);
         }
 
-        return new Query(
-                Criteria.where("_id").is(projectId)
-                        .and("versions").elemMatch(
-                                Criteria.where("_id").is(versionId)
-                                        .andOperator(attemptCriteria)
-                        )
-        );
+        Criteria version = Criteria.where("_id").is(versionId)
+                .and("reviewStatus").is(ProjectVersion.ReviewStatus.PENDING)
+                .and("scanResult.status").is(ScanStatus.SCANNING)
+                .and("scanResult.scanState").in((Object[]) states)
+                .andOperator(attemptCriteria);
+        if (expectedHash != null) version.and("hash").is(expectedHash);
+        return new Query(Criteria.where("_id").is(projectId).and("versions").elemMatch(version));
     }
 }

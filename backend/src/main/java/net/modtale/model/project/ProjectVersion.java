@@ -22,6 +22,12 @@ public class ProjectVersion {
     private List<String> incompatibleProjectIds;
     private Channel channel;
 
+    private ScanResult.SecurityEvidence approvedSecurityEvidence;
+    private long securityApprovedAt;
+    public ScanResult.SecurityEvidence getApprovedSecurityEvidence() { return approvedSecurityEvidence; }
+    public void setApprovedSecurityEvidence(ScanResult.SecurityEvidence value) { approvedSecurityEvidence = value; }
+    public long getSecurityApprovedAt() { return securityApprovedAt; }
+    public void setSecurityApprovedAt(long value) { securityApprovedAt = value; }
     private ScanResult scanResult;
     private List<ApprovedIssueBaseline> approvedIssueBaselines;
 

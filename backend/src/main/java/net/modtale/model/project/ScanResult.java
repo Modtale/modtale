@@ -6,6 +6,24 @@ import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ScanResult {
+    private SecurityEvidence securityEvidence;
+    private boolean artifactVerified;
+    private long reusedReviewApprovedAt;
+    public long getReusedReviewApprovedAt() { return reusedReviewApprovedAt; }
+    public void setReusedReviewApprovedAt(long value) { reusedReviewApprovedAt = value; }
+    private String reusedReviewVersion;
+    public SecurityEvidence getSecurityEvidence() { return securityEvidence; }
+    public void setSecurityEvidence(SecurityEvidence value) { securityEvidence = value; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isArtifactVerified() { return artifactVerified; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public void setArtifactVerified(boolean value) { artifactVerified = value; }
+    public String getReusedReviewVersion() { return reusedReviewVersion; }
+    public void setReusedReviewVersion(String value) { reusedReviewVersion = value; }
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record SecurityEvidence(String policyVersion, String artifactSha256, String contentSha256,
+            boolean complete, boolean clearanceGranted, String reviewState, java.util.Map<String, String> entryHashes) {}
+
     private ScanStatus status;
     private String verdict;
     private String riskLevel;

@@ -27,6 +27,7 @@ public class WardenClientService {
         this.wardenProperties = wardenProperties;
         this.webClient = WebClient.builder()
                 .baseUrl(wardenProperties.url())
+                .codecs(config -> config.defaultCodecs().maxInMemorySize(32 * 1024 * 1024))
                 .defaultHeader("X-Warden-Api-Key", wardenProperties.apiKey())
                 .build();
     }
@@ -59,6 +60,11 @@ public class WardenClientService {
                         .block();
 
                 if (response != null) {
+                    var evidence = response.getSecurityEvidence();
+                    String expectedDigest = java.util.HexFormat.of().formatHex(
+                            java.security.MessageDigest.getInstance("SHA-256").digest(fileBytes));
+                    response.setArtifactVerified(evidence != null && evidence.complete()
+                            && expectedDigest.equals(evidence.artifactSha256()));
                     return response;
                 }
                 throw new IllegalStateException("Warden returned empty response body");
@@ -73,6 +79,20 @@ public class WardenClientService {
 
         logger.error("Warden unavailable after retries for {}: {}", filename, lastError == null ? "unknown" : lastError.getMessage());
         return buildDegradedResult(filename, lastError);
+    }
+
+    public record InspectionResponse(String artifactSha256, List<String> paths, String content, String format) {}
+
+    public InspectionResponse inspectFile(byte[] bytes, String filename, String path) {
+        if (!wardenProperties.enabled()) throw new IllegalStateException("Artifact inspection is unavailable");
+        MultipartBodyBuilder builder = new MultipartBodyBuilder();
+        builder.part("file", new ByteArrayResource(bytes) {
+            @Override public String getFilename() { return filename; }
+        });
+        if (path != null) builder.part("path", path);
+        return webClient.post().uri("/api/v1/inspect").contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(BodyInserters.fromMultipartData(builder.build())).retrieve()
+                .bodyToMono(InspectionResponse.class).timeout(Duration.ofSeconds(90)).block();
     }
 
     private void backoff(int attempt) {
