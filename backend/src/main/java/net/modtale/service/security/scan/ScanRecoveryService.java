@@ -63,7 +63,9 @@ public class ScanRecoveryService {
                     int nextAttempt = currentAttempt + 1;
                     ScanResult queued = scanRoutingService.createQueuedScanResult(
                             nextAttempt,
-                            "Previous scan attempt timed out and was re-queued automatically."
+                            "WAITING_RETRY".equals(scanResult.getScanState())
+                                    ? "Inspection capacity was temporarily unavailable; review was re-queued automatically."
+                                    : "Previous scan attempt timed out and was re-queued automatically."
                     );
 
                     if (scanPersistenceService.queueRetryAttempt(project.getId(), version.getId(), currentAttempt, queued)) {

@@ -55,7 +55,13 @@ public class ScanRoutingService {
         boolean cleared = "AUTO_APPROVE".equals(verdict) && scanResult.getStatus() == ScanStatus.CLEAN
                 && scanResult.getSecurityEvidence().clearanceGranted();
         boolean reused = scanResult.getReusedReviewVersion() != null;
-        if (!cleared && !reused) return new RoutingDecision(RoutingAction.REQUIRE_REVIEW, 0);
+        if (!cleared && !reused) {
+            if (java.util.Set.of("RATE_LIMITED", "TIMEOUT", "UPSTREAM_ERROR", "INTERRUPTED")
+                    .contains(scanResult.getSecurityEvidence().reviewState() == null ? "" : scanResult.getSecurityEvidence().reviewState())
+                    && Math.max(1, scanResult.getScanAttempt()) <= Math.max(1, scanMaxRetries()))
+                return new RoutingDecision(RoutingAction.DEFER, 0);
+            return new RoutingDecision(RoutingAction.REQUIRE_REVIEW, 0);
+        }
         if (isManualRescan) return new RoutingDecision(RoutingAction.APPROVE_NOW, 0);
         long delay = reused
                 ? randomDelay(securityProperties.knownRiskDelayMinutesMin(), securityProperties.knownRiskDelayMinutesMax())
@@ -162,6 +168,7 @@ public class ScanRoutingService {
 
     public enum RoutingAction {
         REQUIRE_REVIEW,
+        DEFER,
         SCHEDULE,
         APPROVE_NOW
     }

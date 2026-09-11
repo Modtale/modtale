@@ -53,10 +53,17 @@ public class ScanPersistenceService {
             ScanRoutingService.RoutingDecision routingDecision,
             ProjectVersion reviewedVersion
     ) {
-        if (routingDecision.action() != ScanRoutingService.RoutingAction.REQUIRE_REVIEW) {
+        if (routingDecision.action() == ScanRoutingService.RoutingAction.SCHEDULE
+                || routingDecision.action() == ScanRoutingService.RoutingAction.APPROVE_NOW) {
             String context = ArtifactReviewContext.automaticallyReviewableFingerprint(reviewedVersion);
             if (context == null || !context.equals(scanResult.getReviewedContextSha256())
                     || !ArtifactClearancePolicy.cleared(scanResult)) return false;
+        }
+        if (routingDecision.action() == ScanRoutingService.RoutingAction.DEFER) {
+            scanResult.setStatus(ScanStatus.SCANNING);
+            scanResult.setScanState("WAITING_RETRY");
+            scanResult.setScanTimestamp(System.currentTimeMillis());
+            scanResult.setReviewerNotes(List.of("Inspection service capacity was temporarily unavailable. An automatic retry is pending; this version remains unpublished."));
         }
         Update update = new Update()
                 .set("versions.$.scanResult", scanResult)
@@ -75,6 +82,10 @@ public class ScanPersistenceService {
             case SCHEDULE -> {
                 update.set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.SCHEDULED);
                 update.set("versions.$.scheduledPublishDate", LocalDateTime.now().plusMinutes(routingDecision.delayMinutes()).toString());
+            }
+            case DEFER -> {
+                update.set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.PENDING)
+                        .set("versions.$.scheduledPublishDate", null);
             }
             case REQUIRE_REVIEW -> {
                 update.set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.PENDING);
@@ -95,7 +106,7 @@ public class ScanPersistenceService {
                 .set("updatedAt", LocalDateTime.now().toString());
 
         return mongoTemplate.updateFirst(
-                buildVersionAttemptQuery(projectId, versionId, currentAttempt, "SCANNING", "QUEUED", null),
+                buildVersionAttemptQuery(projectId, versionId, currentAttempt, "SCANNING", "QUEUED", "WAITING_RETRY", null),
                 retryUpdate,
                 Project.class
         ).getModifiedCount() > 0;
@@ -108,7 +119,7 @@ public class ScanPersistenceService {
                 .set("versions.$.scheduledPublishDate", null)
                 .set("updatedAt", LocalDateTime.now().toString());
 
-        boolean modified = mongoTemplate.updateFirst(buildVersionAttemptQuery(projectId, versionId, expectedAttempt, "SCANNING", "QUEUED", null), update, Project.class)
+        boolean modified = mongoTemplate.updateFirst(buildVersionAttemptQuery(projectId, versionId, expectedAttempt, "SCANNING", "QUEUED", "WAITING_RETRY", null), update, Project.class)
                 .getModifiedCount() > 0;
 
         Project project = projectRepository.findById(projectId).orElse(null);

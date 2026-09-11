@@ -19,6 +19,29 @@ class ScanRoutingServiceTest {
         service = new ScanRoutingService(new AppSecurityProperties("secret", 60, 120, 2, 4, 15, 20, 25, 2));
     }
 
+    @Test void temporaryCapacityFailuresAreRetriedButDoNotClearOrRetryForever() {
+        for (String state : java.util.List.of("RATE_LIMITED", "TIMEOUT", "UPSTREAM_ERROR")) {
+            var result = ScanEvidenceFixtures.complete(false);
+            var evidence = result.getSecurityEvidence();
+            result.setSecurityEvidence(new ScanResult.SecurityEvidence(evidence.policyVersion(), evidence.artifactSha256(),
+                    evidence.contentSha256(), true, false, state, evidence.entryHashes()));
+            result.setScanAttempt(1);
+            assertEquals(ScanRoutingService.RoutingAction.DEFER, service.decideRouting(result, stats(false, 0), false).action());
+            result.setScanAttempt(3);
+            assertEquals(ScanRoutingService.RoutingAction.REQUIRE_REVIEW, service.decideRouting(result, stats(false, 0), false).action());
+            result.setScanAttempt(1); result.setVerdict("BLOCK");
+            assertEquals(ScanRoutingService.RoutingAction.REQUIRE_REVIEW, service.decideRouting(result, stats(false, 0), false).action());
+        }
+    }
+    @Test void permanentCapacityAndAuthenticationFailuresAreNotAutomaticallyRepeated() {
+        for (String state : java.util.List.of("REQUEST_EXCEEDS_CAPACITY", "AUTHENTICATION_ERROR", "COMPLETED", "INCOMPLETE_COVERAGE")) {
+            var result = ScanEvidenceFixtures.complete(false);
+            var evidence = result.getSecurityEvidence();
+            result.setSecurityEvidence(new ScanResult.SecurityEvidence(evidence.policyVersion(), evidence.artifactSha256(),
+                    evidence.contentSha256(), true, false, state, evidence.entryHashes()));
+            assertEquals(ScanRoutingService.RoutingAction.REQUIRE_REVIEW, service.decideRouting(result, stats(false, 0), false).action());
+        }
+    }
     @Test
     void createQueuedScanResultNormalizesAttemptsAndOptionalNotes() {
         ScanResult result = service.createQueuedScanResult(0, "Manual rescan requested.");

@@ -101,7 +101,8 @@ public class ScanCompletionService {
             scanResult.setReviewerNotes(notes);
         }
 
-        if (routingDecision.action() != ScanRoutingService.RoutingAction.REQUIRE_REVIEW
+        if ((routingDecision.action() == ScanRoutingService.RoutingAction.SCHEDULE
+                || routingDecision.action() == ScanRoutingService.RoutingAction.APPROVE_NOW)
                 && !java.util.Objects.equals(scanResult.getSecurityEvidence().policyVersion(), warden.currentPolicyVersion())) {
             routingDecision = new ScanRoutingService.RoutingDecision(ScanRoutingService.RoutingAction.REQUIRE_REVIEW, 0);
             scanResult.setVerdict("REVIEW");
@@ -145,7 +146,7 @@ public class ScanCompletionService {
             webhookService.triggerAdminFlaggedVersionWebhook(refreshed, refreshedVersion, scanResult);
         }
 
-        notifyProjectSubmissionIfReady(projectId, versionId);
+        if (routingDecision.action() != ScanRoutingService.RoutingAction.DEFER) notifyProjectSubmissionIfReady(projectId, versionId);
 
         if (approvedImmediately && refreshed != null) {
             ProjectVersion approvedVersion = projectVersionAccessService.findById(refreshed, versionId);

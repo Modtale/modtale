@@ -60,6 +60,23 @@ class ScanPersistenceServiceTest {
         assertTrue(fields.containsKey("versions.$.scanResult"));
         assertNull(fields.get("versions.$.scanResult"));
     }
+    @Test void deferredReviewPersistsOneScanObjectAndStaysUnpublished() {
+        var mongo = mock(MongoTemplate.class);
+        when(mongo.updateFirst(any(Query.class), any(Update.class), eq(Project.class)))
+                .thenReturn(UpdateResult.acknowledged(1, 1L, null));
+        var service = new ScanPersistenceService(mongo, mock(ProjectRepository.class), mock(ProjectService.class));
+        var result = ScanEvidenceFixtures.complete(false);
+        assertTrue(service.applyScanOutcome("project", "version", 1, result,
+                new ScanRoutingService.RoutingDecision(ScanRoutingService.RoutingAction.DEFER, 0), new ProjectVersion()));
+        var update = ArgumentCaptor.forClass(Update.class);
+        verify(mongo).updateFirst(any(Query.class), update.capture(), eq(Project.class));
+        var fields = (org.bson.Document) update.getValue().getUpdateObject().get("$set");
+        var stored = (ScanResult) fields.get("versions.$.scanResult");
+        assertEquals("WAITING_RETRY", stored.getScanState());
+        assertEquals(ScanStatus.SCANNING, stored.getStatus());
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, fields.get("versions.$.reviewStatus"));
+        assertTrue(fields.keySet().stream().noneMatch(key -> key.startsWith("versions.$.scanResult.")));
+    }
     @Test void retryCanRecoverAnAbandonedQueuedAttempt() {
         MongoTemplate mongo=mock(MongoTemplate.class);
         when(mongo.updateFirst(any(Query.class),any(Update.class),eq(Project.class))).thenReturn(UpdateResult.acknowledged(1,1L,null));
