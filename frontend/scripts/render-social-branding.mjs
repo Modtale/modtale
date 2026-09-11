@@ -5,7 +5,7 @@ import sharp from 'sharp';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = path.join(root, 'media/social-branding');
 await fs.mkdir(out, { recursive: true });
-const avatar = (await fs.readFile(path.join(root, 'public/assets/favicon.svg'), 'utf8')).replaceAll('#0f172a', '#f8fafc').replaceAll('#1f2e4c', '#3b82f6');
+const avatar = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800"><path fill="#0f172a" d="M0 0h800v800H0z"/><circle cx="400" cy="400" r="390" fill="none" stroke="#3b82f6" stroke-width="20"/><path d="M400 180 590.5 290V510L400 620 209.5 510V290Z" fill="#4476c4"/></svg>`;
 await fs.writeFile(path.join(out, 'avatar.svg'), avatar);
 await sharp(Buffer.from(avatar)).resize(800, 800).png().toFile(path.join(out, 'avatar.png'));
 const logo = Buffer.from(await fs.readFile(path.join(root, 'public/assets/logo_light.svg'))).toString('base64');
