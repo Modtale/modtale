@@ -57,9 +57,7 @@ public class ArtifactInspectionController {
                 comparable, comparable && !priorContext.equals(currentContext),before.entryHashes(),after.entryHashes()));
     }
     private static boolean validManifest(Map<String,String> entries) {
-        return entries!=null && !entries.isEmpty() && entries.size()<=20_000
-                && entries.entrySet().stream().allMatch(entry -> entry.getKey()!=null && !entry.getKey().isBlank()
-                && entry.getKey().length()<=8192 && entry.getValue()!=null && entry.getValue().matches("[0-9a-f]{64}"));
+        return net.modtale.model.project.SecurityManifest.valid(entries, false);
     }
     static ArtifactChanges compare(String baseline, boolean comparable, boolean contextChanged,
             Map<String,String> before, Map<String,String> after) {

@@ -2,6 +2,7 @@ package net.modtale.config.db;
 
 import java.util.*;
 import net.modtale.model.project.ScanResult.SecurityEvidence;
+import net.modtale.model.project.SecurityManifest;
 import org.bson.Document;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.data.convert.ReadingConverter;
@@ -14,6 +15,7 @@ public final class SecurityEvidenceConverters {
     @WritingConverter
     public static final class Write implements Converter<SecurityEvidence, Document> {
         @Override public Document convert(SecurityEvidence evidence) {
+            if (!SecurityManifest.valid(evidence.entryHashes(), true)) throw new MappingException("Invalid or oversized security manifest");
             var entries = new ArrayList<Document>();
             if (evidence.entryHashes() != null) evidence.entryHashes().forEach((path, hash) ->
                     entries.add(new Document("path", path).append("sha256", hash)));
@@ -47,6 +49,7 @@ public final class SecurityEvidenceConverters {
                     entries.put(path, hash);
                 }
             } else if (stored != null) throw new MappingException("Invalid security manifest");
+            if (!SecurityManifest.valid(entries, true)) throw new MappingException("Invalid or oversized security manifest");
             return new SecurityEvidence(source.getString("policyVersion"), source.getString("artifactSha256"),
                     source.getString("contentSha256"), Boolean.TRUE.equals(source.get("complete")),
                     Boolean.TRUE.equals(source.get("clearanceGranted")), source.getString("reviewState"), entries);

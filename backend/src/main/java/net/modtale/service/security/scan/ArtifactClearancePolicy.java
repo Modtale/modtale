@@ -1,8 +1,6 @@
 package net.modtale.service.security.scan;
 
 import net.modtale.model.project.*;
-import java.nio.charset.StandardCharsets;
-import java.security.*;
 import java.util.*;
 
 public final class ArtifactClearancePolicy {
@@ -15,19 +13,10 @@ public final class ArtifactClearancePolicy {
                 || summary.getNestedArchiveReadFailures() != 0 || summary.getFilesScanned() <= 0
                 || evidence == null || !evidence.complete() || (evidence.policyVersion() == null || !evidence.policyVersion().matches("warden-3\\.0\\.0:[0-9a-f]{64}"))
                 || !digest(evidence.artifactSha256()) || !digest(evidence.contentSha256())
-                || evidence.entryHashes() == null || evidence.entryHashes().isEmpty() || evidence.entryHashes().size() > 20_000) return false;
-        if (evidence.entryHashes().entrySet().stream().anyMatch(entry -> entry.getKey() == null
-                || entry.getKey().isBlank() || entry.getKey().length() > 8192 || !digest(entry.getValue()))) return false;
-        StringBuilder canonical = new StringBuilder();
-        for (var entry : new TreeMap<>(evidence.entryHashes()).entrySet()) {
-            if (entry.getKey() == null || entry.getKey().isBlank() || !digest(entry.getValue())) return false;
-            canonical.append(entry.getKey().length()).append(':').append(entry.getKey()).append(':').append(entry.getValue()).append('\n');
-        }
-        try {
-            String content = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(canonical.toString().getBytes(StandardCharsets.UTF_8)));
-            return content.equals(evidence.contentSha256());
-        } catch (NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
+                || !SecurityManifest.valid(evidence.entryHashes(), false)) return false;
+        return SecurityManifest.identity(evidence.entryHashes()).equals(evidence.contentSha256());
     }
+
     public static boolean cleared(ScanResult result) {
         if (!complete(result) || "NEW_SECURITY_EVIDENCE".equals(result.getSecurityEvidence().reviewState()) || "BLOCK".equals(result.getVerdict()) || result.getStatus() == ScanStatus.INFECTED) return false;
         return ("AUTO_APPROVE".equals(result.getVerdict()) && result.getStatus() == ScanStatus.CLEAN && result.getSecurityEvidence().clearanceGranted())
@@ -39,5 +28,5 @@ public final class ArtifactClearancePolicy {
         return context != null && context.equals(version.getScanResult().getReviewedContextSha256())
                 && Objects.equals(version.getHash(), version.getScanResult().getSecurityEvidence().artifactSha256());
     }
-    private static boolean digest(String value) { return value != null && value.matches("[0-9a-f]{64}"); }
+    private static boolean digest(String value) { return SecurityManifest.digest(value); }
 }
