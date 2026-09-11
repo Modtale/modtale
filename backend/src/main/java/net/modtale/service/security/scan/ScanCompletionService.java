@@ -83,10 +83,29 @@ public class ScanCompletionService {
         ScanRoutingService.RoutingDecision routingDecision =
                 scanRoutingService.decideRouting(scanResult, classification, isManualRescan);
 
+        scanResult.setReviewedContextSha256(ArtifactReviewContext.automaticallyReviewableFingerprint(targetVersion));
+        if (scanResult.getReviewedContextSha256() == null) {
+            scanResult.setReusedReviewVersion(null);
+            scanResult.setReusedReviewApprovedAt(0);
+            if (!"BLOCK".equals(scanResult.getVerdict()) && scanResult.getStatus() != ScanStatus.INFECTED) {
+                scanResult.setVerdict("REVIEW");
+                scanResult.setStatus(ScanStatus.SUSPICIOUS);
+            }
+            routingDecision = new ScanRoutingService.RoutingDecision(ScanRoutingService.RoutingAction.REQUIRE_REVIEW, 0);
+            var notes = new java.util.ArrayList<>(scanResult.getReviewerNotes() == null
+                    ? java.util.List.<String>of() : scanResult.getReviewerNotes());
+            notes.add("Separate files or unresolved dependency context require additional review before publishing.");
+            scanResult.setReviewerNotes(notes);
+        }
+
         boolean approvedImmediately = routingDecision.action() == ScanRoutingService.RoutingAction.APPROVE_NOW;
         boolean notifyFlagged = routingDecision.action() == ScanRoutingService.RoutingAction.REQUIRE_REVIEW;
 
-        if (!scanPersistenceService.applyScanOutcome(projectId, versionId, expectedAttempt, scanResult, routingDecision)) {
+        if (approvedImmediately) {
+            targetVersion.setScanResult(scanResult);
+            securityIssueAnalysisService.markIssuesAcceptedForApprovedVersion(targetVersion);
+        }
+        if (!scanPersistenceService.applyScanOutcome(projectId, versionId, expectedAttempt, scanResult, routingDecision, targetVersion)) {
             logger.info("Scan result ignored because a newer attempt already exists project={} version={} attempt={}", projectId, versionId, expectedAttempt);
             return;
         }
@@ -117,11 +136,6 @@ public class ScanCompletionService {
         if (approvedImmediately && refreshed != null) {
             ProjectVersion approvedVersion = projectVersionAccessService.findById(refreshed, versionId);
             if (approvedVersion != null) {
-                int pruned = securityIssueAnalysisService.pruneApprovedScanResults(refreshed);
-                if (pruned > 0) {
-                    projectRepository.save(refreshed);
-                    projectService.evictProjectCache(refreshed);
-                }
                 if (refreshed.getStatus() == ProjectStatus.PUBLISHED) {
                     projectNotificationService.notifyUpdates(refreshed, approvedVersion.getVersionNumber());
                     projectNotificationService.notifyDependents(refreshed, approvedVersion.getVersionNumber());

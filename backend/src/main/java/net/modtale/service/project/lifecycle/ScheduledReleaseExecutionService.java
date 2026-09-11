@@ -7,6 +7,7 @@ import net.modtale.service.communication.ProjectNotificationService;
 import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.security.issue.SecurityIssueAnalysisService;
 import net.modtale.service.security.scan.ArtifactClearancePolicy;
+import net.modtale.service.security.scan.ArtifactReviewContext;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.*;
 import org.springframework.stereotype.Service;
@@ -34,14 +35,22 @@ public class ScheduledReleaseExecutionService {
                     .and("scheduledPublishDate").is(version.getScheduledPublishDate())
                     .and("hash").is(version.getHash())
                     .and("scanResult.scanAttempt").is(scan == null ? null : scan.getScanAttempt());
+            ArtifactReviewContext.bindSnapshot(versionMatch, version);
+            long now = System.currentTimeMillis();
             boolean valid = ArtifactClearancePolicy.boundToVersion(version)
                     && scan.getScanTimestamp() > 0
-                    && System.currentTimeMillis() - scan.getScanTimestamp() < java.time.Duration.ofDays(30).toMillis();
+                    && scan.getScanTimestamp() <= now
+                    && now - scan.getScanTimestamp() < java.time.Duration.ofDays(30).toMillis();
             Update update = new Update().set("versions.$.scheduledPublishDate", null)
                     .set("updatedAt", publishTime.toString());
             if (valid) {
                 versionMatch.and("scanResult.securityEvidence.artifactSha256").is(scan.getSecurityEvidence().artifactSha256())
-                        .and("scanResult.securityEvidence.contentSha256").is(scan.getSecurityEvidence().contentSha256());
+                        .and("scanResult.securityEvidence.contentSha256").is(scan.getSecurityEvidence().contentSha256())
+                        .and("scanResult.reviewedContextSha256").is(scan.getReviewedContextSha256())
+                        .and("scanResult.securityEvidence.policyVersion").is(scan.getSecurityEvidence().policyVersion())
+                        .and("scanResult.scanTimestamp").is(scan.getScanTimestamp())
+                        .and("scanResult.verdict").is(scan.getVerdict())
+                        .and("scanResult.status").is(scan.getStatus());
                 issueAnalysis.markIssuesAcceptedForApprovedVersion(version);
                 update.set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.APPROVED)
                         .set("versions.$.approvedSecurityEvidence", version.getApprovedSecurityEvidence())

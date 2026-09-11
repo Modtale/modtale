@@ -8,6 +8,11 @@ import java.util.List;
 public class ScanResult {
     private SecurityEvidence securityEvidence;
     private boolean artifactVerified;
+    private String reviewedContextSha256;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public String getReviewedContextSha256() { return reviewedContextSha256; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public void setReviewedContextSha256(String value) { reviewedContextSha256 = value; }
     private long reusedReviewApprovedAt;
     public long getReusedReviewApprovedAt() { return reusedReviewApprovedAt; }
     public void setReusedReviewApprovedAt(long value) { reusedReviewApprovedAt = value; }

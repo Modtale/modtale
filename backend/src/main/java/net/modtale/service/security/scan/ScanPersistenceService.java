@@ -50,15 +50,26 @@ public class ScanPersistenceService {
             String versionId,
             int expectedAttempt,
             ScanResult scanResult,
-            ScanRoutingService.RoutingDecision routingDecision
+            ScanRoutingService.RoutingDecision routingDecision,
+            ProjectVersion reviewedVersion
     ) {
+        if (routingDecision.action() != ScanRoutingService.RoutingAction.REQUIRE_REVIEW) {
+            String context = ArtifactReviewContext.automaticallyReviewableFingerprint(reviewedVersion);
+            if (context == null || !context.equals(scanResult.getReviewedContextSha256())
+                    || !ArtifactClearancePolicy.cleared(scanResult)) return false;
+        }
         Update update = new Update()
                 .set("versions.$.scanResult", scanResult)
                 .set("updatedAt", LocalDateTime.now().toString());
 
         switch (routingDecision.action()) {
             case APPROVE_NOW -> {
-                update.set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.APPROVED);
+                update.set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.APPROVED)
+                        .set("versions.$.approvedSecurityEvidence", reviewedVersion.getApprovedSecurityEvidence())
+                        .set("versions.$.approvedSecurityContextSha256", reviewedVersion.getApprovedSecurityContextSha256())
+                        .set("versions.$.securityApprovedAt", reviewedVersion.getSecurityApprovedAt())
+                        .set("versions.$.approvedIssueBaselines", reviewedVersion.getApprovedIssueBaselines())
+                        .set("versions.$.scanResult", null);
                 update.set("versions.$.scheduledPublishDate", null);
             }
             case SCHEDULE -> {
@@ -72,7 +83,7 @@ public class ScanPersistenceService {
         }
 
         String expectedHash = scanResult.getSecurityEvidence() == null ? null : scanResult.getSecurityEvidence().artifactSha256();
-        return mongoTemplate.updateFirst(buildVersionAttemptQueryBound(projectId, versionId, expectedAttempt, expectedHash, "SCANNING"), update, Project.class)
+        return mongoTemplate.updateFirst(buildVersionAttemptQueryBound(projectId, versionId, expectedAttempt, expectedHash, reviewedVersion, "SCANNING"), update, Project.class)
                 .getModifiedCount() > 0;
     }
 
@@ -116,9 +127,9 @@ public class ScanPersistenceService {
         return buildVersionAttemptQuery(projectId, versionId, attempt, "SCANNING");
     }
     private Query buildVersionAttemptQuery(String projectId, String versionId, int attempt, String... states) {
-        return buildVersionAttemptQueryBound(projectId, versionId, attempt, null, states);
+        return buildVersionAttemptQueryBound(projectId, versionId, attempt, null, null, states);
     }
-    private Query buildVersionAttemptQueryBound(String projectId, String versionId, int attempt, String expectedHash, String... states) {
+    private Query buildVersionAttemptQueryBound(String projectId, String versionId, int attempt, String expectedHash, ProjectVersion reviewedVersion, String... states) {
         Criteria attemptCriteria;
         if (attempt <= 1) {
             attemptCriteria = new Criteria().orOperator(
@@ -135,6 +146,7 @@ public class ScanPersistenceService {
                 .and("scanResult.status").is(ScanStatus.SCANNING)
                 .and("scanResult.scanState").in((Object[]) states)
                 .andOperator(attemptCriteria);
+        if (reviewedVersion != null) ArtifactReviewContext.bindSnapshot(version, reviewedVersion);
         if (expectedHash != null) version.and("hash").is(expectedHash);
         return new Query(Criteria.where("_id").is(projectId).and("versions").elemMatch(version));
     }

@@ -30,6 +30,19 @@ public final class ArtifactReviewContext {
             return null;
         }
     }
+    public static String automaticallyReviewableFingerprint(ProjectVersion version) {
+        if (version == null || version.getDependencies() != null && !version.getDependencies().isEmpty()) return null;
+        return fingerprint(version);
+    }
+    public static org.springframework.data.mongodb.core.query.Criteria bindSnapshot(
+            org.springframework.data.mongodb.core.query.Criteria criteria, ProjectVersion version) {
+        return criteria.and("gameVersions").is(version.getGameVersions())
+                .and("dependencies").is(version.getDependencies())
+                .and("manifestId").is(version.getManifestId())
+                .and("manifestVersion").is(version.getManifestVersion())
+                .and("overrideFileUrl").is(version.getOverrideFileUrl())
+                .and("modpackConfigs").is(version.getModpackConfigs());
+    }
     public static boolean hasSupplementalContent(ProjectVersion version) {
         return version.getOverrideFileUrl() != null && !version.getOverrideFileUrl().isBlank()
                 || version.getModpackConfigs() != null && !version.getModpackConfigs().isEmpty();

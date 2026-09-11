@@ -58,13 +58,36 @@ class VersionPublishingServiceTest {
         service.processScheduledReleases();
         verifyNoInteractions(notifications);
     }
+    @Test void changedContextOrSupplementalFilesCannotInheritScheduledClearance() {
+        for (String scenario : List.of("override", "game", "manifest", "missing-context", "future-scan")) {
+            reset(mongo, notifications);
+            when(mongo.updateFirst(any(Query.class), any(Update.class), eq(Project.class)))
+                    .thenReturn(UpdateResult.acknowledged(1, 1L, null));
+            Project project = project(true);
+            var version = project.getVersions().getFirst();
+            switch (scenario) {
+                case "override" -> version.setOverrideFileUrl("separate.zip");
+                case "game" -> version.setGameVersions(List.of("changed-runtime"));
+                case "manifest" -> version.setManifestId("changed-entrypoint");
+                case "missing-context" -> version.getScanResult().setReviewedContextSha256(null);
+                case "future-scan" -> version.getScanResult().setScanTimestamp(System.currentTimeMillis() + 60_000);
+            }
+            when(mongo.find(any(Query.class), eq(Project.class))).thenReturn(List.of(project));
+            service.processScheduledReleases();
+            verifyNoInteractions(notifications);
+            var update = ArgumentCaptor.forClass(Update.class);
+            verify(mongo).updateFirst(any(Query.class), update.capture(), eq(Project.class));
+            assertEquals(ProjectVersion.ReviewStatus.PENDING,
+                    ((org.bson.Document) update.getValue().getUpdateObject().get("$set")).get("versions.$.reviewStatus"), scenario);
+        }
+    }
     private Project project(boolean verified) {
         Project p = new Project(); p.setId("project"); p.setVersions(List.of(version("1.0", "2000-01-01T00:00:00", verified))); return p;
     }
     private ProjectVersion version(String number, String date, boolean verified) {
         ProjectVersion v = new ProjectVersion(); v.setId(number); v.setVersionNumber(number);
         v.setReviewStatus(ProjectVersion.ReviewStatus.SCHEDULED); v.setScheduledPublishDate(date);
-        if (verified) { v.setScanResult(ScanEvidenceFixtures.complete(true)); v.setHash(v.getScanResult().getSecurityEvidence().artifactSha256()); }
+        if (verified) { v.setScanResult(ScanEvidenceFixtures.complete(true)); v.setHash(v.getScanResult().getSecurityEvidence().artifactSha256()); v.getScanResult().setReviewedContextSha256(net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(v)); }
         return v;
     }
 }

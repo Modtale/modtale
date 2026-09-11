@@ -35,7 +35,9 @@ public final class ArtifactClearancePolicy {
     }
     public static boolean boundToVersion(ProjectVersion version) {
         if (version == null || !cleared(version.getScanResult())) return false;
-        return Objects.equals(version.getHash(), version.getScanResult().getSecurityEvidence().artifactSha256());
+        String context = ArtifactReviewContext.automaticallyReviewableFingerprint(version);
+        return context != null && context.equals(version.getScanResult().getReviewedContextSha256())
+                && Objects.equals(version.getHash(), version.getScanResult().getSecurityEvidence().artifactSha256());
     }
     private static boolean digest(String value) { return value != null && value.matches("[0-9a-f]{64}"); }
 }

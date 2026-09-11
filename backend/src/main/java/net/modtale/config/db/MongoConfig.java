@@ -13,7 +13,8 @@ public class MongoConfig {
 
     @Bean
     public MongoCustomConversions mongoCustomConversions() {
-        return new MongoCustomConversions(List.of(new StringToOAuthProviderConverter()));
+        return new MongoCustomConversions(List.of(new StringToOAuthProviderConverter(),
+                new SecurityEvidenceConverters.Write(), new SecurityEvidenceConverters.Read()));
     }
 
     @ReadingConverter
