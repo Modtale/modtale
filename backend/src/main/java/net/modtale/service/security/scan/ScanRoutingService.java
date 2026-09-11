@@ -47,7 +47,7 @@ public class ScanRoutingService {
             SecurityIssueAnalysisService.ClassificationStats classification,
             boolean isManualRescan
     ) {
-        if (!hasCompleteEvidence(scanResult)) return new RoutingDecision(RoutingAction.REQUIRE_REVIEW, 0);
+        if (!hasCompleteEvidence(scanResult) || "NEW_SECURITY_EVIDENCE".equals(scanResult.getSecurityEvidence().reviewState())) return new RoutingDecision(RoutingAction.REQUIRE_REVIEW, 0);
         String verdict = scanResult.getVerdict();
         if ("BLOCK".equals(verdict) || scanResult.getStatus() == ScanStatus.INFECTED) {
             return new RoutingDecision(RoutingAction.REQUIRE_REVIEW, 0);

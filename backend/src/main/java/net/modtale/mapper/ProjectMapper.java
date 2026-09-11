@@ -367,7 +367,8 @@ public class ProjectMapper {
                 version.getChannel(),
                 version.getReviewStatus(),
                 version.getRejectionReason(),
-                version.getScanResult()
+                version.getScanResult(),
+                net.modtale.service.admin.review.VersionReviewSnapshot.token(version)
         );
     }
 

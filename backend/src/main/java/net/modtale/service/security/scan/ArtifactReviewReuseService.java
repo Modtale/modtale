@@ -13,6 +13,7 @@ public class ArtifactReviewReuseService {
         result.setReusedReviewApprovedAt(0);
         var current = result.getSecurityEvidence();
         if (!ArtifactClearancePolicy.complete(result) || current == null || !current.complete()
+                || "NEW_SECURITY_EVIDENCE".equals(current.reviewState())
                 || "BLOCK".equals(result.getVerdict()) || result.getStatus() == ScanStatus.INFECTED
                 || project == null || project.getVersions() == null) return;
         ProjectVersion target = project.getVersions().stream().filter(Objects::nonNull)

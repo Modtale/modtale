@@ -18,6 +18,17 @@ class ArtifactReviewReuseServiceTest {
         ProjectVersion current = new ProjectVersion(); current.setId("new"); current.setVersionNumber("1.1");
         Project project = new Project(); project.setVersions(List.of(prior, current)); return project;
     }
+    @Test void freshAdverseEvidenceCannotBeHiddenByAnIdenticalHistoricalApproval() {
+        var result=ScanEvidenceFixtures.complete(false);
+        var project=project(result);
+        var evidence=result.getSecurityEvidence();
+        result.setSecurityEvidence(new ScanResult.SecurityEvidence(evidence.policyVersion(),evidence.artifactSha256(),
+                evidence.contentSha256(),true,false,"NEW_SECURITY_EVIDENCE",evidence.entryHashes()));
+        service.annotate(project,"new",result);
+        assertNull(result.getReusedReviewVersion());
+        result.setReusedReviewVersion("forged-stale-reuse");
+        assertFalse(ArtifactClearancePolicy.cleared(result));
+    }
     @Test void unchangedFullyInspectedArtifactReusesReview() {
         ScanResult result = ScanEvidenceFixtures.complete(false);
         Project project = project(result);

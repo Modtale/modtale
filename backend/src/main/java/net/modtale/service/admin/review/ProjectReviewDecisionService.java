@@ -22,15 +22,15 @@ public class ProjectReviewDecisionService {
         projectReviewEffectService.onProjectPublished(adminUser, id);
     }
 
-    public void approveVersion(User adminUser, String id, String versionId) {
+    public void approveVersion(User adminUser, String id, String versionId, String reviewToken) {
         ProjectReviewTransitionService.VersionReviewDecision decision =
-                projectReviewTransitionService.approveVersion(id, versionId);
+                projectReviewTransitionService.approveVersion(id, versionId, reviewToken);
         projectReviewEffectService.onVersionApproved(adminUser, id, versionId, decision);
     }
 
-    public void rejectVersion(User adminUser, String id, String versionId, String reason) {
+    public void rejectVersion(User adminUser, String id, String versionId, String reason, String reviewToken) {
         ProjectReviewTransitionService.VersionReviewDecision decision =
-                projectReviewTransitionService.rejectVersion(id, versionId, reason);
+                projectReviewTransitionService.rejectVersion(id, versionId, reason, reviewToken);
         projectReviewEffectService.onVersionRejected(adminUser, id, versionId, decision);
     }
 

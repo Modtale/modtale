@@ -78,9 +78,16 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     const pendingVersion = mod.versions.find((v: ProjectVersion) => v.reviewStatus === 'PENDING') || mod.versions[0];
     const scanResult = pendingVersion?.scanResult;
     const scanIssues = scanResult?.issues || [];
-    const securityCleared = scanResult?.status === 'CLEAN' && scanResult?.verdict === 'AUTO_APPROVE'
+    const currentEvidence = /^warden-3\.0\.0:[0-9a-f]{64}$/.test(scanResult?.securityEvidence?.policyVersion || '')
+        && /^[0-9a-f]{64}$/.test(scanResult?.securityEvidence?.artifactSha256 || '')
+        && /^[0-9a-f]{64}$/.test(scanResult?.securityEvidence?.contentSha256 || '');
+    const reviewReused = currentEvidence && Boolean(scanResult?.reusedReviewVersion) && scanResult?.scanState === 'COMPLETED'
+        && scanResult?.securityEvidence?.complete === true && scanResult?.status !== 'INFECTED'
+        && scanResult?.verdict !== 'BLOCK' && scanResult?.securityEvidence?.reviewState !== 'NEW_SECURITY_EVIDENCE';
+    const securityCleared = reviewReused || currentEvidence && scanResult?.status === 'CLEAN' && scanResult?.verdict === 'AUTO_APPROVE'
         && scanResult?.scanState === 'COMPLETED' && scanResult?.securityEvidence?.complete === true
-        && scanResult?.securityEvidence?.clearanceGranted === true;
+        && scanResult?.securityEvidence?.clearanceGranted === true
+        && scanResult?.securityEvidence?.reviewState !== 'NEW_SECURITY_EVIDENCE';
     const hasScanIssues = !!scanResult && scanResult.status !== 'SCANNING' && !securityCleared;
     const isScanning = scanResult?.status === 'SCANNING';
 
@@ -176,11 +183,15 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             setStatus({ type: 'error', title: 'Permission Required', msg: 'You do not have permission to approve projects or versions.' });
             return;
         }
+        if (!isNewProject && !pendingVersion?.reviewToken) {
+            setStatus({ type: 'error', title: 'Refresh Required', msg: 'Refresh this review to load its current evidence before deciding.' });
+            return;
+        }
         try {
             if (isNewProject) {
                 await adminClient.publishProject(mod.id);
             } else {
-                await adminClient.approveVersion(mod.id, pendingVersion.id);
+                await adminClient.approveVersion(mod.id, pendingVersion.id, pendingVersion.reviewToken);
             }
             onApprove();
         } catch (e: any) {
@@ -197,11 +208,15 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             setStatus({ type: 'error', title: 'Permission Required', msg: 'You do not have permission to reject projects or versions.' });
             return;
         }
+        if (!isNewProject && !pendingVersion?.reviewToken) {
+            setStatus({ type: 'error', title: 'Refresh Required', msg: 'Refresh this review to load its current evidence before deciding.' });
+            return;
+        }
         try {
             if (isNewProject) {
                 await adminClient.rejectProject(mod.id, reason);
             } else {
-                await adminClient.rejectVersion(mod.id, pendingVersion.id, reason);
+                await adminClient.rejectVersion(mod.id, pendingVersion.id, reason, pendingVersion.reviewToken);
             }
             onReject(reason);
         } catch (e: any) {
@@ -571,7 +586,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                         </p>
                                         <dl className="text-xs space-y-2">
                                             <div><dt className="text-slate-500">Uploaded artifact SHA-256</dt><dd className="font-mono break-all dark:text-slate-300">{scanResult.securityEvidence.artifactSha256 || 'Unavailable'}</dd></div>
-                                            <div><dt className="text-slate-500">Security review</dt><dd className="dark:text-slate-300">{scanResult.securityEvidence.clearanceGranted ? 'Clearance granted' : 'Manual review required'}</dd></div>
+                                            <div><dt className="text-slate-500">Security review</dt><dd className="dark:text-slate-300">{reviewReused ? `Approved review reused from ${scanResult.reusedReviewVersion}` : scanResult.securityEvidence.clearanceGranted ? 'Clearance granted' : isScanning ? 'Automatic review pending' : 'Manual review required'}</dd></div>
                                         </dl>
                                     </div>
                                 )}
@@ -703,7 +718,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                             <div>
                                                 <h4 className="font-bold text-emerald-500">Artifact Review Completed</h4>
                                                 <p className="text-sm text-emerald-600/80 dark:text-emerald-500/70 font-medium">
-                                                    Inspection and security review completed with no unresolved concerns.
+                                                    {reviewReused ? `Previously approved contents and context match version ${scanResult?.reusedReviewVersion}.` : 'Inspection and security review completed with no unresolved concerns.'}
                                                 </p>
                                                 <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80 font-medium">
                                                     {scanResult?.scanState ? `State: ${scanResult.scanState}` : 'State: unavailable'}

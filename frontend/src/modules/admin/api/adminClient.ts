@@ -9,8 +9,8 @@ export const adminClient = {
     scanVersion: async (projectId: string, versionId: string) => (await api.post(`/admin/projects/${projectId}/versions/${versionId}/scan`)).data,
     publishProject: async (projectId: string) => (await api.post(`/admin/projects/${projectId}/publish`)).data,
     rejectProject: async (projectId: string, reason: string) => (await api.post(`/admin/projects/${projectId}/reject`, { reason })).data,
-    approveVersion: async (projectId: string, versionId: string) => (await api.post(`/admin/projects/${projectId}/versions/${versionId}/approve`)).data,
-    rejectVersion: async (projectId: string, versionId: string, reason: string) => (await api.post(`/admin/projects/${projectId}/versions/${versionId}/reject`, { reason })).data,
+    approveVersion: async (projectId: string, versionId: string, reviewToken?: string) => (await api.post(`/admin/projects/${projectId}/versions/${versionId}/approve`, null, { headers: { 'If-Match': reviewToken } })).data,
+    rejectVersion: async (projectId: string, versionId: string, reason: string, reviewToken?: string) => (await api.post(`/admin/projects/${projectId}/versions/${versionId}/reject`, { reason }, { headers: { 'If-Match': reviewToken } })).data,
 
     getLogs: async (params: any) => (await api.get('/admin/logs', { params })).data,
     getPlatformAnalytics: async (range: string) => (await api.get(`/analytics/platform/full?range=${range}`)).data,

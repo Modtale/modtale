@@ -6,7 +6,7 @@ vi.mock('@/components/ui/ModalPortal', () => ({ ModalPortal: ({ children }: any)
 vi.mock('@/modules/admin/api/adminClient', () => ({ adminClient: {} }));
 
 const clear = { status: 'CLEAN', verdict: 'AUTO_APPROVE', scanState: 'COMPLETED', issues: [],
-    securityEvidence: { complete: true, clearanceGranted: true, policyVersion: 'warden-3.0.0', artifactSha256: 'a'.repeat(64), entryHashes: {} } };
+    securityEvidence: { complete: true, clearanceGranted: true, policyVersion: 'warden-3.0.0:' + 'c'.repeat(64), artifactSha256: 'a'.repeat(64), contentSha256: 'b'.repeat(64), entryHashes: {} } };
 describe('Review security clearance status', () => {
     let container: HTMLDivElement; let root: Root;
     beforeEach(() => { container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container); });
@@ -26,6 +26,19 @@ describe('Review security clearance status', () => {
         { ...clear, scanState: 'INCOMPLETE' }, { ...clear, securityEvidence: { complete: true, clearanceGranted: false } }])
     ('does not show completed clearance for missing or insufficient evidence %#', async scan => {
         await render(scan);
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+    });
+    it('shows precisely reused approval but holds fresh adverse evidence', async () => {
+        const reused = { ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', reusedReviewVersion: '0.9',
+            securityEvidence: { ...clear.securityEvidence, clearanceGranted: false, reviewState: 'POLICY_REVIEW' } };
+        await render(reused);
+        expect(container.textContent).toContain('Previously approved contents and context match version 0.9.');
+        await act(async () => root.unmount()); root = createRoot(container);
+        await render({ ...reused, securityEvidence: { ...reused.securityEvidence, reviewState: 'NEW_SECURITY_EVIDENCE' } });
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+    });
+    it('holds results whose policy identity is obsolete', async () => {
+        await render({ ...clear, securityEvidence: { ...clear.securityEvidence, policyVersion: 'warden-3.0.0' } });
         expect(container.textContent).not.toContain('Artifact Review Completed');
     });
     it('shows completion for explicit completed clearance', async () => {

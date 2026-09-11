@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class ProjectReviewTransitionService {
 
+    private final VersionReviewPersistence reviewPersistence;
     private final ProjectRepository projectRepository;
     private final ProjectService projectService;
     private final LifecycleService lifecycleService;
@@ -30,8 +31,10 @@ public class ProjectReviewTransitionService {
             LifecycleService lifecycleService,
             ScoringService scoringService,
             SecurityIssueAnalysisService securityIssueAnalysisService,
-            ProjectVersionAccessService projectVersionAccessService
+            ProjectVersionAccessService projectVersionAccessService,
+            VersionReviewPersistence reviewPersistence
     ) {
+        this.reviewPersistence = reviewPersistence;
         this.projectRepository = projectRepository;
         this.projectService = projectService;
         this.lifecycleService = lifecycleService;
@@ -44,28 +47,36 @@ public class ProjectReviewTransitionService {
         lifecycleService.publishProject(id, adminUser);
     }
 
-    public VersionReviewDecision approveVersion(String id, String versionId) {
+    public VersionReviewDecision approveVersion(String id, String versionId, String reviewToken) {
         Project project = requireProject(id);
         ProjectVersion version = projectVersionAccessService.requireById(project, versionId,
                 () -> new ResourceNotFoundException("Version not found."));
+        VersionReviewSnapshot.requireCurrent(version,reviewToken);
+        var snapshot=reviewPersistence.capture(id,versionId,reviewToken);
         version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
         version.setRejectionReason(null);
         version.setScheduledPublishDate(null);
-        securityIssueAnalysisService.pruneApprovedScanResults(project);
+        securityIssueAnalysisService.markIssuesAcceptedForApprovedVersion(version);
         project.setUpdatedAt(LocalDateTime.now().toString());
-        projectRepository.save(project);
+        if(!reviewPersistence.apply(snapshot,version)) throw VersionReviewPersistence.conflict();
         projectService.evictProjectCache(project);
         return new VersionReviewDecision(project, version, null);
     }
 
-    public VersionReviewDecision rejectVersion(String id, String versionId, String reason) {
+    public VersionReviewDecision rejectVersion(String id, String versionId, String reason, String reviewToken) {
         Project project = requireProject(id);
         ProjectVersion version = projectVersionAccessService.requireById(project, versionId,
                 () -> new ResourceNotFoundException("Version not found."));
+        VersionReviewSnapshot.requireCurrent(version,reviewToken);
+        var snapshot=reviewPersistence.capture(id,versionId,reviewToken);
         version.setReviewStatus(ProjectVersion.ReviewStatus.REJECTED);
         version.setRejectionReason(reason);
+        version.setApprovedSecurityEvidence(null);
+        version.setApprovedSecurityContextSha256(null);
+        version.setSecurityApprovedAt(0);
+        version.setApprovedIssueBaselines(null);
         version.setScheduledPublishDate(null);
-        projectRepository.save(project);
+        if(!reviewPersistence.apply(snapshot,version)) throw VersionReviewPersistence.conflict();
         projectService.evictProjectCache(project);
         return new VersionReviewDecision(project, version, reason);
     }

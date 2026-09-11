@@ -32,12 +32,12 @@ public class ProjectReviewAdminService {
         projectReviewDecisionService.publishProject(adminUser, id);
     }
 
-    public void approveVersion(User adminUser, String id, String versionId) {
-        projectReviewDecisionService.approveVersion(adminUser, id, versionId);
+    public void approveVersion(User adminUser, String id, String versionId, String reviewToken) {
+        projectReviewDecisionService.approveVersion(adminUser, id, versionId, reviewToken);
     }
 
-    public void rejectVersion(User adminUser, String id, String versionId, String reason) {
-        projectReviewDecisionService.rejectVersion(adminUser, id, versionId, reason);
+    public void rejectVersion(User adminUser, String id, String versionId, String reason, String reviewToken) {
+        projectReviewDecisionService.rejectVersion(adminUser, id, versionId, reason, reviewToken);
     }
 
     public void rejectProject(User adminUser, String id, String reason) {

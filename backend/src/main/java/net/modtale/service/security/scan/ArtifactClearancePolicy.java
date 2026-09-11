@@ -29,7 +29,7 @@ public final class ArtifactClearancePolicy {
         } catch (NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
     }
     public static boolean cleared(ScanResult result) {
-        if (!complete(result) || "BLOCK".equals(result.getVerdict()) || result.getStatus() == ScanStatus.INFECTED) return false;
+        if (!complete(result) || "NEW_SECURITY_EVIDENCE".equals(result.getSecurityEvidence().reviewState()) || "BLOCK".equals(result.getVerdict()) || result.getStatus() == ScanStatus.INFECTED) return false;
         return ("AUTO_APPROVE".equals(result.getVerdict()) && result.getStatus() == ScanStatus.CLEAN && result.getSecurityEvidence().clearanceGranted())
                 || result.getReusedReviewVersion() != null;
     }

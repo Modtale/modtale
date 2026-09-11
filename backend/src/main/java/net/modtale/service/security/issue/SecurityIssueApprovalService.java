@@ -21,7 +21,14 @@ public class SecurityIssueApprovalService {
     }
 
     public void markIssuesAcceptedForApprovedVersion(ProjectVersion version) {
-        if (version == null || version.getScanResult() == null) return;
+        if (version == null) return;
+        if (version.getScanResult() == null) {
+            version.setApprovedSecurityEvidence(null);
+            version.setApprovedSecurityContextSha256(null);
+            version.setSecurityApprovedAt(0);
+            version.setApprovedIssueBaselines(null);
+            return;
+        }
         ScanResult scanResult = version.getScanResult();
         securityIssueClassificationService.normalizeScanResult(scanResult);
 
@@ -63,11 +70,15 @@ public class SecurityIssueApprovalService {
         scanResult.setNewIssueCount(0);
         scanResult.setEscalatedIssueCount(0);
         var evidence = scanResult.getSecurityEvidence();
-        version.setApprovedSecurityEvidence(evidence == null ? null : new ScanResult.SecurityEvidence(
+        boolean reusableEvidence = net.modtale.service.security.scan.ArtifactClearancePolicy.complete(scanResult)
+                && java.util.Objects.equals(version.getHash(), evidence.artifactSha256())
+                && java.util.Objects.equals(net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(version),
+                        scanResult.getReviewedContextSha256());
+        version.setApprovedSecurityEvidence(!reusableEvidence ? null : new ScanResult.SecurityEvidence(
                 evidence.policyVersion(), evidence.artifactSha256(), evidence.contentSha256(), evidence.complete(),
                 evidence.clearanceGranted(), evidence.reviewState(), java.util.Map.of()));
-        version.setApprovedSecurityContextSha256(net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(version));
-        version.setSecurityApprovedAt(scanResult.getReusedReviewApprovedAt() > 0
+        version.setApprovedSecurityContextSha256(reusableEvidence ? scanResult.getReviewedContextSha256() : null);
+        version.setSecurityApprovedAt(!reusableEvidence ? 0 : scanResult.getReusedReviewApprovedAt() > 0
                 ? scanResult.getReusedReviewApprovedAt() : Instant.now().toEpochMilli());
         version.setApprovedIssueBaselines(approvedIssueBaselines);
         version.setScanResult(null);

@@ -28,6 +28,15 @@ describe('adminClient', () => {
         });
     });
 
+    it('binds review decisions to the evidence token that was opened', async () => {
+        mockedApi.post.mockResolvedValue({ data: null } as any);
+        await adminClient.approveVersion('project', 'version', 'snapshot-token');
+        expect(mockedApi.post).toHaveBeenLastCalledWith('/admin/projects/project/versions/version/approve', null,
+            { headers: { 'If-Match': 'snapshot-token' } });
+        await adminClient.rejectVersion('project', 'version', 'reason', 'snapshot-token');
+        expect(mockedApi.post).toHaveBeenLastCalledWith('/admin/projects/project/versions/version/reject', { reason: 'reason' },
+            { headers: { 'If-Match': 'snapshot-token' } });
+    });
     it('posts restore actions with a null body and status query param', async () => {
         mockedApi.post.mockResolvedValue({ data: { restored: true } } as any);
 

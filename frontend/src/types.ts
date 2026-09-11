@@ -241,6 +241,7 @@ export interface ScanResult {
 }
 
 export interface ProjectVersion {
+    reviewToken?: string;
     manifestId?: string;
     modpackConfigs?: { projectId: string; source: string; path: string; sha256: string }[];
     id: string;
