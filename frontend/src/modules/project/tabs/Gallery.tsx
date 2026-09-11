@@ -252,7 +252,7 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
                         >
                             <input
                                 type="file"
-                                accept="image/png, image/jpeg, image/webp"
+                                accept="image/png, image/jpeg, image/webp, image/gif"
                                 multiple
                                 className="hidden"
                                 ref={fileInputRef}

@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import Cropper from 'react-easy-crop';
 import { X, Check } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
+import { isGifImage } from '@/utils/images';
 import { ModalPortal } from '@/components/ui/ModalPortal';
 
 interface ImageCropperModalProps {
@@ -34,6 +35,8 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                                                                         onCancel,
                                                                         onCropComplete
                                                                     }) => {
+    const isGif = isGifImage(imageSrc, sourceFile);
+    const [error, setError] = useState<string | null>(null);
     const [crop, setCrop] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
     const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
@@ -120,10 +123,20 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
     );
 
     const handleSave = async () => {
-        if (!croppedAreaPixels) return;
+        if (!isGif && !croppedAreaPixels) return;
+        setError(null);
         setIsProcessing(true);
 
         try {
+            if (isGif) {
+                // Canvas export only retains one frame. Upload the original animation.
+                const file = sourceFile ?? new File([await (await fetch(imageSrc)).blob()], 'image.gif', { type: 'image/gif' });
+                const uploadFile = /\.gif$/i.test(file.name)
+                    ? file
+                    : new File([file], `${file.name.replace(/\.[^.]+$/, '') || 'image'}.gif`, { type: 'image/gif' });
+                onCropComplete(uploadFile);
+                return;
+            }
             const image = await createImage(imageSrc);
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -173,7 +186,8 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                 0.92
             );
         } catch (e) {
-            console.error('Failed to crop image', e);
+            console.error('Failed to prepare image', e);
+            setError('Could not prepare this image. Please try another file.');
             setIsProcessing(false);
         }
     };
@@ -184,7 +198,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
             <div className="bg-white dark:bg-slate-900 w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 flex flex-col h-[80vh] md:h-[600px] animate-in zoom-in-95 duration-200">
 
                 <div className="p-4 border-b border-slate-200 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-white/5">
-                    <h2 className="text-lg font-black text-slate-900 dark:text-white">Crop Image</h2>
+                    <h2 className="text-lg font-black text-slate-900 dark:text-white">{isGif ? 'Preview GIF' : 'Crop Image'}</h2>
                     <button
                         onClick={onCancel}
                         disabled={isProcessing}
@@ -195,7 +209,11 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                 </div>
 
                 <div className="relative flex-1 bg-slate-950">
-                    <Cropper
+                    {isGif ? (
+                        <div className="absolute inset-6 flex items-center justify-center" style={{ containerType: 'size' }}>
+                            <img src={imageSrc} alt="Animated image preview" className="max-h-full max-w-full object-cover rounded-xl" style={{ width: `min(100cqw, ${aspect * 100}cqh)`, height: `min(${100 / aspect}cqw, 100cqh)` }} />
+                        </div>
+                    ) : <Cropper
                         image={imageSrc}
                         crop={crop}
                         zoom={zoom}
@@ -203,11 +221,11 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                         onCropChange={setCrop}
                         onCropComplete={onCropCompleteChange}
                         onZoomChange={setZoom}
-                    />
+                    />}
                 </div>
 
                 <div className="p-4 border-t border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="w-full sm:w-1/2 flex items-center gap-3">
+                    {isGif ? <p className="text-sm text-slate-500 dark:text-slate-400 sm:max-w-sm">Your GIF stays animated and is centered to fit. Up to 10 MB.</p> : <div className="w-full sm:w-1/2 flex items-center gap-3">
                         <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Zoom</span>
                         <input
                             type="range"
@@ -219,7 +237,8 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                             onChange={(e) => setZoom(Number(e.target.value))}
                             className="themed-range h-4 w-full cursor-pointer"
                         />
-                    </div>
+                    </div>}
+                    {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
                     <div className="flex items-center gap-3 w-full sm:w-auto">
                         <button
                             onClick={onCancel}
@@ -234,7 +253,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                             className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl font-bold text-sm bg-modtale-accent text-white hover:bg-modtale-accentHover shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                         >
                             {isProcessing ? <Spinner className="w-4 h-4 text-white" /> : <Check className="w-4 h-4" />}
-                            Apply Crop
+                            {isGif ? 'Use GIF' : 'Apply Crop'}
                         </button>
                     </div>
                 </div>

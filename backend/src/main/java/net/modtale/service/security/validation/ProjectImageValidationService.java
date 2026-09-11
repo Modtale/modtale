@@ -49,15 +49,26 @@ public class ProjectImageValidationService {
             boolean isJpeg = header[0] == JPEG_HEADER[0] && header[1] == JPEG_HEADER[1] && header[2] == JPEG_HEADER[2];
             boolean isRiff = Arrays.equals(Arrays.copyOfRange(header, 0, 4), RIFF_HEADER);
             boolean isWebP = isRiff && header[8] == 'W' && header[9] == 'E' && header[10] == 'B' && header[11] == 'P';
-            boolean isSvg = isLikelySvg(file, bytes);
+            boolean isGif = new String(header, 0, 6, StandardCharsets.US_ASCII).matches("GIF8[79]a");
+            boolean isSvg = !isGif && isLikelySvg(file, bytes);
 
-            if (!isPng && !isJpeg && !isWebP && !isSvg) {
-                throw new InvalidProjectRequestException("Image must be a valid PNG, JPEG, WebP, or SVG file.");
+            if (!isPng && !isJpeg && !isWebP && !isGif && !isSvg) {
+                throw new InvalidProjectRequestException("Image must be a valid PNG, JPEG, WebP, GIF, or SVG file.");
             }
 
             if (isSvg) {
                 validateSvgAspectRatio(bytes, type, ratioLabel, targetRatio);
                 return;
+            }
+
+            // GIFs retain their original frames; clients center-cover icons and banners.
+            // Check the logical canvas as well as the first frame, which can be smaller.
+            if (isGif) {
+                int width = (bytes[6] & 0xff) | ((bytes[7] & 0xff) << 8);
+                int height = (bytes[8] & 0xff) | ((bytes[9] & 0xff) << 8);
+                if (width == 0 || height == 0 || width > 3840 || height > 2160) {
+                    throw new InvalidProjectRequestException(type + " image dimensions cannot exceed 4K (3840x2160) and must be positive.");
+                }
             }
 
             BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
@@ -69,14 +80,14 @@ public class ProjectImageValidationService {
             }
 
             double actualRatio = (double) image.getWidth() / image.getHeight();
-            if (targetRatio != null && Math.abs(actualRatio - targetRatio) > 0.05) {
+            if (!isGif && targetRatio != null && Math.abs(actualRatio - targetRatio) > 0.05) {
                 throw new InvalidProjectRequestException(
                         String.format("%s image must have an aspect ratio of %s (Uploaded: %.2f).", type, ratioLabel, actualRatio)
                 );
             }
         } catch (IOException e) {
             throw new InvalidProjectRequestException(
-                    type + " image could not be read. Ensure the file is a valid PNG, JPEG, WebP, or SVG and is not corrupted."
+                    type + " image could not be read. Ensure the file is a valid PNG, JPEG, WebP, GIF, or SVG and is not corrupted."
             );
         }
     }
