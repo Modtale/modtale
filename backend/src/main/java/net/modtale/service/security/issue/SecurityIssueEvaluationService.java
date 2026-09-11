@@ -86,7 +86,7 @@ final class SecurityIssueEvaluationService {
                     || alwaysReview;
 
             issue.setEscalated(escalatedIssue);
-            issue.setResolved(!escalatedIssue);
+            issue.setResolved(false);
 
             if (escalatedIssue) {
                 escalated++;
@@ -186,46 +186,11 @@ final class SecurityIssueEvaluationService {
     }
 
     private String normalizePathForFingerprint(String path) {
-        if (path == null || path.isBlank()) {
-            return "archive-root";
-        }
-
-        String normalized = path.replace('\\', '/').toLowerCase(Locale.ROOT);
-        String[] nestedParts = normalized.split("->");
-        String tail = nestedParts[nestedParts.length - 1].trim();
-        if (tail.isBlank()) {
-            tail = normalized;
-        }
-
-        String[] segments = tail.split("/");
-        StringBuilder canonical = new StringBuilder();
-        int start = Math.max(0, segments.length - 4);
-        for (int i = start; i < segments.length; i++) {
-            String segment = segments[i].replaceAll("\\s+", "");
-            if (segment.isBlank()) {
-                continue;
-            }
-            if (canonical.length() > 0) {
-                canonical.append('/');
-            }
-            canonical.append(segment);
-        }
-
-        String out = canonical.length() == 0 ? "archive-root" : canonical.toString();
-        return out.replaceAll("[^a-z0-9./$:_-]+", "");
+        return path == null || path.isBlank() ? "archive-root" : path;
     }
 
     private String normalizeDescription(String text) {
-        if (text == null || text.isBlank()) {
-            return "na";
-        }
-        String normalized = text.toLowerCase(Locale.ROOT);
-        normalized = normalized.replaceAll("0x[0-9a-f]+", "0x#");
-        normalized = normalized.replaceAll("\\b\\d{1,3}(?:\\.\\d{1,3}){3}\\b", "ip#");
-        normalized = normalized.replaceAll("\\d+", "#");
-        normalized = normalized.replaceAll("[^a-z0-9#:/._-]+", " ");
-        normalized = normalized.trim().replaceAll("\\s{2,}", " ");
-        return normalized;
+        return text == null || text.isBlank() ? "na" : text;
     }
 
     private String hash(String input) {
@@ -236,9 +201,9 @@ final class SecurityIssueEvaluationService {
             for (byte b : bytes) {
                 out.append(String.format("%02x", b));
             }
-            return out.substring(0, 24);
+            return out.toString();
         } catch (NoSuchAlgorithmException e) {
-            return Integer.toHexString(input.hashCode());
+            throw new IllegalStateException("Required fingerprint digest unavailable", e);
         }
     }
 
