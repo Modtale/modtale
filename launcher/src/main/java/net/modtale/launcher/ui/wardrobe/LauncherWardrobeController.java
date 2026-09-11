@@ -291,7 +291,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
         Label name = label(displayName, "wardrobe-card-name"); hideWhenEmpty(name); name.setMinWidth(0); name.setMaxWidth(Double.MAX_VALUE);
         VBox contents = new VBox(8, visual, name);
         if (tab == Tab.SAVED && !item.collection().isBlank()) contents.getChildren().add(label(item.collection(), "wardrobe-card-detail"));
-        Button button = new Button(); button.setGraphic(contents); button.getStyleClass().add("wardrobe-card");
+        Button button = new Button(); button.setId("wardrobe-look-" + item.id()); button.setGraphic(contents); button.getStyleClass().add("wardrobe-card");
         button.setMinWidth(0); button.setMaxWidth(Double.MAX_VALUE);
         GridPane.setHgrow(button, Priority.ALWAYS); GridPane.setFillWidth(button, true);
         contents.setMinWidth(0);

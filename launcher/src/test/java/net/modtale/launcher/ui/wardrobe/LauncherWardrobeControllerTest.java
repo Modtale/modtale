@@ -92,7 +92,7 @@ class LauncherWardrobeControllerTest {
             WardrobeItem saved = new WardrobeItem(SKIN.id(), SKIN.kind(), "My favorite outfit", true, "Adventures", SKIN.payload());
             h.store.saveItem(saved);
             fx(() -> { button(h.root(), "Skins").fire(); h.controller.refresh(); return null; });
-            await(() -> card(h.root(), saved.name()) != null);
+            await(() -> h.root().lookup("#wardrobe-look-" + saved.id()) != null);
             // Catalog auto-selection retains the raw item; the dialog must independently resolve its saved UUID.
             FutureTask<Void> opened = submitFx(() -> { button(h.root(), "Edit saved look").fire(); return null; });
             await(() -> h.dialog() != null);
@@ -114,7 +114,7 @@ class LauncherWardrobeControllerTest {
             assertEquals("responsive", fx(() -> "responsive"));
             assertEquals(saved, h.store.items().getFirst());
             h.gateway.releaseHydration.countDown();
-            await(() -> nodes(h.root(), Label.class).stream().anyMatch(l -> "Renamed favorite".equals(l.getText())));
+            await(() -> h.store.items().getFirst().name().equals("Renamed favorite"));
             WardrobeItem persisted = new WardrobeStore(directory).items().getFirst();
             assertEquals("Renamed favorite", persisted.name());
             assertEquals(saved.collection(), persisted.collection());
@@ -141,21 +141,21 @@ class LauncherWardrobeControllerTest {
             await(() -> gridReady(h));
             List<String> seen = new ArrayList<>();
             while (true) {
-                List<String> current = fx(() -> gridCards(h).stream().map(Button::getAccessibleText).toList());
+                List<String> current = fx(() -> gridCards(h).stream().map(Button::getId).toList());
                 seen.addAll(current);
                 if (fx(() -> button(h.root(), "Next Page").isDisabled())) break;
                 int count = fx(() -> ((javafx.scene.layout.GridPane)h.root().lookup("#wardrobe-cards")).getColumnConstraints().size());
                 assertEquals(count * 4, current.size(), "Every nonfinal page must have four full rows");
                 String first = current.getFirst();
                 fx(() -> { button(h.root(), "Next Page").fire(); return null; });
-                await(() -> !gridCards(h).isEmpty() && !gridCards(h).getFirst().getAccessibleText().equals(first)
+                await(() -> !gridCards(h).isEmpty() && !gridCards(h).getFirst().getId().equals(first)
                         && nodes(h.root(), Label.class).stream().noneMatch(l -> l.getText().equals("Loading looks…")));
             }
-            assertEquals(all.stream().map(item -> "Preview " + item.name()).toList(), seen,
+            assertEquals(all.stream().map(item -> "wardrobe-look-" + item.id()).toList(), seen,
                     "Provider page boundaries must not duplicate or skip skins");
             for (int width : new int[]{1100, 1450}) {
                 fx(() -> { h.stage.setWidth(width); return null; });
-                await(() -> gridReady(h) && gridCards(h).getFirst().getAccessibleText().equals("Preview Grid 0"));
+                await(() -> gridReady(h) && gridCards(h).getFirst().getId().equals("wardrobe-look-" + all.getFirst().id()));
                 fx(() -> { assertGridWidth(h); return null; });
             }
         }
@@ -188,7 +188,7 @@ class LauncherWardrobeControllerTest {
             await(() -> gridCards(h).getFirst().getAccessibleText().equals(first));
             h.gateway.skins = List.of(SKIN);
             fx(() -> { button(h.root(), "Skins").fire(); return null; });
-            await(() -> card(h.root(), "Catalog skin") != null);
+            await(() -> h.root().lookup("#wardrobe-look-" + SKIN.id()) != null);
             fx(() -> {
                 assertFalse(h.root().lookup("#wardrobe-pagination").isVisible());
                 assertFalse(h.root().lookup("#wardrobe-pagination").isManaged());

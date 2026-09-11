@@ -245,7 +245,7 @@ class VersionControllerTest {
     @Test
     void downloadBundleTracksOnlySelectedDependencies() throws Exception {
         User currentUser = user("user-1");
-        Project project = project("project-1", "Sky Tools", ProjectClassification.MODPACK);
+        Project project = project("project-1", "Sky Tools", ProjectClassification.DATA);
         ProjectVersion version = version("version-1", "1.0.0");
         version.setDependencies(List.of(
                 new ProjectDependency("dep-a", "Dependency A", "1.0.0"),
