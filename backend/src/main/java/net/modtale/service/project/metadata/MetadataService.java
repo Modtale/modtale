@@ -100,6 +100,12 @@ public class MetadataService {
         existing.setTypes(updated.getTypes());
         existing.setAllowModpacks(updated.isAllowModpacks());
         existing.setAllowComments(updated.isAllowComments());
+        existing.setAdsEnabled(updated.isAdsEnabled());
+        existing.setDonationsEnabled(updated.isDonationsEnabled());
+        if (updated.getSuggestedDonationCents() > 0) {
+            existing.setSuggestedDonationCents(updated.getSuggestedDonationCents());
+        }
+        existing.setDonationRecurringDefault(updated.isDonationRecurringDefault());
         existing.setHmWikiEnabled(updated.isHmWikiEnabled());
         existing.setHmWikiSlug(updated.getHmWikiSlug() != null ? updated.getHmWikiSlug().trim() : null);
         existing.setGalleryCarouselEnabled(updated.isGalleryCarouselEnabled());

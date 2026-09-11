@@ -20,6 +20,7 @@ export enum AdminPermission {
     USER_RAW_EDIT = 'USER_RAW_EDIT',
     AUDIT_LOG_READ = 'AUDIT_LOG_READ',
     PLATFORM_ANALYTICS_READ = 'PLATFORM_ANALYTICS_READ',
+    PLATFORM_FINANCE_MANAGE = 'PLATFORM_FINANCE_MANAGE',
     STATUS_INCIDENT_READ = 'STATUS_INCIDENT_READ',
     STATUS_INCIDENT_MANAGE = 'STATUS_INCIDENT_MANAGE'
 }
@@ -70,6 +71,7 @@ export const ADMIN_PERMISSION_GROUPS = [
         group: 'Platform',
         permissions: [
             { id: AdminPermission.PLATFORM_ANALYTICS_READ, label: 'Read Platform Analytics' },
+            { id: AdminPermission.PLATFORM_FINANCE_MANAGE, label: 'Manage Platform Finance' },
             { id: AdminPermission.AUDIT_LOG_READ, label: 'Read Audit Logs' },
             { id: AdminPermission.STATUS_INCIDENT_READ, label: 'Read Status Incidents' },
             { id: AdminPermission.STATUS_INCIDENT_MANAGE, label: 'Manage Status Incidents' }

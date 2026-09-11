@@ -33,6 +33,10 @@ public class UpdateProjectRequest {
     private Boolean customLicenseOpenSource;
     private Boolean allowModpacks;
     private Boolean allowComments;
+    private Boolean adsEnabled;
+    private Boolean donationsEnabled;
+    private Integer suggestedDonationCents;
+    private Boolean donationRecurringDefault;
     private Boolean hmWikiEnabled;
     private Boolean galleryCarouselEnabled;
 
@@ -64,6 +68,14 @@ public class UpdateProjectRequest {
     public void setAllowModpacks(Boolean allowModpacks) { this.allowModpacks = allowModpacks; }
     public Boolean getAllowComments() { return allowComments; }
     public void setAllowComments(Boolean allowComments) { this.allowComments = allowComments; }
+    public Boolean getAdsEnabled() { return adsEnabled; }
+    public void setAdsEnabled(Boolean adsEnabled) { this.adsEnabled = adsEnabled; }
+    public Boolean getDonationsEnabled() { return donationsEnabled; }
+    public void setDonationsEnabled(Boolean donationsEnabled) { this.donationsEnabled = donationsEnabled; }
+    public Integer getSuggestedDonationCents() { return suggestedDonationCents; }
+    public void setSuggestedDonationCents(Integer suggestedDonationCents) { this.suggestedDonationCents = suggestedDonationCents; }
+    public Boolean getDonationRecurringDefault() { return donationRecurringDefault; }
+    public void setDonationRecurringDefault(Boolean donationRecurringDefault) { this.donationRecurringDefault = donationRecurringDefault; }
     public Boolean getHmWikiEnabled() { return hmWikiEnabled; }
     public void setHmWikiEnabled(Boolean hmWikiEnabled) { this.hmWikiEnabled = hmWikiEnabled; }
     public Boolean getGalleryCarouselEnabled() { return galleryCarouselEnabled; }
