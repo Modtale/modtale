@@ -12,6 +12,16 @@ import org.springframework.data.mongodb.core.convert.MongoCustomConversions;
 public class MongoConfig {
 
     @Bean
+    public ArtifactManifestStore artifactManifestStore(org.springframework.data.mongodb.MongoDatabaseFactory database) {
+        return new MongoArtifactManifestStore(database);
+    }
+
+    @Bean
+    public MongoCustomConversions mongoCustomConversions(ArtifactManifestStore store) {
+        return new MongoCustomConversions(List.of(new StringToOAuthProviderConverter(),
+                new SecurityEvidenceConverters.Write(store), new SecurityEvidenceConverters.Read(store)));
+    }
+
     public MongoCustomConversions mongoCustomConversions() {
         return new MongoCustomConversions(List.of(new StringToOAuthProviderConverter(),
                 new SecurityEvidenceConverters.Write(), new SecurityEvidenceConverters.Read()));

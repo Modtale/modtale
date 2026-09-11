@@ -30,7 +30,7 @@ class VersionReviewPersistenceIntegrationTest {
         if(!Set.of("27029","27030").contains(port)) throw new IllegalArgumentException("Unexpected test database port");
         client=MongoClients.create("mongodb://127.0.0.1:"+port+"/?serverSelectionTimeoutMS=3000");
         var factory=new SimpleMongoClientDatabaseFactory(client,database);
-        var conversions=new MongoConfig().mongoCustomConversions();
+        var conversions=new MongoConfig().mongoCustomConversions(new net.modtale.config.db.MongoArtifactManifestStore(factory));
         var context=new MongoMappingContext();context.setSimpleTypeHolder(conversions.getSimpleTypeHolder());context.afterPropertiesSet();
         var converter=new MappingMongoConverter(new DefaultDbRefResolver(factory),context);
         converter.setCustomConversions(conversions);converter.afterPropertiesSet();
@@ -74,6 +74,57 @@ class VersionReviewPersistenceIntegrationTest {
         String token = ProjectReviewSnapshot.token(project);
         mongo.updateFirst(Query.query(Criteria.where("_id").is(id)), new Update().set("versions.0.hash", "f".repeat(64)), Project.class);
         assertThrows(ResponseStatusException.class, () -> new ProjectReviewPersistence(mongo).capture(id, token));
+    }
+    @Test void referencedManifestsAreVerifiedAndMissingOrCorruptRecordsCannotClear() {
+        var raw = mongo.getCollection("projects").find().first();
+        var evidence = raw.getList("versions", Document.class).getFirst().get("scanResult", Document.class).get("securityEvidence", Document.class);
+        String reference = evidence.getString("manifestRef");
+        assertNotNull(reference); assertFalse(evidence.containsKey("entryHashes"));
+        assertTrue(net.modtale.service.security.scan.ArtifactClearancePolicy.complete(mongo.findById(id, Project.class).getVersions().getFirst().getScanResult()));
+        var manifests = mongo.getCollection(net.modtale.config.db.MongoArtifactManifestStore.COLLECTION);
+        manifests.updateOne(new Document("_id", reference), new Document("$set", new Document("entries", List.of(new Document("path", "substituted").append("sha256", "f".repeat(64))))));
+        assertFalse(net.modtale.service.security.scan.ArtifactClearancePolicy.complete(mongo.findById(id, Project.class).getVersions().getFirst().getScanResult()));
+        manifests.deleteOne(new Document("_id", reference));
+        assertFalse(net.modtale.service.security.scan.ArtifactClearancePolicy.complete(mongo.findById(id, Project.class).getVersions().getFirst().getScanResult()));
+    }
+    @Test void legacyEmbeddedEvidenceMigratesWithoutChangingTheBrowserReviewToken() {
+        var scan = ScanEvidenceFixtures.complete(true);
+        var hashes = new LinkedHashMap<String,String>(); hashes.put("z/nested.class", "b".repeat(64)); hashes.put("a.$manifest", "c".repeat(64));
+        var evidence = scan.getSecurityEvidence();
+        var updated = new ScanResult.SecurityEvidence(evidence.policyVersion(), evidence.artifactSha256(), SecurityManifest.identity(hashes), true, true, "COMPLETED", hashes);
+        var legacy = new net.modtale.config.db.SecurityEvidenceConverters.Write().convert(updated);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)), new Update().set("versions.0.scanResult.securityEvidence", legacy), Project.class);
+        var before = mongo.findById(id, Project.class);
+        assertTrue(net.modtale.service.security.scan.ArtifactClearancePolicy.complete(before.getVersions().getFirst().getScanResult()));
+        String token = VersionReviewSnapshot.token(before.getVersions().getFirst());
+        mongo.save(before);
+        var after = mongo.findById(id, Project.class);
+        assertEquals(token, VersionReviewSnapshot.token(after.getVersions().getFirst()));
+        assertEquals(hashes, after.getVersions().getFirst().getScanResult().getSecurityEvidence().entryHashes());
+        var raw = mongo.getCollection("projects").find().first().getList("versions", Document.class).getFirst()
+                .get("scanResult", Document.class).get("securityEvidence", Document.class);
+        assertTrue(raw.containsKey("manifestRef")); assertFalse(raw.containsKey("entryHashes"));
+    }
+    @Test void sixLargeManifestsNoLongerExceedTheProjectDocumentLimit() {
+        var hashes = new LinkedHashMap<String,String>();
+        for (int i = 0; i < 20_000; i++) hashes.put(String.format("p/%05d/", i) + "a".repeat(30) + ".class", "a".repeat(64));
+        String identity = SecurityManifest.identity(hashes);
+        var project = new Project(); project.setId("large-manifest-fixture");
+        var versions = new ArrayList<ProjectVersion>();
+        for (int i = 0; i < 6; i++) {
+            var item = new ProjectVersion(); item.setId("v" + i);
+            var scan = ScanEvidenceFixtures.complete(true);
+            var prior = scan.getSecurityEvidence();
+            scan.setSecurityEvidence(new ScanResult.SecurityEvidence(prior.policyVersion(), prior.artifactSha256(), identity, true, true, "COMPLETED", hashes));
+            item.setScanResult(scan); versions.add(item);
+        }
+        project.setVersions(versions); mongo.insert(project);
+        var raw = mongo.getCollection("projects").find(new Document("_id", "large-manifest-fixture")).first();
+        assertNotNull(raw);
+        assertTrue(new org.bson.RawBsonDocument(raw, new org.bson.codecs.DocumentCodec()).getByteBuffer().remaining() < 64_000);
+        assertEquals(1, mongo.getCollection(net.modtale.config.db.MongoArtifactManifestStore.COLLECTION).countDocuments(new Document("_id", identity)));
+        var restored = mongo.findById("large-manifest-fixture", Project.class);
+        for (var item : restored.getVersions()) assertTrue(net.modtale.service.security.scan.ArtifactClearancePolicy.complete(item.getScanResult()));
     }
     @AfterEach void cleanup() {if(client!=null) {client.getDatabase(database).drop();client.close();}}
     @Test void conditionalApprovalPreservesConcurrentSiblingAndProjectChanges() {

@@ -14,24 +14,41 @@ public final class SecurityEvidenceConverters {
 
     @WritingConverter
     public static final class Write implements Converter<SecurityEvidence, Document> {
+        private final ArtifactManifestStore store;
+        public Write() { this(null); }
+        public Write(ArtifactManifestStore store) { this.store = store; }
         @Override public Document convert(SecurityEvidence evidence) {
+            if (store != null && evidence.entryHashes() instanceof ReferencedArtifactManifest reference && reference.store == store)
+                return header(evidence).append("manifestRef", reference.identity);
             if (!SecurityManifest.valid(evidence.entryHashes(), true)) throw new MappingException("Invalid or oversized security manifest");
+            if (store != null && evidence.entryHashes() != null && !evidence.entryHashes().isEmpty())
+                return header(evidence).append("manifestRef", store.put(evidence.entryHashes()));
             var entries = new ArrayList<Document>();
             if (evidence.entryHashes() != null) evidence.entryHashes().forEach((path, hash) ->
                     entries.add(new Document("path", path).append("sha256", hash)));
+            return header(evidence).append("entryHashes", entries);
+        }
+        private Document header(SecurityEvidence evidence) {
             return new Document("policyVersion", evidence.policyVersion())
                     .append("artifactSha256", evidence.artifactSha256())
                     .append("contentSha256", evidence.contentSha256())
                     .append("complete", evidence.complete())
                     .append("clearanceGranted", evidence.clearanceGranted())
-                    .append("reviewState", evidence.reviewState())
-                    .append("entryHashes", entries);
+                    .append("reviewState", evidence.reviewState());
         }
     }
 
     @ReadingConverter
     public static final class Read implements Converter<Document, SecurityEvidence> {
+        private final ArtifactManifestStore store;
+        public Read() { this(null); }
+        public Read(ArtifactManifestStore store) { this.store = store; }
         @Override public SecurityEvidence convert(Document source) {
+            if (source.containsKey("manifestRef")) {
+                if (source.containsKey("entryHashes") || store == null || !(source.get("manifestRef") instanceof String identity)
+                        || !SecurityManifest.digest(identity)) throw new MappingException("Invalid artifact manifest reference");
+                return evidence(source, new ReferencedArtifactManifest(store, identity));
+            }
             var entries = new LinkedHashMap<String, String>();
             Object stored = source.get("entryHashes");
             if (stored instanceof List<?> list) {
@@ -50,6 +67,9 @@ public final class SecurityEvidenceConverters {
                 }
             } else if (stored != null) throw new MappingException("Invalid security manifest");
             if (!SecurityManifest.valid(entries, true)) throw new MappingException("Invalid or oversized security manifest");
+            return evidence(source, entries);
+        }
+        private SecurityEvidence evidence(Document source, Map<String,String> entries) {
             return new SecurityEvidence(source.getString("policyVersion"), source.getString("artifactSha256"),
                     source.getString("contentSha256"), Boolean.TRUE.equals(source.get("complete")),
                     Boolean.TRUE.equals(source.get("clearanceGranted")), source.getString("reviewState"), entries);

@@ -9,7 +9,14 @@ import java.util.regex.Pattern;
 public final class SecurityManifest {
     private static final Pattern SHA256 = Pattern.compile("[0-9a-f]{64}");
     private SecurityManifest() {}
+    public static final class Unavailable extends IllegalStateException {
+        public Unavailable(Throwable cause) { super("Artifact manifest is unavailable or invalid", cause); }
+    }
     public static boolean valid(Map<String,String> entries, boolean allowEmpty) {
+        try { return validLoaded(entries, allowEmpty); }
+        catch (Unavailable unavailable) { return false; }
+    }
+    private static boolean validLoaded(Map<String,String> entries, boolean allowEmpty) {
         if (entries == null || entries.isEmpty()) return allowEmpty;
         if (entries.size() > 20_000) return false;
         int characters = 0;
