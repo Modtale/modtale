@@ -24,6 +24,9 @@ public class ProjectVersion {
 
     private ScanResult.SecurityEvidence approvedSecurityEvidence;
     private long securityApprovedAt;
+    private String approvedSecurityContextSha256;
+    public String getApprovedSecurityContextSha256() { return approvedSecurityContextSha256; }
+    public void setApprovedSecurityContextSha256(String value) { approvedSecurityContextSha256 = value; }
     public ScanResult.SecurityEvidence getApprovedSecurityEvidence() { return approvedSecurityEvidence; }
     public void setApprovedSecurityEvidence(ScanResult.SecurityEvidence value) { approvedSecurityEvidence = value; }
     public long getSecurityApprovedAt() { return securityApprovedAt; }

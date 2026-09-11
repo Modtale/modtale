@@ -17,7 +17,7 @@ public final class ScanEvidenceFixtures {
         summary.setFilesScanned(1);
         result.setSummary(summary);
         String hash = "a".repeat(64);
-        result.setSecurityEvidence(new ScanResult.SecurityEvidence("warden-3.0.0", "b".repeat(64),
+        result.setSecurityEvidence(new ScanResult.SecurityEvidence("warden-3.0.0:" + "a".repeat(64), "b".repeat(64),
                 digest("9:Mod.class:" + hash + "\n"), true, granted, "COMPLETED", Map.of("Mod.class", hash)));
         return result;
     }

@@ -13,9 +13,11 @@ public final class ArtifactClearancePolicy {
         var evidence = result.getSecurityEvidence();
         if (summary == null || summary.getRecoverableErrors() != 0 || summary.getOversizedEntriesSkipped() != 0
                 || summary.getNestedArchiveReadFailures() != 0 || summary.getFilesScanned() <= 0
-                || evidence == null || !evidence.complete() || !"warden-3.0.0".equals(evidence.policyVersion())
+                || evidence == null || !evidence.complete() || (evidence.policyVersion() == null || !evidence.policyVersion().matches("warden-3\\.0\\.0:[0-9a-f]{64}"))
                 || !digest(evidence.artifactSha256()) || !digest(evidence.contentSha256())
                 || evidence.entryHashes() == null || evidence.entryHashes().isEmpty() || evidence.entryHashes().size() > 20_000) return false;
+        if (evidence.entryHashes().entrySet().stream().anyMatch(entry -> entry.getKey() == null
+                || entry.getKey().isBlank() || entry.getKey().length() > 8192 || !digest(entry.getValue()))) return false;
         StringBuilder canonical = new StringBuilder();
         for (var entry : new TreeMap<>(evidence.entryHashes()).entrySet()) {
             if (entry.getKey() == null || entry.getKey().isBlank() || !digest(entry.getValue())) return false;

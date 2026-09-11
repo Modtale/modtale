@@ -55,6 +55,19 @@ class SecurityIssueApprovalServiceTest {
     }
 
     @Test
+    void approvalRetainsDigestAndContextWithoutDuplicatingArchiveManifest() {
+        ProjectVersion version = approvedVersion("version", "1.0");
+        ScanResult scan = new ScanResult(); scan.setIssues(new ArrayList<>());
+        scan.setSecurityEvidence(new ScanResult.SecurityEvidence("warden-3.0.0", "a".repeat(64), "b".repeat(64),
+                true, false, "COMPLETED", java.util.Map.of("file", "c".repeat(64))));
+        version.setScanResult(scan);
+        approvalService.markIssuesAcceptedForApprovedVersion(version);
+        assertEquals("b".repeat(64), version.getApprovedSecurityEvidence().contentSha256());
+        assertTrue(version.getApprovedSecurityEvidence().entryHashes().isEmpty());
+        assertEquals(64, version.getApprovedSecurityContextSha256().length());
+    }
+
+    @Test
     void storedBaselinesAreUsedAfterScanResultIsRemoved() {
         ProjectVersion version = approvedVersion("version-1", "1.0.0");
         version.setApprovedIssueBaselines(List.of(new ProjectVersion.ApprovedIssueBaseline(

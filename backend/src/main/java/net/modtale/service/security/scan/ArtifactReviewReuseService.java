@@ -15,6 +15,10 @@ public class ArtifactReviewReuseService {
         if (!ArtifactClearancePolicy.complete(result) || current == null || !current.complete()
                 || "BLOCK".equals(result.getVerdict()) || result.getStatus() == ScanStatus.INFECTED
                 || project == null || project.getVersions() == null) return;
+        ProjectVersion target = project.getVersions().stream().filter(Objects::nonNull)
+                .filter(version -> Objects.equals(currentVersionId, version.getId())).findFirst().orElse(null);
+        String context = ArtifactReviewContext.fingerprint(target);
+        if (context == null) return;
         long now = System.currentTimeMillis();
         for (ProjectVersion version : project.getVersions()) {
             if (version == null || Objects.equals(version.getId(), currentVersionId)
@@ -26,7 +30,8 @@ public class ArtifactReviewReuseService {
                     || !current.policyVersion().equals(prior.policyVersion())
                     || current.contentSha256() == null || !current.contentSha256().equals(prior.contentSha256())
                     || current.entryHashes() == null || current.entryHashes().isEmpty()
-                    || !current.entryHashes().equals(prior.entryHashes())) continue;
+                    || !context.equals(version.getApprovedSecurityContextSha256())
+                    || !context.equals(ArtifactReviewContext.fingerprint(version))) continue;
             result.setReusedReviewVersion(version.getVersionNumber());
             result.setReusedReviewApprovedAt(version.getSecurityApprovedAt());
             for (var issue : result.getIssues()) {

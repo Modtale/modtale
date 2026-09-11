@@ -45,6 +45,7 @@ public class ScheduledReleaseExecutionService {
                 issueAnalysis.markIssuesAcceptedForApprovedVersion(version);
                 update.set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.APPROVED)
                         .set("versions.$.approvedSecurityEvidence", version.getApprovedSecurityEvidence())
+                        .set("versions.$.approvedSecurityContextSha256", version.getApprovedSecurityContextSha256())
                         .set("versions.$.securityApprovedAt", version.getSecurityApprovedAt())
                         .set("versions.$.approvedIssueBaselines", version.getApprovedIssueBaselines())
                         .set("versions.$.scanResult", null);

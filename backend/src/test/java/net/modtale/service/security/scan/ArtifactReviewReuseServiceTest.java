@@ -14,7 +14,9 @@ class ArtifactReviewReuseServiceTest {
         prior.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
         prior.setApprovedSecurityEvidence(result.getSecurityEvidence());
         prior.setSecurityApprovedAt(System.currentTimeMillis() - 1000);
-        Project project = new Project(); project.setVersions(List.of(prior)); return project;
+        prior.setApprovedSecurityContextSha256(ArtifactReviewContext.fingerprint(prior));
+        ProjectVersion current = new ProjectVersion(); current.setId("new"); current.setVersionNumber("1.1");
+        Project project = new Project(); project.setVersions(List.of(prior, current)); return project;
     }
     @Test void unchangedFullyInspectedArtifactReusesReview() {
         ScanResult result = ScanEvidenceFixtures.complete(false);
@@ -41,6 +43,31 @@ class ArtifactReviewReuseServiceTest {
             service.annotate(project, "new", result);
             assertNull(result.getReusedReviewVersion(), scenario);
         }
+    }
+    @Test void changedContextOrSupplementalContentCannotReuse() {
+        for (String scenario : List.of("games", "dependency", "override", "missing-snapshot", "edited-prior")) {
+            ScanResult result = ScanEvidenceFixtures.complete(false);
+            Project project = project(result);
+            ProjectVersion current = project.getVersions().get(1);
+            switch (scenario) {
+                case "games" -> current.setGameVersions(List.of("changed-runtime"));
+                case "dependency" -> current.setDependencies(List.of(new ProjectDependency("dependency", "Dependency", "1.0")));
+                case "override" -> current.setOverrideFileUrl("storage/supplement.zip");
+                case "missing-snapshot" -> project.getVersions().getFirst().setApprovedSecurityContextSha256(null);
+                case "edited-prior" -> project.getVersions().getFirst().setGameVersions(List.of("edited-after-approval"));
+            }
+            service.annotate(project, "new", result);
+            assertNull(result.getReusedReviewVersion(), scenario);
+        }
+    }
+    @Test void compactContentDigestIsSufficientWithoutRetainingEveryPriorEntry() {
+        ScanResult result = ScanEvidenceFixtures.complete(false);
+        Project project = project(result);
+        var evidence = result.getSecurityEvidence();
+        project.getVersions().getFirst().setApprovedSecurityEvidence(new ScanResult.SecurityEvidence(
+                evidence.policyVersion(), evidence.artifactSha256(), evidence.contentSha256(), true, false, "COMPLETED", Map.of()));
+        service.annotate(project, "new", result);
+        assertEquals("1.0", result.getReusedReviewVersion());
     }
     @Test void v2ApprovalDoesNotSupplyV3Evidence() {
         ScanResult result = ScanEvidenceFixtures.complete(false);

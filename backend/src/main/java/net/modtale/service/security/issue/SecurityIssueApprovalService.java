@@ -62,7 +62,11 @@ public class SecurityIssueApprovalService {
         scanResult.setKnownIssueCount(issues.size());
         scanResult.setNewIssueCount(0);
         scanResult.setEscalatedIssueCount(0);
-        version.setApprovedSecurityEvidence(scanResult.getSecurityEvidence());
+        var evidence = scanResult.getSecurityEvidence();
+        version.setApprovedSecurityEvidence(evidence == null ? null : new ScanResult.SecurityEvidence(
+                evidence.policyVersion(), evidence.artifactSha256(), evidence.contentSha256(), evidence.complete(),
+                evidence.clearanceGranted(), evidence.reviewState(), java.util.Map.of()));
+        version.setApprovedSecurityContextSha256(net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(version));
         version.setSecurityApprovedAt(scanResult.getReusedReviewApprovedAt() > 0
                 ? scanResult.getReusedReviewApprovedAt() : Instant.now().toEpochMilli());
         version.setApprovedIssueBaselines(approvedIssueBaselines);
