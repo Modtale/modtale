@@ -20,6 +20,7 @@ public class ScanCompletionService {
 
     private static final Logger logger = LoggerFactory.getLogger(ScanCompletionService.class);
 
+    private final WardenClientService warden;
     private final ProjectRepository projectRepository;
     private final ProjectService projectService;
     private final ProjectNotificationService projectNotificationService;
@@ -37,8 +38,10 @@ public class ScanCompletionService {
             SecurityIssueAnalysisService securityIssueAnalysisService,
             ScanRoutingService scanRoutingService,
             ScanPersistenceService scanPersistenceService,
-            ProjectVersionAccessService projectVersionAccessService
+            ProjectVersionAccessService projectVersionAccessService,
+            WardenClientService warden
     ) {
+        this.warden = warden;
         this.projectRepository = projectRepository;
         this.projectService = projectService;
         this.projectNotificationService = projectNotificationService;
@@ -98,6 +101,17 @@ public class ScanCompletionService {
             scanResult.setReviewerNotes(notes);
         }
 
+        if (routingDecision.action() != ScanRoutingService.RoutingAction.REQUIRE_REVIEW
+                && !java.util.Objects.equals(scanResult.getSecurityEvidence().policyVersion(), warden.currentPolicyVersion())) {
+            routingDecision = new ScanRoutingService.RoutingDecision(ScanRoutingService.RoutingAction.REQUIRE_REVIEW, 0);
+            scanResult.setVerdict("REVIEW");
+            scanResult.setStatus(ScanStatus.SUSPICIOUS);
+            scanResult.setReusedReviewVersion(null);
+            var notes = new java.util.ArrayList<>(scanResult.getReviewerNotes() == null
+                    ? java.util.List.<String>of() : scanResult.getReviewerNotes());
+            notes.add("The current inspection policy could not validate this result. A fresh review is required.");
+            scanResult.setReviewerNotes(notes);
+        }
         boolean approvedImmediately = routingDecision.action() == ScanRoutingService.RoutingAction.APPROVE_NOW;
         boolean notifyFlagged = routingDecision.action() == ScanRoutingService.RoutingAction.REQUIRE_REVIEW;
 

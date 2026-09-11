@@ -14,19 +14,25 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class ScheduledReleaseExecutionService {
+    private final net.modtale.service.security.scan.WardenClientService warden;
     private final MongoTemplate mongo;
     private final ProjectService projectService;
     private final ProjectNotificationService notifications;
     private final SecurityIssueAnalysisService issueAnalysis;
 
     public ScheduledReleaseExecutionService(MongoTemplate mongo, ProjectService projectService,
-            ProjectNotificationService notifications, SecurityIssueAnalysisService issueAnalysis) {
+            ProjectNotificationService notifications, SecurityIssueAnalysisService issueAnalysis,
+            net.modtale.service.security.scan.WardenClientService warden) {
+        this.warden = warden;
         this.mongo = mongo; this.projectService = projectService;
         this.notifications = notifications; this.issueAnalysis = issueAnalysis;
     }
     public List<String> publishDueVersions(Project project, LocalDateTime publishTime) {
         List<String> released = new ArrayList<>();
         if (project.getVersions() == null) return released;
+        if (project.getVersions().stream().noneMatch(version -> due(version, publishTime))) return released;
+        String currentPolicy = warden.currentPolicyVersion();
+        if (currentPolicy == null) return released;
         for (ProjectVersion version : project.getVersions()) {
             if (!due(version, publishTime)) continue;
             ScanResult scan = version.getScanResult();
@@ -38,6 +44,7 @@ public class ScheduledReleaseExecutionService {
             ArtifactReviewContext.bindSnapshot(versionMatch, version);
             long now = System.currentTimeMillis();
             boolean valid = ArtifactClearancePolicy.boundToVersion(version)
+                    && currentPolicy.equals(scan.getSecurityEvidence().policyVersion())
                     && scan.getScanTimestamp() > 0
                     && scan.getScanTimestamp() <= now
                     && now - scan.getScanTimestamp() < java.time.Duration.ofDays(30).toMillis();

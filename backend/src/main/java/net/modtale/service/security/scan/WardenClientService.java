@@ -32,6 +32,21 @@ public class WardenClientService {
                 .build();
     }
 
+    public record PolicyResponse(String policyVersion) {}
+
+    public String currentPolicyVersion() {
+        if (!wardenProperties.enabled()) return null;
+        try {
+            var response = webClient.get().uri("/api/v1/policy").retrieve()
+                    .bodyToMono(PolicyResponse.class).timeout(Duration.ofSeconds(10)).block();
+            String policy = response == null ? null : response.policyVersion();
+            return policy != null && policy.matches("warden-3\\.0\\.0:[0-9a-f]{64}") ? policy : null;
+        } catch (RuntimeException unavailable) {
+            logger.warn("Current scanner policy is unavailable; automatic publication is deferred");
+            return null;
+        }
+    }
+
     public ScanResult scanFile(byte[] fileBytes, String filename) {
         if (!wardenProperties.enabled()) {
             logger.error("Warden scanner is DISABLED. Falling back to manual-review degraded result for file: {}", filename);

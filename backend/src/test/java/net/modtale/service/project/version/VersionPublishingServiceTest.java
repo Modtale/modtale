@@ -17,14 +17,17 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class VersionPublishingServiceTest {
+    private net.modtale.service.security.scan.WardenClientService warden;
     private MongoTemplate mongo;
     private ProjectNotificationService notifications;
     private VersionPublishingService service;
     @BeforeEach void setup() {
+        warden = mock(net.modtale.service.security.scan.WardenClientService.class);
+        when(warden.currentPolicyVersion()).thenReturn(ScanEvidenceFixtures.complete(true).getSecurityEvidence().policyVersion());
         mongo = mock(MongoTemplate.class);
         notifications = mock(ProjectNotificationService.class);
         service = new VersionPublishingService(new ScheduledReleaseQueryService(mongo),
-                new ScheduledReleaseExecutionService(mongo, mock(ProjectService.class), notifications, mock(SecurityIssueAnalysisService.class)));
+                new ScheduledReleaseExecutionService(mongo, mock(ProjectService.class), notifications, mock(SecurityIssueAnalysisService.class), warden));
         when(mongo.updateFirst(any(Query.class), any(Update.class), eq(Project.class))).thenReturn(UpdateResult.acknowledged(1, 1L, null));
     }
     @Test void publishesOnlyDueVersionsWithVerifiedClearance() {
@@ -80,6 +83,25 @@ class VersionPublishingServiceTest {
             assertEquals(ProjectVersion.ReviewStatus.PENDING,
                     ((org.bson.Document) update.getValue().getUpdateObject().get("$set")).get("versions.$.reviewStatus"), scenario);
         }
+    }
+    @Test void unavailablePolicyDefersWithoutChangingQueueOrNotifying() {
+        var project = project(true);
+        when(mongo.find(any(Query.class), eq(Project.class))).thenReturn(List.of(project));
+        when(warden.currentPolicyVersion()).thenReturn(null);
+        service.processScheduledReleases();
+        verify(mongo, never()).updateFirst(any(Query.class), any(Update.class), eq(Project.class));
+        verifyNoInteractions(notifications);
+    }
+    @Test void changedPolicyInvalidatesScheduledClearance() {
+        var project = project(true);
+        when(mongo.find(any(Query.class), eq(Project.class))).thenReturn(List.of(project));
+        when(warden.currentPolicyVersion()).thenReturn("warden-3.0.0:" + "c".repeat(64));
+        service.processScheduledReleases();
+        var update = ArgumentCaptor.forClass(Update.class);
+        verify(mongo).updateFirst(any(Query.class), update.capture(), eq(Project.class));
+        assertEquals(ProjectVersion.ReviewStatus.PENDING,
+                ((org.bson.Document) update.getValue().getUpdateObject().get("$set")).get("versions.$.reviewStatus"));
+        verifyNoInteractions(notifications);
     }
     private Project project(boolean verified) {
         Project p = new Project(); p.setId("project"); p.setVersions(List.of(version("1.0", "2000-01-01T00:00:00", verified))); return p;

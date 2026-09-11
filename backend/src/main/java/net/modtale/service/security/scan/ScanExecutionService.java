@@ -65,7 +65,8 @@ public class ScanExecutionService {
                 securityIssueAnalysisService,
                 scanRoutingService,
                 scanPersistenceService,
-                projectVersionAccessService
+                projectVersionAccessService,
+                wardenService
         );
         this.wardenService = wardenService;
         this.storageService = storageService;
