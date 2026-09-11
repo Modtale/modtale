@@ -209,7 +209,19 @@ export interface ScanReviewTarget {
     relatedChecks?: string[];
 }
 
+export interface ArtifactSecurityEvidence {
+    policyVersion: string;
+    artifactSha256: string;
+    contentSha256: string;
+    complete: boolean;
+    clearanceGranted: boolean;
+    reviewState: string;
+    entryHashes: Record<string, string>;
+}
+
 export interface ScanResult {
+    securityEvidence?: ArtifactSecurityEvidence;
+    reusedReviewVersion?: string;
     status: 'SCANNING' | 'CLEAN' | 'SUSPICIOUS' | 'INFECTED' | 'FAILED' | 'FLAGGED' | string;
     verdict?: 'AUTO_APPROVE' | 'REVIEW' | 'BLOCK' | string;
     riskLevel?: 'LOW' | 'ELEVATED' | 'HIGH' | 'CRITICAL' | string;

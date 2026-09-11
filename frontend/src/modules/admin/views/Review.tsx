@@ -77,7 +77,10 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     const pendingVersion = mod.versions.find((v: ProjectVersion) => v.reviewStatus === 'PENDING') || mod.versions[0];
     const scanResult = pendingVersion?.scanResult;
     const scanIssues = scanResult?.issues || [];
-    const hasScanIssues = !!scanResult && scanResult.status !== 'CLEAN' && scanResult.status !== 'SCANNING' && scanIssues.length > 0;
+    const securityCleared = scanResult?.status === 'CLEAN' && scanResult?.verdict === 'AUTO_APPROVE'
+        && scanResult?.scanState === 'COMPLETED' && scanResult?.securityEvidence?.complete === true
+        && scanResult?.securityEvidence?.clearanceGranted === true;
+    const hasScanIssues = !!scanResult && scanResult.status !== 'SCANNING' && !securityCleared;
     const isScanning = scanResult?.status === 'SCANNING';
 
     const orderedIssues = useMemo(() => {
@@ -538,14 +541,38 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                             <div>
                                                 <h4 className="font-bold text-blue-600 dark:text-blue-400">Scanner Is Running</h4>
                                                 <p className="text-sm text-blue-700/80 dark:text-blue-300/70 font-medium">
-                                                    Warden is still processing this artifact. Refresh or run a manual rescan shortly.
+                                                    Warden is inspecting this artifact. The result will remain pending until inspection and review finish.
                                                 </p>
                                             </div>
                                         </div>
                                     </div>
                                 )}
 
-                                {hasScanIssues && (
+                                {!scanResult && (
+                                    <div className="p-5 rounded-2xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20">
+                                        <h4 className="font-bold text-amber-800 dark:text-amber-200">Security evidence unavailable</h4>
+                                        <p className="text-sm text-amber-700 dark:text-amber-300">This version has no completed artifact review. Inspect it before approving publication.</p>
+                                    </div>
+                                )}
+
+                                {scanResult?.securityEvidence && (
+                                    <div className="rounded-2xl border border-slate-200 dark:border-white/10 p-5 space-y-3">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <h4 className="font-bold dark:text-white">Artifact evidence</h4>
+                                            <span className="text-xs font-medium text-slate-500">{scanResult.securityEvidence.policyVersion}</span>
+                                        </div>
+                                        <p className="text-sm text-slate-600 dark:text-slate-300">
+                                            {scanResult.securityEvidence.complete ? 'Archive inspection completed.' : 'Inspection has gaps; clearance is withheld.'}
+                                            {scanResult.reusedReviewVersion ? ` Contents match the review of version ${scanResult.reusedReviewVersion}.` : ''}
+                                        </p>
+                                        <dl className="text-xs space-y-2">
+                                            <div><dt className="text-slate-500">Uploaded artifact SHA-256</dt><dd className="font-mono break-all dark:text-slate-300">{scanResult.securityEvidence.artifactSha256 || 'Unavailable'}</dd></div>
+                                            <div><dt className="text-slate-500">Security review</dt><dd className="dark:text-slate-300">{scanResult.securityEvidence.clearanceGranted ? 'Clearance granted' : 'Manual review required'}</dd></div>
+                                        </dl>
+                                    </div>
+                                )}
+
+                                {hasScanIssues && scanResult && (
                                     <div className="rounded-2xl border border-red-200 dark:border-red-900/50 overflow-hidden">
                                         <div className="flex items-center justify-between p-5 bg-red-50 dark:bg-red-900/10">
                                             <div className="flex items-center gap-3 text-red-700 dark:text-red-400">
@@ -565,7 +592,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                         New: {scanResult.newIssueCount || 0} • Known: {scanResult.knownIssueCount || 0} • Escalated: {scanResult.escalatedIssueCount || 0}
                                                     </p>
                                                     <p className="text-xs opacity-80 font-medium">
-                                                        {scanResult.scanState ? `State: ${scanResult.scanState}` : 'State: COMPLETED'}
+                                                        {scanResult.scanState ? `State: ${scanResult.scanState}` : 'State: unavailable'}
                                                         {scanResult.scanAttempt ? ` • Attempt ${scanResult.scanAttempt}` : ''}
                                                         {scanResult.summary?.recoverableErrors ? ` • Recoverable Errors ${scanResult.summary.recoverableErrors}` : ''}
                                                     </p>
@@ -613,6 +640,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
 
                                         {showScanDetails && (
                                             <div className="p-4 bg-white dark:bg-black/20 space-y-2 border-t border-red-200 dark:border-red-900/50">
+                                                {orderedIssues.length === 0 && <p className="text-sm text-slate-600 dark:text-slate-300">No heuristic findings were emitted. Review the evidence and reviewer notes before deciding.</p>}
                                                 {orderedIssues.map((issue: ScanIssue, idx: number) => (
                                                     <div key={idx} className="flex items-center justify-between text-sm bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-slate-200 dark:border-white/5">
                                                         <div className="flex-1 min-w-0 pr-4">
@@ -636,7 +664,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                                     <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 uppercase">Suppressed</span>
                                                                 )}
                                                                 {issue.knownIssue && !issue.escalated && (
-                                                                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 uppercase">Known</span>
+                                                                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 uppercase">Previously seen</span>
                                                                 )}
                                                                 {!issue.knownIssue && (
                                                                     <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-200 uppercase">New</span>
@@ -664,17 +692,17 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                     </div>
                                 )}
 
-                                {!hasScanIssues && !isScanning && (
+                                {securityCleared && !isScanning && (
                                     <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between">
                                         <div className="flex items-center gap-4">
                                             <Check className="w-6 h-6 text-emerald-500" />
                                             <div>
-                                                <h4 className="font-bold text-emerald-500">Automated Checks Passed</h4>
+                                                <h4 className="font-bold text-emerald-500">Artifact Review Completed</h4>
                                                 <p className="text-sm text-emerald-600/80 dark:text-emerald-500/70 font-medium">
-                                                    Warden did not surface actionable security findings for this scan.
+                                                    Inspection and security review completed with no unresolved concerns.
                                                 </p>
                                                 <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80 font-medium">
-                                                    {scanResult?.scanState ? `State: ${scanResult.scanState}` : 'State: COMPLETED'}
+                                                    {scanResult?.scanState ? `State: ${scanResult.scanState}` : 'State: unavailable'}
                                                     {scanResult?.scanAttempt ? ` • Attempt ${scanResult.scanAttempt}` : ''}
                                                 </p>
                                             </div>

@@ -141,23 +141,36 @@ const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number;
     }, [content]);
 
     const lines = useMemo(() => safeContent.split('\n'), [safeContent]);
+    const displayedRange = useMemo(() => {
+        if (!startLine || startLine < 1) return undefined;
+        if (!safeContent.startsWith('// JVM bytecode of the uploaded class.')) return { start: startLine, end: endLine || startLine };
+        const matching = lines.flatMap((line, index) => {
+            const marker = line.match(/^\s*LINENUMBER (\d+) /);
+            const sourceLine = marker ? Number(marker[1]) : 0;
+            return sourceLine >= startLine && sourceLine <= (endLine || startLine) ? [index + 1] : [];
+        });
+        return matching.length ? { start: matching[0], end: matching[matching.length - 1] } : undefined;
+    }, [lines, safeContent, startLine, endLine]);
+    const displayedStart = displayedRange?.start;
+
 
     useEffect(() => {
-        if (startLine && scrollContainerRef.current && startLine > 1) {
-            setTimeout(() => {
+        if (displayedStart && scrollContainerRef.current && displayedStart > 1) {
+            const timer = setTimeout(() => {
                 if (scrollContainerRef.current) {
                     const lineHeight = 20;
-                    scrollContainerRef.current.scrollTop = (startLine - 5) * lineHeight;
+                    scrollContainerRef.current.scrollTop = Math.max(0, displayedStart - 5) * lineHeight;
                 }
             }, 100);
+            return () => clearTimeout(timer);
         }
-    }, [startLine, content]);
+    }, [displayedStart, content]);
 
     return (
         <div ref={scrollContainerRef} className="flex h-full overflow-auto bg-[#0d1117] font-mono text-xs relative">
             <div className="sticky left-0 z-10 h-fit min-h-full w-12 select-none border-r border-white/5 bg-[#0d1117] py-4 pr-3 text-right leading-5 text-slate-600">
                 {lines.map((_, i) => (
-                    <div key={i} className={(startLine && endLine && (i+1) >= startLine && (i+1) <= endLine) ? 'text-yellow-500 font-bold bg-yellow-500/10 w-full pr-1' : ''}>
+                    <div key={i} className={(displayedRange && (i+1) >= displayedRange.start && (i+1) <= displayedRange.end) ? 'text-yellow-500 font-bold bg-yellow-500/10 w-full pr-1' : ''}>
                         {i + 1}
                     </div>
                 ))}
@@ -173,6 +186,8 @@ const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number;
 };
 
 export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, versionId, version, structure, issues = [], initialFile, initialLine, initialLineEnd, onClose }) => {
+    const requestGeneration = useRef(0);
+    useEffect(() => () => { requestGeneration.current++; }, [modId, version]);
     const [inspectorFile, setInspectorFile] = useState<string | null>(null);
     const [inspectorContent, setInspectorContent] = useState<any>('');
     const [loadingFile, setLoadingFile] = useState(false);
@@ -222,18 +237,22 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
     };
 
     const loadInspectorFile = async (path: string) => {
+        const generation = ++requestGeneration.current;
+        setInspectorContent('');
         setInspectorFile(path);
         setLoadingFile(true);
         try {
             const data = await adminClient.getFileContent(modId, version, path);
+            if (generation !== requestGeneration.current) return;
             setInspectorContent(data);
             setActionError(null);
         } catch (e) {
+            if (generation !== requestGeneration.current) return;
             const message = extractApiErrorMessage(e, 'We could not load this file from the archive.');
             setActionError(message);
             setInspectorContent(`// ${message}`);
         } finally {
-            setLoadingFile(false);
+            if (generation === requestGeneration.current) setLoadingFile(false);
         }
     };
 
