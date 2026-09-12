@@ -12,7 +12,3 @@ DOCKER_BUILDKIT=1 docker build \
   --cache-from "$image:$tag" --cache-from "$image:latest" \
   --build-arg BUILDKIT_INLINE_CACHE=1 -t "$image:$tag" "$@" .
 docker push "$image:$tag"
-if [[ "$component" == status ]]; then
-  docker tag "$image:$tag" "$image:latest"
-  docker push "$image:latest"
-fi
