@@ -93,6 +93,14 @@ public class ProjectReviewPersistence {
         update.set("updatedAt", java.time.LocalDateTime.now().toString());
         return applyUpdate(snapshot, update);
     }
+    public boolean unlist(Snapshot snapshot) {
+        if (!"PUBLISHED".equals(snapshot.raw().getString("status"))
+                && !"UNLISTED".equals(snapshot.raw().getString("status")))
+            throw ProjectReviewSnapshot.conflict();
+        return applyUpdate(snapshot, new Update().set("status", net.modtale.model.project.ProjectStatus.UNLISTED)
+                .set("expiresAt", null).set("rankingDirty", true)
+                .set("updatedAt", java.time.LocalDateTime.now().toString()));
+    }
     public boolean applyDeletionState(Snapshot snapshot, boolean scrub) {
         var project = snapshot.project();
         var update = new Update().set("status", project.getStatus()).set("deletedAt", project.getDeletedAt())

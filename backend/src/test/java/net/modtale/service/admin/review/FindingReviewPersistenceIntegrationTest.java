@@ -466,4 +466,28 @@ class FindingReviewPersistenceIntegrationTest {
         assertEquals("new-decision", version().getFindingReviewHead());
     }
 
+    @Test void unlistingPreservesEvidenceAndRejectsStaleState() {
+        var event = record(token());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("status", ProjectStatus.PUBLISHED), Project.class);
+        var writes = new ProjectReviewPersistence(mongo);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        snapshot.project().setVersions(List.of());
+        assertTrue(writes.unlist(snapshot));
+        assertEquals(ProjectStatus.UNLISTED, mongo.findById(projectId, Project.class).getStatus());
+        assertEquals(event.id(), version().getFindingReviewHead()); assertNotNull(version().getScanResult());
+        assertFalse(writes.unlist(snapshot));
+        snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("versions.0.findingReviewHead", "new-head"), Project.class);
+        assertFalse(writes.unlist(snapshot)); assertEquals("new-head", version().getFindingReviewHead());
+    }
+    @Test void unlistingCannotPublishAnUnreviewedOrDeletedProject() {
+        var writes = new ProjectReviewPersistence(mongo);
+        for (var status : List.of(ProjectStatus.DRAFT, ProjectStatus.PENDING, ProjectStatus.PRIVATE, ProjectStatus.ARCHIVED, ProjectStatus.DELETED)) {
+            mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("status", status), Project.class);
+            var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+            assertThrows(ResponseStatusException.class, () -> writes.unlist(snapshot));
+            assertEquals(status, mongo.findById(projectId, Project.class).getStatus());
+        }
+    }
+
 }
