@@ -6,6 +6,8 @@ import net.modtale.model.project.*;
 import net.modtale.service.admin.review.VersionReviewPersistence;
 import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.security.scan.ArtifactReviewContext;
+import net.modtale.service.security.scan.ArtifactClearancePolicy;
+import net.modtale.service.security.scan.WardenClientService;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.http.HttpStatus;
@@ -19,9 +21,10 @@ public class FindingReviewService {
     private final MongoTemplate mongo;
     private final VersionReviewPersistence persistence;
     private final ProjectService projects;
+    private final WardenClientService warden;
 
-    public FindingReviewService(MongoTemplate mongo, VersionReviewPersistence persistence, ProjectService projects) {
-        this.mongo = mongo; this.persistence = persistence; this.projects = projects;
+    public FindingReviewService(MongoTemplate mongo, VersionReviewPersistence persistence, ProjectService projects, WardenClientService warden) {
+        this.mongo = mongo; this.persistence = persistence; this.projects = projects; this.warden = warden;
     }
 
     public enum Disposition { ACCEPT, REQUIRE_REVIEW, REVOKE }
@@ -31,7 +34,8 @@ public class FindingReviewService {
             String actorId, long createdAt, long expiresAt, Disposition disposition, String rationale,
             String scope, String artifactSha256, String contentSha256, String policyVersion,
             String contextSha256, Finding finding, String revokedDecisionId, String supersedesDecisionId) {}
-    public record History(List<Event> events, Integer nextOffset) {}
+    public record DecisionAssessment(String state, String explanation) {}
+    public record History(List<Event> events, Integer nextOffset, Map<String, DecisionAssessment> assessments, long assessedAt) {}
 
     public Event record(String projectId, String versionId, String token, String actorId, Request request) {
         if (request == null || request.disposition() == null || request.disposition() == Disposition.REVOKE)
@@ -54,7 +58,7 @@ public class FindingReviewService {
         var previous = head(projectId, versionId, version.getFindingReviewHead());
         String supersedes = chain(projectId, versionId, previous).stream()
                 .filter(event -> event.disposition() != Disposition.REVOKE && event.finding() != null
-                        && identity.equals(event.finding().identity()) && evidence.artifactSha256().equals(event.artifactSha256())
+                        && identity.equals(event.finding().identity())
                         && evidence.contentSha256().equals(event.contentSha256()) && context.equals(event.contextSha256()))
                 .map(Event::id).findFirst().orElse(null);
         long now = Instant.now().toEpochMilli();
@@ -90,7 +94,19 @@ public class FindingReviewService {
         var version = mongo.getConverter().read(ProjectVersion.class, snapshot.version());
         var events = chain(projectId, versionId, head(projectId, versionId, version.getFindingReviewHead()));
         int end = Math.min(events.size(), offset + 50);
-        return new History(List.copyOf(events.subList(Math.min(offset, events.size()), end)), end < events.size() ? end : null);
+        var page = List.copyOf(events.subList(Math.min(offset, events.size()), end));
+        String policy = ArtifactClearancePolicy.complete(version.getScanResult()) && !events.isEmpty()
+                ? warden.currentPolicyVersion() : null;
+        long assessedAt = Instant.now().toEpochMilli();
+        var validity = new FindingDecisionValidity().assess(projectId, version, events, policy, assessedAt);
+        var assessments = new LinkedHashMap<String, DecisionAssessment>();
+        for (var event : events) {
+            var assessment = validity.get(event.id());
+            assessments.put(event.id(), new DecisionAssessment(assessment.state().name(), assessment.explanation()));
+        }
+        // Policy lookup and history reads must not conceal a concurrent change to this version.
+        persistence.capture(projectId, versionId, token);
+        return new History(page, end < events.size() ? end : null, Map.copyOf(assessments), assessedAt);
     }
 
     private Event persist(VersionReviewPersistence.Snapshot snapshot, Event event) {

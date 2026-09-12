@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import type { ScanIssue } from '@/types';
-import { findingReviews, type FindingDecision } from '../api/findingReviews';
+import { findingReviews, type FindingDecision, type DecisionAssessment } from '../api/findingReviews';
 import { extractApiErrorMessage } from '@/utils/api';
 
 type Props = { projectId: string; versionId: string; token?: string; issues: ScanIssue[]; canDecide: boolean; onSaved: () => void };
 export function FindingDecisions({ projectId, versionId, token, issues, canDecide, onSaved }: Props) {
     const [open, setOpen] = useState(false);
     const [events, setEvents] = useState<FindingDecision[]>([]);
+    const [assessments, setAssessments] = useState<Record<string, DecisionAssessment>>({});
+    const [assessedAt, setAssessedAt] = useState<number>();
+    const [showApplicable, setShowApplicable] = useState(false);
     const [next, setNext] = useState<number | null>(null);
     const [issueIndex, setIssueIndex] = useState(0);
     const [disposition, setDisposition] = useState<'ACCEPT' | 'REQUIRE_REVIEW'>('REQUIRE_REVIEW');
@@ -19,7 +22,9 @@ export function FindingDecisions({ projectId, versionId, token, issues, canDecid
         setBusy(true); setError('');
         try {
             const result = await findingReviews.history(projectId, versionId, token, offset);
-            setEvents(old => offset ? [...old, ...result.events] : result.events); setNext(result.nextOffset); setOpen(true);
+            setEvents(old => offset ? [...old, ...result.events] : result.events);
+            setAssessments(result.assessments ?? {});
+            setAssessedAt(result.assessedAt); setNext(result.nextOffset); setOpen(true);
         } catch (e) { setError(extractApiErrorMessage(e, 'Could not load decision history.')); }
         finally { setBusy(false); }
     }
@@ -36,6 +41,9 @@ export function FindingDecisions({ projectId, versionId, token, issues, canDecid
     }
     const superseded = new Set(events.map(event => event.supersedesDecisionId).filter(Boolean));
     const revoked = new Set(events.map(event => event.revokedDecisionId).filter(Boolean));
+    const retained = (event: FindingDecision) => !saved && !revoked.has(event.id) && !superseded.has(event.id) && assessments[event.id]?.state === 'APPLICABLE' && event.expiresAt > Date.now();
+    const retainedCount = events.filter(retained).length;
+    const visible = events.filter(event => showApplicable || !retained(event));
     return <section className="mt-4 rounded-lg border border-slate-300 dark:border-slate-700 p-4 space-y-3">
         <button type="button" disabled={busy || saved} onClick={() => open ? setOpen(false) : void load()} aria-expanded={open} className="font-bold text-sm">{open ? 'Hide finding decisions' : 'Finding decisions and history'}</button>
         {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
@@ -56,8 +64,11 @@ export function FindingDecisions({ projectId, versionId, token, issues, canDecid
                 {issues.length > 0 && <button type="button" disabled={busy || saved || !token || rationale.trim().length < 10} onClick={() => void save()} className="text-sm font-bold">Record decision</button>}
             </div>}
             {!events.length && <p className="text-sm">No recorded finding decisions.</p>}
-            <ol className="space-y-3">{events.map(event => <li key={event.id} className="border-t pt-2 text-sm">
+            {assessedAt && <p className="text-xs text-slate-500">Assessed against this version at {new Date(assessedAt).toLocaleString()}. This comparison does not authorize publication.</p>}
+            {retainedCount > 0 && <button type="button" aria-expanded={showApplicable} onClick={() => setShowApplicable(value => !value)}>{showApplicable ? 'Hide' : 'Show'} retained reasoning ({retainedCount})</button>}
+            <ol className="space-y-3">{visible.map(event => <li key={event.id} className="border-t pt-2 text-sm">
                 <p>{event.disposition === 'ACCEPT' ? 'Accepted for inspected artifact' : event.disposition === 'REVOKE' ? 'Decision revoked' : 'Further review required'} · {event.actorId} · {new Date(event.createdAt).toLocaleString()}</p>
+                <p className="text-xs font-medium">{saved ? 'Reopen the review to reassess the updated history.' : assessments[event.id]?.state === 'APPLICABLE' && event.expiresAt <= Date.now() ? 'This acceptance has expired since the assessment.' : assessments[event.id]?.explanation ?? 'Current applicability has not been verified.'}</p>
                 <p className="break-all">{event.finding.path}:{event.finding.lineStart}</p><p>{event.rationale}</p>
                 {event.disposition !== 'REVOKE' && <p className="text-xs">{revoked.has(event.id) ? 'Revoked' : superseded.has(event.id) ? 'Superseded' : event.expiresAt === 0 ? 'No automatic expiry' : event.expiresAt <= Date.now() ? 'Expired' : `Expires ${new Date(event.expiresAt).toLocaleString()}`}</p>}
                 {canDecide && event.disposition !== 'REVOKE' && !revoked.has(event.id) && !superseded.has(event.id) && <button type="button" disabled={busy || saved || rationale.trim().length < 10} onClick={() => void save(event.id)} className="font-bold">Revoke decision</button>}

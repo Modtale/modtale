@@ -12,7 +12,11 @@ export interface FindingDecision {
     revokedDecisionId: string | null;
     supersedesDecisionId?: string | null;
 }
-export interface FindingHistory { events: FindingDecision[]; nextOffset: number | null }
+export interface DecisionAssessment { state: string; explanation: string }
+export interface FindingHistory {
+    events: FindingDecision[]; nextOffset: number | null;
+    assessments?: Record<string, DecisionAssessment>; assessedAt?: number;
+}
 const path = (project: string, version: string) => `/admin/projects/${encodeURIComponent(project)}/versions/${encodeURIComponent(version)}/finding-decisions`;
 export const findingReviews = {
     history: async (project: string, version: string, token: string, offset = 0): Promise<FindingHistory> =>

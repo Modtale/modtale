@@ -57,3 +57,40 @@ it('revokes with a reason while retaining the original record', async () => {
     expect(findingReviews.revoke).toHaveBeenCalledWith('project', 'version', 'snapshot', 'decision', 'Verified the documented integration');
     expect(container.querySelectorAll('li')).toHaveLength(2); expect(container.textContent).toContain('Revoked');
 });
+
+it('focuses changed decisions while keeping verified retained reasoning accessible', async () => {
+    const changed = { ...event, id: 'changed', rationale: 'Earlier reasoning for a changed artifact' };
+    vi.mocked(findingReviews.history).mockResolvedValue({ events: [event, changed], nextOffset: null, assessedAt: Date.now(),
+        assessments: { decision: { state: 'APPLICABLE', explanation: 'The complete contents and context match.' },
+            changed: { state: 'ARTIFACT_CHANGED', explanation: 'The artifact changed; inspect callers and resources.' } } });
+    await render(); await click('Finding decisions and history');
+    expect(container.querySelectorAll('li')).toHaveLength(1);
+    expect(container.textContent).toContain('inspect callers and resources');
+    expect(container.textContent).not.toContain('Reviewed the service integration');
+    await click('Show retained reasoning (1)');
+    expect(container.querySelectorAll('li')).toHaveLength(2);
+    expect(container.textContent).toContain('The complete contents and context match.');
+});
+it('does not keep an acceptance collapsed after its assessed expiry', async () => {
+    vi.mocked(findingReviews.history).mockResolvedValue({ events: [{ ...event, expiresAt: Date.now() - 1000 }], nextOffset: null,
+        assessments: { decision: { state: 'APPLICABLE', explanation: 'Previously matched' } } });
+    await render(); await click('Finding decisions and history');
+    expect(container.querySelectorAll('li')).toHaveLength(1);
+    expect(container.textContent).toContain('expired since the assessment');
+    expect(container.textContent).not.toContain('Show retained reasoning');
+});
+
+it('updates earlier assessments when policy changes between history pages', async () => {
+    vi.mocked(findingReviews.history)
+        .mockResolvedValueOnce({ events: [event], nextOffset: 50, assessedAt: 1000,
+            assessments: { decision: { state: 'APPLICABLE', explanation: 'Matched earlier policy' } } })
+        .mockResolvedValueOnce({ events: [{ ...event, id: 'older' }], nextOffset: null, assessedAt: 2000,
+            assessments: { decision: { state: 'POLICY_CHANGED', explanation: 'Policy changed since the first page' },
+                older: { state: 'EXPIRED', explanation: 'Older decision expired' } } });
+    await render(); await click('Finding decisions and history');
+    expect(container.querySelectorAll('li')).toHaveLength(0);
+    await click('Older decisions');
+    expect(container.querySelectorAll('li')).toHaveLength(2);
+    expect(container.textContent).toContain('Policy changed since the first page');
+    expect(container.textContent).not.toContain('Show retained reasoning');
+});

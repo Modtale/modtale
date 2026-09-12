@@ -25,6 +25,7 @@ class FindingReviewPersistenceIntegrationTest {
     private VersionReviewPersistence persistence;
     private FindingReviewService service;
     private ProjectService projects;
+    private WardenClientService warden;
     private String database;
     private final String projectId = "abcdefabcdefabcdefabcdef";
 
@@ -39,7 +40,9 @@ class FindingReviewPersistenceIntegrationTest {
         var converter = new MappingMongoConverter(new DefaultDbRefResolver(factory), context);
         converter.setCustomConversions(conversions); converter.afterPropertiesSet();
         mongo = new MongoTemplate(factory, converter); persistence = spy(new VersionReviewPersistence(mongo));
-        projects = mock(ProjectService.class); service = new FindingReviewService(mongo, persistence, projects);
+        projects = mock(ProjectService.class); warden = mock(WardenClientService.class);
+        when(warden.currentPolicyVersion()).thenReturn(ScanEvidenceFixtures.complete(false).getSecurityEvidence().policyVersion());
+        service = new FindingReviewService(mongo, persistence, projects, warden);
         var project = new Project(); project.setId(projectId);
         var version = new ProjectVersion(); version.setId("v1"); version.setVersionNumber("1.0");
         var scan = ScanEvidenceFixtures.complete(false);
@@ -101,6 +104,25 @@ class FindingReviewPersistenceIntegrationTest {
         assertEquals(0, second.expiresAt());
         assertEquals(first, mongo.findById(first.id(), FindingReviewService.Event.class, FindingReviewService.COLLECTION));
         assertEquals(2, service.history(projectId, "v1", token(), 0).events().size());
+    }
+    @Test void historyExplainsScopeChangesAndUnavailablePolicy() {
+        var event = record(token());
+        assertEquals("APPLICABLE", service.history(projectId, "v1", token(), 0).assessments().get(event.id()).state());
+        when(warden.currentPolicyVersion()).thenReturn(null);
+        assertEquals("POLICY_UNAVAILABLE", service.history(projectId, "v1", token(), 0).assessments().get(event.id()).state());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update()
+                .set("versions.0.gameVersions", List.of("different-runtime")), Project.class);
+        assertEquals("CONTEXT_CHANGED", service.history(projectId, "v1", token(), 0).assessments().get(event.id()).state());
+    }
+    @Test void historyRejectsVersionChangeDuringPolicyLookup() {
+        record(token());
+        when(warden.currentPolicyVersion()).thenAnswer(invocation -> {
+            mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update()
+                    .set("versions.0.hash", "f".repeat(64)), Project.class);
+            return ScanEvidenceFixtures.complete(false).getSecurityEvidence().policyVersion();
+        });
+        assertEquals(409, assertThrows(ResponseStatusException.class,
+                () -> service.history(projectId, "v1", token(), 0)).getStatusCode().value());
     }
     @Test void staleConcurrentRecordCannotOverwriteHead() {
         String before = token(); var winner = record(before);
