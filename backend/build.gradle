@@ -26,6 +26,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
     implementation 'org.springframework.session:spring-session-data-mongodb:4.0.0-M2'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
@@ -59,4 +60,13 @@ tasks.named('test') {
         outputs.upToDateWhen { false }
     }
     useJUnitPlatform()
+}
+
+tasks.register('statusServiceJar', org.springframework.boot.gradle.tasks.bundling.BootJar) {
+    group = 'build'
+    description = 'Builds the detached Modtale status service jar.'
+    archiveClassifier = 'status'
+    mainClass = 'net.modtale.status.StatusServiceApplication'
+    targetJavaVersion = JavaVersion.VERSION_21
+    classpath = sourceSets.main.runtimeClasspath
 }
