@@ -47,7 +47,7 @@ export function FindingDecisions({ projectId, versionId, token, issues, canDecid
     return <section className="mt-4 rounded-lg border border-slate-300 dark:border-slate-700 p-4 space-y-3">
         <button type="button" disabled={busy || saved} onClick={() => open ? setOpen(false) : void load()} aria-expanded={open} className="font-bold text-sm">{open ? 'Hide finding decisions' : 'Finding decisions and history'}</button>
         {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
-        {saved && <p role="status" className="text-sm">Decision saved. Close and reopen this review before another decision or publication.</p>}
+        {saved && <p role="status" className="text-sm">Decision saved. Refresh the review evidence before another decision or publication.</p>}
         {open && <>
             <p className="text-sm text-slate-500">These decisions retain your reasoning for the inspected artifact and context. Recording or revoking a decision pauses automatic publication and requires a current moderator review. It does not grant security clearance.</p>
             {canDecide && <div className="space-y-2">
@@ -68,7 +68,7 @@ export function FindingDecisions({ projectId, versionId, token, issues, canDecid
             {retainedCount > 0 && <button type="button" aria-expanded={showApplicable} onClick={() => setShowApplicable(value => !value)}>{showApplicable ? 'Hide' : 'Show'} retained reasoning ({retainedCount})</button>}
             <ol className="space-y-3">{visible.map(event => <li key={event.id} className="border-t pt-2 text-sm">
                 <p>{event.disposition === 'ACCEPT' ? 'Accepted for inspected artifact' : event.disposition === 'REVOKE' ? 'Decision revoked' : 'Further review required'} · {event.actorId} · {new Date(event.createdAt).toLocaleString()}</p>
-                <p className="text-xs font-medium">{saved ? 'Reopen the review to reassess the updated history.' : assessments[event.id]?.state === 'APPLICABLE' && event.expiresAt <= Date.now() ? 'This acceptance has expired since the assessment.' : assessments[event.id]?.explanation ?? 'Current applicability has not been verified.'}</p>
+                <p className="text-xs font-medium">{saved ? 'Refresh the review evidence to reassess the updated history.' : assessments[event.id]?.state === 'APPLICABLE' && event.expiresAt <= Date.now() ? 'This acceptance has expired since the assessment.' : assessments[event.id]?.explanation ?? 'Current applicability has not been verified.'}</p>
                 <p className="break-all">{event.finding.path}:{event.finding.lineStart}</p><p>{event.rationale}</p>
                 {event.disposition !== 'REVOKE' && <p className="text-xs">{revoked.has(event.id) ? 'Revoked' : superseded.has(event.id) ? 'Superseded' : event.expiresAt === 0 ? 'No automatic expiry' : event.expiresAt <= Date.now() ? 'Expired' : `Expires ${new Date(event.expiresAt).toLocaleString()}`}</p>}
                 {canDecide && event.disposition !== 'REVOKE' && !revoked.has(event.id) && !superseded.has(event.id) && <button type="button" disabled={busy || saved || rationale.trim().length < 10} onClick={() => void save(event.id)} className="font-bold">Revoke decision</button>}

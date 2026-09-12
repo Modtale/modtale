@@ -34,7 +34,7 @@ async function reasoning() {
 it('records exact finding and snapshot, then requires a fresh review', async () => {
     await render(); await click('Finding decisions and history'); await reasoning(); await click('Record decision');
     expect(findingReviews.record).toHaveBeenCalledWith('project', 'version', 'snapshot', 0, 'REQUIRE_REVIEW', 'Verified the documented integration');
-    expect(onSaved).toHaveBeenCalledOnce(); expect(container.textContent).toContain('Close and reopen');
+    expect(onSaved).toHaveBeenCalledOnce(); expect(container.textContent).toContain('Refresh the review evidence');
     expect([...container.querySelectorAll('button')].find(b => b.textContent === 'Record decision')?.disabled).toBe(true);
 });
 it('keeps reasoning after a conflicting write and does not report success', async () => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Shield, List, FileText, Box, User as UserIcon, Check, ArrowLeft, Copy, ExternalLink, Terminal, Download, ArrowRight, X, ImageIcon, ChevronDown, ChevronUp, ShieldAlert, Eye, RefreshCw, PlayCircle } from 'lucide-react';
 import { API_BASE_URL, BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
 import { adminClient } from '../api/adminClient';
@@ -73,11 +73,24 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     const [loadingInspector, setLoadingInspector] = useState(false);
 
     const [decisionWritten, setDecisionWritten] = useState(false);
-    const mod = reviewingProject.mod;
+    const [refreshedReview, setRefreshedReview] = useState<{ source: any; data: any; versionId: string } | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
+    const [refreshError, setRefreshError] = useState('');
+    const refreshGeneration = useRef(0);
+    useEffect(() => {
+        refreshGeneration.current++;
+        setRefreshing(false); setRefreshError('');
+        setChecklist({}); setCurrentStep(0); setInspectorData(null); setLoadingInspector(false);
+        return () => { refreshGeneration.current++; };
+    }, [reviewingProject]);
+    const review = refreshedReview !== null && refreshedReview.source === reviewingProject ? refreshedReview.data : reviewingProject;
+    const mod = review.mod;
     const isNewProject = mod.status === 'PENDING';
     const projectLink = SiteRoutes.project(mod);
 
-    const pendingVersion = mod.versions.find((v: ProjectVersion) => v.reviewStatus === 'PENDING') || mod.versions[0];
+    const pendingVersion = refreshedReview !== null && refreshedReview.source === reviewingProject
+        ? mod.versions.find((v: ProjectVersion) => v.id === refreshedReview.versionId)
+        : mod.versions.find((v: ProjectVersion) => v.reviewStatus === 'PENDING') || mod.versions[0];
     useEffect(() => setDecisionWritten(false), [pendingVersion?.id, pendingVersion?.reviewToken]);
     const scanResult = pendingVersion?.scanResult;
     const scanIssues = scanResult?.issues || [];
@@ -121,6 +134,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     useEffect(() => {
         if (!pendingVersion?.dependencies) return;
 
+        let cancelled = false;
         const deps = pendingVersion.dependencies;
         const fetchMeta = async () => {
             const newMeta = { ...depMeta };
@@ -138,15 +152,45 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                     newMeta[d.projectId] = { icon: '', title: d.projectTitle || d.projectId };
                 }
             }));
-            setDepMeta(newMeta);
+            if (!cancelled) setDepMeta(newMeta);
         };
         fetchMeta();
-    }, [reviewingProject]);
+        return () => { cancelled = true; };
+    }, [review]);
+
+    const refreshEvidence = async () => {
+        if (refreshing || !pendingVersion) return;
+        const generation = ++refreshGeneration.current;
+        const versionId = pendingVersion.id;
+        setRefreshing(true); setRefreshError(''); setDecisionWritten(true);
+        setInspectorData(null); setLoadingInspector(false);
+        try {
+            const data = await adminClient.getReviewDetails(mod.id);
+            if (generation !== refreshGeneration.current) return;
+            const versions = data?.mod?.versions?.filter((version: ProjectVersion) => version.id === versionId);
+            if (data?.mod?.id !== mod.id || data.mod.status !== mod.status || versions?.length !== 1
+                || !versions[0].reviewToken || versions[0].reviewToken === pendingVersion.reviewToken
+                || (isNewProject && (!data.mod.reviewToken || data.mod.reviewToken === mod.reviewToken))
+                || !['PENDING', 'SCHEDULED'].includes(versions[0].reviewStatus)) {
+                throw new Error('The selected review is no longer available or lacks a current snapshot. Return to the queue to inspect its state.');
+            }
+            setRefreshedReview({ source: reviewingProject, data, versionId });
+            setChecklist({}); setCurrentStep(0); setShowScanDetails(false); setDepMeta({});
+            setDecisionWritten(false);
+        } catch (error) {
+            if (generation === refreshGeneration.current)
+                setRefreshError(extractApiErrorMessage(error, 'Could not refresh this review. Decisions remain disabled; retry to load current evidence.'));
+        } finally {
+            if (generation === refreshGeneration.current) setRefreshing(false);
+        }
+    };
 
     const openInspector = async (version: string, issues: ScanIssue[] = [], file?: string, lineStart?: number, lineEnd?: number) => {
+        const generation = refreshGeneration.current;
         setLoadingInspector(true);
         try {
             const structure = await adminClient.getStructure(mod.id, version);
+            if (generation !== refreshGeneration.current) return;
             setInspectorData({
                 version,
                 structure,
@@ -156,9 +200,10 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                 initialLineEnd: lineEnd
             });
         } catch (e) {
+            if (generation !== refreshGeneration.current) return;
             setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, "We could not inspect this version's file structure.") });
         } finally {
-            setLoadingInspector(false);
+            if (generation === refreshGeneration.current) setLoadingInspector(false);
         }
     };
 
@@ -580,7 +625,9 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                 {pendingVersion && <FindingDecisions key={`${pendingVersion.id}:${pendingVersion.reviewToken}`}
                                     projectId={mod.id} versionId={pendingVersion.id} token={pendingVersion.reviewToken}
                                     issues={scanIssues} canDecide={canDecide} onSaved={() => setDecisionWritten(true)} />}
-                                {decisionWritten && <p role="status" className="text-sm text-amber-700">A finding decision was saved. Close and reopen this review to inspect the updated history before publishing.</p>}
+                                {decisionWritten && <p role="status" className="text-sm text-amber-700">A finding decision was saved. Refresh the evidence to inspect the updated history before publishing.</p>}
+                                {decisionWritten && <button type="button" disabled={refreshing} onClick={() => void refreshEvidence()} className="text-sm font-bold text-modtale-accent">{refreshing ? 'Refreshing evidence…' : 'Refresh evidence and restart checklist'}</button>}
+                                {refreshError && <p role="alert" className="text-sm text-red-600">{refreshError}</p>}
                                 {scanResult?.securityEvidence && (
                                     <div className="rounded-2xl border border-slate-200 dark:border-white/10 p-5 space-y-3">
                                         <div className="flex items-center justify-between gap-3">
@@ -890,8 +937,8 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                             <div className="max-w-3xl mx-auto space-y-8 animate-in slide-in-from-right-4 duration-300">
                                 <div className="p-8 bg-white dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 flex items-center gap-8">
                                     <div className="w-24 h-24 bg-slate-100 dark:bg-white/10 rounded-2xl flex items-center justify-center overflow-hidden shrink-0">
-                                        {reviewingProject.authorStats?.avatarUrl ? (
-                                            <img src={reviewingProject.authorStats.avatarUrl} className="w-full h-full object-cover" />
+                                        {review.authorStats?.avatarUrl ? (
+                                            <img src={review.authorStats.avatarUrl} className="w-full h-full object-cover" />
                                         ) : (
                                             <UserIcon className="w-10 h-10 text-slate-400" />
                                         )}
@@ -906,11 +953,11 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                         </div>
                                         <div>
                                             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Joined</label>
-                                            <p className="font-mono text-sm dark:text-slate-300 mt-2">{reviewingProject.authorStats?.accountAge}</p>
+                                            <p className="font-mono text-sm dark:text-slate-300 mt-2">{review.authorStats?.accountAge}</p>
                                         </div>
                                         <div className="col-span-2">
                                             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Projects</label>
-                                            <p className="font-black text-2xl text-modtale-accent mt-1">{reviewingProject.authorStats?.totalProjects}</p>
+                                            <p className="font-black text-2xl text-modtale-accent mt-1">{review.authorStats?.totalProjects}</p>
                                         </div>
                                     </div>
                                 </div>
