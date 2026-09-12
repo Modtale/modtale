@@ -103,10 +103,15 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
 
     useEffect(() => {
         if (!canReadReviewQueue) return;
-        const interval = setInterval(() => {
-            fetchQueue(true);
-        }, 30_000);
-        return () => clearInterval(interval);
+        const refreshVisibleQueue = () => {
+            if (document.visibilityState !== 'hidden') fetchQueue(true);
+        };
+        const interval = setInterval(refreshVisibleQueue, 30_000);
+        document.addEventListener('visibilitychange', refreshVisibleQueue);
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', refreshVisibleQueue);
+        };
     }, [canReadReviewQueue]);
 
     useEffect(() => {

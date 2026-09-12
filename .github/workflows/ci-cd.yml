@@ -8,6 +8,11 @@ on:
       - '**'
   delete:
   workflow_dispatch:
+    inputs:
+      cleanup_branches:
+        type: string
+        default: '[]'
+        required: false
   schedule:
     - cron: '17 3 * * *'
 
@@ -490,7 +495,7 @@ jobs:
 
           if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
             # Keep one production instance warm to prevent user-facing cold starts.
-            ARGS+=("--cpu" "2")
+            ARGS+=("--cpu" "1")
             ARGS+=("--min-instances" "1")
             ARGS+=("--max-instances" "10")
             ARGS+=("--cpu-throttling")
@@ -633,7 +638,11 @@ jobs:
           fi
 
           : "${BACKEND_SERVICE_URL:?Backend service URL was not resolved.}"
-          echo "SSR_API_URL=$BACKEND_SERVICE_URL/api/v1" >> $GITHUB_ENV
+          if [ "$ENV_TYPE" = prod ]; then
+            echo "SSR_API_URL=$BACKEND_DOMAIN/api/v1" >> "$GITHUB_ENV"
+          else
+            echo "SSR_API_URL=$BACKEND_SERVICE_URL/api/v1" >> "$GITHUB_ENV"
+          fi
 
           if [ -n "${BACKEND_DOMAIN:-}" ]; then
             echo "API_URL=$BACKEND_DOMAIN/api/v1" >> $GITHUB_ENV
@@ -1042,6 +1051,7 @@ jobs:
       - id: inventory
         env:
           GH_TOKEN: ${{ github.token }}
+          EXPLICIT_CLEANUP_BRANCHES: ${{ inputs.cleanup_branches || '[]' }}
         run: |
           set -euo pipefail
           branches=$(python3 .github/scripts/find-orphan-previews.py)
@@ -1135,6 +1145,28 @@ jobs:
           gcloud container images untag "gcr.io/$PROJECT_ID/modtale-backend:$IMAGE_TAG" --quiet || true
           gcloud container images untag "gcr.io/$PROJECT_ID/modtale-frontend:$IMAGE_TAG" --quiet || true
 
+      - name: Drop branch Mongo database
+        run: |
+          set -euo pipefail
+
+          case "$DB_NAME" in
+            modtale-*)
+              ;;
+            *)
+              echo "::error::Refusing to drop non-preview Mongo database '$DB_NAME'."
+              exit 1
+              ;;
+          esac
+
+          mongodb_uri="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$MONGODB_SECRET_NAME")"
+          echo "::add-mask::$mongodb_uri"
+
+          npm install --silent --prefix "$RUNNER_TEMP/mongo-cleanup" mongodb@6
+
+          MONGODB_URI="$mongodb_uri" \
+          NODE_PATH="$RUNNER_TEMP/mongo-cleanup/node_modules" \
+          node .github/scripts/drop-preview-db.cjs
+
       - name: Delete branch R2 bucket
         run: |
           set -euo pipefail
@@ -1219,43 +1251,3 @@ jobs:
               --project "$PROJECT_ID" \
               --quiet || true
           done
-
-      - name: Drop branch Mongo database
-        run: |
-          set -euo pipefail
-
-          case "$DB_NAME" in
-            modtale-*)
-              ;;
-            *)
-              echo "::error::Refusing to drop non-preview Mongo database '$DB_NAME'."
-              exit 1
-              ;;
-          esac
-
-          mongodb_uri="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$MONGODB_SECRET_NAME")"
-          echo "::add-mask::$mongodb_uri"
-
-          npm install --silent --prefix "$RUNNER_TEMP/mongo-cleanup" mongodb@6
-
-          MONGODB_URI="$mongodb_uri" \
-          NODE_PATH="$RUNNER_TEMP/mongo-cleanup/node_modules" \
-          node <<'NODE'
-          const { MongoClient } = require('mongodb');
-
-          const uri = process.env.MONGODB_URI;
-          const dbName = process.env.DB_NAME;
-
-          if (!/^modtale-[a-z0-9-]+$/.test(dbName)) {
-            throw new Error(`Refusing to drop unsafe database name: ${dbName}`);
-          }
-
-          const client = new MongoClient(uri, { appName: 'modtale-branch-preview-cleanup' });
-          try {
-            await client.connect();
-            const result = await client.db(dbName).dropDatabase();
-            console.log(`Dropped Mongo database ${dbName}: ${result}`);
-          } finally {
-            await client.close();
-          }
-          NODE

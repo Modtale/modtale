@@ -13,7 +13,7 @@ project = os.environ['PROJECT_ID']
 branch_pages = json.loads(subprocess.check_output([
     'gh', 'api', f'repos/{os.environ["GITHUB_REPOSITORY"]}/branches', '--paginate', '--slurp'
 ], text=True))
-live = {guard.branch_slug(branch['name']) for page in branch_pages for branch in page}
+live = {guard.branch_slug(branch['name'], branch.get('commit', {}).get('sha', '')) for page in branch_pages for branch in page}
 live.update({'main', 'develop', 'dev', ''})
 services = json.loads(subprocess.check_output([
     'gcloud', 'run', 'services', 'list', '--project', project, '--region', os.environ['REGION'], '--format=json'
@@ -21,7 +21,10 @@ services = json.loads(subprocess.check_output([
 secrets = json.loads(subprocess.check_output([
     'gcloud', 'secrets', 'list', '--project', project, '--format=json'
 ], text=True))
-candidates = set()
+explicit = json.loads(os.environ.get('EXPLICIT_CLEANUP_BRANCHES') or '[]')
+if not isinstance(explicit, list) or any(not isinstance(value, str) or not re.fullmatch(r'[a-z0-9-]{1,20}', value) for value in explicit):
+    raise ValueError('Cleanup targets must be a JSON array of preview slugs')
+candidates = set(explicit)
 for service in services:
     metadata = service['metadata']
     slug = metadata.get('labels', {}).get('branch')

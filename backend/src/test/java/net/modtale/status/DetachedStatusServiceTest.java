@@ -135,6 +135,25 @@ class DetachedStatusServiceTest {
         assertFalse(service.isReady());
     }
 
+    @Test
+    void failedMongoHydrationIsRetriedWithoutLosingCurrentSamples() {
+        StatusServiceProperties properties = new StatusServiceProperties();
+        properties.setMongoUri("mongodb://test");
+        StatusHistoryEntry old = entry(Instant.now().minusSeconds(3600), SystemStatus.OPERATIONAL);
+        StatusHistoryEntry current = entry(Instant.now(), SystemStatus.OPERATIONAL);
+        when(mongoStatusStore.loadHistoryAfter(any())).thenReturn(Optional.empty(), Optional.empty(), Optional.of(List.of(old)));
+        when(mongoStatusStore.findLatestHistory()).thenReturn(Optional.empty());
+        when(mongoStatusStore.findIncidentBuckets()).thenReturn(Optional.empty());
+        when(statusProbeService.performHealthCheck()).thenReturn(current);
+        DetachedStatusService service = new DetachedStatusService(properties, statusProbeService,
+                mongoStatusStore, snapshotFileStore, statusDiscordNotifier);
+        service.refreshSnapshots();
+        assertEquals(1, service.getSystemStatus("24h").observedSamples());
+        service.refreshSnapshots();
+        assertEquals(2, service.getSystemStatus("24h").observedSamples());
+        assertEquals(old.timestamp().toEpochMilli(), service.getSystemStatus("24h").history().getFirst().time());
+    }
+
     private DetachedStatusService serviceWith(StatusHistoryEntry entry) {
         when(snapshotFileStore.readHistory()).thenReturn(List.of());
         when(mongoStatusStore.findHistoryAfter(any())).thenReturn(List.of());

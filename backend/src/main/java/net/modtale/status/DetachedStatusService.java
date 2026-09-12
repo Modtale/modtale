@@ -36,6 +36,7 @@ public class DetachedStatusService {
     private volatile IncidentBuckets lastKnownIncidents = IncidentBuckets.empty();
     private volatile boolean hydrated;
     private long lastRefreshNanos;
+    private boolean mongoHistoryLoaded;
 
     public DetachedStatusService(
             StatusServiceProperties properties,
@@ -77,6 +78,7 @@ public class DetachedStatusService {
 
     public synchronized void refreshSnapshots() {
         hydrate();
+        recoverMongoHistory();
         StatusHistoryEntry latest = statusProbeService.performHealthCheck();
         addHistory(latest);
         mongoStatusStore.saveHistory(latest);
@@ -127,13 +129,27 @@ public class DetachedStatusService {
 
             addHistory(snapshotFileStore.readHistory());
             Instant since = Instant.now().minus(properties.getHistoryRetention());
-            addHistory(mongoStatusStore.findHistoryAfter(since));
+            if (properties.getMongoUri().isBlank()) {
+                addHistory(mongoStatusStore.findHistoryAfter(since));
+                mongoHistoryLoaded = true;
+            } else {
+                recoverMongoHistory();
+            }
             mongoStatusStore.findLatestHistory().ifPresent(this::addHistory);
             pruneHistory();
             refreshIncidents();
             rebuildSnapshots();
             hydrated = true;
         }
+    }
+
+    private void recoverMongoHistory() {
+        if (mongoHistoryLoaded || properties.getMongoUri().isBlank()) return;
+        mongoStatusStore.loadHistoryAfter(Instant.now().minus(properties.getHistoryRetention())).ifPresent(entries -> {
+            addHistory(entries);
+            mongoHistoryLoaded = true;
+            logger.info("Restored {} persisted status history samples", entries.size());
+        });
     }
 
     private void refreshIncidents() {

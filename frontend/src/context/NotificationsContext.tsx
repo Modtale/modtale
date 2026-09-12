@@ -87,7 +87,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode; userId?
         if (!userId) return;
 
         const interval = setInterval(() => {
-            if (!isIdle) {
+            if (!isIdle && document.visibilityState !== 'hidden') {
                 fetchNotifications();
             }
         }, POLL_INTERVAL);
