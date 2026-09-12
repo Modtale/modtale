@@ -27,6 +27,9 @@ public class StorageService {
     private static final Logger logger = LoggerFactory.getLogger(StorageService.class);
 
     private final S3Client s3Client;
+    private final software.amazon.awssdk.services.s3.presigner.S3Presigner presigner;
+    @org.springframework.beans.factory.annotation.Value("${app.downloads.direct-storage:false}")
+    private boolean directStorageDownloads;
     private final String bucketName;
     private final String publicDomain;
 
@@ -50,9 +53,11 @@ public class StorageService {
 
     public StorageService(
             S3Client s3Client,
-            AppR2Properties r2Properties
+            AppR2Properties r2Properties,
+            software.amazon.awssdk.services.s3.presigner.S3Presigner presigner
     ) {
         this.s3Client = s3Client;
+        this.presigner = presigner;
         this.bucketName = r2Properties.bucket();
         this.publicDomain = r2Properties.publicDomain();
     }
@@ -160,18 +165,59 @@ public class StorageService {
         }
     }
 
+    public java.net.URI directDownloadUri(String key, String filename) {
+        if (!directStorageDownloads) return null;
+        try {
+            String disposition = org.springframework.http.ContentDisposition.attachment()
+                    .filename(filename, java.nio.charset.StandardCharsets.UTF_8).build().toString();
+            return presigner.presignGetObject(request -> request
+                    .signatureDuration(java.time.Duration.ofMinutes(1))
+                    .getObjectRequest(object -> object.bucket(bucketName).key(key)
+                            .responseContentDisposition(disposition)
+                            .responseContentType("application/octet-stream")
+                            .responseCacheControl("private, no-store")))
+                    .url().toURI();
+        } catch (java.net.URISyntaxException | RuntimeException ex) {
+            logger.warn("Could not prepare direct storage download; using the application download path.");
+            return null;
+        }
+    }
+
     public byte[] download(String fileName) {
         try {
             GetObjectRequest getReq = GetObjectRequest.builder()
                     .bucket(bucketName)
                     .key(fileName)
                     .build();
-            ResponseInputStream<GetObjectResponse> response = s3Client.getObject(getReq);
-            return response.readAllBytes();
+            try (ResponseInputStream<GetObjectResponse> response = s3Client.getObject(getReq)) {
+                return response.readAllBytes();
+            }
         } catch (NoSuchKeyException e) {
             throw new StorageDownloadException("The requested file is not available in storage.", e);
         } catch (IOException | SdkException e) {
             throw StorageDownloadException.from(e, "Failed to download the requested file.");
+        }
+    }
+
+    public java.util.Set<String> findExistingKeys(java.util.Set<String> requiredKeys) {
+        java.util.Set<String> found = new java.util.HashSet<>();
+        if (requiredKeys.isEmpty()) return found;
+        try {
+            String continuation = null;
+            do {
+                ListObjectsV2Response page = s3Client.listObjectsV2(ListObjectsV2Request.builder()
+                        .bucket(bucketName).maxKeys(1000).continuationToken(continuation).build());
+                for (S3Object object : page.contents()) {
+                    if (requiredKeys.contains(object.key())) found.add(object.key());
+                }
+                continuation = Boolean.TRUE.equals(page.isTruncated()) ? page.nextContinuationToken() : null;
+            } while (continuation != null && found.size() < requiredKeys.size());
+            return found;
+        } catch (S3Exception e) {
+            if (e.statusCode() != 403) throw e;
+            // Older bucket-scoped credentials may allow object reads without listing.
+            for (String key : requiredKeys) if (exists(key)) found.add(key);
+            return found;
         }
     }
 

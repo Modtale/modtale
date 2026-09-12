@@ -153,6 +153,11 @@ public class VersionDownloadOrchestrationService {
             return new VersionDownloadPayload(buildModpackFilename(project, targetVersion), zipData);
         }
 
+        String filename = extractFilename(targetVersion.getFileUrl());
+        java.net.URI directUri = storageService.directDownloadUri(targetVersion.getFileUrl(), filename);
+        if (directUri != null) {
+            return new VersionDownloadPayload(filename, null, directUri);
+        }
         byte[] data = storageService.download(targetVersion.getFileUrl());
         return new VersionDownloadPayload(extractFilename(targetVersion.getFileUrl()), data);
     }

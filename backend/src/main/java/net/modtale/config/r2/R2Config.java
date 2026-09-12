@@ -26,6 +26,18 @@ public class R2Config {
     }
 
     @Bean
+    public software.amazon.awssdk.services.s3.presigner.S3Presigner s3Presigner() {
+        URI endpoint = URI.create(r2Properties.endpoint());
+        return software.amazon.awssdk.services.s3.presigner.S3Presigner.builder()
+                .endpointOverride(URI.create(endpoint.getScheme() + "://" + endpoint.getAuthority()))
+                .region(Region.of("auto"))
+                .credentialsProvider(StaticCredentialsProvider.create(
+                        AwsBasicCredentials.create(r2Properties.accessKey(), r2Properties.secretKey())))
+                .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
+                .build();
+    }
+
+    @Bean
     public S3Client s3Client() {
         String endpoint = r2Properties.endpoint();
         URI uri = URI.create(endpoint);

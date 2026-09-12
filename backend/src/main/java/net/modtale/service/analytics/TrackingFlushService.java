@@ -125,7 +125,7 @@ public class TrackingFlushService {
 
         Set<String> missingIds = new HashSet<>(projectIds);
         missingIds.removeAll(foundIds);
-        projectService.evictProjectDetailsCaches(projects, missingIds);
+        projectService.evictProjectCounterCaches(projects, missingIds);
     }
 
     private boolean flushMonthlyStats() {

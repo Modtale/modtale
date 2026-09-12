@@ -11,6 +11,32 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class ProjectCacheServiceTest {
 
     @Test
+    void counterUpdatesPreserveContentAndPermissionCaches() {
+        ConcurrentMapCacheManager manager = new ConcurrentMapCacheManager();
+        ProjectCacheService service = new ProjectCacheService(manager, new ProjectRouteService());
+        Project project = new Project();
+        project.setId("project-1");
+        project.setSlug("sky-tools");
+        for (String name : java.util.List.of("projectDetails", "projectDetailDtos", "projectPageDtos", "projectVersionDtos",
+                "projectCommentDtos", "projectPermissionSnapshots", "wikiPageJson", "projectVersionChangelogPages")) {
+            manager.getCache(name).put("public:project-1", "cached");
+        }
+        manager.getCache("projectPageDtos").put("public:sky-tools", "cached");
+        service.evictProjectCounterCaches(java.util.List.of(project), java.util.List.of());
+        for (String name : java.util.List.of("projectDetails", "projectDetailDtos", "projectPageDtos", "projectVersionDtos")) {
+            assertNull(manager.getCache(name).get("public:project-1"));
+        }
+        assertNull(manager.getCache("projectPageDtos").get("public:sky-tools"));
+        for (String name : java.util.List.of("projectCommentDtos", "projectPermissionSnapshots", "wikiPageJson", "projectVersionChangelogPages")) {
+            assertNotNull(manager.getCache(name).get("public:project-1"));
+        }
+        service.evictProjectDetailsCache(project);
+        assertNull(manager.getCache("wikiPageJson").get("public:project-1"));
+        assertNull(manager.getCache("projectVersionChangelogPages").get("public:project-1"));
+    }
+
+
+    @Test
     void evictProjectCacheClearsProjectDetailsAndPublicSearchResults() {
         ConcurrentMapCacheManager cacheManager = new ConcurrentMapCacheManager(
                 "projectDetails",

@@ -148,6 +148,7 @@ jobs:
           name: launcher-linux-appimage
           path: launcher/build/distributions/*.AppImage
           if-no-files-found: error
+          retention-days: 7
 
       - name: Upload Linux Debian package
         if: runner.os == 'Linux'
@@ -156,6 +157,7 @@ jobs:
           name: launcher-linux-deb
           path: launcher/build/distributions/*.deb
           if-no-files-found: error
+          retention-days: 7
 
       - name: Upload Linux RPM package
         if: runner.os == 'Linux'
@@ -164,6 +166,7 @@ jobs:
           name: launcher-linux-rpm
           path: launcher/build/distributions/*.rpm
           if-no-files-found: error
+          retention-days: 7
 
       - name: Upload Linux Flatpak package
         if: runner.os == 'Linux'
@@ -172,6 +175,7 @@ jobs:
           name: launcher-linux-flatpak
           path: launcher/build/distributions/*.flatpak
           if-no-files-found: error
+          retention-days: 7
 
       - name: Upload Linux pacman package
         if: runner.os == 'Linux'
@@ -180,6 +184,7 @@ jobs:
           name: launcher-linux-pacman
           path: launcher/build/distributions/*.pkg.tar.zst
           if-no-files-found: error
+          retention-days: 7
 
       - name: Upload launcher package
         if: runner.os != 'Linux'
@@ -188,6 +193,7 @@ jobs:
           name: ${{ matrix.artifact }}
           path: launcher/build/distributions/*
           if-no-files-found: error
+          retention-days: 7
 
   publish:
     name: Publish Launcher Release

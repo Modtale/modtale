@@ -6,6 +6,11 @@ on:
       - main
       - develop
       - '**'
+  delete:
+
+concurrency:
+  group: modtale-deploy-${{ github.event_name == 'delete' && format('refs/heads/{0}', github.event.ref) || github.ref }}
+  cancel-in-progress: false
 
 env:
   PROJECT_ID: gen-lang-client-0244308719
@@ -13,7 +18,7 @@ env:
 
 jobs:
   deploy:
-    if: github.repository == 'Modtale/modtale' && github.event.deleted != true
+    if: github.repository == 'Modtale/modtale' && github.event_name == 'push' && github.event.deleted != true
     runs-on: ubuntu-latest
     environment: ${{ github.ref_name == 'main' && 'production' || github.ref_name == 'develop' && 'develop' || 'branch-preview' }}
     env:
@@ -24,6 +29,7 @@ jobs:
       CLOUDFLARE_R2_JURISDICTION: ${{ vars.CLOUDFLARE_R2_JURISDICTION }}
     permissions:
       contents: 'read'
+      actions: 'read'
       id-token: 'write'
     outputs:
       launcher_build: ${{ steps.filter.outputs.launcher_build }}
@@ -37,13 +43,22 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Resolve last successful deployment
+        id: previous_deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          previous=$(gh run list --workflow ci-cd.yml --branch "$GITHUB_REF_NAME" --status success --limit 1 --json headSha --jq '.[0].headSha // empty')
+          echo "sha=${previous:-${{ github.event.before }}}" >> "$GITHUB_OUTPUT"
+
       - name: Detect changed components
         id: filter
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          PUSH_BEFORE_SHA: ${{ steps.previous_deploy.outputs.sha }}
         run: bash .github/scripts/detect-component-changes.sh
 
       - name: Configure Environment
@@ -371,6 +386,10 @@ jobs:
           echo "R2_TOKEN_ID_SECRET_VERSION=$R2_TOKEN_ID_SECRET_VERSION" >> "$GITHUB_ENV"
           echo "R2_RUNTIME_CREDENTIALS_REPLACED=$R2_RUNTIME_CREDENTIALS_REPLACED" >> "$GITHUB_ENV"
 
+      - name: Copy missing preview fixtures on the GitHub runner
+        if: env.ENV_TYPE == 'preview'
+        run: python3 .github/scripts/sync-preview-r2.py
+
       - name: Check Existing Services
         id: check_services
         run: |
@@ -430,10 +449,7 @@ jobs:
           # Rotating preview credentials needs a new Cloud Run revision, but the
           # application image is unchanged. Avoid paying to compile it again.
           if [ "${{ steps.filter.outputs.backend }}" = "true" ] || [ "$BACKEND_EXISTS" = "false" ]; then
-            gcloud builds submit \
-              --config=cloudbuild.yml \
-              --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
-              --substitutions=_TAG=${{ env.TAG }} .
+            bash ../.github/scripts/build-container.sh backend "$TAG"
           else
             echo "Reusing the existing backend image for a configuration-only rollout."
           fi
@@ -554,7 +570,7 @@ jobs:
           fi
 
       - name: Build and Deploy Detached Status Service
-        if: env.ENV_TYPE == 'prod' && (steps.filter.outputs.backend == 'true' || env.STATUS_EXISTS == 'false')
+        if: env.ENV_TYPE == 'prod' && (steps.filter.outputs.status == 'true' || env.STATUS_EXISTS == 'false')
         run: |
           set -euo pipefail
           cd backend
@@ -562,10 +578,7 @@ jobs:
           : "${BUILD_SERVICE_ACCOUNT:?Set GitHub environment variable GCP_BUILD_SERVICE_ACCOUNT.}"
           : "${RUNTIME_SERVICE_ACCOUNT:?Set GCP_PROD_RUNTIME_SERVICE_ACCOUNT in the production environment.}"
 
-          gcloud builds submit \
-            --config=cloudbuild-status.yml \
-            --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
-            --substitutions="_TAG=$GITHUB_SHA" .
+          bash ../.github/scripts/build-container.sh status "$GITHUB_SHA" -f Dockerfile.status
 
           gcloud run deploy modtale-status \
             --image="gcr.io/$PROJECT_ID/modtale-status:$GITHUB_SHA" \
@@ -578,10 +591,10 @@ jobs:
             --concurrency=20 \
             --min-instances=1 \
             --max-instances=1 \
-            --no-cpu-throttling \
+            --cpu-throttling \
             --startup-probe="httpGet.path=/api/v1/status/live,httpGet.port=8080,periodSeconds=5,timeoutSeconds=5,failureThreshold=24" \
             --liveness-probe="httpGet.path=/api/v1/status/live,httpGet.port=8080,periodSeconds=30,timeoutSeconds=5,failureThreshold=3" \
-            --set-env-vars="STATUS_TARGET_SITE_URL=https://modtale.net,STATUS_TARGET_API_URL=https://api.modtale.net/actuator/health/readiness,STATUS_MONGODB_DATABASE_NAME=modtale,STATUS_R2_BUCKET_NAME=modtale-binaries,STATUS_REFRESH_INTERVAL_MS=60000,STATUS_STALE_AFTER=3m" \
+            --set-env-vars="STATUS_TARGET_SITE_URL=https://modtale.net,STATUS_TARGET_API_URL=https://api.modtale.net/actuator/health/readiness,STATUS_MONGODB_DATABASE_NAME=modtale,STATUS_R2_BUCKET_NAME=modtale-binaries,STATUS_REFRESH_INTERVAL_MS=60000,STATUS_STALE_AFTER=3m,STATUS_EXTERNAL_REFRESH=true,STATUS_REFRESH_AUDIENCE=https://modtale-status-ptpi2wdeva-uc.a.run.app,STATUS_REFRESH_SERVICE_ACCOUNT=modtale-status-scheduler@$PROJECT_ID.iam.gserviceaccount.com" \
             --update-secrets="STATUS_MONGODB_URI=MONGODB_URI:latest,STATUS_R2_ACCESS_KEY=R2_ACCESS_KEY:latest,STATUS_R2_SECRET_KEY=R2_SECRET_KEY:latest,STATUS_R2_ENDPOINT=R2_ENDPOINT:latest,STATUS_DISCORD_WEBHOOK_URL=STATUS_DISCORD_WEBHOOK_URL:latest" \
             --labels="app=modtale,environment=production,component=status" \
             --quiet
@@ -634,10 +647,9 @@ jobs:
           : "${BUILD_SERVICE_ACCOUNT:?Set GitHub environment variable GCP_BUILD_SERVICE_ACCOUNT.}"
           : "${RUNTIME_SERVICE_ACCOUNT:?Set the GitHub environment runtime service account variable for this environment.}"
 
-          gcloud builds submit \
-            --config=cloudbuild.yml \
-            --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
-            --substitutions=_PUBLIC_API_URL=$API_URL,_SSR_API_URL=$SSR_API_URL,_TAG=$TAG .
+          bash ../.github/scripts/build-container.sh frontend "$TAG" \
+            --build-arg "PUBLIC_API_URL=$API_URL" --build-arg "SSR_API_URL=$SSR_API_URL" \
+            --build-arg "PUBLIC_STATUS_URL=https://status.modtale.net"
 
           FRONTEND_ARGS=(
             "--image" "gcr.io/$PROJECT_ID/modtale-frontend:$TAG"
@@ -859,7 +871,7 @@ jobs:
   package-launcher:
     name: Package Staging Launcher (${{ matrix.name }})
     needs: deploy
-    if: github.repository == 'Modtale/modtale' && needs.deploy.outputs.launcher_build == 'true'
+    if: github.repository == 'Modtale/modtale' && needs.deploy.outputs.launcher_build == 'true' && github.ref_name != 'main' && github.ref_name != 'develop'
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
@@ -963,6 +975,7 @@ jobs:
           name: ${{ needs.deploy.outputs.launcher_artifact_prefix }}-linux-appimage
           path: launcher/build/distributions/*.AppImage
           if-no-files-found: error
+          retention-days: 7
 
       - name: Upload Linux Debian package
         if: runner.os == 'Linux'
@@ -971,6 +984,7 @@ jobs:
           name: ${{ needs.deploy.outputs.launcher_artifact_prefix }}-linux-deb
           path: launcher/build/distributions/*.deb
           if-no-files-found: error
+          retention-days: 7
 
       - name: Upload Linux RPM package
         if: runner.os == 'Linux'
@@ -979,6 +993,7 @@ jobs:
           name: ${{ needs.deploy.outputs.launcher_artifact_prefix }}-linux-rpm
           path: launcher/build/distributions/*.rpm
           if-no-files-found: error
+          retention-days: 7
 
       - name: Upload Linux Flatpak package
         if: runner.os == 'Linux'
@@ -987,6 +1002,7 @@ jobs:
           name: ${{ needs.deploy.outputs.launcher_artifact_prefix }}-linux-flatpak
           path: launcher/build/distributions/*.flatpak
           if-no-files-found: error
+          retention-days: 7
 
       - name: Upload Linux pacman package
         if: runner.os == 'Linux'
@@ -995,6 +1011,7 @@ jobs:
           name: ${{ needs.deploy.outputs.launcher_artifact_prefix }}-linux-pacman
           path: launcher/build/distributions/*.pkg.tar.zst
           if-no-files-found: error
+          retention-days: 7
 
       - name: Upload staging launcher package
         if: runner.os != 'Linux'
@@ -1003,10 +1020,11 @@ jobs:
           name: ${{ needs.deploy.outputs.launcher_artifact_prefix }}-${{ matrix.artifact }}
           path: launcher/build/distributions/*
           if-no-files-found: error
+          retention-days: 7
 
   cleanup-branch-preview:
     name: Clean Up Deleted Branch Preview
-    if: github.repository == 'Modtale/modtale' && github.event.deleted == true && startsWith(github.ref, 'refs/heads/') && github.ref_name != 'main' && github.ref_name != 'develop'
+    if: github.repository == 'Modtale/modtale' && github.event_name == 'delete' && github.event.ref_type == 'branch' && github.event.ref != 'main' && github.event.ref != 'develop'
     runs-on: ubuntu-latest
     environment: branch-preview
     env:
@@ -1021,10 +1039,12 @@ jobs:
 
     steps:
       - name: Prepare cleanup names
+        env:
+          DELETED_BRANCH: ${{ github.event.ref }}
         run: |
           set -euo pipefail
 
-          branch_name="${GITHUB_REF#refs/heads/}"
+          branch_name="$DELETED_BRANCH"
           slug="$(printf '%s' "$branch_name" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]' | sed 's/--*/-/g' | cut -c 1-20 | sed 's/^-//;s/-$//')"
           if [ -z "$slug" ]; then
             deleted_sha="${{ github.event.before }}"
@@ -1061,6 +1081,11 @@ jobs:
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
+
+      - name: Verify no live branch owns this preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/assert-preview-orphan.py "$BRANCH_SLUG"
 
       - name: Delete branch Cloud Run services
         run: |

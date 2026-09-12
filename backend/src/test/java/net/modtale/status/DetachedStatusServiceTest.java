@@ -99,6 +99,42 @@ class DetachedStatusServiceTest {
         assertFalse(status.history().getFirst().time() > status.history().getLast().time());
     }
 
+    @Test
+    void retriesDoNotDuplicateSamples() {
+        DetachedStatusService service = serviceWith(entry(Instant.now(), SystemStatus.OPERATIONAL));
+        service.refreshIfDue();
+        service.refreshIfDue();
+        verify(statusProbeService).performHealthCheck();
+        verify(mongoStatusStore).saveHistory(any());
+    }
+
+    @Test
+    void externallyScheduledServiceDoesNotProbeInBackground() {
+        StatusServiceProperties properties = new StatusServiceProperties();
+        properties.setExternalRefresh(true);
+        DetachedStatusService service = new DetachedStatusService(properties, statusProbeService,
+                mongoStatusStore, snapshotFileStore, statusDiscordNotifier);
+        service.scheduledRefresh();
+        org.mockito.Mockito.verifyNoInteractions(statusProbeService);
+    }
+
+    @Test
+    void cachedOperationalSnapshotBecomesStaleWhenRefreshStops() {
+        StatusServiceProperties properties = new StatusServiceProperties();
+        StatusHistoryEntry current = entry(Instant.now().minusSeconds(1), SystemStatus.OPERATIONAL);
+        when(statusProbeService.performHealthCheck()).thenReturn(current);
+        when(mongoStatusStore.findLatestHistory()).thenReturn(Optional.empty());
+        when(mongoStatusStore.findIncidentBuckets()).thenReturn(Optional.empty());
+        DetachedStatusService service = new DetachedStatusService(properties, statusProbeService,
+                mongoStatusStore, snapshotFileStore, statusDiscordNotifier);
+        service.refreshSnapshots();
+        assertFalse(service.getSystemStatus("24h").stale());
+        properties.setStaleAfter(java.time.Duration.ZERO);
+        assertTrue(service.getSystemStatus("24h").stale());
+        assertEquals(SystemStatus.DEGRADED, service.getSystemStatus("30d").overall());
+        assertFalse(service.isReady());
+    }
+
     private DetachedStatusService serviceWith(StatusHistoryEntry entry) {
         when(snapshotFileStore.readHistory()).thenReturn(List.of());
         when(mongoStatusStore.findHistoryAfter(any())).thenReturn(List.of());

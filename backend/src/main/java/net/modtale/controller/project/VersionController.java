@@ -213,6 +213,11 @@ public class VersionController {
     }
 
     private ResponseEntity<Resource> asDownloadResponse(VersionDownloadPayload payload) {
+        if (payload.redirectUri() != null) {
+            return ResponseEntity.status(302).location(payload.redirectUri())
+                    .cacheControl(org.springframework.http.CacheControl.noStore())
+                    .header("Referrer-Policy", "no-referrer").build();
+        }
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + payload.filename() + "\"")
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)

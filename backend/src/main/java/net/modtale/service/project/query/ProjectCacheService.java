@@ -155,6 +155,34 @@ public class ProjectCacheService {
         evictProjectSearchCache();
     }
 
+    public void evictProjectCounterCaches(Collection<Project> projects, Collection<String> fallbackProjectIds) {
+        if (projects != null) {
+            for (Project project : projects) {
+                if (project == null) continue;
+                evictCounterRoute(project.getId());
+                evictCounterRoute(project.getSlug());
+                evictCounterRoute(projectRouteService.buildProjectHandle(project));
+            }
+        }
+        if (fallbackProjectIds != null) fallbackProjectIds.forEach(this::evictCounterRoute);
+        evictProjectSearchCache();
+    }
+
+    private void evictCounterRoute(String route) {
+        if (route == null || route.isBlank()) return;
+        Cache projects = cacheManager.getCache("projectDetails");
+        if (projects != null) {
+            projects.evict(route);
+            projects.evict("public:" + route);
+            projects.evict("public-page:" + route);
+        }
+        for (String name : java.util.List.of("projectDetailDtos", "projectPageDtos", "projectVersionDtos")) {
+            Cache cache = cacheManager.getCache(name);
+            if (cache != null) cache.evict("public:" + route);
+        }
+        // Counters do not change comments, permissions, wiki content or changelogs.
+    }
+
     private void clearCache(String cacheName) {
         Cache cache = cacheManager.getCache(cacheName);
         if (cache != null) {

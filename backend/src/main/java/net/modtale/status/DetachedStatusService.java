@@ -35,6 +35,7 @@ public class DetachedStatusService {
     private volatile SystemStatusView cached30DayStatus;
     private volatile IncidentBuckets lastKnownIncidents = IncidentBuckets.empty();
     private volatile boolean hydrated;
+    private long lastRefreshNanos;
 
     public DetachedStatusService(
             StatusServiceProperties properties,
@@ -60,6 +61,20 @@ public class DetachedStatusService {
             initialDelayString = "${status.refresh-interval-ms:60000}",
             fixedDelayString = "${status.refresh-interval-ms:60000}"
     )
+    public void scheduledRefresh() {
+        if (!properties.isExternalRefresh()) {
+            refreshIfDue();
+        }
+    }
+
+    public synchronized void refreshIfDue() {
+        // Scheduler retries must not duplicate samples or notifications. Allow cadence jitter.
+        long interval = java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(properties.getRefreshIntervalMs() * 3 / 4);
+        if (lastRefreshNanos == 0 || System.nanoTime() - lastRefreshNanos >= interval) {
+            refreshSnapshots();
+        }
+    }
+
     public synchronized void refreshSnapshots() {
         hydrate();
         StatusHistoryEntry latest = statusProbeService.performHealthCheck();
@@ -69,11 +84,18 @@ public class DetachedStatusService {
         rebuildSnapshots();
         snapshotFileStore.writeHistory(List.copyOf(history));
         statusDiscordNotifier.publishStatus(cached24HourStatus);
+        lastRefreshNanos = System.nanoTime();
     }
 
     public SystemStatusView getSystemStatus(String range) {
         SystemStatusView cached = "30d".equals(range) ? cached30DayStatus : cached24HourStatus;
         if (cached != null) {
+            if (!cached.stale() && Instant.ofEpochMilli(cached.timestamp()).isBefore(Instant.now().minus(properties.getStaleAfter()))) {
+                synchronized (this) {
+                    rebuildSnapshots();
+                    return "30d".equals(range) ? cached30DayStatus : cached24HourStatus;
+                }
+            }
             return cached;
         }
 
@@ -134,7 +156,6 @@ public class DetachedStatusService {
 
         List<StatusHistoryEntry> entries = history.stream()
                 .filter(entry -> !entry.timestamp().isBefore(since))
-                .sorted(Comparator.comparing(StatusHistoryEntry::timestamp))
                 .toList();
         int observedSamples = entries.size();
 
@@ -178,7 +199,13 @@ public class DetachedStatusService {
         if (entry == null) {
             return;
         }
-        addHistory(List.of(entry));
+        if (entry.timestamp() == null) { return; }
+        if (history.isEmpty() || entry.timestamp().isAfter(history.getLast().timestamp())) {
+            history.add(entry);
+            pruneHistory();
+        } else {
+            addHistory(List.of(entry));
+        }
     }
 
     private void addHistory(List<StatusHistoryEntry> entries) {
@@ -212,9 +239,7 @@ public class DetachedStatusService {
         if (history.isEmpty()) {
             return null;
         }
-        return history.stream()
-                .max(Comparator.comparing(StatusHistoryEntry::timestamp))
-                .orElse(null);
+        return history.getLast();
     }
 
     private List<StatusHistoryEntry> downsample(List<StatusHistoryEntry> entries, int targetSize) {
