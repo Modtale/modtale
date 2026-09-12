@@ -77,6 +77,23 @@ describe('projectClient', () => {
         expect(mockedApi.get).toHaveBeenCalledWith('/projects/project-1/versions/changelogs');
     });
 
+    it('fetches changelog pages with the requested offset and cancellation signal', async () => {
+        const changelogs = [{ id: 'version-13', versionNumber: '1.0.12', changelog: 'More changes.' }];
+        const signal = new AbortController().signal;
+        mockedApi.get.mockResolvedValueOnce({ data: changelogs } as any);
+
+        await expect(projectClient.getProjectVersionChangelogs('project-1', {
+            offset: 12,
+            limit: 12,
+            signal
+        })).resolves.toEqual(changelogs);
+
+        expect(mockedApi.get).toHaveBeenCalledWith('/projects/project-1/versions/changelogs', {
+            params: { offset: 12, limit: 12 },
+            signal
+        });
+    });
+
     it('returns project comments when present and falls back to an empty list', async () => {
         mockedApi.get.mockResolvedValueOnce({ data: { comments: [{ id: 'comment-1' }] } } as any);
         await expect(projectClient.getComments('project-1')).resolves.toEqual([{ id: 'comment-1' }]);

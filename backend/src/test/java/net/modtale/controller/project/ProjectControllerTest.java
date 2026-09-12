@@ -7,6 +7,7 @@ import net.modtale.mapper.ProjectMapper;
 import net.modtale.model.dto.project.ProjectDTO;
 import net.modtale.model.dto.project.ProjectMarqueeDTO;
 import net.modtale.model.dto.project.ProjectPageDTO;
+import net.modtale.model.dto.project.ProjectVersionChangelogDTO;
 import net.modtale.model.dto.project.ProjectVersionsDTO;
 import net.modtale.model.dto.project.ProjectSummaryDTO;
 import net.modtale.model.dto.request.project.UpdateProjectRequest;
@@ -480,6 +481,24 @@ class ProjectControllerTest {
         assertEquals(null, dto.versions().getFirst().getChangelog());
         verify(projectService).getProjectVersionsByRouteKey("project-1", currentUser);
         verify(projectService, never()).getProjectDetailsByRouteKey("project-1", currentUser);
+    }
+
+    @Test
+    void getProjectVersionChangelogsUsesRequestedPage() {
+        User currentUser = user("user-1", "ada");
+        List<ProjectVersionChangelogDTO> changelogs = List.of(
+                new ProjectVersionChangelogDTO("version-13", "1.0.12", "More changes.")
+        );
+
+        when(accountService.getCurrentUser((Authentication) null)).thenReturn(currentUser);
+        when(projectService.getVersionChangelogsByRouteKey("project-1", currentUser, 12, 12)).thenReturn(changelogs);
+
+        var response = controller.getProjectVersionChangelogs("project-1", 12, 12, null);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(changelogs, response.getBody());
+        verify(projectService).getVersionChangelogsByRouteKey("project-1", currentUser, 12, 12);
+        verify(projectService, never()).getVersionChangelogsByRouteKey("project-1", currentUser);
     }
 
     @Test

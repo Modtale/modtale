@@ -1,7 +1,7 @@
 import { ProjectLoadingRegion } from '../ProjectLoadingRegion';
 import { PROJECT_LOADING_VERSIONS, loadingNoop } from '../projectLoadingData';
 import React, { memo, useCallback, useMemo, useState } from 'react';
-import { List, X, Download, ChevronUp, ChevronDown, AlertCircle } from 'lucide-react';
+import { List, X, Download, ChevronUp, ChevronDown, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import { theme } from '@/styles/theme';
 import { formatTimeAgo } from '@/utils/modHelpers';
@@ -22,6 +22,12 @@ interface HistoryModalProps {
     isModpack?: boolean;
     isInline?: boolean;
     inlineHeight?: number;
+    changelogError?: boolean;
+    onRetry?: () => void;
+    loadingMore?: boolean;
+    hasMore?: boolean;
+    onLoadMore?: () => void;
+    keepHistoryVisibleWhenLoading?: boolean;
 }
 
 const HistoryVersionItem = memo(({
@@ -94,7 +100,8 @@ const HistoryVersionItem = memo(({
 });
 
 export const HistoryModal: React.FC<HistoryModalProps> = ({
-    loading = false, show, onClose, history, showExperimental, onToggleExperimental, onDownload, hasExperimentalVersions, hasStableVersions, isModpack = false, isInline = false, inlineHeight
+    loading = false, show, onClose, history, showExperimental, onToggleExperimental, onDownload, hasExperimentalVersions, hasStableVersions, isModpack = false, isInline = false, inlineHeight,
+    changelogError = false, onRetry, loadingMore = false, hasMore = false, onLoadMore, keepHistoryVisibleWhenLoading = false
 }) => {
     useScrollLock(show && !isInline);
     const [expandedChangelog, setExpandedChangelog] = useState<string | null>(null);
@@ -119,6 +126,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
     const visibleHistory = useMemo(() => {
         return history.filter((v: any) => effectiveShowExperimental || !v.channel || v.channel === 'RELEASE');
     }, [history, effectiveShowExperimental]);
+    const renderedHistory = visibleHistory.length > 0 || !loading ? visibleHistory : PROJECT_LOADING_VERSIONS;
 
     const getVersionBadgeColor = useCallback((channel: string) => {
         switch(channel) {
@@ -147,7 +155,10 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
         >
             <div className={`p-6 flex justify-between items-center shrink-0 border-b border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-slate-800/50`}>
                 <div>
-                    <h3 className={`text-xl font-black ${theme.colors.textPrimary} flex items-center gap-2`}><List className={`w-5 h-5 ${theme.colors.accent}`} /> Changelog</h3>
+                    <h3 className={`text-xl font-black ${theme.colors.textPrimary} flex items-center gap-2`}>
+                        <List className={`w-5 h-5 ${theme.colors.accent}`} /> Changelog
+                        {loading && <Loader2 className="h-4 w-4 animate-spin text-slate-400" aria-label="Loading changelog" />}
+                    </h3>
                     {actualHasExperimental && actualHasStable && (
                         <ProjectLoadingRegion loading={loading} className="mt-1 flex items-center gap-2 cursor-pointer group" onClick={onToggleExperimental}>
                             <div className={`w-8 h-4 rounded-full relative transition-colors shadow-inner ${showExperimental ? 'bg-modtale-accent' : 'bg-slate-200 dark:bg-slate-800'}`}>
@@ -160,9 +171,9 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                 <button type="button" onClick={onClose} className={`p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 transition-colors`} aria-label="Close Changelog"><X className="w-5 h-5" /></button>
             </div>
 
-            <ProjectLoadingRegion loading={loading} label="Loading changelog" className={`p-6 overflow-y-auto flex-1 relative`}>
+            <ProjectLoadingRegion loading={loading && (!keepHistoryVisibleWhenLoading || visibleHistory.length === 0)} label="Loading changelog" className={`p-6 overflow-y-auto flex-1 relative`}>
                 <div className="space-y-6">
-                    {visibleHistory.map((ver: any) => {
+                    {renderedHistory.map((ver: any) => {
                         return (
                             <HistoryVersionItem
                                 key={ver.id}
@@ -175,6 +186,38 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                             />
                         );
                     })}
+                    {!loading && visibleHistory.length === 0 && changelogError && (
+                        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-5 text-center dark:border-red-500/30 dark:bg-red-500/10">
+                            <p className={`text-sm font-semibold ${theme.colors.textPrimary}`}>The changelog could not be loaded.</p>
+                            {onRetry && (
+                                <button type="button" onClick={onRetry} className={`mt-3 inline-flex items-center gap-2 text-xs font-bold ${theme.colors.accent} hover:underline`}>
+                                    <RefreshCw className="h-3.5 w-3.5" /> Try again
+                                </button>
+                            )}
+                        </div>
+                    )}
+                    {!loading && visibleHistory.length > 0 && changelogError && (
+                        <div role="alert" className="flex flex-wrap items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center dark:border-red-500/30 dark:bg-red-500/10">
+                            <span className={`text-xs font-semibold ${theme.colors.textPrimary}`}>Some older entries could not be loaded.</span>
+                            {onRetry && <button type="button" onClick={onRetry} className={`text-xs font-bold ${theme.colors.accent} hover:underline`}>Retry</button>}
+                        </div>
+                    )}
+                    {!loading && !changelogError && visibleHistory.length === 0 && (
+                        <p className={`py-8 text-center text-sm ${theme.colors.textMuted}`}>No changelog entries are available.</p>
+                    )}
+                    {!loading && hasMore && onLoadMore && (
+                        <div className="flex justify-center pt-1">
+                            <button
+                                type="button"
+                                onClick={onLoadMore}
+                                disabled={loadingMore}
+                                className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-xs font-bold transition-colors ${theme.colors.border} ${theme.colors.textSecondary} hover:border-modtale-accent hover:text-modtale-accent disabled:cursor-wait disabled:opacity-60`}
+                            >
+                                {loadingMore ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                                {loadingMore ? 'Loading older releases…' : 'Load older releases'}
+                            </button>
+                        </div>
+                    )}
                 </div>
             </ProjectLoadingRegion>
         </div>

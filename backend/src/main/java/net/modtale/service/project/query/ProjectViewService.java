@@ -18,8 +18,12 @@ import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.security.access.AccessControlService;
 import net.modtale.util.MongoIdUtils;
+import org.bson.Document;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
@@ -278,6 +282,52 @@ public class ProjectViewService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Loads only one changelog page from MongoDB. The regular endpoint above is
+     * retained for API clients that still request the complete history.
+     */
+    @Cacheable(
+            value = "projectVersionChangelogPages",
+            key = "'public:' + #routeKey + ':' + #offset + ':' + #limit",
+            condition = "#viewer == null",
+            unless = "#result == null"
+    )
+    public List<ProjectVersionChangelogDTO> getVersionChangelogsByRouteKey(
+            String routeKey,
+            User viewer,
+            int offset,
+            int limit
+    ) {
+        Project permissionProject = resolveChangelogPermissionProjectByRouteKey(routeKey);
+        if (permissionProject == null || permissionProject.getDeletedAt() != null) return null;
+
+        boolean privileged = viewer != null && (accessControlService.hasEditPermission(permissionProject, viewer)
+                || accessControlService.canViewPrivilegedProjectData(viewer));
+        if (!privileged && !accessControlService.canReadProject(permissionProject, viewer)) {
+            return null;
+        }
+
+        Project project = findChangelogPageById(
+                permissionProject.getId(),
+                Math.max(0, offset),
+                Math.max(1, limit),
+                privileged
+        );
+        if (project == null) return null;
+        if (project.getVersions() == null) {
+            return List.of();
+        }
+
+        return project.getVersions().stream()
+                .filter(version -> privileged || version.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED)
+                .map(version -> new ProjectVersionChangelogDTO(
+                        version.getId(),
+                        version.getVersionNumber(),
+                        version.getChangelog()
+                ))
+                .collect(Collectors.toList());
+    }
+
     public Project getAdminProjectDetails(String id) {
         Project project = getRawProjectById(id);
         if (project == null) return null;
@@ -411,6 +461,68 @@ public class ProjectViewService {
         if (project != null) return project;
 
         return projectRepository.findChangelogsById(normalized).orElse(null);
+    }
+
+    private Project resolveChangelogPermissionProjectByRouteKey(String routeKey) {
+        if (routeKey == null || routeKey.isBlank()) return null;
+
+        String normalized = routeKey.trim();
+        if (projectRouteService.hasExplicitProjectHandle(normalized)) {
+            String projectId = projectRouteService.extractProjectId(normalized);
+            Project project = projectRepository.findPermissionSnapshotById(projectId).orElse(null);
+            if (project != null) return project;
+            return projectRepository.findPermissionSnapshotBySlug(normalized).orElse(null);
+        }
+
+        Project project = projectRepository.findPermissionSnapshotBySlug(normalized).orElse(null);
+        if (project != null) return project;
+
+        return projectRepository.findPermissionSnapshotById(normalized).orElse(null);
+    }
+
+    private Project findChangelogPageById(String id, int offset, int limit, boolean includeUnapproved) {
+        if (id == null || id.isBlank()) return null;
+        Criteria criteria = Criteria.where("_id").in(MongoIdUtils.expandIds(List.of(id)))
+                .and("deletedAt").is(null);
+        Aggregation aggregation = changelogPageAggregation(criteria, offset, limit, includeUnapproved);
+        AggregationResults<Project> results = mongoTemplate.aggregate(aggregation, "projects", Project.class);
+        return results.getUniqueMappedResult();
+    }
+
+    private Aggregation changelogPageAggregation(
+            Criteria criteria,
+            int offset,
+            int limit,
+            boolean includeUnapproved
+    ) {
+        AggregationOperation projectPage = context -> {
+            Object versions = "$versions";
+            if (!includeUnapproved) {
+                versions = new Document("$filter", new Document()
+                        .append("input", "$versions")
+                        .append("as", "version")
+                        .append("cond", new Document("$eq", List.of("$$version.reviewStatus", "APPROVED"))));
+            }
+
+            Document pagedVersions = new Document("$slice", List.of(versions, offset, limit));
+            Document changelogVersions = new Document("$map", new Document()
+                    .append("input", pagedVersions)
+                    .append("as", "version")
+                    .append("in", new Document()
+                            .append("_id", "$$version._id")
+                            .append("versionNumber", "$$version.versionNumber")
+                            .append("changelog", "$$version.changelog")
+                            .append("reviewStatus", "$$version.reviewStatus")));
+
+            return new Document("$project", new Document()
+                    .append("_id", 1)
+                    .append("versions", changelogVersions));
+        };
+
+        return Aggregation.newAggregation(
+                Aggregation.match(criteria),
+                projectPage
+        );
     }
 
     private Project resolvePublicProjectPageShellByRouteKey(String routeKey) {

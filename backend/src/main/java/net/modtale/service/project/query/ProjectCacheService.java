@@ -32,6 +32,7 @@ public class ProjectCacheService {
         Cache galleryDtoCache = cacheManager.getCache("projectGalleryDtos");
         Cache teamDtoCache = cacheManager.getCache("projectTeamDtos");
         Cache changelogCache = cacheManager.getCache("projectVersionChangelogs");
+        Cache changelogPageCache = cacheManager.getCache("projectVersionChangelogPages");
         Cache metaDtoCache = cacheManager.getCache("projectMetaDtos");
         Cache permissionCache = cacheManager.getCache("projectPermissionSnapshots");
         Cache wikiProjectJsonCache = cacheManager.getCache("wikiProjectJson");
@@ -48,6 +49,7 @@ public class ProjectCacheService {
         if (galleryDtoCache != null && project.getId() != null) galleryDtoCache.evict("public:" + project.getId());
         if (teamDtoCache != null && project.getId() != null) teamDtoCache.evict("public:" + project.getId());
         if (changelogCache != null && project.getId() != null) changelogCache.evict("public:" + project.getId());
+        if (changelogPageCache != null) changelogPageCache.clear();
         if (metaDtoCache != null && project.getId() != null) metaDtoCache.evict("public:" + project.getId());
         if (permissionCache != null && project.getId() != null) permissionCache.evict(project.getId());
         if (wikiProjectJsonCache != null && project.getId() != null) wikiProjectJsonCache.evict("public:" + project.getId());
@@ -117,6 +119,7 @@ public class ProjectCacheService {
         if (changelogCache != null) {
             changelogCache.evict("public:" + projectId);
         }
+        clearCache("projectVersionChangelogPages");
         Cache metaDtoCache = cacheManager.getCache("projectMetaDtos");
         if (metaDtoCache != null) {
             metaDtoCache.evict("public:" + projectId);

@@ -609,11 +609,11 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
                 )}
             </ProjectLoadingRegion>
 
-            <ProjectLoadingRegion loading={loading} label="Loading downloads" className={`p-4 border-t border-slate-100 dark:border-white/5 shrink-0 z-10 flex items-center justify-center bg-slate-50 dark:bg-[#0B1120]`}>
+            <div className={`p-4 border-t border-slate-100 dark:border-white/5 shrink-0 z-10 flex items-center justify-center bg-slate-50 dark:bg-[#0B1120]`}>
                 <button type="button" onClick={onViewHistory} className={`text-xs ${theme.colors.textMuted} hover:${theme.colors.accent} font-bold uppercase tracking-wider flex items-center justify-center gap-1 transition-colors w-full`}>
                     View Full Changelog <ChevronRight className="w-3 h-3" />
                 </button>
-            </ProjectLoadingRegion>
+            </div>
         </div>
     );
 
@@ -628,8 +628,8 @@ export const DownloadModal: React.FC<DownloadModalProps> = ({
     );
 };
 
-export function DownloadModalSkeleton({ show = true, isInline = false, onClose = loadingNoop }: { show?: boolean; isInline?: boolean; onClose?: () => void }) {
+export function DownloadModalSkeleton({ show = true, isInline = false, onClose = loadingNoop, onViewHistory = loadingNoop }: { show?: boolean; isInline?: boolean; onClose?: () => void; onViewHistory?: () => void }) {
     return <DownloadModal loading show={show} isInline={isInline} onClose={onClose}
         versionsByGame={{ '2026.01.17': PROJECT_LOADING_VERSIONS }} orderedGameVersions={['2026.01.17']}
-        onDownload={loadingNoop} showExperimental={false} onToggleExperimental={loadingNoop} onViewHistory={loadingNoop} />;
+        onDownload={loadingNoop} showExperimental={false} onToggleExperimental={loadingNoop} onViewHistory={onViewHistory} />;
 }

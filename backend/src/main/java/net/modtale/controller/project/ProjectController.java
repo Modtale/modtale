@@ -356,14 +356,30 @@ public class ProjectController {
                 .body(ProjectMapper.toTeamDTO(project));
     }
 
+    public ResponseEntity<List<ProjectVersionChangelogDTO>> getProjectVersionChangelogs(
+            String id,
+            Authentication authentication
+    ) {
+        return getProjectVersionChangelogs(id, null, null, authentication);
+    }
+
     @GetMapping("/projects/{id}/versions/changelogs")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#id, 'PROJECT_READ', authentication)")
     public ResponseEntity<List<ProjectVersionChangelogDTO>> getProjectVersionChangelogs(
             @PathVariable String id,
+            @RequestParam(required = false) @Min(value = 0, message = "Offset must be 0 or greater.") Integer offset,
+            @RequestParam(required = false) @Min(value = 1, message = "Limit must be at least 1.") @Max(value = 50, message = "Limit must be 50 or less.") Integer limit,
             Authentication authentication
     ) {
         User currentUser = accountService.getCurrentUser(authentication);
-        List<ProjectVersionChangelogDTO> changelogs = projectService.getVersionChangelogsByRouteKey(id, currentUser);
+        List<ProjectVersionChangelogDTO> changelogs = offset == null && limit == null
+                ? projectService.getVersionChangelogsByRouteKey(id, currentUser)
+                : projectService.getVersionChangelogsByRouteKey(
+                        id,
+                        currentUser,
+                        offset == null ? 0 : offset,
+                        limit == null ? 20 : limit
+                );
         if (changelogs == null) {
             throw new ResourceNotFoundException("We couldn't find a project with that ID.");
         }

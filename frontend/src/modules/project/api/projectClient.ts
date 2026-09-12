@@ -2,6 +2,12 @@ import { api } from '@/utils/api';
 import type { Comment, DependencySource, ExternalProjectReference, GalleryImage, GameVersionCatalog, ManifestInspectionResult, Project, ProjectMember, ProjectRole, ProjectVersion, ProjectVersionChangelog, User } from '@/types';
 import { normalizeUser, normalizeUsers } from '@/utils/users';
 
+interface ChangelogPageOptions {
+    offset?: number;
+    limit?: number;
+    signal?: AbortSignal;
+}
+
 export const projectClient = {
     getProject: async (id: string) => {
         const res = await api.get<Project>(`/projects/${id}`);
@@ -15,8 +21,24 @@ export const projectClient = {
         const res = await api.get<{ versions?: ProjectVersion[] }>(`/projects/${id}/versions`);
         return res.data?.versions || [];
     },
-    getProjectVersionChangelogs: async (id: string) => {
-        const res = await api.get<ProjectVersionChangelog[]>(`/projects/${id}/versions/changelogs`);
+    getProjectVersionChangelogs: async (id: string, options: ChangelogPageOptions = {}) => {
+        const { offset, limit, signal } = options;
+        const path = `/projects/${id}/versions/changelogs`;
+
+        // Keep the unpaged request intact for launcher/API consumers that still
+        // ask for the complete history in one call.
+        if (offset === undefined && limit === undefined && signal === undefined) {
+            const res = await api.get<ProjectVersionChangelog[]>(path);
+            return res.data || [];
+        }
+
+        const res = await api.get<ProjectVersionChangelog[]>(path, {
+            params: {
+                ...(offset === undefined ? {} : { offset }),
+                ...(limit === undefined ? {} : { limit })
+            },
+            ...(signal === undefined ? {} : { signal })
+        });
         return res.data || [];
     },
     getProjectGallery: async (id: string) => {

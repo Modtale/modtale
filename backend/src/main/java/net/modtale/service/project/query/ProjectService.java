@@ -129,6 +129,15 @@ public class ProjectService {
         return projectViewService.getVersionChangelogsByRouteKey(routeKey, viewer);
     }
 
+    public java.util.List<ProjectVersionChangelogDTO> getVersionChangelogsByRouteKey(
+            String routeKey,
+            User viewer,
+            int offset,
+            int limit
+    ) {
+        return projectViewService.getVersionChangelogsByRouteKey(routeKey, viewer, offset, limit);
+    }
+
     public Project getAdminProjectDetails(String id) {
         return projectViewService.getAdminProjectDetails(id);
     }

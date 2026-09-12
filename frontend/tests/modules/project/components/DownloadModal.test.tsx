@@ -66,6 +66,35 @@ describe('DownloadModal Toggle Visibility', () => {
         expect(pageText()).not.toContain('Show Beta/Alpha');
     });
 
+    it('keeps View Full Changelog clickable while downloads are loading', async () => {
+        const onViewHistory = vi.fn();
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <DownloadModal
+                        loading
+                        show={true}
+                        onClose={vi.fn()}
+                        versionsByGame={{ '0.5.4': [] }}
+                        orderedGameVersions={['0.5.4']}
+                        onDownload={vi.fn()}
+                        showExperimental={false}
+                        onToggleExperimental={vi.fn()}
+                        onViewHistory={onViewHistory}
+                    />
+                </MemoryRouter>
+            );
+        });
+
+        const historyButton = Array.from(document.body.querySelectorAll('button'))
+            .find(button => button.textContent?.includes('View Full Changelog')) as HTMLButtonElement;
+
+        await act(async () => historyButton.click());
+
+        expect(onViewHistory).toHaveBeenCalledTimes(1);
+    });
+
     it('shows both toggles when project has both release and experimental versions and pre-releases are available', async () => {
         const versionsByGame = {
             '0.5.4': [
