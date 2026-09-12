@@ -106,9 +106,18 @@ public class VersionDownloadOrchestrationService {
                 targetVersion.getDependencies().forEach(dep -> trackDependencyDownload(dep, context));
             }
             byte[] zipData = downloadService.generateModpackZip(project, targetVersion, context.currentUser());
-            return new VersionDownloadPayload(buildModpackFilename(project, targetVersion), zipData);
+            String filename = buildModpackFilename(project, targetVersion);
+            java.net.URI directUri = targetVersion.getFileUrl() == null ? null
+                    : storageService.directDownloadUri(targetVersion.getFileUrl(), filename);
+            return directUri == null ? new VersionDownloadPayload(filename, zipData)
+                    : new VersionDownloadPayload(filename, null, directUri);
         }
 
+        String filename = extractFilename(targetVersion.getFileUrl());
+        java.net.URI directUri = storageService.directDownloadUri(targetVersion.getFileUrl(), filename);
+        if (directUri != null) {
+            return new VersionDownloadPayload(filename, null, directUri);
+        }
         byte[] data = storageService.download(targetVersion.getFileUrl());
         return new VersionDownloadPayload(extractFilename(targetVersion.getFileUrl()), data);
     }

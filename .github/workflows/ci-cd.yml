@@ -6,6 +6,19 @@ on:
       - main
       - develop
       - '**'
+  delete:
+  workflow_dispatch:
+    inputs:
+      prepare_preview_source:
+        type: boolean
+        default: false
+        required: false
+      cleanup_branches:
+        type: string
+        default: '[]'
+        required: false
+  schedule:
+    - cron: '17 3 * * *'
 
 env:
   PROJECT_ID: gen-lang-client-0244308719
@@ -13,7 +26,10 @@ env:
 
 jobs:
   deploy:
-    if: github.repository == 'Modtale/modtale' && github.event.deleted != true
+    concurrency:
+      group: modtale-deploy-${{ github.ref }}
+      cancel-in-progress: false
+    if: github.repository == 'Modtale/modtale' && github.event_name == 'push' && github.event.deleted != true
     runs-on: ubuntu-latest
     environment: ${{ github.ref_name == 'main' && 'production' || github.ref_name == 'develop' && 'develop' || 'branch-preview' }}
     env:
@@ -24,6 +40,7 @@ jobs:
       CLOUDFLARE_R2_JURISDICTION: ${{ vars.CLOUDFLARE_R2_JURISDICTION }}
     permissions:
       contents: 'read'
+      actions: 'read'
       id-token: 'write'
 
     steps:
@@ -31,13 +48,22 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Resolve last successful deployment
+        id: previous_deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          previous=$(gh run list --workflow ci-cd.yml --branch "$GITHUB_REF_NAME" --event push --status success --limit 1 --json headSha --jq '.[0].headSha // empty')
+          echo "sha=${previous:-${{ github.event.before }}}" >> "$GITHUB_OUTPUT"
+
       - name: Detect changed components
         id: filter
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          PUSH_BEFORE_SHA: ${{ steps.previous_deploy.outputs.sha }}
         run: bash .github/scripts/detect-component-changes.sh
 
       - name: Configure Environment
@@ -109,7 +135,7 @@ jobs:
               BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME="${{ vars.GCP_PREVIEW_SOURCE_R2_BUCKET_NAME }}"
             fi
             if [ -z "$BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME" ]; then
-              BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME="modtale-binaries"
+              BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME="modtale-preview-template"
             fi
 
             BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME="${{ vars.GCP_BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME }}"
@@ -117,7 +143,7 @@ jobs:
               BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME="${{ vars.GCP_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME }}"
             fi
             if [ -z "$BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME" ]; then
-              BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME="R2_SOURCE_READ_ACCESS_KEY"
+              BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME="R2_TEMPLATE_READ_ACCESS_KEY"
             fi
 
             BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME="${{ vars.GCP_BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME }}"
@@ -125,7 +151,7 @@ jobs:
               BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME="${{ vars.GCP_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME }}"
             fi
             if [ -z "$BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME" ]; then
-              BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME="R2_SOURCE_READ_SECRET_KEY"
+              BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME="R2_TEMPLATE_READ_SECRET_KEY"
             fi
 
             BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME="${{ vars.GCP_BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME }}"
@@ -133,7 +159,7 @@ jobs:
               BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME="${{ vars.GCP_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME }}"
             fi
             if [ -z "$BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME" ]; then
-              BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME="R2_SOURCE_READ_ENDPOINT"
+              BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME="R2_TEMPLATE_READ_ENDPOINT"
             fi
 
             echo "ENV_TYPE=preview" >> $GITHUB_ENV
@@ -365,6 +391,10 @@ jobs:
           echo "R2_TOKEN_ID_SECRET_VERSION=$R2_TOKEN_ID_SECRET_VERSION" >> "$GITHUB_ENV"
           echo "R2_RUNTIME_CREDENTIALS_REPLACED=$R2_RUNTIME_CREDENTIALS_REPLACED" >> "$GITHUB_ENV"
 
+      - name: Copy missing preview fixtures on the GitHub runner
+        if: env.ENV_TYPE == 'preview'
+        run: python3 .github/scripts/sync-preview-r2.py
+
       - name: Check Existing Services
         id: check_services
         run: |
@@ -424,10 +454,7 @@ jobs:
           # Rotating preview credentials needs a new Cloud Run revision, but the
           # application image is unchanged. Avoid paying to compile it again.
           if [ "${{ steps.filter.outputs.backend }}" = "true" ] || [ "$BACKEND_EXISTS" = "false" ]; then
-            gcloud builds submit \
-              --config=cloudbuild.yml \
-              --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
-              --substitutions=_TAG=${{ env.TAG }} .
+            bash ../.github/scripts/build-container.sh backend "$TAG"
           else
             echo "Reusing the existing backend image for a configuration-only rollout."
           fi
@@ -465,7 +492,7 @@ jobs:
 
           if [ "${{ env.ENV_TYPE }}" = "prod" ]; then
             # Keep one production instance warm to prevent user-facing cold starts.
-            ARGS+=("--cpu" "2")
+            ARGS+=("--cpu" "1")
             ARGS+=("--min-instances" "1")
             ARGS+=("--max-instances" "10")
             ARGS+=("--cpu-throttling")
@@ -548,7 +575,7 @@ jobs:
           fi
 
       - name: Build and Deploy Detached Status Service
-        if: env.ENV_TYPE == 'prod' && (steps.filter.outputs.backend == 'true' || env.STATUS_EXISTS == 'false')
+        if: env.ENV_TYPE == 'prod' && (steps.filter.outputs.status == 'true' || env.STATUS_EXISTS == 'false')
         run: |
           set -euo pipefail
           cd backend
@@ -556,10 +583,7 @@ jobs:
           : "${BUILD_SERVICE_ACCOUNT:?Set GitHub environment variable GCP_BUILD_SERVICE_ACCOUNT.}"
           : "${RUNTIME_SERVICE_ACCOUNT:?Set GCP_PROD_RUNTIME_SERVICE_ACCOUNT in the production environment.}"
 
-          gcloud builds submit \
-            --config=cloudbuild-status.yml \
-            --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
-            --substitutions="_TAG=$GITHUB_SHA" .
+          bash ../.github/scripts/build-container.sh status "$GITHUB_SHA" -f Dockerfile.status
 
           gcloud run deploy modtale-status \
             --image="gcr.io/$PROJECT_ID/modtale-status:$GITHUB_SHA" \
@@ -572,10 +596,10 @@ jobs:
             --concurrency=20 \
             --min-instances=1 \
             --max-instances=1 \
-            --no-cpu-throttling \
+            --cpu-throttling \
             --startup-probe="httpGet.path=/api/v1/status/live,httpGet.port=8080,periodSeconds=5,timeoutSeconds=5,failureThreshold=24" \
             --liveness-probe="httpGet.path=/api/v1/status/live,httpGet.port=8080,periodSeconds=30,timeoutSeconds=5,failureThreshold=3" \
-            --set-env-vars="STATUS_TARGET_SITE_URL=https://modtale.net,STATUS_TARGET_API_URL=https://api.modtale.net/actuator/health/readiness,STATUS_MONGODB_DATABASE_NAME=modtale,STATUS_R2_BUCKET_NAME=modtale-binaries,STATUS_REFRESH_INTERVAL_MS=60000,STATUS_STALE_AFTER=3m" \
+            --set-env-vars="STATUS_TARGET_SITE_URL=https://modtale.net,STATUS_TARGET_API_URL=https://api.modtale.net/actuator/health/readiness,STATUS_MONGODB_DATABASE_NAME=modtale,STATUS_R2_BUCKET_NAME=modtale-binaries,STATUS_REFRESH_INTERVAL_MS=60000,STATUS_STALE_AFTER=3m,STATUS_EXTERNAL_REFRESH=true,STATUS_REFRESH_AUDIENCE=https://modtale-status-ptpi2wdeva-uc.a.run.app,STATUS_REFRESH_SERVICE_ACCOUNT=modtale-status-scheduler@$PROJECT_ID.iam.gserviceaccount.com" \
             --update-secrets="STATUS_MONGODB_URI=MONGODB_URI:latest,STATUS_R2_ACCESS_KEY=R2_ACCESS_KEY:latest,STATUS_R2_SECRET_KEY=R2_SECRET_KEY:latest,STATUS_R2_ENDPOINT=R2_ENDPOINT:latest,STATUS_DISCORD_WEBHOOK_URL=STATUS_DISCORD_WEBHOOK_URL:latest" \
             --labels="app=modtale,environment=production,component=status" \
             --quiet
@@ -611,7 +635,11 @@ jobs:
           fi
 
           : "${BACKEND_SERVICE_URL:?Backend service URL was not resolved.}"
-          echo "SSR_API_URL=$BACKEND_SERVICE_URL/api/v1" >> $GITHUB_ENV
+          if [ "$ENV_TYPE" = prod ]; then
+            echo "SSR_API_URL=$BACKEND_DOMAIN/api/v1" >> "$GITHUB_ENV"
+          else
+            echo "SSR_API_URL=$BACKEND_SERVICE_URL/api/v1" >> "$GITHUB_ENV"
+          fi
 
           if [ -n "${BACKEND_DOMAIN:-}" ]; then
             echo "API_URL=$BACKEND_DOMAIN/api/v1" >> $GITHUB_ENV
@@ -628,10 +656,9 @@ jobs:
           : "${BUILD_SERVICE_ACCOUNT:?Set GitHub environment variable GCP_BUILD_SERVICE_ACCOUNT.}"
           : "${RUNTIME_SERVICE_ACCOUNT:?Set the GitHub environment runtime service account variable for this environment.}"
 
-          gcloud builds submit \
-            --config=cloudbuild.yml \
-            --service-account="projects/$PROJECT_ID/serviceAccounts/$BUILD_SERVICE_ACCOUNT" \
-            --substitutions=_PUBLIC_API_URL=$API_URL,_SSR_API_URL=$SSR_API_URL,_TAG=$TAG .
+          bash ../.github/scripts/build-container.sh frontend "$TAG" \
+            --build-arg "PUBLIC_API_URL=$API_URL" --build-arg "SSR_API_URL=$SSR_API_URL" \
+            --build-arg "PUBLIC_STATUS_URL=https://status.modtale.net"
 
           FRONTEND_ARGS=(
             "--image" "gcr.io/$PROJECT_ID/modtale-frontend:$TAG"
@@ -835,9 +862,88 @@ jobs:
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "*View deployment details in [Google Cloud Console](https://console.cloud.google.com/run?project=${{ env.PROJECT_ID }}).* " >> $GITHUB_STEP_SUMMARY
 
+  prepare-preview-source:
+    concurrency:
+      group: modtale-template-reader
+      cancel-in-progress: false
+    if: github.repository == 'Modtale/modtale' && github.event_name == 'workflow_dispatch' && inputs.prepare_preview_source
+    runs-on: ubuntu-latest
+    environment: branch-preview
+    permissions:
+      contents: read
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_R2_PROVISIONER: ${{ secrets.CLOUDFLARE_R2_PROVISIONER }}
+      CLOUDFLARE_API_TOKEN_PROVISIONER: ${{ secrets.CLOUDFLARE_API_TOKEN_PROVISIONER }}
+      CLOUDFLARE_API_TOKEN_OWNER: ${{ vars.CLOUDFLARE_API_TOKEN_OWNER }}
+      R2_BUCKET_NAME: modtale-preview-template
+      R2_TOKEN_NAME: modtale-preview-template-reader
+      RUNTIME_SERVICE_ACCOUNT: ${{ vars.GCP_BRANCH_PREVIEW_RUNTIME_SERVICE_ACCOUNT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Provision isolated template reader
+        run: |
+          set -euo pipefail
+          : "${RUNTIME_SERVICE_ACCOUNT:?Preview runtime service account required}"
+          if gcloud secrets describe R2_TEMPLATE_READ_ACCESS_KEY --project "$PROJECT_ID" >/dev/null 2>&1; then
+            echo "Template reader is already provisioned."
+            exit 0
+          fi
+          runtime_env_file=$(mktemp)
+          trap 'rm -f "$runtime_env_file"' EXIT
+          export R2_RUNTIME_ENV_FILE="$runtime_env_file"
+          node .github/scripts/cloudflare-r2-preview.mjs provision-read-only
+          set -a
+          . "$runtime_env_file"
+          set +a
+          for entry in ACCESS_KEY SECRET_KEY ENDPOINT; do
+            variable="R2_RUNTIME_$entry"
+            printf '%s' "${!variable}" | gcloud secrets create "R2_TEMPLATE_READ_$entry" \
+              --project "$PROJECT_ID" --replication-policy=automatic --data-file=- --quiet
+            gcloud secrets add-iam-policy-binding "R2_TEMPLATE_READ_$entry" \
+              --project "$PROJECT_ID" --member="serviceAccount:$RUNTIME_SERVICE_ACCOUNT" \
+              --role=roles/secretmanager.secretAccessor --quiet >/dev/null
+          done
+
+  find-orphan-previews:
+    if: github.repository == 'Modtale/modtale' && (github.event_name == 'delete' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    environment: branch-preview
+    permissions:
+      contents: read
+    outputs:
+      branches: ${{ steps.inventory.outputs.branches }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+      - uses: google-github-actions/setup-gcloud@v2
+      - id: inventory
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPLICIT_CLEANUP_BRANCHES: ${{ inputs.cleanup_branches || '[]' }}
+        run: |
+          set -euo pipefail
+          branches=$(python3 .github/scripts/find-orphan-previews.py)
+          echo "branches=$branches" >> "$GITHUB_OUTPUT"
+
   cleanup-branch-preview:
-    name: Clean Up Deleted Branch Preview
-    if: github.repository == 'Modtale/modtale' && github.event.deleted == true && startsWith(github.ref, 'refs/heads/') && github.ref_name != 'main' && github.ref_name != 'develop'
+    concurrency:
+      group: modtale-preview-cleanup-${{ matrix.branch }}
+      cancel-in-progress: false
+    name: Clean Up Deleted Branch Preview (${{ matrix.branch }})
+    needs: find-orphan-previews
+    if: needs.find-orphan-previews.outputs.branches != '[]'
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        branch: ${{ fromJSON(needs.find-orphan-previews.outputs.branches) }}
     runs-on: ubuntu-latest
     environment: branch-preview
     env:
@@ -852,10 +958,12 @@ jobs:
 
     steps:
       - name: Prepare cleanup names
+        env:
+          DELETED_BRANCH: ${{ matrix.branch }}
         run: |
           set -euo pipefail
 
-          branch_name="${GITHUB_REF#refs/heads/}"
+          branch_name="$DELETED_BRANCH"
           slug="$(printf '%s' "$branch_name" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]' | sed 's/--*/-/g' | cut -c 1-20 | sed 's/^-//;s/-$//')"
           if [ -z "$slug" ]; then
             deleted_sha="${{ github.event.before }}"
@@ -893,6 +1001,11 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Verify no live branch owns this preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/assert-preview-orphan.py "$BRANCH_SLUG"
+
       - name: Delete branch Cloud Run services
         run: |
           gcloud run services delete "$BACKEND_SERVICE" \
@@ -909,6 +1022,28 @@ jobs:
         run: |
           gcloud container images untag "gcr.io/$PROJECT_ID/modtale-backend:$IMAGE_TAG" --quiet || true
           gcloud container images untag "gcr.io/$PROJECT_ID/modtale-frontend:$IMAGE_TAG" --quiet || true
+
+      - name: Drop branch Mongo database
+        run: |
+          set -euo pipefail
+
+          case "$DB_NAME" in
+            modtale-*)
+              ;;
+            *)
+              echo "::error::Refusing to drop non-preview Mongo database '$DB_NAME'."
+              exit 1
+              ;;
+          esac
+
+          mongodb_uri="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$MONGODB_SECRET_NAME")"
+          echo "::add-mask::$mongodb_uri"
+
+          npm install --silent --prefix "$RUNNER_TEMP/mongo-cleanup" mongodb@6
+
+          MONGODB_URI="$mongodb_uri" \
+          NODE_PATH="$RUNNER_TEMP/mongo-cleanup/node_modules" \
+          node .github/scripts/drop-preview-db.cjs
 
       - name: Delete branch R2 bucket
         run: |
@@ -994,43 +1129,3 @@ jobs:
               --project "$PROJECT_ID" \
               --quiet || true
           done
-
-      - name: Drop branch Mongo database
-        run: |
-          set -euo pipefail
-
-          case "$DB_NAME" in
-            modtale-*)
-              ;;
-            *)
-              echo "::error::Refusing to drop non-preview Mongo database '$DB_NAME'."
-              exit 1
-              ;;
-          esac
-
-          mongodb_uri="$(gcloud secrets versions access latest --project "$PROJECT_ID" --secret="$MONGODB_SECRET_NAME")"
-          echo "::add-mask::$mongodb_uri"
-
-          npm install --silent --prefix "$RUNNER_TEMP/mongo-cleanup" mongodb@6
-
-          MONGODB_URI="$mongodb_uri" \
-          NODE_PATH="$RUNNER_TEMP/mongo-cleanup/node_modules" \
-          node <<'NODE'
-          const { MongoClient } = require('mongodb');
-
-          const uri = process.env.MONGODB_URI;
-          const dbName = process.env.DB_NAME;
-
-          if (!/^modtale-[a-z0-9-]+$/.test(dbName)) {
-            throw new Error(`Refusing to drop unsafe database name: ${dbName}`);
-          }
-
-          const client = new MongoClient(uri, { appName: 'modtale-branch-preview-cleanup' });
-          try {
-            await client.connect();
-            const result = await client.db(dbName).dropDatabase();
-            console.log(`Dropped Mongo database ${dbName}: ${result}`);
-          } finally {
-            await client.close();
-          }
-          NODE

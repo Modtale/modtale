@@ -78,6 +78,7 @@ fi
 
 changed_files="$(git diff --name-only --no-renames "$base_sha" "$head_sha")"
 
+status=false
 frontend=false
 backend=false
 
@@ -85,11 +86,21 @@ while IFS= read -r path; do
   [[ -z "$path" ]] && continue
 
   case "$path" in
+    backend/src/main/java/net/modtale/status/*|backend/src/main/resources/application*.properties|backend/src/main/resources/status-static/*|backend/build.gradle|backend/settings.gradle|backend/gradle/*|backend/gradlew|backend/Dockerfile.status|backend/cloudbuild-status.yml)
+      status=true
+      ;;
+  esac
+  case "$path" in
     frontend/*)
       frontend=true
       ;;
     backend/*)
       backend=true
+      ;;
+    .github/workflows/ci-cd.yml|.github/scripts/build-container.sh|.github/scripts/sync-preview-r2.py|.github/scripts/detect-component-changes.sh)
+      frontend=true
+      backend=true
+      status=true
       ;;
   esac
 done <<< "$changed_files"
@@ -107,6 +118,7 @@ done <<< "$changed_files"
 }
 
 {
+  echo "status=$status"
   echo "frontend=$frontend"
   echo "backend=$backend"
 } >> "${GITHUB_OUTPUT:-/dev/stdout}"

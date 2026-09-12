@@ -61,17 +61,22 @@ public class MongoStatusStore implements AutoCloseable {
     }
 
     public List<StatusHistoryEntry> findHistoryAfter(Instant since) {
+        return loadHistoryAfter(since).orElse(List.of());
+    }
+
+    public Optional<List<StatusHistoryEntry>> loadHistoryAfter(Instant since) {
         return withDatabase(database -> {
             ensureHistoryIndex(database);
             FindIterable<Document> documents = history(database)
                     .find(Filters.gte("timestamp", Date.from(since)))
+                    .batchSize(1000)
                     .sort(Sorts.ascending("timestamp"));
             List<StatusHistoryEntry> entries = new ArrayList<>();
             for (Document document : documents) {
                 entries.add(toHistoryEntry(document));
             }
             return entries;
-        }).orElse(List.of());
+        });
     }
 
     public void saveHistory(StatusHistoryEntry entry) {

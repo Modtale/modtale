@@ -12,6 +12,9 @@ public class StatusServiceProperties {
     private Duration degradedLatency = Duration.ofSeconds(2);
     private Duration staleAfter = Duration.ofMinutes(3);
     private Duration historyRetention = Duration.ofDays(30);
+    private boolean externalRefresh;
+    private String refreshAudience = "";
+    private String refreshServiceAccount = "";
     private long refreshIntervalMs = 60_000;
     private String snapshotPath = "/tmp/modtale-status-snapshot.json";
     private String targetSiteUrl = "https://modtale.net";
@@ -22,6 +25,13 @@ public class StatusServiceProperties {
     private String discordWebhookUrl = "";
     private List<String> corsAllowedOrigins = new ArrayList<>(List.of("*"));
     private R2 r2 = new R2();
+
+    public boolean isExternalRefresh() { return externalRefresh; }
+    public void setExternalRefresh(boolean value) { externalRefresh = value; }
+    public String getRefreshAudience() { return refreshAudience; }
+    public void setRefreshAudience(String value) { refreshAudience = value; }
+    public String getRefreshServiceAccount() { return refreshServiceAccount; }
+    public void setRefreshServiceAccount(String value) { refreshServiceAccount = value; }
 
     public Duration getRequestTimeout() {
         return requestTimeout;
