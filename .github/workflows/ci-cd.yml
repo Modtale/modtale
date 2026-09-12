@@ -9,6 +9,10 @@ on:
   delete:
   workflow_dispatch:
     inputs:
+      prepare_preview_source:
+        type: boolean
+        default: false
+        required: false
       cleanup_branches:
         type: string
         default: '[]'
@@ -138,7 +142,7 @@ jobs:
               BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME="${{ vars.GCP_PREVIEW_SOURCE_R2_BUCKET_NAME }}"
             fi
             if [ -z "$BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME" ]; then
-              BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME="modtale-binaries"
+              BRANCH_PREVIEW_SOURCE_R2_BUCKET_NAME="modtale-preview-template"
             fi
 
             BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME="${{ vars.GCP_BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME }}"
@@ -146,7 +150,7 @@ jobs:
               BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME="${{ vars.GCP_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME }}"
             fi
             if [ -z "$BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME" ]; then
-              BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME="R2_SOURCE_READ_ACCESS_KEY"
+              BRANCH_PREVIEW_SOURCE_R2_ACCESS_KEY_SECRET_NAME="R2_TEMPLATE_READ_ACCESS_KEY"
             fi
 
             BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME="${{ vars.GCP_BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME }}"
@@ -154,7 +158,7 @@ jobs:
               BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME="${{ vars.GCP_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME }}"
             fi
             if [ -z "$BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME" ]; then
-              BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME="R2_SOURCE_READ_SECRET_KEY"
+              BRANCH_PREVIEW_SOURCE_R2_SECRET_KEY_SECRET_NAME="R2_TEMPLATE_READ_SECRET_KEY"
             fi
 
             BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME="${{ vars.GCP_BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME }}"
@@ -162,7 +166,7 @@ jobs:
               BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME="${{ vars.GCP_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME }}"
             fi
             if [ -z "$BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME" ]; then
-              BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME="R2_SOURCE_READ_ENDPOINT"
+              BRANCH_PREVIEW_SOURCE_R2_ENDPOINT_SECRET_NAME="R2_TEMPLATE_READ_ENDPOINT"
             fi
 
             echo "ENV_TYPE=preview" >> $GITHUB_ENV
@@ -1033,6 +1037,50 @@ jobs:
           path: launcher/build/distributions/*
           if-no-files-found: error
           retention-days: 7
+
+  prepare-preview-source:
+    if: github.repository == 'Modtale/modtale' && github.event_name == 'workflow_dispatch' && inputs.prepare_preview_source
+    runs-on: ubuntu-latest
+    environment: branch-preview
+    permissions:
+      contents: read
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_R2_PROVISIONER: ${{ secrets.CLOUDFLARE_R2_PROVISIONER }}
+      CLOUDFLARE_API_TOKEN_PROVISIONER: ${{ secrets.CLOUDFLARE_API_TOKEN_PROVISIONER }}
+      CLOUDFLARE_API_TOKEN_OWNER: ${{ vars.CLOUDFLARE_API_TOKEN_OWNER }}
+      R2_BUCKET_NAME: modtale-preview-template
+      R2_TOKEN_NAME: modtale-preview-template-reader
+      RUNTIME_SERVICE_ACCOUNT: ${{ vars.GCP_BRANCH_PREVIEW_RUNTIME_SERVICE_ACCOUNT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Provision isolated template reader
+        run: |
+          set -euo pipefail
+          : "${RUNTIME_SERVICE_ACCOUNT:?Preview runtime service account required}"
+          if gcloud secrets describe R2_TEMPLATE_READ_ACCESS_KEY --project "$PROJECT_ID" >/dev/null 2>&1; then
+            echo "Template reader is already provisioned."
+            exit 0
+          fi
+          runtime_env_file=$(mktemp)
+          trap 'rm -f "$runtime_env_file"' EXIT
+          export R2_RUNTIME_ENV_FILE="$runtime_env_file"
+          node .github/scripts/cloudflare-r2-preview.mjs provision-read-only
+          set -a
+          . "$runtime_env_file"
+          set +a
+          for entry in ACCESS_KEY SECRET_KEY ENDPOINT; do
+            variable="R2_RUNTIME_$entry"
+            printf '%s' "${!variable}" | gcloud secrets create "R2_TEMPLATE_READ_$entry" \
+              --project "$PROJECT_ID" --replication-policy=automatic --data-file=- --quiet
+            gcloud secrets add-iam-policy-binding "R2_TEMPLATE_READ_$entry" \
+              --project "$PROJECT_ID" --member="serviceAccount:$RUNTIME_SERVICE_ACCOUNT" \
+              --role=roles/secretmanager.secretAccessor --quiet >/dev/null
+          done
 
   find-orphan-previews:
     if: github.repository == 'Modtale/modtale' && (github.event_name == 'delete' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')

@@ -17,13 +17,13 @@ class ProjectCacheServiceTest {
         Project project = new Project();
         project.setId("project-1");
         project.setSlug("sky-tools");
-        for (String name : java.util.List.of("projectDetails", "projectDetailDtos", "projectPageDtos", "projectVersionDtos",
+        for (String name : java.util.List.of("projectDetails", "projectDetailDtos", "projectPageDtos", "projectVersionDtos", "projectMetaDtos",
                 "projectCommentDtos", "projectPermissionSnapshots", "wikiPageJson", "projectVersionChangelogPages")) {
             manager.getCache(name).put("public:project-1", "cached");
         }
         manager.getCache("projectPageDtos").put("public:sky-tools", "cached");
         service.evictProjectCounterCaches(java.util.List.of(project), java.util.List.of());
-        for (String name : java.util.List.of("projectDetails", "projectDetailDtos", "projectPageDtos", "projectVersionDtos")) {
+        for (String name : java.util.List.of("projectDetails", "projectDetailDtos", "projectPageDtos", "projectVersionDtos", "projectMetaDtos")) {
             assertNull(manager.getCache(name).get("public:project-1"));
         }
         assertNull(manager.getCache("projectPageDtos").get("public:sky-tools"));

@@ -176,7 +176,7 @@ public class ProjectCacheService {
             projects.evict("public:" + route);
             projects.evict("public-page:" + route);
         }
-        for (String name : java.util.List.of("projectDetailDtos", "projectPageDtos", "projectVersionDtos")) {
+        for (String name : java.util.List.of("projectDetailDtos", "projectPageDtos", "projectVersionDtos", "projectMetaDtos")) {
             Cache cache = cacheManager.getCache(name);
             if (cache != null) cache.evict("public:" + route);
         }
