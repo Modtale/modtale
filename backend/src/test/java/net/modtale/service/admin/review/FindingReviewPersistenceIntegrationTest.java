@@ -346,4 +346,30 @@ class FindingReviewPersistenceIntegrationTest {
         assertNotNull(mongo.findById(event.id(), FindingReviewService.Event.class, FindingReviewService.COLLECTION));
     }
 
+    @Test void presentationWritesCannotChangeVersionApprovalOrProjectStatus() {
+        var event = record(token()); assertTrue(approveVersion());
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var originalStatus = project.getStatus();
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().setTitle("Updated title"); snapshot.project().setStatus(ProjectStatus.DELETED);
+        snapshot.project().getVersions().getFirst().setFindingReviewHead("unrelated");
+        snapshot.project().getVersions().getFirst().setReviewStatus(ProjectVersion.ReviewStatus.REJECTED);
+        assertTrue(writes.applyPresentation(snapshot, false));
+        var stored = mongo.findById(projectId, Project.class);
+        assertEquals("Updated title", stored.getTitle()); assertEquals(originalStatus, stored.getStatus());
+        assertEquals(event.id(), stored.getVersions().getFirst().getApprovedFindingReviewHead());
+        assertEquals(event.id(), stored.getVersions().getFirst().getFindingReviewHead());
+        assertEquals(ProjectVersion.ReviewStatus.APPROVED, stored.getVersions().getFirst().getReviewStatus());
+    }
+    @Test void staleGalleryWriteCannotRestoreOlderApprovalOrDeleteNewHistory() {
+        record(token()); assertTrue(approveVersion());
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().setGalleryImages(List.of("new-gallery.png"));
+        var event = requireFurtherReview();
+        assertFalse(writes.applyPresentation(snapshot, true));
+        assertEquals(event.id(), version().getFindingReviewHead());
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+    }
+
 }

@@ -8,6 +8,8 @@ import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectLicenseSupport;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.admin.review.ProjectReviewPersistence;
+import net.modtale.service.admin.review.ProjectReviewSnapshot;
 import net.modtale.service.project.access.ProjectAccessService;
 import net.modtale.service.project.access.ProjectMutationGuard;
 import net.modtale.service.project.query.ProjectService;
@@ -25,6 +27,7 @@ public class MetadataService {
     );
     private static final Pattern GALLERY_CAROUSEL_MARKER_PATTERN = Pattern.compile("\\{\\{\\s*gallery-carousel\\s*\\}\\}", Pattern.CASE_INSENSITIVE);
 
+    private final ProjectReviewPersistence reviewPersistence;
     private final ProjectRepository projectRepository;
     private final ProjectService projectService;
     private final ValidationService validationService;
@@ -34,6 +37,7 @@ public class MetadataService {
 
     public MetadataService(
             ProjectRepository projectRepository,
+            ProjectReviewPersistence reviewPersistence,
             ProjectService projectService,
             ValidationService validationService,
             ProjectAccessService projectAccessService,
@@ -41,6 +45,7 @@ public class MetadataService {
             SanitizationService sanitizer
     ) {
         this.projectRepository = projectRepository;
+        this.reviewPersistence = reviewPersistence;
         this.projectService = projectService;
         this.validationService = validationService;
         this.projectAccessService = projectAccessService;
@@ -52,6 +57,8 @@ public class MetadataService {
         Project existing = projectAccessService.requireProjectPermission(id, user, "PROJECT_EDIT_METADATA",
                 "You do not have permission to edit this project's metadata.");
         projectMutationGuard.ensureEditable(existing);
+        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(existing));
+        existing = snapshot.project();
 
         if (updated.getClassification() != null && updated.getClassification() != existing.getClassification()) {
             if (!MUTABLE_CLASSIFICATIONS.contains(existing.getClassification())) {
@@ -104,9 +111,10 @@ public class MetadataService {
         existing.setHmWikiSlug(updated.getHmWikiSlug() != null ? updated.getHmWikiSlug().trim() : null);
         existing.setGalleryCarouselEnabled(updated.isGalleryCarouselEnabled());
         if (updated.getLinks() != null) existing.setLinks(updated.getLinks());
-        if (updated.getImageUrl() != null) existing.setImageUrl(updated.getImageUrl());
+        if (updated.getImageUrl() != null && !java.util.Objects.equals(updated.getImageUrl(), existing.getImageUrl()))
+            throw new InvalidProjectRequestException("Use the project image upload endpoint to change its image.");
 
-        projectRepository.save(existing);
+        if (!reviewPersistence.applyPresentation(snapshot, false)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(existing);
     }
 

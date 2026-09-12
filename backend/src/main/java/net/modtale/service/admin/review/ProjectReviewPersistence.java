@@ -63,6 +63,17 @@ public class ProjectReviewPersistence {
         }
         return applyUpdate(snapshot, update, originGuard.getQueryObject().get("$expr"));
     }
+    public boolean applyPresentation(Snapshot snapshot, boolean media) {
+        var fields = media ? List.of("imageUrl", "bannerUrl", "galleryImages", "galleryImageCaptions")
+                : List.of("classification", "tags", "title", "description", "about", "categories", "slug", "license",
+                        "customLicenseOpenSource", "repositoryUrl", "types", "allowModpacks", "allowComments",
+                        "hmWikiEnabled", "hmWikiSlug", "galleryCarouselEnabled", "links", "imageUrl");
+        var encoded = new Document(); mongo.getConverter().write(snapshot.project(), encoded);
+        var update = new Update();
+        for (var field : fields) update.set(field, encoded.get(field));
+        update.set("updatedAt", java.time.LocalDateTime.now().toString()).set("rankingDirty", true);
+        return applyUpdate(snapshot, update);
+    }
     public boolean applyVersionList(Snapshot snapshot) {
         var original = new HashMap<String, Document>();
         for (var raw : snapshot.raw().getList("versions", Document.class, List.of())) {
