@@ -6,7 +6,7 @@ import net.modtale.config.properties.AppLimitProperties;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
-import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.admin.review.ProjectReviewPersistence;
 import net.modtale.service.project.query.ProjectService;
 import org.springframework.stereotype.Service;
 
@@ -18,14 +18,14 @@ public class DownloadService {
     private final BundlePackagingService bundlePackagingService;
 
     public DownloadService(
-            ProjectRepository projectRepository,
+            ProjectReviewPersistence reviewPersistence,
             ProjectService projectService,
             StorageService storageService,
             AppLimitProperties limitProperties
     ) {
         DownloadArchiveSupport archiveSupport = new DownloadArchiveSupport(projectService, storageService);
         this.rateLimitService = new DownloadRateLimitService(limitProperties.modpackGenPerHour());
-        this.modpackArchiveService = new ModpackArchiveService(projectRepository, archiveSupport);
+        this.modpackArchiveService = new ModpackArchiveService(reviewPersistence, archiveSupport);
         this.bundlePackagingService = new BundlePackagingService(archiveSupport);
     }
 

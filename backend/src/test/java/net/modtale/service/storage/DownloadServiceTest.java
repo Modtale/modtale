@@ -19,7 +19,7 @@ import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
-import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.admin.review.ProjectReviewPersistence;
 import net.modtale.service.project.query.ProjectService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,16 +43,17 @@ class DownloadServiceTest {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private DownloadService downloadService;
-    private ProjectRepository projectRepository;
+    private ProjectReviewPersistence reviewPersistence;
     private ProjectService projectService;
     private StorageService storageService;
 
     @BeforeEach
     void setUp() {
-        projectRepository = mock(ProjectRepository.class);
+        reviewPersistence = mock(ProjectReviewPersistence.class);
+        when(reviewPersistence.cacheModpackArchive(any(), any(), any(), any(), any())).thenReturn(true);
         projectService = mock(ProjectService.class);
         storageService = mock(StorageService.class);
-        downloadService = new DownloadService(projectRepository, projectService, storageService, limitProperties(10));
+        downloadService = new DownloadService(reviewPersistence, projectService, storageService, limitProperties(10));
     }
 
     @Test
@@ -69,7 +70,7 @@ class DownloadServiceTest {
 
         assertArrayEquals(cachedArchive, zipBytes);
         verify(storageService).download("modpacks/already-built.zip");
-        verifyNoInteractions(projectService, projectRepository);
+        verifyNoInteractions(projectService, reviewPersistence);
     }
 
     @Test
@@ -110,12 +111,12 @@ class DownloadServiceTest {
         ArgumentCaptor<MultipartFile> uploadCaptor = ArgumentCaptor.forClass(MultipartFile.class);
         verify(storageService).upload(uploadCaptor.capture(), eq("modpacks"));
         assertEquals("sky-pack-1.0.0.zip", uploadCaptor.getValue().getOriginalFilename());
-        verify(projectRepository).save(pack);
+        verify(reviewPersistence).cacheModpackArchive(eq(pack.getId()), any(), any(), any(), any());
     }
 
     @Test
     void generateModpackZipAppliesPerUserRateLimiting() throws Exception {
-        downloadService = new DownloadService(projectRepository, projectService, storageService, limitProperties(1));
+        downloadService = new DownloadService(reviewPersistence, projectService, storageService, limitProperties(1));
 
         Project pack = pack("pack-1", "tiny-pack", "Tiny Pack");
         ProjectVersion version = version("1.0.0");

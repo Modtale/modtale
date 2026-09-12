@@ -17,7 +17,7 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
-import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.admin.review.ProjectReviewPersistence;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.multipart.MultipartFile;
@@ -36,15 +36,16 @@ import static org.mockito.Mockito.when;
 
 class ModpackArchiveServiceTest {
 
-    private ProjectRepository projectRepository;
+    private ProjectReviewPersistence reviewPersistence;
     private DownloadArchiveSupport archiveSupport;
     private ModpackArchiveService service;
 
     @BeforeEach
     void setUp() {
-        projectRepository = mock(ProjectRepository.class);
+        reviewPersistence = mock(ProjectReviewPersistence.class);
+        when(reviewPersistence.cacheModpackArchive(any(), any(), any(), any(), any())).thenReturn(true);
         archiveSupport = mock(DownloadArchiveSupport.class);
-        service = new ModpackArchiveService(projectRepository, archiveSupport);
+        service = new ModpackArchiveService(reviewPersistence, archiveSupport);
     }
 
     @Test
@@ -88,7 +89,7 @@ class ModpackArchiveServiceTest {
         when(archiveSupport.download("modpacks/cached.zip")).thenReturn(cached);
 
         assertArrayEquals(cached, service.generateModpackZip(pack, version));
-        verify(projectRepository, never()).save(pack);
+        verify(reviewPersistence, never()).cacheModpackArchive(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -108,7 +109,7 @@ class ModpackArchiveServiceTest {
         assertTrue(entries.containsKey("manifest.json"));
         assertTrue(entries.containsKey("modtale.lock.json"));
         assertEquals("modpacks/rebuilt.zip", version.getFileUrl());
-        verify(projectRepository).save(pack);
+        verify(reviewPersistence).cacheModpackArchive(eq(pack.getId()), any(), any(), any(), any());
     }
 
     @Test
@@ -124,7 +125,7 @@ class ModpackArchiveServiceTest {
 
         assertEquals(true, entries.containsKey("modpack.json"));
         assertEquals("modpacks/rebuilt.zip", version.getFileUrl());
-        verify(projectRepository).save(pack);
+        verify(reviewPersistence).cacheModpackArchive(eq(pack.getId()), any(), any(), any(), any());
     }
 
     @Test
@@ -336,7 +337,32 @@ class ModpackArchiveServiceTest {
         assertTrue(entries.get("modpack.json").contains("\"externalId\" : \"1450386\""));
         assertTrue(entries.get("modpack.json").contains("\"distribution\" : \"REFERENCE_ONLY\""));
         assertTrue(entries.get("modpack.json").contains("https://www.curseforge.com/hytale/mods/external-mod/files/8227810"));
-        verify(projectRepository).save(pack);
+        verify(reviewPersistence).cacheModpackArchive(eq(pack.getId()), any(), any(), any(), any());
+    }
+
+    @Test
+    void cacheConflictDoesNotAttachOrReturnGeneratedArchive() throws Exception {
+        Project pack = pack(); ProjectVersion version = version("1.0.0", null);
+        when(archiveSupport.newZipMultipartFile(any(), any())).thenReturn(mock(MultipartFile.class));
+        when(archiveSupport.upload(any(), eq("modpacks"))).thenReturn("modpacks/new.zip");
+        when(reviewPersistence.cacheModpackArchive(any(), any(), any(), any(), any())).thenReturn(false);
+        org.junit.jupiter.api.Assertions.assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> service.generateModpackZip(pack, version));
+        org.junit.jupiter.api.Assertions.assertNull(version.getFileUrl());
+    }
+
+    @Test
+    void rebuildingInvalidCacheUsesTokensFromBeforeTheLocalReferenceWasCleared() throws Exception {
+        Project pack = pack(); ProjectVersion version = version("1.0.0", "modpacks/old.zip");
+        version.setId("v1"); pack.setVersions(List.of(version));
+        String projectToken = net.modtale.service.admin.review.ProjectReviewSnapshot.token(pack);
+        String versionToken = net.modtale.service.admin.review.VersionReviewSnapshot.token(version);
+        when(archiveSupport.download("modpacks/old.zip")).thenReturn(new byte[0]);
+        when(archiveSupport.newZipMultipartFile(any(), any())).thenReturn(mock(MultipartFile.class));
+        when(archiveSupport.upload(any(), eq("modpacks"))).thenReturn("modpacks/new.zip");
+        service.generateModpackZip(pack, version);
+        verify(reviewPersistence).cacheModpackArchive(pack.getId(), projectToken, "v1", versionToken, "modpacks/new.zip");
+        assertEquals("modpacks/new.zip", version.getFileUrl());
     }
 
     private static Project pack() {

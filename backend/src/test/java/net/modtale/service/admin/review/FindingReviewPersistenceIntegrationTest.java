@@ -519,4 +519,31 @@ class FindingReviewPersistenceIntegrationTest {
         assertFalse(stored.isAllowComments()); assertEquals("current", stored.getComments().getFirst().getContent());
     }
 
+    @Test void archiveCacheChangesOnlyTheSelectedFileReferenceAndRejectsStaleGeneration() {
+        var event = record(token());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("classification", ProjectClassification.MODPACK), Project.class);
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        String projectToken = ProjectReviewSnapshot.token(project), versionToken = token();
+        assertTrue(writes.cacheModpackArchive(projectId, projectToken, "v1", versionToken, "modpacks/new.zip"));
+        assertEquals("modpacks/new.zip", version().getFileUrl());
+        assertEquals(event.id(), version().getFindingReviewHead()); assertNotNull(version().getScanResult());
+        assertThrows(ResponseStatusException.class, () -> writes.cacheModpackArchive(projectId, projectToken, "v1", versionToken, "modpacks/stale.zip"));
+        project = mongo.findById(projectId, Project.class);
+        String currentProjectToken = ProjectReviewSnapshot.token(project), currentVersionToken = token();
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("versions.0.findingReviewHead", "later"), Project.class);
+        assertThrows(ResponseStatusException.class, () -> writes.cacheModpackArchive(projectId, currentProjectToken, "v1", currentVersionToken, "modpacks/stale.zip"));
+        assertEquals("later", version().getFindingReviewHead()); assertEquals("modpacks/new.zip", version().getFileUrl());
+    }
+    @Test void archiveCacheRejectsForeignVersionsAndNonModpacks() {
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        String original = ProjectReviewSnapshot.token(project);
+        assertThrows(ResponseStatusException.class, () -> writes.cacheModpackArchive(projectId, original, "v1", token(), "modpacks/new.zip"));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("classification", ProjectClassification.MODPACK), Project.class);
+        String current = ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class));
+        assertThrows(ResponseStatusException.class, () -> writes.cacheModpackArchive(projectId, current, "foreign", token(), "modpacks/new.zip"));
+        assertThrows(ResponseStatusException.class, () -> writes.cacheModpackArchive(projectId, current, "v1", "wrong", "modpacks/new.zip"));
+        assertFalse(writes.cacheModpackArchive(projectId, current, "v1", token(), null));
+        assertNull(version().getFileUrl());
+    }
+
 }

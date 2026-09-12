@@ -93,6 +93,22 @@ public class ProjectReviewPersistence {
         update.set("updatedAt", java.time.LocalDateTime.now().toString());
         return applyUpdate(snapshot, update);
     }
+    public boolean cacheModpackArchive(String projectId, String projectToken, String versionId, String versionToken, String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank() || versionId == null || versionId.isBlank()) return false;
+        var snapshot = capture(projectId, projectToken);
+        if (snapshot.project().getClassification() != net.modtale.model.project.ProjectClassification.MODPACK)
+            throw ProjectReviewSnapshot.conflict();
+        var versions = snapshot.project().getVersions();
+        int index = -1;
+        for (int i = 0; i < versions.size(); i++) {
+            if (!Objects.equals(versionId, versions.get(i).getId())) continue;
+            if (index != -1 || !Objects.equals(versionToken, VersionReviewSnapshot.token(versions.get(i))))
+                throw ProjectReviewSnapshot.conflict();
+            index = i;
+        }
+        if (index == -1) throw ProjectReviewSnapshot.conflict();
+        return applyUpdate(snapshot, new Update().set("versions." + index + ".fileUrl", fileUrl));
+    }
     public boolean applyComments(Snapshot snapshot) {
         return applyUpdate(snapshot, new Update().set("comments", snapshot.project().getComments()));
     }
