@@ -33,6 +33,7 @@ import type { ProjectRole } from '@/types';
 import { Permission, PROJECT_PERMISSION_GROUPS } from '@/modules/permissions/permissions';
 import { buildModpackOverrides } from '../utils/modpackConfigs';
 import { VersionFields } from '../components/VersionFields';
+import { CHANGELOG_LIMIT_MESSAGE, MAX_CHANGELOG_CHARACTERS } from '../utils/changelogLimits';
 import { worldListClient } from '@/modules/worldlist/api/worldListClient';
 import { skippedWorldListItems, worldListToProjectDependencies, worldListToOverrideFile } from '@/modules/worldlist/utils/modpackSeed';
 
@@ -484,6 +485,10 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
             onShowStatus('error', 'Upload Failed', 'Version number and game versions are required.');
             return;
         }
+        if (versionData.changelog.length > MAX_CHANGELOG_CHARACTERS) {
+            onShowStatus('error', 'Upload Failed', CHANGELOG_LIMIT_MESSAGE);
+            return;
+        }
         if (versionData.file && isFileOverUploadLimit(versionData.file)) {
             onShowStatus('error', 'Upload Failed', MAX_UPLOAD_ERROR_MESSAGE);
             return;
@@ -544,6 +549,10 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
         if (!projectData?.id || !editingVersion || !editVersionData) return;
         if (!editVersionData.gameVersions || editVersionData.gameVersions.length === 0) {
             onShowStatus('error', 'Update Failed', 'At least one game version is required.');
+            return;
+        }
+        if (editVersionData.changelog.length > MAX_CHANGELOG_CHARACTERS) {
+            onShowStatus('error', 'Update Failed', CHANGELOG_LIMIT_MESSAGE);
             return;
         }
         setIsSavingVersion(true);

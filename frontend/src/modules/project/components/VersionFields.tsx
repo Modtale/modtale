@@ -9,6 +9,7 @@ import { DependencySelector } from './DependencySelector';
 import { projectClient } from '../api/projectClient';
 import { theme } from '@/styles/theme';
 import { VersionRelationKind, type GameVersionCatalog, type ManifestDependencySuggestion, type ProjectDependency } from '@/types';
+import { MAX_CHANGELOG_CHARACTERS } from '../utils/changelogLimits';
 
 const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
@@ -108,6 +109,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
     const isDuplicate = existingVersions.some(existingVersion => existingVersion.toLowerCase() === versionNum.toLowerCase());
     const isValid = versionNum.length > 0 && isFormatValid && !isDuplicate;
     const allowsAutoSwitch = projectType === 'PLUGIN' || projectType === 'DATA' || projectType === 'ART';
+    const changelogLength = data.changelog.length;
 
     const getAcceptTypes = (): Accept => {
         switch (projectType) {
@@ -430,18 +432,28 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
             )}
 
             <div>
-                <div className="flex justify-between items-center mb-2">
-                    <Label>Changelog</Label>
-                    <span className={`text-[10px] uppercase font-bold ${theme.colors.textSecondary} ${theme.colors.bgSurfaceAlt} px-2 py-0.5 rounded border ${theme.colors.border}`}>Markdown Only</span>
+                <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                        <Label className="mb-0">Changelog</Label>
+                        <span className={`text-[10px] uppercase font-bold ${theme.colors.textSecondary} ${theme.colors.bgSurfaceAlt} px-2 py-0.5 rounded border ${theme.colors.border}`}>Markdown Only</span>
+                    </div>
+                    <span className={`text-xs tabular-nums ${changelogLength >= MAX_CHANGELOG_CHARACTERS ? theme.colors.warningText : theme.colors.textSecondary}`}>
+                        {changelogLength.toLocaleString()} / {MAX_CHANGELOG_CHARACTERS.toLocaleString()}
+                    </span>
                 </div>
                 <textarea
+                    aria-label="Changelog"
                     value={data.changelog}
                     disabled={disabled}
                     onChange={e => onChange({...data, changelog: e.target.value})}
+                    maxLength={MAX_CHANGELOG_CHARACTERS}
                     rows={6}
                     className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl px-4 py-3 font-mono text-sm outline-none transition-all placeholder:text-slate-400 dark:text-white shadow-sm ${disabled ? 'cursor-not-allowed opacity-70' : 'focus:ring-2 focus:ring-modtale-accent focus:border-modtale-accent hover:border-modtale-accent'}`}
                     placeholder="- Fixed bugs&#10;- Added new items"
                 />
+                <p className={`mt-1 text-xs ${theme.colors.textSecondary}`}>
+                    Changelogs are limited to {MAX_CHANGELOG_CHARACTERS.toLocaleString()} characters.
+                </p>
             </div>
         </div>
     );

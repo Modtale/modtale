@@ -7,6 +7,7 @@ import { VersionFields } from '@/modules/project/components/VersionFields';
 import { projectClient } from '@/modules/project/api/projectClient';
 import { Permission } from '@/modules/permissions/permissions';
 import { ToastProvider } from '@/components/ui/Toast';
+import { MAX_CHANGELOG_CHARACTERS } from '@/modules/project/utils/changelogLimits';
 
 vi.mock('@/modules/project/api/projectClient', () => ({
     projectClient: {
@@ -99,6 +100,30 @@ describe('Files tab loadability', () => {
         expect(container.textContent).toContain('Game Versions');
         expect(mockedProjectClient.getMetaGameVersionCatalog).toHaveBeenCalledTimes(1);
         expect(mockedProjectClient.getMetaGameVersions).not.toHaveBeenCalled();
+    });
+
+    it('shows the generous changelog limit and applies it to the editor', async () => {
+        await act(async () => {
+            root.render(
+                <ToastProvider>
+                    <VersionFields
+                        data={versionData}
+                        onChange={vi.fn()}
+                        projectType="PLUGIN"
+                        currentProjectId="project-1"
+                        hideFilePicker={true}
+                    />
+                </ToastProvider>
+            );
+        });
+
+        await waitForText(container, 'Changelog');
+
+        const changelog = container.querySelector('textarea[aria-label="Changelog"]') as HTMLTextAreaElement;
+        expect(changelog).not.toBeNull();
+        expect(changelog.maxLength).toBe(MAX_CHANGELOG_CHARACTERS);
+        expect(container.textContent).toContain(`0 / ${MAX_CHANGELOG_CHARACTERS.toLocaleString()}`);
+        expect(container.textContent).toContain(`Changelogs are limited to ${MAX_CHANGELOG_CHARACTERS.toLocaleString()} characters.`);
     });
 
     it('omits shared overrides for modpacks', async () => {
