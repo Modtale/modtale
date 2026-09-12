@@ -63,6 +63,40 @@ public class ProjectReviewPersistence {
         }
         return applyUpdate(snapshot, update, originGuard.getQueryObject().get("$expr"));
     }
+    public boolean applyVersionList(Snapshot snapshot) {
+        var original = new HashMap<String, Document>();
+        for (var raw : snapshot.raw().getList("versions", Document.class, List.of())) {
+            var version = mongo.getConverter().read(ProjectVersion.class, raw);
+            if (version.getId() == null || original.put(version.getId(), raw) != null) throw ProjectReviewSnapshot.conflict();
+        }
+        var seen = new HashSet<String>();
+        var updated = new ArrayList<Document>();
+        for (var version : snapshot.project().getVersions()) {
+            if (version.getId() == null || !seen.add(version.getId())) throw ProjectReviewSnapshot.conflict();
+            var prior = original.get(version.getId());
+            if (prior == null) {
+                if (version.getReviewStatus() != ProjectVersion.ReviewStatus.PENDING) throw ProjectReviewSnapshot.conflict();
+                var added = new Document(); mongo.getConverter().write(version, added); updated.add(added);
+            } else {
+                // Retained versions keep every stored field, including evidence unknown to this binary.
+                var retained = new Document(prior);
+                var before = mongo.getConverter().read(ProjectVersion.class, prior);
+                if (!Objects.equals(before.getGameVersions(), version.getGameVersions())) {
+                    retained.put("gameVersions", version.getGameVersions());
+                    retained.put("reviewStatus", "PENDING"); retained.put("scheduledPublishDate", null);
+                    retained.put("scanResult", mongo.getConverter().convertToMongoType(version.getScanResult()));
+                    for (String field : List.of("approvedSecurityEvidence", "approvedSecurityContextSha256", "approvedReviewOrigins",
+                            "securityApprovalProjectId", "approvedFindingReviewHead", "approvedIssueBaselines")) retained.put(field, null);
+                    retained.put("securityApprovedAt", 0L);
+                }
+                updated.add(retained);
+            }
+        }
+        return applyUpdate(snapshot, new Update().set("versions", updated)
+                .set("classification", snapshot.project().getClassification())
+                .set("childProjectIds", snapshot.project().getChildProjectIds())
+                .set("updatedAt", java.time.LocalDateTime.now().toString()));
+    }
     public boolean applyVersionEdit(Snapshot snapshot, String versionId, boolean contextChanged, boolean childIdsChanged) {
         var versions = snapshot.project().getVersions();
         int index = -1;

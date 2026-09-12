@@ -10,7 +10,8 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
-import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.admin.review.ProjectReviewPersistence;
+import net.modtale.service.admin.review.ProjectReviewSnapshot;
 import net.modtale.service.project.access.ProjectAccessService;
 import net.modtale.service.project.access.ProjectMutationGuard;
 import net.modtale.service.project.access.ProjectVersionAccessService;
@@ -25,7 +26,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class VersionService {
 
-    private final ProjectRepository projectRepository;
+    private final ProjectReviewPersistence reviewPersistence;
     private final ProjectService projectService;
     private final ProjectAccessService projectAccessService;
     private final ProjectMutationGuard projectMutationGuard;
@@ -37,7 +38,7 @@ public class VersionService {
     private final VersionUpdateCommandHandler versionUpdateCommandHandler;
 
     public VersionService(
-            ProjectRepository projectRepository,
+            ProjectReviewPersistence reviewPersistence,
             ProjectService projectService,
             ProjectAccessService projectAccessService,
             ProjectMutationGuard projectMutationGuard,
@@ -48,7 +49,7 @@ public class VersionService {
             VersionCreationCommandHandler versionCreationCommandHandler,
             VersionUpdateCommandHandler versionUpdateCommandHandler
     ) {
-        this.projectRepository = projectRepository;
+        this.reviewPersistence = reviewPersistence;
         this.projectService = projectService;
         this.projectAccessService = projectAccessService;
         this.projectMutationGuard = projectMutationGuard;
@@ -119,6 +120,8 @@ public class VersionService {
         Project project = projectAccessService.requireVersionPermission(id, user, "VERSION_DELETE",
                 "You do not have permission to delete this version.");
         projectMutationGuard.ensureEditable(project);
+        var snapshot = reviewPersistence.capture(project.getId(), ProjectReviewSnapshot.token(project));
+        project = snapshot.project();
         if (project.getStatus() != ProjectStatus.DRAFT
                 && project.getStatus() != ProjectStatus.PRIVATE
                 && project.getVersions().size() <= 1) {
@@ -127,10 +130,10 @@ public class VersionService {
 
         ProjectVersion version = projectVersionAccessService.requireById(project, versionId,
                 () -> new VersionNotFoundException("We couldn't find that project version."));
-        projectDeletionService.deleteVersionFile(version);
         project.getVersions().removeIf(existing -> existing.getId().equals(versionId));
-        projectRepository.save(project);
+        if (!reviewPersistence.applyVersionList(snapshot)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(project);
+        projectDeletionService.deleteVersionFile(version);
     }
 
 }

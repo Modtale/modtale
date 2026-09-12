@@ -70,6 +70,11 @@ class VersionServiceTest {
         validationService = mock(ValidationService.class);
         projectVersionAccessService = new ProjectVersionAccessService(validationService);
         scanService = mock(ScanService.class);
+        when(scanService.nextScanAttempt(any())).thenReturn(1);
+        when(scanService.createQueuedScanResult(anyInt(), anyString())).thenAnswer(invocation -> {
+            var queued = new ScanResult(); queued.setScanAttempt(invocation.getArgument(0)); return queued;
+        });
+        when(reviewPersistence.applyVersionList(any())).thenReturn(true);
         sanitizationService = mock(SanitizationService.class);
         versionArtifactService = mock(VersionArtifactService.class);
         versionDependencyService = mock(VersionDependencyService.class);
@@ -84,7 +89,7 @@ class VersionServiceTest {
                 projectDeletionService
         );
         VersionCreationCommandHandler versionCreationCommandHandler = new VersionCreationCommandHandler(
-                projectRepository,
+                reviewPersistence,
                 projectService,
                 projectAccessService,
                 projectMutationGuard,
@@ -101,7 +106,7 @@ class VersionServiceTest {
         );
 
         service = new VersionService(
-                projectRepository,
+                reviewPersistence,
                 projectService,
                 projectAccessService,
                 projectMutationGuard,
@@ -157,7 +162,7 @@ class VersionServiceTest {
         assertEquals("/files/data/bundle.zip", savedVersion.getFileUrl());
         assertEquals("sha-256", savedVersion.getHash());
         assertEquals(queuedScan, savedVersion.getScanResult());
-        verify(projectRepository).save(project);
+        verify(reviewPersistence).applyVersionList(any());
         verify(projectService).evictProjectCache(project);
         verify(scanService).enqueueBackgroundScan("project-1", savedVersion.getId(), "/files/data/bundle.zip", "bundle.zip", false, 1);
     }
@@ -198,7 +203,7 @@ class VersionServiceTest {
 
         ProjectVersion savedVersion = project.getVersions().getFirst();
         assertNull(savedVersion.getScanResult());
-        verify(projectRepository).save(project);
+        verify(reviewPersistence).applyVersionList(any());
         verify(projectService).evictProjectCache(project);
         verify(scanService, never()).createQueuedScanResult(1, "Initial scan queued.");
         verify(scanService, never()).enqueueBackgroundScan("project-1", savedVersion.getId(), "/files/data/bundle.zip", "bundle.zip", false, 1);
@@ -275,6 +280,16 @@ class VersionServiceTest {
                 .thenReturn(new VersionArtifactService.PreparedVersionArtifact(ProjectClassification.DATA, "/files/data/replacement.zip", "sha-replacement"));
         when(scanService.createQueuedScanResult(1, "Initial scan queued.")).thenReturn(queuedScan);
 
+        when(reviewPersistence.applyVersionList(any())).thenReturn(false);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> service.addVersion(
+                "project-1", "1.0.0", List.of("1.21.0"), file, "Replacement notes", null, null,
+                ProjectVersion.Channel.RELEASE, true, user));
+        verify(projectDeletionService, never()).deleteVersionFile(any(ProjectVersion.class));
+        verify(scanService, never()).enqueueBackgroundScan(anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyInt());
+        project.setVersions(new ArrayList<>(List.of(existing)));
+        clearInvocations(reviewPersistence, scanService);
+        when(reviewPersistence.applyVersionList(any())).thenReturn(true);
+
         service.addVersion(
                 "project-1",
                 "1.0.0",
@@ -297,7 +312,7 @@ class VersionServiceTest {
         assertEquals(0, savedVersion.getDownloadCount());
         assertEquals(queuedScan, savedVersion.getScanResult());
         verify(projectDeletionService).deleteVersionFile(existing);
-        verify(projectRepository).save(project);
+        verify(reviewPersistence).applyVersionList(any());
         verify(projectService).evictProjectCache(project);
         verify(scanService).enqueueBackgroundScan("project-1", savedVersion.getId(), "/files/data/replacement.zip", "replacement.zip", false, 1);
     }
@@ -347,7 +362,8 @@ class VersionServiceTest {
         assertEquals(List.of("1.21.0"), project.getVersions().getFirst().getGameVersions());
         assertEquals("version-old", project.getVersions().get(1).getId());
         assertEquals(List.of("1.20.0"), project.getVersions().get(1).getGameVersions());
-        assertEquals(ProjectVersion.ReviewStatus.APPROVED, project.getVersions().get(1).getReviewStatus());
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, project.getVersions().get(1).getReviewStatus());
+        verify(scanService).enqueueBackgroundScan("project-1", "version-old", "/files/data/old.zip", "/files/data/old.zip", false, 1);
         verify(projectDeletionService, never()).deleteVersionFile(existing);
     }
 
@@ -454,11 +470,18 @@ class VersionServiceTest {
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
         when(accessControlService.hasProjectPermission(project, user, "VERSION_DELETE")).thenReturn(true);
 
+        when(reviewPersistence.applyVersionList(any())).thenReturn(false);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> service.deleteVersion("project-1", "version-1", user));
+        verify(projectDeletionService, never()).deleteVersionFile(any(ProjectVersion.class));
+        project.setVersions(new ArrayList<>(List.of(version)));
+        clearInvocations(reviewPersistence);
+        when(reviewPersistence.applyVersionList(any())).thenReturn(true);
+
         service.deleteVersion("project-1", "version-1", user);
 
         assertEquals(0, project.getVersions().size());
         verify(projectDeletionService).deleteVersionFile(version);
-        verify(projectRepository).save(project);
+        verify(reviewPersistence).applyVersionList(any());
         verify(projectService).evictProjectCache(project);
     }
 

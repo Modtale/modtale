@@ -307,4 +307,43 @@ class FindingReviewPersistenceIntegrationTest {
         assertEquals(requirement.id(), version().getFindingReviewHead());
     }
 
+    @Test void addingAVersionPreservesUnknownSiblingEvidenceAndLinkedApproval() {
+        var event = record(token()); assertTrue(approveVersion());
+        mongo.getCollection("projects").updateOne(new Document(), new Document("$set", new Document("versions.0.futureEvidence", new Document("marker", true))));
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        var added = new ProjectVersion(); added.setId("new-version"); added.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
+        snapshot.project().getVersions().addFirst(added);
+        assertTrue(writes.applyVersionList(snapshot));
+        var stored = mongo.findById(projectId, Project.class).getVersions();
+        assertEquals("new-version", stored.getFirst().getId());
+        assertEquals(event.id(), stored.get(1).getApprovedFindingReviewHead());
+        assertEquals(ProjectVersion.ReviewStatus.APPROVED, stored.get(1).getReviewStatus());
+        assertEquals(new Document("marker", true), mongo.getCollection("projects").find().first().getList("versions", Document.class).get(1).get("futureEvidence"));
+    }
+    @Test void staleVersionDeletionCannotEraseANewerReviewRequirement() {
+        record(token()); assertTrue(approveVersion());
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().getVersions().clear();
+        var requirement = requireFurtherReview();
+        assertFalse(writes.applyVersionList(snapshot));
+        assertEquals(requirement.id(), version().getFindingReviewHead());
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+    }
+    @Test void replacingSomeGameTargetsInvalidatesRetainedApprovalWithoutDeletingHistory() {
+        var event = record(token()); assertTrue(approveVersion());
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        var retained = snapshot.project().getVersions().getFirst();
+        retained.setGameVersions(List.of("remaining-runtime"));
+        var queued = new ScanResult(); queued.setScanAttempt(3); queued.setScanState("QUEUED"); retained.setScanResult(queued);
+        assertTrue(writes.applyVersionList(snapshot));
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+        assertNull(version().getApprovedFindingReviewHead()); assertNull(version().getApprovedSecurityEvidence());
+        assertEquals(event.id(), version().getFindingReviewHead());
+        assertEquals(3, version().getScanResult().getScanAttempt());
+        assertNotNull(mongo.findById(event.id(), FindingReviewService.Event.class, FindingReviewService.COLLECTION));
+    }
+
 }
