@@ -1,9 +1,8 @@
 import React from 'react';
-import {Activity, FileText, Shield, Layers, Box, Database, Palette, Save, Code, Layout} from 'lucide-react';
+import {FileText, Shield, Layers, Box, Database, Palette, Save, Code, Layout} from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { BlueskyBrandIcon, DiscordBrandIcon, GitHubBrandIcon, XBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { SiteRoutes } from '@/utils/routes';
-import { STATUS_PAGE_URL } from '@/utils/status';
 
 interface FooterProps {
     isDarkMode: boolean;
@@ -76,9 +75,6 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
                             <Link to={SiteRoutes.apiDocs()} className={linkClass}>
                                 <Code className="w-4 h-4 mr-2 opacity-70" /> API Docs
                             </Link>
-                            <a href={STATUS_PAGE_URL} className={linkClass}>
-                                <Activity className="w-4 h-4 mr-2 opacity-70" /> Status
-                            </a>
                             <div className="h-px bg-slate-100 dark:bg-white/5 my-1"></div>
                             <Link to={SiteRoutes.terms()} className={linkClass}>
                                 <FileText className="w-4 h-4 mr-2 opacity-70" /> Terms of Service
