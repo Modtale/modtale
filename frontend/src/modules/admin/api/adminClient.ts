@@ -17,7 +17,7 @@ export const adminClient = {
 
     searchProjects: async (params: any) => (await api.get('/admin/projects/search', { params })).data,
     getProjectById: async (id: string) => (await api.get(`/admin/projects/${id}`)).data,
-    updateProjectRaw: async (id: string, data: any) => (await api.put(`/admin/projects/${id}/raw`, data)).data,
+    updateProjectRaw: async (id: string, data: Record<string, unknown>, token: string) => (await api.put(`/admin/projects/${id}/raw`, data, { headers: { 'If-Match': token } })).data,
     deleteProject: async (id: string, reason: string) => (await api.delete(`/admin/projects/${id}`, { params: { reason } })).data,
     hardDeleteProject: async (id: string, reason: string) => (await api.delete(`/admin/projects/${id}/hard`, { params: { reason } })).data,
     restoreProject: async (id: string, status: string) => (await api.post(`/admin/projects/${id}/restore`, null, { params: { status } })).data,

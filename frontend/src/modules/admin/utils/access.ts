@@ -50,7 +50,7 @@ export const ADMIN_PERMISSION_GROUPS = [
             { id: AdminPermission.PROJECT_DELETE, label: 'Delete Projects' },
             { id: AdminPermission.PROJECT_RESTORE, label: 'Restore Projects' },
             { id: AdminPermission.PROJECT_VERSION_DELETE, label: 'Delete Versions' },
-            { id: AdminPermission.PROJECT_RAW_EDIT, label: 'Edit Raw Project JSON' }
+            { id: AdminPermission.PROJECT_RAW_EDIT, label: 'Repair Project Metadata' }
         ]
     },
     {

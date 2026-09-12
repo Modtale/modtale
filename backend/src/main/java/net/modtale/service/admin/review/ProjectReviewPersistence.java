@@ -47,6 +47,16 @@ public class ProjectReviewPersistence {
                     .set(path + "securityApprovedAt", version.getSecurityApprovedAt())
                     .set(path + "approvedIssueBaselines", version.getApprovedIssueBaselines());
         }
+        return applyUpdate(snapshot, update);
+    }
+    public boolean applyMetadataRepair(Snapshot snapshot, Map<String, Object> metadata) {
+        net.modtale.service.admin.project.ProjectMetadataRepair.validate(metadata);
+        var update = new Update();
+        metadata.forEach(update::set);
+        update.set("updatedAt", java.time.LocalDateTime.now().toString()).set("rankingDirty", true);
+        return applyUpdate(snapshot, update);
+    }
+    private boolean applyUpdate(Snapshot snapshot, Update update) {
         var entity = mongo.getConverter().getMappingContext().getPersistentEntity(Project.class);
         var mapped = new UpdateMapper(mongo.getConverter()).getMappedObject(update.getUpdateObject(), entity);
         var query = new Document("_id", snapshot.raw().get("_id")).append("$expr",

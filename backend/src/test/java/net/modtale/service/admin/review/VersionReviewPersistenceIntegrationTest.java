@@ -18,6 +18,31 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @EnabledIfEnvironmentVariable(named="WARDEN_REVIEW_DB_TEST",matches="true")
 class VersionReviewPersistenceIntegrationTest {
+    @Test void metadataRepairPreservesVersionsEvidenceAndUnknownFields() {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)), new Update().set("futureField", "retain"), Project.class);
+        var repairs = new ProjectReviewPersistence(mongo);
+        var project = mongo.findById(id, Project.class);
+        var snapshot = repairs.capture(id, ProjectReviewSnapshot.token(project));
+        var originalVersions = snapshot.raw().get("versions");
+        assertTrue(repairs.applyMetadataRepair(snapshot, Map.of("title", "Metadata repaired", "links", Map.of("source", "https://example.com"))));
+        var raw = mongo.getCollection("projects").find().first();
+        assertEquals(originalVersions, raw.get("versions"));
+        assertEquals("retain", raw.getString("futureField"));
+        assertEquals("Metadata repaired", raw.getString("title"));
+        assertTrue(net.modtale.service.security.scan.ArtifactClearancePolicy.complete(mongo.findById(id, Project.class).getVersions().getFirst().getScanResult()));
+    }
+    @Test void metadataRepairRejectsForgedStateAndConcurrentDecisions() {
+        var repairs = new ProjectReviewPersistence(mongo);
+        var project = mongo.findById(id, Project.class);
+        var snapshot = repairs.capture(id, ProjectReviewSnapshot.token(project));
+        assertThrows(ResponseStatusException.class, () -> repairs.applyMetadataRepair(snapshot, Map.of("status", "PUBLISHED")));
+        assertEquals("original", mongo.findById(id, Project.class).getTitle());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)), new Update()
+                .set("versions.0.reviewStatus", ProjectVersion.ReviewStatus.REJECTED), Project.class);
+        assertFalse(repairs.applyMetadataRepair(snapshot, Map.of("title", "Stale title")));
+        assertEquals("original", mongo.findById(id, Project.class).getTitle());
+        assertEquals(ProjectVersion.ReviewStatus.REJECTED, mongo.findById(id, Project.class).getVersions().getFirst().getReviewStatus());
+    }
     private ScanResult queued() {
         var scan = new ScanResult(); scan.setStatus(ScanStatus.SCANNING);
         scan.setScanState("QUEUED"); scan.setScanAttempt(2); return scan;

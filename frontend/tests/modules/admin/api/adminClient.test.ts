@@ -18,6 +18,13 @@ describe('adminClient', () => {
         vi.clearAllMocks();
     });
 
+    it('binds metadata repairs to their inspected snapshot', async () => {
+        mockedApi.put.mockResolvedValue({ data: null } as any);
+        await adminClient.updateProjectRaw('project', { title: 'Repair' }, 'snapshot');
+        expect(mockedApi.put).toHaveBeenCalledWith('/admin/projects/project/raw', { title: 'Repair' },
+            { headers: { 'If-Match': 'snapshot' } });
+    });
+
     it('binds project decisions to the reviewed project and selected version', async () => {
         mockedApi.post.mockResolvedValue({ data: null } as any);
         await adminClient.publishProject('project', 'snapshot', 'selected');

@@ -64,9 +64,9 @@ public class ProjectManagementController {
 
     @PutMapping("/projects/{id}/raw")
     @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_RAW_EDIT', authentication)")
-    public ResponseEntity<Void> updateRawProject(@PathVariable String id, @RequestBody Project updatedProject) {
+    public ResponseEntity<Void> updateRawProject(@PathVariable String id, @RequestBody java.util.Map<String, Object> metadata, @RequestHeader("If-Match") String token) {
         User currentUser = accountService.requireCurrentUser("editing raw project data");
-        projectAdminOperationsService.updateRawProject(currentUser.getId(), id, updatedProject);
+        projectAdminOperationsService.updateRawProject(currentUser.getId(), id, metadata, token);
         return ResponseEntity.ok().build();
     }
 
