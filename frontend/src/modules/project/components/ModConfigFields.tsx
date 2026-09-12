@@ -4,7 +4,7 @@ import { FileCode2, X } from 'lucide-react';
 import { ModalPortal } from '@/components/ui/ModalPortal';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { Input } from './FormShared';
-import { CONFIG_EXTENSIONS, configFileName, configPath, readConfigBytes, validateModConfigs, type ModConfig } from '../utils/modpackConfigs';
+import { CONFIG_EXTENSIONS, MAX_CONFIG_FILE_BYTES, MAX_CONFIG_FILES, MAX_CONFIG_TOTAL_BYTES, configFileName, configPath, readConfigBytes, validateModConfigs, type ModConfig } from '../utils/modpackConfigs';
 import { projectClient } from '../api/projectClient';
 import { theme } from '@/styles/theme';
 
@@ -77,7 +77,7 @@ export function ModConfigFields({ projectId, title, source = 'MODTALE', versionN
                 if ([...draft, ...additions].some(config => configFileName(config).toLowerCase() === configFileName(item).toLowerCase())) throw new Error(`${configFileName(item)} is already attached. Remove it before replacing it.`);
                 additions.push(item);
             }
-            if (draft.length + additions.length > 100) throw new Error('You can attach up to 100 config files.');
+            if (draft.length + additions.length > MAX_CONFIG_FILES) throw new Error(`You can attach up to ${MAX_CONFIG_FILES} config files.`);
             if (importedFolder && !draft.length) { setFolder(importedFolder); folderEdited.current = true; }
             setDraft(previous => [...previous, ...additions]);
         } catch (e) { setError((e as Error).message); }
@@ -91,6 +91,7 @@ export function ModConfigFields({ projectId, title, source = 'MODTALE', versionN
                 <div className={`${theme.components.modalBody} !space-y-5`}>
                     <div>
                         <div className="flex items-center justify-between mb-2"><span className={`text-xs font-bold ${theme.colors.textSecondary}`}>Files</span><div className="flex gap-3"><button type="button" onClick={() => fileInput.current?.click()} className={`text-xs ${theme.colors.accent} hover:underline`}>Add files</button><button type="button" onClick={() => folderInput.current?.click()} className={`text-xs ${theme.colors.textMuted} hover:underline`}>Add folder</button></div></div>
+                        <p className={`mb-3 text-[11px] leading-relaxed ${theme.colors.textMuted}`}>Supported types: {CONFIG_EXTENSIONS.split(',').join(', ')} · maximum {MAX_CONFIG_FILE_BYTES / (1024 * 1024)} MiB per file, {MAX_CONFIG_TOTAL_BYTES / (1024 * 1024)} MiB total, and {MAX_CONFIG_FILES} files.</p>
                         <div onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void addFiles(Array.from(event.dataTransfer.files)); }}>
                             {draft.length ? <div className={`divide-y divide-slate-200 dark:divide-white/10`}>{draft.map(config => <div key={config.id} className="flex items-center gap-2 py-2 min-w-0"><FileCode2 className={`w-4 h-4 shrink-0 ${theme.colors.textMuted}`} /><button type="button" className={`min-w-0 flex-1 text-left text-sm truncate ${theme.colors.textPrimary}`} onClick={async () => { try { setPreview(preview?.name === configFileName(config) ? null : { name: configFileName(config), text: await config.file.text() }); } catch { setError('Could not preview this file.'); } }}>{configFileName(config)}</button><span className={`text-[11px] ${theme.colors.textMuted}`}>{config.file.size < 1024 ? `${config.file.size} B` : `${(config.file.size / 1024).toFixed(1)} KiB`}</span><button type="button" aria-label={`Remove ${configFileName(config)}`} onClick={() => { setDraft(items => items.filter(item => item.id !== config.id)); setPreview(null); }} className={theme.components.iconButton}><X className="w-3.5 h-3.5" /></button></div>)}</div> : <button type="button" onClick={() => fileInput.current?.click()} className={`w-full rounded-xl border border-dashed ${theme.colors.border} px-4 py-6 text-sm ${theme.colors.textMuted} hover:border-modtale-accent`}>Choose config files or drop them here</button>}
                         </div>

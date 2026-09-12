@@ -4,6 +4,7 @@ import { ArrowRight, Loader2, Lock } from 'lucide-react';
 import { authClient } from '../api/authClient';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { extractApiErrorMessage } from '@/utils/api';
+import { MIN_PASSWORD_CHARACTERS } from '@/utils/siteLimits';
 
 export function ResetPassword() {
     const [searchParams] = useSearchParams();
@@ -99,12 +100,13 @@ export function ResetPassword() {
                         <input
                             type="password"
                             required
-                            minLength={6}
+                            minLength={MIN_PASSWORD_CHARACTERS}
                             value={password}
                             onChange={e => setPassword(e.target.value)}
                             className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm shadow-inner dark:text-white"
                             placeholder="••••••••"
                         />
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">At least {MIN_PASSWORD_CHARACTERS} characters.</p>
                     </div>
 
                     <div className="space-y-1">
@@ -112,12 +114,13 @@ export function ResetPassword() {
                         <input
                             type="password"
                             required
-                            minLength={6}
+                            minLength={MIN_PASSWORD_CHARACTERS}
                             value={confirmPassword}
                             onChange={e => setConfirmPassword(e.target.value)}
                             className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm shadow-inner dark:text-white"
                             placeholder="••••••••"
                         />
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">At least {MIN_PASSWORD_CHARACTERS} characters.</p>
                     </div>
 
                     <button

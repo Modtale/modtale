@@ -36,9 +36,10 @@ import { VersionFields } from '../components/VersionFields';
 import { CHANGELOG_LIMIT_MESSAGE, MAX_CHANGELOG_CHARACTERS } from '../utils/changelogLimits';
 import { worldListClient } from '@/modules/worldlist/api/worldListClient';
 import { skippedWorldListItems, worldListToProjectDependencies, worldListToOverrideFile } from '@/modules/worldlist/utils/modpackSeed';
+import { IMAGE_FORMAT_LABEL, isSupportedImageFile, MAX_IMAGE_UPLOAD_BYTES, MAX_PROJECT_DESCRIPTION_CHARACTERS, MAX_PROJECT_SUMMARY_CHARACTERS, MAX_PROJECT_TITLE_CHARACTERS, MAX_PROJECT_UPLOAD_BYTES, MAX_ROLE_NAME_CHARACTERS, MIN_PROJECT_SUMMARY_CHARACTERS } from '@/utils/siteLimits';
 
-const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
+const MAX_IMAGE_UPLOAD_ERROR_MESSAGE = 'Gallery images must be 10 MB or smaller.';
 
 const appendDependenciesToFormData = (formData: FormData, dependencies: ProjectDependency[] = [], isModpack = false) => {
     dependencies.forEach((dependency, index) => {
@@ -55,7 +56,7 @@ const appendDependenciesToFormData = (formData: FormData, dependencies: ProjectD
         if (dependency.hytaleProjectConfirmed) formData.append(`dependencies[${index}].hytaleProjectConfirmed`, 'true');
     });
 };
-const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
+const isFileOverUploadLimit = (file: File) => file.size > MAX_PROJECT_UPLOAD_BYTES;
 const CARD_PREVIEW_BASE_WIDTH = 340;
 const CARD_PREVIEW_FALLBACK_HEIGHT = 390;
 const CARD_PREVIEW_MAX_SCALE = 2.15;
@@ -436,15 +437,15 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
     const isCustomLicense = typeof metaData.license === 'string' && !LICENSES.some(l => l.id === metaData.license);
     const hasTitle = metaData.title && metaData.title.trim().length > 0;
     const hasTags = metaData.tags.length > 0;
-    const hasSummary = metaData.summary && metaData.summary.length >= 10 && metaData.summary.length <= 250;
-    const hasValidDescription = !metaData.description || metaData.description.length <= 50000;
+    const hasSummary = metaData.summary && metaData.summary.length >= MIN_PROJECT_SUMMARY_CHARACTERS && metaData.summary.length <= MAX_PROJECT_SUMMARY_CHARACTERS;
+    const hasValidDescription = !metaData.description || metaData.description.length <= MAX_PROJECT_DESCRIPTION_CHARACTERS;
     const hasVersion = (projectData?.versions?.length || 0) > 0;
     const hasLicense = isModpack || (!!metaData.license && (!isCustomLicense || !!metaData.links.LICENSE));
     const hasValidSlug = !metaData.slug || !slugError;
 
     const publishRequirements = [
         { label: 'Project Title', met: !!hasTitle },
-        { label: 'Short Summary (10-250 chars)', met: !!hasSummary },
+        { label: `Short Summary (${MIN_PROJECT_SUMMARY_CHARACTERS}-${MAX_PROJECT_SUMMARY_CHARACTERS} chars)`, met: !!hasSummary },
         { label: 'At least one Tag', met: hasTags }
     ];
 
@@ -734,9 +735,12 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                             type="text"
                                             value={editingRole.name || ''}
                                             onChange={e => setEditingRole({ ...editingRole, name: e.target.value })}
+                                            maxLength={MAX_ROLE_NAME_CHARACTERS}
+                                            aria-label="Role name"
                                             className={theme.components.inputField}
                                             required
                                         />
+                                        <p className={`mt-1 text-[10px] ${theme.colors.textMuted}`}>Up to {MAX_ROLE_NAME_CHARACTERS} characters.</p>
                                     </div>
                                     <div>
                                         <label className={`block text-[10px] font-bold ${theme.colors.textMuted} uppercase tracking-widest mb-1.5 ml-1`}>Role Color</label>
@@ -751,10 +755,13 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                                 type="text"
                                                 value={editingRole.color || '#3b82f6'}
                                                 onChange={e => setEditingRole({ ...editingRole, color: e.target.value })}
+                                                maxLength={7}
+                                                aria-label="Role color hex value"
                                                 className={`${theme.components.inputField} flex-1 font-mono`}
                                                 pattern="^#[0-9A-Fa-f]{6}$"
                                             />
                                         </div>
+                                        <p className={`mt-1 text-[10px] ${theme.colors.textMuted}`}>Use a 6-digit hex color, for example #3b82f6.</p>
                                     </div>
                                 </div>
 
@@ -947,10 +954,13 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                 <input
                                     value={metaData.title}
                                     onChange={e => { markDirty(); setMetaData({...metaData, title: e.target.value}); }}
+                                    maxLength={MAX_PROJECT_TITLE_CHARACTERS}
+                                    aria-label="Project title"
                                     className={`text-4xl md:text-5xl font-black ${theme.colors.textPrimary} bg-transparent border-b border-slate-300 dark:border-white/20 outline-none w-full focus:border-modtale-accent pb-1 pr-10`}
                                     placeholder="Project Title"
                                     autoFocus
                                 />
+                                <div className={`mt-1 text-right text-[10px] tabular-nums ${theme.colors.textMuted}`}>{metaData.title.length}/{MAX_PROJECT_TITLE_CHARACTERS} characters</div>
                                 <button
                                     onClick={() => { setMetaData({...metaData, title: projectData.title || ''}); setIsEditingTitle(false); }}
                                     className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
@@ -968,7 +978,8 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                 {!readOnly && <Edit3 className="w-5 h-5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />}
                             </div>
                         )}
-                        <input value={metaData.summary} disabled={readOnly} onChange={e => { markDirty(); setMetaData({...metaData, summary: e.target.value}); }} className={`text-lg ${theme.colors.textPrimary} font-medium bg-transparent border-b border-transparent outline-none w-full mt-2 hover:border-slate-300 dark:hover:border-white/20 focus:border-modtale-accent pb-1`} placeholder="Short summary..."/>
+                        <input value={metaData.summary} disabled={readOnly} onChange={e => { markDirty(); setMetaData({...metaData, summary: e.target.value}); }} maxLength={MAX_PROJECT_SUMMARY_CHARACTERS} aria-label="Short project summary" className={`text-lg ${theme.colors.textPrimary} font-medium bg-transparent border-b border-transparent outline-none w-full mt-2 hover:border-slate-300 dark:hover:border-white/20 focus:border-modtale-accent pb-1`} placeholder="Short summary..."/>
+                        {!readOnly && <div className={`mt-1 flex justify-between gap-3 text-[10px] tabular-nums ${theme.colors.textMuted}`}><span>{MIN_PROJECT_SUMMARY_CHARACTERS}–{MAX_PROJECT_SUMMARY_CHARACTERS} characters</span><span>{metaData.summary.length}/{MAX_PROJECT_SUMMARY_CHARACTERS}</span></div>}
                         {projectData.status === 'PENDING' && (
                             <div className="mt-4 rounded-2xl border border-amber-300/70 dark:border-amber-400/30 bg-amber-50/90 dark:bg-amber-500/10 p-4">
                                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -1149,7 +1160,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                             />
                         )}
                         {activeTab === 'gallery' && (
-                <Gallery
+                            <Gallery
                                 projectData={projectData}
                                 readOnly={readOnly}
                                 hasProjectPermission={hasProjectPermission}
@@ -1158,19 +1169,23 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                                 handleGalleryVideoAdd={handleGalleryVideoAdd}
                                 handleGalleryReorder={handleGalleryReorder}
                                 galleryUploadProgress={galleryUploadProgress}
-                    handleGallerySelect={(files) => {
-                        if (files.some(isFileOverUploadLimit)) {
-                            onShowStatus('error', 'Upload Failed', MAX_UPLOAD_ERROR_MESSAGE);
-                            return;
-                        }
-                        if (files.length === 1) {
-                            const [file] = files;
-                            setGalleryCropImage(URL.createObjectURL(file));
-                            setGalleryCropFile(file);
-                            return;
-                        }
-                        return handleGalleryUpload(files);
-                    }}
+                                handleGallerySelect={(files) => {
+                                    if (files.some(file => file.size > MAX_IMAGE_UPLOAD_BYTES)) {
+                                        onShowStatus('error', 'Upload Failed', MAX_IMAGE_UPLOAD_ERROR_MESSAGE);
+                                        return;
+                                    }
+                                    if (files.some(file => !isSupportedImageFile(file))) {
+                                        onShowStatus('error', 'Upload Failed', `Unsupported image type. Use ${IMAGE_FORMAT_LABEL}.`);
+                                        return;
+                                    }
+                                    if (files.length === 1) {
+                                        const [file] = files;
+                                        setGalleryCropImage(URL.createObjectURL(file));
+                                        setGalleryCropFile(file);
+                                        return;
+                                    }
+                                    return handleGalleryUpload(files);
+                                }}
                                 isLoading={isSaving}
                             />
                         )}

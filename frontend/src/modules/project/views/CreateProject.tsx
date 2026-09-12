@@ -11,6 +11,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { SignInModal } from '@/modules/auth/components/SignInModal';
 import { worldListClient } from '@/modules/worldlist/api/worldListClient';
+import { MAX_PROJECT_SUMMARY_CHARACTERS, MAX_PROJECT_TITLE_CHARACTERS, MIN_PROJECT_SUMMARY_CHARACTERS } from '@/utils/siteLimits';
 
 interface CreateProjectProps {
     onNavigate: (page: string) => void;
@@ -347,18 +348,22 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
                                 )}
 
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest mb-2 ml-1">Project Title</label>
-                                    <input maxLength={100} value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-white/90 dark:bg-black/60 border border-slate-300/50 dark:border-white/20 rounded-2xl px-6 py-4 font-black text-2xl dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner backdrop-blur-md placeholder:text-slate-400 dark:placeholder:text-slate-500" placeholder="My Awesome Project"/>
+                                    <div className="flex items-center justify-between mb-2 ml-1 pr-1">
+                                        <label className="block text-[10px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest">Project Title</label>
+                                        <span className="text-[10px] text-slate-500 dark:text-slate-300 font-bold tabular-nums">{title.length}/{MAX_PROJECT_TITLE_CHARACTERS}</span>
+                                    </div>
+                                    <input maxLength={MAX_PROJECT_TITLE_CHARACTERS} value={title} onChange={e => setTitle(e.target.value)} aria-label="Project title" className="w-full bg-white/90 dark:bg-black/60 border border-slate-300/50 dark:border-white/20 rounded-2xl px-6 py-4 font-black text-2xl dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner backdrop-blur-md placeholder:text-slate-400 dark:placeholder:text-slate-500" placeholder="My Awesome Project"/>
                                 </div>
                                 <div>
                                     <div className="flex justify-between items-end mb-2 ml-1 pr-1">
                                         <label className="block text-[10px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest">Short Summary</label>
-                                        <p className="text-[10px] text-slate-500 dark:text-slate-300 font-bold uppercase tracking-normal">{summary.length}/250</p>
+                                        <p className="text-[10px] text-slate-500 dark:text-slate-300 font-bold uppercase tracking-normal tabular-nums">{summary.length}/{MAX_PROJECT_SUMMARY_CHARACTERS}</p>
                                     </div>
-                                    <input maxLength={250} value={summary} onChange={e => setSummary(e.target.value)} className="w-full bg-white/90 dark:bg-black/60 border border-slate-300/50 dark:border-white/20 rounded-2xl px-6 py-4 dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner backdrop-blur-md font-medium text-sm placeholder:text-slate-400 dark:placeholder:text-slate-500" placeholder="A brief description of what this does..."/>
+                                    <input maxLength={MAX_PROJECT_SUMMARY_CHARACTERS} value={summary} onChange={e => setSummary(e.target.value)} aria-label="Short project summary" className="w-full bg-white/90 dark:bg-black/60 border border-slate-300/50 dark:border-white/20 rounded-2xl px-6 py-4 dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner backdrop-blur-md font-medium text-sm placeholder:text-slate-400 dark:placeholder:text-slate-500" placeholder="A brief description of what this does..."/>
+                                    <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-300">Write at least {MIN_PROJECT_SUMMARY_CHARACTERS} characters, up to {MAX_PROJECT_SUMMARY_CHARACTERS}.</p>
                                 </div>
 
-                                <button onClick={handleCreateDraft} disabled={isLoading || !title || !summary || summary.length < 10} className="w-full h-16 mt-4 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-2xl font-black text-xl flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-modtale-accent/20 active:scale-95 group">
+                                <button onClick={handleCreateDraft} disabled={isLoading || !title || !summary || summary.length < MIN_PROJECT_SUMMARY_CHARACTERS} className="w-full h-16 mt-4 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-2xl font-black text-xl flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-modtale-accent/20 active:scale-95 group">
                                     {isLoading ? <Spinner className="w-6 h-6 text-white" fullScreen={false} /> : <>Start Building <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform"/></>}
                                 </button>
                             </div>

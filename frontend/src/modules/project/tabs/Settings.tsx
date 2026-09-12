@@ -5,6 +5,7 @@ import { theme } from '@/styles/theme';
 import type { Project } from '@/types';
 import type { MetadataFormData } from '../components/FormShared';
 import { Permission } from '@/modules/permissions/permissions';
+import { MAX_SLUG_CHARACTERS, MIN_SLUG_CHARACTERS } from '@/utils/siteLimits';
 
 interface SettingsProps {
     projectData: Project | null;
@@ -82,8 +83,9 @@ export const Settings: React.FC<SettingsProps> = ({
                         <div><h3 className={`text-sm font-bold ${theme.colors.textPrimary} flex items-center gap-2`}><Link2 className={`w-4 h-4 ${theme.colors.textMuted}`} /> Project Slug</h3></div>
                         <div className={`flex items-center w-full ${theme.colors.bgBase} border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-modtale-accent transition-all ${slugError ? 'border-red-500' : theme.colors.border}`}>
                             <div className={`px-4 py-2 ${theme.colors.bgSurface} border-r ${theme.colors.border} ${theme.colors.textMuted} text-sm font-mono whitespace-nowrap select-none`}>{getUrlPrefix()}</div>
-                            <input id="project-custom-slug-input" disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)} value={metaData.slug || ''} onChange={handleSlugChange} className={`flex-1 bg-transparent border-none px-4 py-2 text-sm font-mono ${theme.colors.textPrimary} focus:outline-none placeholder:text-slate-400 ${slugError ? 'text-red-500' : ''}`} />
+                            <input id="project-custom-slug-input" disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)} value={metaData.slug || ''} onChange={handleSlugChange} maxLength={MAX_SLUG_CHARACTERS} aria-label="Project slug" className={`flex-1 bg-transparent border-none px-4 py-2 text-sm font-mono ${theme.colors.textPrimary} focus:outline-none placeholder:text-slate-400 ${slugError ? 'text-red-500' : ''}`} />
                         </div>
+                        <p className={`text-[10px] ${theme.colors.textMuted}`}>{MIN_SLUG_CHARACTERS}–{MAX_SLUG_CHARACTERS} lowercase letters, numbers, or hyphens.</p>
                         {slugError && <p className="text-[10px] text-red-500 font-bold">{slugError}</p>}
                     </div>
                 </div>
@@ -109,7 +111,8 @@ export const Settings: React.FC<SettingsProps> = ({
                 {projectData?.hmWikiEnabled && (
                     <div className={`mb-4 p-4 ${theme.colors.bgSurfaceAlt} rounded-xl border ${theme.colors.border} animate-in slide-in-from-top-2`}>
                         <label className={`text-[10px] font-black uppercase ${theme.colors.textMuted} tracking-widest px-1 mb-2 block`}>Wiki Project Slug / ID</label>
-                        <input value={projectData.hmWikiSlug || ''} onChange={e => { markDirty(); const newSlug = e.target.value; setProjectData(prev => prev ? {...prev, hmWikiSlug: newSlug} : null); setMetaData(prev => { const currentWiki = prev.links.WIKI || ''; if (!currentWiki || /^https?:\/\/wiki\.hytalemodding\.dev\/mods?\//i.test(currentWiki)) { return { ...prev, links: { ...prev.links, WIKI: newSlug ? `https://wiki.hytalemodding.dev/mod/${newSlug}` : '' } }; } return prev; }); }} disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)} placeholder="e.g., my-awesome-mod" className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-lg px-3 py-2 text-sm font-mono focus:border-modtale-accent focus:ring-1 focus:ring-modtale-accent outline-none transition-all`} />
+                        <input value={projectData.hmWikiSlug || ''} onChange={e => { markDirty(); const newSlug = e.target.value; setProjectData(prev => prev ? {...prev, hmWikiSlug: newSlug} : null); setMetaData(prev => { const currentWiki = prev.links.WIKI || ''; if (!currentWiki || /^https?:\/\/wiki\.hytalemodding\.dev\/mods?\//i.test(currentWiki)) { return { ...prev, links: { ...prev.links, WIKI: newSlug ? `https://wiki.hytalemodding.dev/mod/${newSlug}` : '' } }; } return prev; }); }} maxLength={MAX_SLUG_CHARACTERS} aria-label="Wiki project slug" disabled={readOnly || !hasProjectPermission(Permission.PROJECT_EDIT_METADATA)} placeholder="e.g., my-awesome-mod" className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-lg px-3 py-2 text-sm font-mono focus:border-modtale-accent focus:ring-1 focus:ring-modtale-accent outline-none transition-all`} />
+                        <p className={`mt-1 text-[10px] ${theme.colors.textMuted}`}>{MIN_SLUG_CHARACTERS}–{MAX_SLUG_CHARACTERS} lowercase letters, numbers, or hyphens.</p>
                     </div>
                 )}
                 <BeaconSettings />

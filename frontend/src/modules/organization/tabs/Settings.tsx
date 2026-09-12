@@ -19,10 +19,10 @@ import { organizationClient, hasOrgPermission } from '../api/organizationClient'
 import { Permission } from '@/modules/permissions/permissions';
 import { BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
 import type { User } from '@/types';
+import { ACCOUNT_NAME_FORMAT_LABEL, IMAGE_ACCEPT, IMAGE_DIMENSION_LABEL, IMAGE_FORMAT_LABEL, isSupportedImageFile, MAX_DISPLAY_NAME_CHARACTERS, MAX_IMAGE_UPLOAD_BYTES, MAX_ORGANIZATION_BIO_CHARACTERS, MIN_DISPLAY_NAME_CHARACTERS } from '@/utils/siteLimits';
 
-const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
-const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
-const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
+const MAX_UPLOAD_ERROR_MESSAGE = 'Images must be 10 MB or smaller.';
+const isFileOverUploadLimit = (file: File) => file.size > MAX_IMAGE_UPLOAD_BYTES;
 
 
 interface SettingsProps {
@@ -76,6 +76,11 @@ export const Settings: React.FC<SettingsProps> = ({ org, currentUser, onUpdateOr
             const file = e.target.files[0];
             if (isFileOverUploadLimit(file)) {
                 showStatus('error', 'Upload Failed', MAX_UPLOAD_ERROR_MESSAGE);
+                e.target.value = '';
+                return;
+            }
+            if (!isSupportedImageFile(file)) {
+                showStatus('error', 'Upload Failed', `Unsupported image type. Use ${IMAGE_FORMAT_LABEL}.`);
                 e.target.value = '';
                 return;
             }
@@ -199,8 +204,9 @@ export const Settings: React.FC<SettingsProps> = ({ org, currentUser, onUpdateOr
                     <div className="flex items-center gap-4">
                         <img src={org.avatarUrl} alt="" className={`w-16 h-16 rounded-2xl object-cover ${theme.colors.bgSurfaceAlt} border ${theme.colors.border} shadow-sm`} />
                         <div>
-                            <input type="file" ref={avatarInputRef} onChange={e => handleFileSelect(e, 'avatar')} className="hidden" accept="image/*" />
+                            <input type="file" ref={avatarInputRef} onChange={e => handleFileSelect(e, 'avatar')} className="hidden" accept={IMAGE_ACCEPT} />
                             <button onClick={() => avatarInputRef.current?.click()} className={theme.components.buttonSecondary}><Upload className="w-4 h-4" /> Upload</button>
+                            <p className={`mt-2 text-[10px] ${theme.colors.textMuted}`}>Max 10 MB · {IMAGE_FORMAT_LABEL} · {IMAGE_DIMENSION_LABEL} · square icon</p>
                         </div>
                     </div>
                 </div>
@@ -211,8 +217,9 @@ export const Settings: React.FC<SettingsProps> = ({ org, currentUser, onUpdateOr
                             {org.bannerUrl && <img src={org.bannerUrl} alt="" className="w-full h-full object-cover" />}
                         </div>
                         <div>
-                            <input type="file" ref={bannerInputRef} onChange={e => handleFileSelect(e, 'banner')} className="hidden" accept="image/*" />
+                            <input type="file" ref={bannerInputRef} onChange={e => handleFileSelect(e, 'banner')} className="hidden" accept={IMAGE_ACCEPT} />
                             <button onClick={() => bannerInputRef.current?.click()} className={theme.components.buttonSecondary}><ImageIcon className="w-4 h-4" /> Upload</button>
+                            <p className={`mt-2 text-[10px] ${theme.colors.textMuted}`}>Max 10 MB · {IMAGE_FORMAT_LABEL} · {IMAGE_DIMENSION_LABEL} · 3:1 banner</p>
                         </div>
                     </div>
                 </div>
@@ -223,12 +230,13 @@ export const Settings: React.FC<SettingsProps> = ({ org, currentUser, onUpdateOr
                 <form onSubmit={handleUpdateProfile} className="space-y-4">
                     <div>
                         <label className={`block text-xs font-bold uppercase ${theme.colors.textMuted} mb-1`}>Organization Name (Username)</label>
-                        <input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} className={theme.components.inputField} />
-                        <p className={`text-[10px] ${theme.colors.textMuted} mt-1`}>This is your unique organization identifier.</p>
+                        <input type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} maxLength={MAX_DISPLAY_NAME_CHARACTERS} aria-label="Organization name" className={theme.components.inputField} />
+                        <p className={`text-[10px] ${theme.colors.textMuted} mt-1`}>{MIN_DISPLAY_NAME_CHARACTERS}–{MAX_DISPLAY_NAME_CHARACTERS} characters; {ACCOUNT_NAME_FORMAT_LABEL}. This is your unique organization identifier.</p>
                     </div>
                     <div>
                         <label className={`block text-xs font-bold uppercase ${theme.colors.textMuted} mb-1`}>Bio</label>
-                        <textarea value={bio} onChange={e => setBio(e.target.value)} rows={3} className={theme.components.inputField} />
+                        <textarea value={bio} onChange={e => setBio(e.target.value)} maxLength={MAX_ORGANIZATION_BIO_CHARACTERS} aria-label="Organization bio" rows={3} className={theme.components.inputField} />
+                        <p className={`mt-1 text-right text-[10px] tabular-nums ${theme.colors.textMuted}`}>{bio.length.toLocaleString()} / {MAX_ORGANIZATION_BIO_CHARACTERS.toLocaleString()} characters</p>
                     </div>
                     <div className="flex justify-end">
                         <button type="submit" disabled={saving} className={theme.components.buttonPrimary}>{saving ? 'Saving...' : 'Save Changes'}</button>

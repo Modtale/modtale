@@ -4,6 +4,7 @@ import { X, Check } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
 import { isGifImage } from '@/utils/images';
 import { ModalPortal } from '@/components/ui/ModalPortal';
+import { IMAGE_DIMENSION_LABEL, IMAGE_FORMAT_LABEL } from '@/utils/siteLimits';
 
 interface ImageCropperModalProps {
     imageSrc: string;
@@ -225,7 +226,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                 </div>
 
                 <div className="p-4 border-t border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    {isGif ? <p className="text-sm text-slate-500 dark:text-slate-400 sm:max-w-sm">Your GIF stays animated and is centered to fit. Up to 10 MB.</p> : <div className="w-full sm:w-1/2 flex items-center gap-3">
+                    {isGif ? <p className="text-sm text-slate-500 dark:text-slate-400 sm:max-w-sm">Your GIF stays animated and is centered to fit. Accepted: {IMAGE_FORMAT_LABEL} · max 10 MB · {IMAGE_DIMENSION_LABEL}.</p> : <div className="w-full sm:w-1/2 flex items-center gap-3">
                         <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Zoom</span>
                         <input
                             type="range"
@@ -238,6 +239,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                             className="themed-range h-4 w-full cursor-pointer"
                         />
                     </div>}
+                    {!isGif && <p className="text-[11px] text-slate-500 dark:text-slate-400">Accepted: {IMAGE_FORMAT_LABEL} · max 10 MB · {IMAGE_DIMENSION_LABEL}.</p>}
                     {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
                     <div className="flex items-center gap-3 w-full sm:w-auto">
                         <button

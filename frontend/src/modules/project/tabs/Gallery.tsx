@@ -7,6 +7,16 @@ import { ModalPortal } from '@/components/ui/ModalPortal';
 import type { Project } from '@/types';
 import { Permission } from '@/modules/permissions/permissions';
 import { getGalleryEmbedSnippet, resolveGalleryImages, type ResolvedGalleryImage } from '../utils/galleryImages';
+import {
+    IMAGE_ACCEPT,
+    IMAGE_DIMENSION_LABEL,
+    IMAGE_FORMAT_LABEL,
+    MAX_GALLERY_CAPTION_CHARACTERS,
+    MAX_GALLERY_IMAGES,
+    MAX_IMAGE_UPLOAD_BYTES,
+    MAX_YOUTUBE_URL_CHARACTERS,
+    isSupportedImageFile
+} from '@/utils/siteLimits';
 
 interface GalleryProps {
     projectData: Project | null;
@@ -28,6 +38,7 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
     const [youtubeUrl, setYoutubeUrl] = useState('');
     const [copiedEmbedUrl, setCopiedEmbedUrl] = useState<string | null>(null);
     const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+    const [selectionError, setSelectionError] = useState<string | null>(null);
     const [isCommittingFiles, setIsCommittingFiles] = useState(false);
     const [draggedUrl, setDraggedUrl] = useState<string | null>(null);
     const [draftOrder, setDraftOrder] = useState<string[]>([]);
@@ -46,11 +57,19 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
     }, [projectData?.galleryImages, draggedUrl]);
 
     const addPendingFiles = (files: File[]) => {
-        const remaining = Math.max(0, 20 - resolvedGalleryImages.length - pendingFiles.length);
-        const accepted = files.slice(0, remaining).map(file => {
+        const supportedFiles = files.filter(isSupportedImageFile);
+        const oversizedFiles = supportedFiles.filter(file => file.size > MAX_IMAGE_UPLOAD_BYTES);
+        const validFiles = supportedFiles.filter(file => file.size <= MAX_IMAGE_UPLOAD_BYTES);
+        const remaining = Math.max(0, MAX_GALLERY_IMAGES - resolvedGalleryImages.length - pendingFiles.length);
+        const accepted = validFiles.slice(0, remaining).map(file => {
             (file as File & { __preview?: string }).__preview = URL.createObjectURL(file);
             return file;
         });
+        const errors: string[] = [];
+        if (files.length !== supportedFiles.length) errors.push(`Only ${IMAGE_FORMAT_LABEL} images are supported.`);
+        if (oversizedFiles.length > 0) errors.push('Each gallery image must be 10 MB or smaller.');
+        if (validFiles.length > remaining) errors.push(`You can add ${remaining} more image${remaining === 1 ? '' : 's'} (maximum ${MAX_GALLERY_IMAGES} total).`);
+        setSelectionError(errors.length ? errors.join(' ') : null);
         setPendingFiles(current => [...current, ...accepted]);
     };
 
@@ -66,6 +85,7 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
             if (preview) URL.revokeObjectURL(preview);
         });
         setPendingFiles([]);
+        setSelectionError(null);
     };
 
     const commitPendingFiles = async () => {
@@ -226,7 +246,7 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
                                 <input
                                     key={`${item.url}-${item.caption || 'empty'}`}
                                     defaultValue={item.caption}
-                                    maxLength={240}
+                                    maxLength={MAX_GALLERY_CAPTION_CHARACTERS}
                                     disabled={isLoading}
                                     onBlur={(event) => {
                                         const nextCaption = event.currentTarget.value.trim();
@@ -237,6 +257,7 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
                                     className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-lg px-3 py-2 text-xs ${theme.colors.textPrimary} focus:border-modtale-accent focus:ring-1 focus:ring-modtale-accent outline-none transition-all`}
                                     placeholder="Optional caption"
                                 />
+                                <p className={`mt-1 px-1 text-[10px] ${theme.colors.textMuted}`}>Maximum {MAX_GALLERY_CAPTION_CHARACTERS} characters.</p>
                             </div>
                         ) : item.caption ? (
                             <p className={`p-3 text-xs font-semibold ${theme.colors.textSecondary}`}>{item.caption}</p>
@@ -246,13 +267,17 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
 
                 {!readOnly && hasProjectPermission(Permission.PROJECT_GALLERY_ADD) && (
                     <>
+                        <div className="col-span-full">
+                            <p className={`text-xs ${theme.colors.textMuted}`}>Gallery limits: {MAX_GALLERY_IMAGES} images total · {IMAGE_FORMAT_LABEL} · maximum 10 MB per image · {IMAGE_DIMENSION_LABEL}.</p>
+                            {selectionError && <p role="alert" className={`mt-2 text-xs font-bold ${theme.colors.dangerText}`}>{selectionError}</p>}
+                        </div>
                         <div
                             onClick={() => fileInputRef.current?.click()}
                             className={`aspect-video rounded-xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${theme.colors.border} ${theme.colors.bgSurfaceAlt} hover:border-modtale-accent hover:${theme.colors.bgSurfaceHover}`}
                         >
                             <input
                                 type="file"
-                                accept="image/png, image/jpeg, image/webp, image/gif"
+                                accept={IMAGE_ACCEPT}
                                 multiple
                                 className="hidden"
                                 ref={fileInputRef}
@@ -288,9 +313,11 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
                                 value={youtubeUrl}
                                 onChange={(event) => setYoutubeUrl(event.target.value)}
                                 placeholder="https://youtu.be/..."
+                                maxLength={MAX_YOUTUBE_URL_CHARACTERS}
                                 disabled={isLoading}
                                 className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-lg px-3 py-2 text-xs ${theme.colors.textPrimary} focus:border-modtale-accent focus:ring-1 focus:ring-modtale-accent outline-none transition-all`}
                             />
+                            <p className={`text-[10px] ${theme.colors.textMuted}`}>YouTube URL · maximum {MAX_YOUTUBE_URL_CHARACTERS.toLocaleString()} characters.</p>
                             <button
                                 type="submit"
                                 disabled={isLoading || !youtubeUrl.trim()}

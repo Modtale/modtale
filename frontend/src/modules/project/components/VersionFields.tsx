@@ -10,8 +10,8 @@ import { projectClient } from '../api/projectClient';
 import { theme } from '@/styles/theme';
 import { VersionRelationKind, type GameVersionCatalog, type ManifestDependencySuggestion, type ProjectDependency } from '@/types';
 import { MAX_CHANGELOG_CHARACTERS } from '../utils/changelogLimits';
+import { MAX_PROJECT_UPLOAD_BYTES } from '@/utils/siteLimits';
 
-const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
 
 const STRICT_VERSION_REGEX = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
@@ -124,6 +124,12 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
         }
     };
 
+    const acceptedFileTypes = projectType === 'SAVE' || projectType === 'MODPACK'
+        ? '.zip'
+        : projectType
+            ? '.jar or .zip'
+            : '.jar, .zip, or .json';
+
     const onFileDrop = useCallback((acceptedFiles: File[]) => {
         const nextFile = acceptedFiles[0];
         if (!nextFile || disabled) return;
@@ -160,14 +166,14 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
 
     const onFileDropRejected = useCallback((rejections: FileRejection[]) => {
         const tooLarge = rejections.some(r => r.errors.some(e => e.code === 'file-too-large'));
-        setFileError(tooLarge ? MAX_UPLOAD_ERROR_MESSAGE : 'Invalid file type. Please upload a supported file.');
-    }, []);
+        setFileError(tooLarge ? MAX_UPLOAD_ERROR_MESSAGE : `Invalid file type. Accepted file types: ${acceptedFileTypes}.`);
+    }, [acceptedFileTypes]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop: onFileDrop,
         onDropRejected: onFileDropRejected,
         maxFiles: 1,
-        maxSize: MAX_UPLOAD_BYTES,
+        maxSize: MAX_PROJECT_UPLOAD_BYTES,
         accept: getAcceptTypes(),
         disabled: disabled
     });
@@ -207,7 +213,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
 
     const filePicker = (!hideFilePicker && (
                 <div className="group/upload">
-                    <Label required={!isModpack}>Project File <span className={`${theme.colors.textSecondary} font-normal normal-case ml-1`}>{allowsAutoSwitch ? '(.jar or .zip)' : '(.zip)'}</span></Label>
+                    <Label required={!isModpack}>Project File <span className={`${theme.colors.textSecondary} font-normal normal-case ml-1`}>({acceptedFileTypes})</span></Label>
                     <div
                         {...getRootProps()}
                         className={`border-2 border-dashed rounded-2xl p-10 text-center transition-all group shadow-sm ${
@@ -241,7 +247,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                                 <div className={`text-xs ${theme.colors.textSecondary} mt-1`}>
                                     {isModpack ? 'Config defaults and resources; existing files are preserved by the launcher' : allowsAutoSwitch ? 'Supports .jar and .zip (type auto-switches when needed)' : 'Supports .zip archives'}
                                 </div>
-                                <div className={`text-xs ${theme.colors.textSecondary} mt-1`}>Maximum file size: 100MB</div>
+                                <div className={`text-xs ${theme.colors.textSecondary} mt-1`}>Maximum file size: 100 MB · Accepted file types: {acceptedFileTypes}</div>
                             </div>
                         )}
                     </div>

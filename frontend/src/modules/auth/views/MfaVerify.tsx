@@ -5,6 +5,7 @@ import { SiteRoutes } from '@/utils/routes';
 import { authClient, completeSignInMethod } from '../api/authClient';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { extractApiErrorMessage } from '@/utils/api';
+import { MFA_CODE_LENGTH } from '@/utils/siteLimits';
 
 export function MfaVerify() {
     const [searchParams] = useSearchParams();
@@ -77,11 +78,11 @@ export function MfaVerify() {
                                     type="text"
                                     required
                                     value={code}
-                                    onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                    onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, MFA_CODE_LENGTH))}
                                     className="w-full px-4 py-4 pl-12 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-2xl font-mono tracking-[0.5em] text-center shadow-inner dark:text-white"
                                     placeholder="000000"
                                     autoFocus
-                                    maxLength={6}
+                                    maxLength={MFA_CODE_LENGTH}
                                 />
                                 <Smartphone className="absolute left-4 top-[1.1rem] w-6 h-6 text-slate-400" />
                             </div>
@@ -89,7 +90,7 @@ export function MfaVerify() {
 
                         <button
                             type="submit"
-                            disabled={loading || code.length !== 6}
+                            disabled={loading || code.length !== MFA_CODE_LENGTH}
                             className="w-full bg-modtale-accent text-white py-4 px-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-modtale-accentHover transition-all active:scale-95 duration-200 shadow-lg shadow-modtale-accent/20 disabled:opacity-50 disabled:active:scale-100 text-lg"
                         >
                             {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (

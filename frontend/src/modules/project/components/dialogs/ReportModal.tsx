@@ -5,6 +5,7 @@ import { theme } from '@/styles/theme';
 import { extractApiErrorMessage } from '@/utils/api';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { ModalPortal } from '@/components/ui/ModalPortal';
+import { MAX_REPORT_DESCRIPTION_CHARACTERS } from '@/utils/siteLimits';
 
 interface ReportModalProps {
     isOpen: boolean;
@@ -173,10 +174,13 @@ export const ReportModal: React.FC<ReportModalProps> = ({ isOpen, onClose, targe
                                 <textarea
                                     value={description}
                                     onChange={e => setDescription(e.target.value)}
+                                    maxLength={MAX_REPORT_DESCRIPTION_CHARACTERS}
+                                    aria-label="Report description"
                                     placeholder="Please provide details about the issue..."
                                     className={`w-full p-3 rounded-xl ${theme.colors.bgSurface} border ${theme.colors.border} ${theme.colors.textPrimary} font-medium outline-none focus:ring-2 focus:ring-modtale-accent min-h-[100px] resize-none`}
                                     required
                                 />
+                                <p className={`mt-1 text-right text-xs tabular-nums ${theme.colors.textMuted}`}>{description.length.toLocaleString()} / {MAX_REPORT_DESCRIPTION_CHARACTERS.toLocaleString()} characters</p>
                             </div>
 
                             <div className="pt-2">

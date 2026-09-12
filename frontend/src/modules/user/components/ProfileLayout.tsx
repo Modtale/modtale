@@ -12,10 +12,10 @@ import { BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
 import { Link } from 'react-router-dom';
 import { getConnectedAccountProfileUrl } from '@/modules/user/utils/connectedAccountLinks';
+import { IMAGE_ACCEPT, IMAGE_DIMENSION_LABEL, IMAGE_FORMAT_LABEL, isSupportedImageFile, MAX_IMAGE_UPLOAD_BYTES } from '@/utils/siteLimits';
 
-const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
-const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
-const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
+const MAX_UPLOAD_ERROR_MESSAGE = 'Images must be 10 MB or smaller.';
+const isFileOverUploadLimit = (file: File) => file.size > MAX_IMAGE_UPLOAD_BYTES;
 
 export const Badge = ({ type }: { type: string | ProfileBadge }) => {
     if (typeof type !== 'string') {
@@ -139,6 +139,11 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
         const file = e.target.files[0];
         if (isFileOverUploadLimit(file)) {
             setUploadError(MAX_UPLOAD_ERROR_MESSAGE);
+            e.target.value = '';
+            return;
+        }
+        if (!isSupportedImageFile(file)) {
+            setUploadError(`Unsupported image type. Use ${IMAGE_FORMAT_LABEL}.`);
             e.target.value = '';
             return;
         }
@@ -270,15 +275,15 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                     </div>
                 )}
                 {isEditing && (
-                    <label className={`absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-[2px] z-30 cursor-pointer text-white`}>
-                        <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileSelect(e, 'avatar')} disabled={uploadingAvatar} />
+                    <label title={`Avatar upload: max 10 MB · ${IMAGE_FORMAT_LABEL} · ${IMAGE_DIMENSION_LABEL} · square`} className={`absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-[2px] z-30 cursor-pointer text-white`}>
+                        <input type="file" className="hidden" accept={IMAGE_ACCEPT} onChange={(e) => handleFileSelect(e, 'avatar')} disabled={uploadingAvatar} />
                         {uploadingAvatar ? (
                             <Spinner className="w-6 h-6 text-white" />
                         ) : (
                             <>
                                 <ImageIcon className="w-8 h-8 text-white mb-2" aria-hidden="true" />
                                 <span className="text-xs font-bold text-white">Change Avatar</span>
-                                <span className="text-[10px] font-medium text-white/70">Rec: 512x512</span>
+                                <span className="text-[10px] font-medium text-white/70">Rec: 512x512 · Max 10 MB · {IMAGE_DIMENSION_LABEL}</span>
                             </>
                         )}
                     </label>
@@ -326,25 +331,26 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                 />
 
                 {isEditing && (
-                    <label className={`cursor-pointer transition-all duration-300 pointer-events-auto ${
+                    <label title={`Banner upload: max 10 MB · ${IMAGE_FORMAT_LABEL} · ${IMAGE_DIMENSION_LABEL} · 3:1`} className={`cursor-pointer transition-all duration-300 pointer-events-auto ${
                         resolvedBanner
                             ? "absolute top-6 right-6 z-30 bg-black/60 hover:bg-black/80 text-white px-4 py-2 rounded-xl text-xs font-bold border border-white/20 backdrop-blur-sm shadow-lg hover:scale-105"
                             : "absolute inset-0 z-30 flex flex-col items-center justify-center m-6 rounded-2xl border-2 border-dashed border-white/10 hover:border-white/30 bg-white/5 hover:bg-white/10 group/banner"
                     }`}>
-                        <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileSelect(e, 'banner')} disabled={uploadingBanner} />
+                        <input type="file" className="hidden" accept={IMAGE_ACCEPT} onChange={(e) => handleFileSelect(e, 'banner')} disabled={uploadingBanner} />
                         {resolvedBanner ? (
                             <div className="flex flex-col items-end">
                                 <div className="flex items-center gap-2 drop-shadow-sm">
                                     {uploadingBanner ? <Spinner className="w-4 h-4" /> : <ImageIcon className="w-4 h-4" />}
                                     {uploadingBanner ? 'Uploading...' : 'Change Banner'}
                                 </div>
-                                <span className="text-[10px] font-bold opacity-70 drop-shadow-sm mt-0.5">Rec: 1920x640</span>
+                                <span className="text-[10px] font-bold opacity-70 drop-shadow-sm mt-0.5">Rec: 1920x640 · Max 10 MB · {IMAGE_DIMENSION_LABEL}</span>
                             </div>
                         ) : (
                             <div className="flex flex-col items-center">
                                 <Plus className="w-8 h-8 text-white/50 mb-2" />
                                 <span className="text-lg font-bold text-white/80">Upload Banner</span>
-                                <span className="text-xs font-medium text-white/40 mt-1">Recommended: 1920x640</span>
+                                <span className="text-xs font-medium text-white/40 mt-1">Recommended: 1920x640 · Max 10 MB · {IMAGE_DIMENSION_LABEL}</span>
+                                <span className="text-[10px] font-medium text-white/40 mt-1">{IMAGE_FORMAT_LABEL}</span>
                             </div>
                         )}
                     </label>

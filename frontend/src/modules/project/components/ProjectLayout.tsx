@@ -6,10 +6,10 @@ import { ImageCropperModal } from '@/components/ui/ImageCropperModal';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { useTranslation } from 'react-i18next';
+import { IMAGE_ACCEPT, IMAGE_DIMENSION_LABEL, IMAGE_FORMAT_LABEL, isSupportedImageFile, MAX_IMAGE_UPLOAD_BYTES } from '@/utils/siteLimits';
 
-const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
-const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
-const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
+const MAX_UPLOAD_ERROR_MESSAGE = 'Images must be 10 MB or smaller.';
+const isFileOverUploadLimit = (file: File) => file.size > MAX_IMAGE_UPLOAD_BYTES;
 const supportsNativeScrollLinkedBanner = () => (
     typeof CSS !== 'undefined'
     && typeof CSS.supports === 'function'
@@ -158,6 +158,11 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
             e.target.value = '';
             return;
         }
+        if (!isSupportedImageFile(file)) {
+            setUploadError(`Unsupported image type. Use ${IMAGE_FORMAT_LABEL}.`);
+            e.target.value = '';
+            return;
+        }
         setUploadError(null);
         setTempImage(URL.createObjectURL(file));
         setTempImageFile(file);
@@ -227,17 +232,18 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                 ? "absolute top-6 right-6 z-30 bg-black/60 hover:bg-black/80 text-white px-4 py-2 rounded-xl text-xs font-bold border border-white/20 backdrop-blur-sm shadow-lg hover:scale-105"
                                 : "absolute inset-0 z-30 flex flex-col items-center justify-center m-6 rounded-2xl border-2 border-dashed border-white/10 hover:border-white/30 bg-white/5 hover:bg-white/10 group/banner"
                         }`}>
-                            <input type="file" accept="image/*" onChange={e => handleFileSelect(e, 'banner')} className="hidden" />
+                            <input type="file" accept={IMAGE_ACCEPT} onChange={e => handleFileSelect(e, 'banner')} className="hidden" />
                             {loading ? mediaPlaceholder : finalBanner ? (
                                 <div className="flex flex-col items-end">
                                     <div className="flex items-center gap-2"><ImageIcon className="w-4 h-4" /> {t('project:changeBanner')}</div>
-                                    <span className="text-[10px] font-medium text-white/50">{t('project:shortRecommendedBannerSize')}</span>
+                                    <span className="text-[10px] font-medium text-white/50">{t('project:shortRecommendedBannerSize')} · Max 10 MB · {IMAGE_FORMAT_LABEL} · {IMAGE_DIMENSION_LABEL}</span>
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center">
                                     <Plus className="w-8 h-8 text-white/50 mb-2" />
                                     <span className="text-lg font-bold text-white/80">{t('project:uploadBanner')}</span>
                                     <span className="text-xs font-medium text-white/40 mt-1">{t('project:recommendedBannerSize')}</span>
+                                    <span className="text-[10px] font-medium text-white/40 mt-1">Max 10 MB · {IMAGE_FORMAT_LABEL} · 3:1 · {IMAGE_DIMENSION_LABEL}</span>
                                 </div>
                             )}
                         </label>
@@ -261,9 +267,9 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                     <div className="relative md:p-12 md:pb-6 border-b border-slate-200 dark:border-white/10 p-4 pt-0">
                         <div className="md:hidden flex justify-between items-end -mt-16 mb-6 relative z-50">
                             <div className="flex-shrink-0">
-                                <label className={`block w-32 h-32 rounded-3xl bg-transparent backdrop-blur-md shadow-md border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden relative group ${isEditing ? 'cursor-pointer' : ''}`}>
+                                <label title={`Icon upload: max 10 MB · ${IMAGE_FORMAT_LABEL} · ${IMAGE_DIMENSION_LABEL} · square`} className={`block w-32 h-32 rounded-3xl bg-transparent backdrop-blur-md shadow-md border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden relative group ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <div className="absolute inset-0 bg-white/40 dark:bg-slate-900/40 z-0 backdrop-blur-md" />
-                                    <input type="file" disabled={!isEditing || loading} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
+                                    <input type="file" disabled={!isEditing || loading} accept={IMAGE_ACCEPT} onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
                                     {loading ? mediaPlaceholder : finalIcon ? (
                                         <OptimizedImage
                                             src={finalIcon}
@@ -287,9 +293,9 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
 
                         <div className="flex flex-col md:flex-row gap-8 items-start relative z-10">
                             <div className="hidden md:block flex-shrink-0 relative z-50 -mt-24 ml-2">
-                                <label className={`block w-56 h-56 rounded-3xl bg-transparent backdrop-blur-md shadow-xl border-[8px] border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden group relative ${isEditing ? 'cursor-pointer' : ''}`}>
+                                <label title={`Icon upload: max 10 MB · ${IMAGE_FORMAT_LABEL} · ${IMAGE_DIMENSION_LABEL} · square`} className={`block w-56 h-56 rounded-3xl bg-transparent backdrop-blur-md shadow-xl border-[8px] border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden group relative ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <div className="absolute inset-0 bg-white/40 dark:bg-slate-900/40 z-0 backdrop-blur-md" />
-                                    <input type="file" disabled={!isEditing || loading} accept="image/*" onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
+                                    <input type="file" disabled={!isEditing || loading} accept={IMAGE_ACCEPT} onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
                                     {loading ? mediaPlaceholder : finalIcon ? (
                                         <OptimizedImage
                                             src={finalIcon}
@@ -309,6 +315,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                             <ImageIcon className="w-8 h-8 text-white mb-2" aria-hidden="true" />
                                             <span className="text-xs font-bold text-white">{t('project:changeIcon')}</span>
                                             <span className="text-[10px] font-medium text-white/70">{t('project:recommendedIconSize')}</span>
+                                            <span className="text-[10px] font-medium text-white/60">Max 10 MB · {IMAGE_FORMAT_LABEL} · {IMAGE_DIMENSION_LABEL}</span>
                                         </div>
                                     )}
                                 </label>

@@ -8,6 +8,7 @@ import { StatusModal } from '@/components/ui/StatusModal';
 import { ModalPortal } from '@/components/ui/ModalPortal';
 import { useToast } from '@/components/ui/Toast';
 import { SiteRoutes } from '@/utils/routes';
+import { ACCOUNT_NAME_FORMAT_LABEL, MAX_USERNAME_CHARACTERS, MIN_PASSWORD_CHARACTERS, MIN_USERNAME_CHARACTERS } from '@/utils/siteLimits';
 import {
     authClient,
     completeSignInMethod,
@@ -258,9 +259,13 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                                     required
                                     value={username}
                                     onChange={e => setUsername(e.target.value)}
+                                    minLength={MIN_USERNAME_CHARACTERS}
+                                    maxLength={MAX_USERNAME_CHARACTERS}
+                                    aria-label="Username"
                                     className="w-full px-4 py-3 rounded-xl bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm text-slate-900 dark:text-white shadow-inner backdrop-blur-md"
                                     placeholder="Display name"
                                 />
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400">{MIN_USERNAME_CHARACTERS}–{MAX_USERNAME_CHARACTERS} characters; {ACCOUNT_NAME_FORMAT_LABEL}.</p>
                             </div>
                         )}
 
@@ -303,12 +308,13 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                                 <input
                                     type="password"
                                     required
-                                    minLength={6}
+                                    minLength={mode === 'register' ? MIN_PASSWORD_CHARACTERS : undefined}
                                     value={password}
                                     onChange={e => setPassword(e.target.value)}
                                     className="w-full px-4 py-3 rounded-xl bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm text-slate-900 dark:text-white shadow-inner backdrop-blur-md"
                                     placeholder="••••••••"
                                 />
+                                {mode === 'register' && <p className="text-[11px] text-slate-500 dark:text-slate-400">At least {MIN_PASSWORD_CHARACTERS} characters.</p>}
                             </div>
                         )}
 

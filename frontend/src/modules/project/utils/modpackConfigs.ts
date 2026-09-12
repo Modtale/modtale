@@ -3,6 +3,10 @@ import type { VersionFormData } from '../components/FormShared';
 
 export const CONFIG_MANIFEST = 'modtale.configs.json';
 export const CONFIG_EXTENSIONS = '.json,.toml,.yaml,.yml,.properties,.cfg,.conf,.ini';
+export const MAX_CONFIG_FILES = 100;
+export const MAX_CONFIG_FILE_BYTES = 1024 * 1024;
+export const MAX_CONFIG_TOTAL_BYTES = 32 * 1024 * 1024;
+export const MAX_CONFIG_BUNDLE_BYTES = 100 * 1024 * 1024;
 export type ModConfig = { id: string; projectId: string; source?: string; file: File; destination: string; relativePath?: string };
 export type ConfigReference = { projectId: string; source: string; path: string; sha256: string };
 const ZIP_DATE = new Date('1980-01-01T00:00:00Z');
@@ -22,14 +26,14 @@ export function configPath(config: ModConfig): string {
     if (!/\.(json|toml|yaml|yml|properties|cfg|conf|ini)$/i.test(config.file.name) || config.file.name.toLowerCase() === 'manifest.json') {
         throw new Error(`${config.file.name} is not a supported config file.`);
     }
-    if (config.file.size > 1024 * 1024) throw new Error(`${config.file.name} exceeds the 1 MiB config file limit.`);
+    if (config.file.size > MAX_CONFIG_FILE_BYTES) throw new Error(`${config.file.name} exceeds the 1 MiB config file limit.`);
     return `overrides/${parts.join('/')}`;
 }
 
 export function validateModConfigs(configs: ModConfig[]): string | null {
     try {
-        if (configs.length > 100) throw new Error('A modpack can include up to 100 attached config files.');
-        if (configs.reduce((total, config) => total + config.file.size, 0) > 32 * 1024 * 1024) throw new Error('Attached configs exceed the 32 MiB total limit.');
+        if (configs.length > MAX_CONFIG_FILES) throw new Error(`A modpack can include up to ${MAX_CONFIG_FILES} attached config files.`);
+        if (configs.reduce((total, config) => total + config.file.size, 0) > MAX_CONFIG_TOTAL_BYTES) throw new Error('Attached configs exceed the 32 MiB total limit.');
         const paths = new Set<string>();
         for (const config of configs) {
             const path = configPath(config);
@@ -78,17 +82,17 @@ export async function buildModpackOverrides(data: VersionFormData): Promise<File
         zip.file(path, entries.get(path)!, { date: ZIP_DATE, createFolders: false });
     }
     const blob = await zip.generateAsync({ type: 'blob', compression: 'STORE', platform: 'DOS' });
-    if (blob.size > 100 * 1024 * 1024) throw new Error('Combined configs and overrides exceed the 100MB upload limit.');
+    if (blob.size > MAX_CONFIG_BUNDLE_BYTES) throw new Error('Combined configs and overrides exceed the 100MB upload limit.');
     return new File([blob], 'modpack-configs.zip', { type: 'application/zip', lastModified: ZIP_DATE.getTime() });
 }
 
 export async function importModpackConfigs(file: File, dependencies: VersionFormData['dependencies']): Promise<{ configs: ModConfig[]; sharedFile: File | null }> {
-    if (file.size > 100 * 1024 * 1024) throw new Error('Config bundle exceeds the 100MB upload limit.');
+    if (file.size > MAX_CONFIG_BUNDLE_BYTES) throw new Error('Config bundle exceeds the 100MB upload limit.');
     const zip = await JSZip.loadAsync(await file.arrayBuffer());
     const manifestFile = zip.file(CONFIG_MANIFEST);
     if (!manifestFile) throw new Error('This ZIP has no mod associations. Use the shared overrides ZIP option for legacy bundles.');
     const manifest = JSON.parse(await manifestFile.async('string'));
-    if (manifest.format !== 'modtale-configs' || manifest.formatVersion !== 1 || !Array.isArray(manifest.configs) || manifest.configs.length > 100) throw new Error('Unsupported config manifest.');
+    if (manifest.format !== 'modtale-configs' || manifest.formatVersion !== 1 || !Array.isArray(manifest.configs) || manifest.configs.length > MAX_CONFIG_FILES) throw new Error('Unsupported config manifest.');
     const configs: ModConfig[] = [];
     const consumed = new Set<string>([CONFIG_MANIFEST]);
     for (const ref of manifest.configs as ConfigReference[]) {
@@ -97,7 +101,7 @@ export async function importModpackConfigs(file: File, dependencies: VersionForm
         const entry = zip.file(ref.path);
         if (!entry || consumed.has(ref.path)) throw new Error(`Missing or duplicate config: ${ref.path}`);
         const bytes = await entry.async('arraybuffer');
-        if (bytes.byteLength > 1024 * 1024) throw new Error('An imported config exceeds 1 MiB.');
+        if (bytes.byteLength > MAX_CONFIG_FILE_BYTES) throw new Error('An imported config exceeds 1 MiB.');
         const hash = await crypto.subtle.digest('SHA-256', bytes);
         const actual = Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');
         if (actual !== ref.sha256) throw new Error(`Config checksum mismatch: ${ref.path}`);

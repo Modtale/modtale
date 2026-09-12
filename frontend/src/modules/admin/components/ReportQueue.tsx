@@ -5,6 +5,7 @@ import { adminClient } from '../api/adminClient';
 import { extractApiErrorMessage } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
 import type { Report } from '@/types';
+import { MAX_REPORT_DESCRIPTION_CHARACTERS } from '@/utils/siteLimits';
 
 interface ReportQueueProps {
     reports: Report[];
@@ -166,12 +167,19 @@ export function ReportQueue({ reports: initialReports, onRefresh, canResolve = f
                             </div>
 
                             {report.status === 'OPEN' && canResolve && (
-                                <textarea
-                                    value={responses[report.id] || ''}
-                                    onChange={(e) => setResponses(prev => ({ ...prev, [report.id]: e.target.value }))}
-                                    placeholder="Add an optional response to the reporter..."
-                                    className="w-full p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-y min-h-[80px]"
-                                />
+                                <div>
+                                    <textarea
+                                        value={responses[report.id] || ''}
+                                        onChange={(e) => setResponses(prev => ({ ...prev, [report.id]: e.target.value }))}
+                                        placeholder="Add an optional response to the reporter..."
+                                        aria-label="Optional response to the reporter"
+                                        maxLength={MAX_REPORT_DESCRIPTION_CHARACTERS}
+                                        className="w-full p-3 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-y min-h-[80px]"
+                                    />
+                                    <p className="mt-1 text-right text-[10px] text-slate-400">
+                                        {(responses[report.id] || '').length.toLocaleString()} / {MAX_REPORT_DESCRIPTION_CHARACTERS.toLocaleString()} characters
+                                    </p>
+                                </div>
                             )}
 
                             {report.status !== 'OPEN' && (

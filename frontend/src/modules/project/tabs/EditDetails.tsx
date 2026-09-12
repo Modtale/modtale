@@ -7,6 +7,7 @@ import type { MetadataFormData } from '../components/FormShared';
 import { GalleryCarousel } from '../components/GalleryCarousel';
 import { Permission } from '@/modules/permissions/permissions';
 import { GALLERY_CAROUSEL_MARKER, splitDescriptionByGalleryCarouselMarker } from '../utils/galleryCarouselMarker';
+import { MAX_PROJECT_DESCRIPTION_CHARACTERS } from '@/utils/siteLimits';
 
 interface EditDetailsProps {
     metaData: MetadataFormData;
@@ -48,7 +49,10 @@ export const EditDetails: React.FC<EditDetailsProps> = ({ metaData, projectData,
                 </p>
             )}
             {editorMode === 'write' && canEdit ? (
-                <textarea value={metaData.description} onChange={e => { markDirty(); setMetaData({...metaData, description: e.target.value}); }} className={`flex-1 w-full h-full min-h-[400px] bg-transparent border-none outline-none ${theme.colors.textPrimary} font-mono text-sm resize-none`} placeholder="# Description..." />
+                <>
+                    <textarea value={metaData.description} onChange={e => { markDirty(); setMetaData({...metaData, description: e.target.value}); }} maxLength={MAX_PROJECT_DESCRIPTION_CHARACTERS} aria-label="Project description" className={`flex-1 w-full h-full min-h-[400px] bg-transparent border-none outline-none ${theme.colors.textPrimary} font-mono text-sm resize-none`} placeholder="# Description..." />
+                    <p className={`mt-2 text-right text-xs tabular-nums ${theme.colors.textMuted}`}>{metaData.description.length.toLocaleString()} / {MAX_PROJECT_DESCRIPTION_CHARACTERS.toLocaleString()} characters</p>
+                </>
             ) : (
                 <div className="min-h-[400px]">
                     {previewDescriptionParts.map((part, index) => (
