@@ -63,6 +63,23 @@ public class ProjectReviewPersistence {
         }
         return applyUpdate(snapshot, update, originGuard.getQueryObject().get("$expr"));
     }
+    public boolean applyDeletionState(Snapshot snapshot, boolean scrub) {
+        var project = snapshot.project();
+        var update = new Update().set("status", project.getStatus()).set("deletedAt", project.getDeletedAt())
+                .set("updatedAt", java.time.LocalDateTime.now().toString()).set("rankingDirty", true);
+        if (scrub) {
+            var encoded = new Document(); mongo.getConverter().write(project, encoded);
+            for (String field : List.of("title", "description", "about", "slug", "imageUrl", "bannerUrl", "galleryImages",
+                    "galleryImageCaptions", "teamMembers", "teamInvites", "projectRoles", "comments", "tags"))
+                update.set(field, encoded.get(field));
+        }
+        return applyUpdate(snapshot, update);
+    }
+    public boolean deleteProject(Snapshot snapshot) {
+        var query = new Document("_id", snapshot.raw().get("_id")).append("$expr",
+                new Document("$eq", List.of("$$ROOT", new Document("$literal", snapshot.raw()))));
+        return mongo.getCollection(mongo.getCollectionName(Project.class)).deleteOne(query).getDeletedCount() == 1;
+    }
     public boolean applyPresentation(Snapshot snapshot, boolean media) {
         var fields = media ? List.of("imageUrl", "bannerUrl", "galleryImages", "galleryImageCaptions")
                 : List.of("classification", "tags", "title", "description", "about", "categories", "slug", "license",

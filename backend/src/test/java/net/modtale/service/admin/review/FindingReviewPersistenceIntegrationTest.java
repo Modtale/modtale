@@ -372,4 +372,41 @@ class FindingReviewPersistenceIntegrationTest {
         assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
     }
 
+    @Test void softDeleteAndRestorePreserveVersionReviewHistory() {
+        var event = record(token());
+        var writes = new ProjectReviewPersistence(mongo);
+        for (var status : List.of(ProjectStatus.DELETED, ProjectStatus.PUBLISHED)) {
+            var project = mongo.findById(projectId, Project.class);
+            var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+            snapshot.project().setStatus(status);
+            snapshot.project().getVersions().clear();
+            assertTrue(writes.applyDeletionState(snapshot, false));
+            assertEquals(status, mongo.findById(projectId, Project.class).getStatus());
+            assertEquals(event.id(), version().getFindingReviewHead());
+            assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+        }
+    }
+    @Test void staleHardDeleteCannotEraseANewerDecisionButCurrentDeleteRemovesExactlyItsProject() {
+        record(token()); var writes = new ProjectReviewPersistence(mongo);
+        var project = mongo.findById(projectId, Project.class);
+        var stale = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        var event = requireFurtherReview();
+        assertFalse(writes.deleteProject(stale));
+        assertEquals(event.id(), version().getFindingReviewHead());
+        var current = mongo.findById(projectId, Project.class);
+        assertTrue(writes.deleteProject(writes.capture(projectId, ProjectReviewSnapshot.token(current))));
+        assertNull(mongo.findById(projectId, Project.class));
+        assertNotNull(mongo.findById(event.id(), FindingReviewService.Event.class, FindingReviewService.COLLECTION));
+    }
+    @Test void dependencyScrubDoesNotRewritePreservedVersionEvidence() {
+        var event = record(token()); assertTrue(approveVersion());
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().setTitle("Deleted Project"); snapshot.project().setImageUrl(null);
+        snapshot.project().getVersions().getFirst().setApprovedFindingReviewHead("forged");
+        assertTrue(writes.applyDeletionState(snapshot, true));
+        assertEquals(event.id(), version().getApprovedFindingReviewHead());
+        assertEquals(ProjectVersion.ReviewStatus.APPROVED, version().getReviewStatus());
+    }
+
 }
