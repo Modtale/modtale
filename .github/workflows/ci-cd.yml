@@ -20,16 +20,15 @@ on:
   schedule:
     - cron: '17 3 * * *'
 
-concurrency:
-  group: modtale-deploy-${{ github.event_name == 'delete' && format('refs/heads/{0}', github.event.ref) || github.ref }}
-  cancel-in-progress: false
-
 env:
   PROJECT_ID: gen-lang-client-0244308719
   REGION: us-central1
 
 jobs:
   deploy:
+    concurrency:
+      group: modtale-deploy-${{ github.ref }}
+      cancel-in-progress: false
     if: github.repository == 'Modtale/modtale' && github.event_name == 'push' && github.event.deleted != true
     runs-on: ubuntu-latest
     environment: ${{ github.ref_name == 'main' && 'production' || github.ref_name == 'develop' && 'develop' || 'branch-preview' }}
@@ -61,7 +60,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          previous=$(gh run list --workflow ci-cd.yml --branch "$GITHUB_REF_NAME" --status success --limit 1 --json headSha --jq '.[0].headSha // empty')
+          previous=$(gh run list --workflow ci-cd.yml --branch "$GITHUB_REF_NAME" --event push --status success --limit 1 --json headSha --jq '.[0].headSha // empty')
           echo "sha=${previous:-${{ github.event.before }}}" >> "$GITHUB_OUTPUT"
 
       - name: Detect changed components
@@ -1039,6 +1038,9 @@ jobs:
           retention-days: 7
 
   prepare-preview-source:
+    concurrency:
+      group: modtale-template-reader
+      cancel-in-progress: false
     if: github.repository == 'Modtale/modtale' && github.event_name == 'workflow_dispatch' && inputs.prepare_preview_source
     runs-on: ubuntu-latest
     environment: branch-preview
@@ -1106,6 +1108,9 @@ jobs:
           echo "branches=$branches" >> "$GITHUB_OUTPUT"
 
   cleanup-branch-preview:
+    concurrency:
+      group: modtale-preview-cleanup-${{ matrix.branch }}
+      cancel-in-progress: false
     name: Clean Up Deleted Branch Preview (${{ matrix.branch }})
     needs: find-orphan-previews
     if: needs.find-orphan-previews.outputs.branches != '[]'
