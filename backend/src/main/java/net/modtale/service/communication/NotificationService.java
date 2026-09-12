@@ -103,7 +103,7 @@ public class NotificationService {
         if (!expired.isEmpty()) {
             logger.info("Cleaning up {} expired actionable notifications.", expired.size());
             for (Notification n : expired) {
-                voidAction(n);
+                voidAction(n, true);
                 notificationRepository.delete(n);
             }
         }
@@ -117,14 +117,30 @@ public class NotificationService {
         notificationDeliveryService.sendNotifcation(userIds, title, message, link, iconUrl);
     }
 
-    private void voidAction(Notification n) {
+    @Scheduled(fixedDelay = 60000)
+    public void cleanupExpiredTransfers() {
+        mongoTemplate.updateMulti(new Query(Criteria.where("pendingTransferExpiresAt").gt(0).lte(System.currentTimeMillis())),
+                clearTransfer(), Project.class);
+    }
+
+    private Update clearTransfer() {
+        return new Update().unset("pendingTransferTo").unset("pendingTransferRequestId")
+                .unset("pendingTransferOwnerId").unset("pendingTransferExpiresAt");
+    }
+
+    private void voidAction(Notification n) { voidAction(n, false); }
+    private void voidAction(Notification n, boolean expired) {
         try {
             if (n.getType() == NotificationType.TRANSFER_REQUEST) {
                 String projectId = n.getMetadata().get("projectId");
-                if (projectId != null) {
-                    mongoTemplate.updateFirst(
-                            new Query(Criteria.where("_id").is(projectId).and("pendingTransferTo").exists(true)),
-                            new Update().unset("pendingTransferTo"),
+                String requestId = n.getMetadata().get("requestId");
+                String targetUserId = n.getMetadata().get("targetUserId");
+                if (projectId != null && requestId != null && !requestId.isBlank() && targetUserId != null
+                        && (expired || targetUserId.equals(n.getUserId()))) {
+                    var match = Criteria.where("_id").is(projectId).and("pendingTransferTo").is(targetUserId)
+                            .and("pendingTransferRequestId").is(requestId);
+                    if (expired) match.and("pendingTransferExpiresAt").gt(0).lte(System.currentTimeMillis());
+                    mongoTemplate.updateFirst(new Query(match), clearTransfer(),
                             Project.class
                     );
                 }

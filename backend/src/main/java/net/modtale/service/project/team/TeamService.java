@@ -27,8 +27,8 @@ public class TeamService {
         teamTransferService.requestTransfer(id, targetUserId, requester);
     }
 
-    public void resolveTransfer(String id, boolean accept, User responder) {
-        teamTransferService.resolveTransfer(id, accept, responder);
+    public void resolveTransfer(String id, boolean accept, String requestId, User responder) {
+        teamTransferService.resolveTransfer(id, accept, requestId, responder);
     }
 
     public Project createProjectRole(String id, String name, String color, Set<ApiKey.ApiPermission> perms, User requester) {

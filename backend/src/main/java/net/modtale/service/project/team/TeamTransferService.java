@@ -65,6 +65,9 @@ public class TeamTransferService {
         }
 
         project.setPendingTransferTo(target.getId());
+        project.setPendingTransferRequestId(java.util.UUID.randomUUID().toString());
+        project.setPendingTransferOwnerId(project.getAuthorId());
+        project.setPendingTransferExpiresAt(System.currentTimeMillis() + java.time.Duration.ofDays(7).toMillis());
         if (!reviewPersistence.applyTeam(snapshot)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(project);
 
@@ -72,7 +75,7 @@ public class TeamTransferService {
         teamNotificationService.sendTransferRequest(project, target, author);
     }
 
-    public void resolveTransfer(String id, boolean accept, User responder) {
+    public void resolveTransfer(String id, boolean accept, String requestId, User responder) {
         Project project = projectService.getRawProjectById(id);
         if (project == null || project.getPendingTransferTo() == null) {
             throw new InvalidProjectRequestException("We couldn't find a pending transfer request for that project.");
@@ -80,6 +83,12 @@ public class TeamTransferService {
         projectMutationGuard.ensureEditable(project);
         var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
         project = snapshot.project();
+
+        if (requestId == null || requestId.isBlank() || !requestId.equals(project.getPendingTransferRequestId())
+                || project.getPendingTransferExpiresAt() <= System.currentTimeMillis()
+                || project.getPendingTransferOwnerId() == null
+                || !project.getPendingTransferOwnerId().equals(project.getAuthorId()))
+            throw new InvalidProjectRequestException("This transfer request is no longer current. Ask the owner to send a new request.");
 
         if (!responder.getId().equals(project.getPendingTransferTo())) {
             User targetUser = userRepository.findById(project.getPendingTransferTo()).orElse(null);
@@ -103,7 +112,7 @@ public class TeamTransferService {
                 project.getTeamMembers().removeIf(member -> member.getUserId().equals(newOwner.getId()));
             }
 
-            if (!reviewPersistence.applyTeam(snapshot)) throw ProjectReviewSnapshot.conflict();
+            if (!reviewPersistence.resolveTransfer(snapshot, requestId)) throw ProjectReviewSnapshot.conflict();
             projectService.evictProjectCache(project);
             if (oldOwner != null) {
                 if (oldOwner.getAccountType() == User.AccountType.ORGANIZATION && oldOwner.getOrganizationMembers() != null) {
@@ -119,7 +128,7 @@ public class TeamTransferService {
         }
 
         project.setPendingTransferTo(null);
-        if (!reviewPersistence.applyTeam(snapshot)) throw ProjectReviewSnapshot.conflict();
+        if (!reviewPersistence.resolveTransfer(snapshot, requestId)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(project);
         User oldOwner = userRepository.findById(project.getAuthorId()).orElse(null);
         teamNotificationService.sendTransferDeclined(project, oldOwner);

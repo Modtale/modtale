@@ -66,7 +66,8 @@ public class TeamNotificationService {
                 URI.create("/dashboard/projects"),
                 project.getImageUrl(),
                 NotificationType.TRANSFER_REQUEST,
-                Map.of("projectId", project.getId(), "action", "TRANSFER_REQUEST")
+                Map.of("projectId", project.getId(), "action", "TRANSFER_REQUEST",
+                        "requestId", project.getPendingTransferRequestId(), "targetUserId", targetUser.getId())
         );
     }
 

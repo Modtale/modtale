@@ -2,7 +2,7 @@ import type { Notification } from '@/context/NotificationsContext';
 
 export interface NotificationActionRequest {
     endpoint: string;
-    body?: Record<string, boolean>;
+    body?: Record<string, boolean | string>;
 }
 
 export const resolveNotificationAction = (
@@ -12,8 +12,9 @@ export const resolveNotificationAction = (
     const projectId = notification.metadata?.projectId;
 
     if (notification.type === 'TRANSFER_REQUEST') {
-        return projectId
-            ? { endpoint: `/projects/${projectId}/transfer/resolve`, body: { accept } }
+        const requestId = notification.metadata?.requestId;
+        return projectId && requestId
+            ? { endpoint: `/projects/${projectId}/transfer/resolve`, body: { accept, requestId } }
             : null;
     }
 

@@ -193,6 +193,9 @@ public class Project {
     private List<ProjectMember> teamInvites = new ArrayList<>();
 
     private String pendingTransferTo;
+    private String pendingTransferRequestId;
+    private String pendingTransferOwnerId;
+    private long pendingTransferExpiresAt;
 
     private List<String> galleryImages = new ArrayList<>();
     private Map<String, String> galleryImageCaptions = new HashMap<>();
@@ -298,7 +301,16 @@ public class Project {
     public void setTeamInvites(List<ProjectMember> teamInvites) { this.teamInvites = teamInvites; }
 
     public String getPendingTransferTo() { return pendingTransferTo; }
-    public void setPendingTransferTo(String pendingTransferTo) { this.pendingTransferTo = pendingTransferTo; }
+    public void setPendingTransferTo(String pendingTransferTo) {
+        this.pendingTransferTo = pendingTransferTo;
+        if (pendingTransferTo == null) { pendingTransferRequestId = null; pendingTransferOwnerId = null; pendingTransferExpiresAt = 0; }
+    }
+    public String getPendingTransferRequestId() { return pendingTransferRequestId; }
+    public void setPendingTransferRequestId(String id) { pendingTransferRequestId = id; }
+    public String getPendingTransferOwnerId() { return pendingTransferOwnerId; }
+    public void setPendingTransferOwnerId(String id) { pendingTransferOwnerId = id; }
+    public long getPendingTransferExpiresAt() { return pendingTransferExpiresAt; }
+    public void setPendingTransferExpiresAt(long time) { pendingTransferExpiresAt = time; }
     public List<String> getGalleryImages() { return galleryImages; }
     public void setGalleryImages(List<String> galleryImages) { this.galleryImages = galleryImages; }
     public Map<String, String> getGalleryImageCaptions() { return galleryImageCaptions; }

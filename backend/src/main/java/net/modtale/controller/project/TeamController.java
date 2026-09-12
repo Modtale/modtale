@@ -147,7 +147,7 @@ public class TeamController {
             @Valid @RequestBody ResolveProjectTransferRequest requestPayload
     ) {
         User user = accountService.requireCurrentUser("responding to a project transfer");
-        teamService.resolveTransfer(projectId, requestPayload.getAccept(), user);
+        teamService.resolveTransfer(projectId, requestPayload.getAccept(), requestPayload.getRequestId(), user);
         return ResponseEntity.ok().build();
     }
 }

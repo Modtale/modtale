@@ -546,4 +546,56 @@ class FindingReviewPersistenceIntegrationTest {
         assertNull(version().getFileUrl());
     }
 
+    @Test void staleTransferNotificationsCannotCancelReplacementRequests() {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("pendingTransferTo", "recipient")
+                .set("pendingTransferRequestId", "new-request").set("pendingTransferOwnerId", "owner")
+                .set("pendingTransferExpiresAt", System.currentTimeMillis() + 60000), Project.class);
+        var repository = mock(net.modtale.repository.user.NotificationRepository.class);
+        var notifications = new net.modtale.service.communication.NotificationService(repository,
+                mock(net.modtale.repository.user.UserRepository.class), mongo,
+                mock(net.modtale.service.communication.NotificationDeliveryService.class));
+        var otherRecipient = new net.modtale.model.user.Notification("other-recipient", "Request", "Request", java.net.URI.create("/dashboard"), null,
+                net.modtale.model.user.NotificationType.TRANSFER_REQUEST,
+                Map.of("projectId", projectId, "requestId", "new-request", "targetUserId", "recipient"));
+        otherRecipient.setId("other-notification"); when(repository.findById("other-notification")).thenReturn(Optional.of(otherRecipient));
+        notifications.deleteNotification("other-notification", "other-recipient");
+        assertEquals("recipient", mongo.findById(projectId, Project.class).getPendingTransferTo());
+        for (String requestId : List.of("", "old-request", "new-request")) {
+            var metadata = new HashMap<String,String>(); metadata.put("projectId", projectId);
+            metadata.put("targetUserId", "recipient"); if (!requestId.isEmpty()) metadata.put("requestId", requestId);
+            var notification = new net.modtale.model.user.Notification("recipient", "Request", "Request", java.net.URI.create("/dashboard"), null,
+                    net.modtale.model.user.NotificationType.TRANSFER_REQUEST, metadata); notification.setId("notification");
+            when(repository.findById("notification")).thenReturn(Optional.of(notification));
+            notifications.deleteNotification("notification", "recipient");
+            var current = mongo.findById(projectId, Project.class);
+            if (requestId.equals("new-request")) assertNull(current.getPendingTransferTo());
+            else assertEquals("recipient", current.getPendingTransferTo());
+        }
+        assertNotNull(version().getScanResult());
+    }
+    @Test void expiredTransferCleanupWorksWithoutAnyNotificationAndKeepsNewRequests() {
+        var notifications = new net.modtale.service.communication.NotificationService(mock(net.modtale.repository.user.NotificationRepository.class),
+                mock(net.modtale.repository.user.UserRepository.class), mongo, mock(net.modtale.service.communication.NotificationDeliveryService.class));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("pendingTransferTo", "recipient")
+                .set("pendingTransferRequestId", "expired").set("pendingTransferExpiresAt", 1L), Project.class);
+        notifications.cleanupExpiredTransfers(); assertNull(mongo.findById(projectId, Project.class).getPendingTransferTo());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("pendingTransferTo", "recipient")
+                .set("pendingTransferRequestId", "new").set("pendingTransferExpiresAt", System.currentTimeMillis()+60000), Project.class);
+        notifications.cleanupExpiredTransfers(); assertEquals("new", mongo.findById(projectId, Project.class).getPendingTransferRequestId());
+    }
+    @Test void finalTransferWriteChecksDatabaseExpiryAndOriginalOwner() {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("authorId", "owner")
+                .set("pendingTransferOwnerId", "owner").set("pendingTransferTo", "recipient")
+                .set("pendingTransferRequestId", "request").set("pendingTransferExpiresAt", 1L), Project.class);
+        var writes = new ProjectReviewPersistence(mongo);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        snapshot.project().setAuthorId("recipient"); snapshot.project().setPendingTransferTo(null);
+        assertFalse(writes.resolveTransfer(snapshot, "request")); assertEquals("owner", mongo.findById(projectId, Project.class).getAuthorId());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("pendingTransferExpiresAt", System.currentTimeMillis()+60000), Project.class);
+        snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        snapshot.project().setAuthorId("recipient"); snapshot.project().setPendingTransferTo(null);
+        assertTrue(writes.resolveTransfer(snapshot, "request"));
+        assertEquals("recipient", mongo.findById(projectId, Project.class).getAuthorId()); assertNotNull(version().getScanResult());
+    }
+
 }

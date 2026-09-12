@@ -85,13 +85,21 @@ public class ProjectReviewPersistence {
         }
         return applyUpdate(snapshot, update);
     }
-    public boolean applyTeam(Snapshot snapshot) {
+    public boolean applyTeam(Snapshot snapshot) { return applyTeam(snapshot, null); }
+    public boolean resolveTransfer(Snapshot snapshot, String requestId) {
+        if (requestId == null || !requestId.equals(snapshot.raw().getString("pendingTransferRequestId"))
+                || snapshot.raw().get("pendingTransferOwnerId") == null
+                || !Objects.equals(snapshot.raw().get("pendingTransferOwnerId"), snapshot.raw().get("authorId")))
+            throw ProjectReviewSnapshot.conflict();
+        return applyTeam(snapshot, new Document("$gt", List.of("$pendingTransferExpiresAt", new Document("$toLong", "$$NOW"))));
+    }
+    private boolean applyTeam(Snapshot snapshot, Object guard) {
         var encoded = new Document(); mongo.getConverter().write(snapshot.project(), encoded);
         var update = new Update();
-        for (String field : List.of("authorId", "author", "pendingTransferTo", "teamMembers", "teamInvites", "projectRoles"))
+        for (String field : List.of("authorId", "author", "pendingTransferTo", "pendingTransferRequestId", "pendingTransferOwnerId", "pendingTransferExpiresAt", "teamMembers", "teamInvites", "projectRoles"))
             update.set(field, encoded.get(field));
         update.set("updatedAt", java.time.LocalDateTime.now().toString());
-        return applyUpdate(snapshot, update);
+        return applyUpdate(snapshot, update, guard);
     }
     public boolean cacheModpackArchive(String projectId, String projectToken, String versionId, String versionToken, String fileUrl) {
         if (fileUrl == null || fileUrl.isBlank() || versionId == null || versionId.isBlank()) return false;

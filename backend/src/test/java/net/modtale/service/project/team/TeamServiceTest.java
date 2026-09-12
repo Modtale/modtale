@@ -117,7 +117,8 @@ class TeamServiceTest {
                 eq(java.net.URI.create("/dashboard/projects")),
                 eq(project.getImageUrl()),
                 eq(net.modtale.model.user.NotificationType.TRANSFER_REQUEST),
-                eq(java.util.Map.of("projectId", "project-1", "action", "TRANSFER_REQUEST"))
+                eq(java.util.Map.of("projectId", "project-1", "action", "TRANSFER_REQUEST",
+                        "requestId", project.getPendingTransferRequestId(), "targetUserId", "user-2"))
         );
     }
 
@@ -176,6 +177,8 @@ class TeamServiceTest {
         Project project = project("project-1");
         project.setAuthorId("owner-1");
         project.setPendingTransferTo("user-2");
+        project.setPendingTransferRequestId("request-1"); project.setPendingTransferOwnerId("owner-1");
+        project.setPendingTransferExpiresAt(System.currentTimeMillis() + 60000);
         project.setTeamMembers(new ArrayList<>(List.of(new Project.ProjectMember("user-2", "role-1"))));
 
         User responder = user("user-2", "Bea");
@@ -186,16 +189,18 @@ class TeamServiceTest {
         when(userRepository.findById("owner-1")).thenReturn(Optional.of(oldOwner));
         when(userRepository.findById("user-2")).thenReturn(Optional.of(newOwner));
 
-        when(reviewPersistence.applyTeam(any())).thenReturn(false);
+        when(reviewPersistence.resolveTransfer(any(), eq("request-1"))).thenReturn(false);
         assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                () -> service.resolveTransfer("project-1", true, responder));
+                () -> service.resolveTransfer("project-1", true, "request-1", responder));
         verifyNoInteractions(apiKeyService, notificationService);
         project.setAuthorId("owner-1"); project.setPendingTransferTo("user-2");
+        project.setPendingTransferRequestId("request-1"); project.setPendingTransferOwnerId("owner-1");
+        project.setPendingTransferExpiresAt(System.currentTimeMillis() + 60000);
         project.setTeamMembers(new ArrayList<>(List.of(new Project.ProjectMember("user-2", "role-1"))));
         clearInvocations(reviewPersistence);
-        when(reviewPersistence.applyTeam(any())).thenReturn(true);
+        when(reviewPersistence.resolveTransfer(any(), eq("request-1"))).thenReturn(true);
 
-        service.resolveTransfer("project-1", true, responder);
+        service.resolveTransfer("project-1", true, "request-1", responder);
 
         assertEquals("user-2", project.getAuthorId());
         assertNull(project.getPendingTransferTo());
@@ -306,4 +311,18 @@ class TeamServiceTest {
         user.setUsername(username);
         return user;
     }
+    @Test void staleExpiredAndOwnerChangedTransferResponsesCannotResolve() {
+        Project project = project("project-1"); project.setAuthorId("owner-1"); project.setPendingTransferTo("user-2");
+        project.setPendingTransferRequestId("new-request"); project.setPendingTransferOwnerId("owner-1");
+        project.setPendingTransferExpiresAt(System.currentTimeMillis() + 60000);
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        User responder = user("user-2", "Bea");
+        assertThrows(net.modtale.exception.InvalidProjectRequestException.class, () -> service.resolveTransfer("project-1", true, "old-request", responder));
+        project.setPendingTransferExpiresAt(1);
+        assertThrows(net.modtale.exception.InvalidProjectRequestException.class, () -> service.resolveTransfer("project-1", true, "new-request", responder));
+        project.setPendingTransferExpiresAt(System.currentTimeMillis() + 60000); project.setAuthorId("new-owner");
+        assertThrows(net.modtale.exception.InvalidProjectRequestException.class, () -> service.resolveTransfer("project-1", true, "new-request", responder));
+        verify(reviewPersistence, never()).resolveTransfer(any(), any()); verifyNoInteractions(apiKeyService, notificationService);
+    }
+
 }

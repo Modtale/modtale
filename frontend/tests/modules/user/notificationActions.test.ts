@@ -26,12 +26,16 @@ describe('resolveNotificationAction', () => {
     });
 
     it('uses canonical projectId metadata for project transfers', () => {
-        const transfer = notification('TRANSFER_REQUEST', { projectId: 'project-1' });
+        const transfer = notification('TRANSFER_REQUEST', { projectId: 'project-1', requestId: 'request-1' });
 
         expect(resolveNotificationAction(transfer, true)).toEqual({
             endpoint: '/projects/project-1/transfer/resolve',
-            body: { accept: true }
+            body: { accept: true, requestId: 'request-1' }
         });
+    });
+
+    it('rejects legacy transfers without request identity', () => {
+        expect(resolveNotificationAction(notification('TRANSFER_REQUEST', { projectId: 'project-1' }), true)).toBeNull();
     });
 
     it('rejects contributor invitations without projectId metadata', () => {
