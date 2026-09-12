@@ -63,6 +63,28 @@ public class ProjectReviewPersistence {
         }
         return applyUpdate(snapshot, update, originGuard.getQueryObject().get("$expr"));
     }
+    public boolean submitDraft(Snapshot snapshot) {
+        if (snapshot.project().getStatus() != net.modtale.model.project.ProjectStatus.PENDING
+                || !"DRAFT".equals(snapshot.raw().getString("status"))) throw ProjectReviewSnapshot.conflict();
+        var update = new Update().set("status", net.modtale.model.project.ProjectStatus.PENDING)
+                .set("expiresAt", null).set("updatedAt", java.time.LocalDateTime.now().toString());
+        var originals = snapshot.raw().getList("versions", Document.class, List.of());
+        var versions = snapshot.project().getVersions();
+        if (originals.size() != versions.size()) throw ProjectReviewSnapshot.conflict();
+        for (int i = 0; i < versions.size(); i++) {
+            var original = mongo.getConverter().read(ProjectVersion.class, originals.get(i));
+            var version = versions.get(i);
+            if (!Objects.equals(original.getId(), version.getId())) throw ProjectReviewSnapshot.conflict();
+            String path = "versions." + i + ".";
+            if (original.getScanResult() == null && version.getScanResult() != null) {
+                update.set(path + "scanResult", version.getScanResult()).set(path + "reviewStatus", ProjectVersion.ReviewStatus.PENDING)
+                        .set(path + "scheduledPublishDate", null);
+            } else if (original.getReviewStatus() == null || original.getReviewStatus() == ProjectVersion.ReviewStatus.REJECTED) {
+                update.set(path + "reviewStatus", ProjectVersion.ReviewStatus.PENDING);
+            }
+        }
+        return applyUpdate(snapshot, update);
+    }
     public boolean applyTeam(Snapshot snapshot) {
         var encoded = new Document(); mongo.getConverter().write(snapshot.project(), encoded);
         var update = new Update();

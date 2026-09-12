@@ -437,4 +437,33 @@ class FindingReviewPersistenceIntegrationTest {
         assertEquals("different-owner", mongo.findById(projectId, Project.class).getAuthorId());
     }
 
+    @Test void draftSubmissionPreservesCurrentEvidenceAndUnknownFields() {
+        var event = record(token());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("status", ProjectStatus.DRAFT), Project.class);
+        mongo.getCollection("projects").updateOne(new Document(), new Document("$set", new Document("versions.0.futureEvidence", "preserved")));
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().setStatus(ProjectStatus.PENDING);
+        snapshot.project().getVersions().getFirst().setScanResult(null);
+        assertTrue(writes.submitDraft(snapshot));
+        assertNotNull(version().getScanResult()); assertEquals(event.id(), version().getFindingReviewHead());
+        assertEquals("preserved", mongo.getCollection("projects").find().first().getList("versions", Document.class).getFirst().get("futureEvidence"));
+        assertFalse(writes.submitDraft(snapshot));
+    }
+    @Test void draftSubmissionQueuesOnlyUnscannedVersionsAndLosesToConcurrentDecision() {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("status", ProjectStatus.DRAFT).set("versions.0.scanResult", null), Project.class);
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().setStatus(ProjectStatus.PENDING);
+        var queued = new ScanResult(); queued.setScanState("QUEUED"); queued.setScanAttempt(1);
+        snapshot.project().getVersions().getFirst().setScanResult(queued);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("versions.0.findingReviewHead", "new-decision"), Project.class);
+        assertFalse(writes.submitDraft(snapshot)); assertNull(version().getScanResult());
+        project = mongo.findById(projectId, Project.class);
+        snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().setStatus(ProjectStatus.PENDING); snapshot.project().getVersions().getFirst().setScanResult(queued);
+        assertTrue(writes.submitDraft(snapshot)); assertEquals(1, version().getScanResult().getScanAttempt());
+        assertEquals("new-decision", version().getFindingReviewHead());
+    }
+
 }
