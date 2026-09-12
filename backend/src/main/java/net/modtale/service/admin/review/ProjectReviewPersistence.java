@@ -44,6 +44,8 @@ public class ProjectReviewPersistence {
             if (!approvedVersionId.equals(original.getId())) throw ProjectReviewSnapshot.conflict();
             if (version.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED)
                 net.modtale.service.security.issue.FindingReviewHistory.requireManualApproval(mongo, project.getId(), original);
+            version.setApprovedFindingReviewHead(version.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED
+                    ? original.getFindingReviewHead() : null);
             var scan = original.getScanResult();
             if (version.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED && scan != null && scan.getReusedReviewVersion() != null
                     && (!net.modtale.service.security.scan.ArtifactClearancePolicy.complete(scan)
@@ -53,6 +55,7 @@ public class ProjectReviewPersistence {
                     .set(path + "scheduledPublishDate", version.getScheduledPublishDate()).set(path + "scanResult", version.getScanResult())
                     .set(path + "securityApprovalProjectId", version.getSecurityApprovalProjectId())
                     .set(path + "approvedReviewOrigins", version.getApprovedReviewOrigins())
+                    .set(path + "approvedFindingReviewHead", version.getApprovedFindingReviewHead())
                     .set(path + "approvedSecurityEvidence", version.getApprovedSecurityEvidence())
                     .set(path + "approvedSecurityContextSha256", version.getApprovedSecurityContextSha256())
                     .set(path + "securityApprovedAt", version.getSecurityApprovedAt())

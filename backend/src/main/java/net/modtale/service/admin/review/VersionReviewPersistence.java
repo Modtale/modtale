@@ -46,6 +46,8 @@ public class VersionReviewPersistence {
         var originalVersion = mongo.getConverter().read(ProjectVersion.class, snapshot.version());
         if (reviewed.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED)
             net.modtale.service.security.issue.FindingReviewHistory.requireManualApproval(mongo, snapshot.projectId().toString(), originalVersion);
+        reviewed.setApprovedFindingReviewHead(reviewed.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED
+                ? originalVersion.getFindingReviewHead() : null);
         var original = originalVersion.getScanResult();
         if (reviewed.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED && original != null && original.getReusedReviewVersion() != null
                 && (!net.modtale.service.security.scan.ArtifactClearancePolicy.complete(original)
@@ -56,6 +58,7 @@ public class VersionReviewPersistence {
                 .set("versions.$.scanResult",reviewed.getScanResult())
                 .set("versions.$.securityApprovalProjectId", reviewed.getSecurityApprovalProjectId())
                 .set("versions.$.approvedReviewOrigins",reviewed.getApprovedReviewOrigins())
+                .set("versions.$.approvedFindingReviewHead", reviewed.getApprovedFindingReviewHead())
                 .set("versions.$.approvedSecurityEvidence",reviewed.getApprovedSecurityEvidence())
                 .set("versions.$.approvedSecurityContextSha256",reviewed.getApprovedSecurityContextSha256())
                 .set("versions.$.securityApprovedAt",reviewed.getSecurityApprovedAt())

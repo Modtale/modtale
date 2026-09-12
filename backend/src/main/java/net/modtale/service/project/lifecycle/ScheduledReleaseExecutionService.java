@@ -65,6 +65,7 @@ public class ScheduledReleaseExecutionService {
                 update.set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.APPROVED)
                         .set("versions.$.securityApprovalProjectId", version.getSecurityApprovalProjectId())
                         .set("versions.$.approvedReviewOrigins", version.getApprovedReviewOrigins())
+                        .set("versions.$.approvedFindingReviewHead", null)
                         .set("versions.$.approvedSecurityEvidence", version.getApprovedSecurityEvidence())
                         .set("versions.$.approvedSecurityContextSha256", version.getApprovedSecurityContextSha256())
                         .set("versions.$.securityApprovedAt", version.getSecurityApprovedAt())

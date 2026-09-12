@@ -22,7 +22,7 @@ public class ArtifactReviewReuseService {
         if (context == null || target.getFindingReviewHead() != null) return;
         long now = System.currentTimeMillis();
         for (ProjectVersion version : project.getVersions()) {
-            if (version == null || version.getFindingReviewHead() != null || Objects.equals(version.getId(), currentVersionId)
+            if (version == null || Objects.equals(version.getId(), currentVersionId)
                     || version.getReviewStatus() != ProjectVersion.ReviewStatus.APPROVED
                     || version.getSecurityApprovedAt() <= 0 || version.getSecurityApprovedAt() > now
                     || now - version.getSecurityApprovedAt() > MAX_AGE_MS) continue;

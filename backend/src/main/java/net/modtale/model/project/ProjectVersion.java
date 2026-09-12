@@ -39,6 +39,9 @@ public class ProjectVersion {
     private java.util.Map<String, String> approvedReviewOrigins;
     public java.util.Map<String, String> getApprovedReviewOrigins() { return approvedReviewOrigins; }
     public void setApprovedReviewOrigins(java.util.Map<String, String> value) { approvedReviewOrigins = value; }
+    private String approvedFindingReviewHead;
+    public String getApprovedFindingReviewHead() { return approvedFindingReviewHead; }
+    public void setApprovedFindingReviewHead(String value) { approvedFindingReviewHead = value; }
     private String findingReviewHead;
     public String getFindingReviewHead() { return findingReviewHead; }
     public void setFindingReviewHead(String value) { findingReviewHead = value; }

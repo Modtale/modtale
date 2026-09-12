@@ -13,7 +13,7 @@ import org.springframework.data.mongodb.core.query.*;
 /** Flattened approval ancestry; copied approvals never become independent trust roots. */
 public final class ArtifactReviewLineage {
     private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
-    private static final List<String> FIELDS = List.of("_id", "hash", "reviewStatus", "findingReviewHead",
+    private static final List<String> FIELDS = List.of("_id", "hash", "reviewStatus", "findingReviewHead", "approvedFindingReviewHead",
             "securityApprovalProjectId", "approvedSecurityEvidence", "approvedSecurityContextSha256", "securityApprovedAt", "approvedReviewOrigins",
             "gameVersions", "dependencies", "manifestId", "manifestVersion", "overrideFileUrl", "modpackConfigs");
     private ArtifactReviewLineage() {}
@@ -25,7 +25,7 @@ public final class ArtifactReviewLineage {
     private static boolean validId(String id) { return id != null && id.matches("[a-zA-Z0-9_-]{1,128}"); }
     public static String stamp(ProjectVersion source) {
         if (source == null || source.getReviewStatus() != ProjectVersion.ReviewStatus.APPROVED
-                || source.getFindingReviewHead() != null || !wellFormed(source.getApprovedReviewOrigins())) return null;
+                || !Objects.equals(source.getFindingReviewHead(), source.getApprovedFindingReviewHead()) || !wellFormed(source.getApprovedReviewOrigins())) return null;
         var evidence = source.getApprovedSecurityEvidence();
         String context = ArtifactReviewContext.fingerprint(source);
         long now = System.currentTimeMillis();
@@ -38,7 +38,7 @@ public final class ArtifactReviewLineage {
                 || source.getSecurityApprovedAt() <= 0 || source.getSecurityApprovedAt() > now
                 || now - source.getSecurityApprovedAt() > 30L * 86400000) return null;
         try {
-            var fields = Arrays.asList("approval-origin-1", source.getSecurityApprovalProjectId(), source.getId(), source.getHash(), evidence.policyVersion(),
+            var fields = Arrays.asList("approval-origin-2", source.getFindingReviewHead(), source.getApprovedFindingReviewHead(), source.getSecurityApprovalProjectId(), source.getId(), source.getHash(), evidence.policyVersion(),
                     evidence.contentSha256(), evidence.reviewState(), evidence.clearanceGranted(), context,
                     source.getSecurityApprovedAt(), source.getApprovedReviewOrigins());
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(JSON.writeValueAsBytes(fields)));
@@ -93,6 +93,11 @@ public final class ArtifactReviewLineage {
         var evidence = scan.getSecurityEvidence();
         if (!valid(project, origins) || evidence == null || !SecurityManifest.digest(scan.getReviewedContextSha256())) return false;
         for (var source : project.getVersions()) if (origins.containsKey(source.getId())) {
+            try {
+                net.modtale.service.security.issue.FindingReviewHistory.requireManualApproval(mongo, projectId, source);
+            } catch (org.springframework.web.server.ResponseStatusException invalidHistory) {
+                return false;
+            }
             var prior = source.getApprovedSecurityEvidence();
             if (!Objects.equals(evidence.contentSha256(), prior.contentSha256())
                     || !Objects.equals(evidence.policyVersion(), prior.policyVersion())

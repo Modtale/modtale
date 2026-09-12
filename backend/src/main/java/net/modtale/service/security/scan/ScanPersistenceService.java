@@ -74,6 +74,7 @@ public class ScanPersistenceService {
                 update.set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.APPROVED)
                         .set("versions.$.securityApprovalProjectId", reviewedVersion.getSecurityApprovalProjectId())
                         .set("versions.$.approvedReviewOrigins", reviewedVersion.getApprovedReviewOrigins())
+                        .set("versions.$.approvedFindingReviewHead", null)
                         .set("versions.$.approvedSecurityEvidence", reviewedVersion.getApprovedSecurityEvidence())
                         .set("versions.$.approvedSecurityContextSha256", reviewedVersion.getApprovedSecurityContextSha256())
                         .set("versions.$.securityApprovedAt", reviewedVersion.getSecurityApprovedAt())

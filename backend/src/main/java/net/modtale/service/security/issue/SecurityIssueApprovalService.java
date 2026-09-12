@@ -22,6 +22,8 @@ public class SecurityIssueApprovalService {
 
     public void markIssuesAcceptedForApprovedVersion(ProjectVersion version) {
         if (version == null) return;
+        // Only the conditional manual approval writer may attest a reviewed finding-history head.
+        version.setApprovedFindingReviewHead(null);
         if (version.getScanResult() == null) {
             version.setSecurityApprovalProjectId(null);
             version.setApprovedReviewOrigins(null);

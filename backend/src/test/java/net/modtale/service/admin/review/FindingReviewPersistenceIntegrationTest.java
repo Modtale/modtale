@@ -227,6 +227,7 @@ class FindingReviewPersistenceIntegrationTest {
         var resolution = record(token());
         assertEquals(requirement.id(), resolution.supersedesDecisionId());
         assertTrue(approveProject());
+        assertEquals(resolution.id(), version().getApprovedFindingReviewHead());
         assertEquals(ProjectVersion.ReviewStatus.APPROVED, version().getReviewStatus());
     }
     @Test void requirementsSurviveContextChangesAndPruningUntilExplicitRevocation() {
