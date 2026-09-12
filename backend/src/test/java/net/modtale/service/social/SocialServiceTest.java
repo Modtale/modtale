@@ -33,7 +33,8 @@ class SocialServiceTest {
                 mock(NotificationService.class),
                 mock(SanitizationService.class),
                 mock(MongoTemplate.class),
-                mock(ScoringService.class)
+                mock(ScoringService.class),
+                mock(net.modtale.service.admin.review.ProjectReviewPersistence.class)
         );
     }
 

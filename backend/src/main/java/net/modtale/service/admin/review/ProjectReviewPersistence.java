@@ -93,6 +93,9 @@ public class ProjectReviewPersistence {
         update.set("updatedAt", java.time.LocalDateTime.now().toString());
         return applyUpdate(snapshot, update);
     }
+    public boolean applyComments(Snapshot snapshot) {
+        return applyUpdate(snapshot, new Update().set("comments", snapshot.project().getComments()));
+    }
     public boolean unlist(Snapshot snapshot) {
         if (!"PUBLISHED".equals(snapshot.raw().getString("status"))
                 && !"UNLISTED".equals(snapshot.raw().getString("status")))

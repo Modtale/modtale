@@ -5,6 +5,7 @@ import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.analytics.ScoringService;
+import net.modtale.service.admin.review.ProjectReviewPersistence;
 import net.modtale.service.communication.NotificationService;
 import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.security.validation.SanitizationService;
@@ -24,7 +25,8 @@ public class SocialService {
             NotificationService notificationService,
             SanitizationService sanitizer,
             MongoTemplate mongoTemplate,
-            ScoringService scoringService
+            ScoringService scoringService,
+            ProjectReviewPersistence reviewPersistence
     ) {
         this.projectSocialService = new ProjectSocialService(
                 projectRepository,
@@ -32,7 +34,8 @@ public class SocialService {
                 projectService,
                 notificationService,
                 sanitizer,
-                scoringService
+                scoringService,
+                reviewPersistence
         );
         this.userFollowService = new UserFollowService(userRepository, notificationService, mongoTemplate);
     }

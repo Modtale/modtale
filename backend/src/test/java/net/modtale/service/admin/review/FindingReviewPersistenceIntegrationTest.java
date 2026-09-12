@@ -490,4 +490,33 @@ class FindingReviewPersistenceIntegrationTest {
         }
     }
 
+    @Test void commentUpdatesCannotChangeReviewStateOrOverwriteNewDecisions() {
+        var event = record(token()); var writes = new ProjectReviewPersistence(mongo);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        snapshot.project().setComments(List.of(new Comment("user", "hello")));
+        var originalStatus = snapshot.project().getStatus();
+        snapshot.project().setStatus(ProjectStatus.DELETED); snapshot.project().setVersions(List.of());
+        assertTrue(writes.applyComments(snapshot));
+        var stored = mongo.findById(projectId, Project.class);
+        assertEquals(originalStatus, stored.getStatus());
+        assertEquals("hello", stored.getComments().getFirst().getContent());
+        assertEquals(event.id(), version().getFindingReviewHead()); assertNotNull(version().getScanResult());
+        snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(stored));
+        snapshot.project().getComments().getFirst().setPinned(true);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("versions.0.findingReviewHead", "later"), Project.class);
+        assertFalse(writes.applyComments(snapshot));
+        assertFalse(mongo.findById(projectId, Project.class).getComments().getFirst().isPinned());
+        assertEquals("later", version().getFindingReviewHead());
+    }
+    @Test void commentUpdatesCannotUndoConcurrentCommentPolicyOrEdits() {
+        var writes = new ProjectReviewPersistence(mongo);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        snapshot.project().setComments(List.of(new Comment("user", "stale")));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)),
+                new Update().set("allowComments", false).set("comments", List.of(new Comment("other", "current"))), Project.class);
+        assertFalse(writes.applyComments(snapshot));
+        var stored = mongo.findById(projectId, Project.class);
+        assertFalse(stored.isAllowComments()); assertEquals("current", stored.getComments().getFirst().getContent());
+    }
+
 }
