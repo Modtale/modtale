@@ -317,7 +317,6 @@ export const Gallery: React.FC<GalleryProps> = ({ projectData, readOnly, hasProj
                                 disabled={isLoading}
                                 className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-lg px-3 py-2 text-xs ${theme.colors.textPrimary} focus:border-modtale-accent focus:ring-1 focus:ring-modtale-accent outline-none transition-all`}
                             />
-                            <p className={`text-[10px] ${theme.colors.textMuted}`}>YouTube URL · maximum {MAX_YOUTUBE_URL_CHARACTERS.toLocaleString()} characters.</p>
                             <button
                                 type="submit"
                                 disabled={isLoading || !youtubeUrl.trim()}
