@@ -13,10 +13,13 @@ class ArtifactReviewReuseServiceTest {
         prior.setId("prior"); prior.setVersionNumber("1.0");
         prior.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
         prior.setApprovedSecurityEvidence(result.getSecurityEvidence());
+        prior.setHash(result.getSecurityEvidence().artifactSha256());
+        prior.setApprovedReviewOrigins(Map.of());
+        prior.setSecurityApprovalProjectId("p");
         prior.setSecurityApprovedAt(System.currentTimeMillis() - 1000);
         prior.setApprovedSecurityContextSha256(ArtifactReviewContext.fingerprint(prior));
         ProjectVersion current = new ProjectVersion(); current.setId("new"); current.setVersionNumber("1.1");
-        Project project = new Project(); project.setVersions(List.of(prior, current)); return project;
+        Project project = new Project(); project.setId("p"); project.setVersions(List.of(prior, current)); return project;
     }
     @Test void freshAdverseEvidenceCannotBeHiddenByAnIdenticalHistoricalApproval() {
         var result=ScanEvidenceFixtures.complete(false);

@@ -23,6 +23,8 @@ public class SecurityIssueApprovalService {
     public void markIssuesAcceptedForApprovedVersion(ProjectVersion version) {
         if (version == null) return;
         if (version.getScanResult() == null) {
+            version.setSecurityApprovalProjectId(null);
+            version.setApprovedReviewOrigins(null);
             version.setApprovedSecurityEvidence(null);
             version.setApprovedSecurityContextSha256(null);
             version.setSecurityApprovedAt(0);
@@ -79,6 +81,12 @@ public class SecurityIssueApprovalService {
                 && java.util.Objects.equals(version.getHash(), evidence.artifactSha256())
                 && java.util.Objects.equals(net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(version),
                         scanResult.getReviewedContextSha256());
+        reusableEvidence = reusableEvidence && (scanResult.getReusedReviewVersion() == null
+                || net.modtale.service.security.scan.ArtifactReviewLineage.wellFormed(scanResult.getReusedReviewOrigins())
+                && !scanResult.getReusedReviewOrigins().isEmpty());
+        if (!reusableEvidence) version.setSecurityApprovalProjectId(null);
+        version.setApprovedReviewOrigins(!reusableEvidence ? null : scanResult.getReusedReviewVersion() == null
+                ? java.util.Map.of() : java.util.Map.copyOf(scanResult.getReusedReviewOrigins()));
         version.setApprovedSecurityEvidence(!reusableEvidence ? null : new ScanResult.SecurityEvidence(
                 evidence.policyVersion(), evidence.artifactSha256(), evidence.contentSha256(), evidence.complete(),
                 evidence.clearanceGranted(), evidence.reviewState(), java.util.Map.of()));
@@ -101,6 +109,7 @@ public class SecurityIssueApprovalService {
                     || version.getScanResult() == null) {
                 continue;
             }
+            version.setSecurityApprovalProjectId(project.getId());
             markIssuesAcceptedForApprovedVersion(version);
             pruned++;
         }

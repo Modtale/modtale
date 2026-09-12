@@ -42,16 +42,23 @@ public class VersionReviewPersistence {
         throw conflict();
     }
     public boolean apply(Snapshot snapshot, ProjectVersion reviewed) {
+        var originGuard = new org.springframework.data.mongodb.core.query.Query();
+        var original = mongo.getConverter().read(ProjectVersion.class, snapshot.version()).getScanResult();
+        if (reviewed.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED && original != null && original.getReusedReviewVersion() != null
+                && (!net.modtale.service.security.scan.ArtifactClearancePolicy.complete(original)
+                || !net.modtale.service.security.scan.ArtifactReviewLineage.bind(mongo, snapshot.projectId().toString(), original, originGuard))) return false;
         var update=new Update().set("versions.$.reviewStatus",reviewed.getReviewStatus())
                 .set("versions.$.rejectionReason",reviewed.getRejectionReason())
                 .set("versions.$.scheduledPublishDate",reviewed.getScheduledPublishDate())
                 .set("versions.$.scanResult",reviewed.getScanResult())
+                .set("versions.$.securityApprovalProjectId", reviewed.getSecurityApprovalProjectId())
+                .set("versions.$.approvedReviewOrigins",reviewed.getApprovedReviewOrigins())
                 .set("versions.$.approvedSecurityEvidence",reviewed.getApprovedSecurityEvidence())
                 .set("versions.$.approvedSecurityContextSha256",reviewed.getApprovedSecurityContextSha256())
                 .set("versions.$.securityApprovedAt",reviewed.getSecurityApprovedAt())
                 .set("versions.$.approvedIssueBaselines",reviewed.getApprovedIssueBaselines())
                 .set("updatedAt",LocalDateTime.now().toString());
-        return applyUpdate(snapshot, update);
+        return applyUpdate(snapshot, update, originGuard.getQueryObject());
     }
     public boolean queueRescan(Snapshot snapshot, net.modtale.model.project.ScanResult queued) {
         return applyUpdate(snapshot, new Update()
@@ -66,10 +73,12 @@ public class VersionReviewPersistence {
                 .set("versions.$.scheduledPublishDate", null)
                 .set("updatedAt", LocalDateTime.now().toString()));
     }
-    private boolean applyUpdate(Snapshot snapshot, Update update) {
+    private boolean applyUpdate(Snapshot snapshot, Update update) { return applyUpdate(snapshot, update, new Document()); }
+    private boolean applyUpdate(Snapshot snapshot, Update update, Document originGuard) {
         var entity=mongo.getConverter().getMappingContext().getPersistentEntity(Project.class);
         var mapped=new UpdateMapper(mongo.getConverter()).getMappedObject(update.getUpdateObject(),entity);
         var filter=Filters.and(Filters.eq("_id",snapshot.projectId()),new Document("versions",new Document("$eq",snapshot.version())));
+        if (!originGuard.isEmpty()) filter = Filters.and(filter, originGuard);
         return mongo.getCollection(mongo.getCollectionName(Project.class)).updateOne(filter,mapped).getModifiedCount()>0;
     }
     public static ResponseStatusException conflict() {

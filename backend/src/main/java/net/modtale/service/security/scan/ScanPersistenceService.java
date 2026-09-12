@@ -72,6 +72,8 @@ public class ScanPersistenceService {
         switch (routingDecision.action()) {
             case APPROVE_NOW -> {
                 update.set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.APPROVED)
+                        .set("versions.$.securityApprovalProjectId", reviewedVersion.getSecurityApprovalProjectId())
+                        .set("versions.$.approvedReviewOrigins", reviewedVersion.getApprovedReviewOrigins())
                         .set("versions.$.approvedSecurityEvidence", reviewedVersion.getApprovedSecurityEvidence())
                         .set("versions.$.approvedSecurityContextSha256", reviewedVersion.getApprovedSecurityContextSha256())
                         .set("versions.$.securityApprovedAt", reviewedVersion.getSecurityApprovedAt())
@@ -94,8 +96,23 @@ public class ScanPersistenceService {
         }
 
         String expectedHash = scanResult.getSecurityEvidence() == null ? null : scanResult.getSecurityEvidence().artifactSha256();
-        return mongoTemplate.updateFirst(buildVersionAttemptQueryBound(projectId, versionId, expectedAttempt, expectedHash, reviewedVersion, "SCANNING"), update, Project.class)
-                .getModifiedCount() > 0;
+        Query target = buildVersionAttemptQueryBound(projectId, versionId, expectedAttempt, expectedHash, reviewedVersion, "SCANNING");
+        boolean automatic = routingDecision.action() == ScanRoutingService.RoutingAction.APPROVE_NOW
+                || routingDecision.action() == ScanRoutingService.RoutingAction.SCHEDULE;
+        boolean linked = scanResult.getReusedReviewVersion() != null;
+        boolean validOrigins = !automatic || ArtifactReviewLineage.bind(mongoTemplate, projectId, scanResult, target);
+        if (validOrigins && mongoTemplate.updateFirst(target, update, Project.class).getModifiedCount() > 0) return true;
+        if (automatic && linked) {
+            ArtifactReviewLineage.invalidate(scanResult);
+            var hold = new Update().set("versions.$.scanResult", scanResult)
+                    .set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.PENDING)
+                    .set("versions.$.scheduledPublishDate", null).set("updatedAt", LocalDateTime.now().toString());
+            if (mongoTemplate.updateFirst(buildVersionAttemptQueryBound(projectId, versionId, expectedAttempt, expectedHash,
+                    reviewedVersion, "SCANNING"), hold, Project.class).getModifiedCount() > 0)
+                projectRepository.findById(projectId).ifPresent(projectService::evictProjectCache);
+        }
+        // A held fallback must not make the caller announce an approval.
+        return false;
     }
 
     public boolean queueRetryAttempt(String projectId, String versionId, int currentAttempt, ScanResult queued) {

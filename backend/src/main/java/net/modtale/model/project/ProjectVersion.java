@@ -33,6 +33,12 @@ public class ProjectVersion {
     public void setSecurityApprovedAt(long value) { securityApprovedAt = value; }
     private ScanResult scanResult;
     private List<ApprovedIssueBaseline> approvedIssueBaselines;
+    private String securityApprovalProjectId;
+    public String getSecurityApprovalProjectId() { return securityApprovalProjectId; }
+    public void setSecurityApprovalProjectId(String value) { securityApprovalProjectId = value; }
+    private java.util.Map<String, String> approvedReviewOrigins;
+    public java.util.Map<String, String> getApprovedReviewOrigins() { return approvedReviewOrigins; }
+    public void setApprovedReviewOrigins(java.util.Map<String, String> value) { approvedReviewOrigins = value; }
     private String findingReviewHead;
     public String getFindingReviewHead() { return findingReviewHead; }
     public void setFindingReviewHead(String value) { findingReviewHead = value; }

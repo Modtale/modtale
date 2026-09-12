@@ -30,6 +30,7 @@ public final class VersionReviewSnapshot {
             fields.remove("downloadCount");
             var scan=version.getScanResult();
             fields.put("verifiedArtifact",scan!=null && scan.isArtifactVerified());
+            fields.put("reusedOrigins",scan==null ? null : scan.getReusedReviewOrigins());
             fields.put("reviewedContext",scan==null ? null : scan.getReviewedContextSha256());
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(MAPPER.writeValueAsBytes(fields)));
         } catch(Exception invalid) {throw new IllegalStateException("Could not bind the review snapshot",invalid);}

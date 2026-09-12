@@ -174,6 +174,7 @@ public class ProjectPublicationService {
             selected.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
             selected.setScheduledPublishDate(null);
             selected.setRejectionReason(null);
+            selected.setSecurityApprovalProjectId(project.getId());
             securityIssueAnalysisService.markIssuesAcceptedForApprovedVersion(selected);
         }
 

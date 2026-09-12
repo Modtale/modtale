@@ -55,6 +55,7 @@ public class ProjectReviewTransitionService {
         version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
         version.setRejectionReason(null);
         version.setScheduledPublishDate(null);
+        version.setSecurityApprovalProjectId(project.getId());
         securityIssueAnalysisService.markIssuesAcceptedForApprovedVersion(version);
         project.setUpdatedAt(LocalDateTime.now().toString());
         if(!reviewPersistence.apply(snapshot,version)) throw VersionReviewPersistence.conflict();

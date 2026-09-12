@@ -13,6 +13,11 @@ public class ScanResult {
     public String getReviewedContextSha256() { return reviewedContextSha256; }
     @com.fasterxml.jackson.annotation.JsonIgnore
     public void setReviewedContextSha256(String value) { reviewedContextSha256 = value; }
+    private java.util.Map<String, String> reusedReviewOrigins;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public java.util.Map<String, String> getReusedReviewOrigins() { return reusedReviewOrigins; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public void setReusedReviewOrigins(java.util.Map<String, String> value) { reusedReviewOrigins = value; }
     private long reusedReviewApprovedAt;
     public long getReusedReviewApprovedAt() { return reusedReviewApprovedAt; }
     public void setReusedReviewApprovedAt(long value) { reusedReviewApprovedAt = value; }
@@ -24,7 +29,7 @@ public class ScanResult {
     @com.fasterxml.jackson.annotation.JsonIgnore
     public void setArtifactVerified(boolean value) { artifactVerified = value; }
     public String getReusedReviewVersion() { return reusedReviewVersion; }
-    public void setReusedReviewVersion(String value) { reusedReviewVersion = value; }
+    public void setReusedReviewVersion(String value) { reusedReviewVersion = value; if (value == null) reusedReviewOrigins = null; }
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record SecurityEvidence(String policyVersion, String artifactSha256, String contentSha256,
             boolean complete, boolean clearanceGranted, String reviewState, java.util.Map<String, String> entryHashes) {}

@@ -20,7 +20,8 @@ public final class ArtifactClearancePolicy {
     public static boolean cleared(ScanResult result) {
         if (!complete(result) || "NEW_SECURITY_EVIDENCE".equals(result.getSecurityEvidence().reviewState()) || "BLOCK".equals(result.getVerdict()) || result.getStatus() == ScanStatus.INFECTED) return false;
         return ("AUTO_APPROVE".equals(result.getVerdict()) && result.getStatus() == ScanStatus.CLEAN && result.getSecurityEvidence().clearanceGranted())
-                || result.getReusedReviewVersion() != null;
+                || result.getReusedReviewVersion() != null && ArtifactReviewLineage.wellFormed(result.getReusedReviewOrigins())
+                    && !result.getReusedReviewOrigins().isEmpty();
     }
     public static boolean boundToVersion(ProjectVersion version) {
         if (version == null || version.getFindingReviewHead() != null || !cleared(version.getScanResult())) return false;

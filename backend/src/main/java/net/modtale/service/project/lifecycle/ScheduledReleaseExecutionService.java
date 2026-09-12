@@ -50,6 +50,8 @@ public class ScheduledReleaseExecutionService {
                     && now - scan.getScanTimestamp() < java.time.Duration.ofDays(30).toMillis();
             Update update = new Update().set("versions.$.scheduledPublishDate", null)
                     .set("updatedAt", publishTime.toString());
+            Query originGuard = new Query();
+            valid = valid && net.modtale.service.security.scan.ArtifactReviewLineage.bind(mongo, project.getId(), scan, originGuard);
             if (valid) {
                 versionMatch.and("scanResult.securityEvidence.artifactSha256").is(scan.getSecurityEvidence().artifactSha256())
                         .and("scanResult.securityEvidence.contentSha256").is(scan.getSecurityEvidence().contentSha256())
@@ -58,8 +60,11 @@ public class ScheduledReleaseExecutionService {
                         .and("scanResult.scanTimestamp").is(scan.getScanTimestamp())
                         .and("scanResult.verdict").is(scan.getVerdict())
                         .and("scanResult.status").is(scan.getStatus());
+                version.setSecurityApprovalProjectId(project.getId());
                 issueAnalysis.markIssuesAcceptedForApprovedVersion(version);
                 update.set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.APPROVED)
+                        .set("versions.$.securityApprovalProjectId", version.getSecurityApprovalProjectId())
+                        .set("versions.$.approvedReviewOrigins", version.getApprovedReviewOrigins())
                         .set("versions.$.approvedSecurityEvidence", version.getApprovedSecurityEvidence())
                         .set("versions.$.approvedSecurityContextSha256", version.getApprovedSecurityContextSha256())
                         .set("versions.$.securityApprovedAt", version.getSecurityApprovedAt())
@@ -67,9 +72,23 @@ public class ScheduledReleaseExecutionService {
                         .set("versions.$.scanResult", null);
             } else {
                 update.set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.PENDING);
+                if (scan != null && scan.getReusedReviewVersion() != null) {
+                    net.modtale.service.security.scan.ArtifactReviewLineage.invalidate(scan);
+                    update.set("versions.$.scanResult", scan);
+                }
             }
             Query query = new Query(Criteria.where("_id").is(project.getId()).and("versions").elemMatch(versionMatch));
-            if (mongo.updateFirst(query, update, Project.class).getModifiedCount() == 0) continue;
+            if (originGuard.getQueryObject().containsKey("$expr")) query.addCriteria(Criteria.where("$expr").is(originGuard.getQueryObject().get("$expr")));
+            if (mongo.updateFirst(query, update, Project.class).getModifiedCount() == 0) {
+                if (valid && scan.getReusedReviewVersion() != null) {
+                    net.modtale.service.security.scan.ArtifactReviewLineage.invalidate(scan);
+                    var hold = new Update().set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.PENDING)
+                            .set("versions.$.scanResult", scan).set("versions.$.scheduledPublishDate", null);
+                    var targetOnly = new Query(Criteria.where("_id").is(project.getId()).and("versions").elemMatch(versionMatch));
+                    if (mongo.updateFirst(targetOnly, hold, Project.class).getModifiedCount() > 0) projectService.evictProjectCache(project);
+                }
+                continue;
+            }
             projectService.evictProjectCache(project);
             if (valid) {
                 released.add(version.getVersionNumber());

@@ -130,6 +130,7 @@ public class ScanCompletionService {
 
         if (approvedImmediately) {
             targetVersion.setScanResult(scanResult);
+            targetVersion.setSecurityApprovalProjectId(project.getId());
             securityIssueAnalysisService.markIssuesAcceptedForApprovedVersion(targetVersion);
         }
         if (!scanPersistenceService.applyScanOutcome(projectId, versionId, expectedAttempt, scanResult, routingDecision, targetVersion)) {

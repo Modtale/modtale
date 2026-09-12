@@ -12,7 +12,7 @@ public class ArtifactReviewReuseService {
         result.setReusedReviewVersion(null);
         result.setReusedReviewApprovedAt(0);
         var current = result.getSecurityEvidence();
-        if (!ArtifactClearancePolicy.complete(result) || current == null || !current.complete()
+        if (!ArtifactClearancePolicy.complete(result) || ArtifactClearancePolicy.cleared(result) || current == null || !current.complete()
                 || "NEW_SECURITY_EVIDENCE".equals(current.reviewState())
                 || "BLOCK".equals(result.getVerdict()) || result.getStatus() == ScanStatus.INFECTED
                 || project == null || project.getVersions() == null) return;
@@ -33,7 +33,10 @@ public class ArtifactReviewReuseService {
                     || current.entryHashes() == null || current.entryHashes().isEmpty()
                     || !context.equals(version.getApprovedSecurityContextSha256())
                     || !context.equals(ArtifactReviewContext.fingerprint(version))) continue;
+            var origins = ArtifactReviewLineage.extend(project, version);
+            if (origins == null) continue;
             result.setReusedReviewVersion(version.getVersionNumber());
+            result.setReusedReviewOrigins(origins);
             result.setReusedReviewApprovedAt(version.getSecurityApprovedAt());
             for (var issue : result.getIssues()) {
                 if (issue == null) continue;
