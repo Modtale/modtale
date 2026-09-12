@@ -42,6 +42,8 @@ public class ProjectReviewPersistence {
             ProjectVersion version = versions.get(index);
             var original = mongo.getConverter().read(ProjectVersion.class, snapshot.raw().getList("versions", Document.class).get(index));
             if (!approvedVersionId.equals(original.getId())) throw ProjectReviewSnapshot.conflict();
+            if (version.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED)
+                net.modtale.service.security.issue.FindingReviewHistory.requireManualApproval(mongo, project.getId(), original);
             var scan = original.getScanResult();
             if (version.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED && scan != null && scan.getReusedReviewVersion() != null
                     && (!net.modtale.service.security.scan.ArtifactClearancePolicy.complete(scan)

@@ -43,7 +43,10 @@ public class VersionReviewPersistence {
     }
     public boolean apply(Snapshot snapshot, ProjectVersion reviewed) {
         var originGuard = new org.springframework.data.mongodb.core.query.Query();
-        var original = mongo.getConverter().read(ProjectVersion.class, snapshot.version()).getScanResult();
+        var originalVersion = mongo.getConverter().read(ProjectVersion.class, snapshot.version());
+        if (reviewed.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED)
+            net.modtale.service.security.issue.FindingReviewHistory.requireManualApproval(mongo, snapshot.projectId().toString(), originalVersion);
+        var original = originalVersion.getScanResult();
         if (reviewed.getReviewStatus() == ProjectVersion.ReviewStatus.APPROVED && original != null && original.getReusedReviewVersion() != null
                 && (!net.modtale.service.security.scan.ArtifactClearancePolicy.complete(original)
                 || !net.modtale.service.security.scan.ArtifactReviewLineage.bind(mongo, snapshot.projectId().toString(), original, originGuard))) return false;

@@ -198,4 +198,71 @@ class FindingReviewPersistenceIntegrationTest {
         assertThrows(ResponseStatusException.class, () -> record(token()));
         assertEquals(0, mongo.getCollection(FindingReviewService.COLLECTION).countDocuments());
     }
+    private FindingReviewService.Event requireFurtherReview() {
+        return service.record(projectId, "v1", token(), "moderator", new FindingReviewService.Request(0,
+                FindingReviewService.Disposition.REQUIRE_REVIEW, "Investigate the destination and its caller"));
+    }
+    private boolean approveVersion() {
+        var current = version(); var snapshot = persistence.capture(projectId, "v1", token());
+        current.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        return persistence.apply(snapshot, current);
+    }
+    private boolean approveProject() {
+        var current = mongo.findById(projectId, Project.class);
+        var projectPersistence = new ProjectReviewPersistence(mongo);
+        var snapshot = projectPersistence.capture(projectId, ProjectReviewSnapshot.token(current));
+        snapshot.project().setStatus(ProjectStatus.PUBLISHED);
+        snapshot.project().getVersions().getFirst().setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        return projectPersistence.apply(snapshot, "v1");
+    }
+    @Test void unresolvedRequirementBlocksBothManualApprovalPathsUntilExplicitResolution() {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("status", ProjectStatus.PENDING), Project.class);
+        var requirement = requireFurtherReview();
+        var failure = assertThrows(ResponseStatusException.class, this::approveVersion);
+        assertEquals(409, failure.getStatusCode().value());
+        assertTrue(failure.getReason().contains("outstanding finding-review"));
+        assertThrows(ResponseStatusException.class, this::approveProject);
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+        assertEquals(ProjectStatus.PENDING, mongo.findById(projectId, Project.class).getStatus());
+        var resolution = record(token());
+        assertEquals(requirement.id(), resolution.supersedesDecisionId());
+        assertTrue(approveProject());
+        assertEquals(ProjectVersion.ReviewStatus.APPROVED, version().getReviewStatus());
+    }
+    @Test void requirementsSurviveContextChangesAndPruningUntilExplicitRevocation() {
+        var requirement = requireFurtherReview();
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update()
+                .set("versions.0.scanResult", null).set("versions.0.gameVersions", List.of("new-runtime")), Project.class);
+        assertThrows(ResponseStatusException.class, this::approveVersion);
+        service.revoke(projectId, "v1", token(), "moderator", requirement.id(), "Independent inspection resolves this requirement");
+        assertTrue(approveVersion());
+    }
+    @Test void missingOrForgedHistoryCannotAuthorizeManualApproval() {
+        var event = record(token());
+        mongo.getCollection(FindingReviewService.COLLECTION).updateOne(new Document("_id", event.id()),
+                new Document("$set", new Document("supersedesDecisionId", "unreachable-event")));
+        assertThrows(ResponseStatusException.class, this::approveVersion);
+        assertThrows(ResponseStatusException.class, this::approveProject);
+        mongo.getCollection(FindingReviewService.COLLECTION).deleteOne(new Document("_id", event.id()));
+        assertThrows(ResponseStatusException.class, this::approveVersion);
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+    }
+    @Test void approvalSnapshotCannotSkipANewlyRecordedRequirement() {
+        record(token());
+        var current = version(); var snapshot = persistence.capture(projectId, "v1", token());
+        current.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        requireFurtherReview();
+        assertFalse(persistence.apply(snapshot, current));
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+    }
+    @Test void revokingReplacementDoesNotResurrectEarlierConclusionOrIgnoreNewRequirement() {
+        requireFurtherReview();
+        var resolution = record(token());
+        service.revoke(projectId, "v1", token(), "moderator", resolution.id(), "This acceptance needs to be reconsidered");
+        // Manual approval is a new decision; revoked acceptance never provides automatic clearance.
+        assertTrue(approveVersion());
+        requireFurtherReview();
+        assertThrows(ResponseStatusException.class, this::approveVersion);
+    }
+
 }

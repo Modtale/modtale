@@ -17,7 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class FindingReviewService {
     public static final String COLLECTION = "finding_review_events";
-    private static final int MAX_EVENTS = 1000;
+    private static final int MAX_EVENTS = FindingReviewHistory.MAX_EVENTS;
     private final MongoTemplate mongo;
     private final VersionReviewPersistence persistence;
     private final ProjectService projects;
@@ -125,15 +125,9 @@ public class FindingReviewService {
         return event;
     }
     private List<Event> chain(String projectId, String versionId, Event head) {
-        var result = new ArrayList<Event>();
-        int expected = head == null ? 0 : head.sequence();
-        for (var event = head; event != null; event = head(projectId, versionId, event.previousId())) {
-            if (event.sequence() != expected-- || result.size() >= MAX_EVENTS) throw unavailable();
-            result.add(event);
-        }
-        if (expected != 0) throw unavailable();
-        return result;
+        return FindingReviewHistory.load(mongo, projectId, versionId, head == null ? null : head.id());
     }
+
     private int nextSequence(Event previous) {
         if (previous != null && previous.sequence() >= MAX_EVENTS)
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This version reached the decision history limit");
