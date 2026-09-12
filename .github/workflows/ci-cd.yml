@@ -7,6 +7,9 @@ on:
       - develop
       - '**'
   delete:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * *'
 
 concurrency:
   group: modtale-deploy-${{ github.event_name == 'delete' && format('refs/heads/{0}', github.event.ref) || github.ref }}
@@ -1022,9 +1025,37 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  find-orphan-previews:
+    if: github.repository == 'Modtale/modtale' && (github.event_name == 'delete' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    environment: branch-preview
+    permissions:
+      contents: read
+    outputs:
+      branches: ${{ steps.inventory.outputs.branches }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+      - uses: google-github-actions/setup-gcloud@v2
+      - id: inventory
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          branches=$(python3 .github/scripts/find-orphan-previews.py)
+          echo "branches=$branches" >> "$GITHUB_OUTPUT"
+
   cleanup-branch-preview:
-    name: Clean Up Deleted Branch Preview
-    if: github.repository == 'Modtale/modtale' && github.event_name == 'delete' && github.event.ref_type == 'branch' && github.event.ref != 'main' && github.event.ref != 'develop'
+    name: Clean Up Deleted Branch Preview (${{ matrix.branch }})
+    needs: find-orphan-previews
+    if: needs.find-orphan-previews.outputs.branches != '[]'
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        branch: ${{ fromJSON(needs.find-orphan-previews.outputs.branches) }}
     runs-on: ubuntu-latest
     environment: branch-preview
     env:
@@ -1040,7 +1071,7 @@ jobs:
     steps:
       - name: Prepare cleanup names
         env:
-          DELETED_BRANCH: ${{ github.event.ref }}
+          DELETED_BRANCH: ${{ matrix.branch }}
         run: |
           set -euo pipefail
 
