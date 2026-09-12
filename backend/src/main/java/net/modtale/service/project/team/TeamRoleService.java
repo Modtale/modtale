@@ -7,7 +7,8 @@ import net.modtale.exception.InvalidProjectRequestException;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
-import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.admin.review.ProjectReviewPersistence;
+import net.modtale.service.admin.review.ProjectReviewSnapshot;
 import net.modtale.service.auth.ApiKeyService;
 import net.modtale.service.project.access.ProjectAccessService;
 import net.modtale.service.project.query.ProjectService;
@@ -16,18 +17,18 @@ import org.springframework.stereotype.Service;
 @Service
 public class TeamRoleService {
 
-    private final ProjectRepository projectRepository;
+    private final ProjectReviewPersistence reviewPersistence;
     private final ProjectService projectService;
     private final ProjectAccessService projectAccessService;
     private final ApiKeyService apiKeyService;
 
     public TeamRoleService(
-            ProjectRepository projectRepository,
+            ProjectReviewPersistence reviewPersistence,
             ProjectService projectService,
             ProjectAccessService projectAccessService,
             ApiKeyService apiKeyService
     ) {
-        this.projectRepository = projectRepository;
+        this.reviewPersistence = reviewPersistence;
         this.projectService = projectService;
         this.projectAccessService = projectAccessService;
         this.apiKeyService = apiKeyService;
@@ -36,6 +37,8 @@ public class TeamRoleService {
     public Project createProjectRole(String id, String name, String color, Set<ApiKey.ApiPermission> perms, User requester) {
         Project project = projectAccessService.requireProjectPermission(id, requester, "PROJECT_MEMBER_EDIT_ROLE",
                 "You do not have permission to manage project roles.");
+        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
+        project = snapshot.project();
         if (project.getProjectRoles() == null) {
             project.setProjectRoles(new ArrayList<>());
         }
@@ -44,13 +47,15 @@ public class TeamRoleService {
         }
 
         project.getProjectRoles().add(new Project.ProjectRole(UUID.randomUUID().toString(), name, color, perms));
-        saveProject(project);
+        saveProject(snapshot);
         return project;
     }
 
     public Project updateProjectRole(String id, String roleId, String name, String color, Set<ApiKey.ApiPermission> perms, User requester) {
         Project project = projectAccessService.requireProjectPermission(id, requester, "PROJECT_MEMBER_EDIT_ROLE",
                 "You do not have permission to manage project roles.");
+        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
+        project = snapshot.project();
 
         Project.ProjectRole role = project.getProjectRoles().stream()
                 .filter(existingRole -> existingRole.getId().equals(roleId))
@@ -64,19 +69,19 @@ public class TeamRoleService {
         }
         if (perms != null) {
             role.setPermissions(perms);
-            if (project.getTeamMembers() != null) {
-                project.getTeamMembers().stream()
-                        .filter(member -> roleId.equals(member.getRoleId()))
-                        .forEach(member -> apiKeyService.syncUserProjectPermissions(member.getUserId(), id, perms));
-            }
         }
-        saveProject(project);
+        saveProject(snapshot);
+        if (perms != null && project.getTeamMembers() != null) project.getTeamMembers().stream()
+                .filter(member -> roleId.equals(member.getRoleId()))
+                .forEach(member -> apiKeyService.syncUserProjectPermissions(member.getUserId(), id, perms));
         return project;
     }
 
     public Project deleteProjectRole(String id, String roleId, User requester) {
         Project project = projectAccessService.requireProjectPermission(id, requester, "PROJECT_MEMBER_EDIT_ROLE",
                 "You do not have permission to manage project roles.");
+        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
+        project = snapshot.project();
 
         boolean inUse = (project.getTeamMembers() != null && project.getTeamMembers().stream().anyMatch(member -> roleId.equals(member.getRoleId())))
                 || (project.getTeamInvites() != null && project.getTeamInvites().stream().anyMatch(invite -> roleId.equals(invite.getRoleId())));
@@ -85,12 +90,12 @@ public class TeamRoleService {
         }
 
         project.getProjectRoles().removeIf(role -> role.getId().equals(roleId));
-        saveProject(project);
+        saveProject(snapshot);
         return project;
     }
 
-    private void saveProject(Project project) {
-        projectRepository.save(project);
-        projectService.evictProjectCache(project);
+    private void saveProject(ProjectReviewPersistence.Snapshot snapshot) {
+        if (!reviewPersistence.applyTeam(snapshot)) throw ProjectReviewSnapshot.conflict();
+        projectService.evictProjectCache(snapshot.project());
     }
 }

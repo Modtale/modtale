@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -32,6 +33,7 @@ import static org.mockito.Mockito.when;
 class TeamServiceTest {
 
     private TeamService service;
+    private net.modtale.service.admin.review.ProjectReviewPersistence reviewPersistence;
     private ProjectRepository projectRepository;
     private UserRepository userRepository;
     private ProjectService projectService;
@@ -44,6 +46,10 @@ class TeamServiceTest {
     @BeforeEach
     void setUp() {
         projectRepository = mock(ProjectRepository.class);
+        reviewPersistence = mock(net.modtale.service.admin.review.ProjectReviewPersistence.class);
+        when(reviewPersistence.capture(anyString(), anyString())).thenAnswer(invocation ->
+                new net.modtale.service.admin.review.ProjectReviewPersistence.Snapshot(new org.bson.Document(), projectService.getRawProjectById(invocation.getArgument(0))));
+        when(reviewPersistence.applyTeam(any())).thenReturn(true);
         userRepository = mock(UserRepository.class);
         projectService = mock(ProjectService.class);
         projectMutationGuard = new ProjectMutationGuard();
@@ -54,7 +60,7 @@ class TeamServiceTest {
         TeamNotificationService teamNotificationService = new TeamNotificationService(notificationService, projectService);
 
         TeamTransferService teamTransferService = new TeamTransferService(
-                projectRepository,
+                reviewPersistence,
                 userRepository,
                 projectService,
                 projectAccessService,
@@ -64,13 +70,13 @@ class TeamServiceTest {
                 accessControlService
         );
         TeamRoleService teamRoleService = new TeamRoleService(
-                projectRepository,
+                reviewPersistence,
                 projectService,
                 projectAccessService,
                 apiKeyService
         );
         TeamMembershipService teamMembershipService = new TeamMembershipService(
-                projectRepository,
+                reviewPersistence,
                 userRepository,
                 projectService,
                 projectAccessService,
@@ -102,7 +108,7 @@ class TeamServiceTest {
         service.requestTransfer("project-1", "user-2", requester);
 
         assertEquals("user-2", project.getPendingTransferTo());
-        verify(projectRepository).save(project);
+        verify(reviewPersistence).applyTeam(any());
         verify(projectService).evictProjectCache(project);
         verify(notificationService).sendNotifcation(
                 eq(List.of("user-2")),
@@ -129,7 +135,7 @@ class TeamServiceTest {
 
         assertTrue(project.getTeamMembers().isEmpty());
         verify(apiKeyService).syncUserProjectPermissions(eq("user-2"), eq("project-1"), argThat(Set::isEmpty));
-        verify(projectRepository).save(project);
+        verify(reviewPersistence).applyTeam(any());
         verify(projectService).evictProjectCache(project);
     }
 
@@ -153,7 +159,7 @@ class TeamServiceTest {
 
         assertEquals(1, project.getTeamInvites().size());
         assertEquals("role-1", project.getTeamInvites().getFirst().getRoleId());
-        verify(projectRepository).save(project);
+        verify(reviewPersistence).applyTeam(any());
         verify(notificationService).sendNotifcation(
                 eq(List.of("user-2")),
                 eq("Contributor Invite"),
@@ -179,6 +185,15 @@ class TeamServiceTest {
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
         when(userRepository.findById("owner-1")).thenReturn(Optional.of(oldOwner));
         when(userRepository.findById("user-2")).thenReturn(Optional.of(newOwner));
+
+        when(reviewPersistence.applyTeam(any())).thenReturn(false);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> service.resolveTransfer("project-1", true, responder));
+        verifyNoInteractions(apiKeyService, notificationService);
+        project.setAuthorId("owner-1"); project.setPendingTransferTo("user-2");
+        project.setTeamMembers(new ArrayList<>(List.of(new Project.ProjectMember("user-2", "role-1"))));
+        clearInvocations(reviewPersistence);
+        when(reviewPersistence.applyTeam(any())).thenReturn(true);
 
         service.resolveTransfer("project-1", true, responder);
 
@@ -221,7 +236,7 @@ class TeamServiceTest {
         assertTrue(project.getTeamInvites().isEmpty());
         assertEquals(1, project.getTeamMembers().size());
         assertEquals("user-2", project.getTeamMembers().getFirst().getUserId());
-        verify(projectRepository).save(project);
+        verify(reviewPersistence).applyTeam(any());
         verify(projectService).evictProjectCache(project);
         verify(apiKeyService).syncUserProjectPermissions(
                 "user-2",
@@ -250,6 +265,29 @@ class TeamServiceTest {
                 InvalidProjectRequestException.class,
                 () -> service.acceptInvite("project-1", "user-2")
         );
+    }
+
+    @Test void failedRoleChangeDoesNotSynchronizeKeysOrNotify() {
+        var project = project("project-1");
+        project.setProjectRoles(new ArrayList<>(List.of(new Project.ProjectRole("role-1", "Writer", "#fff", Set.of()))));
+        project.setTeamMembers(new ArrayList<>(List.of(new Project.ProjectMember("user-2", "role-1"))));
+        var owner = user("owner-1", "Owner");
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.hasProjectPermission(project, owner, "PROJECT_MEMBER_EDIT_ROLE")).thenReturn(true);
+        when(reviewPersistence.applyTeam(any())).thenReturn(false);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> service.updateProjectRole(
+                "project-1", "role-1", null, null, Set.of(ApiKey.ApiPermission.PROJECT_EDIT_METADATA), owner));
+        verifyNoInteractions(apiKeyService, notificationService);
+        verify(projectService, never()).evictProjectCache(any());
+    }
+    @Test void failedContributorRemovalDoesNotRevokeKeys() {
+        var project = project("project-1");
+        project.setTeamMembers(new ArrayList<>(List.of(new Project.ProjectMember("user-2", "role-1"))));
+        var member = user("user-2", "Member");
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(reviewPersistence.applyTeam(any())).thenReturn(false);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> service.removeContributor("project-1", "user-2", member));
+        verifyNoInteractions(apiKeyService, notificationService);
     }
 
     private static Project project(String id) {

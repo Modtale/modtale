@@ -409,4 +409,32 @@ class FindingReviewPersistenceIntegrationTest {
         assertEquals(ProjectVersion.ReviewStatus.APPROVED, version().getReviewStatus());
     }
 
+    @Test void teamUpdatesCannotChangeReviewAuthorityOrPublicationState() {
+        var event = record(token()); assertTrue(approveVersion());
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var originalStatus = project.getStatus();
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().setAuthorId("new-owner"); snapshot.project().setStatus(ProjectStatus.DELETED);
+        snapshot.project().setTeamMembers(List.of(new Project.ProjectMember("contributor", "role")));
+        snapshot.project().getVersions().clear();
+        assertTrue(writes.applyTeam(snapshot));
+        var stored = mongo.findById(projectId, Project.class);
+        assertEquals("new-owner", stored.getAuthorId()); assertEquals(originalStatus, stored.getStatus());
+        assertEquals(event.id(), version().getApprovedFindingReviewHead());
+        assertEquals(ProjectVersion.ReviewStatus.APPROVED, version().getReviewStatus());
+    }
+    @Test void staleTeamUpdateCannotEraseANewerRequirementOrConcurrentOwnershipChange() {
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().setPendingTransferTo("requested-owner");
+        var event = requireFurtherReview();
+        assertFalse(writes.applyTeam(snapshot)); assertEquals(event.id(), version().getFindingReviewHead());
+        project = mongo.findById(projectId, Project.class);
+        snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().setPendingTransferTo("requested-owner");
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("authorId", "different-owner"), Project.class);
+        assertFalse(writes.applyTeam(snapshot));
+        assertEquals("different-owner", mongo.findById(projectId, Project.class).getAuthorId());
+    }
+
 }

@@ -63,6 +63,14 @@ public class ProjectReviewPersistence {
         }
         return applyUpdate(snapshot, update, originGuard.getQueryObject().get("$expr"));
     }
+    public boolean applyTeam(Snapshot snapshot) {
+        var encoded = new Document(); mongo.getConverter().write(snapshot.project(), encoded);
+        var update = new Update();
+        for (String field : List.of("authorId", "author", "pendingTransferTo", "teamMembers", "teamInvites", "projectRoles"))
+            update.set(field, encoded.get(field));
+        update.set("updatedAt", java.time.LocalDateTime.now().toString());
+        return applyUpdate(snapshot, update);
+    }
     public boolean applyDeletionState(Snapshot snapshot, boolean scrub) {
         var project = snapshot.project();
         var update = new Update().set("status", project.getStatus()).set("deletedAt", project.getDeletedAt())
