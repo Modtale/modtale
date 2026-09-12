@@ -7,7 +7,8 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.project.ScanResult;
 import net.modtale.model.user.User;
-import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.admin.review.VersionReviewPersistence;
+import net.modtale.service.admin.review.VersionReviewSnapshot;
 import net.modtale.service.project.access.ProjectVersionAccessService;
 import net.modtale.service.project.query.ProjectService;
 import org.slf4j.Logger;
@@ -19,7 +20,7 @@ public class ScanRequestService {
 
     private static final Logger logger = LoggerFactory.getLogger(ScanRequestService.class);
 
-    private final ProjectRepository projectRepository;
+    private final VersionReviewPersistence reviewPersistence;
     private final ProjectService projectService;
     private final ScanThrottleService scanThrottleService;
     private final ScanRoutingService scanRoutingService;
@@ -27,14 +28,14 @@ public class ScanRequestService {
     private final ScanExecutionService scanExecutionService;
 
     public ScanRequestService(
-            ProjectRepository projectRepository,
+            VersionReviewPersistence reviewPersistence,
             ProjectService projectService,
             ScanThrottleService scanThrottleService,
             ScanRoutingService scanRoutingService,
             ProjectVersionAccessService projectVersionAccessService,
             ScanExecutionService scanExecutionService
     ) {
-        this.projectRepository = projectRepository;
+        this.reviewPersistence = reviewPersistence;
         this.projectService = projectService;
         this.scanThrottleService = scanThrottleService;
         this.scanRoutingService = scanRoutingService;
@@ -58,13 +59,14 @@ public class ScanRequestService {
             throw new InvalidProjectRequestException("This version does not have an uploaded file to scan.");
         }
 
+        var snapshot = reviewPersistence.captureForRescan(projectId, versionId, VersionReviewSnapshot.rescanToken(version));
         int attempt = scanRoutingService.nextScanAttempt(version.getScanResult());
         ScanResult pending = scanRoutingService.createQueuedScanResult(attempt, "Manual rescan requested.");
+        if (!reviewPersistence.queueRescan(snapshot, pending)) throw VersionReviewPersistence.conflict();
         version.setScanResult(pending);
         version.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
         version.setScheduledPublishDate(null);
 
-        projectRepository.save(project);
         projectService.evictProjectCache(project);
 
         String originalFilename = scanExecutionService.extractOriginalFilename(version.getFileUrl());

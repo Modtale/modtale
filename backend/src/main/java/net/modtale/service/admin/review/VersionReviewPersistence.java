@@ -20,6 +20,12 @@ public class VersionReviewPersistence {
     public VersionReviewPersistence(MongoTemplate mongo) {this.mongo=mongo;}
     public record Snapshot(Object projectId, Document version) {}
     public Snapshot capture(String projectId, String versionId, String expectedToken) {
+        return capture(projectId, versionId, expectedToken, false);
+    }
+    public Snapshot captureForRescan(String projectId, String versionId, String expectedToken) {
+        return capture(projectId, versionId, expectedToken, true);
+    }
+    private Snapshot capture(String projectId, String versionId, String expectedToken, boolean rescan) {
         var entity=mongo.getConverter().getMappingContext().getPersistentEntity(Project.class);
         var filter=new QueryMapper(mongo.getConverter()).getMappedObject(new Document("_id",projectId),entity);
         Document project=mongo.getCollection(mongo.getCollectionName(Project.class)).find(filter).first();
@@ -27,7 +33,9 @@ public class VersionReviewPersistence {
         for(Object item:versions) if(item instanceof Document stored) {
             var version=mongo.getConverter().read(ProjectVersion.class,stored);
             if(Objects.equals(versionId,version.getId())) {
-                VersionReviewSnapshot.requireCurrent(version,expectedToken);
+                if (rescan) {
+                    if (expectedToken == null || !expectedToken.equals(VersionReviewSnapshot.rescanToken(version))) throw conflict();
+                } else VersionReviewSnapshot.requireCurrent(version,expectedToken);
                 return new Snapshot(project.get("_id"),stored);
             }
         }
@@ -43,12 +51,22 @@ public class VersionReviewPersistence {
                 .set("versions.$.securityApprovedAt",reviewed.getSecurityApprovedAt())
                 .set("versions.$.approvedIssueBaselines",reviewed.getApprovedIssueBaselines())
                 .set("updatedAt",LocalDateTime.now().toString());
+        return applyUpdate(snapshot, update);
+    }
+    public boolean queueRescan(Snapshot snapshot, net.modtale.model.project.ScanResult queued) {
+        return applyUpdate(snapshot, new Update()
+                .set("versions.$.scanResult", queued)
+                .set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.PENDING)
+                .set("versions.$.scheduledPublishDate", null)
+                .set("updatedAt", LocalDateTime.now().toString()));
+    }
+    private boolean applyUpdate(Snapshot snapshot, Update update) {
         var entity=mongo.getConverter().getMappingContext().getPersistentEntity(Project.class);
         var mapped=new UpdateMapper(mongo.getConverter()).getMappedObject(update.getUpdateObject(),entity);
         var filter=Filters.and(Filters.eq("_id",snapshot.projectId()),new Document("versions",new Document("$eq",snapshot.version())));
         return mongo.getCollection(mongo.getCollectionName(Project.class)).updateOne(filter,mapped).getModifiedCount()>0;
     }
-    static ResponseStatusException conflict() {
+    public static ResponseStatusException conflict() {
         return new ResponseStatusException(HttpStatus.CONFLICT,"This version changed while the decision was being applied. Refresh its evidence before deciding.");
     }
 }

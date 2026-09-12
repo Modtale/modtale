@@ -5,7 +5,8 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.project.ScanResult;
 import net.modtale.model.user.User;
-import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.admin.review.VersionReviewPersistence;
+import static org.mockito.ArgumentMatchers.any;
 import net.modtale.service.project.access.ProjectVersionAccessService;
 import net.modtale.service.project.query.ProjectService;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +25,7 @@ class ScanServiceTest {
     private ScanService service;
     private ScanRequestService scanRequestService;
     private ScanExecutionService scanExecutionService;
-    private ProjectRepository projectRepository;
+    private VersionReviewPersistence reviewPersistence;
     private ProjectService projectService;
     private ProjectVersionAccessService projectVersionAccessService;
     private ScanThrottleService scanThrottleService;
@@ -32,14 +33,15 @@ class ScanServiceTest {
 
     @BeforeEach
     void setUp() {
-        projectRepository = mock(ProjectRepository.class);
+        reviewPersistence = mock(VersionReviewPersistence.class);
+        when(reviewPersistence.queueRescan(any(), any())).thenReturn(true);
         projectService = mock(ProjectService.class);
         projectVersionAccessService = mock(ProjectVersionAccessService.class);
         scanThrottleService = mock(ScanThrottleService.class);
         scanRoutingService = mock(ScanRoutingService.class);
         scanExecutionService = mock(ScanExecutionService.class);
         scanRequestService = new ScanRequestService(
-                projectRepository,
+                reviewPersistence,
                 projectService,
                 scanThrottleService,
                 scanRoutingService,
@@ -76,7 +78,7 @@ class ScanServiceTest {
         assertEquals(pendingScan, version.getScanResult());
         assertEquals(ProjectVersion.ReviewStatus.PENDING, version.getReviewStatus());
         verify(scanThrottleService).enforceRescanLimit(user);
-        verify(projectRepository).save(project);
+        verify(reviewPersistence).queueRescan(any(), any());
         verify(projectService).evictProjectCache(project);
         ArgumentCaptor<String> originalFilename = ArgumentCaptor.forClass(String.class);
         verify(scanExecutionService).enqueueBackgroundScan(

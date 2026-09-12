@@ -18,6 +18,50 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @EnabledIfEnvironmentVariable(named="WARDEN_REVIEW_DB_TEST",matches="true")
 class VersionReviewPersistenceIntegrationTest {
+    private ScanResult queued() {
+        var scan = new ScanResult(); scan.setStatus(ScanStatus.SCANNING);
+        scan.setScanState("QUEUED"); scan.setScanAttempt(2); return scan;
+    }
+    @Test void missingPriorManifestDoesNotPreventRescanning() {
+        mongo.getCollection(net.modtale.config.db.MongoArtifactManifestStore.COLLECTION).deleteMany(new Document());
+        var current = mongo.findById(id, Project.class).getVersions().getFirst();
+        var snapshot = persistence.captureForRescan(id, current.getId(), VersionReviewSnapshot.rescanToken(current));
+        assertTrue(persistence.queueRescan(snapshot, queued()));
+        var result = mongo.findById(id, Project.class).getVersions().getFirst();
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, result.getReviewStatus());
+        assertEquals("QUEUED", result.getScanResult().getScanState());
+        assertFalse(net.modtale.service.security.scan.ArtifactClearancePolicy.cleared(result.getScanResult()));
+    }
+    @Test void rescanPreservesConcurrentSiblingAndUnknownFieldsAndOnlyOneRequestWins() {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)), new Update()
+                .set("versions.0.legacyMarker", "retain"), Project.class);
+        var snapshot = persistence.captureForRescan(id, version.getId(), VersionReviewSnapshot.rescanToken(version));
+        var competing = persistence.captureForRescan(id, version.getId(), VersionReviewSnapshot.rescanToken(version));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)), new Update()
+                .set("title", "concurrent title").set("versions.1.reviewStatus", ProjectVersion.ReviewStatus.REJECTED), Project.class);
+        assertTrue(persistence.queueRescan(snapshot, queued()));
+        assertFalse(persistence.queueRescan(competing, queued()));
+        var saved = mongo.findById(id, Project.class);
+        assertEquals("concurrent title", saved.getTitle());
+        assertEquals(ProjectVersion.ReviewStatus.REJECTED, saved.getVersions().get(1).getReviewStatus());
+        assertEquals("QUEUED", saved.getVersions().getFirst().getScanResult().getScanState());
+        assertEquals(2, saved.getVersions().getFirst().getScanResult().getScanAttempt());
+        assertEquals("retain", mongo.getCollection("projects").find().first().getList("versions", Document.class).getFirst().getString("legacyMarker"));
+    }
+    @Test void rescanRejectsChangesToArtifactContextOrReviewDecision() {
+        var changes = List.of(new Update().set("versions.0.hash", "f".repeat(64)),
+                new Update().set("versions.0.gameVersions", List.of("changed")),
+                new Update().set("versions.0.reviewStatus", ProjectVersion.ReviewStatus.APPROVED),
+                new Update().set("versions.0.reviewStatus", ProjectVersion.ReviewStatus.REJECTED));
+        for (var change : changes) {
+            var current = mongo.findById(id, Project.class).getVersions().getFirst();
+            var snapshot = persistence.captureForRescan(id, current.getId(), VersionReviewSnapshot.rescanToken(current));
+            mongo.updateFirst(Query.query(Criteria.where("_id").is(id)), change, Project.class);
+            assertFalse(persistence.queueRescan(snapshot, queued()));
+            assertThrows(ResponseStatusException.class, () -> persistence.captureForRescan(id, current.getId(), VersionReviewSnapshot.rescanToken(current)));
+            assertNotEquals("QUEUED", mongo.findById(id, Project.class).getVersions().getFirst().getScanResult().getScanState());
+        }
+    }
     private MongoClient client;
     private MongoTemplate mongo;
     private VersionReviewPersistence persistence;
