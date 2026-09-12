@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 
+import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -39,6 +40,7 @@ import static org.mockito.Mockito.when;
 class VersionServiceTest {
 
     private VersionService service;
+    private net.modtale.service.admin.review.ProjectReviewPersistence reviewPersistence;
     private ProjectRepository projectRepository;
     private ProjectService projectService;
     private ProjectAccessService projectAccessService;
@@ -56,6 +58,11 @@ class VersionServiceTest {
     @BeforeEach
     void setUp() {
         projectRepository = mock(ProjectRepository.class);
+        reviewPersistence = mock(net.modtale.service.admin.review.ProjectReviewPersistence.class);
+        when(reviewPersistence.capture(anyString(), anyString())).thenAnswer(invocation ->
+                new net.modtale.service.admin.review.ProjectReviewPersistence.Snapshot(new org.bson.Document(),
+                        projectService.getRawProjectById(invocation.getArgument(0))));
+        when(reviewPersistence.applyVersionEdit(any(), anyString(), anyBoolean(), anyBoolean())).thenReturn(true);
         projectService = mock(ProjectService.class);
         accessControlService = mock(AccessControlService.class);
         projectAccessService = new ProjectAccessService(projectService, accessControlService);
@@ -85,7 +92,7 @@ class VersionServiceTest {
                 new AppLimitProperties(10, 5, 10, 5, 5, 50, 20, 10)
         );
         VersionUpdateCommandHandler versionUpdateCommandHandler = new VersionUpdateCommandHandler(
-                projectRepository,
+                reviewPersistence,
                 projectService,
                 projectAccessService,
                 projectMutationGuard,
@@ -370,6 +377,15 @@ class VersionServiceTest {
                         List.of("new-dep")
                 ));
 
+        when(reviewPersistence.applyVersionEdit(any(), anyString(), anyBoolean(), anyBoolean())).thenReturn(false);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> service.updateVersion(
+                "project-1", "version-1", List.of(dependency), List.of(), null, null, null, user));
+        verify(projectDeletionService, never()).deleteStoredFile(anyString());
+        version.setFileUrl("modpacks/sky-pack-1.0.0.zip");
+        version.setDependencies(new ArrayList<>(List.of(new ProjectDependency("old-dep", "Old Dependency", "1.0.0"))));
+        clearInvocations(reviewPersistence);
+        when(reviewPersistence.applyVersionEdit(any(), anyString(), anyBoolean(), anyBoolean())).thenReturn(true);
+
         service.updateVersion(
                 "project-1",
                 "version-1",
@@ -385,8 +401,40 @@ class VersionServiceTest {
         assertEquals(List.of("new-dep"), project.getChildProjectIds());
         assertEquals("new-dep", version.getDependencies().getFirst().getProjectId());
         verify(projectDeletionService).deleteStoredFile("modpacks/sky-pack-1.0.0.zip");
-        verify(projectRepository).save(project);
+        verify(reviewPersistence).applyVersionEdit(any(), eq("version-1"), eq(true), eq(true));
+        verify(projectRepository, never()).save(any());
         verify(projectService).evictProjectCache(project);
+    }
+
+    @Test
+    void contextEditQueuesOnlyAfterSuccessfulConditionalPersistence() {
+        var project = new Project(); project.setId("project-1"); project.setStatus(ProjectStatus.PUBLISHED);
+        project.setClassification(ProjectClassification.PLUGIN);
+        var version = new ProjectVersion(); version.setId("version-1"); version.setFileUrl("mods/mod.jar");
+        version.setGameVersions(List.of("old")); version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        project.setVersions(new ArrayList<>(List.of(version)));
+        var user = new User(); user.setId("user-1");
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.hasProjectPermission(project, user, "VERSION_EDIT")).thenReturn(true);
+        when(validationService.isGameVersionSupported("new")).thenReturn(true);
+        when(scanService.nextScanAttempt(null)).thenReturn(2);
+        var queued = new ScanResult(); queued.setScanAttempt(2);
+        when(scanService.createQueuedScanResult(eq(2), anyString())).thenReturn(queued);
+        when(reviewPersistence.applyVersionEdit(any(), anyString(), anyBoolean(), anyBoolean())).thenReturn(false);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> service.updateVersion(
+                "project-1", "version-1", null, null, List.of("new"), null, null, user));
+        verify(scanService, never()).enqueueBackgroundScan(anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyInt());
+        verify(projectService, never()).evictProjectCache(any());
+        verify(projectRepository, never()).save(any());
+        clearInvocations(reviewPersistence, scanService);
+        // A fresh request succeeds and uses the newly prepared attempt after the database accepts it.
+        version.setGameVersions(List.of("old")); version.setScanResult(null);
+        when(reviewPersistence.applyVersionEdit(any(), anyString(), anyBoolean(), anyBoolean())).thenReturn(true);
+        service.updateVersion("project-1", "version-1", null, null, List.of("new"), null, null, user);
+        var order = inOrder(reviewPersistence, scanService);
+        order.verify(reviewPersistence).applyVersionEdit(any(), eq("version-1"), eq(true), eq(false));
+        order.verify(scanService).enqueueBackgroundScan("project-1", "version-1", "mods/mod.jar", "mods/mod.jar", false, 2);
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, version.getReviewStatus());
     }
 
     @Test

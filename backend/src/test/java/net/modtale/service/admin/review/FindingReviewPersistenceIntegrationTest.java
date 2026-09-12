@@ -266,4 +266,45 @@ class FindingReviewPersistenceIntegrationTest {
         assertThrows(ResponseStatusException.class, this::approveVersion);
     }
 
+    @Test void contextEditsInvalidateApprovalButRetainHistoryAndUnknownStoredFields() {
+        var event = record(token()); assertTrue(approveVersion());
+        mongo.getCollection("projects").updateOne(new Document("_id", new org.bson.types.ObjectId(projectId)),
+                new Document("$set", new Document("versions.0.futureEvidence", new Document("marker", true))));
+        var edits = new ProjectReviewPersistence(mongo);
+        var project = mongo.findById(projectId, Project.class);
+        var snapshot = edits.capture(projectId, ProjectReviewSnapshot.token(project));
+        var edited = snapshot.project().getVersions().getFirst();
+        edited.setGameVersions(List.of("new-runtime"));
+        var queued = new ScanResult(); queued.setScanState("QUEUED"); queued.setScanAttempt(2); edited.setScanResult(queued);
+        assertTrue(edits.applyVersionEdit(snapshot, "v1", true, false));
+        var stored = version();
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, stored.getReviewStatus());
+        assertEquals(event.id(), stored.getFindingReviewHead());
+        assertNull(stored.getApprovedFindingReviewHead()); assertNull(stored.getApprovedSecurityEvidence());
+        assertNull(stored.getApprovedReviewOrigins()); assertEquals(0, stored.getSecurityApprovedAt());
+        assertEquals(2, stored.getScanResult().getScanAttempt());
+        assertEquals(new Document("marker", true), mongo.getCollection("projects").find().first()
+                .getList("versions", Document.class).getFirst().get("futureEvidence"));
+    }
+    @Test void metadataOnlyVersionEditPreservesReviewStateAndHistory() {
+        var event = record(token()); assertTrue(approveVersion());
+        var edits = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var snapshot = edits.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().getVersions().getFirst().setChangelog("Documentation corrected");
+        assertTrue(edits.applyVersionEdit(snapshot, "v1", false, false));
+        assertEquals(ProjectVersion.ReviewStatus.APPROVED, version().getReviewStatus());
+        assertEquals(event.id(), version().getApprovedFindingReviewHead());
+        assertEquals("Documentation corrected", version().getChangelog());
+    }
+    @Test void staleVersionEditCannotRestoreAnApprovalOrEraseNewFindingHistory() {
+        record(token()); assertTrue(approveVersion());
+        var edits = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var snapshot = edits.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().getVersions().getFirst().setChangelog("Unrelated correction");
+        var requirement = requireFurtherReview();
+        assertFalse(edits.applyVersionEdit(snapshot, "v1", false, false));
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+        assertEquals(requirement.id(), version().getFindingReviewHead());
+    }
+
 }

@@ -63,6 +63,30 @@ public class ProjectReviewPersistence {
         }
         return applyUpdate(snapshot, update, originGuard.getQueryObject().get("$expr"));
     }
+    public boolean applyVersionEdit(Snapshot snapshot, String versionId, boolean contextChanged, boolean childIdsChanged) {
+        var versions = snapshot.project().getVersions();
+        int index = -1;
+        for (int i = 0; i < versions.size(); i++) if (versionId.equals(versions.get(i).getId())) {
+            if (index >= 0) throw ProjectReviewSnapshot.conflict();
+            index = i;
+        }
+        if (index < 0) throw ProjectReviewSnapshot.conflict();
+        var version = versions.get(index);
+        String path = "versions." + index + ".";
+        var update = new Update().set(path + "gameVersions", version.getGameVersions())
+                .set(path + "dependencies", version.getDependencies()).set(path + "incompatibleProjectIds", version.getIncompatibleProjectIds())
+                .set(path + "changelog", version.getChangelog()).set(path + "channel", version.getChannel())
+                .set(path + "fileUrl", version.getFileUrl());
+        if (childIdsChanged) update.set("childProjectIds", snapshot.project().getChildProjectIds());
+        if (contextChanged) update.set(path + "reviewStatus", ProjectVersion.ReviewStatus.PENDING)
+                .set(path + "scheduledPublishDate", null).set(path + "scanResult", version.getScanResult())
+                .set(path + "approvedSecurityEvidence", null).set(path + "approvedSecurityContextSha256", null)
+                .set(path + "securityApprovedAt", 0).set(path + "approvedReviewOrigins", null)
+                .set(path + "securityApprovalProjectId", null).set(path + "approvedFindingReviewHead", null)
+                .set(path + "approvedIssueBaselines", null);
+        update.set("updatedAt", java.time.LocalDateTime.now().toString());
+        return applyUpdate(snapshot, update);
+    }
     public boolean applyMetadataRepair(Snapshot snapshot, Map<String, Object> metadata) {
         net.modtale.service.admin.project.ProjectMetadataRepair.validate(metadata);
         var update = new Update();
