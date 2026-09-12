@@ -77,7 +77,8 @@ public class VersionMutationOrchestrationService {
 
         List<String> allowedGameVersions = validationService.getAllowedGameVersions();
         for (String gameVersion : gameVersions) {
-            if (!allowedGameVersions.contains(gameVersion)) {
+            if ((allowedGameVersions == null || !allowedGameVersions.contains(gameVersion))
+                    && !validationService.isGameVersionSupported(gameVersion)) {
                 throw new InvalidVersionRequestException("Invalid game version: " + gameVersion);
             }
         }
