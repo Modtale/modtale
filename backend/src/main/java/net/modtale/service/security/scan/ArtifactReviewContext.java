@@ -36,7 +36,7 @@ public final class ArtifactReviewContext {
     }
     public static org.springframework.data.mongodb.core.query.Criteria bindSnapshot(
             org.springframework.data.mongodb.core.query.Criteria criteria, ProjectVersion version) {
-        return criteria.and("gameVersions").is(version.getGameVersions())
+        return criteria.and("findingReviewHead").is(version.getFindingReviewHead()).and("gameVersions").is(version.getGameVersions())
                 .and("dependencies").is(version.getDependencies())
                 .and("manifestId").is(version.getManifestId())
                 .and("manifestVersion").is(version.getManifestVersion())

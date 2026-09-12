@@ -4,6 +4,7 @@ import { API_BASE_URL, BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
 import { adminClient } from '../api/adminClient';
 import { SourceInspector } from './SourceInspector';
 import { ArtifactChanges } from './ArtifactChanges';
+import { FindingDecisions } from './FindingDecisions';
 import { SiteRoutes } from '@/utils/routes';
 import type { ScanIssue, ProjectVersion, ScanReviewTarget } from '@/types';
 import { ModalPortal } from '@/components/ui/ModalPortal';
@@ -71,11 +72,13 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     const [inspectorData, setInspectorData] = useState<{ version: string, structure: string[], issues: ScanIssue[], initialFile?: string, initialLine?: number, initialLineEnd?: number } | null>(null);
     const [loadingInspector, setLoadingInspector] = useState(false);
 
+    const [decisionWritten, setDecisionWritten] = useState(false);
     const mod = reviewingProject.mod;
     const isNewProject = mod.status === 'PENDING';
     const projectLink = SiteRoutes.project(mod);
 
     const pendingVersion = mod.versions.find((v: ProjectVersion) => v.reviewStatus === 'PENDING') || mod.versions[0];
+    useEffect(() => setDecisionWritten(false), [pendingVersion?.id, pendingVersion?.reviewToken]);
     const scanResult = pendingVersion?.scanResult;
     const scanIssues = scanResult?.issues || [];
     const currentEvidence = /^warden-3\.0\.0:[0-9a-f]{64}$/.test(scanResult?.securityEvidence?.policyVersion || '')
@@ -183,7 +186,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             setStatus({ type: 'error', title: 'Permission Required', msg: 'You do not have permission to approve projects or versions.' });
             return;
         }
-        if (isNewProject ? !mod.reviewToken : !pendingVersion?.reviewToken) {
+        if (decisionWritten || (isNewProject ? !mod.reviewToken : !pendingVersion?.reviewToken)) {
             setStatus({ type: 'error', title: 'Refresh Required', msg: 'Refresh this review to load its current evidence before deciding.' });
             return;
         }
@@ -208,7 +211,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             setStatus({ type: 'error', title: 'Permission Required', msg: 'You do not have permission to reject projects or versions.' });
             return;
         }
-        if (isNewProject ? !mod.reviewToken : !pendingVersion?.reviewToken) {
+        if (decisionWritten || (isNewProject ? !mod.reviewToken : !pendingVersion?.reviewToken)) {
             setStatus({ type: 'error', title: 'Refresh Required', msg: 'Refresh this review to load its current evidence before deciding.' });
             return;
         }
@@ -574,6 +577,10 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
 
                                 {pendingVersion && <ArtifactChanges projectId={mod.id} version={pendingVersion.versionNumber}
                                     onInspect={(version, path) => openInspector(version, version === pendingVersion.versionNumber ? scanIssues : [], path)} />}
+                                {pendingVersion && <FindingDecisions key={`${pendingVersion.id}:${pendingVersion.reviewToken}`}
+                                    projectId={mod.id} versionId={pendingVersion.id} token={pendingVersion.reviewToken}
+                                    issues={scanIssues} canDecide={canDecide} onSaved={() => setDecisionWritten(true)} />}
+                                {decisionWritten && <p role="status" className="text-sm text-amber-700">A finding decision was saved. Close and reopen this review to inspect the updated history before publishing.</p>}
                                 {scanResult?.securityEvidence && (
                                     <div className="rounded-2xl border border-slate-200 dark:border-white/10 p-5 space-y-3">
                                         <div className="flex items-center justify-between gap-3">
@@ -936,7 +943,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                 <div className="flex flex-col gap-4">
                                     <button
                                         onClick={handleVersionApprove}
-                                        disabled={!canDecide}
+                                        disabled={!canDecide || decisionWritten}
                                         className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-emerald-500/20 transition-all transform hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                                     >
                                         Approve & Publish
@@ -958,7 +965,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                         <div className="flex gap-4">
                             <button
                                 onClick={() => setShowRejectPanel(true)}
-                                disabled={!canDecide}
+                                disabled={!canDecide || decisionWritten}
                                 className="px-6 py-3 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-500/10 disabled:hover:text-red-500"
                             >
                                 Reject...

@@ -33,6 +33,9 @@ public class ProjectVersion {
     public void setSecurityApprovedAt(long value) { securityApprovedAt = value; }
     private ScanResult scanResult;
     private List<ApprovedIssueBaseline> approvedIssueBaselines;
+    private String findingReviewHead;
+    public String getFindingReviewHead() { return findingReviewHead; }
+    public void setFindingReviewHead(String value) { findingReviewHead = value; }
 
     private ReviewStatus reviewStatus = ReviewStatus.PENDING;
     private String rejectionReason;

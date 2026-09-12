@@ -113,6 +113,18 @@ public class ScanCompletionService {
             notes.add("The current inspection policy could not validate this result. A fresh review is required.");
             scanResult.setReviewerNotes(notes);
         }
+        if (targetVersion.getFindingReviewHead() != null) {
+            scanResult.setReusedReviewVersion(null);
+            scanResult.setReusedReviewApprovedAt(0);
+            if (!"BLOCK".equals(scanResult.getVerdict()) && scanResult.getStatus() != ScanStatus.INFECTED) {
+                scanResult.setVerdict("REVIEW");
+                scanResult.setStatus(ScanStatus.SUSPICIOUS);
+            }
+            routingDecision = new ScanRoutingService.RoutingDecision(ScanRoutingService.RoutingAction.REQUIRE_REVIEW, 0);
+            var notes = new java.util.ArrayList<>(scanResult.getReviewerNotes());
+            notes.add("Recorded finding decisions require a current moderator review before publication.");
+            scanResult.setReviewerNotes(notes);
+        }
         boolean approvedImmediately = routingDecision.action() == ScanRoutingService.RoutingAction.APPROVE_NOW;
         boolean notifyFlagged = routingDecision.action() == ScanRoutingService.RoutingAction.REQUIRE_REVIEW;
 

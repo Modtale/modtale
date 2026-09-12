@@ -56,7 +56,7 @@ public class ScanPersistenceService {
         if (routingDecision.action() == ScanRoutingService.RoutingAction.SCHEDULE
                 || routingDecision.action() == ScanRoutingService.RoutingAction.APPROVE_NOW) {
             String context = ArtifactReviewContext.automaticallyReviewableFingerprint(reviewedVersion);
-            if (context == null || !context.equals(scanResult.getReviewedContextSha256())
+            if (reviewedVersion.getFindingReviewHead() != null || context == null || !context.equals(scanResult.getReviewedContextSha256())
                     || !ArtifactClearancePolicy.cleared(scanResult)) return false;
         }
         if (routingDecision.action() == ScanRoutingService.RoutingAction.DEFER) {

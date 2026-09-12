@@ -60,6 +60,12 @@ public class VersionReviewPersistence {
                 .set("versions.$.scheduledPublishDate", null)
                 .set("updatedAt", LocalDateTime.now().toString()));
     }
+    public boolean appendFindingReview(Snapshot snapshot, String decisionId) {
+        return applyUpdate(snapshot, new Update().set("versions.$.findingReviewHead", decisionId)
+                .set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.PENDING)
+                .set("versions.$.scheduledPublishDate", null)
+                .set("updatedAt", LocalDateTime.now().toString()));
+    }
     private boolean applyUpdate(Snapshot snapshot, Update update) {
         var entity=mongo.getConverter().getMappingContext().getPersistentEntity(Project.class);
         var mapped=new UpdateMapper(mongo.getConverter()).getMappedObject(update.getUpdateObject(),entity);

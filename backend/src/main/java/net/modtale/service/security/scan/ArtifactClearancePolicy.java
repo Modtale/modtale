@@ -23,7 +23,7 @@ public final class ArtifactClearancePolicy {
                 || result.getReusedReviewVersion() != null;
     }
     public static boolean boundToVersion(ProjectVersion version) {
-        if (version == null || !cleared(version.getScanResult())) return false;
+        if (version == null || version.getFindingReviewHead() != null || !cleared(version.getScanResult())) return false;
         String context = ArtifactReviewContext.automaticallyReviewableFingerprint(version);
         return context != null && context.equals(version.getScanResult().getReviewedContextSha256())
                 && Objects.equals(version.getHash(), version.getScanResult().getSecurityEvidence().artifactSha256());

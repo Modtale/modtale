@@ -29,6 +29,15 @@ class ArtifactReviewReuseServiceTest {
         result.setReusedReviewVersion("forged-stale-reuse");
         assertFalse(ArtifactClearancePolicy.cleared(result));
     }
+    @Test void recordedDecisionsPreventImplicitReuseUntilExplicitlyEvaluated() {
+        for (int index : List.of(0, 1)) {
+            var result = ScanEvidenceFixtures.complete(false);
+            var project = project(result);
+            project.getVersions().get(index).setFindingReviewHead("decision-history");
+            service.annotate(project, "new", result);
+            assertNull(result.getReusedReviewVersion());
+        }
+    }
     @Test void unchangedFullyInspectedArtifactReusesReview() {
         ScanResult result = ScanEvidenceFixtures.complete(false);
         Project project = project(result);

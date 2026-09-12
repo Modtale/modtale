@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Review } from '@/modules/admin/views/Review';
+vi.mock('@/modules/admin/views/FindingDecisions', () => ({ FindingDecisions: ({ onSaved }: any) => <button onClick={onSaved}>Save finding reasoning</button> }));
 vi.mock('@/components/ui/ModalPortal', () => ({ ModalPortal: ({ children }: any) => children }));
 vi.mock('@/modules/admin/api/adminClient', () => ({ adminClient: { publishProject: vi.fn().mockResolvedValue(null) } }));
 import { adminClient } from '@/modules/admin/api/adminClient';
@@ -12,17 +13,31 @@ describe('Review security clearance status', () => {
     let container: HTMLDivElement; let root: Root;
     beforeEach(() => { container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container); });
     afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
-    async function render(scanResult: any, decision = false, token?: string) {
+    async function render(scanResult: any, decision = false, token?: string, steps?: number) {
         const project = { mod: { id: 'project', slug: 'project', title: 'Example', status: decision ? 'PENDING' : 'PUBLISHED', reviewToken: token, classification: 'PLUGIN', tags: [],
             versions: [{ id: 'version', versionNumber: '1.0', reviewStatus: 'PENDING', scanResult }] } };
         await act(async () => root.render(<Review reviewingProject={project} onClose={vi.fn()} onApprove={vi.fn()} onReject={vi.fn()} setStatus={vi.fn()} canDecide={decision} />));
-        for (let step = 0; step < (decision ? 4 : 2); step++) {
+        for (let step = 0; step < (steps ?? (decision ? 4 : 2)); step++) {
             await act(async () => container.querySelectorAll<HTMLInputElement>('input[type=checkbox]').forEach(input => input.click()));
             const next = [...container.querySelectorAll('button')].find(button => button.textContent?.includes('Next Step'));
             expect(next?.disabled).toBe(false);
             await act(async () => next!.click());
         }
     }
+    it('requires reopening before publishing after a finding decision changes the snapshot', async () => {
+        vi.mocked(adminClient.publishProject).mockClear();
+        await render(clear, true, 'project-snapshot', 2);
+        const save = [...container.querySelectorAll('button')].find(b => b.textContent === 'Save finding reasoning');
+        expect(save).toBeTruthy(); await act(async () => save!.click());
+        for (let step = 0; step < 2; step++) {
+            await act(async () => container.querySelectorAll<HTMLInputElement>('input[type=checkbox]').forEach(input => input.click()));
+            const next = [...container.querySelectorAll('button')].find(b => b.textContent?.includes('Next Step'));
+            await act(async () => next!.click());
+        }
+        const approve = [...container.querySelectorAll('button')].find(b => b.textContent?.includes('Approve & Publish'));
+        expect(approve?.disabled).toBe(true);
+        expect(adminClient.publishProject).not.toHaveBeenCalled();
+    });
     it('publishes exactly the inspected version with the project snapshot', async () => {
         vi.mocked(adminClient.publishProject).mockClear();
         await render(clear, true, 'project-snapshot');
