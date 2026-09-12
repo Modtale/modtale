@@ -35,14 +35,20 @@ public class ProjectArtifactDeletionService {
         }
     }
 
+    public void deleteProjectMediaFile(Project project, String location) {
+        if (project == null) return;
+        var remaining = new java.util.ArrayList<String>();
+        remaining.add(project.getImageUrl()); remaining.add(project.getBannerUrl());
+        if (project.getGalleryImages() != null) remaining.addAll(project.getGalleryImages());
+        storageService.deleteOwnedProjectMedia(project.getId(), location, remaining);
+    }
+
     public void deleteProjectMedia(Project project) {
-        deleteStoredFile(project.getImageUrl());
-        deleteStoredFile(project.getBannerUrl());
-        if (project.getGalleryImages() != null) {
-            project.getGalleryImages().forEach(this::deleteStoredFile);
-            project.getGalleryImages().clear();
-        }
-        project.setImageUrl(null);
-        project.setBannerUrl(null);
+        var removed = new java.util.ArrayList<String>();
+        removed.add(project.getImageUrl()); removed.add(project.getBannerUrl());
+        if (project.getGalleryImages() != null) removed.addAll(project.getGalleryImages());
+        project.setImageUrl(null); project.setBannerUrl(null);
+        project.setGalleryImages(new java.util.ArrayList<>());
+        for (String location : removed) deleteProjectMediaFile(project, location);
     }
 }

@@ -87,7 +87,7 @@ class ProjectMediaServiceTest {
 
         assertEquals("This project has already reached the gallery limit of 2 items.", error.getMessage());
         verify(fileValidationService, never()).validateGalleryImage(any());
-        verify(mediaUploadService, never()).uploadPublicUrl(any(), eq("gallery"), any());
+        verify(mediaUploadService, never()).uploadPublicUrl(any(), eq("project-media/project-1/gallery"), any());
     }
 
     @Test
@@ -198,7 +198,7 @@ class ProjectMediaServiceTest {
 
         assertEquals(List.of("https://cdn.modtale.test/gallery/b.png"), project.getGalleryImages());
         assertFalse(project.getGalleryImageCaptions().containsKey("https://cdn.modtale.test/gallery/a.png"));
-        verify(projectDeletionService).deleteStoredFile("https://cdn.modtale.test/gallery/a.png");
+        verify(projectDeletionService).deleteProjectMediaFile(project, "https://cdn.modtale.test/gallery/a.png");
         verify(reviewPersistence).applyPresentation(any(), eq(true));
         verify(projectService).evictProjectCache(project);
     }
@@ -218,7 +218,7 @@ class ProjectMediaServiceTest {
 
         assertEquals(List.of(), project.getGalleryImages());
         assertFalse(project.getGalleryImageCaptions().containsKey("https://www.youtube.com/watch?v=dQw4w9WgXcQ"));
-        verify(projectDeletionService, never()).deleteStoredFile(any());
+        verify(projectDeletionService, never()).deleteProjectMediaFile(any(), any());
         verify(reviewPersistence).applyPresentation(any(), eq(true));
         verify(projectService).evictProjectCache(project);
     }
@@ -295,12 +295,12 @@ class ProjectMediaServiceTest {
 
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
         when(accessControlService.hasProjectPermission(project, user, "PROJECT_EDIT_ICON")).thenReturn(true);
-        when(mediaUploadService.uploadPublicUrl(eq(file), eq("images"), any())).thenReturn("https://cdn.modtale.test/images/new-icon.png");
+        when(mediaUploadService.uploadPublicUrl(eq(file), eq("project-media/project-1/images"), any())).thenReturn("https://cdn.modtale.test/images/new-icon.png");
 
         when(reviewPersistence.applyPresentation(any(), eq(true))).thenReturn(false);
         assertThrows(org.springframework.web.server.ResponseStatusException.class,
                 () -> service.updateProjectImage("project-1", file, user, false));
-        verify(projectDeletionService, never()).deleteStoredFile(anyString());
+        verify(projectDeletionService, never()).deleteProjectMediaFile(any(), anyString());
         project.setImageUrl("https://cdn.modtale.test/images/current-icon.png");
         clearInvocations(reviewPersistence);
         when(reviewPersistence.applyPresentation(any(), eq(true))).thenReturn(true);
@@ -308,7 +308,7 @@ class ProjectMediaServiceTest {
         service.updateProjectImage("project-1", file, user, false);
 
         assertEquals("https://cdn.modtale.test/images/new-icon.png", project.getImageUrl());
-        verify(projectDeletionService).deleteStoredFile("https://cdn.modtale.test/images/current-icon.png");
+        verify(projectDeletionService).deleteProjectMediaFile(project, "https://cdn.modtale.test/images/current-icon.png");
         verify(reviewPersistence).applyPresentation(any(), eq(true));
         verify(projectService).evictProjectCache(project);
     }
@@ -323,7 +323,7 @@ class ProjectMediaServiceTest {
         assertThrows(InvalidProjectRequestException.class, () -> service.removeGalleryImage("project-1", "foreign.png", user));
         when(reviewPersistence.applyPresentation(any(), eq(true))).thenReturn(false);
         assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> service.removeGalleryImage("project-1", "owned.png", user));
-        verify(projectDeletionService, never()).deleteStoredFile(anyString());
+        verify(projectDeletionService, never()).deleteProjectMediaFile(any(), anyString());
     }
 
     private static User user(String id) {

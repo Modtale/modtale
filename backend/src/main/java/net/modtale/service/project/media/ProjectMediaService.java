@@ -71,7 +71,7 @@ public class ProjectMediaService {
             String currentUrl = isBanner ? project.getBannerUrl() : project.getImageUrl();
             String publicUrl = mediaUploadService.uploadPublicUrl(
                     file,
-                    "images",
+                    net.modtale.service.storage.ProjectMediaKeys.prefix(project.getId(), "images"),
                     isBanner ? fileValidationService::validateBanner : fileValidationService::validateIcon
             );
 
@@ -83,7 +83,7 @@ public class ProjectMediaService {
 
             saveAndEvict(snapshot);
             if (currentUrl != null && !currentUrl.equals(publicUrl) && !currentUrl.contains("default.png")
-                    && !currentUrl.contains("placeholder") && !currentUrl.contains("favicon")) projectDeletionService.deleteStoredFile(currentUrl);
+                    && !currentUrl.contains("placeholder") && !currentUrl.contains("favicon")) projectDeletionService.deleteProjectMediaFile(project, currentUrl);
         } catch (StorageUploadException ex) {
             throw new ProjectMediaOperationException(ex.getMessage(), ex);
         }
@@ -98,7 +98,7 @@ public class ProjectMediaService {
         ensureGalleryCapacity(project);
 
         try {
-            galleryItems(project).add(mediaUploadService.uploadPublicUrl(file, "gallery", fileValidationService::validateGalleryImage));
+            galleryItems(project).add(mediaUploadService.uploadPublicUrl(file, net.modtale.service.storage.ProjectMediaKeys.prefix(project.getId(), "gallery"), fileValidationService::validateGalleryImage));
             return saveAndEvict(snapshot);
         } catch (StorageUploadException ex) {
             throw new ProjectMediaOperationException(ex.getMessage(), ex);
@@ -137,7 +137,7 @@ public class ProjectMediaService {
             project.setGalleryImageCaptions(captions);
         }
         var saved = saveAndEvict(snapshot);
-        if (!isYouTubeUrl(imageUrl)) projectDeletionService.deleteStoredFile(imageUrl);
+        if (!isYouTubeUrl(imageUrl)) projectDeletionService.deleteProjectMediaFile(project, imageUrl);
         return saved;
     }
 
