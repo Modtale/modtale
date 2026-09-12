@@ -1,0 +1,278 @@
+package net.modtale.status;
+
+import java.time.Instant;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import net.modtale.status.StatusModels.IncidentBuckets;
+import net.modtale.status.StatusModels.StatusHistoryEntry;
+import net.modtale.status.StatusModels.StatusHistoryPointView;
+import net.modtale.status.StatusModels.SystemStatus;
+import net.modtale.status.StatusModels.SystemStatusView;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+
+@Service
+public class DetachedStatusService {
+
+    private static final Logger logger = LoggerFactory.getLogger(DetachedStatusService.class);
+
+    private final StatusServiceProperties properties;
+    private final StatusProbeService statusProbeService;
+    private final MongoStatusStore mongoStatusStore;
+    private final StatusSnapshotFileStore snapshotFileStore;
+    private final StatusDiscordNotifier statusDiscordNotifier;
+
+    private final List<StatusHistoryEntry> history = new ArrayList<>();
+    private volatile SystemStatusView cached24HourStatus;
+    private volatile SystemStatusView cached30DayStatus;
+    private volatile IncidentBuckets lastKnownIncidents = IncidentBuckets.empty();
+    private volatile boolean hydrated;
+    private long lastRefreshNanos;
+    private boolean mongoHistoryLoaded;
+
+    public DetachedStatusService(
+            StatusServiceProperties properties,
+            StatusProbeService statusProbeService,
+            MongoStatusStore mongoStatusStore,
+            StatusSnapshotFileStore snapshotFileStore,
+            StatusDiscordNotifier statusDiscordNotifier
+    ) {
+        this.properties = properties;
+        this.statusProbeService = statusProbeService;
+        this.mongoStatusStore = mongoStatusStore;
+        this.snapshotFileStore = snapshotFileStore;
+        this.statusDiscordNotifier = statusDiscordNotifier;
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void onStartup() {
+        hydrate();
+        refreshSnapshots();
+    }
+
+    @Scheduled(
+            initialDelayString = "${status.refresh-interval-ms:60000}",
+            fixedDelayString = "${status.refresh-interval-ms:60000}"
+    )
+    public void scheduledRefresh() {
+        if (!properties.isExternalRefresh()) {
+            refreshIfDue();
+        }
+    }
+
+    public synchronized void refreshIfDue() {
+        // Scheduler retries must not duplicate samples or notifications. Allow cadence jitter.
+        long interval = java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(properties.getRefreshIntervalMs() * 3 / 4);
+        if (lastRefreshNanos == 0 || System.nanoTime() - lastRefreshNanos >= interval) {
+            refreshSnapshots();
+        }
+    }
+
+    public synchronized void refreshSnapshots() {
+        hydrate();
+        recoverMongoHistory();
+        StatusHistoryEntry latest = statusProbeService.performHealthCheck();
+        addHistory(latest);
+        mongoStatusStore.saveHistory(latest);
+        refreshIncidents();
+        rebuildSnapshots();
+        snapshotFileStore.writeHistory(List.copyOf(history));
+        statusDiscordNotifier.publishStatus(cached24HourStatus);
+        lastRefreshNanos = System.nanoTime();
+    }
+
+    public SystemStatusView getSystemStatus(String range) {
+        SystemStatusView cached = "30d".equals(range) ? cached30DayStatus : cached24HourStatus;
+        if (cached != null) {
+            if (!cached.stale() && Instant.ofEpochMilli(cached.timestamp()).isBefore(Instant.now().minus(properties.getStaleAfter()))) {
+                synchronized (this) {
+                    rebuildSnapshots();
+                    return "30d".equals(range) ? cached30DayStatus : cached24HourStatus;
+                }
+            }
+            return cached;
+        }
+
+        synchronized (this) {
+            cached = "30d".equals(range) ? cached30DayStatus : cached24HourStatus;
+            if (cached != null) {
+                return cached;
+            }
+
+            refreshSnapshots();
+            return "30d".equals(range) ? cached30DayStatus : cached24HourStatus;
+        }
+    }
+
+    public synchronized boolean isReady() {
+        StatusHistoryEntry latest = latestHistory();
+        return latest != null && !isStale(latest);
+    }
+
+    private void hydrate() {
+        if (hydrated) {
+            return;
+        }
+
+        synchronized (this) {
+            if (hydrated) {
+                return;
+            }
+
+            addHistory(snapshotFileStore.readHistory());
+            Instant since = Instant.now().minus(properties.getHistoryRetention());
+            if (properties.getMongoUri().isBlank()) {
+                addHistory(mongoStatusStore.findHistoryAfter(since));
+                mongoHistoryLoaded = true;
+            } else {
+                recoverMongoHistory();
+            }
+            mongoStatusStore.findLatestHistory().ifPresent(this::addHistory);
+            pruneHistory();
+            refreshIncidents();
+            rebuildSnapshots();
+            hydrated = true;
+        }
+    }
+
+    private void recoverMongoHistory() {
+        if (mongoHistoryLoaded || properties.getMongoUri().isBlank()) return;
+        mongoStatusStore.loadHistoryAfter(Instant.now().minus(properties.getHistoryRetention())).ifPresent(entries -> {
+            addHistory(entries);
+            mongoHistoryLoaded = true;
+            logger.info("Restored {} persisted status history samples", entries.size());
+        });
+    }
+
+    private void refreshIncidents() {
+        mongoStatusStore.findIncidentBuckets().ifPresent(buckets -> lastKnownIncidents = buckets);
+    }
+
+    private void rebuildSnapshots() {
+        StatusHistoryEntry latest = latestHistory();
+        if (latest == null) {
+            return;
+        }
+        cached24HourStatus = buildStatusView(latest, "24h");
+        cached30DayStatus = buildStatusView(latest, "30d");
+    }
+
+    private SystemStatusView buildStatusView(StatusHistoryEntry latest, String range) {
+        Instant since = "30d".equals(range)
+                ? Instant.now().minus(properties.getHistoryRetention())
+                : Instant.now().minusSeconds(24 * 60 * 60);
+
+        List<StatusHistoryEntry> entries = history.stream()
+                .filter(entry -> !entry.timestamp().isBefore(since))
+                .toList();
+        int observedSamples = entries.size();
+
+        if ("30d".equals(range) && entries.size() > 500) {
+            entries = downsample(entries, 250);
+        }
+
+        List<StatusHistoryPointView> points = entries.stream()
+                .map(StatusHistoryEntry::toPoint)
+                .toList();
+
+        boolean stale = isStale(latest);
+        long windowMillis = "30d".equals(range)
+                ? properties.getHistoryRetention().toMillis()
+                : Duration.ofHours(24).toMillis();
+        int expectedSamples = (int) Math.max(1, windowMillis / Math.max(1, properties.getRefreshIntervalMs()));
+        SystemStatus effectiveOverall = stale && latest.overallStatus() == SystemStatus.OPERATIONAL
+                ? SystemStatus.DEGRADED
+                : latest.overallStatus();
+
+        return new SystemStatusView(
+                effectiveOverall,
+                latest.toServices(),
+                latest.timestamp().toEpochMilli(),
+                stale,
+                observedSamples,
+                expectedSamples,
+                points,
+                lastKnownIncidents.activeIncidents(),
+                lastKnownIncidents.scheduledMaintenances(),
+                lastKnownIncidents.incidentHistory()
+        );
+    }
+
+    private boolean isStale(StatusHistoryEntry latest) {
+        Duration staleAfter = properties.getStaleAfter();
+        return latest.timestamp().isBefore(Instant.now().minus(staleAfter));
+    }
+
+    private void addHistory(StatusHistoryEntry entry) {
+        if (entry == null) {
+            return;
+        }
+        if (entry.timestamp() == null) { return; }
+        if (history.isEmpty() || entry.timestamp().isAfter(history.getLast().timestamp())) {
+            history.add(entry);
+            pruneHistory();
+        } else {
+            addHistory(List.of(entry));
+        }
+    }
+
+    private void addHistory(List<StatusHistoryEntry> entries) {
+        if (entries == null || entries.isEmpty()) {
+            return;
+        }
+
+        Map<Long, StatusHistoryEntry> byTimestamp = new LinkedHashMap<>();
+        for (StatusHistoryEntry existing : history) {
+            byTimestamp.put(existing.timestamp().toEpochMilli(), existing);
+        }
+        for (StatusHistoryEntry entry : entries) {
+            if (entry != null && entry.timestamp() != null) {
+                byTimestamp.put(entry.timestamp().toEpochMilli(), entry);
+            }
+        }
+
+        history.clear();
+        history.addAll(byTimestamp.values().stream()
+                .sorted(Comparator.comparing(StatusHistoryEntry::timestamp))
+                .toList());
+        pruneHistory();
+    }
+
+    private void pruneHistory() {
+        Instant oldest = Instant.now().minus(properties.getHistoryRetention());
+        history.removeIf(entry -> entry.timestamp().isBefore(oldest));
+    }
+
+    private StatusHistoryEntry latestHistory() {
+        if (history.isEmpty()) {
+            return null;
+        }
+        return history.getLast();
+    }
+
+    private List<StatusHistoryEntry> downsample(List<StatusHistoryEntry> entries, int targetSize) {
+        if (entries.size() <= targetSize) {
+            return entries;
+        }
+
+        int step = Math.max(1, entries.size() / targetSize);
+        List<StatusHistoryEntry> sampled = new ArrayList<>();
+        for (int i = 0; i < entries.size(); i += step) {
+            sampled.add(entries.get(i));
+        }
+        StatusHistoryEntry last = entries.get(entries.size() - 1);
+        if (!sampled.get(sampled.size() - 1).timestamp().equals(last.timestamp())) {
+            sampled.add(last);
+        }
+        logger.debug("Downsampled detached status history from {} to {} points", entries.size(), sampled.size());
+        return sampled;
+    }
+}

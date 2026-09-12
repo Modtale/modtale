@@ -19,6 +19,7 @@ interface Window {
 
 interface ImportMetaEnv {
     readonly PUBLIC_API_URL: string;
+    readonly PUBLIC_STATUS_URL: string;
     readonly SSR_API_URL?: string;
 }
 
