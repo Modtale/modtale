@@ -25,7 +25,10 @@ resolve_push_base() {
 
   if ! is_zero_sha "$before_sha"; then
     if ! commit_exists "$before_sha"; then
-      echo "::error::Push base commit '$before_sha' is missing from the checkout."
+      git fetch --no-tags origin "$before_sha" >/dev/null 2>&1 || true
+    fi
+    if ! commit_exists "$before_sha"; then
+      echo "::error::Push base commit '$before_sha' is missing from the checkout." >&2
       exit 1
     fi
 
