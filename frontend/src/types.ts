@@ -174,6 +174,7 @@ export interface ScanIssue {
     baselineVersion?: string;
     baselineScoreImpact?: number;
     baselineSeverity?: string;
+    historicalFileEvidenceIdentical?: boolean;
 }
 
 export interface ScanSummary {

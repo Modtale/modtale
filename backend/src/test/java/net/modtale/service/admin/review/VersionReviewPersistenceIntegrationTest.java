@@ -43,6 +43,35 @@ class VersionReviewPersistenceIntegrationTest {
         assertEquals("original", mongo.findById(id, Project.class).getTitle());
         assertEquals(ProjectVersion.ReviewStatus.REJECTED, mongo.findById(id, Project.class).getVersions().getFirst().getReviewStatus());
     }
+    @Test void conditionalApprovalRetainsFindingEvidenceAfterScanPruningAndReload() {
+        var loaded = mongo.findById(id, Project.class);
+        var selected = loaded.getVersions().getFirst();
+        selected.setHash(selected.getScanResult().getSecurityEvidence().artifactSha256());
+        var issue = new ScanResult.ScanIssue(); issue.setFilePath("Mod.class");
+        issue.setType("Network"); issue.setDescription("connect"); issue.setSeverity("LOW");
+        selected.getScanResult().setIssues(new ArrayList<>(List.of(issue)));
+        mongo.save(loaded);
+        selected = mongo.findById(id, Project.class).getVersions().getFirst();
+        var snapshot = persistence.capture(id, selected.getId(), VersionReviewSnapshot.token(selected));
+        var classification = new net.modtale.service.security.issue.SecurityIssueClassificationService(
+                new net.modtale.config.properties.AppSecurityProperties("test", 60, 120, 2, 12, 15, 120, 25, 2));
+        new net.modtale.service.security.issue.SecurityIssueApprovalService(classification)
+                .markIssuesAcceptedForApprovedVersion(selected);
+        selected.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        assertTrue(persistence.apply(snapshot, selected));
+        var restored = mongo.findById(id, Project.class);
+        var baseline = restored.getVersions().getFirst().getApprovedIssueBaselines().getFirst();
+        assertTrue(baseline.getEvidenceIdentity().matches("ie1:[0-9a-f]{64}"));
+        assertNull(restored.getVersions().getFirst().getScanResult());
+        var nextScan = ScanEvidenceFixtures.complete(false);
+        var nextIssue = new ScanResult.ScanIssue(); nextIssue.setFilePath("Mod.class");
+        nextIssue.setType("Network"); nextIssue.setDescription("connect"); nextIssue.setSeverity("LOW");
+        nextScan.setIssues(new ArrayList<>(List.of(nextIssue)));
+        classification.annotateAgainstBaselines(nextScan, classification.collectApprovedIssueBaselines(restored, null));
+        assertTrue(nextIssue.isHistoricalFileEvidenceIdentical());
+        assertFalse(nextIssue.isResolved());
+        assertFalse(net.modtale.service.security.scan.ArtifactClearancePolicy.cleared(nextScan));
+    }
     private ScanResult queued() {
         var scan = new ScanResult(); scan.setStatus(ScanStatus.SCANNING);
         scan.setScanState("QUEUED"); scan.setScanAttempt(2); return scan;

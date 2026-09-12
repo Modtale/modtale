@@ -639,6 +639,8 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                     </button>
                                                 )}
                                                 <button
+                                                    aria-label={showScanDetails ? "Hide findings" : "Show findings"}
+                                                    aria-expanded={showScanDetails}
                                                     onClick={() => setShowScanDetails(!showScanDetails)}
                                                     className="p-2 hover:bg-white/20 rounded-lg transition-colors text-red-600 dark:text-red-400"
                                                 >
@@ -697,6 +699,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                                 {typeof issue.scoreImpact === 'number' && <span className="bg-slate-200 dark:bg-slate-700 px-1.5 rounded">Impact {issue.scoreImpact}</span>}
                                                             </div>
                                                             <p className="text-xs text-slate-600 dark:text-slate-400 leading-snug">{issue.description}</p>
+                                                            {issue.historicalFileEvidenceIdentical && <p className="text-xs text-slate-500 mt-1">Same finding and file as approved version {issue.baselineVersion}. Changes elsewhere still require review.</p>}
                                                         </div>
                                                         <button
                                                             onClick={() => openInspector(pendingVersion.versionNumber, scanResult.issues, issue.filePath, issue.lineStart, issue.lineEnd)}

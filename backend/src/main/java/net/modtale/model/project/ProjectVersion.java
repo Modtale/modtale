@@ -45,6 +45,7 @@ public class ProjectVersion {
     public static class ApprovedIssueBaseline {
         private String fingerprint;
         private String looseFingerprint;
+        private String evidenceIdentity;
         private String severity;
         private int scoreImpact;
         private int confidence;
@@ -67,6 +68,9 @@ public class ProjectVersion {
             this.confidence = confidence;
             this.approvedAt = approvedAt;
         }
+
+        public String getEvidenceIdentity() { return evidenceIdentity; }
+        public void setEvidenceIdentity(String value) { evidenceIdentity = value; }
 
         public String getFingerprint() { return fingerprint; }
         public void setFingerprint(String fingerprint) { this.fingerprint = fingerprint; }

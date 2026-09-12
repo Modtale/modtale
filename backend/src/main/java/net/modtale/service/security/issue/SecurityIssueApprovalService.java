@@ -35,6 +35,9 @@ public class SecurityIssueApprovalService {
         List<ScanResult.ScanIssue> issues = scanResult.getIssues();
         List<ProjectVersion.ApprovedIssueBaseline> approvedIssueBaselines = new ArrayList<>();
         long approvedAt = approvedAt(version);
+        var identities = IssueEvidenceIdentity.from(java.util.Objects.equals(version.getHash(),
+                scanResult.getSecurityEvidence() == null ? null : scanResult.getSecurityEvidence().artifactSha256())
+                ? scanResult : null);
 
         for (ScanResult.ScanIssue issue : issues) {
             if (issue == null) continue;
@@ -56,14 +59,16 @@ public class SecurityIssueApprovalService {
                 issue.setBaselineScoreImpact(Math.max(0, issue.getScoreImpact()));
             }
 
-            approvedIssueBaselines.add(new ProjectVersion.ApprovedIssueBaseline(
+            var stored = new ProjectVersion.ApprovedIssueBaseline(
                     fingerprint,
                     looseFingerprint,
                     severity,
                     Math.max(0, issue.getScoreImpact()),
                     Math.max(0, issue.getConfidence()),
                     approvedAt
-            ));
+            );
+            stored.setEvidenceIdentity(identities.identify(issue));
+            approvedIssueBaselines.add(stored);
         }
 
         scanResult.setKnownIssueCount(issues.size());

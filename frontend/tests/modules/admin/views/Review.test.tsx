@@ -56,7 +56,19 @@ describe('Review security clearance status', () => {
         await render({ ...clear, securityEvidence: { ...clear.securityEvidence, policyVersion: 'warden-3.0.0' } });
         expect(container.textContent).not.toContain('Artifact Review Completed');
     });
-    it('shows completion for explicit completed clearance', async () => {
+    it.each([true, false, undefined])('distinguishes identical local evidence without claiming clearance: %s', async identical => {
+        await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW',
+            issues: [{ type: 'Network', severity: 'LOW', description: 'connect', filePath: 'Mod.class',
+                lineStart: 9, lineEnd: 11, knownIssue: true, baselineVersion: '0.9',
+                historicalFileEvidenceIdentical: identical }] });
+        const show = container.querySelector<HTMLButtonElement>('button[aria-label="Show findings"]');
+        if (show) await act(async () => show.click());
+        expect(container.textContent?.includes('Same finding and file as approved version 0.9.')).toBe(identical === true);
+        if (identical) expect(container.textContent).toContain('Changes elsewhere still require review.');
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+        expect([...container.querySelectorAll('button')].some(button => button.textContent?.includes('Inspect'))).toBe(true);
+    });
+    it('shows completion for explicit completed clearance' , async () => {
         await render(clear); expect(container.textContent).toContain('Artifact Review Completed');
     });
 });

@@ -227,6 +227,7 @@ public class ScanResult {
         private boolean resolved;
         private String fingerprint;
         private boolean knownIssue;
+        private boolean historicalFileEvidenceIdentical;
         private boolean escalated;
         private String baselineVersion;
         private int baselineScoreImpact;
@@ -281,6 +282,9 @@ public class ScanResult {
 
         public String getFingerprint() { return fingerprint; }
         public void setFingerprint(String fingerprint) { this.fingerprint = fingerprint; }
+
+        public boolean isHistoricalFileEvidenceIdentical() { return historicalFileEvidenceIdentical; }
+        public void setHistoricalFileEvidenceIdentical(boolean value) { historicalFileEvidenceIdentical = value; }
 
         public boolean isKnownIssue() { return knownIssue; }
         public void setKnownIssue(boolean knownIssue) { this.knownIssue = knownIssue; }

@@ -28,6 +28,7 @@ final class SecurityIssueEvaluationService {
                 ? new SecurityIssueAnalysisService.BaselineIndex(new HashMap<>(), new HashMap<>())
                 : approvedBaselines;
 
+        var identities = IssueEvidenceIdentity.from(scanResult);
         int known = 0;
         int fresh = 0;
         int escalated = 0;
@@ -40,6 +41,7 @@ final class SecurityIssueEvaluationService {
                 continue;
             }
 
+            issue.setHistoricalFileEvidenceIdentical(false);
             String fingerprint = fingerprint(issue);
             String looseFingerprint = looseFingerprint(issue);
             issue.setFingerprint(fingerprint);
@@ -63,6 +65,9 @@ final class SecurityIssueEvaluationService {
                 continue;
             }
 
+            String identity = identities.identify(issue);
+            issue.setHistoricalFileEvidenceIdentical(!looseMatch && identity != null
+                    && identity.equals(baseline.evidenceIdentity()));
             issue.setKnownIssue(true);
             issue.setBaselineVersion(baseline.versionNumber());
             issue.setBaselineScoreImpact(baseline.scoreImpact());
