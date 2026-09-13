@@ -91,6 +91,52 @@ class NativeInteractionRegressionTest {
     }
 
     @Test
+    void wheelFramesMatchCapturedChromiumCompositorTraceExactly() throws Exception {
+        com.fasterxml.jackson.databind.JsonNode reference;
+        try (var input = getClass().getResourceAsStream("/scroll/chromium-153-wheel.json")) {
+            reference = new com.fasterxml.jackson.databind.ObjectMapper().readTree(input);
+        }
+        fx(() -> {
+            Region content = new Region();
+            content.resize(800, 2400);
+            ScrollPane pane = new ScrollPane(content);
+            pane.setViewportBounds(new BoundingBox(0, 0, 800, 400));
+            double delta = reference.get("deltaPixels").asDouble();
+            long frameInterval = Math.round(reference.get("frameIntervalMillis").asDouble() * 1e6);
+            long delay = Math.round((200 - reference.get("compositorDurationMillis").asDouble()) * 1e6);
+            LauncherScrollAnimator animator = new LauncherScrollAnimator(frameInterval);
+            animator.animate(pane, 0, delta, 0);
+            for (var frame : reference.get("frames")) {
+                long now = delay + Math.round(frame.get("millisAfterFirstFrame").asDouble() * 1e6);
+                animator.tick(now);
+                assertEquals(frame.get("scrollY").asLong(), Math.round(pane.getVvalue() * 2000),
+                        "Rendered CSS pixel at " + frame.get("millisAfterFirstFrame") + " ms");
+            }
+            animator.cancel(pane);
+            return null;
+        });
+    }
+
+    @Test
+    void queuedWheelNotchesAreNotLostWhenTheUiThreadMissesTheirDuration() throws Exception {
+        fx(() -> {
+            Region content = new Region();
+            content.resize(800, 2400);
+            ScrollPane pane = new ScrollPane(content);
+            pane.setViewportBounds(new BoundingBox(0, 0, 800, 400));
+            LauncherScrollAnimator animator = new LauncherScrollAnimator(16_666_667);
+            animator.animate(pane, 0, 120, 0);
+            animator.animate(pane, 0, 120, 250_000_000);
+            assertEquals(0, pane.getVvalue(), "No frame has been presented yet");
+            animator.tick(260_000_000);
+            animator.tick(600_000_000);
+            assertEquals(240, pane.getVvalue() * 2000, 1e-9);
+            animator.cancel(pane);
+            return null;
+        });
+    }
+
+    @Test
     void galleryKeepsItsCurrentFrameUntilReplacementHasDecoded() throws Exception {
         Path file = directory.resolve("replacement.png");
         ImageIO.write(new BufferedImage(200, 100, BufferedImage.TYPE_INT_ARGB), "png", file.toFile());

@@ -1,7 +1,9 @@
 package net.modtale.launcher.ui.common;
 
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.WeakHashMap;
 import javafx.animation.AnimationTimer;
 import javafx.geometry.Bounds;
@@ -24,6 +26,8 @@ final class LauncherScrollAnimator {
     private static final double PROGRAMMATIC_SECOND_CONTROL_X = 0;
     private static final double PROGRAMMATIC_MAX_DURATION_SECONDS = 1.5;
 
+    private final long frameIntervalNanos;
+    private final Set<ScrollPane> pendingWheelStarts = Collections.newSetFromMap(new WeakHashMap<>());
     private final Map<ScrollPane, AnimationState> states = new WeakHashMap<>();
     private final AnimationTimer timer = new AnimationTimer() {
         @Override
@@ -32,6 +36,26 @@ final class LauncherScrollAnimator {
         }
     };
     private boolean timerRunning;
+
+    LauncherScrollAnimator() {
+        this(configuredFrameIntervalNanos());
+    }
+
+    LauncherScrollAnimator(long frameIntervalNanos) {
+        this.frameIntervalNanos = frameIntervalNanos;
+    }
+
+    private static long configuredFrameIntervalNanos() {
+        try {
+            double rate = Double.parseDouble(System.getProperty("javafx.animation.framerate",
+                    System.getProperty("javafx.animation.pulse", "60")));
+            if (Double.isFinite(rate) && rate >= 30 && rate <= 1000) {
+                return Math.round(1_000_000_000.0 / rate);
+            }
+        } catch (NumberFormatException ignored) {
+        }
+        return Math.round(1_000_000_000.0 / 60);
+    }
 
     void animate(ScrollPane pane, double deltaX, double deltaY, long now) {
         ScrollMetrics metrics = metrics(pane);
@@ -43,9 +67,11 @@ final class LauncherScrollAnimator {
 
         AnimationState state = states.get(pane);
         Point actual = new Point(horizontalOffset(pane, metrics), verticalOffset(pane, metrics));
-        if (state == null || state.finished(now) || state.divergedFrom(actual)) {
+        boolean restarting = state == null || state.divergedFrom(actual);
+        if (restarting) {
             state = AnimationState.stopped(actual);
-        } else {
+            pendingWheelStarts.add(pane);
+        } else if (!pendingWheelStarts.contains(pane)) {
             state = state.at(now);
         }
 
@@ -53,8 +79,10 @@ final class LauncherScrollAnimator {
                 clamp(state.target.x + deltaX, 0, metrics.maxX),
                 clamp(state.target.y + deltaY, 0, metrics.maxY)
         );
+        if (!restarting && target.distanceMaximum(state.target) < EPSILON) return;
         if (target.distanceMaximum(state.current) < EPSILON) {
             states.remove(pane);
+            pendingWheelStarts.remove(pane);
             stopTimerIfIdle();
             return;
         }
@@ -74,6 +102,7 @@ final class LauncherScrollAnimator {
 
     void cancel(ScrollPane pane) {
         states.remove(pane);
+        pendingWheelStarts.remove(pane);
         stopTimerIfIdle();
     }
 
@@ -93,9 +122,11 @@ final class LauncherScrollAnimator {
         if (delta < EPSILON) {
             apply(pane, metrics, target);
             states.remove(pane);
+            pendingWheelStarts.remove(pane);
             stopTimerIfIdle();
             return;
         }
+        pendingWheelStarts.remove(pane);
         double duration = programmaticDuration(delta * outputScale(pane));
         states.put(pane, AnimationState.programmatic(initial, target, now, duration));
         startTimer();
@@ -111,12 +142,16 @@ final class LauncherScrollAnimator {
         return state == null ? verticalOffset(pane, metrics) : state.target.y;
     }
 
-    private void tick(long now) {
+    void tick(long now) {
         Iterator<Map.Entry<ScrollPane, AnimationState>> iterator = states.entrySet().iterator();
         while (iterator.hasNext()) {
             Map.Entry<ScrollPane, AnimationState> entry = iterator.next();
             ScrollPane pane = entry.getKey();
-            AnimationState state = entry.getValue().at(now);
+            AnimationState state = entry.getValue();
+            if (pendingWheelStarts.remove(pane)) {
+                state = state.startAtFirstFrame(now, frameIntervalNanos);
+            }
+            state = state.at(now);
             ScrollMetrics metrics = metrics(pane);
             apply(pane, metrics, state.current);
             if (state.finished(now) || !metrics.scrollable()) {
@@ -289,6 +324,15 @@ final class LauncherScrollAnimator {
             return new AnimationState(initial, initial, target, now,
                     Math.round(duration * 1_000_000_000.0),
                     PROGRAMMATIC_FIRST_CONTROL_X, 0, PROGRAMMATIC_SECOND_CONTROL_X, 1, 0, 0);
+        }
+
+        AnimationState startAtFirstFrame(long now, long frameIntervalNanos) {
+            // Chromium starts wheel animations one frame in and subtracts input
+            // queueing delay from their duration (LayerTreeHostImpl::ScrollAnimationCreate).
+            long delay = Math.max(0, now - startNanos);
+            return new AnimationState(initial, current, target, now - frameIntervalNanos,
+                    Math.max(0, durationNanos - delay), firstControlX, firstControlY,
+                    secondControlX, secondControlY, velocityX, velocityY);
         }
 
         AnimationState at(long now) {
