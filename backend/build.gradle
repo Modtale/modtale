@@ -9,7 +9,7 @@ version = '0.0.1-SNAPSHOT'
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 
@@ -67,6 +67,6 @@ tasks.register('statusServiceJar', org.springframework.boot.gradle.tasks.bundlin
     description = 'Builds the detached Modtale status service jar.'
     archiveClassifier = 'status'
     mainClass = 'net.modtale.status.StatusServiceApplication'
-    targetJavaVersion = JavaVersion.VERSION_21
+    targetJavaVersion = JavaVersion.VERSION_25
     classpath = sourceSets.main.runtimeClasspath
 }

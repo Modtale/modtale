@@ -12,7 +12,7 @@ version = configuredLauncherVersion
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(26)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 
@@ -23,7 +23,7 @@ repositories {
 def currentOs = org.gradle.internal.os.OperatingSystem.current()
 
 def packagingJavaLauncher = javaToolchains.launcherFor {
-    languageVersion = JavaLanguageVersion.of(26)
+    languageVersion = JavaLanguageVersion.of(25)
 }
 
 
@@ -333,7 +333,7 @@ def configureJpackageTask = { TaskProvider<Exec> packageTask, String packageType
         doFirst {
             def executable = jpackageExecutable.get()
             if (!executable.exists()) {
-                throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 26 to build native launcher installers.")
+                throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 25 to build native launcher installers.")
             }
 
             delete layout.buildDirectory.dir("jpackage/tmp/${name}")
@@ -396,7 +396,7 @@ tasks.register('prepareLinuxAppImageRuntime', Exec) {
     doFirst {
         def executable = jpackageExecutable.get()
         if (!executable.exists()) {
-            throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 26 to build the Linux AppImage.")
+            throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 25 to build the Linux AppImage.")
         }
 
         delete linuxAppImageDirectory
@@ -863,7 +863,7 @@ tasks.register('jpackageAppImage', Exec) {
     doFirst {
         def executable = jpackageExecutable.get()
         if (!executable.exists()) {
-            throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 26 to build native launcher app images.")
+            throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 25 to build native launcher app images.")
         }
 
         delete layout.buildDirectory.dir('jpackage/app-image')

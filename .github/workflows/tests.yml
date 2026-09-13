@@ -134,7 +134,8 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: 25
+          check-latest: true
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
@@ -163,7 +164,8 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: 25
+          check-latest: true
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
@@ -172,10 +174,12 @@ jobs:
         run: chmod +x gradlew
 
       - name: Install virtual display for JavaFX tests
-        run: sudo apt-get update && sudo apt-get install -y xvfb xauth libgtk-3-0
+        run: |
+          sudo bash scripts/install_linux_build_dependencies.sh
+          sudo apt-get install -y xvfb xauth
 
       - name: Run launcher tests
-        run: xvfb-run -a ./gradlew test --no-daemon
+        run: GDK_BACKEND=x11 xvfb-run -a ./gradlew test --no-daemon
 
       - name: Upload launcher test reports
         if: ${{ !cancelled() }}

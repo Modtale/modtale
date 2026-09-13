@@ -90,7 +90,7 @@ jobs:
         uses: actions/setup-java@v6.0.1
         with:
           distribution: temurin
-          java-version: 26
+          java-version: 25
           check-latest: true
 
       - name: Set up Gradle

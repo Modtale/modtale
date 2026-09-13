@@ -1,4 +1,4 @@
-FROM gradle:jdk21-jammy AS builder
+FROM docker.io/library/eclipse-temurin:25-jdk-jammy AS builder
 WORKDIR /app
 COPY gradlew settings.gradle build.gradle ./
 COPY gradle ./gradle
@@ -11,7 +11,7 @@ COPY . .
 
 RUN ./gradlew bootJar --no-daemon
 
-FROM eclipse-temurin:21-jre-jammy
+FROM docker.io/library/eclipse-temurin:25-jre-jammy
 WORKDIR /app
 COPY --from=builder /app/build/libs/*.jar app.jar
 
