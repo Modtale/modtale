@@ -113,6 +113,12 @@ final class LauncherScrollAnimator {
                 verticalOffset(pane, metrics) + deltaY));
     }
 
+    void cancelAll() {
+        states.clear();
+        pendingWheelStarts.clear();
+        stopTimerIfIdle();
+    }
+
     void cancel(ScrollPane pane) {
         states.remove(pane);
         pendingWheelStarts.remove(pane);

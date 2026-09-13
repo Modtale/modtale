@@ -368,7 +368,7 @@ public class ArchiveInstaller {
     private static Path resolveSafeDestination(Path modsDirectory, String entryName) throws IOException {
         String filename = safeFilename(Path.of(entryName).getFileName().toString());
         Path destination = uniqueDestination(modsDirectory, filename);
-        Path normalizedTarget = destination.normalize();
+        Path normalizedTarget = destination.getParent().toRealPath().resolve(destination.getFileName()).normalize();
         Path normalizedRoot = modsDirectory.toRealPath().normalize();
         if (!normalizedTarget.toAbsolutePath().normalize().startsWith(normalizedRoot.toAbsolutePath())) {
             throw new IOException("Archive entry escapes the target mods directory: " + entryName);

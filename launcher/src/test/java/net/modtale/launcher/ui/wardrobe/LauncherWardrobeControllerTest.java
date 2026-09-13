@@ -130,7 +130,7 @@ class LauncherWardrobeControllerTest {
             for (int i = 0; i < 83; i++) all.add(new WardrobeItem(new UUID(0, i + 100),
                     WardrobeItem.Kind.SKIN, "Grid " + i, false, "", SKIN.payload()));
             h.gateway.skins = List.copyOf(all);
-            fx(() -> { h.stage.setWidth(1750); button(h.root(), "Skins").fire(); h.controller.refresh(); return null; });
+            fx(() -> { h.root().setManaged(false); ((javafx.scene.layout.Region) h.root()).resize(1750, 800); button(h.root(), "Skins").fire(); h.controller.refresh(); return null; });
             await(() -> gridReady(h));
             fx(() -> {
                 assertFalse(h.root().lookup("#wardrobe-saved-filter").isVisible(), "Skin sort dropdown must be hidden");
@@ -154,7 +154,7 @@ class LauncherWardrobeControllerTest {
             assertEquals(all.stream().map(item -> "wardrobe-look-" + item.id()).toList(), seen,
                     "Provider page boundaries must not duplicate or skip skins");
             for (int width : new int[]{1100, 1450}) {
-                fx(() -> { h.stage.setWidth(width); return null; });
+                fx(() -> { ((javafx.scene.layout.Region) h.root()).resize(width, 800); return null; });
                 await(() -> gridReady(h) && gridCards(h).getFirst().getId().equals("wardrobe-look-" + all.getFirst().id()));
                 fx(() -> { assertGridWidth(h); return null; });
             }

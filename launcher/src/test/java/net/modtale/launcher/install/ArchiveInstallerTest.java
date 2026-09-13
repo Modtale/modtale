@@ -78,6 +78,24 @@ class ArchiveInstallerTest {
     }
 
     @Test
+    void acceptsAnInstallDirectoryReachedThroughAFilesystemAlias() throws IOException {
+        Path actual = Files.createDirectory(tempDir.resolve("actual"));
+        Path alias = tempDir.resolve("alias");
+        try {
+            Files.createSymbolicLink(alias, actual);
+        } catch (IOException | UnsupportedOperationException unsupported) {
+            org.junit.jupiter.api.Assumptions.abort("Symbolic links unavailable: " + unsupported);
+        }
+        Path archive = tempDir.resolve("alias-bundle.zip");
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(archive))) {
+            add(zip, "mod.jar", "mod");
+        }
+        new ArchiveInstaller().extractInstallableEntries(archive, alias.resolve("mods"));
+        assertEquals("mod", Files.readString(actual.resolve("mods/mod.jar")));
+        assertTrue(Files.notExists(tempDir.resolve("mod.jar")));
+    }
+
+    @Test
     void installsOnlyHytaleModFilesFromLegacyModpackArchive() throws IOException {
         Path archive = tempDir.resolve("modpack.zip");
         try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(archive))) {

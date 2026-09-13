@@ -42,7 +42,7 @@ class MacScrollInputTest {
                     var sample = MacScrollInput.fromEvent(nsEvent, System.nanoTime());
                     assertNotNull(sample);
                     assertEquals(unit == 0, sample.precise());
-                    assertEquals(0, sample.x());
+                    assertEquals(0, sample.x(), 0.0);
                     assertTrue(sample.y() > 0, "Both native event types must scroll down");
                     if (unit == 0) assertEquals(12, sample.y());
                 } finally {

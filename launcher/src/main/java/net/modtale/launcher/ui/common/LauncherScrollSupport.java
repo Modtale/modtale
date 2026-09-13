@@ -1,9 +1,11 @@
 package net.modtale.launcher.ui.common;
 
+import java.lang.ref.WeakReference;
 import java.util.Collections;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.function.Supplier;
+import java.util.function.LongSupplier;
 import javafx.animation.FadeTransition;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
@@ -43,7 +45,9 @@ public final class LauncherScrollSupport {
 
     private final Supplier<Node> rootSupplier;
     private final InteractionIdleTimer interactionIdleTimer;
-    private final LauncherScrollAnimator animator = new LauncherScrollAnimator();
+    private final LauncherScrollAnimator animator;
+    private final LongSupplier nanoTime;
+    private WheelSequence wheelSequence;
     private final EventHandler<ScrollEvent> scrollHandler = this::observeNativeScroll;
     private final Set<Node> configuredNodes = Collections.newSetFromMap(new WeakHashMap<>());
     private final Set<Node> installedRoots = Collections.newSetFromMap(new WeakHashMap<>());
@@ -56,6 +60,8 @@ public final class LauncherScrollSupport {
 
     public LauncherScrollSupport(Supplier<Node> rootSupplier) {
         this.rootSupplier = rootSupplier;
+        this.animator = new LauncherScrollAnimator();
+        this.nanoTime = System::nanoTime;
         PauseTransition transition = new PauseTransition(INTERACTION_IDLE_DELAY);
         transition.setOnFinished(event -> clearScrollInteraction());
         this.interactionIdleTimer = new InteractionIdleTimer() {
@@ -72,8 +78,15 @@ public final class LauncherScrollSupport {
     }
 
     LauncherScrollSupport(Supplier<Node> rootSupplier, InteractionIdleTimer interactionIdleTimer) {
+        this(rootSupplier, interactionIdleTimer, new LauncherScrollAnimator(), System::nanoTime);
+    }
+
+    LauncherScrollSupport(Supplier<Node> rootSupplier, InteractionIdleTimer interactionIdleTimer,
+                          LauncherScrollAnimator animator, LongSupplier nanoTime) {
         this.rootSupplier = rootSupplier;
         this.interactionIdleTimer = interactionIdleTimer;
+        this.animator = animator;
+        this.nanoTime = nanoTime;
     }
 
     public void configure(ScrollPane scrollPane, boolean horizontal) {
@@ -103,6 +116,7 @@ public final class LauncherScrollSupport {
         if (installedRoots.isEmpty()) {
             for (Node configuredNode : configuredNodes) {
                 configuredNode.removeEventFilter(ScrollEvent.SCROLL, scrollHandler);
+                configuredNode.removeEventFilter(ScrollEvent.SCROLL_STARTED, scrollHandler);
                 configuredNode.getProperties().remove(INSTALLED_PROPERTY);
             }
             configuredNodes.clear();
@@ -144,28 +158,37 @@ public final class LauncherScrollSupport {
         NativeScrollInput.install();
         scrollNode.getProperties().put(INSTALLED_PROPERTY, Boolean.TRUE);
         scrollNode.addEventFilter(ScrollEvent.SCROLL, scrollHandler);
+        scrollNode.addEventFilter(ScrollEvent.SCROLL_STARTED, scrollHandler);
         configuredNodes.add(scrollNode);
     }
 
     private void observeNativeScroll(ScrollEvent event) {
         long operationStart = LauncherPerformanceProbe.operationStartNanos();
         try {
+            if (event.getEventType() == ScrollEvent.SCROLL_STARTED) {
+                animator.cancelAll();
+                wheelSequence = null;
+                return;
+            }
+            if (event.getEventType() != ScrollEvent.SCROLL) return;
             NativeScrollInput.Sample nativeInput = NativeScrollInput.take(eventOutputScale(event));
             if (event.isControlDown()) {
+                wheelSequence = null;
                 return;
             }
             activateScrollInteraction();
             interactionIdleTimer.restart();
-            ScrollRequest request = scrollRequest(event, nativeInput);
+            long now = nanoTime.getAsLong();
+            boolean precise = nativeInput != null ? nativeInput.precise() : isPreciseScroll(event);
+            ScrollRequest request = scrollRequest(event, nativeInput, !precise, now);
             if (request == null) return;
             revealScrollbars(request.pane());
-            boolean precise = nativeInput != null ? nativeInput.precise() : isPreciseScroll(event);
             if (precise || !NativeScrollInput.animationsEnabled()) {
                 animator.scrollBy(request.pane(), request.metrics(), request.deltaX(), request.deltaY());
                 event.consume();
                 return;
             }
-            animator.animate(request.pane(), request.metrics(), request.deltaX(), request.deltaY(), System.nanoTime(),
+            animator.animate(request.pane(), request.metrics(), request.deltaX(), request.deltaY(), now,
                     nativeInput == null ? 0 : nativeInput.delayNanos());
             event.consume();
         } finally {
@@ -173,7 +196,7 @@ public final class LauncherScrollSupport {
         }
     }
 
-    private ScrollRequest scrollRequest(ScrollEvent event, NativeScrollInput.Sample nativeInput) {
+    private ScrollRequest scrollRequest(ScrollEvent event, NativeScrollInput.Sample nativeInput, boolean wheel, long now) {
         if (!(event.getTarget() instanceof Node target)) return null;
 
         double scale = eventOutputScale(event);
@@ -184,27 +207,70 @@ public final class LauncherScrollSupport {
             deltaY = 0;
         }
 
+        if (wheel && wheelSequence != null && wheelSequence.matches(event, target, now)) {
+            ScrollPane pane = wheelSequence.pane.get();
+            wheelSequence.lastInput = now;
+            return requestForPane(pane, event, deltaX, deltaY, scale);
+        }
+        wheelSequence = null;
         Node candidate = target;
         while (candidate != null) {
             if (candidate instanceof ScrollPane pane) {
-                LauncherScrollAnimator.ScrollMetrics metrics = LauncherScrollAnimator.metrics(pane);
-                boolean horizontal = horizontalScrollingEnabled(pane);
-                double requestedX = horizontalDelta(horizontal, deltaX);
-                double requestedY = event.getTextDeltaYUnits() == ScrollEvent.VerticalTextScrollUnits.PAGES
-                        ? -event.getTextDeltaY() * scale * pageStep(pane.getViewportBounds().getHeight())
-                        : deltaY;
-                if (horizontal && Math.abs(requestedY) >= Math.abs(requestedX)
-                        && metrics.maxY() <= 0 && metrics.maxX() > 0) {
-                    requestedX = requestedY;
-                    requestedY = 0;
-                }
-                if (canConsume(pane, metrics, requestedX, requestedY)) {
-                    return new ScrollRequest(pane, metrics, requestedX, requestedY);
+                ScrollRequest request = requestForPane(pane, event, deltaX, deltaY, scale);
+                if (canConsume(pane, request.metrics(), request.deltaX(), request.deltaY())) {
+                    if (wheel) wheelSequence = new WheelSequence(pane, event, now);
+                    return request;
                 }
             }
             candidate = candidate.getParent();
         }
         return null;
+    }
+
+    private static ScrollRequest requestForPane(ScrollPane pane, ScrollEvent event,
+                                                double deltaX, double deltaY, double scale) {
+        LauncherScrollAnimator.ScrollMetrics metrics = LauncherScrollAnimator.metrics(pane);
+        boolean horizontal = horizontalScrollingEnabled(pane);
+        double requestedX = horizontalDelta(horizontal, deltaX);
+        double requestedY = event.getTextDeltaYUnits() == ScrollEvent.VerticalTextScrollUnits.PAGES
+                ? -event.getTextDeltaY() * scale * pageStep(pane.getViewportBounds().getHeight()) : deltaY;
+        if (horizontal && Math.abs(requestedY) >= Math.abs(requestedX)
+                && metrics.maxY() <= 0 && metrics.maxX() > 0) {
+            requestedX = requestedY;
+            requestedY = 0;
+        }
+        return new ScrollRequest(pane, metrics, requestedX, requestedY);
+    }
+
+    private static final class WheelSequence {
+        private final WeakReference<ScrollPane> pane;
+        private final double x, y;
+        private final int modifiers;
+        private long lastInput;
+
+        private WheelSequence(ScrollPane pane, ScrollEvent event, long now) {
+            this.pane = new WeakReference<>(pane);
+            x = event.getScreenX();
+            y = event.getScreenY();
+            modifiers = modifiers(event);
+            lastInput = now;
+        }
+
+        private boolean matches(ScrollEvent event, Node target, long now) {
+            ScrollPane current = pane.get();
+            if (current == null || current.getScene() != target.getScene()
+                    || now - lastInput >= 500_000_000 || modifiers != modifiers(event)) return false;
+            for (Node node = current; node != null; node = node.getParent()) {
+                if (!node.isVisible()) return false;
+            }
+            double dx = event.getScreenX() - x, dy = event.getScreenY() - y;
+            return dx * dx + dy * dy < 100;
+        }
+
+        private static int modifiers(ScrollEvent event) {
+            return (event.isShiftDown() ? 1 : 0) | (event.isControlDown() ? 2 : 0)
+                    | (event.isAltDown() ? 4 : 0) | (event.isMetaDown() ? 8 : 0);
+        }
     }
 
     private static boolean horizontalScrollingEnabled(ScrollPane pane) {

@@ -118,6 +118,71 @@ class NativeInteractionRegressionTest {
     }
 
     @Test
+    void wheelBurstStaysInItsScrollerAtTheEdgeUntilANewSequenceStarts() throws Exception {
+        fx(() -> {
+            Region innerContent = new Region(); innerContent.resize(500, 800);
+            ScrollPane inner = new ScrollPane(innerContent);
+            inner.setViewportBounds(new BoundingBox(0, 0, 500, 700)); inner.setVvalue(.9);
+            var outerContent = new javafx.scene.layout.VBox(inner); outerContent.resize(500, 2000);
+            ScrollPane outer = new ScrollPane(outerContent);
+            new javafx.scene.Scene(outer, 500, 1000);
+            outer.applyCss();
+            innerContent.resize(500, 800); outerContent.resize(500, 2000);
+            inner.setViewportBounds(new BoundingBox(0, 0, 500, 700)); inner.setVvalue(.9);
+            outer.setViewportBounds(new BoundingBox(0, 0, 500, 1000));
+            var time = new java.util.concurrent.atomic.AtomicLong();
+            LauncherScrollAnimator animator = new LauncherScrollAnimator(16_666_667);
+            LauncherScrollSupport support = new LauncherScrollSupport(() -> outer,
+                    new LauncherScrollSupport.InteractionIdleTimer() {
+                        public void restart() { }
+                        public void stop() { }
+                    }, animator, time::get);
+            support.configureNode(outer);
+            innerContent.fireEvent(wheel(ScrollEvent.SCROLL)); animator.tick(0);
+            time.set(50_000_000);
+            innerContent.fireEvent(wheel(ScrollEvent.SCROLL)); animator.tick(500_000_000);
+            assertEquals(1, inner.getVvalue());
+            assertEquals(0, outer.getVvalue(), "Reaching a nested edge must not move its parent mid-burst");
+            time.set(600_000_000);
+            innerContent.fireEvent(wheel(ScrollEvent.SCROLL));
+            animator.tick(600_000_000); animator.tick(900_000_000);
+            assertEquals(120, outer.getVvalue() * 1000, 1e-8,
+                    "A new wheel sequence at the edge may scroll the parent");
+            animator.cancelAll();
+            return null;
+        });
+    }
+
+    @Test
+    void beginningATouchpadGestureCancelsOutstandingWheelMomentum() throws Exception {
+        fx(() -> {
+            Region content = new Region(); content.resize(800, 2400);
+            ScrollPane pane = new ScrollPane(content);
+            pane.setViewportBounds(new BoundingBox(0, 0, 800, 400));
+            LauncherScrollAnimator animator = new LauncherScrollAnimator(16_666_667);
+            LauncherScrollSupport support = new LauncherScrollSupport(() -> pane,
+                    new LauncherScrollSupport.InteractionIdleTimer() {
+                        public void restart() { }
+                        public void stop() { }
+                    }, animator, () -> 0);
+            support.configureNode(pane);
+            pane.fireEvent(wheel(ScrollEvent.SCROLL)); animator.tick(0);
+            double before = pane.getVvalue();
+            pane.fireEvent(wheel(ScrollEvent.SCROLL_STARTED));
+            animator.tick(500_000_000);
+            assertEquals(before, pane.getVvalue(), "Touch contact must cancel the previous wheel animation");
+            return null;
+        });
+    }
+
+    private static ScrollEvent wheel(javafx.event.EventType<ScrollEvent> type) {
+        return new ScrollEvent(type, 20, 20, 20, 20,
+                false, false, false, false, false, false, 0, -40, 0, -40,
+                ScrollEvent.HorizontalTextScrollUnits.NONE, 0,
+                ScrollEvent.VerticalTextScrollUnits.NONE, 0, 0, null);
+    }
+
+    @Test
     void draggingTheScrollbarInterruptsMomentumInsteadOfSnappingBack() throws Exception {
         fx(() -> {
             Region content = new Region();
