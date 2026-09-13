@@ -13,6 +13,21 @@ import org.junit.jupiter.api.Test;
 
 class NativeCreatorProfileViewTest {
     @Test
+    void avatarHasItsFullSizeBeforeDecodingAndAfterResize() {
+        StackPane media = new StackPane();
+        media.resize(208, 208);
+        var image = NativeCreatorProfileView.coverImage(media);
+        assertEquals(208, image.getFitWidth());
+        assertEquals(208, image.getFitHeight());
+        image.setImage(new WritableImage(224, 224));
+        assertEquals(208, image.getBoundsInLocal().getWidth());
+        assertEquals(208, image.getBoundsInLocal().getHeight());
+        media.resize(80, 80);
+        assertEquals(80, image.getBoundsInLocal().getWidth());
+        assertEquals(80, image.getBoundsInLocal().getHeight());
+    }
+
+    @Test
     void resolvesProviderUrlsLikeTheWebProfile() {
         assertEquals("https://discord.com/users/123",
                 NativeCreatorProfileView.socialUrl(account("discord", "123", "ada", "")));

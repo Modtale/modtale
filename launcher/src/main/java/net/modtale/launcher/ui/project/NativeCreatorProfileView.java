@@ -565,40 +565,18 @@ final class NativeCreatorProfileView {
     }
 
     private ImageView coverImage(String url, Region box, double requestedWidth, double requestedHeight) {
+        ImageView image = coverImage(box);
+        imageLoader.loadInto(image, url, requestedWidth, requestedHeight);
+        return image;
+    }
+
+    static ImageView coverImage(Region box) {
         ImageView image = new ImageView();
         image.setSmooth(true);
         image.setPreserveRatio(false);
-        // Keep the remote image's natural/request dimensions out of parent layout. Otherwise the
-        // banner can make the page thousands of pixels wide before its viewport has been measured,
-        // creating a self-sustaining oversized cover crop.
-        image.setFitWidth(1);
-        image.setFitHeight(1);
-        imageLoader.loadInto(image, url, requestedWidth, requestedHeight, true);
-        Runnable update = () -> {
-            double width = box.getWidth();
-            double height = box.getHeight();
-            javafx.scene.image.Image loaded = image.getImage();
-            if (!Double.isFinite(width) || width <= 1 || !Double.isFinite(height) || height <= 1 || loaded == null) {
-                return;
-            }
-            double imageWidth = loaded.getWidth();
-            double imageHeight = loaded.getHeight();
-            if (!Double.isFinite(imageWidth) || imageWidth <= 0 || !Double.isFinite(imageHeight) || imageHeight <= 0) {
-                return;
-            }
-            double imageRatio = imageWidth / imageHeight;
-            double boxRatio = width / height;
-            if (imageRatio > boxRatio) {
-                image.setFitWidth(height * imageRatio);
-                image.setFitHeight(height);
-            } else {
-                image.setFitWidth(width);
-                image.setFitHeight(width / imageRatio);
-            }
-        };
-        box.widthProperty().addListener((observable, previous, current) -> update.run());
-        box.heightProperty().addListener((observable, previous, current) -> update.run());
-        image.imageProperty().addListener((observable, previous, current) -> update.run());
+        // Size independently of asynchronous decoding; the shared loader updates the cover crop.
+        image.fitWidthProperty().bind(box.widthProperty());
+        image.fitHeightProperty().bind(box.heightProperty());
         return image;
     }
 
