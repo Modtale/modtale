@@ -56,7 +56,7 @@ class MacScrollInputTest {
     }
 
     interface CoreGraphics extends Library {
-        Pointer CGEventCreateScrollWheelEvent(Pointer source, int unit, int wheelCount, Object... deltas);
+        Pointer CGEventCreateScrollWheelEvent(Pointer source, int unit, int wheelCount, int firstDelta, Object... additionalDeltas);
         void CFRelease(Pointer object);
     }
 }
