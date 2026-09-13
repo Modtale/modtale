@@ -35,6 +35,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 26
+          check-latest: true
       - uses: gradle/actions/setup-gradle@v6.3.0
       - name: Install Linux display dependencies
         if: runner.os == 'Linux'

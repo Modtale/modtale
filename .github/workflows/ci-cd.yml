@@ -871,6 +871,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 26
+          check-latest: true
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6.3.0
