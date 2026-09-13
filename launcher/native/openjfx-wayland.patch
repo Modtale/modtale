@@ -321,7 +321,7 @@ index 4d1420d2..cfb1f938 100644
      JNI_EXCEPTION_TO_CPP(env);
      return jScreen;
 diff --git a/modules/javafx.graphics/src/main/native-glass/gtk/glass_window.cpp b/modules/javafx.graphics/src/main/native-glass/gtk/glass_window.cpp
-index ec79b4ea..a709b575 100644
+index ec79b4ea..237e7867 100644
 --- a/modules/javafx.graphics/src/main/native-glass/gtk/glass_window.cpp
 +++ b/modules/javafx.graphics/src/main/native-glass/gtk/glass_window.cpp
 @@ -41,6 +41,7 @@
@@ -353,7 +353,17 @@ index ec79b4ea..a709b575 100644
      cairo_region_destroy(region);
  #endif
  
-@@ -687,6 +695,21 @@ WindowFrameExtents WindowContextTop::normal_extents = {0, 0, 0, 0};
+@@ -545,6 +553,9 @@ void WindowContextBase::remove_child(WindowContextTop* child) {
+ void WindowContextBase::set_visible(bool visible) {
+     if (visible) {
+         gtk_widget_show(gtk_widget);
++        if (GDK_IS_WAYLAND_DISPLAY(gdk_display_get_default())) {
++            gdk_wayland_window_set_application_id(gdk_window, "net.modtale.launcher");
++        }
+     } else {
+         gtk_widget_hide(gtk_widget);
+         if (jview && is_mouse_entered) {
+@@ -687,6 +698,21 @@ WindowFrameExtents WindowContextTop::normal_extents = {0, 0, 0, 0};
  WindowFrameExtents WindowContextTop::utility_extents = {0, 0, 0, 0};
  
  
@@ -375,7 +385,7 @@ index ec79b4ea..a709b575 100644
  static void event_realize(GtkWidget* self, gpointer user_data) {
      WindowContextTop *ctx = ((WindowContextTop *) user_data);
      ctx->process_realize();
-@@ -762,14 +785,15 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
+@@ -762,14 +788,15 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
          gtk_window_set_type_hint(GTK_WINDOW(gtk_widget), GDK_WINDOW_TYPE_HINT_UTILITY);
      }
  
@@ -393,7 +403,7 @@ index ec79b4ea..a709b575 100644
          GdkVisual *visual = gdk_x11_screen_lookup_visual(gdk_screen_get_default(), xvisualID);
          glass_gtk_window_configure_from_visual(gtk_widget, visual);
      }
-@@ -800,6 +824,7 @@ void WindowContextTop::detach_from_java() {
+@@ -800,6 +827,7 @@ void WindowContextTop::detach_from_java() {
  }
  
  void WindowContextTop::request_frame_extents() {
@@ -401,19 +411,18 @@ index ec79b4ea..a709b575 100644
      Display *display = GDK_DISPLAY_XDISPLAY(gdk_window_get_display(gdk_window));
      static Atom rfeAtom = XInternAtom(display, "_NET_REQUEST_FRAME_EXTENTS", False);
  
-@@ -976,6 +1001,11 @@ void WindowContextTop::process_realize() {
+@@ -976,6 +1004,10 @@ void WindowContextTop::process_realize() {
      gdk_window_set_events(gdk_window, GDK_FILTERED_EVENTS_MASK);
      g_object_set_data_full(G_OBJECT(gdk_window), GDK_WINDOW_DATA_CONTEXT, this, NULL);
      gdk_window_register_dnd(gdk_window);
 +    if (!GDK_IS_X11_DISPLAY(gdk_display_get_default())) {
-+        gdk_wayland_window_set_application_id(gdk_window, "net.modtale.launcher");
 +        g_signal_connect(gtk_widget, "notify::scale-factor", G_CALLBACK(event_output_scale), this);
 +        event_output_scale(G_OBJECT(gtk_widget), NULL, this);
 +    }
  
      if (gdk_windowManagerFunctions) {
          gdk_window_set_functions(gdk_window, gdk_windowManagerFunctions);
-@@ -1023,7 +1053,9 @@ void WindowContextTop::process_configure(GdkEventConfigure* event) {
+@@ -1023,7 +1055,9 @@ void WindowContextTop::process_configure(GdkEventConfigure* event) {
      geometry.view_y = origin_y - root_y;
      notify_window_move();
  
