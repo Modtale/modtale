@@ -133,7 +133,7 @@ index 98e45d5e..7f87d6ff 100644
  
  def closedDir = file("$projectDir/../rt-closed")
 diff --git a/modules/javafx.graphics/src/main/native-glass/gtk/GlassApplication.cpp b/modules/javafx.graphics/src/main/native-glass/gtk/GlassApplication.cpp
-index dec009e8..8c030378 100644
+index dec009e8..c58445c2 100644
 --- a/modules/javafx.graphics/src/main/native-glass/gtk/GlassApplication.cpp
 +++ b/modules/javafx.graphics/src/main/native-glass/gtk/GlassApplication.cpp
 @@ -22,10 +22,8 @@
@@ -148,7 +148,23 @@ index dec009e8..8c030378 100644
  #include <gtk/gtk.h>
  #include <glib.h>
  #include <sstream>
-@@ -157,11 +155,8 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1queryLibrary
+@@ -98,15 +96,6 @@ extern "C" {
+ #pragma GCC diagnostic push
+ #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+ static void init_threads() {
+-    gboolean is_g_thread_get_initialized = FALSE;
+-    if (glib_check_version(2, 32, 0)) { // < 2.32
+-        if (!glib_check_version(2, 20, 0)) {
+-            is_g_thread_get_initialized = g_thread_get_initialized();
+-        }
+-        if (!is_g_thread_get_initialized) {
+-            g_thread_init(NULL);
+-        }
+-    }
+     gdk_threads_init();
+ }
+ #pragma GCC diagnostic pop
+@@ -157,11 +146,8 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1queryLibrary
      (void)suggestedVersion;
      (void)verbose;
  
@@ -162,7 +178,7 @@ index dec009e8..8c030378 100644
  
      return com_sun_glass_ui_gtk_GtkApplication_QUERY_USE_CURRENT;
  }
-@@ -181,7 +176,6 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1init
+@@ -181,7 +167,6 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1init
      process_events_prev = (GdkEventFunc) handler;
      disableGrab = (gboolean) _disableGrab;
  
@@ -170,7 +186,7 @@ index dec009e8..8c030378 100644
      gdk_event_handler_set(process_events, NULL, NULL);
  
      GdkScreen *default_gdk_screen = gdk_screen_get_default();
-@@ -192,8 +186,6 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1init
+@@ -192,8 +177,6 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1init
                           G_CALLBACK(screen_settings_changed), NULL);
      }
  
@@ -179,7 +195,7 @@ index dec009e8..8c030378 100644
  
      platformSupport = new PlatformSupport(env, obj);
  
-@@ -215,37 +207,8 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1runLoop
+@@ -215,37 +198,8 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1runLoop
      env->CallVoidMethod(launchable, jRunnableRun);
      CHECK_JNI_EXCEPTION(env);
  
@@ -217,7 +233,7 @@ index dec009e8..8c030378 100644
      gdk_threads_leave();
  
  }
-@@ -465,8 +428,42 @@ bool is_window_enabled_for_event(GdkWindow * window, WindowContext *ctx, gint ev
+@@ -465,8 +419,42 @@ bool is_window_enabled_for_event(GdkWindow * window, WindowContext *ctx, gint ev
      return TRUE;
  }
  
@@ -794,7 +810,7 @@ index 4d1420d2..f32cfc44 100644
      JNI_EXCEPTION_TO_CPP(env);
      return jScreen;
 diff --git a/modules/javafx.graphics/src/main/native-glass/gtk/glass_window.cpp b/modules/javafx.graphics/src/main/native-glass/gtk/glass_window.cpp
-index ec79b4ea..7eb15d3f 100644
+index ec79b4ea..4b31b671 100644
 --- a/modules/javafx.graphics/src/main/native-glass/gtk/glass_window.cpp
 +++ b/modules/javafx.graphics/src/main/native-glass/gtk/glass_window.cpp
 @@ -36,13 +36,10 @@
@@ -812,7 +828,19 @@ index ec79b4ea..7eb15d3f 100644
  #endif
  
  #include <string.h>
-@@ -517,6 +514,10 @@ void WindowContextBase::paint(void* data, jint width, jint height) {
+@@ -395,11 +392,8 @@ void WindowContextBase::process_mouse_scroll(GdkEventScroll* event) {
+ 
+     // converting direction to change in pixels
+     switch (event->direction) {
+-#if GTK_CHECK_VERSION(3, 4, 0)
+         case GDK_SCROLL_SMOOTH:
+-            //FIXME 3.4 ???
+             break;
+-#endif
+         case GDK_SCROLL_UP:
+             dy = 1;
+             break;
+@@ -517,6 +511,10 @@ void WindowContextBase::paint(void* data, jint width, jint height) {
              CAIRO_FORMAT_ARGB32,
              width, height, width * 4);
  
@@ -823,7 +851,7 @@ index ec79b4ea..7eb15d3f 100644
      applyShapeMask(data, width, height);
  
      cairo_set_source_surface(context, cairo_surface, 0, 0);
-@@ -525,6 +526,9 @@ void WindowContextBase::paint(void* data, jint width, jint height) {
+@@ -525,6 +523,9 @@ void WindowContextBase::paint(void* data, jint width, jint height) {
  
  #ifdef GLASS_GTK3
      gdk_window_end_paint(gdk_window);
@@ -833,7 +861,7 @@ index ec79b4ea..7eb15d3f 100644
      cairo_region_destroy(region);
  #endif
  
-@@ -545,6 +549,9 @@ void WindowContextBase::remove_child(WindowContextTop* child) {
+@@ -545,6 +546,9 @@ void WindowContextBase::remove_child(WindowContextTop* child) {
  void WindowContextBase::set_visible(bool visible) {
      if (visible) {
          gtk_widget_show(gtk_widget);
@@ -843,7 +871,7 @@ index ec79b4ea..7eb15d3f 100644
      } else {
          gtk_widget_hide(gtk_widget);
          if (jview && is_mouse_entered) {
-@@ -687,6 +694,21 @@ WindowFrameExtents WindowContextTop::normal_extents = {0, 0, 0, 0};
+@@ -687,6 +691,21 @@ WindowFrameExtents WindowContextTop::normal_extents = {0, 0, 0, 0};
  WindowFrameExtents WindowContextTop::utility_extents = {0, 0, 0, 0};
  
  
@@ -865,7 +893,7 @@ index ec79b4ea..7eb15d3f 100644
  static void event_realize(GtkWidget* self, gpointer user_data) {
      WindowContextTop *ctx = ((WindowContextTop *) user_data);
      ctx->process_realize();
-@@ -762,17 +784,13 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
+@@ -762,17 +781,13 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
          gtk_window_set_type_hint(GTK_WINDOW(gtk_widget), GDK_WINDOW_TYPE_HINT_UTILITY);
      }
  
@@ -884,7 +912,7 @@ index ec79b4ea..7eb15d3f 100644
  
      gtk_widget_set_events(gtk_widget, GDK_FILTERED_EVENTS_MASK);
      gtk_widget_set_app_paintable(gtk_widget, TRUE);
-@@ -800,23 +818,7 @@ void WindowContextTop::detach_from_java() {
+@@ -800,23 +815,7 @@ void WindowContextTop::detach_from_java() {
  }
  
  void WindowContextTop::request_frame_extents() {
@@ -909,7 +937,7 @@ index ec79b4ea..7eb15d3f 100644
  }
  
  void WindowContextTop::update_frame_extents() {
-@@ -976,6 +978,10 @@ void WindowContextTop::process_realize() {
+@@ -976,6 +975,10 @@ void WindowContextTop::process_realize() {
      gdk_window_set_events(gdk_window, GDK_FILTERED_EVENTS_MASK);
      g_object_set_data_full(G_OBJECT(gdk_window), GDK_WINDOW_DATA_CONTEXT, this, NULL);
      gdk_window_register_dnd(gdk_window);
@@ -920,7 +948,7 @@ index ec79b4ea..7eb15d3f 100644
  
      if (gdk_windowManagerFunctions) {
          gdk_window_set_functions(gdk_window, gdk_windowManagerFunctions);
-@@ -1023,7 +1029,7 @@ void WindowContextTop::process_configure(GdkEventConfigure* event) {
+@@ -1023,7 +1026,7 @@ void WindowContextTop::process_configure(GdkEventConfigure* event) {
      geometry.view_y = origin_y - root_y;
      notify_window_move();
  

@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.awt.Desktop;
+import net.modtale.launcher.platform.SystemFileOpener;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -137,11 +137,8 @@ public class LauncherUpdateService {
         if (installer == null) {
             return;
         }
-        if (!Desktop.isDesktopSupported()) {
-            throw new ModtaleApiException("This desktop environment cannot open " + installer + " automatically.");
-        }
         try {
-            Desktop.getDesktop().open(installer.toFile());
+            SystemFileOpener.open(installer);
         } catch (IOException ex) {
             LOG.warn("Could not open launcher installer " + installer, ex);
             throw new ModtaleApiException("Could not open launcher installer " + installer, ex);
