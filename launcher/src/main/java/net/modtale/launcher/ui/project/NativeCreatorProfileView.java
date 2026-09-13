@@ -132,65 +132,17 @@ final class NativeCreatorProfileView {
     }
 
     private StackPane hero(CreatorProfile profile) {
-        StackPane hero = new StackPane();
-        hero.getStyleClass().add("creator-profile-hero");
-        hero.setMinWidth(0);
-        hero.setMaxWidth(Double.MAX_VALUE);
-        hero.setPrefHeight(BANNER_FALLBACK_HEIGHT);
-        hero.setMaxHeight(Double.MAX_VALUE);
-
-        StackPane media = new StackPane();
-        media.getStyleClass().add("creator-profile-banner");
-        media.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        String bannerUrl = profile == null ? "" : value(profile.bannerUrl(), "");
-        if (bannerUrl.isBlank()) {
-            media.getChildren().add(fallbackBanner());
-        } else {
-            media.getStyleClass().add("letterboxed");
-            ImageView image = bannerImage(hero);
-            imageLoader.loadInto(image, bannerUrl, 1920, 640, true);
-            media.getChildren().add(image);
-        }
-
-        Region fade = new Region();
-        fade.getStyleClass().add("creator-profile-banner-fade");
-        fade.setMouseTransparent(true);
-        NativeBannerScrollEffect.bind(media, fade, scrollPixels, hero.widthProperty());
-
-        HBox backLayer = new HBox();
-        backLayer.setAlignment(Pos.TOP_LEFT);
-        backLayer.setMaxWidth(Double.MAX_VALUE);
-        backLayer.setMouseTransparent(false);
-        StackPane.setAlignment(backLayer, Pos.TOP_CENTER);
-        StackPane.setMargin(backLayer, LauncherLayout.launcherPageInsets(25, 0));
-        Button back = new Button("Back", LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_LEFT, 16));
-        back.getStyleClass().add("creator-profile-back");
-        back.setOnAction(event -> showDiscover.run());
-        backLayer.getChildren().add(back);
-
-        hero.getChildren().addAll(media, fade, backLayer);
-        return hero;
+        return NativePageBanner.create("creator-profile-hero", "creator-profile",
+                profile == null ? "" : value(profile.bannerUrl(), ""), imageLoader,
+                scrollPixels, showDiscover, BANNER_FALLBACK_HEIGHT);
     }
 
     static ImageView bannerImage(Region banner) {
-        ImageView image = new ImageView();
-        image.getStyleClass().add("creator-profile-banner-image");
-        image.setPreserveRatio(true);
-        image.setSmooth(true);
-        image.fitWidthProperty().bind(banner.widthProperty());
-        image.fitHeightProperty().bind(banner.heightProperty());
-        return image;
+        return NativePageBanner.image(banner, "creator-profile-banner-image");
     }
 
     static double bannerHeight(double width) {
-        return Double.isFinite(width) && width > 0 ? width / 3.0 : BANNER_FALLBACK_HEIGHT;
-    }
-
-    private Region fallbackBanner() {
-        Region fallback = new Region();
-        fallback.getStyleClass().add("creator-profile-banner-fallback");
-        fallback.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        return fallback;
+        return NativePageBanner.height(width, BANNER_FALLBACK_HEIGHT);
     }
 
     private HBox loadingCard() {

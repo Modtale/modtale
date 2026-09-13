@@ -1269,63 +1269,20 @@ public final class ProjectPageController {
     }
 
     private StackPane banner(ProjectSummary summary, ProjectDetail detail, boolean hasBanner) {
-        StackPane banner = new StackPane();
-        banner.getStyleClass().add("project-detail-banner");
-        banner.setMinWidth(0);
-        banner.setMaxWidth(Double.MAX_VALUE);
-        banner.setPrefHeight(BANNER_FALLBACK_HEIGHT);
-        banner.setMaxHeight(Double.MAX_VALUE);
+        StackPane banner = NativePageBanner.create("project-detail-banner", "project-detail",
+                hasBanner ? first(detail == null ? null : detail.bannerUrl(), summary.bannerUrl()) : "",
+                imageLoader, scrollPixels, showDiscover, BANNER_FALLBACK_HEIGHT);
         banner.prefHeightProperty().bind(Bindings.createDoubleBinding(
                 () -> bannerHeight(content.getWidth()),
                 content.widthProperty()
         ));
         banner.minHeightProperty().bind(banner.prefHeightProperty());
 
-        StackPane media = new StackPane();
-        media.getStyleClass().add("project-detail-banner-media");
-        media.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-
-        String bannerUrl = first(detail == null ? null : detail.bannerUrl(), summary.bannerUrl());
-        if (hasBanner) {
-            media.getStyleClass().add("letterboxed");
-            ImageView image = new ImageView();
-            image.getStyleClass().add("project-detail-banner-image");
-            image.setPreserveRatio(true);
-            image.setSmooth(true);
-            image.fitWidthProperty().bind(banner.widthProperty());
-            image.fitHeightProperty().bind(banner.heightProperty());
-            imageLoader.loadInto(image, bannerUrl, 1920, 640, true);
-            media.getChildren().add(image);
-        } else {
-            Region fallback = new Region();
-            fallback.getStyleClass().add("project-detail-banner-fallback");
-            fallback.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-            media.getChildren().add(fallback);
-        }
-        banner.getChildren().add(media);
-
-        Region fade = new Region();
-        fade.getStyleClass().add("project-detail-banner-fade");
-        fade.setMouseTransparent(true);
-        NativeBannerScrollEffect.bind(media, fade, scrollPixels, banner.widthProperty());
-        banner.getChildren().add(fade);
-
-        HBox backLayer = new HBox();
-        backLayer.setAlignment(Pos.TOP_LEFT);
-        backLayer.setMaxWidth(Double.MAX_VALUE);
-        backLayer.setMouseTransparent(false);
-        StackPane.setAlignment(backLayer, Pos.TOP_CENTER);
-        StackPane.setMargin(backLayer, LauncherLayout.launcherPageInsets(25, 0));
-        Button back = new Button("Back", LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_LEFT, 16));
-        back.getStyleClass().add("project-detail-back");
-        back.setOnAction(event -> showDiscover.run());
-        backLayer.getChildren().add(back);
-        banner.getChildren().add(backLayer);
         return banner;
     }
 
     static double bannerHeight(double width) {
-        return Double.isFinite(width) && width > 0 ? width / 3.0 : BANNER_FALLBACK_HEIGHT;
+        return NativePageBanner.height(width, BANNER_FALLBACK_HEIGHT);
     }
 
     private Node header(ProjectSummary summary, ProjectDetail detail, boolean loading) {

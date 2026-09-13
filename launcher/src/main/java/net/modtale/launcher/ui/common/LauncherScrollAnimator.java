@@ -9,7 +9,7 @@ import javafx.scene.control.ScrollPane;
 
 /**
  * Mouse-wheel scroll animation matching Chromium's inverse-delta scroll curve.
- * Precise touchpad input never enters this animator; the platform handles it directly.
+ * Precise touchpad input bypasses animation and applies its pixel deltas directly.
  */
 final class LauncherScrollAnimator {
 
@@ -63,6 +63,13 @@ final class LauncherScrollAnimator {
         states.put(pane, retargeted);
         apply(pane, metrics, retargeted.current);
         startTimer();
+    }
+
+    void scrollBy(ScrollPane pane, ScrollMetrics metrics, double deltaX, double deltaY) {
+        cancel(pane);
+        apply(pane, metrics, new Point(
+                horizontalOffset(pane, metrics) + deltaX,
+                verticalOffset(pane, metrics) + deltaY));
     }
 
     void cancel(ScrollPane pane) {

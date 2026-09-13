@@ -111,6 +111,8 @@ public final class ProjectBrowseCategories {
         rebuildCategories();
         pillIndicator.getStyleClass().add("category-pill-indicator");
         pillIndicator.setMouseTransparent(true);
+        pillIndicator.setCache(true);
+        pillIndicator.setCacheHint(javafx.scene.CacheHint.SCALE);
         pillIndicator.setVisible(false);
         pillIndicator.setMinWidth(0);
         pillIndicator.setMinHeight(36);
@@ -173,6 +175,12 @@ public final class ProjectBrowseCategories {
         content.setMouseTransparent(true);
         button.setGraphic(content);
         button.setOnAction(event -> selectClassification(option));
+        button.layoutBoundsProperty().addListener(observable -> {
+            if (option.equals(selectedClassification)) animatePill();
+        });
+        button.layoutXProperty().addListener(observable -> {
+            if (option.equals(selectedClassification)) animatePill();
+        });
         categoryButtons.put(option, button);
         pane.getChildren().add(button);
     }
@@ -242,11 +250,10 @@ public final class ProjectBrowseCategories {
             return;
         }
         if (selected.getWidth() <= 0) {
-            Platform.runLater(this::animatePill);
             return;
         }
         pillIndicator.setVisible(true);
-        double targetX = selected.getBoundsInParent().getMinX();
+        double targetX = selected.getLayoutX();
         double targetWidth = selected.getWidth();
         if (pillTimeline != null) {
             pillTimeline.stop();
@@ -259,8 +266,10 @@ public final class ProjectBrowseCategories {
             pillIndicator.setScaleX(1);
             return;
         }
-        double startWidth = Math.max(1, pillIndicator.getBoundsInParent().getWidth());
-        double startX = pillIndicator.getBoundsInParent().getMinX();
+        double startWidth = Math.max(1, pillIndicator.getWidth() * pillIndicator.getScaleX());
+        // Bounds in parent include the drop shadow, which is not part of the pill.
+        double startX = pillIndicator.getTranslateX()
+                + (pillIndicator.getWidth() - startWidth) / 2.0;
         double startScale = startWidth / targetWidth;
         double startTranslate = startX - (targetWidth - startWidth) / 2.0;
         pillIndicator.setMinWidth(targetWidth);

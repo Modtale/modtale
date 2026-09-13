@@ -36,9 +36,12 @@ final class NativeBannerScrollEffect {
         scrollPixels.addListener(scrollListener);
         viewportWidth.addListener(widthListener);
         media.sceneProperty().addListener((observable, previous, current) -> {
-            if (previous != null && current == null) {
-                scrollPixels.removeListener(scrollListener);
-                viewportWidth.removeListener(widthListener);
+            scrollPixels.removeListener(scrollListener);
+            viewportWidth.removeListener(widthListener);
+            if (current != null) {
+                scrollPixels.addListener(scrollListener);
+                viewportWidth.addListener(widthListener);
+                widthListener.invalidated(viewportWidth);
             }
         });
         widthListener.invalidated(viewportWidth);

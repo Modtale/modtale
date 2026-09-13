@@ -1,7 +1,6 @@
 package net.modtale.launcher.ui.common;
 
 import java.util.Collections;
-import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.function.Supplier;
@@ -30,6 +29,8 @@ public final class LauncherScrollSupport {
 
     private static final String INSTALLED_PROPERTY = LauncherScrollSupport.class.getName() + ".installed";
     private static final String SCROLLBAR_DISCOVERY_PROPERTY = LauncherScrollSupport.class.getName() + ".scrollbarDiscovery";
+    private static final String SCROLLBAR_VISIBILITY_PROPERTY = LauncherScrollSupport.class.getName() + ".visibility";
+    private static final String SCROLLBARS_PROPERTY = LauncherScrollSupport.class.getName() + ".scrollbars";
     private static final String HORIZONTAL_SCROLL_PROPERTY = LauncherScrollSupport.class.getName() + ".horizontal";
     private static final String HORIZONTAL_LOCK_PROPERTY = LauncherScrollSupport.class.getName() + ".horizontalLock";
     private static final PseudoClass SCROLLING = PseudoClass.getPseudoClass("scrolling");
@@ -46,7 +47,6 @@ public final class LauncherScrollSupport {
     private final EventHandler<ScrollEvent> scrollHandler = this::observeNativeScroll;
     private final Set<Node> configuredNodes = Collections.newSetFromMap(new WeakHashMap<>());
     private final Set<Node> installedRoots = Collections.newSetFromMap(new WeakHashMap<>());
-    private final Map<ScrollBar, ScrollbarVisibility> scrollbarVisibility = new WeakHashMap<>();
     private final ListChangeListener<Window> windowListener = change -> {
         while (change.next()) {
             if (change.wasAdded()) change.getAddedSubList().forEach(this::installWindow);
@@ -94,8 +94,8 @@ public final class LauncherScrollSupport {
         if (Boolean.TRUE.equals(scrollPane.getProperties().get(SCROLLBAR_DISCOVERY_PROPERTY))) return;
         scrollPane.getProperties().put(SCROLLBAR_DISCOVERY_PROPERTY, Boolean.TRUE);
         scrollPane.skinProperty().addListener((observable, previous, current) ->
-                Platform.runLater(() -> configureScrollbars(scrollPane)));
-        Platform.runLater(() -> configureScrollbars(scrollPane));
+                Platform.runLater(() -> discoverScrollbars(scrollPane)));
+        Platform.runLater(() -> discoverScrollbars(scrollPane));
     }
 
     public void install(Node root) {
@@ -158,7 +158,8 @@ public final class LauncherScrollSupport {
             if (request == null) return;
             revealScrollbars(request.pane());
             if (isPreciseScroll(event)) {
-                animator.cancel(request.pane());
+                animator.scrollBy(request.pane(), request.metrics(), request.deltaX(), request.deltaY());
+                event.consume();
                 return;
             }
             animator.animate(request.pane(), request.metrics(), request.deltaX(), request.deltaY(), System.nanoTime());
@@ -316,19 +317,39 @@ public final class LauncherScrollSupport {
                 .forEach(this::configureScrollbar);
     }
 
-    private void revealScrollbars(ScrollPane pane) {
-        configureScrollbars(pane);
-        pane.lookupAll(".scroll-bar").stream()
+    private void discoverScrollbars(ScrollPane pane) {
+        var bars = pane.lookupAll(".scroll-bar").stream()
                 .filter(ScrollBar.class::isInstance)
                 .map(ScrollBar.class::cast)
-                .filter(Node::isVisible)
-                .forEach(bar -> scrollbarVisibility.get(bar).reveal());
+                // A parent scroll pane must not retain every nested scroller's bars.
+                .filter(bar -> owningScrollPane(bar) == pane)
+                .toList();
+        bars.forEach(this::configureScrollbar);
+        pane.getProperties().put(SCROLLBARS_PROPERTY, bars);
+    }
+
+    private static ScrollPane owningScrollPane(Node node) {
+        for (Node parent = node.getParent(); parent != null; parent = parent.getParent()) {
+            if (parent instanceof ScrollPane pane) return pane;
+        }
+        return null;
+    }
+
+    private void revealScrollbars(ScrollPane pane) {
+        configureScrollbarDiscovery(pane);
+        Object cached = pane.getProperties().get(SCROLLBARS_PROPERTY);
+        if (!(cached instanceof java.util.List<?> bars)) return;
+        for (Object value : bars) {
+            if (value instanceof ScrollBar bar && bar.isVisible()) {
+                ((ScrollbarVisibility) bar.getProperties().get(SCROLLBAR_VISIBILITY_PROPERTY)).reveal();
+            }
+        }
     }
 
     private void configureScrollbar(ScrollBar bar) {
-        if (scrollbarVisibility.containsKey(bar)) return;
+        if (bar.getProperties().containsKey(SCROLLBAR_VISIBILITY_PROPERTY)) return;
         ScrollbarVisibility visibility = new ScrollbarVisibility(bar);
-        scrollbarVisibility.put(bar, visibility);
+        bar.getProperties().put(SCROLLBAR_VISIBILITY_PROPERTY, visibility);
         bar.addEventHandler(MouseEvent.MOUSE_ENTERED, event -> visibility.reveal());
         bar.addEventHandler(MouseEvent.MOUSE_EXITED, event -> visibility.scheduleFade());
         bar.valueProperty().addListener((observable, previous, value) -> visibility.reveal());

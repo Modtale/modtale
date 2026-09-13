@@ -27,6 +27,9 @@ import java.util.concurrent.Executor;
 import java.util.function.Function;
 import javax.imageio.ImageIO;
 import javafx.application.Platform;
+import javafx.beans.InvalidationListener;
+import javafx.beans.WeakInvalidationListener;
+import javafx.beans.value.ChangeListener;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -73,7 +76,19 @@ public final class CachedImageLoader {
         ImageKey key = new ImageKey(resolvedUrl, requestedWidth, requestedHeight, preserveRatio);
         view.getProperties().put(IMAGE_KEY_PROPERTY, key);
         if (view.getProperties().putIfAbsent(COVER_BINDING_PROPERTY, Boolean.TRUE) == null) {
-            view.imageProperty().addListener((observable, oldImage, newImage) -> updateViewport(view));
+            InvalidationListener dimensionsChanged = observable -> updateViewport(view);
+            WeakInvalidationListener weakDimensionsChanged = new WeakInvalidationListener(dimensionsChanged);
+            view.imageProperty().addListener((observable, oldImage, newImage) -> {
+                if (oldImage != null) {
+                    oldImage.widthProperty().removeListener(weakDimensionsChanged);
+                    oldImage.heightProperty().removeListener(weakDimensionsChanged);
+                }
+                if (newImage != null) {
+                    newImage.widthProperty().addListener(weakDimensionsChanged);
+                    newImage.heightProperty().addListener(weakDimensionsChanged);
+                }
+                dimensionsChanged.invalidated(observable);
+            });
             view.fitWidthProperty().addListener(observable -> updateViewport(view));
             view.fitHeightProperty().addListener(observable -> updateViewport(view));
         }
@@ -81,7 +96,7 @@ public final class CachedImageLoader {
 
         Image memoryImage = memoryImages.get(key);
         if (memoryImage != null) {
-            view.setImage(memoryImage);
+            setImage(view, key, memoryImage);
             return;
         }
 
@@ -216,6 +231,21 @@ public final class CachedImageLoader {
         if (!Objects.equals(view.getProperties().get(IMAGE_KEY_PROPERTY), key)) {
             return;
         }
+        if (view.getImage() != null && image.getProgress() < 1) {
+            // Keep the current gallery frame visible until its replacement is decoded.
+            ChangeListener<Number> ready = new ChangeListener<>() {
+                @Override
+                public void changed(javafx.beans.value.ObservableValue<? extends Number> value,
+                                    Number previous, Number progress) {
+                    if (progress.doubleValue() >= 1) {
+                        image.progressProperty().removeListener(this);
+                        setImage(view, key, image);
+                    }
+                }
+            };
+            image.progressProperty().addListener(ready);
+            return;
+        }
         view.setImage(image);
     }
 
@@ -230,7 +260,7 @@ public final class CachedImageLoader {
                 key.requestedHeight(),
                 true,
                 true,
-                isHttpUrl(imageUrl)
+                true
         );
         memoryImages.put(key, image);
         return image;

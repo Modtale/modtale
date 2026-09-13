@@ -172,13 +172,43 @@ def linuxFlatpakFile = distributionDirectory.map {
     it.file("${appId}-${installerVersion}-${flatpakArchitecture()}.flatpak")
 }
 
+// Installer icons are consumed by jpackage directly from the source tree.
+tasks.named('processResources') {
+    exclude '**/favicon.ico', '**/favicon.icns'
+}
+
+def packagedJna = tasks.register('packageHostJna', Jar) {
+    onlyIf { currentOs.isLinux() }
+    archiveFileName = 'jna-host.jar'
+    destinationDirectory = layout.buildDirectory.dir('jpackage/host-libraries')
+    def jnaFiles = configurations.runtimeClasspath.filter { it.name.startsWith('jna-') }
+    inputs.files(jnaFiles)
+    def hostArch = System.getProperty('os.arch', '').toLowerCase(Locale.ROOT)
+    def nativePrefix = 'linux-' + (hostArch in ['amd64', 'x86_64'] ? 'x86-64'
+            : hostArch in ['arm64', 'aarch64'] ? 'aarch64' : hostArch)
+    inputs.property('nativePrefix', nativePrefix)
+    from({ jnaFiles.collect { zipTree(it) } }) {
+        exclude 'META-INF/MANIFEST.MF'
+        eachFile { entry ->
+            if (entry.path.matches('com/sun/jna/[^/]+/[^/]+[.](so|dll|jnilib|a)')
+                    && !entry.path.startsWith("com/sun/jna/${nativePrefix}/")) {
+                entry.exclude()
+            }
+        }
+        includeEmptyDirs = false
+    }
+}
+
 tasks.register('prepareJpackageInput', Sync) {
     group = 'distribution'
     description = 'Collects launcher jars for self-contained jpackage installers.'
     dependsOn tasks.named('jar')
     into layout.buildDirectory.dir('jpackage/input')
     from(appJar)
-    from(runtimeClasspathFiles)
+    from(runtimeClasspathFiles) {
+        if (currentOs.isLinux()) exclude 'jna-*.jar'
+    }
+    if (currentOs.isLinux()) from(packagedJna)
 }
 
 def java21Launcher = javaToolchains.launcherFor {
@@ -807,6 +837,24 @@ tasks.register('jpackageAppImage', Exec) {
                 '--type', 'app-image',
                 '--dest', layout.buildDirectory.dir('jpackage/app-image').get().asFile.absolutePath
         ] + commonJpackageArgs.call())
+    }
+}
+
+// Preserve exported JNI/runtime symbols while removing unused local ELF symbol tables.
+// strip-debug alone leaves these tables in many JDK distributions.
+['jpackageAppImage', 'prepareLinuxAppImageRuntime'].each { taskName ->
+    tasks.named(taskName) {
+        doLast {
+            if (currentOs.isLinux()) {
+                def imageRoot = taskName == 'jpackageAppImage'
+                        ? layout.buildDirectory.dir('jpackage/app-image').get().asFile
+                        : linuxAppImageDirectory.get().asFile
+                def stripTool = resolveExecutable('strip', 'strip', 'Install binutils to package the Linux runtime.')
+                fileTree(imageRoot) { include '**/*.so' }.files.each { nativeLibrary ->
+                    runExternalCommand([stripTool, '--strip-unneeded', nativeLibrary.absolutePath])
+                }
+            }
+        }
     }
 }
 
