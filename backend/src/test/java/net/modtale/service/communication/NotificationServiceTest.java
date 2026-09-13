@@ -111,7 +111,7 @@ class NotificationServiceTest {
                 URI.create("/dashboard/orgs"),
                 "https://cdn.example/org.png",
                 NotificationType.ORG_INVITE,
-                Map.of("orgId", "org-1")
+                Map.of("orgId", "org-1", "requestId", "invite-1")
         );
         notification.setId("notification-1");
 

@@ -26,6 +26,8 @@ export interface OrganizationRole {
 }
 
 export interface OrganizationMember {
+    requestId?: string;
+    requestExpiresAt?: number;
     userId: string;
     roleId: string;
 }

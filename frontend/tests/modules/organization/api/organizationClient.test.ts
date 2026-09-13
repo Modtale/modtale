@@ -19,6 +19,12 @@ describe('organizationClient', () => {
         vi.clearAllMocks();
     });
 
+    it('binds cancellation to the displayed invitation identity', async () => {
+        mockedApi.delete.mockResolvedValue({ data: null } as any);
+        await organizationClient.cancelInvite('org-1', 'user-1', 'invite-1');
+        expect(mockedApi.delete).toHaveBeenCalledWith('/orgs/org-1/invites/user-1', { params: { requestId: 'invite-1' } });
+    });
+
     it('unwraps organization projects from paged responses', async () => {
         mockedApi.get.mockResolvedValue({ data: { content: [{ id: 'project-1' }, { id: 'project-2' }] } } as any);
 

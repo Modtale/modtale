@@ -34,6 +34,13 @@ describe('resolveNotificationAction', () => {
         });
     });
 
+    it('binds organization invitation responses and refuses unbound legacy requests', () => {
+        const invite = notification('ORG_INVITE', { orgId: 'org-1', requestId: 'request-1' });
+        expect(resolveNotificationAction(invite, true)).toEqual({ endpoint: '/orgs/org-1/invite/accept', body: { requestId: 'request-1' } });
+        expect(resolveNotificationAction(invite, false)).toEqual({ endpoint: '/orgs/org-1/invite/decline', body: { requestId: 'request-1' } });
+        expect(resolveNotificationAction(notification('ORG_INVITE', { orgId: 'org-1' }), true)).toBeNull();
+    });
+
     it('rejects legacy transfers without request identity', () => {
         expect(resolveNotificationAction(notification('TRANSFER_REQUEST', { projectId: 'project-1' }), true)).toBeNull();
     });

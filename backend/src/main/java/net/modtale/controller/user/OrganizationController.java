@@ -182,25 +182,25 @@ public class OrganizationController {
 
     @PostMapping("/orgs/{orgId}/invite/accept")
     @PreAuthorize("@apiSecurity.hasPersonalPerm('ORG_INVITE_ACCEPT', authentication)")
-    public ResponseEntity<Void> acceptOrgInvite(@PathVariable String orgId) {
+    public ResponseEntity<Void> acceptOrgInvite(@PathVariable String orgId, @Valid @RequestBody net.modtale.model.dto.request.user.OrganizationInvitationResponse response) {
         User user = accountService.requireCurrentUser("accepting an organization invite");
-        organizationApplicationService.acceptOrganizationInvite(orgId, user);
+        organizationApplicationService.acceptOrganizationInvite(orgId, response.requestId(), user);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/orgs/{orgId}/invite/decline")
     @PreAuthorize("@apiSecurity.hasPersonalPerm('ORG_INVITE_DECLINE', authentication)")
-    public ResponseEntity<Void> declineOrgInvite(@PathVariable String orgId) {
+    public ResponseEntity<Void> declineOrgInvite(@PathVariable String orgId, @Valid @RequestBody net.modtale.model.dto.request.user.OrganizationInvitationResponse response) {
         User user = accountService.requireCurrentUser("declining an organization invite");
-        organizationApplicationService.declineOrganizationInvite(orgId, user);
+        organizationApplicationService.declineOrganizationInvite(orgId, response.requestId(), user);
         return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/orgs/{orgId}/invites/{userId}")
     @PreAuthorize("@apiSecurity.hasOrgPerm(#orgId, 'ORG_MEMBER_INVITE', authentication)")
-    public ResponseEntity<Void> cancelOrgInvite(@PathVariable String orgId, @PathVariable String userId) {
+    public ResponseEntity<Void> cancelOrgInvite(@PathVariable String orgId, @PathVariable String userId, @org.springframework.web.bind.annotation.RequestParam String requestId) {
         User user = accountService.requireCurrentUser("canceling an organization invite");
-        organizationApplicationService.cancelOrganizationInvite(orgId, userId, user);
+        organizationApplicationService.cancelOrganizationInvite(orgId, userId, requestId, user);
         return ResponseEntity.ok().build();
     }
 }

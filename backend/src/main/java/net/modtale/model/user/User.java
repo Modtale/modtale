@@ -143,6 +143,18 @@ public class User implements Serializable {
         private String userId;
         private String role;
         private String roleId;
+        private String requestId;
+        private long requestExpiresAt;
+        private Set<ApiKey.ApiPermission> requestPermissions;
+        private Set<String> requestOwnerIds;
+        public String getRequestId() { return requestId; }
+        public void setRequestId(String value) { requestId = value; }
+        public long getRequestExpiresAt() { return requestExpiresAt; }
+        public void setRequestExpiresAt(long value) { requestExpiresAt = value; }
+        public Set<ApiKey.ApiPermission> getRequestPermissions() { return requestPermissions; }
+        public void setRequestPermissions(Set<ApiKey.ApiPermission> value) { requestPermissions = value; }
+        public Set<String> getRequestOwnerIds() { return requestOwnerIds; }
+        public void setRequestOwnerIds(Set<String> value) { requestOwnerIds = value; }
 
         public OrganizationMember() {}
         public OrganizationMember(String userId, String roleId) {
