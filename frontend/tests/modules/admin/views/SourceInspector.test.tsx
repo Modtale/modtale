@@ -7,7 +7,7 @@ import { adminClient } from '@/modules/admin/api/adminClient';
 vi.mock('@/modules/admin/api/adminClient', () => ({ adminClient: { getFileContent: vi.fn(), scanVersion: vi.fn() } }));
 vi.mock('@/components/ui/ModalPortal', () => ({ ModalPortal: ({ children }: any) => children }));
 
-const props = { modId: 'project', versionId: 'version-id', version: '1.0', structure: ['a.txt', 'b.txt', 'Example.class'], onClose: vi.fn() };
+const props = { reviewToken: 'snapshot', modId: 'project', versionId: 'version-id', version: '1.0', structure: ['a.txt', 'b.txt', 'Example.class'], onClose: vi.fn() };
 describe('SourceInspector evidence display', () => {
     let container: HTMLDivElement;
     let root: Root;
@@ -41,5 +41,16 @@ describe('SourceInspector evidence display', () => {
         await act(async () => root.render(<SourceInspector {...props} initialFile="Example.class" initialLine={42} />));
         const highlighted = [...container.querySelectorAll('div.text-yellow-500')].map(node => node.textContent);
         expect(highlighted).toEqual(['3']);
+    });
+    it('binds file requests and discards responses after the review token changes', async () => {
+        let stale!: (value: string) => void;
+        vi.mocked(adminClient.getFileContent).mockReturnValueOnce(new Promise(done => { stale = done; }));
+        await act(async () => root.render(<SourceInspector {...props} initialFile="a.txt" />));
+        expect(adminClient.getFileContent).toHaveBeenLastCalledWith('project', '1.0', 'a.txt', 'snapshot');
+        vi.mocked(adminClient.getFileContent).mockResolvedValueOnce('New review evidence');
+        await act(async () => root.render(<SourceInspector {...props} reviewToken="new" initialFile="a.txt" />));
+        expect(adminClient.getFileContent).toHaveBeenLastCalledWith('project', '1.0', 'a.txt', 'new');
+        await act(async () => stale('Old review evidence'));
+        expect(container.querySelector('code')?.textContent).toBe('New review evidence');
     });
 });

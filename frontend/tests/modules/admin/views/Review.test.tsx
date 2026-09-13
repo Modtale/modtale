@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Review } from '@/modules/admin/views/Review';
 vi.mock('@/modules/admin/views/FindingDecisions', () => ({ FindingDecisions: ({ onSaved }: any) => <button onClick={onSaved}>Save finding reasoning</button> }));
 vi.mock('@/components/ui/ModalPortal', () => ({ ModalPortal: ({ children }: any) => children }));
-vi.mock('@/modules/admin/api/adminClient', () => ({ adminClient: { publishProject: vi.fn().mockResolvedValue(null), getReviewDetails: vi.fn() } }));
+vi.mock('@/modules/admin/api/adminClient', () => ({ adminClient: { publishProject: vi.fn().mockResolvedValue(null), getReviewDetails: vi.fn(), getStructure: vi.fn(), getArtifactChanges: vi.fn(), getFileContent: vi.fn() } }));
 import { adminClient } from '@/modules/admin/api/adminClient';
 
 const clear = { status: 'CLEAN', verdict: 'AUTO_APPROVE', scanState: 'COMPLETED', issues: [],
@@ -138,5 +138,33 @@ describe('Review security clearance status', () => {
     });
     it('shows completion for explicit completed clearance' , async () => {
         await render(clear); expect(container.textContent).toContain('Artifact Review Completed');
+    });
+    it('carries the opened project token from a removed-file comparison into source inspection', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: false, added: 0, modified: 0, removed: 1, unchanged: 0,
+            files: [{ path: 'removed.txt', change: 'REMOVED' }] });
+        vi.mocked(adminClient.getStructure).mockResolvedValue(['removed.txt']);
+        vi.mocked(adminClient.getFileContent).mockResolvedValue('Previously approved file contents');
+        await render(clear, true, 'snapshot', 2);
+        await click('Compare with approved version');
+        await click('removed.txt');
+        expect(adminClient.getArtifactChanges).toHaveBeenLastCalledWith('project', '1.0', 'snapshot');
+        expect(adminClient.getStructure).toHaveBeenLastCalledWith('project', '0.9', 'snapshot');
+        expect(adminClient.getFileContent).toHaveBeenLastCalledWith('project', '0.9', 'removed.txt', 'snapshot');
+        expect(container.textContent).toContain('Previously approved file contents');
+    });
+    it('keeps the latest selected comparison file when structure responses arrive out of order', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: false, added: 1, modified: 0, removed: 1, unchanged: 0,
+            files: [{ path: 'old.txt', change: 'REMOVED' }, { path: 'new.txt', change: 'ADDED' }] });
+        let stale!: (value: string[]) => void;
+        vi.mocked(adminClient.getStructure).mockReturnValueOnce(new Promise(done => { stale = done; }))
+            .mockResolvedValueOnce(['new.txt']);
+        vi.mocked(adminClient.getFileContent).mockResolvedValue('Current selection contents');
+        await render(clear, true, 'snapshot', 2);
+        await click('Compare with approved version'); await click('old.txt'); await click('new.txt');
+        await act(async () => stale(['old.txt']));
+        expect(adminClient.getFileContent).toHaveBeenLastCalledWith('project', '1.0', 'new.txt', 'snapshot');
+        expect(container.querySelector('code')?.textContent).toBe('Current selection contents');
     });
 });

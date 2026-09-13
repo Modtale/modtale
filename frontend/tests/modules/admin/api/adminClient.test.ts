@@ -38,10 +38,10 @@ describe('adminClient', () => {
     it('passes file paths as query params when loading admin file content', async () => {
         mockedApi.get.mockResolvedValue({ data: 'contents' } as any);
 
-        await adminClient.getFileContent('project-1', '1.0.0', 'mods/sky.txt');
+        await adminClient.getFileContent('project-1', '1.0.0', 'mods/sky.txt', 'snapshot');
 
         expect(mockedApi.get).toHaveBeenCalledWith('/admin/projects/project-1/versions/1.0.0/file', {
-            params: { path: 'mods/sky.txt' }
+            params: { path: 'mods/sky.txt' }, headers: { 'If-Match': 'snapshot' }
         });
     });
 
@@ -91,5 +91,12 @@ describe('adminClient', () => {
         await adminClient.deleteProject('project-1', 'spam');
 
         expect(mockedApi.delete).toHaveBeenCalledWith('/admin/projects/project-1', { params: { reason: 'spam' } });
+    });
+    it('binds comparison and structure to the opened project review', async () => {
+        mockedApi.get.mockResolvedValue({ data: [] } as any);
+        await adminClient.getArtifactChanges('project', '2.0', 'snapshot');
+        expect(mockedApi.get).toHaveBeenLastCalledWith('/admin/projects/project/versions/2.0/changes', { headers: { 'If-Match': 'snapshot' } });
+        await adminClient.getStructure('project', '1.0', 'snapshot');
+        expect(mockedApi.get).toHaveBeenLastCalledWith('/admin/projects/project/versions/1.0/structure', { headers: { 'If-Match': 'snapshot' } });
     });
 });

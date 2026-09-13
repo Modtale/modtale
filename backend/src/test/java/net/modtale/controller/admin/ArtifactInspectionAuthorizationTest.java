@@ -41,9 +41,9 @@ class ArtifactInspectionAuthorizationTest {
     @Test void comparisonAndSourceInspectionRequireReviewReadPermission() {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("ordinary-user",null,
                 List.of(new SimpleGrantedAuthority("PROJECT_REVIEW_DECIDE"))));
-        assertThrows(AccessDeniedException.class,()->controller.structure("project","version"));
-        assertThrows(AccessDeniedException.class,()->controller.file("project","version","manifest.json"));
-        assertThrows(AccessDeniedException.class,()->controller.changes("project","version"));
+        assertThrows(AccessDeniedException.class,()->controller.structure("project","version",null));
+        assertThrows(AccessDeniedException.class,()->controller.file("project","version","manifest.json",null));
+        assertThrows(AccessDeniedException.class,()->controller.changes("project","version",null));
         verifyNoInteractions(projects,storage,inspector);
     }
 }

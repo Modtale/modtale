@@ -11,6 +11,7 @@ interface SourceInspectorProps {
     versionId: string;
     canRescan?: boolean;
     version: string;
+    reviewToken: string;
     structure: string[];
     issues?: ScanIssue[];
     initialFile?: string;
@@ -186,9 +187,9 @@ const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number;
     );
 };
 
-export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, versionId, canRescan = false, version, structure, issues = [], initialFile, initialLine, initialLineEnd, onClose }) => {
+export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, versionId, canRescan = false, version, reviewToken, structure, issues = [], initialFile, initialLine, initialLineEnd, onClose }) => {
     const requestGeneration = useRef(0);
-    useEffect(() => () => { requestGeneration.current++; }, [modId, version]);
+    useEffect(() => () => { requestGeneration.current++; }, [modId, version, reviewToken]);
     const [inspectorFile, setInspectorFile] = useState<string | null>(null);
     const [inspectorContent, setInspectorContent] = useState<any>('');
     const [loadingFile, setLoadingFile] = useState(false);
@@ -204,6 +205,11 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         start: number;
         end: number;
     } | null>(null);
+
+    useEffect(() => {
+        setInspectorContent(''); setInspectorFile(null); setLoadingFile(false);
+        setResolvedIssues(new Set()); setActiveHighlight(null); setActionError(null);
+    }, [modId, version, reviewToken]);
 
     const fileTree = useMemo(() => buildFileTree(structure), [structure]);
 
@@ -243,7 +249,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         setInspectorFile(path);
         setLoadingFile(true);
         try {
-            const data = await adminClient.getFileContent(modId, version, path);
+            const data = await adminClient.getFileContent(modId, version, path, reviewToken);
             if (generation !== requestGeneration.current) return;
             setInspectorContent(data);
             setActionError(null);
@@ -301,7 +307,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
             const targetLineEnd = initialLineEnd || issue?.lineEnd || initialLine || 0;
             handleJumpToIssue(initialFile, initialLine || 0, targetLineEnd);
         }
-    }, [initialFile]);
+    }, [initialFile, modId, version, reviewToken]);
 
     const dynamicHighlight = useMemo(() => {
         if (!activeHighlight || activeHighlight.file !== inspectorFile) return undefined;

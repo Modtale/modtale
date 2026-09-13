@@ -3,6 +3,7 @@ import { adminClient } from '../api/adminClient';
 import { extractApiErrorMessage } from '@/utils/api';
 
 export interface ArtifactChangeSummary {
+    reviewToken: string;
     baselineVersion: string | null;
     contextComparable: boolean;
     contextChanged: boolean;
@@ -13,10 +14,11 @@ export interface ArtifactChangeSummary {
     files: { path: string; change: 'ADDED' | 'MODIFIED' | 'REMOVED' | 'UNCHANGED' }[];
 }
 
-export function ArtifactChanges({ projectId, version, onInspect }: {
+export function ArtifactChanges({ projectId, version, reviewToken, onInspect }: {
     projectId: string;
     version: string;
-    onInspect: (version: string, path: string) => void;
+    reviewToken: string;
+    onInspect: (version: string, path: string, reviewToken: string) => void;
 }) {
     const [result, setResult] = useState<ArtifactChangeSummary | null>(null);
     const [loading, setLoading] = useState(false);
@@ -29,12 +31,13 @@ export function ArtifactChanges({ projectId, version, onInspect }: {
         generation.current++;
         setResult(null); setLoading(false); setError(''); setSearch(''); setLimit(100); setShowUnchanged(false);
         return () => { generation.current++; };
-    }, [projectId, version]);
+    }, [projectId, version, reviewToken]);
     const load = async () => {
         const request = ++generation.current;
         setLoading(true); setError(''); setResult(null);
         try {
-            const next = await adminClient.getArtifactChanges(projectId, version);
+            const next = await adminClient.getArtifactChanges(projectId, version, reviewToken);
+            if (next.reviewToken !== reviewToken) throw new Error('This comparison no longer matches the opened review. Refresh its evidence.');
             if (request === generation.current) setResult(next);
         } catch (failure) {
             if (request === generation.current) setError(extractApiErrorMessage(failure, 'Artifact comparison is unavailable.'));
@@ -66,7 +69,7 @@ export function ArtifactChanges({ projectId, version, onInspect }: {
                 <label className="flex items-center gap-2 text-sm text-slate-500"><input type="checkbox" checked={showUnchanged} onChange={event => { setShowUnchanged(event.target.checked); setLimit(100); }} />Show unchanged files</label>
             </div>
             <div className="max-h-72 overflow-auto divide-y divide-slate-100 dark:divide-slate-800">
-                {visible.slice(0, limit).map(file => <button key={file.path} type="button" onClick={() => onInspect(file.change === 'REMOVED' ? result.baselineVersion! : version, file.path)} className="w-full flex items-start gap-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800">
+                {visible.slice(0, limit).map(file => <button key={file.path} type="button" onClick={() => onInspect(file.change === 'REMOVED' ? result.baselineVersion! : version, file.path, result.reviewToken)} className="w-full flex items-start gap-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800">
                     <span className="w-20 shrink-0 text-xs text-slate-500">{file.change.toLowerCase()}</span>
                     <span className="min-w-0 break-all font-mono text-xs text-indigo-600 dark:text-indigo-300">{file.path}</span>
                 </button>)}

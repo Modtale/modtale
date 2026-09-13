@@ -22,30 +22,31 @@ public class ArtifactInspectionController {
         this.projects=projects;this.storage=storage;this.inspector=inspector;
     }
     @GetMapping("/structure")
-    public ResponseEntity<List<String>> structure(@PathVariable String id,@PathVariable String version) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(inspect(id,version,null).paths());
+    public ResponseEntity<List<String>> structure(@PathVariable String id,@PathVariable String version, @RequestHeader(value="If-Match", required=false) String expected) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(inspect(id,version,null,expected).paths());
     }
     @GetMapping(value="/file",produces=MediaType.TEXT_PLAIN_VALUE)
-    public ResponseEntity<String> file(@PathVariable String id,@PathVariable String version,@RequestParam String path) {
-        var response=inspect(id,version,path);
+    public ResponseEntity<String> file(@PathVariable String id,@PathVariable String version,@RequestParam String path, @RequestHeader(value="If-Match", required=false) String expected) {
+        var response=inspect(id,version,path,expected);
         String prefix="JVM_BYTECODE".equals(response.format()) ? "// JVM bytecode of the uploaded class. LINE entries refer to original source lines.\n" : "";
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff").body(prefix+response.content());
     }
     public record FileChange(String path, String change) {}
-    public record ArtifactChanges(String baselineVersion, boolean contextComparable, boolean contextChanged,
+    public record ArtifactChanges(String reviewToken, String baselineVersion, boolean contextComparable, boolean contextChanged,
             int added, int modified, int removed, int unchanged, List<FileChange> files) {}
 
     @GetMapping("/changes")
-    public ResponseEntity<ArtifactChanges> changes(@PathVariable String id, @PathVariable String version) {
+    public ResponseEntity<ArtifactChanges> changes(@PathVariable String id, @PathVariable String version, @RequestHeader(value="If-Match", required=false) String expected) {
         Project project=projects.getRawProjectById(id);
         if(project==null || project.getVersions()==null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        ProjectReviewSnapshot.requireCurrent(project, expected);
         String snapshot = ProjectReviewSnapshot.token(project);
         ProjectVersion current = requireVersion(project, version);
         ProjectVersion baseline=project.getVersions().stream().filter(Objects::nonNull).filter(v -> v.getReviewStatus()==ProjectVersion.ReviewStatus.APPROVED
                 && !Objects.equals(v.getId(),current.getId()))
                 .max(Comparator.comparingLong(ProjectVersion::getSecurityApprovedAt)).orElse(null);
         if(baseline==null) return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(new ArtifactChanges(null,false,false,0,0,0,0,List.of()));
+                .body(new ArtifactChanges(snapshot,null,false,false,0,0,0,0,List.of()));
         requireVersion(project, baseline.getVersionNumber());
         var before=inspect(baseline,null);
         var after=inspect(current,null);
@@ -57,13 +58,13 @@ public class ArtifactInspectionController {
         String currentContext=net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(current);
         boolean comparable=priorContext!=null && currentContext!=null
                 && priorContext.equals(net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(baseline));
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(compare(baseline.getVersionNumber(),
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(compare(snapshot,baseline.getVersionNumber(),
                 comparable, comparable && !priorContext.equals(currentContext),before.entryHashes(),after.entryHashes()));
     }
     private static boolean validManifest(Map<String,String> entries) {
         return net.modtale.model.project.SecurityManifest.valid(entries, false);
     }
-    static ArtifactChanges compare(String baseline, boolean comparable, boolean contextChanged,
+    static ArtifactChanges compare(String snapshot, String baseline, boolean comparable, boolean contextChanged,
             Map<String,String> before, Map<String,String> after) {
         var paths=new TreeSet<String>(); paths.addAll(before.keySet()); paths.addAll(after.keySet());
         var changes=new ArrayList<FileChange>(); int added=0,modified=0,removed=0,unchanged=0;
@@ -75,11 +76,12 @@ public class ArtifactInspectionController {
             else {change="UNCHANGED";unchanged++;}
             changes.add(new FileChange(path,change));
         }
-        return new ArtifactChanges(baseline,comparable,contextChanged,added,modified,removed,unchanged,List.copyOf(changes));
+        return new ArtifactChanges(snapshot,baseline,comparable,contextChanged,added,modified,removed,unchanged,List.copyOf(changes));
     }
-    private WardenClientService.InspectionResponse inspect(String id,String number,String path) {
+    private WardenClientService.InspectionResponse inspect(String id,String number,String path,String expected) {
         Project project=projects.getRawProjectById(id);
         if(project==null || project.getVersions()==null)throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        ProjectReviewSnapshot.requireCurrent(project, expected);
         String snapshot = ProjectReviewSnapshot.token(project);
         var result = inspect(requireVersion(project, number), path);
         requireUnchanged(id, snapshot);

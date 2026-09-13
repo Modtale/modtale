@@ -69,7 +69,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     const [showScanDetails, setShowScanDetails] = useState(false);
     const [rescanning, setRescanning] = useState(false);
 
-    const [inspectorData, setInspectorData] = useState<{ version: string, structure: string[], issues: ScanIssue[], initialFile?: string, initialLine?: number, initialLineEnd?: number } | null>(null);
+    const [inspectorData, setInspectorData] = useState<{ version: string, reviewToken: string, structure: string[], issues: ScanIssue[], initialFile?: string, initialLine?: number, initialLineEnd?: number } | null>(null);
     const [loadingInspector, setLoadingInspector] = useState(false);
 
     const [decisionWritten, setDecisionWritten] = useState(false);
@@ -77,6 +77,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     const [refreshing, setRefreshing] = useState(false);
     const [refreshError, setRefreshError] = useState('');
     const refreshGeneration = useRef(0);
+    const inspectionGeneration = useRef(0);
     useEffect(() => {
         refreshGeneration.current++;
         setRefreshing(false); setRefreshError('');
@@ -185,14 +186,18 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
         }
     };
 
-    const openInspector = async (version: string, issues: ScanIssue[] = [], file?: string, lineStart?: number, lineEnd?: number) => {
+    const openInspector = async (version: string, issues: ScanIssue[] = [], file?: string, lineStart?: number, lineEnd?: number, reviewToken = mod.reviewToken) => {
         const generation = refreshGeneration.current;
+        const inspection = ++inspectionGeneration.current;
+        setInspectorData(null);
         setLoadingInspector(true);
         try {
-            const structure = await adminClient.getStructure(mod.id, version);
-            if (generation !== refreshGeneration.current) return;
+            if (!reviewToken) throw new Error('Refresh this review before inspecting its files.');
+            const structure = await adminClient.getStructure(mod.id, version, reviewToken);
+            if (generation !== refreshGeneration.current || inspection !== inspectionGeneration.current) return;
             setInspectorData({
                 version,
+                reviewToken,
                 structure,
                 issues,
                 initialFile: file,
@@ -200,10 +205,10 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                 initialLineEnd: lineEnd
             });
         } catch (e) {
-            if (generation !== refreshGeneration.current) return;
+            if (generation !== refreshGeneration.current || inspection !== inspectionGeneration.current) return;
             setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, "We could not inspect this version's file structure.") });
         } finally {
-            if (generation === refreshGeneration.current) setLoadingInspector(false);
+            if (generation === refreshGeneration.current && inspection === inspectionGeneration.current) setLoadingInspector(false);
         }
     };
 
@@ -303,13 +308,15 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                     modId={mod.id}
                     versionId={mod.versions.find((candidate: ProjectVersion) => candidate.versionNumber === inspectorData.version)?.id || ''}
                     canRescan={canRescan}
+                    key={`${mod.id}:${inspectorData.version}:${inspectorData.reviewToken}`}
                     version={inspectorData.version}
+                    reviewToken={inspectorData.reviewToken}
                     structure={inspectorData.structure}
                     issues={inspectorData.issues}
                     initialFile={inspectorData.initialFile}
                     initialLine={inspectorData.initialLine}
                     initialLineEnd={inspectorData.initialLineEnd}
-                    onClose={() => setInspectorData(null)}
+                    onClose={() => { inspectionGeneration.current++; setInspectorData(null); }}
                 />
             )}
 
@@ -620,8 +627,8 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                     </div>
                                 )}
 
-                                {pendingVersion && <ArtifactChanges projectId={mod.id} version={pendingVersion.versionNumber}
-                                    onInspect={(version, path) => openInspector(version, version === pendingVersion.versionNumber ? scanIssues : [], path)} />}
+                                {pendingVersion && <ArtifactChanges projectId={mod.id} version={pendingVersion.versionNumber} reviewToken={mod.reviewToken || ''}
+                                    onInspect={(version, path, token) => openInspector(version, version === pendingVersion.versionNumber ? scanIssues : [], path, undefined, undefined, token)} />}
                                 {pendingVersion && <FindingDecisions key={`${pendingVersion.id}:${pendingVersion.reviewToken}`}
                                     projectId={mod.id} versionId={pendingVersion.id} token={pendingVersion.reviewToken}
                                     issues={scanIssues} canDecide={canDecide} onSaved={() => setDecisionWritten(true)} />}
