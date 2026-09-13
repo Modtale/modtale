@@ -32,7 +32,7 @@ export function ArtifactChanges({ projectId, version, onInspect }: {
     }, [projectId, version]);
     const load = async () => {
         const request = ++generation.current;
-        setLoading(true); setError('');
+        setLoading(true); setError(''); setResult(null);
         try {
             const next = await adminClient.getArtifactChanges(projectId, version);
             if (request === generation.current) setResult(next);

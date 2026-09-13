@@ -1,6 +1,7 @@
 package net.modtale.controller.admin;
 
 import net.modtale.model.project.*;
+import net.modtale.service.admin.review.ProjectReviewSnapshot;
 import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.security.scan.WardenClientService;
 import net.modtale.service.storage.StorageService;
@@ -38,21 +39,24 @@ public class ArtifactInspectionController {
     public ResponseEntity<ArtifactChanges> changes(@PathVariable String id, @PathVariable String version) {
         Project project=projects.getRawProjectById(id);
         if(project==null || project.getVersions()==null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        ProjectVersion current=project.getVersions().stream().filter(v -> Objects.equals(v.getVersionNumber(),version)).findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        ProjectVersion baseline=project.getVersions().stream().filter(v -> v.getReviewStatus()==ProjectVersion.ReviewStatus.APPROVED
+        String snapshot = ProjectReviewSnapshot.token(project);
+        ProjectVersion current = requireVersion(project, version);
+        ProjectVersion baseline=project.getVersions().stream().filter(Objects::nonNull).filter(v -> v.getReviewStatus()==ProjectVersion.ReviewStatus.APPROVED
                 && !Objects.equals(v.getId(),current.getId()))
                 .max(Comparator.comparingLong(ProjectVersion::getSecurityApprovedAt)).orElse(null);
         if(baseline==null) return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(new ArtifactChanges(null,false,false,0,0,0,0,List.of()));
-        var before=inspect(id,baseline.getVersionNumber(),null);
-        var after=inspect(id,version,null);
+        requireVersion(project, baseline.getVersionNumber());
+        var before=inspect(baseline,null);
+        var after=inspect(current,null);
+        requireUnchanged(id, snapshot);
         if(!validManifest(before.entryHashes()) || !validManifest(after.entryHashes()) || before.policyVersion()==null
                 || !before.policyVersion().equals(after.policyVersion()))
             throw new ResponseStatusException(HttpStatus.CONFLICT,"A consistent artifact comparison is unavailable");
         String priorContext=baseline.getApprovedSecurityContextSha256();
         String currentContext=net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(current);
-        boolean comparable=priorContext!=null && currentContext!=null;
+        boolean comparable=priorContext!=null && currentContext!=null
+                && priorContext.equals(net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(baseline));
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(compare(baseline.getVersionNumber(),
                 comparable, comparable && !priorContext.equals(currentContext),before.entryHashes(),after.entryHashes()));
     }
@@ -76,8 +80,24 @@ public class ArtifactInspectionController {
     private WardenClientService.InspectionResponse inspect(String id,String number,String path) {
         Project project=projects.getRawProjectById(id);
         if(project==null || project.getVersions()==null)throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-        ProjectVersion version=project.getVersions().stream().filter(v->Objects.equals(v.getVersionNumber(),number)).findFirst()
-                .orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND));
+        String snapshot = ProjectReviewSnapshot.token(project);
+        var result = inspect(requireVersion(project, number), path);
+        requireUnchanged(id, snapshot);
+        return result;
+    }
+    private ProjectVersion requireVersion(Project project, String number) {
+        var matches = project.getVersions().stream().filter(Objects::nonNull)
+                .filter(v -> Objects.equals(v.getVersionNumber(), number)).toList();
+        if (matches.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        if (matches.size() != 1) throw new ResponseStatusException(HttpStatus.CONFLICT, "Version identity is ambiguous");
+        return matches.getFirst();
+    }
+    private void requireUnchanged(String id, String snapshot) {
+        var current = projects.getRawProjectById(id);
+        if (current == null || current.getVersions() == null) throw ProjectReviewSnapshot.conflict();
+        ProjectReviewSnapshot.requireCurrent(current, snapshot);
+    }
+    private WardenClientService.InspectionResponse inspect(ProjectVersion version, String path) {
         if(version.getFileUrl()==null)throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         byte[] bytes=storage.download(version.getFileUrl());
         try {

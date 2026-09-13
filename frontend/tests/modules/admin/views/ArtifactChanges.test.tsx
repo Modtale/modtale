@@ -42,6 +42,20 @@ describe('artifact changes', () => {
         expect(container.textContent).not.toContain('removed.class');
         expect(button('Compare with approved version')).toBeTruthy();
     });
+    it('removes the old comparison during refresh and after a conflict', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValueOnce(summary);
+        await act(async () => root.render(<ArtifactChanges projectId="project" version="2.0" onInspect={vi.fn()} />));
+        await act(async () => button('Compare with approved version').click());
+        expect(container.textContent).toContain('removed.class');
+        let reject!: (error: Error) => void;
+        vi.mocked(adminClient.getArtifactChanges).mockReturnValueOnce(new Promise((_, fail) => { reject = fail; }));
+        await act(async () => button('Refresh comparison').click());
+        expect(container.textContent).not.toContain('removed.class');
+        await act(async () => reject(new Error('Project changed')));
+        expect(container.querySelector('[role="alert"]')).not.toBeNull();
+        expect(container.textContent).not.toContain('removed.class');
+        expect(button('Compare with approved version')).toBeTruthy();
+    });
     it('shows an unavailable baseline without implying that nothing changed', async () => {
         vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ ...summary, baselineVersion: null, files: [] });
         await act(async () => root.render(<ArtifactChanges projectId="project" version="2.0" onInspect={vi.fn()} />));
