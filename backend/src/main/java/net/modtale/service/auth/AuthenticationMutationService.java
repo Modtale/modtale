@@ -44,28 +44,6 @@ public class AuthenticationMutationService {
         this.reservedAccountGuardService = reservedAccountGuardService;
     }
 
-    public void setTempMfaSecret(String userId, String secret) {
-        User user = requireUser(userId);
-        user.setMfaSecret(secret);
-        userRepository.save(user);
-    }
-
-    public void enableMfa(String userId) {
-        User user = requireUser(userId);
-        if (user.getMfaSecret() == null || user.getMfaSecret().isBlank()) {
-            throw new InvalidAuthenticationRequestException("Cannot enable two-factor authentication because no secret has been set.");
-        }
-        user.setMfaEnabled(true);
-        userRepository.save(user);
-    }
-
-    public void disableMfa(String userId) {
-        User user = requireUser(userId);
-        user.setMfaEnabled(false);
-        user.setMfaSecret(null);
-        userRepository.save(user);
-    }
-
     public void addCredentials(String userId, String email, String password) {
         User user = requireUser(userId);
         reservedAccountGuardService.rejectReservedEmailInProduction(email);

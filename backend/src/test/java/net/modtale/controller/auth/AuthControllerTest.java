@@ -50,7 +50,8 @@ class AuthControllerTest {
                 accountService,
                 twoFactorService,
                 launcherAuthService,
-                securityContextRepository
+                securityContextRepository,
+                mock(net.modtale.service.auth.MfaEnrollmentService.class)
         );
     }
 

@@ -54,6 +54,7 @@ public class AuthController {
     private final AuthenticationMutationService authenticationMutationService;
     private final AccountService accountService;
     private final TwoFactorService twoFactorService;
+    private final net.modtale.service.auth.MfaEnrollmentService mfaEnrollmentService;
     private final LauncherAuthService launcherAuthService;
     private final SecurityContextRepository securityContextRepository;
 
@@ -63,9 +64,11 @@ public class AuthController {
             AccountService accountService,
             TwoFactorService twoFactorService,
             LauncherAuthService launcherAuthService,
-            SecurityContextRepository securityContextRepository
+            SecurityContextRepository securityContextRepository,
+            net.modtale.service.auth.MfaEnrollmentService mfaEnrollmentService
     ) {
         this.authenticationService = authenticationService;
+        this.mfaEnrollmentService = mfaEnrollmentService;
         this.authenticationMutationService = authenticationMutationService;
         this.accountService = accountService;
         this.twoFactorService = twoFactorService;
@@ -158,8 +161,7 @@ public class AuthController {
             throw new InvalidAuthenticationRequestException("Two-factor authentication is already enabled for this account.");
         }
 
-        String secret = twoFactorService.generateNewSecret();
-        authenticationMutationService.setTempMfaSecret(user.getId(), secret);
+        String secret = mfaEnrollmentService.begin(user.getId());
 
         String qrCode = twoFactorService.generateQrCodeImageUri(secret, user.getUsername());
         return ResponseEntity.ok(new MfaSetupResponse(secret, qrCode));
@@ -169,10 +171,7 @@ public class AuthController {
     @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<MessageResponse> verifyMfaSetup(@Valid @RequestBody VerifyMfaRequest requestPayload) {
         User user = accountService.requireCurrentUser("verifying two-factor authentication setup");
-        if (!twoFactorService.isOtpValid(user.getMfaSecret(), requestPayload.getCode())) {
-            throw new InvalidAuthenticationRequestException("That verification code was not accepted, so two-factor authentication was not enabled.");
-        }
-        authenticationMutationService.enableMfa(user.getId());
+        mfaEnrollmentService.verify(user.getId(), requestPayload.getCode());
         return ResponseEntity.ok(new MessageResponse("MFA enabled successfully"));
     }
 
