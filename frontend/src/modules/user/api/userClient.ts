@@ -19,7 +19,7 @@ export const userClient = {
     unlinkConnection: async (provider: string) => (await api.delete(`/user/connections/${provider}`)).data,
     toggleConnectionVisibility: async (provider: string) => (await api.post(`/user/connections/${provider}/toggle-visibility`)).data,
     resendVerification: async () => (await api.post('/auth/resend-verification')).data,
-    startMfaSetup: async () => (await api.get('/auth/mfa/setup')).data,
+    startMfaSetup: async () => (await api.post('/auth/mfa/setup')).data,
     verifyMfa: async (code: string) => (await api.post('/auth/mfa/verify', { code })).data,
     updateNotifications: async (data: any) => (await api.put('/user/settings/notifications', data)).data,
 };

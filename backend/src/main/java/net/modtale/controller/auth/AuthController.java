@@ -153,8 +153,8 @@ public class AuthController {
         return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/mfa/setup")
-    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
+    @PostMapping("/mfa/setup")
+    @PreAuthorize("!@apiSecurity.isApiKey(authentication) && @apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<MfaSetupResponse> setupMfa() {
         User user = accountService.requireCurrentUser("setting up two-factor authentication");
         if (user.isMfaEnabled()) {
@@ -168,7 +168,7 @@ public class AuthController {
     }
 
     @PostMapping("/mfa/verify")
-    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
+    @PreAuthorize("!@apiSecurity.isApiKey(authentication) && @apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<MessageResponse> verifyMfaSetup(@Valid @RequestBody VerifyMfaRequest requestPayload) {
         User user = accountService.requireCurrentUser("verifying two-factor authentication setup");
         mfaEnrollmentService.verify(user.getId(), requestPayload.getCode());

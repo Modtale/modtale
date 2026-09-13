@@ -56,6 +56,14 @@ class AuthControllerTest {
     }
 
     @Test
+    void getCannotStartMfaEnrollment() throws Exception {
+        var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/auth/mfa/setup"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isMethodNotAllowed());
+        org.mockito.Mockito.verifyNoInteractions(accountService, twoFactorService, authenticationMutationService);
+    }
+
+    @Test
     void loginReturnsAcceptedChallengeWhenMfaIsEnabled() {
         User user = new User();
         user.setId("user-1");
