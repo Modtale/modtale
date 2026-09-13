@@ -118,6 +118,31 @@ class NativeInteractionRegressionTest {
     }
 
     @Test
+    void wheelBurstRetargetsAtThePresentedFrameMinusNativeInputDelay() throws Exception {
+        fx(() -> {
+            Region content = new Region();
+            content.resize(800, 2400);
+            ScrollPane pane = new ScrollPane(content);
+            pane.setViewportBounds(new BoundingBox(0, 0, 800, 400));
+            LauncherScrollAnimator animator = new LauncherScrollAnimator(16_666_667);
+            animator.animate(pane, 0, 120, 0);
+            animator.tick(0);
+            animator.tick(50_000_000);
+            double presented = pane.getVvalue();
+            animator.animate(pane, LauncherScrollAnimator.metrics(pane), 0, 120,
+                    59_000_000, 4_000_000);
+            assertEquals(presented, pane.getVvalue(), "Input must not render between animation frames");
+            animator.tick(100_000_000);
+            assertEquals(LauncherScrollAnimator.wheelTraceOffset(120, 62.666667, 120, 116.666667),
+                    pane.getVvalue() * 2000, 1e-6);
+            animator.tick(500_000_000);
+            assertEquals(240, pane.getVvalue() * 2000, 1e-9);
+            animator.cancel(pane);
+            return null;
+        });
+    }
+
+    @Test
     void queuedWheelNotchesAreNotLostWhenTheUiThreadMissesTheirDuration() throws Exception {
         fx(() -> {
             Region content = new Region();

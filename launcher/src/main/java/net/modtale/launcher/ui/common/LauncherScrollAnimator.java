@@ -36,6 +36,7 @@ final class LauncherScrollAnimator {
         }
     };
     private boolean timerRunning;
+    private long lastPulseNanos;
 
     LauncherScrollAnimator() {
         this(configuredFrameIntervalNanos());
@@ -63,16 +64,28 @@ final class LauncherScrollAnimator {
     }
 
     void animate(ScrollPane pane, ScrollMetrics metrics, double deltaX, double deltaY, long now) {
+        animate(pane, metrics, deltaX, deltaY, now, 0);
+    }
+
+    void animate(ScrollPane pane, ScrollMetrics metrics, double deltaX, double deltaY,
+                 long now, long inputDelayNanos) {
         if (!metrics.scrollable()) return;
 
         AnimationState state = states.get(pane);
         Point actual = new Point(horizontalOffset(pane, metrics), verticalOffset(pane, metrics));
         boolean restarting = state == null || state.divergedFrom(actual);
+        long retargetTime = now - Math.max(0, inputDelayNanos);
+        long overlappingDelay = 0;
         if (restarting) {
             state = AnimationState.stopped(actual);
             pendingWheelStarts.add(pane);
         } else if (!pendingWheelStarts.contains(pane)) {
-            state = state.at(now);
+            // Chromium retargets at the current compositor frame minus the
+            // input's queue delay, preserving velocity across wheel bursts.
+            retargetTime = lastPulseNanos - Math.max(0, inputDelayNanos);
+            overlappingDelay = Math.max(0, state.startNanos - retargetTime);
+            retargetTime = Math.max(state.startNanos, retargetTime);
+            state = state.at(retargetTime);
         }
 
         Point target = new Point(
@@ -87,9 +100,9 @@ final class LauncherScrollAnimator {
             return;
         }
 
-        AnimationState retargeted = state.retarget(target, now, outputScale(pane));
+        AnimationState retargeted = state.retarget(target, retargetTime, outputScale(pane), overlappingDelay)
+                .withCurrent(actual);
         states.put(pane, retargeted);
-        apply(pane, metrics, retargeted.current);
         startTimer();
     }
 
@@ -143,6 +156,7 @@ final class LauncherScrollAnimator {
     }
 
     void tick(long now) {
+        lastPulseNanos = now;
         Iterator<Map.Entry<ScrollPane, AnimationState>> iterator = states.entrySet().iterator();
         while (iterator.hasNext()) {
             Map.Entry<ScrollPane, AnimationState> entry = iterator.next();
@@ -356,11 +370,22 @@ final class LauncherScrollAnimator {
                     nextVelocityX, nextVelocityY);
         }
 
+        AnimationState withCurrent(Point rendered) {
+            return new AnimationState(initial, rendered, target, startNanos, durationNanos,
+                    firstControlX, firstControlY, secondControlX, secondControlY, velocityX, velocityY);
+        }
+
         AnimationState retarget(Point newTarget, long now, double outputScale) {
+            return retarget(newTarget, now, outputScale, 0);
+        }
+
+        AnimationState retarget(Point newTarget, long now, double outputScale, long delayNanos) {
             Point delta = new Point(newTarget.x - current.x, newTarget.y - current.y);
             double maximumDelta = Math.abs(delta.x) >= Math.abs(delta.y) ? delta.x : delta.y;
-            double duration = inverseDeltaDuration(maximumDelta * outputScale);
-            double velocity = Math.abs(delta.x) >= Math.abs(delta.y) ? velocityX : velocityY;
+            double duration = Math.max(0, inverseDeltaDuration(maximumDelta * outputScale)
+                    - delayNanos / 1_000_000_000.0);
+            double velocity = Math.abs(target.x - initial.x) >= Math.abs(target.y - initial.y)
+                    ? velocityX : velocityY;
             if (Math.abs(velocity) >= EPSILON && maximumDelta / velocity > 0) {
                 duration = Math.min(duration, maximumDelta / velocity * 2.5);
             }

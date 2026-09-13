@@ -141,6 +141,7 @@ public final class LauncherScrollSupport {
         if (scrollNode == null || Boolean.TRUE.equals(scrollNode.getProperties().get(INSTALLED_PROPERTY))) {
             return;
         }
+        LinuxScrollInput.install();
         scrollNode.getProperties().put(INSTALLED_PROPERTY, Boolean.TRUE);
         scrollNode.addEventFilter(ScrollEvent.SCROLL, scrollHandler);
         configuredNodes.add(scrollNode);
@@ -149,31 +150,34 @@ public final class LauncherScrollSupport {
     private void observeNativeScroll(ScrollEvent event) {
         long operationStart = LauncherPerformanceProbe.operationStartNanos();
         try {
+            LinuxScrollInput.Sample nativeInput = LinuxScrollInput.take();
             if (event.isControlDown()) {
                 return;
             }
             activateScrollInteraction();
             interactionIdleTimer.restart();
-            ScrollRequest request = scrollRequest(event);
+            ScrollRequest request = scrollRequest(event, nativeInput);
             if (request == null) return;
             revealScrollbars(request.pane());
-            if (isPreciseScroll(event)) {
+            if (nativeInput != null ? nativeInput.precise() : isPreciseScroll(event)) {
                 animator.scrollBy(request.pane(), request.metrics(), request.deltaX(), request.deltaY());
                 event.consume();
                 return;
             }
-            animator.animate(request.pane(), request.metrics(), request.deltaX(), request.deltaY(), System.nanoTime());
+            animator.animate(request.pane(), request.metrics(), request.deltaX(), request.deltaY(), System.nanoTime(),
+                    nativeInput == null ? 0 : nativeInput.delayNanos());
             event.consume();
         } finally {
             LauncherPerformanceProbe.recordOperation("scroll.input", operationStart);
         }
     }
 
-    private ScrollRequest scrollRequest(ScrollEvent event) {
+    private ScrollRequest scrollRequest(ScrollEvent event, LinuxScrollInput.Sample nativeInput) {
         if (!(event.getTarget() instanceof Node target)) return null;
 
-        double deltaX = -browserDelta(event, event.getDeltaX());
-        double deltaY = -browserDelta(event, event.getDeltaY());
+        double scale = eventOutputScale(event);
+        double deltaX = nativeInput == null ? -browserDelta(event, event.getDeltaX(), scale) : nativeInput.x() / scale;
+        double deltaY = nativeInput == null ? -browserDelta(event, event.getDeltaY(), scale) : nativeInput.y() / scale;
         if (event.isShiftDown() && Math.abs(deltaX) < 0.01) {
             deltaX = deltaY;
             deltaY = 0;
