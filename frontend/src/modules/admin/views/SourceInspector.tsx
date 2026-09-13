@@ -27,47 +27,52 @@ interface TreeNode {
     children: TreeNode[];
 }
 
+const FILES_PER_PAGE = 200;
+
 const buildFileTree = (paths: string[]): TreeNode[] => {
     const root: TreeNode[] = [];
-
-    paths.forEach(path => {
+    const levels = new Map<TreeNode[], Map<string, TreeNode>>();
+    levels.set(root, new Map());
+    for (const path of paths) {
         const parts = path.split('/');
-        let currentLevel = root;
-
-        parts.forEach((part, index) => {
-            const isFile = index === parts.length - 1;
-            const existingNode = currentLevel.find(n => n.name === part && n.type === (isFile ? 'file' : 'folder'));
-
-            if (existingNode) {
-                currentLevel = existingNode.children;
-            } else {
-                const newNode: TreeNode = {
-                    name: part,
-                    path: isFile ? path : parts.slice(0, index + 1).join('/'),
-                    type: isFile ? 'file' : 'folder',
-                    children: []
-                };
-                currentLevel.push(newNode);
-                currentLevel = newNode.children;
+        let children = root;
+        let prefix = '';
+        for (let index = 0; index < parts.length; index++) {
+            const name = parts[index];
+            const type = index === parts.length - 1 ? 'file' : 'folder';
+            prefix += (index ? '/' : '') + name;
+            const level = levels.get(children)!;
+            const key = `${type}:${name}`;
+            let node = level.get(key);
+            if (!node) {
+                node = { name, path: prefix, type, children: [] };
+                level.set(key, node); children.push(node);
+                levels.set(node.children, new Map());
             }
-        });
-    });
-
-    const sortNodes = (nodes: TreeNode[]) => {
-        nodes.sort((a, b) => {
-            if (a.type === b.type) return a.name.localeCompare(b.name);
-            return a.type === 'folder' ? -1 : 1;
-        });
-        nodes.forEach(node => {
-            if (node.children.length > 0) sortNodes(node.children);
-        });
-    };
-
-    sortNodes(root);
+            children = node.children;
+        }
+    }
+    // Archive paths can be deeply nested; neither sorting nor rendering recurses.
+    for (const nodes of levels.keys()) nodes.sort((a, b) => a.type === b.type
+        ? a.name.localeCompare(b.name) : a.type === 'folder' ? -1 : 1);
     return root;
 };
 
-const FileTreeNode: React.FC<{
+const visibleFileRows = (tree: TreeNode[], expanded: Set<string>) => {
+    const rows: { node: TreeNode; depth: number }[] = [];
+    const pending = tree.map(node => ({ node, depth: 0 })).reverse();
+    while (pending.length) {
+        const row = pending.pop()!;
+        rows.push(row);
+        if (row.node.type === 'folder' && expanded.has(row.node.path)) {
+            for (let i = row.node.children.length - 1; i >= 0; i--)
+                pending.push({ node: row.node.children[i], depth: row.depth + 1 });
+        }
+    }
+    return rows;
+};
+
+const FileRow: React.FC<{
     node: TreeNode;
     depth: number;
     expanded: Set<string>;
@@ -75,60 +80,22 @@ const FileTreeNode: React.FC<{
     selectedFile: string | null;
     onSelectFile: (path: string) => void;
 }> = ({ node, depth, expanded, toggleFolder, selectedFile, onSelectFile }) => {
+    const folder = node.type === 'folder';
     const isExpanded = expanded.has(node.path);
-    const isSelected = selectedFile === node.path;
-
-    let Icon = FileText;
-    if (node.type === 'folder') Icon = isExpanded ? FolderOpen : Folder;
-    else if (node.name.endsWith('.class') || node.name.endsWith('.java')) Icon = FileCode;
-    else if (node.name.endsWith('.json') || node.name.endsWith('.yml')) Icon = FileText;
-
-    const handleClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (node.type === 'folder') {
-            toggleFolder(node.path);
-        } else {
-            onSelectFile(node.path);
-        }
-    };
-
-    return (
-        <div>
-            <div
-                onClick={handleClick}
-                className={`flex items-center gap-1.5 py-1 pr-2 rounded-lg cursor-pointer transition-colors text-xs font-mono select-none
-                ${isSelected ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}
-                `}
-                style={{ paddingLeft: `${depth * 12 + 12}px` }}
-            >
-                {node.type === 'folder' && (
-                    <span className="opacity-50">
-                        {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                    </span>
-                )}
-                {node.type === 'file' && <span className="w-3" />}
-
-                <Icon className={`w-3.5 h-3.5 shrink-0 ${node.type === 'folder' ? 'text-blue-400' : ''}`} />
-                <span className="truncate">{node.name}</span>
-            </div>
-
-            {node.type === 'folder' && isExpanded && (
-                <div>
-                    {node.children.map(child => (
-                        <FileTreeNode
-                            key={child.path}
-                            node={child}
-                            depth={depth + 1}
-                            expanded={expanded}
-                            toggleFolder={toggleFolder}
-                            selectedFile={selectedFile}
-                            onSelectFile={onSelectFile}
-                        />
-                    ))}
-                </div>
-            )}
-        </div>
-    );
+    const isSelected = !folder && selectedFile === node.path;
+    const Icon = folder ? (isExpanded ? FolderOpen : Folder)
+        : /\.(class|java)$/.test(node.name) ? FileCode : FileText;
+    return <button type="button" title={node.path}
+        aria-label={`${folder ? 'Folder' : 'File'} ${node.path}`}
+        aria-expanded={folder ? isExpanded : undefined}
+        aria-current={isSelected ? 'true' : undefined}
+        onClick={() => folder ? toggleFolder(node.path) : onSelectFile(node.path)}
+        className={`w-full flex items-center gap-1.5 py-1 pr-2 rounded-lg text-left text-xs font-mono select-none focus-visible:outline focus-visible:outline-indigo-400 ${isSelected ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'}`}
+        style={{ paddingLeft: `${Math.min(depth, 12) * 12 + 12}px` }}>
+        {folder ? (isExpanded ? <ChevronDown aria-hidden="true" className="w-3 h-3 shrink-0" /> : <ChevronRight aria-hidden="true" className="w-3 h-3 shrink-0" />) : <span className="w-3 shrink-0" />}
+        <Icon aria-hidden="true" className={`w-3.5 h-3.5 shrink-0 ${folder ? 'text-blue-400' : ''}`} />
+        <span className="truncate">{node.name}</span>
+    </button>;
 };
 
 const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number; endLine?: number; firstLine?: number; format?: string }> = ({ content, filename, startLine, endLine, firstLine = 1, format }) => {
@@ -189,6 +156,7 @@ const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number;
 
 export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, versionId, canRescan = false, version, reviewToken, structure, issues = [], initialFile, initialLine, initialLineEnd, onClose }) => {
     const requestGeneration = useRef(0);
+    const fileListRef = useRef<HTMLElement>(null);
     useEffect(() => () => { requestGeneration.current++; }, [modId, version, reviewToken]);
     const [inspectorFile, setInspectorFile] = useState<string | null>(null);
     const [inspectorContent, setInspectorContent] = useState<any>('');
@@ -196,6 +164,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
     const [previousOffsets, setPreviousOffsets] = useState<number[]>([]);
     const [loadingFile, setLoadingFile] = useState(false);
     const [fileSearch, setFileSearch] = useState('');
+    const [filePage, setFilePage] = useState(0);
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
     const [showIssuesDropdown, setShowIssuesDropdown] = useState(false);
     const [resolvedIssues, setResolvedIssues] = useState<Set<number>>(new Set());
@@ -211,6 +180,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
     useEffect(() => {
         setInspectorContent(''); setInspectorFile(null); setLoadingFile(false); setWindow(null); setPreviousOffsets([]);
         setResolvedIssues(new Set()); setActiveHighlight(null); setActionError(null);
+        setFileSearch(''); setFilePage(0); setExpandedFolders(new Set());
     }, [modId, version, reviewToken]);
 
     const fileTree = useMemo(() => buildFileTree(structure), [structure]);
@@ -287,6 +257,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         }
         setExpandedFolders(prev => new Set([...prev, ...foldersToExpand]));
 
+        setFileSearch('');
         setActiveHighlight({
             file: targetFile,
             start: lineStart,
@@ -326,10 +297,23 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         return undefined;
     }, [activeHighlight, inspectorFile]);
 
-    const filteredFiles = useMemo(() => {
-        if (!fileSearch) return [];
-        return structure.filter(f => f.toLowerCase().includes(fileSearch.toLowerCase()));
-    }, [structure, fileSearch]);
+    const fileRows = useMemo(() => {
+        const search = fileSearch.toLowerCase();
+        if (search) return structure.filter(path => path.toLowerCase().includes(search))
+            .map(path => ({ node: { name: path, path, type: 'file' as const, children: [] }, depth: 0 }));
+        return visibleFileRows(fileTree, expandedFolders);
+    }, [structure, fileSearch, fileTree, expandedFolders]);
+    const lastFilePage = Math.max(0, Math.ceil(fileRows.length / FILES_PER_PAGE) - 1);
+    const currentFilePage = Math.min(filePage, lastFilePage);
+    const firstFileRow = currentFilePage * FILES_PER_PAGE;
+    useEffect(() => {
+        // A finding jump reveals its file even when its ancestors span several pages.
+        const index = fileRows.findIndex(row => row.node.type === 'file' && row.node.path === inspectorFile);
+        if (index >= 0) setFilePage(Math.floor(index / FILES_PER_PAGE));
+    }, [inspectorFile, modId, version, reviewToken]);
+    useEffect(() => {
+        if (fileListRef.current) fileListRef.current.scrollTop = 0;
+    }, [currentFilePage, fileSearch]);
 
     const renderIssueItem = (issue: any, isResolved: boolean) => (
         <div
@@ -418,7 +402,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                     >
                         <RefreshCw className={`w-5 h-5 ${isScanning ? 'animate-spin' : ''}`} />
                     </button>}
-                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white">
+                    <button aria-label="Close source inspector" onClick={onClose} className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -438,45 +422,30 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                             <input
                                 type="text"
                                 placeholder="Search files..."
+                                aria-label="Search files"
                                 className="w-full pl-9 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder:text-slate-500 focus:ring-1 focus:ring-indigo-500 outline-none"
                                 value={fileSearch}
-                                onChange={e => setFileSearch(e.target.value)}
+                                onChange={e => { setFileSearch(e.target.value); setFilePage(0); }}
                             />
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-2">
-                        {fileSearch ? (
-                            <div>
-                                {filteredFiles.length === 0 && (
-                                    <div className="p-4 text-center text-xs text-slate-500 italic">No files found</div>
-                                )}
-                                {filteredFiles.map((file, idx) => (
-                                    <button
-                                        key={idx}
-                                        onClick={() => loadInspectorFile(file)}
-                                        className={`w-full text-left px-3 py-2 rounded-lg text-xs font-mono truncate flex items-center gap-2 transition-colors ${inspectorFile === file ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
-                                    >
-                                        <FileCode className="w-3 h-3 shrink-0" />
-                                        {file}
-                                    </button>
-                                ))}
-                            </div>
-                        ) : (
-                            <div>
-                                {fileTree.map(node => (
-                                    <FileTreeNode
-                                        key={node.path}
-                                        node={node}
-                                        depth={0}
-                                        expanded={expandedFolders}
-                                        toggleFolder={toggleFolder}
-                                        selectedFile={inspectorFile}
-                                        onSelectFile={loadInspectorFile}
-                                    />
-                                ))}
-                            </div>
-                        )}
+                    <nav ref={fileListRef} aria-label="Archive files" className="flex-1 overflow-y-auto p-2">
+                        {!fileRows.length && <p className="p-4 text-center text-xs text-slate-500">{fileSearch ? 'No files found' : 'No files available'}</p>}
+                        {fileRows.slice(firstFileRow, firstFileRow + FILES_PER_PAGE).map(({ node, depth }) => (
+                            <FileRow key={`${node.type}:${node.path}`} node={node} depth={depth}
+                                expanded={expandedFolders} toggleFolder={toggleFolder}
+                                selectedFile={inspectorFile} onSelectFile={loadInspectorFile} />
+                        ))}
+                    </nav>
+                    <div className="border-t border-white/10 p-3 text-xs text-slate-300">
+                        <p role="status">{fileRows.length ? `Entries ${firstFileRow + 1}–${Math.min(firstFileRow + FILES_PER_PAGE, fileRows.length)} of ${fileRows.length}` : '0 entries'}</p>
+                        <div className="flex flex-wrap gap-3 mt-2">
+                            <button disabled={currentFilePage === 0} onClick={() => setFilePage(0)} className="disabled:opacity-40">First files</button>
+                            <button disabled={currentFilePage === 0} onClick={() => setFilePage(currentFilePage - 1)} className="disabled:opacity-40">Previous files</button>
+                            <button disabled={currentFilePage === lastFilePage} onClick={() => setFilePage(currentFilePage + 1)} className="disabled:opacity-40">Next files</button>
+                            <button disabled={currentFilePage === lastFilePage} onClick={() => setFilePage(lastFilePage)} className="disabled:opacity-40">Last files</button>
+                        </div>
                     </div>
                 </div>
 

@@ -18,6 +18,55 @@ describe('SourceInspector evidence display', () => {
     });
     afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
     const click = async (label: string) => act(async () => [...container.querySelectorAll('button')].find(button => button.textContent === label)!.click());
+    it('bounds a 20,000-file inventory while allowing the final page to be inspected', async () => {
+        const structure = Array.from({ length: 20_000 }, (_, i) => `file-${String(i).padStart(5, '0')}.txt`);
+        vi.mocked(adminClient.getFileWindow).mockResolvedValue(window('last file'));
+        await act(async () => root.render(<SourceInspector {...props} structure={structure} />));
+        expect(container.querySelectorAll('svg').length).toBeLessThan(500);
+        await click('Last files');
+        const last = container.querySelector<HTMLButtonElement>('button[title="file-19999.txt"]');
+        expect(last).not.toBeNull();
+        await act(async () => last!.click());
+        expect(adminClient.getFileWindow).toHaveBeenLastCalledWith('project', '1.0', 'file-19999.txt', 'snapshot', 0, undefined, 0);
+    });
+    it('provides native keyboard controls for folders and files', async () => {
+        vi.mocked(adminClient.getFileWindow).mockResolvedValue(window('nested'));
+        await act(async () => root.render(<SourceInspector {...props} structure={['folder/nested.txt']} />));
+        const folder = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
+        expect(folder).not.toBeNull();
+        await act(async () => folder!.click());
+        expect(folder!.getAttribute('aria-expanded')).toBe('true');
+        const file = container.querySelector<HTMLButtonElement>('button[title="folder/nested.txt"]');
+        expect(file).not.toBeNull();
+        await act(async () => file!.click());
+        expect(container.querySelector('code')?.textContent).toBe('nested');
+    });
+    it('opens a deeply nested finding without recursive DOM or losing the selected file', async () => {
+        const path = `${'a/'.repeat(3500)}tail.txt`;
+        vi.mocked(adminClient.getFileWindow).mockResolvedValue(window('deep evidence'));
+        await act(async () => root.render(<SourceInspector {...props} structure={[path]} initialFile={path} />));
+        expect(container.querySelectorAll('svg').length).toBeLessThan(500);
+        expect(container.querySelector('button[aria-current="true"]')?.getAttribute('title')).toBe(path);
+        expect(container.querySelector('code')?.textContent).toBe('deep evidence');
+    });
+    it('searches all inventory pages and resets pagination when the search changes', async () => {
+        const structure = Array.from({ length: 2000 }, (_, i) => `item-${String(i).padStart(4, '0')}.txt`);
+        await act(async () => root.render(<SourceInspector {...props} structure={structure} />));
+        await click('Last files');
+        const input = container.querySelector('input')!;
+        const search = async (value: string) => act(async () => {
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        await search('item-0000');
+        expect(container.querySelector('button[title="item-0000.txt"]')).not.toBeNull();
+        expect(container.querySelector('nav')?.querySelectorAll('button')).toHaveLength(1);
+        await search('item-');
+        expect(container.querySelector('nav')?.querySelectorAll('button')).toHaveLength(200);
+        expect(container.textContent).toContain('Entries 1–200 of 2000');
+        await search('missing');
+        expect(container.textContent).toContain('No files found');
+    });
     it('navigates exact returned offsets and keeps the representation identity', async () => {
         vi.mocked(adminClient.getFileWindow).mockResolvedValueOnce(window('first', 'TEXT_RESOURCE', 0, 10))
             .mockResolvedValueOnce(window('later', 'TEXT_RESOURCE', 5, 10))
