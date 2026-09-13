@@ -1,3 +1,5 @@
+import { loadPriorFindingReasoning } from '@/modules/admin/api/findingReviews';
+vi.mock('@/modules/admin/api/findingReviews', () => ({ loadPriorFindingReasoning: vi.fn() }));
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -13,9 +15,9 @@ describe('Review security clearance status', () => {
     let container: HTMLDivElement; let root: Root;
     beforeEach(() => { container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container); });
     afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
-    async function render(scanResult: any, decision = false, token?: string, steps?: number) {
+    async function render(scanResult: any, decision = false, token?: string, steps?: number, sources: any[] = []) {
         const project = { mod: { id: 'project', slug: 'project', title: 'Example', status: decision ? 'PENDING' : 'PUBLISHED', reviewToken: token, classification: 'PLUGIN', tags: [],
-            versions: [{ id: 'version', versionNumber: '1.0', reviewStatus: 'PENDING', reviewToken: 'old-version', scanResult }] } };
+            versions: [{ id: 'version', versionNumber: '1.0', reviewStatus: 'PENDING', reviewToken: 'old-version', scanResult }, ...sources] } };
         await act(async () => root.render(<Review reviewingProject={project} onClose={vi.fn()} onApprove={vi.fn()} onReject={vi.fn()} setStatus={vi.fn()} canDecide={decision} />));
         for (let step = 0; step < (steps ?? (decision ? 4 : 2)); step++) {
             await act(async () => container.querySelectorAll<HTMLInputElement>('input[type=checkbox]').forEach(input => input.click()));
@@ -166,5 +168,41 @@ describe('Review security clearance status', () => {
         await act(async () => stale(['old.txt']));
         expect(adminClient.getFileContent).toHaveBeenLastCalledWith('project', '1.0', 'new.txt', 'snapshot');
         expect(container.querySelector('code')?.textContent).toBe('Current selection contents');
+    });
+    const earlierSources = [{ id: 'older', versionNumber: '0.8', reviewStatus: 'APPROVED' }, { id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }];
+    const twoFindings = { ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', issues: [
+        { type: 'Network', severity: 'LOW', description: 'first original occurrence', filePath: 'Same.class', lineStart: 9, lineEnd: 9, baselineVersion: '0.9' },
+        { type: 'Network', severity: 'HIGH', description: 'second original occurrence', filePath: 'Same.class', lineStart: 9, lineEnd: 9, baselineVersion: '0.9' }
+    ] };
+    const earlierResponse = (rationale: string) => ({ reviewToken: 'snapshot', sourceVersionId: 'baseline', sourceVersion: '0.9', assessedAt: Date.now(), reviewReasons: ['Current review required'], omitted: 0,
+        decisions: [{ id: 'reasoning', actorId: 'reviewer', createdAt: 1, expiresAt: 2, disposition: 'ACCEPT' as const, scope: 'WHOLE_ARTIFACT', rationale,
+            finding: { path: 'Same.class', description: 'prior', lineStart: 9 }, revokedDecisionId: null }] });
+    it('opens prior reasoning in one click using the original occurrence index after sorting', async () => {
+        vi.mocked(loadPriorFindingReasoning).mockReset().mockResolvedValue(earlierResponse('Exact second occurrence reasoning'));
+        await render(twoFindings, true, 'snapshot', 2, earlierSources);
+        const show = container.querySelector<HTMLButtonElement>('button[aria-label="Show findings"]');
+        if (show) await act(async () => show.click());
+        const buttons = container.querySelectorAll<HTMLButtonElement>('button[aria-label^="Earlier reasoning for finding"]');
+        expect(buttons[0].getAttribute('aria-label')).toBe('Earlier reasoning for finding 2');
+        expect(loadPriorFindingReasoning).not.toHaveBeenCalled();
+        await act(async () => buttons[0].click());
+        expect(loadPriorFindingReasoning).toHaveBeenCalledExactlyOnceWith('project', 'version', 'baseline', 1, 'snapshot');
+        expect(container.querySelector('select[aria-label="Earlier reasoning finding"]')).toBeNull();
+        expect(container.textContent).toContain('Exact second occurrence reasoning');
+        expect(container.textContent).toContain('No current acceptance is granted');
+    });
+    it('does not attach a late rationale to a different selected occurrence', async () => {
+        let resolve!: (value: ReturnType<typeof earlierResponse>) => void;
+        vi.mocked(loadPriorFindingReasoning).mockReset().mockReturnValueOnce(new Promise(done => { resolve = done; }))
+            .mockResolvedValueOnce(earlierResponse('Current occurrence reasoning'));
+        await render(twoFindings, true, 'snapshot', 2, earlierSources);
+        const show = container.querySelector<HTMLButtonElement>('button[aria-label="Show findings"]');
+        if (show) await act(async () => show.click());
+        await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="Earlier reasoning for finding 2"]')!.click());
+        await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="Earlier reasoning for finding 1"]')!.click());
+        await act(async () => resolve(earlierResponse('Stale occurrence reasoning')));
+        expect(loadPriorFindingReasoning).toHaveBeenLastCalledWith('project', 'version', 'baseline', 0, 'snapshot');
+        expect(container.querySelectorAll('section[aria-label="Earlier finding reasoning"]')).toHaveLength(1);
+        expect(container.textContent).toContain('Current occurrence reasoning');expect(container.textContent).not.toContain('Stale occurrence reasoning');
     });
 });

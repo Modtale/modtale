@@ -94,8 +94,11 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
         ? mod.versions.find((v: ProjectVersion) => v.id === refreshedReview.versionId)
         : mod.versions.find((v: ProjectVersion) => v.reviewStatus === 'PENDING') || mod.versions[0];
     useEffect(() => setDecisionWritten(false), [pendingVersion?.id, pendingVersion?.reviewToken]);
+    const [reasoningIssue, setReasoningIssue] = useState<number | null>(null);
+    useEffect(() => setReasoningIssue(null), [pendingVersion?.id, mod.reviewToken]);
+    const priorSources = mod.versions.filter((v: ProjectVersion) => v.id !== pendingVersion?.id && v.reviewStatus === 'APPROVED');
     const scanResult = pendingVersion?.scanResult;
-    const scanIssues = scanResult?.issues || [];
+    const scanIssues: ScanIssue[] = scanResult?.issues || [];
     const currentEvidence = /^warden-3\.0\.0:[0-9a-f]{64}$/.test(scanResult?.securityEvidence?.policyVersion || '')
         && /^[0-9a-f]{64}$/.test(scanResult?.securityEvidence?.artifactSha256 || '')
         && /^[0-9a-f]{64}$/.test(scanResult?.securityEvidence?.contentSha256 || '');
@@ -117,7 +120,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             return 1;
         };
 
-        return [...scanIssues].sort((a, b) => {
+        return scanIssues.map((issue: ScanIssue, originalIndex: number) => ({ issue, originalIndex })).sort(({ issue: a }, { issue: b }) => {
             const cadenceDiff = Number((b.reviewCadence || '').toUpperCase() === 'ALWAYS')
                 - Number((a.reviewCadence || '').toUpperCase() === 'ALWAYS');
             if (cadenceDiff !== 0) return cadenceDiff;
@@ -630,9 +633,6 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
 
                                 {pendingVersion && <ArtifactChanges projectId={mod.id} version={pendingVersion.versionNumber} reviewToken={mod.reviewToken || ''}
                                     onInspect={(version, path, token) => openInspector(version, version === pendingVersion.versionNumber ? scanIssues : [], path, undefined, undefined, token)} />}
-                                {pendingVersion && <PriorFindingReasoning key={`prior:${pendingVersion.id}:${mod.reviewToken}`}
-                                    projectId={mod.id} versionId={pendingVersion.id} token={mod.reviewToken || ''} issues={scanIssues}
-                                    sources={mod.versions.filter((v: ProjectVersion) => v.id !== pendingVersion.id && v.reviewStatus === 'APPROVED')} />}
                                 {pendingVersion && <FindingDecisions key={`${pendingVersion.id}:${pendingVersion.reviewToken}`}
                                     projectId={mod.id} versionId={pendingVersion.id} token={pendingVersion.reviewToken}
                                     issues={scanIssues} canDecide={canDecide} onSaved={() => setDecisionWritten(true)} />}
@@ -727,8 +727,9 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                         {showScanDetails && (
                                             <div className="p-4 bg-white dark:bg-black/20 space-y-2 border-t border-red-200 dark:border-red-900/50">
                                                 {orderedIssues.length === 0 && <p className="text-sm text-slate-600 dark:text-slate-300">No heuristic findings were emitted. Review the evidence and reviewer notes before deciding.</p>}
-                                                {orderedIssues.map((issue: ScanIssue, idx: number) => (
-                                                    <div key={idx} className="flex items-center justify-between text-sm bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-slate-200 dark:border-white/5">
+                                                {orderedIssues.map(({ issue, originalIndex }) => (
+                                                    <div key={originalIndex} className="text-sm bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-slate-200 dark:border-white/5">
+                                                        <div className="flex flex-wrap items-center justify-between gap-2">
                                                         <div className="flex-1 min-w-0 pr-4">
                                                             <div className="flex items-center gap-2 mb-1">
                                                                 <span className={`font-black text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wide
@@ -766,12 +767,26 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                             <p className="text-xs text-slate-600 dark:text-slate-400 leading-snug">{issue.description}</p>
                                                             {issue.historicalFileEvidenceIdentical && <p className="text-xs text-slate-500 mt-1">Same finding and file as approved version {issue.baselineVersion}. Changes elsewhere still require review.</p>}
                                                         </div>
+                                                        {priorSources.length > 0 && <button type="button"
+                                                            aria-label={`Earlier reasoning for finding ${originalIndex + 1}`}
+                                                            aria-expanded={reasoningIssue === originalIndex}
+                                                            onClick={() => setReasoningIssue(value => value === originalIndex ? null : originalIndex)}
+                                                            className="shrink-0 text-xs font-bold text-indigo-600 dark:text-indigo-300 px-3 py-2">
+                                                            {reasoningIssue === originalIndex ? 'Hide earlier reasoning' : 'Earlier reasoning'}
+                                                        </button>}
                                                         <button
                                                             onClick={() => openInspector(pendingVersion.versionNumber, scanResult.issues, issue.filePath, issue.lineStart, issue.lineEnd)}
                                                             className="shrink-0 flex items-center gap-1.5 text-xs font-bold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 px-3 py-2 rounded-lg transition-colors"
                                                         >
                                                             <Eye className="w-3.5 h-3.5" /> Inspect
                                                         </button>
+                                                        </div>
+                                                        {reasoningIssue === originalIndex && <PriorFindingReasoning
+                                                            key={`${pendingVersion.id}:${mod.reviewToken}:${originalIndex}`}
+                                                            projectId={mod.id} versionId={pendingVersion.id} token={mod.reviewToken || ''}
+                                                            issues={scanIssues} issueIndex={originalIndex} sources={priorSources} autoLoad
+                                                            sourceVersionId={priorSources.filter((v: ProjectVersion) => v.versionNumber === issue.baselineVersion).length === 1
+                                                                ? priorSources.find((v: ProjectVersion) => v.versionNumber === issue.baselineVersion)?.id : undefined} />}
                                                     </div>
                                                 ))}
                                             </div>
