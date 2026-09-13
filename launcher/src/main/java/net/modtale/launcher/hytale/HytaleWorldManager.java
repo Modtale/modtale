@@ -51,7 +51,7 @@ public final class HytaleWorldManager {
         JsonNode mods = root.get("Mods");
         Map<String, Boolean> enabledByMod = new LinkedHashMap<>();
         if (mods != null && mods.isObject()) {
-            mods.fields().forEachRemaining(entry -> {
+            mods.properties().forEach(entry -> {
                 JsonNode enabled = entry.getValue().get("Enabled");
                 enabledByMod.put(entry.getKey(), enabled != null && enabled.asBoolean(false));
             });
@@ -196,7 +196,7 @@ public final class HytaleWorldManager {
                 continue;
             }
             if (node.isObject()) {
-                Iterator<Map.Entry<String, JsonNode>> fields = node.fields();
+                Iterator<Map.Entry<String, JsonNode>> fields = node.properties().iterator();
                 while (fields.hasNext()) {
                     Map.Entry<String, JsonNode> field = fields.next();
                     if (isPreviewField(field.getKey())) {

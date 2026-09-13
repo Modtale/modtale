@@ -19,7 +19,7 @@ final class LauncherRenderSettings {
     private static final int MIN_REFRESH_RATE = 30;
     private static final int MAX_REFRESH_RATE = 1000;
     private static final String WINDOWS_PRISM_ORDER = "d3d,sw";
-    private static final String MACOS_PRISM_ORDER = "es2,sw";
+    private static final String MACOS_PRISM_ORDER = "mtl,es2,sw";
     private static final String LINUX_PRISM_ORDER = "es2,sw";
 
     private LauncherRenderSettings() {
@@ -102,8 +102,8 @@ final class LauncherRenderSettings {
     }
 
     private static String prismOrder(String osName) {
-        String normalized = osName == null ? "" : osName.toLowerCase();
-        if (normalized.contains("win")) {
+        String normalized = osName == null ? "" : osName.toLowerCase(java.util.Locale.ROOT);
+        if (normalized.contains("win") && !normalized.contains("darwin")) {
             return WINDOWS_PRISM_ORDER;
         }
         if (normalized.contains("mac") || normalized.contains("darwin")) {

@@ -32,7 +32,7 @@ public final class ProjectBrowseCategories {
 
     private static final double VIEWPORT_CHROME_BUFFER = 8;
     private static final double OVERFLOW_TOLERANCE = 12;
-    private static final Interpolator PILL_EASE = Interpolator.SPLINE(0.16, 1.0, 0.30, 1.0);
+    private static final Interpolator PILL_EASE = Interpolator.ofSpline(0.16, 1.0, 0.30, 1.0);
     private static final Duration PILL_TRANSITION_DURATION = Duration.millis(700);
 
     private final LauncherScrollSupport scrollSupport;

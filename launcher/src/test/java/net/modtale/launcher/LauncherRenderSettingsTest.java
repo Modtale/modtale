@@ -72,7 +72,7 @@ class LauncherRenderSettingsTest {
         LauncherRenderSettings.configure(linuxProperties, "Linux", OptionalInt.empty());
 
         assertEquals("d3d,sw", windowsProperties.getProperty(LauncherRenderSettings.PRISM_ORDER_PROPERTY));
-        assertEquals("es2,sw", macProperties.getProperty(LauncherRenderSettings.PRISM_ORDER_PROPERTY));
+        assertEquals("mtl,es2,sw", macProperties.getProperty(LauncherRenderSettings.PRISM_ORDER_PROPERTY));
         assertEquals("es2,sw", linuxProperties.getProperty(LauncherRenderSettings.PRISM_ORDER_PROPERTY));
     }
 

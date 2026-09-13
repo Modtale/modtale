@@ -98,7 +98,7 @@ public class WardrobeApiClient {
         requireSelectedProfile(settings, profile.toString());
         if (root == null || !root.isObject()) throw failure("Invalid unlocked cosmetics response");
         Map<String, Set<String>> result = new LinkedHashMap<>();
-        root.fields().forEachRemaining(entry -> result.put(entry.getKey(), stringSet(entry.getValue())));
+        root.properties().forEach(entry -> result.put(entry.getKey(), stringSet(entry.getValue())));
         return java.util.Collections.unmodifiableMap(result);
     }
 

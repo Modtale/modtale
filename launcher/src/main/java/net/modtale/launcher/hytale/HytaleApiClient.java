@@ -808,7 +808,7 @@ public class HytaleApiClient {
                 }
             }
         }
-        node.fields().forEachRemaining(entry -> {
+        node.properties().forEach(entry -> {
             if (patchlineContext) {
                 normalizePatchlineId(entry.getKey()).ifPresent(patchlines::add);
             }
@@ -848,7 +848,7 @@ public class HytaleApiClient {
         if (!node.isObject()) {
             return;
         }
-        node.fields().forEachRemaining(entry -> collectFriendArrays(entry.getValue(), entry.getKey(), friendArrays));
+        node.properties().forEach(entry -> collectFriendArrays(entry.getValue(), entry.getKey(), friendArrays));
     }
 
     private static Optional<HytaleFriend> toFriend(JsonNode node) {

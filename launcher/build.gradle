@@ -12,7 +12,7 @@ version = configuredLauncherVersion
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(26)
     }
 }
 
@@ -35,9 +35,9 @@ dependencies {
     implementation 'com.vladsch.flexmark:flexmark-ext-gfm-tasklist:0.64.8'
     implementation 'com.vladsch.flexmark:flexmark-html2md-converter:0.64.8'
     implementation 'net.java.dev.jna:jna:5.19.1'
-    implementation "org.openjfx:javafx-base:21.0.12:${javafxPlatform()}"
-    implementation "org.openjfx:javafx-graphics:21.0.12:${javafxPlatform()}"
-    implementation "org.openjfx:javafx-controls:21.0.12:${javafxPlatform()}"
+    implementation "org.openjfx:javafx-base:26.0.2:${javafxPlatform()}"
+    implementation "org.openjfx:javafx-graphics:26.0.2:${javafxPlatform()}"
+    implementation "org.openjfx:javafx-controls:26.0.2:${javafxPlatform()}"
 
     testImplementation 'org.junit.jupiter:junit-jupiter:6.1.3'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:6.1.3'
@@ -64,7 +64,9 @@ def modtaleApiBaseUrl = providers.gradleProperty('modtaleApiBaseUrl')
         .orElse(providers.gradleProperty('apiBaseUrl'))
         .orElse('')
         .get()
-def launcherJvmArgs = ["-Dmodtale.launcherVersion=${packageVersion}"]
+// JavaFX and JNA load native libraries from the class path.
+def nativeAccessJvmArgs = ['--enable-native-access=ALL-UNNAMED']
+def launcherJvmArgs = nativeAccessJvmArgs + ["-Dmodtale.launcherVersion=${packageVersion}"]
 if (!discordClientId.isBlank()) {
     launcherJvmArgs.add("-Dmodtale.discordClientId=${discordClientId.trim()}")
 }
@@ -207,11 +209,11 @@ tasks.register('prepareJpackageInput', Sync) {
     from(packagedJna)
 }
 
-def java21Launcher = javaToolchains.launcherFor {
-    languageVersion = JavaLanguageVersion.of(21)
+def packagingJavaLauncher = javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(26)
 }
 
-def jpackageExecutable = java21Launcher.map {
+def jpackageExecutable = packagingJavaLauncher.map {
     def extension = currentOs.isWindows() ? '.exe' : ''
     file("${it.executablePath.asFile.parentFile}/jpackage${extension}")
 }
@@ -294,7 +296,7 @@ def configureJpackageTask = { TaskProvider<Exec> packageTask, String packageType
         doFirst {
             def executable = jpackageExecutable.get()
             if (!executable.exists()) {
-                throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 21 to build native launcher installers.")
+                throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 26 to build native launcher installers.")
             }
 
             delete layout.buildDirectory.dir("jpackage/tmp/${name}")
@@ -357,7 +359,7 @@ tasks.register('prepareLinuxAppImageRuntime', Exec) {
     doFirst {
         def executable = jpackageExecutable.get()
         if (!executable.exists()) {
-            throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 21 to build the Linux AppImage.")
+            throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 26 to build the Linux AppImage.")
         }
 
         delete linuxAppImageDirectory
@@ -824,7 +826,7 @@ tasks.register('jpackageAppImage', Exec) {
     doFirst {
         def executable = jpackageExecutable.get()
         if (!executable.exists()) {
-            throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 21 to build native launcher app images.")
+            throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 26 to build native launcher app images.")
         }
 
         delete layout.buildDirectory.dir('jpackage/app-image')
@@ -881,6 +883,10 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.named('test') {
     useJUnitPlatform()
+    jvmArgs nativeAccessJvmArgs
+    if (currentOs.isMacOsX()) {
+        systemProperty 'prism.order', 'mtl,es2,sw'
+    }
     timeout = java.time.Duration.ofMinutes(10)
     systemProperty 'junit.jupiter.execution.timeout.default', '60 s'
 }

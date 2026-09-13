@@ -19,7 +19,7 @@ public final class ProjectCardInteraction {
     private static final String INDEPENDENT_CONTENT_PROPERTY = "net.modtale.launcher.independentAnimatedContent";
     private static final String ANIMATION_CACHE_ENABLED_PROPERTY = "net.modtale.launcher.animationCacheEnabled";
     private static final String ANIMATION_CACHE_HINT_PROPERTY = "net.modtale.launcher.animationCacheHint";
-    private static final Interpolator HOVER_EASE = Interpolator.SPLINE(0.16, 1.0, 0.30, 1.0);
+    private static final Interpolator HOVER_EASE = Interpolator.ofSpline(0.16, 1.0, 0.30, 1.0);
     private static final Duration HOVER_TRANSLATE_DURATION = Duration.millis(800);
     private static final Duration HOVER_SCALE_DURATION = Duration.millis(900);
 

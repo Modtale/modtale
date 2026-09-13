@@ -281,7 +281,7 @@ public final class CosmeticCatalogClient {
         if (!variantId.isEmpty()) {
             JsonNode variant = base.path("Variants").get(variantId);
             if (variant == null || !variant.isObject()) throw new IllegalArgumentException("Invalid variant " + variantId);
-            variant.fields().forEachRemaining(entry -> result.set(entry.getKey(), entry.getValue().deepCopy()));
+            variant.properties().forEach(entry -> result.set(entry.getKey(), entry.getValue().deepCopy()));
         }
         return result;
     }

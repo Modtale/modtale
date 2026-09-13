@@ -39,7 +39,7 @@ public final class ConfigSettingsDocument {
     private void collect(JsonNode node, String pointer, String context, int depth) throws IOException {
         if (depth > 16 || settings.size() > 1500) throw new IOException("Settings are too large for this form");
         if (node.isObject()) {
-            var fields = node.fields();
+            var fields = node.properties().iterator();
             while (fields.hasNext()) {
                 if (settings.size() >= 1500) throw new IOException("Settings are too large for this form");
                 var field = fields.next();

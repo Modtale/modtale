@@ -406,7 +406,7 @@ final class NativeMarkdownRenderer {
     }
 
     private int hitInsertionIndex(TextFlow flow, MouseEvent event) {
-        HitInfo hit = flow.hitTest(flow.sceneToLocal(event.getSceneX(), event.getSceneY()));
+        HitInfo hit = flow.getHitInfo(flow.sceneToLocal(event.getSceneX(), event.getSceneY()));
         return Math.max(0, hit.getInsertionIndex());
     }
 
@@ -417,7 +417,7 @@ final class NativeMarkdownRenderer {
         }
         int start = Math.min(anchor, caret);
         int end = Math.max(anchor, caret);
-        PathElement[] shape = flow.rangeShape(start, end);
+        PathElement[] shape = flow.getRangeShape(start, end, false);
         selection.getElements().setAll(Arrays.asList(shape));
     }
 
