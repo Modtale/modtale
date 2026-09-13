@@ -15,9 +15,26 @@ describe('SourceInspector evidence display', () => {
     beforeEach(() => {
         container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
         vi.clearAllMocks();
+
     });
     afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
     const click = async (label: string) => act(async () => [...container.querySelectorAll('button')].find(button => button.textContent === label)!.click());
+    it('opens modally and routes Escape through the finding panel before closing', async () => {
+        const issues = [{ type: 'Example', severity: 'HIGH', description: 'Test', filePath: 'a.txt', lineStart: 0, lineEnd: 0 } as any];
+        await act(async () => root.render(<SourceInspector {...props} issues={issues} />));
+        const dialog = container.querySelector('dialog')!;
+        expect(dialog.open).toBe(true);
+        expect(dialog.getAttribute('aria-labelledby')).toBe(container.querySelector('h3')!.id);
+        const trigger = [...container.querySelectorAll('button')].find(button => button.textContent?.includes('Issues Active'))!;
+        await act(async () => trigger.click());
+        expect(container.querySelector('button[aria-label="Inspect Example in a.txt"]')).not.toBeNull();
+        await act(async () => dialog.dispatchEvent(new Event('cancel', { cancelable: true })));
+        expect(props.onClose).not.toHaveBeenCalled();
+        expect(trigger.getAttribute('aria-expanded')).toBe('false');
+        expect(document.activeElement).toBe(trigger);
+        await act(async () => dialog.dispatchEvent(new Event('cancel', { cancelable: true })));
+        expect(props.onClose).toHaveBeenCalledOnce();
+    });
     it('bounds a 20,000-file inventory while allowing the final page to be inspected', async () => {
         const structure = Array.from({ length: 20_000 }, (_, i) => `file-${String(i).padStart(5, '0')}.txt`);
         vi.mocked(adminClient.getFileWindow).mockResolvedValue(window('last file'));

@@ -1,5 +1,5 @@
 import { SkeletonSurface } from '@/components/ui/Skeleton';
-import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect, useId } from 'react';
 import { Search, FileCode, Terminal, FileText, X, Folder, FolderOpen, ChevronRight, ChevronDown, ShieldAlert, CheckCircle2, Square, RefreshCw } from 'lucide-react';
 import { adminClient, type InspectionWindow } from '../api/adminClient';
 import { extractApiErrorMessage } from '@/utils/api';
@@ -155,6 +155,20 @@ const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number;
 };
 
 export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, versionId, canRescan = false, version, reviewToken, structure, issues = [], initialFile, initialLine, initialLineEnd, onClose }) => {
+    const dialogRef = useRef<HTMLDialogElement>(null);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+    const issuesTriggerRef = useRef<HTMLButtonElement>(null);
+    const dialogTitleId = useId();
+    useEffect(() => {
+        const opener = document.activeElement;
+        const dialog = dialogRef.current!;
+        dialog.showModal();
+        searchInputRef.current?.focus({ preventScroll: true });
+        return () => {
+            dialog.close();
+            if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true });
+        };
+    }, []);
     const requestGeneration = useRef(0);
     const fileListRef = useRef<HTMLElement>(null);
     useEffect(() => () => { requestGeneration.current++; }, [modId, version, reviewToken]);
@@ -266,6 +280,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
 
         loadInspectorFile(targetFile, 0, undefined, [], Math.max(0, lineStart || 0));
         setShowIssuesDropdown(false);
+        if (showIssuesDropdown) issuesTriggerRef.current?.focus();
     };
 
     const handleRescan = async () => {
@@ -321,7 +336,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
             className={`w-full text-left p-3 hover:bg-white/5 rounded-lg group border border-transparent hover:border-white/5 transition-all mb-1 ${isResolved ? 'opacity-50' : ''}`}
         >
             <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 cursor-pointer" onClick={() => handleJumpToIssue(issue.filePath, issue.lineStart, issue.lineEnd)}>
+                <button type="button" aria-label={`Inspect ${issue.type} in ${issue.filePath}`} className="flex-1 text-left rounded focus-visible:outline focus-visible:outline-indigo-400" onClick={() => handleJumpToIssue(issue.filePath, issue.lineStart, issue.lineEnd)}>
                     <div className="flex items-center gap-2 mb-1">
                         <span className={`font-black text-[10px] px-1.5 py-0.5 rounded uppercase
                                                         ${issue.severity === 'CRITICAL' ? 'bg-red-500 text-white' : 'bg-amber-500 text-white'}`}>
@@ -333,12 +348,13 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                         {issue.filePath.split('/').pop()} {issue.lineStart > 0 ? `:${issue.lineStart} - ${issue.lineEnd}` : ''}
                     </div>
                     <p className="text-[10px] text-slate-400 line-clamp-2">{issue.description}</p>
-                </div>
+                </button>
 
                 <button
                     onClick={(e) => toggleResolved(issue.originalIndex, e)}
                     className={`shrink-0 p-1 rounded hover:bg-white/10 transition-colors ${isResolved ? 'text-emerald-500' : 'text-slate-600'}`}
                     title={isResolved ? "Mark as Unresolved" : "Mark as Resolved"}
+                    aria-label={`${isResolved ? "Mark unresolved" : "Mark resolved"}: ${issue.type} in ${issue.filePath}`}
                 >
                     {isResolved ? <CheckCircle2 className="w-5 h-5"/> : <Square className="w-5 h-5"/>}
                 </button>
@@ -348,18 +364,24 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
 
     return (
         <ModalPortal>
-        <div className="fixed inset-0 z-[160] bg-slate-950/90 backdrop-blur-md flex flex-col animate-in fade-in duration-200">
+        <dialog ref={dialogRef} aria-labelledby={dialogTitleId}
+            onCancel={event => {
+                event.preventDefault();
+                if (showIssuesDropdown) { setShowIssuesDropdown(false); issuesTriggerRef.current?.focus(); }
+                else onClose();
+            }}
+            className="fixed inset-0 m-0 border-0 p-0 w-screen h-dvh max-w-none max-h-none z-[160] bg-slate-950/90 backdrop-blur-md open:flex flex-col animate-in fade-in duration-200">
             <div className="h-14 border-b border-white/10 bg-slate-900 flex items-center justify-between px-4 shrink-0">
                 <div className="flex items-center gap-4">
                     <FileCode className="w-5 h-5 text-indigo-400" />
                     <div>
-                        <h3 className="text-sm font-bold text-white">Source Inspector</h3>
+                        <h3 id={dialogTitleId} className="text-sm font-bold text-white">Source Inspector</h3>
                         <p className="text-[10px] text-slate-400 font-mono">{modId} @ {version}</p>
                     </div>
 
                     {issues.length > 0 && (
                         <div className="relative ml-4">
-                            <button
+                            <button ref={issuesTriggerRef} aria-expanded={showIssuesDropdown}
                                 onClick={() => setShowIssuesDropdown(!showIssuesDropdown)}
                                 className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs font-bold transition-colors border border-red-500/20"
                             >
@@ -423,6 +445,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                                 type="text"
                                 placeholder="Search files..."
                                 aria-label="Search files"
+                                ref={searchInputRef}
                                 className="w-full pl-9 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder:text-slate-500 focus:ring-1 focus:ring-indigo-500 outline-none"
                                 value={fileSearch}
                                 onChange={e => { setFileSearch(e.target.value); setFilePage(0); }}
@@ -483,7 +506,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                     )}
                 </div>
             </div>
-        </div>
+        </dialog>
         </ModalPortal>
     );
 };
