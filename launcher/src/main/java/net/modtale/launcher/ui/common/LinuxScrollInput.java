@@ -34,7 +34,10 @@ final class LinuxScrollInput {
                     .map(fields -> fields[5].replace("\\040", " "))
                     .findFirst().orElse(null);
             if (library == null) return;
-            glass = NativeLibrary.getInstance(library);
+            // Glass statically links C++ runtime symbols. Promoting it to RTLD_GLOBAL
+            // interposes GTK dependencies and corrupts std::locale cleanup on Linux.
+            glass = NativeLibrary.getInstance(library,
+                    java.util.Map.of(com.sun.jna.Library.OPTION_OPEN_FLAGS, 1)); // RTLD_LAZY | RTLD_LOCAL
             Gdk gdk = Native.load("gdk-3", Gdk.class);
             Glib glib = Native.load("glib-2.0", Glib.class);
             DoubleByReference dx = new DoubleByReference();
