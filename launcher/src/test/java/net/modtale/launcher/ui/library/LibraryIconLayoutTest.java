@@ -2,6 +2,7 @@ package net.modtale.launcher.ui.library;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
@@ -77,9 +78,9 @@ class LibraryIconLayoutTest {
         var file = java.nio.file.Files.createTempFile("transparent-project-icon-", ".png");
         try {
             var source = new java.awt.image.BufferedImage(16, 16, java.awt.image.BufferedImage.TYPE_INT_ARGB);
-            source.setRGB(1, 1, 0xffff0000);
+            source.setRGB(8, 3, 0xffff0000);
             javax.imageio.ImageIO.write(source, "png", file.toFile());
-            FutureTask<Void> task = new FutureTask<>(() -> {
+            FutureTask<StackPane[]> task = new FutureTask<>(() -> {
                 String asset = file.toUri().toString();
                 String placeholder = getClass().getResource(
                         "/net/modtale/launcher/ui/nativefx/assets/project-placeholder.png").toExternalForm();
@@ -95,7 +96,25 @@ class LibraryIconLayoutTest {
                         "id", "slug", "Transparent", "", "", "", asset, "", "PLUGIN", 0, 0, "", java.util.List.of());
                 var browse = new net.modtale.launcher.ui.browse.card.ProjectCardMedia(resolver, Runnable::run)
                         .projectIcon(project, 80, 4);
-                for (StackPane icon : new StackPane[] {library, browse}) {
+                return new StackPane[] {library, browse};
+            });
+            Platform.runLater(task);
+            StackPane[] icons = task.get(30, TimeUnit.SECONDS);
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            boolean decoded = false;
+            do {
+                FutureTask<Boolean> ready = new FutureTask<>(() -> java.util.Arrays.stream(icons).allMatch(icon ->
+                        imageViews(icon).stream().anyMatch(view -> view.getImage() != null
+                                && view.getImage().getUrl() != null
+                                && view.getImage().getUrl().endsWith(file.getFileName().toString())
+                                && view.getImage().getProgress() == 1 && !view.getImage().isError())));
+                Platform.runLater(ready);
+                decoded = ready.get(5, TimeUnit.SECONDS);
+                if (!decoded) Thread.sleep(10);
+            } while (!decoded && System.nanoTime() < deadline);
+            assertTrue(decoded, "Snapshots must wait for the actual source image to finish decoding");
+            FutureTask<Void> snapshots = new FutureTask<>(() -> {
+                for (StackPane icon : icons) {
                     StackPane root = new StackPane(icon);
                     Scene scene = new Scene(root, 100, 100);
                     scene.getStylesheets().add(getClass().getResource(
@@ -110,14 +129,30 @@ class LibraryIconLayoutTest {
                     assertEquals(0, pixels.getPixelReader().getArgb(
                             (int) pixels.getWidth() / 2, (int) pixels.getHeight() / 2),
                             "Transparent source pixels must remain transparent through the styled renderer");
+                    boolean hasSourcePixel = false;
+                    for (int y = 0; y < pixels.getHeight(); y++) {
+                        for (int x = 0; x < pixels.getWidth(); x++) {
+                            hasSourcePixel |= pixels.getPixelReader().getArgb(x, y) == 0xffff0000;
+                        }
+                    }
+                    assertTrue(hasSourcePixel, "The rendered icon must contain the decoded source, not a blank image");
                 }
                 return null;
             });
-            Platform.runLater(task);
-            task.get(30, TimeUnit.SECONDS);
+            Platform.runLater(snapshots);
+            snapshots.get(30, TimeUnit.SECONDS);
         } finally {
             java.nio.file.Files.deleteIfExists(file);
         }
+    }
+
+    private static java.util.List<ImageView> imageViews(javafx.scene.Node node) {
+        var views = new java.util.ArrayList<ImageView>();
+        if (node instanceof ImageView image) views.add(image);
+        if (node instanceof javafx.scene.Parent parent) {
+            for (var child : parent.getChildrenUnmodifiable()) views.addAll(imageViews(child));
+        }
+        return views;
     }
 
     @Test
