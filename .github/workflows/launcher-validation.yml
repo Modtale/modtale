@@ -40,21 +40,27 @@ jobs:
       - name: Install Linux display dependencies
         if: runner.os == 'Linux'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb libgtk-3-0
+          sudo bash scripts/install_linux_build_dependencies.sh
+          sudo apt-get install -y xvfb weston libgl1-mesa-dri
       - name: Test and build the native application image
         run: |
           chmod +x gradlew
           if [ "$RUNNER_OS" = "Linux" ]; then
-            xvfb-run -a ./gradlew test jpackageImage
+            GDK_BACKEND=x11 xvfb-run -a ./gradlew test jpackageImage
           else
             ./gradlew test jpackageImage
           fi
+      - name: Test native Wayland without an X11 display
+        if: runner.os == 'Linux'
+        run: |
+          mv build/reports/tests/test build/reports/tests/x11
+          mv build/test-results/test build/test-results/x11
+          xvfb-run -a bash scripts/test_wayland.sh
       - name: Upload validation reports
         if: always()
         uses: actions/upload-artifact@v7.0.1
         with:
           name: launcher-validation-${{ runner.os }}
           path: |
-            launcher/build/reports/tests/test
-            launcher/build/test-results/test
+            launcher/build/reports/tests
+            launcher/build/test-results

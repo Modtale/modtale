@@ -6,10 +6,7 @@ import com.sun.jna.NativeLibrary;
 import com.sun.jna.Pointer;
 import com.sun.jna.ptr.DoubleByReference;
 import com.sun.jna.ptr.IntByReference;
-import java.io.IOException;
 import net.modtale.launcher.ui.common.NativeScrollInput.Sample;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Locale;
 import net.modtale.launcher.logging.LauncherLog;
 
@@ -28,16 +25,9 @@ final class LinuxScrollInput {
         if (attempted) return;
         attempted = true;
         if (!System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("linux")) return;
-        try (var mappings = Files.lines(Path.of("/proc/self/maps"))) {
-            String library = mappings.map(line -> line.split("\\s+", 6))
-                    .filter(fields -> fields.length == 6 && fields[5].endsWith("/libglassgtk3.so"))
-                    .map(fields -> fields[5].replace("\\040", " "))
-                    .findFirst().orElse(null);
-            if (library == null) return;
-            // Glass statically links C++ runtime symbols. Promoting it to RTLD_GLOBAL
-            // interposes GTK dependencies and corrupts std::locale cleanup on Linux.
-            glass = NativeLibrary.getInstance(library,
-                    java.util.Map.of(com.sun.jna.Library.OPTION_OPEN_FLAGS, 1)); // RTLD_LAZY | RTLD_LOCAL
+        try {
+            glass = net.modtale.launcher.platform.LinuxDesktopBackend.glassLibrary();
+            if (glass == null) return;
             Gdk gdk = Native.load("gdk-3", Gdk.class);
             Glib glib = Native.load("glib-2.0", Glib.class);
             DoubleByReference dx = new DoubleByReference();
@@ -64,7 +54,7 @@ final class LinuxScrollInput {
             // It observes events without replacing GTK's handler or changing native memory.
             registration = glass.getFunction("_Z21glass_evloop_hook_addPFvP9_GdkEventPvES1_")
                     .invokePointer(new Object[]{hook, null});
-        } catch (IOException | RuntimeException | LinkageError failure) {
+        } catch (RuntimeException | LinkageError failure) {
             LauncherLog.getLogger(LinuxScrollInput.class).warn("Native smooth-scroll metadata unavailable: " + failure);
         }
     }

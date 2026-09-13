@@ -62,6 +62,7 @@ final class LinuxWindowManagerSupport {
     }
 
     static boolean applySystemCursor(Stage stage, Cursor cursor) {
+        if (net.modtale.launcher.platform.LinuxDesktopBackend.isWayland()) return false;
         String cursorName = systemCursorName(cursor);
         if (!isLinux() || stage == null || cursorName == null || System.getenv("DISPLAY") == null) {
             return false;
@@ -147,6 +148,9 @@ final class LinuxWindowManagerSupport {
     }
 
     private static boolean beginMoveResize(Stage stage, MouseEvent event, int direction) {
+        if (stage != null && event != null && net.modtale.launcher.platform.LinuxDesktopBackend.isWayland()) {
+            return net.modtale.launcher.platform.LinuxDesktopBackend.beginMoveResize(direction);
+        }
         if (!isLinux() || stage == null || event == null || System.getenv("DISPLAY") == null) {
             return false;
         }

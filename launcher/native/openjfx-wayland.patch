@@ -1,0 +1,1033 @@
+diff --git a/build.gradle b/build.gradle
+index 8e4e8e98..b8034c9c 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -2353,7 +2353,7 @@ project(":graphics") {
+ 
+     dependencies {
+         antlr group: "org.antlr", name: "antlr4", version: "${antlr4Version}", classifier: "complete"
+-        testImplementation project(":base").sourceSets.test.output
++        testImplementation rootProject.project(":base").sourceSets.test.output
+         implementation project(':base')
+     }
+ 
+@@ -2874,8 +2874,8 @@ project(":controls") {
+     commonModuleSetup(project, [ 'base', 'graphics', 'controls' ])
+ 
+     dependencies {
+-        testImplementation project(":graphics").sourceSets.test.output
+-        testImplementation project(":base").sourceSets.test.output
++        testImplementation rootProject.project(":graphics").sourceSets.test.output
++        testImplementation rootProject.project(":base").sourceSets.test.output
+         implementation project(':base')
+         implementation project(':graphics')
+     }
+@@ -2972,9 +2972,9 @@ project(":incubator.input") {
+     ])
+ 
+     dependencies {
+-        testImplementation project(":base").sourceSets.test.output
+-        testImplementation project(":graphics").sourceSets.test.output
+-        testImplementation project(":controls").sourceSets.test.output
++        testImplementation rootProject.project(":base").sourceSets.test.output
++        testImplementation rootProject.project(":graphics").sourceSets.test.output
++        testImplementation rootProject.project(":controls").sourceSets.test.output
+         implementation project(':base')
+         implementation project(':graphics')
+         implementation project(':controls')
+@@ -3029,10 +3029,10 @@ project(":incubator.richtext") {
+     ])
+ 
+     dependencies {
+-        testImplementation project(":base").sourceSets.test.output
+-        testImplementation project(":graphics").sourceSets.test.output
+-        testImplementation project(":controls").sourceSets.test.output
+-        testImplementation project(":incubator.input").sourceSets.test.output
++        testImplementation rootProject.project(":base").sourceSets.test.output
++        testImplementation rootProject.project(":graphics").sourceSets.test.output
++        testImplementation rootProject.project(":controls").sourceSets.test.output
++        testImplementation rootProject.project(":incubator.input").sourceSets.test.output
+         implementation project(':base')
+         implementation project(':graphics')
+         implementation project(':controls')
+@@ -3212,8 +3212,8 @@ project(":fxml") {
+ 
+ 
+     dependencies {
+-        testImplementation project(":graphics").sourceSets.test.output
+-        testImplementation project(":base").sourceSets.test.output
++        testImplementation rootProject.project(":graphics").sourceSets.test.output
++        testImplementation rootProject.project(":base").sourceSets.test.output
+         implementation project(":base")
+         implementation project(":graphics")
+     }
+@@ -3907,7 +3907,7 @@ project(":web") {
+         implementation project(":graphics")
+         implementation project(":controls")
+         implementation project(":media")
+-        testImplementation project(":base").sourceSets.test.output
++        testImplementation rootProject.project(":base").sourceSets.test.output
+     }
+ 
+     compileJava.dependsOn updateCacheIfNeeded
+@@ -4223,10 +4223,10 @@ project(":systemTests") {
+     project.ext.moduleName = "systemTests"
+ 
+     dependencies {
+-        testImplementation project(":graphics").sourceSets.test.output
+-        testImplementation project(":base").sourceSets.test.output
+-        testImplementation project(":controls").sourceSets.test.output
+-        testImplementation project(":swing").sourceSets.test.output
++        testImplementation rootProject.project(":graphics").sourceSets.test.output
++        testImplementation rootProject.project(":base").sourceSets.test.output
++        testImplementation rootProject.project(":controls").sourceSets.test.output
++        testImplementation rootProject.project(":swing").sourceSets.test.output
+     }
+ 
+     def dependentProjects = [
+diff --git a/buildSrc/linux.gradle b/buildSrc/linux.gradle
+index 98e45d5e..c8624b82 100644
+--- a/buildSrc/linux.gradle
++++ b/buildSrc/linux.gradle
+@@ -274,9 +274,9 @@ LINUX.prismES2.nativeSource = [
+     file("${project("graphics").projectDir}/src/main/native-prism-es2/x11")
+ ]
+ LINUX.prismES2.compiler = compiler
+-LINUX.prismES2.ccFlags = ["-DLINUX", cFlags].flatten()
++LINUX.prismES2.ccFlags = ["-DLINUX", "-DMODTALE_WAYLAND", cFlags, gtk3CCFlags].flatten()
+ LINUX.prismES2.linker = linker
+-LINUX.prismES2.linkFlags =IS_STATIC_BUILD ? linkFlags : [linkFlags, "-lX11", "-lXxf86vm", "-lGL"].flatten()
++LINUX.prismES2.linkFlags =IS_STATIC_BUILD ? linkFlags : [linkFlags, gtk3LinkFlags, "-lX11", "-lXxf86vm", "-lGL", "-lEGL", "-lwayland-egl", "-lwayland-client"].flatten()
+ LINUX.prismES2.lib = "prism_es2"
+ 
+ def closedDir = file("$projectDir/../rt-closed")
+diff --git a/modules/javafx.graphics/src/main/native-glass/gtk/GlassApplication.cpp b/modules/javafx.graphics/src/main/native-glass/gtk/GlassApplication.cpp
+index dec009e8..c5ea91c4 100644
+--- a/modules/javafx.graphics/src/main/native-glass/gtk/GlassApplication.cpp
++++ b/modules/javafx.graphics/src/main/native-glass/gtk/GlassApplication.cpp
+@@ -157,11 +157,11 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1queryLibrary
+     (void)suggestedVersion;
+     (void)verbose;
+ 
+-    Display *display = XOpenDisplay(NULL);
+-    if (display == NULL) {
+-        return com_sun_glass_ui_gtk_GtkApplication_QUERY_NO_DISPLAY;
++    if (getenv("WAYLAND_DISPLAY") == NULL) {
++        Display *display = XOpenDisplay(NULL);
++        if (display == NULL) return com_sun_glass_ui_gtk_GtkApplication_QUERY_NO_DISPLAY;
++        XCloseDisplay(display);
+     }
+-    XCloseDisplay(display);
+ 
+     return com_sun_glass_ui_gtk_GtkApplication_QUERY_USE_CURRENT;
+ }
+@@ -181,7 +181,8 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1init
+     process_events_prev = (GdkEventFunc) handler;
+     disableGrab = (gboolean) _disableGrab;
+ 
+-    glass_gdk_x11_display_set_window_scale(gdk_display_get_default(), 1);
++    if (GDK_IS_X11_DISPLAY(gdk_display_get_default()))
++        glass_gdk_x11_display_set_window_scale(gdk_display_get_default(), 1);
+     gdk_event_handler_set(process_events, NULL, NULL);
+ 
+     GdkScreen *default_gdk_screen = gdk_screen_get_default();
+@@ -193,7 +194,7 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1init
+     }
+ 
+     GdkWindow *root = gdk_screen_get_root_window(default_gdk_screen);
+-    gdk_window_set_events(root, static_cast<GdkEventMask>(gdk_window_get_events(root) | GDK_PROPERTY_CHANGE_MASK));
++    if (GDK_IS_X11_DISPLAY(gdk_display_get_default())) gdk_window_set_events(root, static_cast<GdkEventMask>(gdk_window_get_events(root) | GDK_PROPERTY_CHANGE_MASK));
+ 
+     platformSupport = new PlatformSupport(env, obj);
+ 
+@@ -225,7 +226,7 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1runLoop
+ 
+     // Disable X error handling
+ #ifndef VERBOSE
+-    if (!noErrorTrap) {
++    if (!noErrorTrap && GDK_IS_X11_DISPLAY(gdk_display_get_default())) {
+         gdk_error_trap_push();
+     }
+ #endif
+@@ -241,7 +242,7 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1runLoop
+ 
+     // Restore X error handling
+     // #ifndef VERBOSE
+-    //     if (!noErrorTrap) {
++    //     if (!noErrorTrap && GDK_IS_X11_DISPLAY(gdk_display_get_default())) {
+     //         gdk_error_trap_pop();
+     //     }
+     // #endif
+@@ -465,8 +466,42 @@ bool is_window_enabled_for_event(GdkWindow * window, WindowContext *ctx, gint ev
+     return TRUE;
+ }
+ 
++static GdkEvent* modtale_current_event = NULL;
++struct ModtaleEventScope {
++    GdkEvent* previous;
++    ModtaleEventScope(GdkEvent* event) : previous(modtale_current_event) { modtale_current_event = event; }
++    ~ModtaleEventScope() { modtale_current_event = previous; }
++};
++
++extern "C" JNIEXPORT int modtale_glass_is_wayland() {
++    GdkDisplay* display = gdk_display_get_default();
++    return display != NULL && !GDK_IS_X11_DISPLAY(display);
++}
++
++extern "C" JNIEXPORT int modtale_glass_begin_move_resize(int direction) {
++    GdkEvent* event = modtale_current_event;
++    if (!modtale_glass_is_wayland() || !event || direction < 0 || direction > 8) return 0;
++    if (event->type != GDK_BUTTON_PRESS && event->type != GDK_MOTION_NOTIFY) return 0;
++    GdkWindow* window = event->any.window;
++    GdkDevice* device = gdk_event_get_device(event);
++    if (!window || !device) return 0;
++    gdouble x = 0, y = 0;
++    gdk_event_get_root_coords(event, &x, &y);
++    guint32 time = gdk_event_get_time(event);
++    if (direction == 8) {
++        gdk_window_begin_move_drag_for_device(window, device, 1, (gint)x, (gint)y, time);
++    } else {
++        const GdkWindowEdge edges[] = {GDK_WINDOW_EDGE_NORTH_WEST, GDK_WINDOW_EDGE_NORTH,
++            GDK_WINDOW_EDGE_NORTH_EAST, GDK_WINDOW_EDGE_EAST, GDK_WINDOW_EDGE_SOUTH_EAST,
++            GDK_WINDOW_EDGE_SOUTH, GDK_WINDOW_EDGE_SOUTH_WEST, GDK_WINDOW_EDGE_WEST};
++        gdk_window_begin_resize_drag_for_device(window, edges[direction], device, 1, (gint)x, (gint)y, time);
++    }
++    return 1;
++}
++
+ static void process_events(GdkEvent* event, gpointer data)
+ {
++    ModtaleEventScope eventScope(event);
+     GdkWindow* window = event->any.window;
+     WindowContext *ctx = window != NULL ? (WindowContext*)
+         g_object_get_data(G_OBJECT(window), GDK_WINDOW_DATA_CONTEXT) : NULL;
+diff --git a/modules/javafx.graphics/src/main/native-glass/gtk/GlassWindow.cpp b/modules/javafx.graphics/src/main/native-glass/gtk/GlassWindow.cpp
+index 5707060b..41e8f157 100644
+--- a/modules/javafx.graphics/src/main/native-glass/gtk/GlassWindow.cpp
++++ b/modules/javafx.graphics/src/main/native-glass/gtk/GlassWindow.cpp
+@@ -541,7 +541,7 @@ JNIEXPORT jlong JNICALL Java_com_sun_glass_ui_gtk_GtkWindow__1getNativeWindowImp
+         return 0;
+     }
+ 
+-    return GDK_WINDOW_XID(win);
++    return GDK_IS_X11_DISPLAY(gdk_display_get_default()) ? GDK_WINDOW_XID(win) : (jlong)(uintptr_t)win;
+ }
+ 
+ } // extern "C"
+diff --git a/modules/javafx.graphics/src/main/native-glass/gtk/glass_general.cpp b/modules/javafx.graphics/src/main/native-glass/gtk/glass_general.cpp
+index 38e9e072..e0c63f7c 100644
+--- a/modules/javafx.graphics/src/main/native-glass/gtk/glass_general.cpp
++++ b/modules/javafx.graphics/src/main/native-glass/gtk/glass_general.cpp
+@@ -74,6 +74,7 @@ jmethodID jWindowNotifyFocus;
+ jmethodID jWindowNotifyFocusDisabled;
+ jmethodID jWindowNotifyFocusUngrab;
+ jmethodID jWindowNotifyMoveToAnotherScreen;
++jmethodID jWindowNotifyScaleChanged;
+ jmethodID jWindowNotifyLevelChanged;
+ jmethodID jWindowIsEnabled;
+ jmethodID jWindowNotifyDelegatePtr;
+@@ -258,6 +259,7 @@ JNI_OnLoad(JavaVM *jvm, void *reserved)
+     jWindowNotifyFocusUngrab = env->GetMethodID(clazz, "notifyFocusUngrab", "()V");
+     if (env->ExceptionCheck()) return JNI_ERR;
+     jWindowNotifyMoveToAnotherScreen = env->GetMethodID(clazz, "notifyMoveToAnotherScreen", "(Lcom/sun/glass/ui/Screen;)V");
++    jWindowNotifyScaleChanged = env->GetMethodID(clazz, "notifyScaleChanged", "(FFFF)V");
+     if (env->ExceptionCheck()) return JNI_ERR;
+     jWindowNotifyLevelChanged = env->GetMethodID(clazz, "notifyLevelChanged", "(I)V");
+     if (env->ExceptionCheck()) return JNI_ERR;
+diff --git a/modules/javafx.graphics/src/main/native-glass/gtk/glass_general.h b/modules/javafx.graphics/src/main/native-glass/gtk/glass_general.h
+index cee6ea15..a25d076e 100644
+--- a/modules/javafx.graphics/src/main/native-glass/gtk/glass_general.h
++++ b/modules/javafx.graphics/src/main/native-glass/gtk/glass_general.h
+@@ -178,7 +178,8 @@ private:
+     extern jmethodID jWindowNotifyFocus; // com.sun.glass.ui.Window#notifyFocus (I)V
+     extern jmethodID jWindowNotifyFocusDisabled; // com.sun.glass.ui.Window#notifyFocusDisabled ()V
+     extern jmethodID jWindowNotifyFocusUngrab; // com.sun.glass.ui.Window#notifyFocusUngrab ()V
+-    extern jmethodID jWindowNotifyMoveToAnotherScreen; // com.sun.glass.ui.Window#notifyMoveToAnotherScreen (Lcom/sun/glass/ui/Screen;)V
++    extern jmethodID jWindowNotifyMoveToAnotherScreen;
++extern jmethodID jWindowNotifyScaleChanged; // com.sun.glass.ui.Window#notifyMoveToAnotherScreen (Lcom/sun/glass/ui/Screen;)V
+     extern jmethodID jWindowNotifyDelegatePtr; //com.sun.glass.ui.Window#notifyDelegatePtr (J)V
+     extern jmethodID jWindowNotifyLevelChanged; //com.sun.glass.ui.Window#notifyLevelChanged (I)V
+ 
+diff --git a/modules/javafx.graphics/src/main/native-glass/gtk/glass_key.cpp b/modules/javafx.graphics/src/main/native-glass/gtk/glass_key.cpp
+index 071f35bd..3ed8b87a 100644
+--- a/modules/javafx.graphics/src/main/native-glass/gtk/glass_key.cpp
++++ b/modules/javafx.graphics/src/main/native-glass/gtk/glass_key.cpp
+@@ -655,7 +655,8 @@ static Bool isXkbAvailable(Display *display) {
+   * in Gdk.
+   */
+  static gint get_current_keyboard_group() {
+-     Display* display = gdk_x11_display_get_xdisplay(gdk_display_get_default());
++     if (!GDK_IS_X11_DISPLAY(gdk_display_get_default())) return -1;
++    Display* display = gdk_x11_display_get_xdisplay(gdk_display_get_default());
+      if (isXkbAvailable(display)) {
+          XkbStateRec xkbState;
+          XkbGetState(display, XkbUseCoreKbd, &xkbState);
+@@ -672,6 +673,7 @@ static Bool isXkbAvailable(Display *display) {
+ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1isKeyLocked
+   (JNIEnv * env, jobject obj, jint keyCode)
+ {
++    if (!GDK_IS_X11_DISPLAY(gdk_display_get_default())) return com_sun_glass_events_KeyEvent_KEY_LOCK_UNKNOWN;
+     Display* display = gdk_x11_display_get_xdisplay(gdk_display_get_default());
+     if (!isXkbAvailable(display)) {
+         return com_sun_glass_events_KeyEvent_KEY_LOCK_UNKNOWN;
+diff --git a/modules/javafx.graphics/src/main/native-glass/gtk/glass_screen.cpp b/modules/javafx.graphics/src/main/native-glass/gtk/glass_screen.cpp
+index 4d1420d2..cfb1f938 100644
+--- a/modules/javafx.graphics/src/main/native-glass/gtk/glass_screen.cpp
++++ b/modules/javafx.graphics/src/main/native-glass/gtk/glass_screen.cpp
+@@ -35,6 +35,7 @@ jfloat OverrideUIScale = -1.0f;
+ int DEFAULT_DPI = 96;
+ 
+ static guint get_current_desktop(GdkScreen *screen) {
++    if (!GDK_IS_X11_DISPLAY(gdk_display_get_default())) return 0;
+     Display* display = gdk_x11_display_get_xdisplay(gdk_display_get_default());
+     Atom currentDesktopAtom = XInternAtom(display, "_NET_CURRENT_DESKTOP", True);
+     guint ret = 0;
+@@ -66,6 +67,11 @@ static guint get_current_desktop(GdkScreen *screen) {
+ }
+ 
+ static GdkRectangle get_screen_workarea(GdkScreen *screen) {
++    if (!GDK_IS_X11_DISPLAY(gdk_display_get_default())) {
++        GdkRectangle area;
++        gdk_screen_get_monitor_workarea(screen, 0, &area);
++        return area;
++    }
+     Display* display = gdk_x11_display_get_xdisplay(gdk_display_get_default());
+     GdkRectangle ret = { 0, 0, gdk_screen_get_width(screen), gdk_screen_get_height(screen)};
+ 
+@@ -104,6 +110,7 @@ static GdkRectangle get_screen_workarea(GdkScreen *screen) {
+ }
+ 
+ jfloat getUIScale(GdkScreen* screen) {
++    if (!GDK_IS_X11_DISPLAY(gdk_display_get_default())) return 1.0f;
+     jfloat uiScale;
+     if (OverrideUIScale > 0.0f) {
+         uiScale = OverrideUIScale;
+@@ -152,6 +159,8 @@ static jobject createJavaScreen(JNIEnv* env, GdkScreen* screen, gint monitor_idx
+     gdk_rectangle_intersect(&workArea, &monitor_geometry, &working_monitor_geometry);
+ 
+     jfloat uiScale = getUIScale(screen);
++    jfloat outputScale = GDK_IS_X11_DISPLAY(gdk_display_get_default()) ? uiScale
++        : gdk_screen_get_monitor_scale_factor(screen, monitor_idx);
+ 
+ 
+     jint mx = monitor_geometry.x / uiScale;
+@@ -194,7 +203,7 @@ static jobject createJavaScreen(JNIEnv* env, GdkScreen* screen, gint monitor_idx
+                                      wx, wy, ww, wh,
+ 
+                                      dpiX, dpiY,
+-                                     uiScale, uiScale, uiScale, uiScale);
++                                     uiScale, uiScale, outputScale, outputScale);
+ 
+     JNI_EXCEPTION_TO_CPP(env);
+     return jScreen;
+diff --git a/modules/javafx.graphics/src/main/native-glass/gtk/glass_window.cpp b/modules/javafx.graphics/src/main/native-glass/gtk/glass_window.cpp
+index ec79b4ea..a709b575 100644
+--- a/modules/javafx.graphics/src/main/native-glass/gtk/glass_window.cpp
++++ b/modules/javafx.graphics/src/main/native-glass/gtk/glass_window.cpp
+@@ -41,6 +41,7 @@
+ #include <cairo-xlib.h>
+ #include <gdk/gdkx.h>
+ #include <gdk/gdk.h>
++#include <gdk/gdkwayland.h>
+ #ifdef GLASS_GTK3
+ #include <gtk/gtkx.h>
+ #endif
+@@ -517,6 +518,10 @@ void WindowContextBase::paint(void* data, jint width, jint height) {
+             CAIRO_FORMAT_ARGB32,
+             width, height, width * 4);
+ 
++    if (!GDK_IS_X11_DISPLAY(gdk_display_get_default())) {
++        int scale = gdk_window_get_scale_factor(gdk_window);
++        cairo_surface_set_device_scale(cairo_surface, scale, scale);
++    }
+     applyShapeMask(data, width, height);
+ 
+     cairo_set_source_surface(context, cairo_surface, 0, 0);
+@@ -525,6 +530,9 @@ void WindowContextBase::paint(void* data, jint width, jint height) {
+ 
+ #ifdef GLASS_GTK3
+     gdk_window_end_paint(gdk_window);
++    if (!GDK_IS_X11_DISPLAY(gdk_display_get_default())) {
++        gdk_frame_clock_request_phase(gdk_window_get_frame_clock(gdk_window), GDK_FRAME_CLOCK_PHASE_AFTER_PAINT);
++    }
+     cairo_region_destroy(region);
+ #endif
+ 
+@@ -687,6 +695,21 @@ WindowFrameExtents WindowContextTop::normal_extents = {0, 0, 0, 0};
+ WindowFrameExtents WindowContextTop::utility_extents = {0, 0, 0, 0};
+ 
+ 
++static void event_output_scale(GObject* widget, GParamSpec* property, gpointer data) {
++    (void)widget; (void)property;
++    WindowContextTop* ctx = static_cast<WindowContextTop*>(data);
++    GdkWindow* window = ctx->get_gdk_window();
++    if (!window || GDK_IS_X11_DISPLAY(gdk_display_get_default())) return;
++    int scale = gdk_window_get_scale_factor(window);
++    if (GPOINTER_TO_INT(g_object_get_data(G_OBJECT(window), "modtale-output-scale")) == scale) return;
++    g_object_set_data(G_OBJECT(window), "modtale-output-scale", GINT_TO_POINTER(scale));
++    jobject jwindow = ctx->get_jwindow();
++    if (jwindow) {
++        mainEnv->CallVoidMethod(jwindow, jWindowNotifyScaleChanged, 1.0f, 1.0f, (jfloat)scale, (jfloat)scale);
++        CHECK_JNI_EXCEPTION(mainEnv)
++    }
++}
++
+ static void event_realize(GtkWidget* self, gpointer user_data) {
+     WindowContextTop *ctx = ((WindowContextTop *) user_data);
+     ctx->process_realize();
+@@ -762,14 +785,15 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
+         gtk_window_set_type_hint(GTK_WINDOW(gtk_widget), GDK_WINDOW_TYPE_HINT_UTILITY);
+     }
+ 
+-    const char* wm_name = gdk_x11_screen_get_window_manager_name(gdk_screen_get_default());
++    const char* wm_name = GDK_IS_X11_DISPLAY(gdk_display_get_default())
++        ? gdk_x11_screen_get_window_manager_name(gdk_screen_get_default()) : "Wayland";
+     wmanager = (g_strcmp0("Compiz", wm_name) == 0) ? COMPIZ : UNKNOWN;
+ 
+ //    glong xdisplay = (glong)mainEnv->GetStaticLongField(jApplicationCls, jApplicationDisplay);
+ //    gint  xscreenID = (gint)mainEnv->GetStaticIntField(jApplicationCls, jApplicationScreen);
+     glong xvisualID = (glong)mainEnv->GetStaticLongField(jApplicationCls, jApplicationVisualID);
+ 
+-    if (xvisualID != 0) {
++    if (xvisualID != 0 && GDK_IS_X11_DISPLAY(gdk_display_get_default())) {
+         GdkVisual *visual = gdk_x11_screen_lookup_visual(gdk_screen_get_default(), xvisualID);
+         glass_gtk_window_configure_from_visual(gtk_widget, visual);
+     }
+@@ -800,6 +824,7 @@ void WindowContextTop::detach_from_java() {
+ }
+ 
+ void WindowContextTop::request_frame_extents() {
++    if (!GDK_IS_X11_DISPLAY(gdk_display_get_default())) return;
+     Display *display = GDK_DISPLAY_XDISPLAY(gdk_window_get_display(gdk_window));
+     static Atom rfeAtom = XInternAtom(display, "_NET_REQUEST_FRAME_EXTENTS", False);
+ 
+@@ -976,6 +1001,11 @@ void WindowContextTop::process_realize() {
+     gdk_window_set_events(gdk_window, GDK_FILTERED_EVENTS_MASK);
+     g_object_set_data_full(G_OBJECT(gdk_window), GDK_WINDOW_DATA_CONTEXT, this, NULL);
+     gdk_window_register_dnd(gdk_window);
++    if (!GDK_IS_X11_DISPLAY(gdk_display_get_default())) {
++        gdk_wayland_window_set_application_id(gdk_window, "net.modtale.launcher");
++        g_signal_connect(gtk_widget, "notify::scale-factor", G_CALLBACK(event_output_scale), this);
++        event_output_scale(G_OBJECT(gtk_widget), NULL, this);
++    }
+ 
+     if (gdk_windowManagerFunctions) {
+         gdk_window_set_functions(gdk_window, gdk_windowManagerFunctions);
+@@ -1023,7 +1053,9 @@ void WindowContextTop::process_configure(GdkEventConfigure* event) {
+     geometry.view_y = origin_y - root_y;
+     notify_window_move();
+ 
+-    glong to_screen = getScreenPtrForLocation(geometry.x, geometry.y);
++    glong to_screen = GDK_IS_X11_DISPLAY(gdk_display_get_default())
++        ? getScreenPtrForLocation(geometry.x, geometry.y)
++        : gdk_screen_get_monitor_at_window(gdk_screen_get_default(), gdk_window);
+     if (to_screen != -1) {
+         if (to_screen != screen) {
+             if (jwindow) {
+diff --git a/modules/javafx.graphics/src/main/native-glass/gtk/launcher.c b/modules/javafx.graphics/src/main/native-glass/gtk/launcher.c
+index 02234c89..660efb3c 100644
+--- a/modules/javafx.graphics/src/main/native-glass/gtk/launcher.c
++++ b/modules/javafx.graphics/src/main/native-glass/gtk/launcher.c
+@@ -196,15 +196,12 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1queryLibrary
+ 
+     gtk_versionDebug = verbose;
+ 
+-    //Set the gtk backend to x11 on all the systems
+-    putenv("GDK_BACKEND=x11");
+-
+-    // Before doing anything with GTK we validate that the DISPLAY can be opened
+-    Display *display = XOpenDisplay(NULL);
+-    if (display == NULL) {
+-        return com_sun_glass_ui_gtk_GtkApplication_QUERY_NO_DISPLAY;
++    // GTK selects the session backend, including native Wayland.
++    if (getenv("WAYLAND_DISPLAY") == NULL) {
++        Display *display = XOpenDisplay(NULL);
++        if (display == NULL) return com_sun_glass_ui_gtk_GtkApplication_QUERY_NO_DISPLAY;
++        XCloseDisplay(display);
+     }
+-    XCloseDisplay(display);
+ 
+     // now check the the presence of the libraries
+ 
+diff --git a/modules/javafx.graphics/src/main/native-prism-es2/GLContext.c b/modules/javafx.graphics/src/main/native-prism-es2/GLContext.c
+index 2cb5db88..c0627d8a 100644
+--- a/modules/javafx.graphics/src/main/native-prism-es2/GLContext.c
++++ b/modules/javafx.graphics/src/main/native-prism-es2/GLContext.c
+@@ -31,6 +31,9 @@
+ #include <math.h>
+ 
+ #include "PrismES2Defs.h"
++#ifdef MODTALE_WAYLAND
++#include "Wayland.h"
++#endif
+ 
+ extern char *strJavaToC(JNIEnv *env, jstring str);
+ 
+@@ -67,6 +70,9 @@ void initializeCtxInfo(ContextInfo *ctxInfo) {
+     if (ctxInfo == NULL) {
+         return;
+     }
++#ifdef MODTALE_WAYLAND
++    if (ctxInfo->waylandContext) prism_wayland_destroy_context(ctxInfo);
++#endif
+     // Initialize structure to all zeros
+     memset(ctxInfo, 0, sizeof (ContextInfo));
+ }
+@@ -111,6 +117,9 @@ void deleteCtxInfo(ContextInfo *ctxInfo) {
+         eglDestroyContext(ctxInfo->display, ctxInfo->context);
+ #endif
+     }
++#endif
++#ifdef MODTALE_WAYLAND
++    if (ctxInfo->waylandContext) prism_wayland_destroy_context(ctxInfo);
+ #endif
+     // Initialize structure to all zeros
+     memset(ctxInfo, 0, sizeof (ContextInfo));
+diff --git a/modules/javafx.graphics/src/main/native-prism-es2/PrismES2Defs.h b/modules/javafx.graphics/src/main/native-prism-es2/PrismES2Defs.h
+index aa43478e..3df23e56 100644
+--- a/modules/javafx.graphics/src/main/native-prism-es2/PrismES2Defs.h
++++ b/modules/javafx.graphics/src/main/native-prism-es2/PrismES2Defs.h
+@@ -147,6 +147,9 @@ typedef struct PixelFormatInfoRec PixelFormatInfo;
+ 
+ /* define the structure to hold the resources and proerties of pixelformat */
+ struct PixelFormatInfoRec {
++#ifdef MODTALE_WAYLAND
++    void *waylandConfig;
++#endif
+ #ifdef WIN32 /* WIN32 */
+     int pixelFormat;
+     HWND dummyHwnd;
+@@ -171,6 +174,9 @@ typedef struct DrawableInfoRec DrawableInfo;
+ 
+ /* define the structure to hold the resources and proerties of drawable */
+ struct DrawableInfoRec {
++#ifdef MODTALE_WAYLAND
++    void *waylandSurface, *waylandWindow, *waylandGdkWindow;
++#endif
+     jboolean onScreen;
+ 
+ #ifdef WIN32 /* WIN32 */
+@@ -219,6 +225,9 @@ typedef struct ContextInfoRec ContextInfo;
+ 
+ /* define the structure to hold the properties of graphics context */
+ struct ContextInfoRec {
++#ifdef MODTALE_WAYLAND
++    void *waylandContext;
++#endif
+ #ifdef WIN32 /* WIN32 */
+     HGLRC hglrc;
+ #endif /* WIN32 */
+diff --git a/modules/javafx.graphics/src/main/native-prism-es2/Wayland.c b/modules/javafx.graphics/src/main/native-prism-es2/Wayland.c
+new file mode 100644
+index 00000000..80886814
+--- /dev/null
++++ b/modules/javafx.graphics/src/main/native-prism-es2/Wayland.c
+@@ -0,0 +1,308 @@
++/*
++ * Copyright (c) 2012, 2024, Oracle and/or its affiliates. All rights reserved.
++ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
++ *
++ * This code is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 only, as
++ * published by the Free Software Foundation.  Oracle designates this
++ * particular file as subject to the "Classpath" exception as provided
++ * by Oracle in the LICENSE file that accompanied this code.
++ *
++ * This code is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
++ * version 2 for more details (a copy is included in the LICENSE file that
++ * accompanied this code).
++ *
++ * You should have received a copy of the GNU General Public License version
++ * 2 along with this work; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
++ *
++ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
++ * or visit www.oracle.com if you need additional information or have any
++ * questions.
++ */
++
++#ifdef MODTALE_WAYLAND
++#include "Wayland.h"
++#include <gtk/gtk.h>
++#include <gdk/gdkwayland.h>
++#include <wayland-client.h>
++#include <wayland-egl.h>
++#include <EGL/egl.h>
++#include <stdlib.h>
++#include <string.h>
++
++static EGLDisplay egl_display = EGL_NO_DISPLAY;
++static EGLConfig egl_config;
++static EGLContext shared_context = EGL_NO_CONTEXT;
++
++int prism_wayland_enabled(void) {
++    const char *backend = getenv("GDK_BACKEND");
++    return getenv("WAYLAND_DISPLAY") != NULL && (!backend || strcmp(backend, "x11") != 0);
++}
++
++static ContextInfo *create_context(jboolean vsync) {
++    EGLContext context = eglCreateContext(egl_display, egl_config, shared_context, NULL);
++    EGLint size[] = {EGL_WIDTH, 1, EGL_HEIGHT, 1, EGL_NONE};
++    EGLSurface bootstrap = eglCreatePbufferSurface(egl_display, egl_config, size);
++    if (context == EGL_NO_CONTEXT || bootstrap == EGL_NO_SURFACE || !eglMakeCurrent(egl_display, bootstrap, bootstrap, context)) {
++        fprintf(stderr, "Wayland EGL context failed: 0x%x\n", eglGetError());
++        if (context != EGL_NO_CONTEXT) eglDestroyContext(egl_display, context);
++        if (bootstrap != EGL_NO_SURFACE) eglDestroySurface(egl_display, bootstrap);
++        return NULL;
++    }
++    ContextInfo *ctxInfo = calloc(1, sizeof(ContextInfo));
++    if (!ctxInfo) {
++        eglMakeCurrent(egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
++        eglDestroySurface(egl_display, bootstrap);
++        eglDestroyContext(egl_display, context);
++        return NULL;
++    }
++    const char *version = (const char *)glGetString(GL_VERSION);
++    const char *extensions = (const char *)glGetString(GL_EXTENSIONS);
++    const char *vendor = (const char *)glGetString(GL_VENDOR);
++    const char *renderer = (const char *)glGetString(GL_RENDERER);
++    if (!version || !extensions || !vendor || !renderer) goto failed;
++    ctxInfo->versionStr = strdup(version);
++    ctxInfo->vendorStr = strdup(vendor);
++    ctxInfo->rendererStr = strdup(renderer);
++    ctxInfo->glExtensionStr = strdup(extensions);
++    ctxInfo->glxExtensionStr = strdup("");
++    char *parsed = strdup(version);
++    if (!parsed || !ctxInfo->versionStr || !ctxInfo->vendorStr || !ctxInfo->rendererStr
++            || !ctxInfo->glExtensionStr || !ctxInfo->glxExtensionStr) { free(parsed); goto failed; }
++    extractVersionInfo(parsed, ctxInfo->versionNumbers);
++    free(parsed);
++    if (ctxInfo->versionNumbers[0] < 2 || (ctxInfo->versionNumbers[0] == 2 && ctxInfo->versionNumbers[1] < 1)) goto failed;
++    ctxInfo->gl2 = JNI_TRUE;
++    ctxInfo->waylandContext = context;
++    ctxInfo->vSyncRequested = vsync;
++    /* set function pointers */
++    ctxInfo->glActiveTexture = (PFNGLACTIVETEXTUREPROC)
++            eglGetProcAddress( "glActiveTexture");
++    ctxInfo->glAttachShader = (PFNGLATTACHSHADERPROC)
++            eglGetProcAddress( "glAttachShader");
++    ctxInfo->glBindAttribLocation = (PFNGLBINDATTRIBLOCATIONPROC)
++            eglGetProcAddress( "glBindAttribLocation");
++    ctxInfo->glBindFramebuffer = (PFNGLBINDFRAMEBUFFERPROC)
++            eglGetProcAddress( "glBindFramebuffer");
++    ctxInfo->glBindRenderbuffer = (PFNGLBINDRENDERBUFFERPROC)
++            eglGetProcAddress( "glBindRenderbuffer");
++    ctxInfo->glCheckFramebufferStatus = (PFNGLCHECKFRAMEBUFFERSTATUSPROC)
++            eglGetProcAddress( "glCheckFramebufferStatus");
++    ctxInfo->glCreateProgram = (PFNGLCREATEPROGRAMPROC)
++            eglGetProcAddress( "glCreateProgram");
++    ctxInfo->glCreateShader = (PFNGLCREATESHADERPROC)
++            eglGetProcAddress( "glCreateShader");
++    ctxInfo->glCompileShader = (PFNGLCOMPILESHADERPROC)
++            eglGetProcAddress( "glCompileShader");
++    ctxInfo->glDeleteBuffers = (PFNGLDELETEBUFFERSPROC)
++            eglGetProcAddress( "glDeleteBuffers");
++    ctxInfo->glDeleteFramebuffers = (PFNGLDELETEFRAMEBUFFERSPROC)
++            eglGetProcAddress( "glDeleteFramebuffers");
++    ctxInfo->glDeleteProgram = (PFNGLDELETEPROGRAMPROC)
++            eglGetProcAddress( "glDeleteProgram");
++    ctxInfo->glDeleteRenderbuffers = (PFNGLDELETERENDERBUFFERSPROC)
++            eglGetProcAddress( "glDeleteRenderbuffers");
++    ctxInfo->glDeleteShader = (PFNGLDELETESHADERPROC)
++            eglGetProcAddress( "glDeleteShader");
++    ctxInfo->glDetachShader = (PFNGLDETACHSHADERPROC)
++            eglGetProcAddress( "glDetachShader");
++    ctxInfo->glDisableVertexAttribArray = (PFNGLDISABLEVERTEXATTRIBARRAYPROC)
++            eglGetProcAddress( "glDisableVertexAttribArray");
++    ctxInfo->glEnableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAYPROC)
++            eglGetProcAddress( "glEnableVertexAttribArray");
++    ctxInfo->glFramebufferRenderbuffer = (PFNGLFRAMEBUFFERRENDERBUFFERPROC)
++            eglGetProcAddress( "glFramebufferRenderbuffer");
++    ctxInfo->glFramebufferTexture2D = (PFNGLFRAMEBUFFERTEXTURE2DPROC)
++            eglGetProcAddress( "glFramebufferTexture2D");
++    ctxInfo->glGenFramebuffers = (PFNGLGENFRAMEBUFFERSPROC)
++            eglGetProcAddress( "glGenFramebuffers");
++    ctxInfo->glGenRenderbuffers = (PFNGLGENRENDERBUFFERSPROC)
++            eglGetProcAddress( "glGenRenderbuffers");
++    ctxInfo->glGetProgramiv = (PFNGLGETPROGRAMIVPROC)
++            eglGetProcAddress( "glGetProgramiv");
++    ctxInfo->glGetShaderiv = (PFNGLGETSHADERIVPROC)
++            eglGetProcAddress( "glGetShaderiv");
++    ctxInfo->glGetUniformLocation = (PFNGLGETUNIFORMLOCATIONPROC)
++            eglGetProcAddress( "glGetUniformLocation");
++    ctxInfo->glLinkProgram = (PFNGLLINKPROGRAMPROC)
++            eglGetProcAddress( "glLinkProgram");
++    ctxInfo->glRenderbufferStorage = (PFNGLRENDERBUFFERSTORAGEPROC)
++            eglGetProcAddress( "glRenderbufferStorage");
++    ctxInfo->glShaderSource = (PFNGLSHADERSOURCEPROC)
++            eglGetProcAddress( "glShaderSource");
++    ctxInfo->glUniform1f = (PFNGLUNIFORM1FPROC)
++            eglGetProcAddress( "glUniform1f");
++    ctxInfo->glUniform2f = (PFNGLUNIFORM2FPROC)
++            eglGetProcAddress( "glUniform2f");
++    ctxInfo->glUniform3f = (PFNGLUNIFORM3FPROC)
++            eglGetProcAddress( "glUniform3f");
++    ctxInfo->glUniform4f = (PFNGLUNIFORM4FPROC)
++            eglGetProcAddress( "glUniform4f");
++    ctxInfo->glUniform4fv = (PFNGLUNIFORM4FVPROC)
++            eglGetProcAddress( "glUniform4fv");
++    ctxInfo->glUniform1i = (PFNGLUNIFORM1IPROC)
++            eglGetProcAddress( "glUniform1i");
++    ctxInfo->glUniform2i = (PFNGLUNIFORM2IPROC)
++            eglGetProcAddress( "glUniform2i");
++    ctxInfo->glUniform3i = (PFNGLUNIFORM3IPROC)
++            eglGetProcAddress( "glUniform3i");
++    ctxInfo->glUniform4i = (PFNGLUNIFORM4IPROC)
++            eglGetProcAddress( "glUniform4i");
++    ctxInfo->glUniform4iv = (PFNGLUNIFORM4IVPROC)
++            eglGetProcAddress( "glUniform4iv");
++    ctxInfo->glUniformMatrix4fv = (PFNGLUNIFORMMATRIX4FVPROC)
++            eglGetProcAddress( "glUniformMatrix4fv");
++    ctxInfo->glUseProgram = (PFNGLUSEPROGRAMPROC)
++            eglGetProcAddress( "glUseProgram");
++    ctxInfo->glValidateProgram = (PFNGLVALIDATEPROGRAMPROC)
++            eglGetProcAddress( "glValidateProgram");
++    ctxInfo->glVertexAttribPointer = (PFNGLVERTEXATTRIBPOINTERPROC)
++            eglGetProcAddress( "glVertexAttribPointer");
++    ctxInfo->glGenBuffers = (PFNGLGENBUFFERSPROC)
++            eglGetProcAddress( "glGenBuffers");
++    ctxInfo->glBindBuffer = (PFNGLBINDBUFFERPROC)
++            eglGetProcAddress( "glBindBuffer");
++    ctxInfo->glBufferData = (PFNGLBUFFERDATAPROC)
++            eglGetProcAddress( "glBufferData");
++    ctxInfo->glBufferSubData = (PFNGLBUFFERSUBDATAPROC)
++            eglGetProcAddress( "glBufferSubData");
++    ctxInfo->glGetShaderInfoLog = (PFNGLGETSHADERINFOLOGPROC)
++            eglGetProcAddress( "glGetShaderInfoLog");
++    ctxInfo->glGetProgramInfoLog = (PFNGLGETPROGRAMINFOLOGPROC)
++            eglGetProcAddress( "glGetProgramInfoLog");
++    ctxInfo->glTexImage2DMultisample = (PFNGLTEXIMAGE2DMULTISAMPLEPROC)
++            eglGetProcAddress("glTexImage2DMultisample");
++    ctxInfo->glRenderbufferStorageMultisample = (PFNGLRENDERBUFFERSTORAGEMULTISAMPLEPROC)
++            eglGetProcAddress("glRenderbufferStorageMultisample");
++    ctxInfo->glBlitFramebuffer = (PFNGLBLITFRAMEBUFFERPROC)
++            eglGetProcAddress("glBlitFramebuffer");
++
++    initState(ctxInfo);
++    eglMakeCurrent(egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
++    eglDestroySurface(egl_display, bootstrap);
++    return ctxInfo;
++failed:
++    eglMakeCurrent(egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
++    eglDestroySurface(egl_display, bootstrap);
++    eglDestroyContext(egl_display, context);
++    free(ctxInfo->versionStr);
++    free(ctxInfo->vendorStr);
++    free(ctxInfo->rendererStr);
++    free(ctxInfo->glExtensionStr);
++    free(ctxInfo->glxExtensionStr);
++    free(ctxInfo);
++    return NULL;
++}
++
++jlong prism_wayland_initialize(JNIEnv *env, jintArray attrs) {
++    (void)env; (void)attrs;
++    // Initialize the display before Prism; Glass subsequently reuses it.
++    gdk_threads_init();
++    if (!gtk_init_check(NULL, NULL)) return 0;
++    GdkDisplay *display = gdk_display_get_default();
++    if (!GDK_IS_WAYLAND_DISPLAY(display)) return 0;
++    egl_display = eglGetDisplay((EGLNativeDisplayType)gdk_wayland_display_get_wl_display(display));
++    if (egl_display == EGL_NO_DISPLAY || !eglInitialize(egl_display, NULL, NULL) || !eglBindAPI(EGL_OPENGL_API)) return 0;
++    EGLint options[] = {EGL_SURFACE_TYPE, EGL_WINDOW_BIT | EGL_PBUFFER_BIT,
++        EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT, EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8,
++        EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_DEPTH_SIZE, 24, EGL_SAMPLE_BUFFERS, 0, EGL_SAMPLES, 0, EGL_NONE};
++    EGLint count = 0;
++    if (!eglChooseConfig(egl_display, options, &egl_config, 1, &count) || count == 0) return 0;
++    ContextInfo *context = create_context(JNI_FALSE);
++    if (context) {
++        shared_context = context->waylandContext;
++        fprintf(stderr, "Prism native Wayland EGL: %s / %s\n", context->vendorStr, context->rendererStr);
++    }
++    return ptr_to_jlong(context);
++}
++
++jlong prism_wayland_pixel_format(JNIEnv *env, jintArray attrs) {
++    (void)env; (void)attrs;
++    PixelFormatInfo *format = calloc(1, sizeof(PixelFormatInfo));
++    if (format) format->waylandConfig = egl_config;
++    return ptr_to_jlong(format);
++}
++
++jlong prism_wayland_drawable(jlong native_window, jlong native_format) {
++    (void)native_format;
++    DrawableInfo *drawable = calloc(1, sizeof(DrawableInfo));
++    if (!drawable) return 0;
++    if (native_window) {
++        GdkWindow *window = (GdkWindow *)jlong_to_ptr(native_window);
++        struct wl_surface *surface = gdk_wayland_window_get_wl_surface(window);
++        int scale = gdk_window_get_scale_factor(window);
++        struct wl_egl_window *egl_window = wl_egl_window_create(surface,
++            gdk_window_get_width(window) * scale, gdk_window_get_height(window) * scale);
++        if (!egl_window) { free(drawable); return 0; }
++        wl_surface_set_buffer_scale(surface, scale);
++        drawable->waylandSurface = eglCreateWindowSurface(egl_display, egl_config, (EGLNativeWindowType)egl_window, NULL);
++        drawable->waylandWindow = egl_window;
++        drawable->waylandGdkWindow = g_object_ref(window);
++        drawable->onScreen = JNI_TRUE;
++    } else {
++        EGLint size[] = {EGL_WIDTH, 1, EGL_HEIGHT, 1, EGL_NONE};
++        drawable->waylandSurface = eglCreatePbufferSurface(egl_display, egl_config, size);
++    }
++    if (drawable->waylandSurface == EGL_NO_SURFACE) {
++        fprintf(stderr, "Wayland EGL surface failed: 0x%x\n", eglGetError());
++        prism_wayland_release_drawable(ptr_to_jlong(drawable));
++        return 0;
++    }
++    return ptr_to_jlong(drawable);
++}
++
++jlong prism_wayland_context(jlong drawable, jlong format, jboolean vsync) {
++    (void)drawable; (void)format;
++    return ptr_to_jlong(create_context(vsync));
++}
++
++jlong prism_wayland_handle(jlong context) {
++    ContextInfo *info = jlong_to_ptr(context);
++    return info ? ptr_to_jlong(info->waylandContext) : 0;
++}
++
++void prism_wayland_make_current(jlong context, jlong drawable) {
++    ContextInfo *ctx = jlong_to_ptr(context);
++    DrawableInfo *target = jlong_to_ptr(drawable);
++    if (!ctx || !target) return;
++    if (target->waylandGdkWindow) {
++        GdkWindow *window = target->waylandGdkWindow;
++        int scale = gdk_window_get_scale_factor(window);
++        wl_egl_window_resize(target->waylandWindow,
++            MAX(1, gdk_window_get_width(window) * scale),
++            MAX(1, gdk_window_get_height(window) * scale), 0, 0);
++    }
++    if (!eglMakeCurrent(egl_display, target->waylandSurface, target->waylandSurface, ctx->waylandContext)) {
++        fprintf(stderr, "Wayland EGL make-current failed: 0x%x\n", eglGetError());
++        return;
++    }
++    jboolean vsync = ctx->vSyncRequested && target->onScreen;
++    eglSwapInterval(egl_display, vsync ? 1 : 0);
++    ctx->state.vSyncEnabled = vsync;
++}
++
++jboolean prism_wayland_swap(jlong drawable) {
++    DrawableInfo *target = jlong_to_ptr(drawable);
++    return target && eglSwapBuffers(egl_display, target->waylandSurface) ? JNI_TRUE : JNI_FALSE;
++}
++
++static gboolean release_window(gpointer window) { g_object_unref(window); return G_SOURCE_REMOVE; }
++void prism_wayland_release_drawable(jlong drawable) {
++    DrawableInfo *target = jlong_to_ptr(drawable);
++    if (!target) return;
++    if (target->waylandSurface) eglDestroySurface(egl_display, target->waylandSurface);
++    if (target->waylandWindow) wl_egl_window_destroy(target->waylandWindow);
++    if (target->waylandGdkWindow) g_idle_add(release_window, target->waylandGdkWindow);
++    free(target);
++}
++
++void prism_wayland_destroy_context(ContextInfo *context) {
++    if (context->waylandContext == shared_context) shared_context = EGL_NO_CONTEXT;
++    eglDestroyContext(egl_display, context->waylandContext);
++    context->waylandContext = NULL;
++}
++
++#endif
+diff --git a/modules/javafx.graphics/src/main/native-prism-es2/Wayland.h b/modules/javafx.graphics/src/main/native-prism-es2/Wayland.h
+new file mode 100644
+index 00000000..cf319267
+--- /dev/null
++++ b/modules/javafx.graphics/src/main/native-prism-es2/Wayland.h
+@@ -0,0 +1,39 @@
++/*
++ * Copyright (c) 2012, 2024, Oracle and/or its affiliates. All rights reserved.
++ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
++ *
++ * This code is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 only, as
++ * published by the Free Software Foundation.  Oracle designates this
++ * particular file as subject to the "Classpath" exception as provided
++ * by Oracle in the LICENSE file that accompanied this code.
++ *
++ * This code is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
++ * version 2 for more details (a copy is included in the LICENSE file that
++ * accompanied this code).
++ *
++ * You should have received a copy of the GNU General Public License version
++ * 2 along with this work; if not, write to the Free Software Foundation,
++ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
++ *
++ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
++ * or visit www.oracle.com if you need additional information or have any
++ * questions.
++ */
++
++#ifndef MODTALE_WAYLAND_H
++#define MODTALE_WAYLAND_H
++#include "PrismES2Defs.h"
++int prism_wayland_enabled(void);
++jlong prism_wayland_initialize(JNIEnv *, jintArray);
++jlong prism_wayland_pixel_format(JNIEnv *, jintArray);
++jlong prism_wayland_drawable(jlong, jlong);
++jboolean prism_wayland_swap(jlong);
++void prism_wayland_release_drawable(jlong);
++jlong prism_wayland_context(jlong, jlong, jboolean);
++jlong prism_wayland_handle(jlong);
++void prism_wayland_make_current(jlong, jlong);
++void prism_wayland_destroy_context(ContextInfo *);
++#endif
+diff --git a/modules/javafx.graphics/src/main/native-prism-es2/x11/X11GLContext.c b/modules/javafx.graphics/src/main/native-prism-es2/x11/X11GLContext.c
+index fde0bf57..34902659 100644
+--- a/modules/javafx.graphics/src/main/native-prism-es2/x11/X11GLContext.c
++++ b/modules/javafx.graphics/src/main/native-prism-es2/x11/X11GLContext.c
+@@ -31,6 +31,9 @@
+ #include <math.h>
+ 
+ #include "../PrismES2Defs.h"
++#ifdef MODTALE_WAYLAND
++#include "../Wayland.h"
++#endif
+ #include "com_sun_prism_es2_X11GLContext.h"
+ 
+ /*
+@@ -41,6 +44,10 @@
+ JNIEXPORT jlong JNICALL Java_com_sun_prism_es2_X11GLContext_nInitialize
+ (JNIEnv *env, jclass class, jlong nativeDInfo, jlong nativePFInfo,
+         jboolean vSyncRequested) {
++#ifdef MODTALE_WAYLAND
++    if (prism_wayland_enabled()) { return prism_wayland_context(nativeDInfo, nativePFInfo, vSyncRequested); }
++#endif
++
+     const char *glVersion;
+     const char *glVendor;
+     const char *glRenderer;
+@@ -304,6 +311,10 @@ JNIEXPORT jlong JNICALL Java_com_sun_prism_es2_X11GLContext_nInitialize
+  */
+ JNIEXPORT jlong JNICALL Java_com_sun_prism_es2_X11GLContext_nGetNativeHandle
+ (JNIEnv *env, jclass class, jlong nativeCtxInfo) {
++#ifdef MODTALE_WAYLAND
++    if (prism_wayland_enabled()) { return prism_wayland_handle(nativeCtxInfo); }
++#endif
++
+     ContextInfo *ctxInfo = (ContextInfo *) jlong_to_ptr(nativeCtxInfo);
+     if (ctxInfo == NULL) {
+         return 0;
+@@ -318,6 +329,10 @@ JNIEXPORT jlong JNICALL Java_com_sun_prism_es2_X11GLContext_nGetNativeHandle
+  */
+ JNIEXPORT void JNICALL Java_com_sun_prism_es2_X11GLContext_nMakeCurrent
+ (JNIEnv *env, jclass class, jlong nativeCtxInfo, jlong nativeDInfo) {
++#ifdef MODTALE_WAYLAND
++    if (prism_wayland_enabled()) { prism_wayland_make_current(nativeCtxInfo, nativeDInfo); return; }
++#endif
++
+     ContextInfo *ctxInfo = (ContextInfo *) jlong_to_ptr(nativeCtxInfo);
+     DrawableInfo *dInfo = (DrawableInfo *) jlong_to_ptr(nativeDInfo);
+     int interval;
+diff --git a/modules/javafx.graphics/src/main/native-prism-es2/x11/X11GLDrawable.c b/modules/javafx.graphics/src/main/native-prism-es2/x11/X11GLDrawable.c
+index e23b344f..5e44559d 100644
+--- a/modules/javafx.graphics/src/main/native-prism-es2/x11/X11GLDrawable.c
++++ b/modules/javafx.graphics/src/main/native-prism-es2/x11/X11GLDrawable.c
+@@ -31,6 +31,9 @@
+ #include <math.h>
+ 
+ #include "../PrismES2Defs.h"
++#ifdef MODTALE_WAYLAND
++#include "../Wayland.h"
++#endif
+ #include "com_sun_prism_es2_X11GLDrawable.h"
+ 
+ /*
+@@ -40,6 +43,10 @@
+  */
+ JNIEXPORT jlong JNICALL Java_com_sun_prism_es2_X11GLDrawable_nCreateDrawable
+ (JNIEnv *env, jclass class, jlong nativeWindow, jlong nativePFInfo) {
++#ifdef MODTALE_WAYLAND
++    if (prism_wayland_enabled()) { return prism_wayland_drawable(nativeWindow, nativePFInfo); }
++#endif
++
+     DrawableInfo *dInfo = NULL;
+     PixelFormatInfo *pfInfo = (PixelFormatInfo *) jlong_to_ptr(nativePFInfo);
+     if (pfInfo == NULL) {
+@@ -72,6 +79,10 @@ JNIEXPORT jlong JNICALL Java_com_sun_prism_es2_X11GLDrawable_nCreateDrawable
+  */
+ JNIEXPORT jlong JNICALL Java_com_sun_prism_es2_X11GLDrawable_nGetDummyDrawable
+ (JNIEnv *env, jclass class, jlong nativePFInfo) {
++#ifdef MODTALE_WAYLAND
++    if (prism_wayland_enabled()) { return prism_wayland_drawable(0, nativePFInfo); }
++#endif
++
+     DrawableInfo *dInfo = NULL;
+     PixelFormatInfo *pfInfo = (PixelFormatInfo *) jlong_to_ptr(nativePFInfo);
+     if (pfInfo == NULL) {
+@@ -104,6 +115,10 @@ JNIEXPORT jlong JNICALL Java_com_sun_prism_es2_X11GLDrawable_nGetDummyDrawable
+  */
+ JNIEXPORT jboolean JNICALL Java_com_sun_prism_es2_X11GLDrawable_nSwapBuffers
+ (JNIEnv *env, jclass class, jlong nativeDInfo) {
++#ifdef MODTALE_WAYLAND
++    if (prism_wayland_enabled()) { return prism_wayland_swap(nativeDInfo); }
++#endif
++
+     DrawableInfo *dInfo = (DrawableInfo *) jlong_to_ptr(nativeDInfo);
+     if (dInfo == NULL) {
+         return JNI_FALSE;
+@@ -119,6 +134,10 @@ JNIEXPORT jboolean JNICALL Java_com_sun_prism_es2_X11GLDrawable_nSwapBuffers
+  */
+ JNIEXPORT void JNICALL Java_com_sun_prism_es2_X11GLDrawable_nReleaseDrawable
+ (JNIEnv *env, jclass class, jlong nativeDInfo) {
++#ifdef MODTALE_WAYLAND
++    if (prism_wayland_enabled()) { prism_wayland_release_drawable(nativeDInfo); return; }
++#endif
++
+     DrawableInfo *dInfo = (DrawableInfo *) jlong_to_ptr(nativeDInfo);
+     if (dInfo == NULL) {
+         return;
+diff --git a/modules/javafx.graphics/src/main/native-prism-es2/x11/X11GLFactory.c b/modules/javafx.graphics/src/main/native-prism-es2/x11/X11GLFactory.c
+index 07e5d57d..1931140d 100644
+--- a/modules/javafx.graphics/src/main/native-prism-es2/x11/X11GLFactory.c
++++ b/modules/javafx.graphics/src/main/native-prism-es2/x11/X11GLFactory.c
+@@ -32,6 +32,9 @@
+ #include <X11/Xutil.h>
+ 
+ #include "../PrismES2Defs.h"
++#ifdef MODTALE_WAYLAND
++#include "../Wayland.h"
++#endif
+ #include "com_sun_prism_es2_X11GLFactory.h"
+ #ifdef STATIC_BUILD
+ JNIEXPORT jint JNICALL
+@@ -165,6 +168,10 @@ static int x11errorDetector (Display *dpy, XErrorEvent *error)
+  */
+ JNIEXPORT jlong JNICALL Java_com_sun_prism_es2_X11GLFactory_nInitialize
+ (JNIEnv *env, jclass class, jintArray attrArr) {
++#ifdef MODTALE_WAYLAND
++    if (prism_wayland_enabled()) { return prism_wayland_initialize(env, attrArr); }
++#endif
++
+ 
+     int glxAttrs[MAX_GLX_ATTRS_LENGTH]; /* value, attr pair plus a None */
+     jint *attrs;
+diff --git a/modules/javafx.graphics/src/main/native-prism-es2/x11/X11GLPixelFormat.c b/modules/javafx.graphics/src/main/native-prism-es2/x11/X11GLPixelFormat.c
+index 75019447..c5e6e992 100644
+--- a/modules/javafx.graphics/src/main/native-prism-es2/x11/X11GLPixelFormat.c
++++ b/modules/javafx.graphics/src/main/native-prism-es2/x11/X11GLPixelFormat.c
+@@ -31,6 +31,9 @@
+ #include <math.h>
+ 
+ #include "../PrismES2Defs.h"
++#ifdef MODTALE_WAYLAND
++#include "../Wayland.h"
++#endif
+ #include "com_sun_prism_es2_X11GLPixelFormat.h"
+ 
+ extern void setGLXAttrs(jint *attrs, int *glxAttrs);
+@@ -45,6 +48,10 @@ extern void printAndReleaseResources(Display *display, GLXFBConfig *fbConfigList
+  */
+ JNIEXPORT jlong JNICALL Java_com_sun_prism_es2_X11GLPixelFormat_nCreatePixelFormat
+ (JNIEnv *env, jclass class, jlong nativeScreen, jintArray attrArr) {
++#ifdef MODTALE_WAYLAND
++    if (prism_wayland_enabled()) { return prism_wayland_pixel_format(env, attrArr); }
++#endif
++
+     int glxAttrs[MAX_GLX_ATTRS_LENGTH]; /* value, attr pair plus a None */
+     jint *attrs;
+     PixelFormatInfo *pfInfo = NULL;

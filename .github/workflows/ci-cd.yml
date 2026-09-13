@@ -879,6 +879,7 @@ jobs:
       - name: Set up Linux packaging tooling
         if: runner.os == 'Linux'
         run: |
+          sudo bash scripts/install_linux_build_dependencies.sh
           sudo apt-get update
           sudo apt-get install -y \
             binutils \

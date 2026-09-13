@@ -22,6 +22,11 @@ repositories {
 
 def currentOs = org.gradle.internal.os.OperatingSystem.current()
 
+def packagingJavaLauncher = javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(26)
+}
+
+
 dependencies {
     implementation 'com.twelvemonkeys.imageio:imageio-webp:3.15.0'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.2'
@@ -197,6 +202,42 @@ def packagedJna = tasks.register('packageHostJna', Jar) {
     }
 }
 
+def waylandBackend = null
+if (currentOs.isLinux()) {
+    def graphicsName = "javafx-graphics-26.0.2-${javafxPlatform()}.jar"
+    def graphicsJar = configurations.runtimeClasspath.filter { it.name == graphicsName }
+    def nativeDirectory = providers.gradleProperty('waylandNativeDir')
+    waylandBackend = tasks.register('buildWaylandBackend', Exec) {
+        group = 'build'
+        description = 'Builds the pinned native Wayland/EGL backend for JavaFX.'
+        inputs.files(graphicsJar)
+        inputs.file('native/openjfx-wayland.patch')
+        inputs.file('scripts/build_wayland_backend.py')
+        if (nativeDirectory.isPresent()) inputs.dir(nativeDirectory.get())
+        def output = layout.buildDirectory.file("native-javafx/${graphicsName}")
+        outputs.file(output)
+        doFirst {
+            def args = ['python3', file('scripts/build_wayland_backend.py').absolutePath,
+                        '--base-jar', graphicsJar.singleFile.absolutePath,
+                        '--output', output.get().asFile.absolutePath,
+                        '--work', layout.buildDirectory.dir('openjfx-wayland').get().asFile.absolutePath,
+                        '--patch', file('native/openjfx-wayland.patch').absolutePath,
+                        '--java-home', packagingJavaLauncher.get().metadata.installationPath.asFile.absolutePath,
+                        '--gradle', new File(gradle.gradleHomeDir, 'bin/gradle').absolutePath]
+            if (nativeDirectory.isPresent()) args += ['--native-dir', file(nativeDirectory.get()).absolutePath]
+            commandLine args
+        }
+    }
+    runtimeClasspathFiles = files(configurations.runtimeClasspath.filter { it.name != graphicsName }, waylandBackend)
+    tasks.named('run', JavaExec) {
+        classpath = files(sourceSets.main.output, runtimeClasspathFiles)
+    }
+    tasks.named('test', Test) {
+        classpath = files(sourceSets.test.output, sourceSets.main.output,
+                configurations.testRuntimeClasspath.filter { it.name != graphicsName }, waylandBackend)
+    }
+}
+
 tasks.register('prepareJpackageInput', Sync) {
     group = 'distribution'
     description = 'Collects launcher jars for self-contained jpackage installers.'
@@ -207,10 +248,6 @@ tasks.register('prepareJpackageInput', Sync) {
         exclude 'jna-*.jar'
     }
     from(packagedJna)
-}
-
-def packagingJavaLauncher = javaToolchains.launcherFor {
-    languageVersion = JavaLanguageVersion.of(26)
 }
 
 def jpackageExecutable = packagingJavaLauncher.map {
