@@ -25,6 +25,11 @@ describe('projectClient', () => {
         vi.clearAllMocks();
     });
 
+    it('binds invite cancellation to its request identity', async () => {
+        await projectClient.cancelInvite('project-1', 'user-1', 'invite-1');
+        expect(mockedApi.delete).toHaveBeenCalledWith('/projects/project-1/invites/user-1', { params: { requestId: 'invite-1' } });
+    });
+
     it('fetches project details from the lean project endpoint', async () => {
         mockedApi.get.mockResolvedValueOnce({ data: { id: 'project-1' } } as any);
 

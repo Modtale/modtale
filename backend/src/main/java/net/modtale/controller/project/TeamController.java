@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -91,9 +92,9 @@ public class TeamController {
 
     @DeleteMapping("/invites/{userId}")
     @PreAuthorize("@apiSecurity.hasProjectPerm(#projectId, 'PROJECT_TEAM_INVITE', authentication)")
-    public ResponseEntity<Void> cancelInvite(@PathVariable String projectId, @PathVariable String userId) {
+    public ResponseEntity<Void> cancelInvite(@PathVariable String projectId, @PathVariable String userId, @RequestParam String requestId) {
         User user = accountService.requireCurrentUser("canceling a project invite");
-        teamService.cancelInvite(projectId, userId, user);
+        teamService.cancelInvite(projectId, userId, requestId, user);
         return ResponseEntity.ok().build();
     }
 
@@ -117,16 +118,16 @@ public class TeamController {
     }
 
     @PostMapping("/invite/accept")
-    public ResponseEntity<Void> acceptInvite(@PathVariable String projectId) {
+    public ResponseEntity<Void> acceptInvite(@PathVariable String projectId, @Valid @RequestBody net.modtale.model.dto.request.project.ProjectInvitationResponse response) {
         User user = accountService.requireCurrentUser("accepting a project invite");
-        teamService.acceptInvite(projectId, user.getId());
+        teamService.acceptInvite(projectId, user.getId(), response.requestId());
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/invite/decline")
-    public ResponseEntity<Void> declineInvite(@PathVariable String projectId) {
+    public ResponseEntity<Void> declineInvite(@PathVariable String projectId, @Valid @RequestBody net.modtale.model.dto.request.project.ProjectInvitationResponse response) {
         User user = accountService.requireCurrentUser("declining a project invite");
-        teamService.declineInvite(projectId, user.getId());
+        teamService.declineInvite(projectId, user.getId(), response.requestId());
         return ResponseEntity.ok().build();
     }
 

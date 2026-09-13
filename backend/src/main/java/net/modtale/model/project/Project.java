@@ -97,6 +97,18 @@ public class Project {
     public static class ProjectMember {
         private String userId;
         private String roleId;
+        private String requestId;
+        private String requestOwnerId;
+        private long requestExpiresAt;
+        private Set<ApiKey.ApiPermission> requestPermissions;
+        public String getRequestId() { return requestId; }
+        public void setRequestId(String value) { requestId = value; }
+        public String getRequestOwnerId() { return requestOwnerId; }
+        public void setRequestOwnerId(String value) { requestOwnerId = value; }
+        public long getRequestExpiresAt() { return requestExpiresAt; }
+        public void setRequestExpiresAt(long value) { requestExpiresAt = value; }
+        public Set<ApiKey.ApiPermission> getRequestPermissions() { return requestPermissions; }
+        public void setRequestPermissions(Set<ApiKey.ApiPermission> value) { requestPermissions = value; }
 
         @Transient private String username;
         @Transient private String avatarUrl;

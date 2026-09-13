@@ -300,6 +300,8 @@ export interface ProjectRole {
 }
 
 export interface ProjectMember {
+    requestId?: string;
+    requestExpiresAt?: number;
     userId: string;
     roleId: string;
     username?: string;

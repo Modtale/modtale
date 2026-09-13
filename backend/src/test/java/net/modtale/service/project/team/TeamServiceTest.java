@@ -168,7 +168,8 @@ class TeamServiceTest {
                 eq(java.net.URI.create("/dashboard/projects")),
                 eq(project.getImageUrl()),
                 eq(net.modtale.model.user.NotificationType.CONTRIBUTOR_INVITE),
-                eq(java.util.Map.of("projectId", "project-1", "action", "CONTRIBUTOR_INVITE"))
+                eq(java.util.Map.of("projectId", "project-1", "action", "CONTRIBUTOR_INVITE",
+                        "requestId", project.getTeamInvites().getFirst().getRequestId()))
         );
     }
 
@@ -236,12 +237,16 @@ class TeamServiceTest {
         when(userRepository.findById("owner-1")).thenReturn(Optional.of(owner));
         when(projectService.getProjectLink(project)).thenReturn("/mod/sky-tools~project-1");
 
-        service.acceptInvite("project-1", "user-2");
+        var invitation = project.getTeamInvites().getFirst(); invitation.setRequestId("invite-1");
+        invitation.setRequestExpiresAt(System.currentTimeMillis()+60000); invitation.setRequestOwnerId(project.getAuthorId());
+        invitation.setRequestPermissions(Set.of(ApiKey.ApiPermission.PROJECT_EDIT_METADATA));
+        when(reviewPersistence.resolveContributorInvite(any(), any(), any(), anyBoolean())).thenReturn(true);
+        service.acceptInvite("project-1", "user-2", "invite-1");
 
         assertTrue(project.getTeamInvites().isEmpty());
         assertEquals(1, project.getTeamMembers().size());
         assertEquals("user-2", project.getTeamMembers().getFirst().getUserId());
-        verify(reviewPersistence).applyTeam(any());
+        verify(reviewPersistence).resolveContributorInvite(any(), eq("user-2"), eq("invite-1"), eq(true));
         verify(projectService).evictProjectCache(project);
         verify(apiKeyService).syncUserProjectPermissions(
                 "user-2",
@@ -268,7 +273,7 @@ class TeamServiceTest {
 
         assertThrows(
                 InvalidProjectRequestException.class,
-                () -> service.acceptInvite("project-1", "user-2")
+                () -> service.acceptInvite("project-1", "user-2", "invite-1")
         );
     }
 

@@ -26,8 +26,9 @@ export const resolveNotificationAction = (
     }
 
     if (notification.type === 'CONTRIBUTOR_INVITE') {
-        return projectId
-            ? { endpoint: `/projects/${projectId}/invite/${accept ? 'accept' : 'decline'}` }
+        const requestId = notification.metadata?.requestId;
+        return projectId && requestId
+            ? { endpoint: `/projects/${projectId}/invite/${accept ? 'accept' : 'decline'}`, body: { requestId } }
             : null;
     }
 

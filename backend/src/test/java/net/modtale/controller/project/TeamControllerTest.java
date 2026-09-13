@@ -81,10 +81,10 @@ class TeamControllerTest {
         User user = user("user-2");
         when(accountService.requireCurrentUser("accepting a project invite")).thenReturn(user);
 
-        mockMvc.perform(post("/api/v1/projects/project-1/invite/accept"))
+        mockMvc.perform(post("/api/v1/projects/project-1/invite/accept").contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"requestId\":\"invite-1\"}"))
                 .andExpect(status().isOk());
 
-        verify(teamService).acceptInvite("project-1", "user-2");
+        verify(teamService).acceptInvite("project-1", "user-2", "invite-1");
     }
 
     private static User user(String id) {

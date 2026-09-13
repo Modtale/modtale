@@ -86,6 +86,11 @@ public class ProjectReviewPersistence {
         return applyUpdate(snapshot, update);
     }
     public boolean applyTeam(Snapshot snapshot) { return applyTeam(snapshot, null); }
+    public boolean resolveContributorInvite(Snapshot snapshot, String userId, String requestId, boolean accepting) {
+        var original = mongo.getConverter().read(Project.class, snapshot.raw());
+        var invite = net.modtale.service.project.team.ProjectInvitationPolicy.require(original, userId, requestId, accepting);
+        return applyTeam(snapshot, accepting ? new Document("$gt", List.of(invite.getRequestExpiresAt(), new Document("$toLong", "$$NOW"))) : null);
+    }
     public boolean resolveTransfer(Snapshot snapshot, String requestId) {
         if (requestId == null || !requestId.equals(snapshot.raw().getString("pendingTransferRequestId"))
                 || snapshot.raw().get("pendingTransferOwnerId") == null

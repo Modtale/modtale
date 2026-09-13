@@ -172,8 +172,8 @@ export const projectClient = {
     inviteUser: async (projectId: string, userId: string, roleId: string) => {
         await api.post(`/projects/${projectId}/invite`, { userId, roleId });
     },
-    cancelInvite: async (projectId: string, userId: string) => {
-        await api.delete(`/projects/${projectId}/invites/${userId}`);
+    cancelInvite: async (projectId: string, userId: string, requestId: string) => {
+        await api.delete(`/projects/${projectId}/invites/${userId}`, { params: { requestId } });
     },
     removeContributor: async (projectId: string, userId: string) => {
         await api.delete(`/projects/${projectId}/contributors/${userId}`);

@@ -598,4 +598,57 @@ class FindingReviewPersistenceIntegrationTest {
         assertEquals("recipient", mongo.findById(projectId, Project.class).getAuthorId()); assertNotNull(version().getScanResult());
     }
 
+    private void prepareContributorInvite(String requestId, long expiry) {
+        var invite = new Project.ProjectMember("recipient", "role"); invite.setRequestId(requestId);
+        invite.setRequestOwnerId("owner"); invite.setRequestExpiresAt(expiry);
+        invite.setRequestPermissions(Set.of(net.modtale.model.user.ApiKey.ApiPermission.PROJECT_EDIT_METADATA));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("authorId", "owner")
+                .set("teamInvites", List.of(invite)).set("projectRoles", List.of(new Project.ProjectRole("role", "Role", "#fff", invite.getRequestPermissions()))), Project.class);
+    }
+    @Test void contributorAcceptanceRetainsEvidenceAndBindsTheOfferedRole() {
+        var event = record(token()); prepareContributorInvite("invite", System.currentTimeMillis()+60000);
+        var writes = new ProjectReviewPersistence(mongo);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        snapshot.project().setTeamInvites(List.of()); snapshot.project().setTeamMembers(List.of(new Project.ProjectMember("recipient", "role")));
+        assertTrue(writes.resolveContributorInvite(snapshot, "recipient", "invite", true));
+        assertEquals(event.id(), version().getFindingReviewHead()); assertNotNull(version().getScanResult());
+        prepareContributorInvite("invite2", System.currentTimeMillis()+60000);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("projectRoles.0.permissions", List.of()), Project.class);
+        var changed = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        assertThrows(net.modtale.exception.InvalidProjectRequestException.class, () -> writes.resolveContributorInvite(changed, "recipient", "invite2", true));
+    }
+    @Test void staleContributorCancellationAndLegacyIdentityCannotRemoveReplacement() {
+        prepareContributorInvite("old", System.currentTimeMillis()+60000); var writes = new ProjectReviewPersistence(mongo);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        snapshot.project().setTeamInvites(List.of()); prepareContributorInvite("new", System.currentTimeMillis()+60000);
+        assertFalse(writes.resolveContributorInvite(snapshot, "recipient", "old", false));
+        var current = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        assertThrows(net.modtale.exception.InvalidProjectRequestException.class, () -> writes.resolveContributorInvite(current, "recipient", "legacy", false));
+        prepareContributorInvite(null, 0);
+        var legacy = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        legacy.project().setTeamInvites(List.of()); assertTrue(writes.resolveContributorInvite(legacy, "recipient", "legacy", false));
+    }
+    @Test void contributorNotificationsAndIndependentExpiryKeepCurrentInvitations() {
+        prepareContributorInvite("new", System.currentTimeMillis()+60000);
+        var repository = mock(net.modtale.repository.user.NotificationRepository.class);
+        var notifications = new net.modtale.service.communication.NotificationService(repository,
+                mock(net.modtale.repository.user.UserRepository.class), mongo, mock(net.modtale.service.communication.NotificationDeliveryService.class));
+        var old = new net.modtale.model.user.Notification("recipient", "Invite", "Invite", java.net.URI.create("/dashboard"), null,
+                net.modtale.model.user.NotificationType.CONTRIBUTOR_INVITE, Map.of("projectId", projectId, "requestId", "old"));
+        old.setId("old"); when(repository.findById("old")).thenReturn(Optional.of(old)); notifications.deleteNotification("old", "recipient");
+        notifications.cleanupExpiredContributorInvites();
+        assertEquals("new", mongo.findById(projectId, Project.class).getTeamInvites().getFirst().getRequestId());
+        prepareContributorInvite("expired", 1); notifications.cleanupExpiredContributorInvites();
+        assertTrue(mongo.findById(projectId, Project.class).getTeamInvites().isEmpty());
+    }
+    @Test void expiredOrOwnerChangedContributorInvitesCannotGrantMembership() {
+        var writes = new ProjectReviewPersistence(mongo); prepareContributorInvite("invite", 1);
+        var expired = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        assertThrows(net.modtale.exception.InvalidProjectRequestException.class, () -> writes.resolveContributorInvite(expired, "recipient", "invite", true));
+        prepareContributorInvite("invite", System.currentTimeMillis()+60000);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("authorId", "different"), Project.class);
+        var changed = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        assertThrows(net.modtale.exception.InvalidProjectRequestException.class, () -> writes.resolveContributorInvite(changed, "recipient", "invite", true));
+    }
+
 }
