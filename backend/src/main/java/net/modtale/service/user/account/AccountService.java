@@ -33,6 +33,7 @@ public class AccountService {
     private static final int MAX_LAUNCHER_SYNC_HASH = 128;
 
     private final UserRepository userRepository;
+    private final AccountPreferencesPersistence preferencesPersistence;
     private final MongoTemplate mongoTemplate;
     private final SanitizationService sanitizer;
     private final CurrentUserResolutionService currentUserResolutionService;
@@ -47,9 +48,11 @@ public class AccountService {
             CurrentUserResolutionService currentUserResolutionService,
             OAuthAvatarHealingService oauthAvatarHealingService,
             AccountLifecycleService accountLifecycleService,
-            ConnectedAccountMutationService connectedAccountMutationService
+            ConnectedAccountMutationService connectedAccountMutationService,
+            AccountPreferencesPersistence preferencesPersistence
     ) {
         this.userRepository = userRepository;
+        this.preferencesPersistence = preferencesPersistence;
         this.mongoTemplate = mongoTemplate;
         this.sanitizer = sanitizer;
         this.currentUserResolutionService = currentUserResolutionService;
@@ -150,21 +153,24 @@ public class AccountService {
     }
 
     public void updateUserAvatar(String userId, String url) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found."));
+        var state = requirePreferencesSnapshot(userId);
+        User user = state.user();
         user.setAvatarUrl(url);
-        userRepository.save(user);
+        persistPreferences(state, AccountPreferencesPersistence.Field.AVATAR);
     }
 
     public void updateUserBanner(String userId, String url) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found."));
+        var state = requirePreferencesSnapshot(userId);
+        User user = state.user();
         user.setBannerUrl(url);
-        userRepository.save(user);
+        persistPreferences(state, AccountPreferencesPersistence.Field.BANNER);
     }
 
     public void updateNotificationPreferences(String userId, User.NotificationPreferences prefs) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found."));
+        var state = requirePreferencesSnapshot(userId);
+        User user = state.user();
         user.setNotificationPreferences(prefs);
-        userRepository.save(user);
+        persistPreferences(state, AccountPreferencesPersistence.Field.NOTIFICATIONS);
     }
 
     public LauncherSettingsSnapshot getLauncherSettings(String userId) {
@@ -173,18 +179,20 @@ public class AccountService {
     }
 
     public LauncherSettingsSnapshot updateLauncherSettings(String userId, LauncherSettingsSnapshot snapshot) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found."));
+        var state = requirePreferencesSnapshot(userId);
+        User user = state.user();
         LauncherSettingsSnapshot normalized = normalizeLauncherSettings(snapshot, user.getLauncherSettings());
         user.setLauncherSettings(normalized);
-        userRepository.save(user);
+        persistPreferences(state, AccountPreferencesPersistence.Field.LAUNCHER);
         return normalized;
     }
 
     public LauncherSettingsSnapshot updateLauncherSettingsPreferences(String userId, LauncherSettingsSnapshot snapshot) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found."));
+        var state = requirePreferencesSnapshot(userId);
+        User user = state.user();
         LauncherSettingsSnapshot normalized = normalizeLauncherSettingsPreferences(snapshot, user.getLauncherSettings());
         user.setLauncherSettings(normalized);
-        userRepository.save(user);
+        persistPreferences(state, AccountPreferencesPersistence.Field.LAUNCHER);
         return normalized;
     }
 
@@ -239,6 +247,21 @@ public class AccountService {
 
     public void recoverUser(String userId) {
         accountLifecycleService.recoverUser(userId);
+    }
+
+    private AccountPreferencesPersistence.Snapshot requirePreferencesSnapshot(String userId) {
+        var snapshot = preferencesPersistence.capture(userId);
+        if (snapshot == null) throw new ResourceNotFoundException("User not found.");
+        return snapshot;
+    }
+
+    private void persistPreferences(AccountPreferencesPersistence.Snapshot snapshot,
+            AccountPreferencesPersistence.Field field) {
+        if (!preferencesPersistence.update(snapshot, field)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.CONFLICT,
+                    "Account changed while saving settings. Refresh and retry.");
+        }
     }
 
     private LauncherSettingsSnapshot normalizeLauncherSettings(LauncherSettingsSnapshot snapshot, LauncherSettingsSnapshot existing) {
