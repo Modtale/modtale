@@ -80,6 +80,35 @@ class SecurityConfigLauncherOAuthTest {
         );
     }
 
+    @Test
+    void enabledMfaAlwaysChallengesWebAndLauncherLoginsWithoutAccountMutation() throws Exception {
+        for (String secret : new String[]{null, "", "   ", "fixture-secret"}) {
+            for (boolean launcher : new boolean[]{false, true}) {
+                AccountService accounts = mock(AccountService.class);
+                LauncherAuthService grants = mock(LauncherAuthService.class);
+                User user = new User(); user.setId("user-1"); user.setUsername("ada");
+                user.setMfaEnabled(true); user.setMfaSecret(secret);
+                when(accounts.getPublicProfile("ada")).thenReturn(user);
+                var request = launcher ? launcherOAuthRequest() : new MockHttpServletRequest();
+                var session = request.getSession();
+                var response = new MockHttpServletResponse();
+                var auth = authentication();
+                SecurityContextHolder.getContext().setAuthentication(auth);
+                session.setAttribute("SPRING_SECURITY_CONTEXT", SecurityContextHolder.getContext());
+                try {
+                    config(accounts, grants).oauthSuccessHandler().onAuthenticationSuccess(request, response, auth);
+                    org.junit.jupiter.api.Assertions.assertTrue(response.getRedirectedUrl().startsWith("http://localhost:5173/mfa?token="));
+                    org.junit.jupiter.api.Assertions.assertTrue(user.isMfaEnabled());
+                    org.junit.jupiter.api.Assertions.assertTrue(((org.springframework.mock.web.MockHttpSession) session).isInvalid());
+                    org.junit.jupiter.api.Assertions.assertNull(SecurityContextHolder.getContext().getAuthentication());
+                    org.mockito.Mockito.verifyNoInteractions(grants);
+                    org.mockito.Mockito.verify(accounts).getPublicProfile("ada");
+                    org.mockito.Mockito.verifyNoMoreInteractions(accounts);
+                } finally { SecurityContextHolder.clearContext(); }
+            }
+        }
+    }
+
     private static SecurityConfig config(AccountService accountService, LauncherAuthService launcherAuthService) {
         return new SecurityConfig(
                 mock(ApiKeyAuthFilter.class),

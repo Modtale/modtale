@@ -46,6 +46,7 @@ public class TwoFactorService {
     }
 
     public boolean isOtpValid(String secret, String code) {
+        if (secret == null || secret.isBlank() || code == null || !code.matches("[0-9]{6}")) return false;
         TimeProvider timeProvider = new SystemTimeProvider();
         CodeGenerator codeGenerator = new DefaultCodeGenerator();
         DefaultCodeVerifier verifier = new DefaultCodeVerifier(codeGenerator, timeProvider);
