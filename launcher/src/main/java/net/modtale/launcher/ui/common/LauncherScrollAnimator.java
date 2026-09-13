@@ -162,11 +162,18 @@ final class LauncherScrollAnimator {
             Map.Entry<ScrollPane, AnimationState> entry = iterator.next();
             ScrollPane pane = entry.getKey();
             AnimationState state = entry.getValue();
+            ScrollMetrics metrics = metrics(pane);
+            if (state.divergedFrom(new Point(horizontalOffset(pane, metrics), verticalOffset(pane, metrics)))) {
+                // Scrollbar drags, keyboard navigation, and external position
+                // changes must not be overwritten by the next animation pulse.
+                iterator.remove();
+                pendingWheelStarts.remove(pane);
+                continue;
+            }
             if (pendingWheelStarts.remove(pane)) {
                 state = state.startAtFirstFrame(now, frameIntervalNanos);
             }
             state = state.at(now);
-            ScrollMetrics metrics = metrics(pane);
             apply(pane, metrics, state.current);
             if (state.finished(now) || !metrics.scrollable()) {
                 iterator.remove();

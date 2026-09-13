@@ -1,0 +1,59 @@
+name: Launcher validation
+
+on:
+  push:
+    paths:
+      - 'launcher/**'
+      - '.github/workflows/launcher-validation.yml'
+  pull_request:
+    paths:
+      - 'launcher/**'
+      - '.github/workflows/launcher-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: launcher-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: launcher
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v3
+      - name: Install Linux display dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgtk-3-0
+      - name: Test and build the native application image
+        run: |
+          chmod +x gradlew
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            xvfb-run -a ./gradlew test jpackageImage
+          else
+            ./gradlew test jpackageImage
+          fi
+      - name: Upload validation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-validation-${{ runner.os }}
+          path: |
+            launcher/build/reports/tests/test
+            launcher/build/test-results/test

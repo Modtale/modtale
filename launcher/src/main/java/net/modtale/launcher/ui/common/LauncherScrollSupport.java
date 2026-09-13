@@ -141,7 +141,7 @@ public final class LauncherScrollSupport {
         if (scrollNode == null || Boolean.TRUE.equals(scrollNode.getProperties().get(INSTALLED_PROPERTY))) {
             return;
         }
-        LinuxScrollInput.install();
+        NativeScrollInput.install();
         scrollNode.getProperties().put(INSTALLED_PROPERTY, Boolean.TRUE);
         scrollNode.addEventFilter(ScrollEvent.SCROLL, scrollHandler);
         configuredNodes.add(scrollNode);
@@ -150,7 +150,7 @@ public final class LauncherScrollSupport {
     private void observeNativeScroll(ScrollEvent event) {
         long operationStart = LauncherPerformanceProbe.operationStartNanos();
         try {
-            LinuxScrollInput.Sample nativeInput = LinuxScrollInput.take();
+            NativeScrollInput.Sample nativeInput = NativeScrollInput.take(eventOutputScale(event));
             if (event.isControlDown()) {
                 return;
             }
@@ -159,7 +159,8 @@ public final class LauncherScrollSupport {
             ScrollRequest request = scrollRequest(event, nativeInput);
             if (request == null) return;
             revealScrollbars(request.pane());
-            if (nativeInput != null ? nativeInput.precise() : isPreciseScroll(event)) {
+            boolean precise = nativeInput != null ? nativeInput.precise() : isPreciseScroll(event);
+            if (precise || !NativeScrollInput.animationsEnabled()) {
                 animator.scrollBy(request.pane(), request.metrics(), request.deltaX(), request.deltaY());
                 event.consume();
                 return;
@@ -172,12 +173,12 @@ public final class LauncherScrollSupport {
         }
     }
 
-    private ScrollRequest scrollRequest(ScrollEvent event, LinuxScrollInput.Sample nativeInput) {
+    private ScrollRequest scrollRequest(ScrollEvent event, NativeScrollInput.Sample nativeInput) {
         if (!(event.getTarget() instanceof Node target)) return null;
 
         double scale = eventOutputScale(event);
-        double deltaX = nativeInput == null ? -browserDelta(event, event.getDeltaX(), scale) : nativeInput.x() / scale;
-        double deltaY = nativeInput == null ? -browserDelta(event, event.getDeltaY(), scale) : nativeInput.y() / scale;
+        double deltaX = nativeInput == null ? -browserAxisDelta(event, true, scale) : nativeInput.x();
+        double deltaY = nativeInput == null ? -browserAxisDelta(event, false, scale) : nativeInput.y();
         if (event.isShiftDown() && Math.abs(deltaX) < 0.01) {
             deltaX = deltaY;
             deltaY = 0;
@@ -189,7 +190,9 @@ public final class LauncherScrollSupport {
                 LauncherScrollAnimator.ScrollMetrics metrics = LauncherScrollAnimator.metrics(pane);
                 boolean horizontal = horizontalScrollingEnabled(pane);
                 double requestedX = horizontalDelta(horizontal, deltaX);
-                double requestedY = deltaY;
+                double requestedY = event.getTextDeltaYUnits() == ScrollEvent.VerticalTextScrollUnits.PAGES
+                        ? -event.getTextDeltaY() * scale * pageStep(pane.getViewportBounds().getHeight())
+                        : deltaY;
                 if (horizontal && Math.abs(requestedY) >= Math.abs(requestedX)
                         && metrics.maxY() <= 0 && metrics.maxX() > 0) {
                     requestedX = requestedY;
@@ -263,6 +266,20 @@ public final class LauncherScrollSupport {
     static double browserDelta(ScrollEvent event, double delta, double outputScale) {
         if (!looksLikeJavaFxDiscreteWheel(event, outputScale)) return delta;
         return delta / JAVAFX_DISCRETE_WHEEL_UNIT * BROWSER_DISCRETE_WHEEL_UNIT;
+    }
+
+    static double browserAxisDelta(ScrollEvent event, boolean horizontal, double outputScale) {
+        if (horizontal && event.getTextDeltaXUnits() == ScrollEvent.HorizontalTextScrollUnits.CHARACTERS) {
+            return event.getTextDeltaX() * (100.0 / 3);
+        }
+        if (!horizontal && event.getTextDeltaYUnits() == ScrollEvent.VerticalTextScrollUnits.LINES) {
+            return event.getTextDeltaY() * (100.0 / 3);
+        }
+        return browserDelta(event, horizontal ? event.getDeltaX() : event.getDeltaY(), outputScale);
+    }
+
+    static double pageStep(double viewport) {
+        return Math.max(1, (int) (viewport * .875));
     }
 
     private static boolean hasPixelUnits(ScrollEvent event) {

@@ -118,6 +118,27 @@ class NativeInteractionRegressionTest {
     }
 
     @Test
+    void draggingTheScrollbarInterruptsMomentumInsteadOfSnappingBack() throws Exception {
+        fx(() -> {
+            Region content = new Region();
+            content.resize(800, 2400);
+            ScrollPane pane = new ScrollPane(content);
+            pane.setViewportBounds(new BoundingBox(0, 0, 800, 400));
+            LauncherScrollAnimator animator = new LauncherScrollAnimator(16_666_667);
+            animator.animate(pane, 0, 480, 0);
+            animator.tick(0);
+            animator.tick(20_000_000);
+            // ScrollPaneSkin writes the value when its scrollbar is dragged or keyed.
+            pane.setVvalue(.75);
+            animator.tick(40_000_000);
+            assertEquals(.75, pane.getVvalue(), "Direct navigation must win over momentum");
+            animator.tick(500_000_000);
+            assertEquals(.75, pane.getVvalue(), "Cancelled momentum must not resume");
+            return null;
+        });
+    }
+
+    @Test
     void wheelBurstRetargetsAtThePresentedFrameMinusNativeInputDelay() throws Exception {
         fx(() -> {
             Region content = new Region();

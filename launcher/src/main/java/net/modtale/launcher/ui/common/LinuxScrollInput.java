@@ -7,6 +7,7 @@ import com.sun.jna.Pointer;
 import com.sun.jna.ptr.DoubleByReference;
 import com.sun.jna.ptr.IntByReference;
 import java.io.IOException;
+import net.modtale.launcher.ui.common.NativeScrollInput.Sample;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
@@ -87,5 +88,4 @@ final class LinuxScrollInput {
         long g_get_monotonic_time();
     }
 
-    record Sample(double x, double y, boolean precise, long delayNanos) {}
 }
