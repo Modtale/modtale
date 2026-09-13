@@ -1,10 +1,10 @@
 # Modtale Launcher
 
-Java 21 / JavaFX desktop launcher for Modtale.
+Java 25 / JavaFX 26 desktop launcher for Modtale.
 
 ## Setup
 
-Install a full JDK 21, then run from the repository root:
+Install a full JDK 25, then run from the repository root:
 
 ```bash
 cd launcher
@@ -27,6 +27,6 @@ MODTALE_SITE_BASE_URL=http://localhost:5173 MODTALE_API_BASE_URL=http://localhos
 ./gradlew build      # Run checks and package for the host OS
 ```
 
-Native packages are written to `build/distributions/`. Packaging requires JDK 21's `jpackage` and platform packaging tools; Linux AppImage builds require `appimagetool` on `PATH`.
+Native packages are written to `build/distributions/`. Packaging requires JDK 25's `jpackage` and platform packaging tools; Linux AppImage builds require `appimagetool` on `PATH`.
 
 Keep contributions focused and run `./gradlew test` before submitting changes.
