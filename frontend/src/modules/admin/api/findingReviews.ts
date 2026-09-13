@@ -26,3 +26,11 @@ export const findingReviews = {
     revoke: async (project: string, version: string, token: string, decision: string, rationale: string): Promise<FindingDecision> =>
         (await api.post(`${path(project, version)}/${encodeURIComponent(decision)}/revoke`, { rationale }, { headers: { 'If-Match': token } })).data,
 };
+
+export interface PriorFindingReasoning {
+    reviewToken: string; sourceVersionId: string; sourceVersion: string; assessedAt: number;
+    reviewReasons: string[]; decisions: FindingDecision[]; omitted: number;
+}
+export const loadPriorFindingReasoning = async (project: string, version: string, sourceVersionId: string, issueIndex: number, token: string): Promise<PriorFindingReasoning> =>
+    (await api.get(`/admin/projects/${encodeURIComponent(project)}/versions/${encodeURIComponent(version)}/prior-finding-reasoning`,
+        { headers: { 'If-Match': token }, params: { sourceVersionId, issueIndex } })).data;

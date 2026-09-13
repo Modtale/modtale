@@ -64,7 +64,7 @@ final class FindingDecisionValidity {
                 && Objects.equals(recorded.type(), current.getType()) && Objects.equals(recorded.description(), current.getDescription())
                 && recorded.lineStart() == current.getLineStart() && recorded.lineEnd() == current.getLineEnd();
     }
-    private boolean validRecord(FindingReviewService.Event event, String projectId, ProjectVersion version, long now) {
+    boolean validRecord(FindingReviewService.Event event, String projectId, ProjectVersion version, long now) {
         if (version == null || !Objects.equals(projectId, event.projectId()) || !Objects.equals(version.getId(), event.versionId())
                 || event.disposition() == null || event.actorId() == null || event.actorId().isBlank() || event.actorId().length() > 256
                 || event.rationale() == null || event.rationale().strip().length() < 10 || event.rationale().length() > 4000 || event.createdAt() <= 0

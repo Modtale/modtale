@@ -1,3 +1,4 @@
+import { PriorFindingReasoning } from './PriorFindingReasoning';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Shield, List, FileText, Box, User as UserIcon, Check, ArrowLeft, Copy, ExternalLink, Terminal, Download, ArrowRight, X, ImageIcon, ChevronDown, ChevronUp, ShieldAlert, Eye, RefreshCw, PlayCircle } from 'lucide-react';
 import { API_BASE_URL, BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
@@ -629,6 +630,9 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
 
                                 {pendingVersion && <ArtifactChanges projectId={mod.id} version={pendingVersion.versionNumber} reviewToken={mod.reviewToken || ''}
                                     onInspect={(version, path, token) => openInspector(version, version === pendingVersion.versionNumber ? scanIssues : [], path, undefined, undefined, token)} />}
+                                {pendingVersion && <PriorFindingReasoning key={`prior:${pendingVersion.id}:${mod.reviewToken}`}
+                                    projectId={mod.id} versionId={pendingVersion.id} token={mod.reviewToken || ''} issues={scanIssues}
+                                    sources={mod.versions.filter((v: ProjectVersion) => v.id !== pendingVersion.id && v.reviewStatus === 'APPROVED')} />}
                                 {pendingVersion && <FindingDecisions key={`${pendingVersion.id}:${pendingVersion.reviewToken}`}
                                     projectId={mod.id} versionId={pendingVersion.id} token={pendingVersion.reviewToken}
                                     issues={scanIssues} canDecide={canDecide} onSaved={() => setDecisionWritten(true)} />}
