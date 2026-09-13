@@ -48,7 +48,7 @@ class CosmeticEditorControllerTest {
 
     @BeforeAll static void toolkit() throws Exception {
         if (System.getProperty("os.name", "").toLowerCase().contains("linux"))
-            assumeTrue(!System.getenv().getOrDefault("DISPLAY", "").isBlank(), "JavaFX controller tests require DISPLAY");
+            assumeTrue(!System.getenv().getOrDefault("WAYLAND_DISPLAY", "").isBlank(), "JavaFX controller tests require WAYLAND_DISPLAY");
         try { Platform.startup(() -> Platform.setImplicitExit(false)); }
         catch (IllegalStateException alreadyStarted) { /* Shared toolkit. */ }
         catch (UnsupportedOperationException unavailable) {

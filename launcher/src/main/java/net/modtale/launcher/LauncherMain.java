@@ -2,7 +2,6 @@ package net.modtale.launcher;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Map;
 import net.modtale.launcher.logging.LauncherLogging;
 import net.modtale.launcher.logging.LauncherLog;
 import net.modtale.launcher.logging.LauncherLogger;
@@ -15,12 +14,8 @@ public final class LauncherMain {
     }
 
     public static void main(String[] args) {
-        Map<String, String> cursorSettings = LinuxCursorSettings.configure();
         LauncherLogging.initialize();
         LauncherRenderSettings.configure();
-        if (!cursorSettings.isEmpty()) {
-            LOG.info("Applied native Linux cursor settings: " + cursorSettings);
-        }
         LOG.info("Starting Modtale Launcher " + System.getProperty("modtale.launcherVersion", "dev"));
         launchJavaFx(args);
     }

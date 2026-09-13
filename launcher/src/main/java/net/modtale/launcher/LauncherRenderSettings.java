@@ -28,7 +28,8 @@ final class LauncherRenderSettings {
     static void configure() {
         OptionalInt nativeRate = net.modtale.launcher.platform.LinuxDesktopBackend.prepareDisplay();
         configure(System.getProperties(), System.getProperty("os.name"),
-                nativeRate.isPresent() ? nativeRate : detectDisplayRefreshRate());
+                System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT).contains("linux")
+                        ? nativeRate : detectDisplayRefreshRate());
     }
 
     static void configure(Properties properties, String osName, OptionalInt detectedRefreshRate) {

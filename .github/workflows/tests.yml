@@ -173,13 +173,13 @@ jobs:
       - name: Ensure Gradle wrapper is executable
         run: chmod +x gradlew
 
-      - name: Install virtual display for JavaFX tests
+      - name: Install Wayland compositor for JavaFX tests
         run: |
           sudo bash scripts/install_linux_build_dependencies.sh
-          sudo apt-get install -y xvfb xauth
+          sudo apt-get install -y weston libgl1-mesa-dri
 
       - name: Run launcher tests
-        run: GDK_BACKEND=x11 xvfb-run -a ./gradlew test --no-daemon
+        run: bash scripts/test_wayland.sh test --no-daemon
 
       - name: Upload launcher test reports
         if: ${{ !cancelled() }}

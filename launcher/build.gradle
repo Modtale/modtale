@@ -450,9 +450,7 @@ tasks.register('prepareLinuxAppDir') {
         appRun.text = '''#!/usr/bin/env sh
 set -eu
 APPDIR="${APPDIR:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}"
-if [ -n "${WAYLAND_DISPLAY:-}" ]; then
-    export GDK_BACKEND=x11
-fi
+export GDK_BACKEND=wayland
 exec "$APPDIR/bin/Modtale Launcher" "$@"
 '''
         appRun.setExecutable(true, false)
@@ -579,7 +577,7 @@ Priority: optional
 Architecture: ${debArchitecture()}
 Maintainer: ${linuxDebMaintainer}
 Installed-Size: ${installedSizeKb}
-Depends: libc6, libx11-6, libxext6, libxrender1, libxtst6, libxi6, libfreetype6, fontconfig, libgtk-3-0, zlib1g
+Depends: libc6, libwayland-client0, libwayland-egl1, libegl1, libopengl0, libfreetype6, fontconfig, libgtk-3-0, zlib1g
 Homepage: ${appHomepage}
 Description: ${appDescription}
  Install, update, and manage Hytale mods from Modtale with a self-contained native launcher.
@@ -733,14 +731,11 @@ size = ${installedBytes}
 arch = ${pacmanArchitecture()}
 license = ${appLicenseId}
 depend = glibc
-depend = libx11
-depend = libxext
-depend = libxrender
-depend = libxtst
-depend = libxi
 depend = freetype2
 depend = fontconfig
 depend = gtk3
+depend = wayland
+depend = libglvnd
 """
 
         runExternalCommand([
@@ -820,7 +815,6 @@ exec "\$APPDIR/bin/${appDisplayName}" "\$@"
                 "--command=${appSlug}",
                 '--share=network',
                 '--share=ipc',
-                '--socket=x11',
                 '--socket=wayland',
                 '--device=dri',
                 '--filesystem=home',

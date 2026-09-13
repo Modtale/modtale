@@ -91,9 +91,12 @@ class LinuxScrollInputTest {
         Gdk gdk = Native.load("gdk-3", Gdk.class);
         NativeLibrary objects = NativeLibrary.getInstance("gobject-2.0");
         Pointer display = gdk.gdk_display_get_default();
-        Pointer pointer = gdk.gdk_seat_get_pointer(gdk.gdk_display_get_default_seat(display));
+        Pointer seat = gdk.gdk_display_get_default_seat(display);
+        Pointer pointer = seat == null ? null : gdk.gdk_seat_get_pointer(seat);
+        NativeLong deviceType = pointer == null ? gdk.gdk_wayland_device_get_type()
+                : pointer.getPointer(0).getNativeLong(0);
         Pointer device = objects.getFunction("g_object_new").invokePointer(new Object[]{
-                new NativeLong(pointer.getPointer(0).getNativeLong(0).longValue()),
+                deviceType,
                 "name", "Launcher scroll regression device", "input-source", source,
                 "display", display, "device-manager", gdk.gdk_display_get_device_manager(display), null});
         Pointer windows = gdk.gdk_screen_get_toplevel_windows(gdk.gdk_screen_get_default());
@@ -109,7 +112,7 @@ class LinuxScrollInputTest {
                 scroll.direction = 4;
                 scroll.dy = delta;
                 scroll.write();
-                gdk.gdk_event_set_device(event, pointer);
+                gdk.gdk_event_set_device(event, pointer == null ? device : pointer);
                 gdk.gdk_event_set_source_device(event, device);
                 gdk.gdk_event_put(event);
                 // The queued copy owns references; this original borrows its window.
@@ -126,6 +129,7 @@ class LinuxScrollInputTest {
     }
 
     interface Gdk extends Library {
+        NativeLong gdk_wayland_device_get_type();
         Pointer gdk_screen_get_default();
         Pointer gdk_screen_get_toplevel_windows(Pointer screen);
         int gdk_window_is_visible(Pointer window);

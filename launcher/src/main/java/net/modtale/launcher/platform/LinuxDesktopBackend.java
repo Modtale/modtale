@@ -23,12 +23,12 @@ public final class LinuxDesktopBackend {
 
     public static OptionalInt prepareDisplay() {
         if (!isLinux() || System.getenv("WAYLAND_DISPLAY") == null
-                || "x11".equals(System.getenv("GDK_BACKEND"))
                 || LinuxDesktopBackend.class.getResource("/META-INF/modtale-native-wayland") == null) {
             return OptionalInt.empty();
         }
         try {
             Gdk gdk = Native.load("gdk-3", Gdk.class, LOCAL_SYMBOLS);
+            gdk.gdk_set_allowed_backends("wayland");
             gdk.gdk_threads_init();
             if (gdk.gdk_init_check(null, null) == 0) return OptionalInt.empty();
             Pointer display = gdk.gdk_display_get_default();
@@ -85,6 +85,7 @@ public final class LinuxDesktopBackend {
     }
 
     private interface Gdk extends Library {
+        void gdk_set_allowed_backends(String backends);
         void gdk_threads_init();
         int gdk_init_check(Pointer argc, Pointer argv);
         Pointer gdk_display_get_default();

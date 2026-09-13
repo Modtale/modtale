@@ -27,9 +27,7 @@ import net.modtale.launcher.update.LauncherUpdateService;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
-@EnabledIfEnvironmentVariable(named = "DISPLAY", matches = ".+")
 class LauncherUpdateControllerTest {
     @TempDir Path directory;
 

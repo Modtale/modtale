@@ -21,9 +21,7 @@ import net.modtale.launcher.ui.common.LauncherScrollSupport;
 import net.modtale.launcher.ui.common.LauncherView;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
-@EnabledIfEnvironmentVariable(named = "DISPLAY", matches = ".+")
 class LauncherBrowseMenuTest {
     @BeforeAll
     static void toolkit() throws Exception {
