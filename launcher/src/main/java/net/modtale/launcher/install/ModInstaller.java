@@ -49,12 +49,6 @@ public class ModInstaller {
         this.archiveInstaller = archiveInstaller;
     }
 
-    public InstallResult installLatest(ProjectDetail project, LauncherSettings settings) {
-        ProjectVersion version = VersionSelector.latestCompatible(project, settings.getGameVersion())
-                .orElseThrow(() -> new ModtaleApiException("No compatible version was found for " + project.title()));
-        return install(project, version, optionsFrom(settings));
-    }
-
     public InstallResult install(ProjectDetail project, ProjectVersion version, InstallOptions options) {
         if (project == null || version == null) {
             throw new ModtaleApiException("Select a project and version before installing.");

@@ -41,7 +41,7 @@ class LauncherPageLayoutTest {
             var api = new ModtaleApiClient("http://localhost", directory.resolve("session.json"));
             var settings = new LauncherSettingsController(new SettingsStore(directory.resolve("settings.json")),
                     api, () -> null, () -> LauncherView.PLAY);
-            var feedback = new LauncherFeedback(paused, new Label(), new VBox(), new StackPane(),
+            var feedback = new LauncherFeedback(paused, new Label(), new StackPane(),
                     new Label(), new Label(), () -> "");
             var installs = new java.util.concurrent.atomic.AtomicInteger();
             var favorites = new java.util.concurrent.atomic.AtomicInteger();

@@ -160,7 +160,7 @@ class CosmeticEditorControllerTest {
             WardrobeStore store = new WardrobeStore(directory);
             status = fx(Label::new);
             controller = fx(() -> new CosmeticEditorController(gateway, store, () -> settings,
-                    new LauncherFeedback(executor, status, new VBox(), new StackPane(), new Label(), new Label(), () -> "Ready"), executor));
+                    new LauncherFeedback(executor, status, new StackPane(), new Label(), new Label(), () -> "Ready"), executor));
             stage = fx(() -> {
                 Stage result = new Stage();
                 Scene scene = new Scene(new StackPane(controller.view()), 1100, 800);

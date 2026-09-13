@@ -63,7 +63,7 @@ class LauncherUpdateControllerTest {
             categories.stream().map(javafx.scene.control.ToggleButton.class::cast)
                     .filter(button -> button.getText().equals(net.modtale.launcher.i18n.LauncherI18n.get().text("settings.maintenance.section")))
                     .findFirst().orElseThrow().fire();
-            var feedback = new LauncherFeedback(jobs::add, new Label(), new VBox(), new StackPane(),
+            var feedback = new LauncherFeedback(jobs::add, new Label(), new StackPane(),
                     new Label(), new Label(), () -> "Channel test");
             var updater = new LauncherUpdateController(service, controller, feedback, jobs::add, () -> null);
             updater.checkOnStartup();

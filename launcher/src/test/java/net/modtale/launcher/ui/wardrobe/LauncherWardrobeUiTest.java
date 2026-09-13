@@ -95,7 +95,7 @@ class LauncherWardrobeUiTest {
         }
         try (ExecutorService executor = Executors.newFixedThreadPool(3)) {
             Harness harness = fx(() -> {
-                var feedback = new LauncherFeedback(executor, new Label(), new VBox(), new StackPane(),
+                var feedback = new LauncherFeedback(executor, new Label(), new StackPane(),
                         new Label(), new Label(), () -> "Fixture ready");
                 var preview = new WardrobePreview(executor, false, (uri, limit) -> {
                     assertFalse(Platform.isFxApplicationThread(), "Preview fetch must be asynchronous");
@@ -238,7 +238,7 @@ class LauncherWardrobeUiTest {
         List<String> failures = new ArrayList<>();
         try (ExecutorService executor = Executors.newFixedThreadPool(4)) {
             Harness harness = fx(() -> {
-                var feedback = new LauncherFeedback(executor, new Label(), new VBox(), new StackPane(),
+                var feedback = new LauncherFeedback(executor, new Label(), new StackPane(),
                         new Label(), new Label(), () -> "Read-only public catalog");
                 var controller = new LauncherWardrobeController(gateway, store, LauncherSettings::new, feedback, executor);
                 var scroll = new ScrollPane(controller.view());

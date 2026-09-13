@@ -230,7 +230,7 @@ class LauncherWardrobeControllerTest {
             ImageIO.write(pixel, "png", output);
             byte[] png = output.toByteArray();
             controller = fx(() -> {
-                var feedback = new LauncherFeedback(executor, new Label(), new VBox(), new StackPane(), new Label(), new Label(), () -> "Ready");
+                var feedback = new LauncherFeedback(executor, new Label(), new StackPane(), new Label(), new Label(), () -> "Ready");
                 var preview = new WardrobePreview(executor, false, (uri, limit) -> {
                     assertFalse(Platform.isFxApplicationThread());
                     previews.add(uri); return png;

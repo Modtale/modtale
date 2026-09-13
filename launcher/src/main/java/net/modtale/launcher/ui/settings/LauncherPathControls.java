@@ -1,18 +1,14 @@
 package net.modtale.launcher.ui.settings;
 
-import static net.modtale.launcher.ui.common.LauncherUi.miniIcon;
 import static net.modtale.launcher.ui.common.LauncherUi.readableField;
 import static net.modtale.launcher.ui.common.LauncherUi.secondaryButton;
 
 import java.util.function.Supplier;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
-import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import net.modtale.launcher.settings.HytalePathDetector;
 
@@ -49,20 +45,5 @@ public final class LauncherPathControls {
         return row;
     }
 
-    public static Node pathSummary(String title, TextField source) {
-        HBox row = new HBox(12);
-        row.getStyleClass().add("row-card");
-        row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-        StackPane icon = miniIcon("F");
-        VBox copy = new VBox(4);
-        Label titleLabel = new Label(title);
-        titleLabel.getStyleClass().add("row-title");
-        Label value = new Label();
-        value.textProperty().bind(source.textProperty());
-        value.getStyleClass().add("row-subtitle");
-        copy.getChildren().addAll(titleLabel, value);
-        HBox.setHgrow(copy, Priority.ALWAYS);
-        row.getChildren().addAll(icon, copy);
-        return row;
-    }
+
 }

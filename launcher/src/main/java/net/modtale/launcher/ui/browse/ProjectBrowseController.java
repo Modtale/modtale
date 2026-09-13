@@ -259,20 +259,6 @@ public final class ProjectBrowseController {
         categories.selectClassification(classification);
     }
 
-    public void selectDefaultBrowsePage() {
-        withSuppressedSearch(() -> {
-            activeBrowseView = BrowseOptions.BrowseViewOption.defaultOption();
-            searchField.clear();
-            sortCombo.setValue(ProjectBrowseSort.defaultSort());
-            filterOptions.reset(false);
-            filterOptions.popover().setVisible(false);
-        });
-        searchDebounce.stop();
-        refreshBrowseControls();
-        showDiscover.run();
-        categories.selectClassification(BrowseOptions.ClassificationOption.defaultOption());
-    }
-
     public void refreshControls() {
         categories.refresh();
         tags.refresh();

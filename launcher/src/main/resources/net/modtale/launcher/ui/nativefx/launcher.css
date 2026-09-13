@@ -393,32 +393,6 @@
 }
 
 .account-chip,
-.status-chip {
-    -fx-min-height: 38px;
-    -fx-padding: 0 12px;
-    -fx-background-radius: 8px;
-    -fx-border-radius: 8px;
-    -fx-border-color: rgba(255, 255, 255, 0.10);
-    -fx-background-color: rgba(15, 23, 42, 0.78);
-    -fx-text-fill: #cbd5e1;
-    -fx-font-size: 13px;
-    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
-    -fx-font-weight: 800;
-}
-
-.status-chip .label {
-    -fx-text-fill: #94a3b8;
-}
-
-.status-dot {
-    -fx-min-width: 8px;
-    -fx-min-height: 8px;
-    -fx-max-width: 8px;
-    -fx-max-height: 8px;
-    -fx-background-color: #64748b;
-    -fx-background-radius: 999px;
-}
-
 .avatar {
     -fx-min-width: 38px;
     -fx-min-height: 38px;
@@ -962,8 +936,7 @@
 }
 
 .rail-title,
-.field-label,
-.metric-label {
+.field-label {
     -fx-text-fill: #94a3b8;
     -fx-font-size: 12px;
     -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
@@ -7668,29 +7641,6 @@
     -fx-graphic-text-gap: 8px;
 }
 
-.metric-grid {
-    -fx-padding: 4px 0 0 0;
-}
-
-.metric-card {
-    -fx-padding: 14px;
-    -fx-background-radius: 16px;
-    -fx-border-radius: 16px;
-    -fx-border-color: rgba(255, 255, 255, 0.10);
-    -fx-background-color: rgba(2, 6, 23, 0.30);
-}
-
-.metric-value {
-    -fx-text-fill: white;
-    -fx-font-size: 18px;
-    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
-    -fx-font-weight: 900;
-}
-
-.form-grid {
-    -fx-padding: 4px 0 0 0;
-}
-
 .path-row {
     -fx-alignment: center-left;
 }
@@ -9294,22 +9244,6 @@
 
 .log-scroll > .viewport {
     -fx-background-color: transparent;
-}
-
-.log-line {
-    -fx-padding: 2px 8px;
-}
-
-.log-time {
-    -fx-text-fill: #475569;
-    -fx-font-family: "Monospaced";
-    -fx-font-size: 11px;
-}
-
-.log-text {
-    -fx-text-fill: #94a3b8;
-    -fx-font-family: "Monospaced";
-    -fx-font-size: 11px;
 }
 
 .toast {

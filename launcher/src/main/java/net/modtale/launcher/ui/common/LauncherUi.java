@@ -7,7 +7,6 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
-import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -30,21 +29,6 @@ public final class LauncherUi {
         sub.getStyleClass().add("panel-subtitle");
         panel.getChildren().addAll(heading, sub);
         return panel;
-    }
-
-    public static GridPane formGrid() {
-        GridPane grid = new GridPane();
-        grid.getStyleClass().add("form-grid");
-        grid.setHgap(14);
-        grid.setVgap(14);
-        ColumnConstraints labelColumn = new ColumnConstraints();
-        labelColumn.setMinWidth(98);
-        labelColumn.setPrefWidth(118);
-        ColumnConstraints fieldColumn = new ColumnConstraints();
-        fieldColumn.setHgrow(Priority.ALWAYS);
-        fieldColumn.setFillWidth(true);
-        grid.getColumnConstraints().addAll(labelColumn, fieldColumn);
-        return grid;
     }
 
     public static void addField(GridPane grid, int row, String label, Node field) {
@@ -100,12 +84,6 @@ public final class LauncherUi {
         return button;
     }
 
-    public static Node statusDot() {
-        Region dot = new Region();
-        dot.getStyleClass().add("status-dot");
-        return dot;
-    }
-
     public static StackPane miniIcon(String text) {
         Label label = new Label(text);
         StackPane pane = new StackPane(label);
@@ -116,17 +94,6 @@ public final class LauncherUi {
     public static Node toggleCard(CheckBox checkBox) {
         StackPane card = new StackPane(checkBox);
         card.getStyleClass().add("toggle-card");
-        HBox.setHgrow(card, Priority.ALWAYS);
-        return card;
-    }
-
-    public static Node metricCard(String label, Label value) {
-        VBox card = new VBox(6);
-        card.getStyleClass().add("metric-card");
-        Label title = new Label(label);
-        title.getStyleClass().add("metric-label");
-        value.getStyleClass().add("metric-value");
-        card.getChildren().addAll(title, value);
         HBox.setHgrow(card, Priority.ALWAYS);
         return card;
     }

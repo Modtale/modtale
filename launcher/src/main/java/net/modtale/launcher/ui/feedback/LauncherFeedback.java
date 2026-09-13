@@ -1,6 +1,5 @@
 package net.modtale.launcher.ui.feedback;
 
-import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -22,7 +21,6 @@ import net.modtale.launcher.logging.LauncherLogger;
 public final class LauncherFeedback {
 
     private static final LauncherLogger LOG = LauncherLog.getLogger(LauncherFeedback.class);
-    private static final DateTimeFormatter LOG_TIME = DateTimeFormatter.ofPattern("HH:mm");
     private static final String TOAST_SUCCESS = "toast-success";
     private static final String TOAST_ERROR = "toast-error";
     private static final String TOAST_NEUTRAL = "toast-neutral";
@@ -33,7 +31,6 @@ public final class LauncherFeedback {
 
     private final Executor executor;
     private final Label statusText;
-    private final VBox logList;
     private final StackPane toast;
     private final Label toastTitle;
     private final Label toastMessage;
@@ -43,7 +40,6 @@ public final class LauncherFeedback {
     public LauncherFeedback(
             Executor executor,
             Label statusText,
-            VBox logList,
             StackPane toast,
             Label toastTitle,
             Label toastMessage,
@@ -51,7 +47,6 @@ public final class LauncherFeedback {
     ) {
         this.executor = executor;
         this.statusText = statusText;
-        this.logList = logList;
         this.toast = toast;
         this.toastTitle = toastTitle;
         this.toastMessage = toastMessage;
@@ -83,19 +78,6 @@ public final class LauncherFeedback {
 
     public void log(String message) {
         LOG.info(message);
-        Platform.runLater(() -> {
-            HBox line = new HBox(10);
-            line.getStyleClass().add("log-line");
-            Label time = new Label(LOG_TIME.format(java.time.LocalTime.now()));
-            time.getStyleClass().add("log-time");
-            Label text = new Label(message);
-            text.getStyleClass().add("log-text");
-            line.getChildren().addAll(time, text);
-            logList.getChildren().add(line);
-            if (logList.getChildren().size() > 80) {
-                logList.getChildren().remove(0);
-            }
-        });
     }
 
     public void showToast(String title, String message) {

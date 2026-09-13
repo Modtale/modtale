@@ -113,10 +113,6 @@ public class HytaleApiClient {
         ), TokenResponse.class);
     }
 
-    public HytaleProfile fetchProfile(String accessToken) {
-        return fetchProfiles(accessToken).getFirst();
-    }
-
     public List<HytaleProfile> fetchProfiles(String accessToken) {
         HttpRequest request = officialRequestBuilder(launcherDataUrl(), "release")
                 .GET()

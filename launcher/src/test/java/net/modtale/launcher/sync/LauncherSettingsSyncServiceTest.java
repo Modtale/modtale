@@ -68,7 +68,7 @@ class LauncherSettingsSyncServiceTest {
         LinkedBlockingQueue<Runnable> work = new LinkedBlockingQueue<>();
         LauncherSettingsSyncService service = fx(() -> {
             var controller = new LauncherSettingsController(store, api, () -> null, () -> LauncherView.LIBRARY);
-            var feedback = new LauncherFeedback(work::add, new Label(), new VBox(), new StackPane(), new Label(), new Label(), () -> "");
+            var feedback = new LauncherFeedback(work::add, new Label(), new StackPane(), new Label(), new Label(), () -> "");
             return new LauncherSettingsSyncService(api, store, controller, null, feedback, signedIn::get, StackPane::new);
         });
         fx(() -> { service.syncAfterLocalChange(); return null; });

@@ -80,7 +80,7 @@ class CosmeticEditorUiTest {
         };
         try (var executor = Executors.newFixedThreadPool(4)) {
             Harness harness = fx(() -> {
-                var feedback = new LauncherFeedback(executor, new Label(), new VBox(), new StackPane(), new Label(), new Label(), () -> "Local editor test");
+                var feedback = new LauncherFeedback(executor, new Label(), new StackPane(), new Label(), new Label(), () -> "Local editor test");
                 var controller = new CosmeticEditorController(gateway, store, () -> settings, feedback, executor);
                 var scroll = new ScrollPane(controller.view()); scroll.setFitToWidth(true);
                 scroll.setStyle("-fx-background: #0B1120; -fx-background-color: #0B1120; -fx-padding: 24;");
@@ -200,7 +200,7 @@ class CosmeticEditorUiTest {
             LauncherSettings settings, java.util.concurrent.Executor executor, CosmeticCatalogClient catalog,
             JsonNode composition, Path output) throws Exception {
         LauncherWardrobeController wardrobe = fx(() -> {
-            var feedback = new LauncherFeedback(executor, new Label(), new VBox(), new StackPane(), new Label(), new Label(), () -> "Local editor test");
+            var feedback = new LauncherFeedback(executor, new Label(), new StackPane(), new Label(), new Label(), () -> "Local editor test");
             var controller = new LauncherWardrobeController(gateway, store, () -> settings, feedback, executor);
             standalone.scroll().setContent(controller.view());
             button(standalone.root(), "Customize").fire();

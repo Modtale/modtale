@@ -57,7 +57,7 @@ class SavedLookThumbnailsTest {
                     new net.modtale.launcher.wardrobe.WardrobeApiClient(new net.modtale.launcher.hytale.HytaleAuthService(null, null)),
                     store, () -> settings,
                     new net.modtale.launcher.ui.feedback.LauncherFeedback(executor, new javafx.scene.control.Label(),
-                            new javafx.scene.layout.VBox(), new javafx.scene.layout.StackPane(), new javafx.scene.control.Label(),
+                            new javafx.scene.layout.StackPane(), new javafx.scene.control.Label(),
                             new javafx.scene.control.Label(), () -> "Ready"), executor));
             var stage = fx(() -> {
                 Platform.setImplicitExit(false);
