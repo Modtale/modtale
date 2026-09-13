@@ -31,6 +31,58 @@ public class ArtifactInspectionController {
         String prefix="JVM_BYTECODE".equals(response.format()) ? "// JVM bytecode of the uploaded class. LINE entries refer to original source lines.\n" : "";
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff").body(prefix+response.content());
     }
+    public record FileWindow(String identity, String content, String format, int start, int end, int totalCharacters,
+            int firstLine, boolean lineMatched, boolean representationComplete, List<String> gaps) {}
+    @GetMapping("/file-window")
+    public ResponseEntity<FileWindow> window(@PathVariable String id, @PathVariable String version, @RequestParam String path,
+            @RequestParam(defaultValue="0") int offset, @RequestParam(defaultValue="32000") int characters,
+            @RequestParam(defaultValue="0") int sourceLine, @RequestParam(required=false) String identity,
+            @RequestHeader(value="If-Match",required=false) String expected) {
+        Project project = projects.getRawProjectById(id);
+        if (project == null || project.getVersions() == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        ProjectReviewSnapshot.requireCurrent(project, expected);
+        String snapshot = ProjectReviewSnapshot.token(project);
+        if (path == null || path.isBlank() || path.length() > 8192 || offset < 0 || offset > 4_000_000
+                || characters < 1 || characters > 32000 || sourceLine < 0 || sourceLine > 4_000_001
+                || sourceLine > 0 && offset != 0 || offset > 0 && identity == null || identity != null && !identity.matches("[0-9a-f]{64}"))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid inspection window");
+        var selected = requireVersion(project, version);
+        byte[] bytes = verifiedBytes(selected);
+        var response = inspector.inspectWindow(bytes, path, offset, characters, sourceLine);
+        requireUnchanged(id, snapshot);
+        if (!validWindow(response, selected.getHash(), path, offset, characters, sourceLine))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "A consistent inspection window is unavailable");
+        var fields = new ArrayList<>(List.of(response.artifactSha256(), response.path(), response.entrySha256(), response.policyVersion(),
+                response.representationSha256(), response.format(), Integer.toString(response.totalCharacters()), Boolean.toString(response.representationComplete())));
+        fields.addAll(response.gaps());
+        StringBuilder binding = new StringBuilder(); fields.forEach(field -> binding.append(field.length()).append(':').append(field));
+        String actual = digest(binding.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        if (identity != null && !identity.equals(actual)) throw new ResponseStatusException(HttpStatus.CONFLICT, "Inspection changed; reopen the file");
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Content-Type-Options", "nosniff")
+                .body(new FileWindow(actual, response.content(), response.format(), response.start(), response.end(), response.totalCharacters(),
+                        response.firstLine(), response.lineMatched(), response.representationComplete(), response.gaps()));
+    }
+    private static boolean validWindow(WardenClientService.InspectionWindow w, String hash, String path, int offset, int characters, int sourceLine) {
+        return w != null && Objects.equals(hash,w.artifactSha256()) && path.equals(w.path())
+                && w.entrySha256() != null && w.entrySha256().matches("[0-9a-f]{64}") && w.representationSha256() != null && w.representationSha256().matches("[0-9a-f]{64}")
+                && w.policyVersion() != null && !w.policyVersion().isBlank() && w.policyVersion().length() <= 256 && w.format() != null
+                && Set.of("JVM_BYTECODE","TEXT_RESOURCE","JSON_RESOURCE","VALIDATED_RASTER","OPAQUE_RESOURCE","UNREPRESENTED").contains(w.format())
+                && w.start() >= 0 && (sourceLine != 0 || offset == w.start()) && w.end() >= w.start() && w.end() <= w.totalCharacters() && w.totalCharacters() <= 4_000_000
+                && (w.start() == w.totalCharacters() || w.end() > w.start()) && w.firstLine() >= 1 && w.firstLine() <= w.start() + 1
+                && w.content() != null && w.content().length() == w.end()-w.start() && w.content().length() <= characters
+                && w.gaps() != null && w.gaps().size() <= 8 && w.gaps().stream().allMatch(gap -> gap != null && gap.length() <= 512)
+                && (!w.representationComplete() || w.gaps().isEmpty() && !Set.of("OPAQUE_RESOURCE","UNREPRESENTED").contains(w.format()));
+    }
+    private static String digest(byte[] bytes) {
+        try { return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)); }
+        catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
+    }
+    private byte[] verifiedBytes(ProjectVersion version) {
+        if (version.getFileUrl() == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        byte[] bytes = storage.download(version.getFileUrl());
+        if (!Objects.equals(digest(bytes),version.getHash())) throw new ResponseStatusException(HttpStatus.CONFLICT,"Stored artifact hash mismatch");
+        return bytes;
+    }
     public record FileChange(String path, String change) {}
     public record ArtifactChanges(String reviewToken, String baselineVersion, boolean contextComparable, boolean contextChanged,
             int added, int modified, int removed, int unchanged, List<FileChange> files) {}

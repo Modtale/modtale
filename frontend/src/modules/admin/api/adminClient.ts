@@ -1,11 +1,19 @@
 import { api } from '@/utils/api';
 import type { AdminVerificationQueueItem } from '@/types';
 
+export interface InspectionWindow {
+    identity: string; content: string; format: string; start: number; end: number; totalCharacters: number;
+    firstLine: number; lineMatched: boolean; representationComplete: boolean; gaps: string[];
+}
+
 export const adminClient = {
     getProjectMeta: async (projectId: string) => (await api.get(`/projects/${projectId}/meta`)).data,
     getArtifactChanges: async (projectId: string, version: string, reviewToken: string): Promise<import('../views/ArtifactChanges').ArtifactChangeSummary> => (await api.get(`/admin/projects/${encodeURIComponent(projectId)}/versions/${encodeURIComponent(version)}/changes`, { headers: { 'If-Match': reviewToken } })).data,
     getStructure: async (projectId: string, version: string, reviewToken: string) => (await api.get(`/admin/projects/${encodeURIComponent(projectId)}/versions/${encodeURIComponent(version)}/structure`, { headers: { 'If-Match': reviewToken } })).data,
     getFileContent: async (projectId: string, version: string, path: string, reviewToken: string) => (await api.get(`/admin/projects/${encodeURIComponent(projectId)}/versions/${encodeURIComponent(version)}/file`, { params: { path }, headers: { 'If-Match': reviewToken } })).data,
+    getFileWindow: async (projectId: string, version: string, path: string, reviewToken: string, offset = 0, identity?: string, sourceLine = 0): Promise<InspectionWindow> =>
+        (await api.get(`/admin/projects/${encodeURIComponent(projectId)}/versions/${encodeURIComponent(version)}/file-window`,
+            { params: { path, offset, characters: 32000, sourceLine, identity }, headers: { 'If-Match': reviewToken } })).data,
     scanVersion: async (projectId: string, versionId: string) => (await api.post(`/admin/projects/${projectId}/versions/${versionId}/scan`)).data,
     publishProject: async (projectId: string, reviewToken?: string, versionId?: string) => (await api.post(`/admin/projects/${projectId}/publish`, null, { headers: { 'If-Match': reviewToken }, params: { versionId } })).data,
     rejectProject: async (projectId: string, reason: string, reviewToken?: string) => (await api.post(`/admin/projects/${projectId}/reject`, { reason }, { headers: { 'If-Match': reviewToken } })).data,

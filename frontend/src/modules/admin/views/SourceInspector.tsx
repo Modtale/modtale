@@ -1,7 +1,7 @@
 import { SkeletonSurface } from '@/components/ui/Skeleton';
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { Search, FileCode, Terminal, FileText, X, Folder, FolderOpen, ChevronRight, ChevronDown, ShieldAlert, CheckCircle2, Square, RefreshCw } from 'lucide-react';
-import { adminClient } from '../api/adminClient';
+import { adminClient, type InspectionWindow } from '../api/adminClient';
 import { extractApiErrorMessage } from '@/utils/api';
 import type { ScanIssue } from '@/types';
 import { ModalPortal } from '@/components/ui/ModalPortal';
@@ -131,7 +131,7 @@ const FileTreeNode: React.FC<{
     );
 };
 
-const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number; endLine?: number }> = ({ content, filename, startLine, endLine }) => {
+const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number; endLine?: number; firstLine?: number; format?: string }> = ({ content, filename, startLine, endLine, firstLine = 1, format }) => {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     const safeContent = useMemo(() => {
@@ -145,14 +145,14 @@ const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number;
     const lines = useMemo(() => safeContent.split('\n'), [safeContent]);
     const displayedRange = useMemo(() => {
         if (!startLine || startLine < 1) return undefined;
-        if (!safeContent.startsWith('// JVM bytecode of the uploaded class.')) return { start: startLine, end: endLine || startLine };
+        if (format !== 'JVM_BYTECODE') return startLine >= firstLine && startLine < firstLine + lines.length ? { start: startLine - firstLine + 1, end: (endLine || startLine) - firstLine + 1 } : undefined;
         const matching = lines.flatMap((line, index) => {
             const marker = line.match(/^\s*LINENUMBER (\d+) /);
             const sourceLine = marker ? Number(marker[1]) : 0;
             return sourceLine >= startLine && sourceLine <= (endLine || startLine) ? [index + 1] : [];
         });
         return matching.length ? { start: matching[0], end: matching[matching.length - 1] } : undefined;
-    }, [lines, safeContent, startLine, endLine]);
+    }, [lines, safeContent, startLine, endLine, firstLine, format]);
     const displayedStart = displayedRange?.start;
 
 
@@ -173,7 +173,7 @@ const CodeViewer: React.FC<{ content: any; filename: string; startLine?: number;
             <div className="sticky left-0 z-10 h-fit min-h-full w-12 select-none border-r border-white/5 bg-[#0d1117] py-4 pr-3 text-right leading-5 text-slate-600">
                 {lines.map((_, i) => (
                     <div key={i} className={(displayedRange && (i+1) >= displayedRange.start && (i+1) <= displayedRange.end) ? 'text-yellow-500 font-bold bg-yellow-500/10 w-full pr-1' : ''}>
-                        {i + 1}
+                        {i + firstLine}
                     </div>
                 ))}
             </div>
@@ -192,6 +192,8 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
     useEffect(() => () => { requestGeneration.current++; }, [modId, version, reviewToken]);
     const [inspectorFile, setInspectorFile] = useState<string | null>(null);
     const [inspectorContent, setInspectorContent] = useState<any>('');
+    const [window, setWindow] = useState<InspectionWindow | null>(null);
+    const [previousOffsets, setPreviousOffsets] = useState<number[]>([]);
     const [loadingFile, setLoadingFile] = useState(false);
     const [fileSearch, setFileSearch] = useState('');
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -207,7 +209,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
     } | null>(null);
 
     useEffect(() => {
-        setInspectorContent(''); setInspectorFile(null); setLoadingFile(false);
+        setInspectorContent(''); setInspectorFile(null); setLoadingFile(false); setWindow(null); setPreviousOffsets([]);
         setResolvedIssues(new Set()); setActiveHighlight(null); setActionError(null);
     }, [modId, version, reviewToken]);
 
@@ -243,15 +245,22 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
         });
     };
 
-    const loadInspectorFile = async (path: string) => {
+    const loadInspectorFile = async (path: string, offset = 0, identity?: string, previous: number[] = [], sourceLine = 0) => {
         const generation = ++requestGeneration.current;
-        setInspectorContent('');
+        setInspectorContent(''); setWindow(null);
         setInspectorFile(path);
         setLoadingFile(true);
         try {
-            const data = await adminClient.getFileContent(modId, version, path, reviewToken);
+            const data = await adminClient.getFileWindow(modId, version, path, reviewToken, offset, identity, sourceLine);
             if (generation !== requestGeneration.current) return;
-            setInspectorContent(data);
+            if (!data || typeof data.content !== 'string' || typeof data.format !== 'string' || !Array.isArray(data.gaps) || !data.gaps.every(gap => typeof gap === 'string')
+                || !Number.isInteger(data.firstLine) || data.firstLine < 1 || data.firstLine > data.start + 1
+                || typeof data.lineMatched !== 'boolean' || typeof data.representationComplete !== 'boolean' || !/^[0-9a-f]{64}$/.test(data.identity)
+                || (identity && identity !== data.identity) || !Number.isInteger(data.start) || !Number.isInteger(data.end)
+                || !Number.isInteger(data.totalCharacters) || data.start < 0 || data.end < data.start || data.end > data.totalCharacters
+                || data.totalCharacters > 4_000_000 || data.end - data.start !== data.content.length || data.content.length > 32000
+                || (sourceLine === 0 && data.start !== offset)) throw new Error('The inspection changed. Reopen this file.');
+            setInspectorContent(data.content); setWindow(data); setPreviousOffsets(previous);
             setActionError(null);
         } catch (e) {
             if (generation !== requestGeneration.current) return;
@@ -284,7 +293,7 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
             end: lineEnd,
         });
 
-        loadInspectorFile(targetFile);
+        loadInspectorFile(targetFile, 0, undefined, [], Math.max(0, lineStart || 0));
         setShowIssuesDropdown(false);
     };
 
@@ -472,14 +481,28 @@ export const SourceInspector: React.FC<SourceInspectorProps> = ({ modId, version
                 </div>
 
                 <div className="flex-1 bg-[#0d1117] overflow-hidden flex flex-col">
+                    {window && inspectorFile && <div className="border-b border-white/10 px-4 py-2 text-xs text-slate-300 space-y-2">
+                        <div className="flex items-center gap-3">
+                            <span>{window.totalCharacters ? `Characters ${window.start + 1}–${window.end} of ${window.totalCharacters}` : 'No text content'}</span>
+                            <button disabled={loadingFile || window.start === 0} onClick={() => loadInspectorFile(inspectorFile, 0, window.identity)} className="disabled:opacity-40">Start of file</button>
+                            <button disabled={loadingFile || !previousOffsets.length} onClick={() => loadInspectorFile(inspectorFile, previousOffsets[previousOffsets.length - 1], window.identity, previousOffsets.slice(0, -1))} className="disabled:opacity-40">Previous section</button>
+                            <button disabled={loadingFile || window.end >= window.totalCharacters} onClick={() => loadInspectorFile(inspectorFile, window.end, window.identity, [...previousOffsets, window.start])} className="disabled:opacity-40">Next section</button>
+                        </div>
+                        {window.format === 'JVM_BYTECODE' && <p>JVM bytecode of the uploaded class. LINENUMBER entries refer to original source lines.</p>}
+                        {!window.lineMatched && <p>The requested source line was not found in this representation.</p>}
+                        {!window.representationComplete && <p className="text-amber-300">This representation is incomplete. {window.gaps.join(' ')}</p>}
+                    </div>}
                     {loadingFile ? (
                         <SkeletonSurface className="h-full [&>.skeleton-layout]:h-full" label="Loading source file">
                             <CodeViewer filename={inspectorFile || 'source.txt'} content={Array.from({ length: 24 }, (_, index) => `${'    '.repeat(index % 3)}Source code line awaiting file content`).join('\n')} />
                         </SkeletonSurface>
                     ) : inspectorFile ? (
                         <CodeViewer
+                            key={`${inspectorFile}:${window?.start ?? 0}`}
                             content={inspectorContent}
                             filename={inspectorFile}
+                            firstLine={window?.firstLine}
+                            format={window?.format}
                             startLine={dynamicHighlight?.start}
                             endLine={dynamicHighlight?.end}
                         />

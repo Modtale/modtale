@@ -110,6 +110,20 @@ public class WardenClientService {
                 .bodyToMono(InspectionResponse.class).timeout(Duration.ofSeconds(90)).block();
     }
 
+    public record InspectionWindow(String artifactSha256, String path, String entrySha256, String policyVersion,
+            String representationSha256, String format, int start, int end, int totalCharacters, int firstLine,
+            boolean lineMatched, boolean representationComplete, String content, List<String> gaps) {}
+    public InspectionWindow inspectWindow(byte[] bytes, String path, int offset, int characters, int sourceLine) {
+        if (!wardenProperties.enabled()) throw new IllegalStateException("Artifact inspection is unavailable");
+        MultipartBodyBuilder builder = new MultipartBodyBuilder();
+        builder.part("file", new ByteArrayResource(bytes) { @Override public String getFilename() { return "artifact.zip"; } });
+        builder.part("path", path); builder.part("offset", Integer.toString(offset));
+        builder.part("characters", Integer.toString(characters)); builder.part("sourceLine", Integer.toString(sourceLine));
+        return webClient.post().uri("/api/v1/inspect-window").contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(BodyInserters.fromMultipartData(builder.build())).retrieve()
+                .bodyToMono(InspectionWindow.class).timeout(Duration.ofSeconds(90)).block();
+    }
+
     private void backoff(int attempt) {
         long delayMs = Math.min(3000L, 400L * attempt);
         try {

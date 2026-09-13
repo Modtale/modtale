@@ -11,6 +11,45 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class ArtifactInspectionControllerTest {
+    private WardenClientService.InspectionWindow window(Fixture f, int start, String policy) {
+        return new WardenClientService.InspectionWindow(f.after.getHash(),"file.json","a".repeat(64),policy,"b".repeat(64),
+                "TEXT_RESOURCE",start,start+2,4,1,true,true,"{}",List.of());
+    }
+    @Test void windowContinuationsBindRepresentationAndReviewState() throws Exception {
+        var f=new Fixture();String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
+        when(f.inspector.inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt())).thenReturn(window(f,0,"policy"));
+        var first=f.controller.window("project","2","file.json",0,2,0,null,token).getBody();
+        assertEquals(64,first.identity().length());
+        when(f.inspector.inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt())).thenReturn(window(f,2,"policy"));
+        assertEquals(2,f.controller.window("project","2","file.json",2,2,0,first.identity(),token).getBody().start());
+        when(f.inspector.inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt())).thenReturn(window(f,2,"changed-policy"));
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->f.controller.window("project","2","file.json",2,2,0,first.identity(),token)).getStatusCode().value());
+        doAnswer(invocation->{f.after.setFindingReviewHead("new-head");return window(f,0,"policy");})
+                .when(f.inspector).inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt());
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->f.controller.window("project","2","file.json",0,2,0,null,token)).getStatusCode().value());
+    }
+    @Test void invalidWindowRequestsStopBeforeArtifactAccessAndMalformedRepliesAreRejected() throws Exception {
+        var f=new Fixture();String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->f.controller.window("project","2","file.json",0,2,0,null,"stale")).getStatusCode().value());
+        assertEquals(400,assertThrows(ResponseStatusException.class,()->f.controller.window("project","2","file.json",2,2,0,null,token)).getStatusCode().value());
+        assertEquals(400,assertThrows(ResponseStatusException.class,()->f.controller.window("project","2","file.json",0,32001,0,null,token)).getStatusCode().value());
+        verifyNoInteractions(f.storage,f.inspector);
+        when(f.inspector.inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt())).thenReturn(window(f,1,"policy"));
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->f.controller.window("project","2","file.json",0,2,0,null,token)).getStatusCode().value());
+    }
+    @Test void windowHttpRouteRequiresTheOpenedReviewAndReturnsBoundedJsonWithoutCaching() throws Exception {
+        var f=new Fixture();String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
+        when(f.inspector.inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt())).thenReturn(window(f,0,"policy"));
+        var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(f.controller).build();
+        String route="/api/v1/admin/projects/project/versions/2/file-window";
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(route).param("path","file.json"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict());
+        verifyNoInteractions(f.storage,f.inspector);
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(route).param("path","file.json").header("If-Match",token))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control","no-store"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.content").value("{}"));
+    }
     @Test void comparesFullCaseSensitiveNestedPathsAndRemovals() {
         var before=Map.of("nested.jar!/A.class","a", "removed.class","b", "same.json","c");
         var after=Map.of("nested.jar!/A.class","changed", "nested.jar!/a.class","a", "same.json","c");

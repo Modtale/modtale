@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Review } from '@/modules/admin/views/Review';
 vi.mock('@/modules/admin/views/FindingDecisions', () => ({ FindingDecisions: ({ onSaved }: any) => <button onClick={onSaved}>Save finding reasoning</button> }));
 vi.mock('@/components/ui/ModalPortal', () => ({ ModalPortal: ({ children }: any) => children }));
-vi.mock('@/modules/admin/api/adminClient', () => ({ adminClient: { publishProject: vi.fn().mockResolvedValue(null), getReviewDetails: vi.fn(), getStructure: vi.fn(), getArtifactChanges: vi.fn(), getFileContent: vi.fn() } }));
+vi.mock('@/modules/admin/api/adminClient', () => ({ adminClient: { publishProject: vi.fn().mockResolvedValue(null), getReviewDetails: vi.fn(), getStructure: vi.fn(), getArtifactChanges: vi.fn(), getFileWindow: vi.fn() } }));
 import { adminClient } from '@/modules/admin/api/adminClient';
 
 const clear = { status: 'CLEAN', verdict: 'AUTO_APPROVE', scanState: 'COMPLETED', issues: [],
@@ -146,13 +146,13 @@ describe('Review security clearance status', () => {
             contextComparable: true, contextChanged: false, added: 0, modified: 0, removed: 1, unchanged: 0,
             files: [{ path: 'removed.txt', change: 'REMOVED' }] });
         vi.mocked(adminClient.getStructure).mockResolvedValue(['removed.txt']);
-        vi.mocked(adminClient.getFileContent).mockResolvedValue('Previously approved file contents');
+        vi.mocked(adminClient.getFileWindow).mockResolvedValue({identity:'a'.repeat(64),content:'Previously approved file contents',format:'TEXT_RESOURCE',start:0,end:33,totalCharacters:33,firstLine:1,lineMatched:true,representationComplete:true,gaps:[]});
         await render(clear, true, 'snapshot', 2);
         await click('Compare with approved version');
         await click('removed.txt');
         expect(adminClient.getArtifactChanges).toHaveBeenLastCalledWith('project', '1.0', 'snapshot');
         expect(adminClient.getStructure).toHaveBeenLastCalledWith('project', '0.9', 'snapshot');
-        expect(adminClient.getFileContent).toHaveBeenLastCalledWith('project', '0.9', 'removed.txt', 'snapshot');
+        expect(adminClient.getFileWindow).toHaveBeenLastCalledWith('project', '0.9', 'removed.txt', 'snapshot', 0, undefined, 0);
         expect(container.textContent).toContain('Previously approved file contents');
     });
     it('keeps the latest selected comparison file when structure responses arrive out of order', async () => {
@@ -162,11 +162,11 @@ describe('Review security clearance status', () => {
         let stale!: (value: string[]) => void;
         vi.mocked(adminClient.getStructure).mockReturnValueOnce(new Promise(done => { stale = done; }))
             .mockResolvedValueOnce(['new.txt']);
-        vi.mocked(adminClient.getFileContent).mockResolvedValue('Current selection contents');
+        vi.mocked(adminClient.getFileWindow).mockResolvedValue({identity:'a'.repeat(64),content:'Current selection contents',format:'TEXT_RESOURCE',start:0,end:26,totalCharacters:26,firstLine:1,lineMatched:true,representationComplete:true,gaps:[]});
         await render(clear, true, 'snapshot', 2);
         await click('Compare with approved version'); await click('old.txt'); await click('new.txt');
         await act(async () => stale(['old.txt']));
-        expect(adminClient.getFileContent).toHaveBeenLastCalledWith('project', '1.0', 'new.txt', 'snapshot');
+        expect(adminClient.getFileWindow).toHaveBeenLastCalledWith('project', '1.0', 'new.txt', 'snapshot', 0, undefined, 0);
         expect(container.querySelector('code')?.textContent).toBe('Current selection contents');
     });
     const earlierSources = [{ id: 'older', versionNumber: '0.8', reviewStatus: 'APPROVED' }, { id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }];

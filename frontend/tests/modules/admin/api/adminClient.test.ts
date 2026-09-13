@@ -17,6 +17,14 @@ describe('adminClient', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
+    it('binds bounded inspection requests to source identity and the opened review', async () => {
+        mockedApi.get.mockResolvedValue({ data: {} } as any);
+        await adminClient.getFileWindow('project', '1.0', 'nested.jar!/A.class', 'snapshot', 32000, 'identity');
+        expect(mockedApi.get).toHaveBeenCalledWith('/admin/projects/project/versions/1.0/file-window', {
+            params: { path: 'nested.jar!/A.class', offset: 32000, characters: 32000, sourceLine: 0, identity: 'identity' },
+            headers: { 'If-Match': 'snapshot' }
+        });
+    });
 
     it('binds metadata repairs to their inspected snapshot', async () => {
         mockedApi.put.mockResolvedValue({ data: null } as any);
