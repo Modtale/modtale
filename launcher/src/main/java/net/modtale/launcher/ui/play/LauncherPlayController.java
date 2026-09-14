@@ -45,6 +45,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.util.StringConverter;
@@ -1378,6 +1379,7 @@ public final class LauncherPlayController {
             identityMenu.hide();
         }
         ContextMenu menu = new ContextMenu();
+        menu.getScene().setFill(Color.TRANSPARENT);
         identityMenu = menu;
         menu.getStyleClass().add("play-identity-menu");
         menu.setOnHidden(event -> {
