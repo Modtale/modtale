@@ -127,8 +127,9 @@ public final class ProjectPageController {
     private final ProjectCardFactory projectCardFactory;
     private final Consumer<ProjectSummary> installProject;
     private final VersionInstallAction installProjectVersion;
-    private final Runnable showDiscover;
+    private final Runnable goBack;
     private final Runnable showProject;
+    private Consumer<Runnable> pageNavigation;
     private final BiConsumer<String, String> toast;
     private final Supplier<String> gameVersion;
     private final Supplier<CurrentUser> currentUserSupplier;
@@ -206,7 +207,7 @@ public final class ProjectPageController {
             ProjectCardFactory projectCardFactory,
             Consumer<ProjectSummary> installProject,
             VersionInstallAction installProjectVersion,
-            Runnable showDiscover,
+            Runnable goBack,
             Runnable showProject,
             BiConsumer<String, String> toast,
             Supplier<String> gameVersion,
@@ -228,7 +229,7 @@ public final class ProjectPageController {
                 this.installProject.accept(summaryFromDetail(project));
             }
         } : installProjectVersion;
-        this.showDiscover = showDiscover;
+        this.goBack = goBack;
         this.showProject = showProject;
         this.toast = toast;
         this.gameVersion = gameVersion;
@@ -303,13 +304,25 @@ public final class ProjectPageController {
                 this::openProject,
                 this::openCreator,
                 toggleFavorite,
-                showDiscover,
+                goBack,
                 this::toggleCreatorFollow,
                 this::copyCreatorId,
                 this::showCreatorReportModal,
                 this::openUrlInBrowser,
                 scrollPixels
         );
+    }
+
+    public void setPageNavigation(Consumer<Runnable> pageNavigation) {
+        this.pageNavigation = pageNavigation;
+    }
+
+    private void showPage(Runnable restorePage) {
+        if (pageNavigation == null) {
+            showProject.run();
+        } else {
+            pageNavigation.accept(restorePage);
+        }
     }
 
     public Node view() {
@@ -352,7 +365,7 @@ public final class ProjectPageController {
         long requestId = ++detailRequestId;
         fetchGalleryForCurrentProject();
         renderProject(true);
-        showProject.run();
+        showPage(() -> openProject(project));
         fetchProjectDetail(project, requestId);
     }
 
@@ -380,7 +393,7 @@ public final class ProjectPageController {
         fetchGalleryForCurrentProject();
         fetchCommentsForCurrentProject();
         renderProject(false);
-        showProject.run();
+        showPage(() -> openProjectChangelog(detail));
         Platform.runLater(this::showChangelogModal);
     }
 
@@ -412,7 +425,7 @@ public final class ProjectPageController {
         ++detailRequestId;
         creatorLoading = true;
         renderCreator(true);
-        showProject.run();
+        showPage(() -> openCreator(project));
         fetchCreatorProfile(currentCreatorHandle, requestId);
     }
 
@@ -1271,7 +1284,7 @@ public final class ProjectPageController {
     private StackPane banner(ProjectSummary summary, ProjectDetail detail, boolean hasBanner) {
         StackPane banner = NativePageBanner.create("project-detail-banner", "project-detail",
                 hasBanner ? first(detail == null ? null : detail.bannerUrl(), summary.bannerUrl()) : "",
-                imageLoader, scrollPixels, showDiscover, BANNER_FALLBACK_HEIGHT);
+                imageLoader, scrollPixels, goBack, BANNER_FALLBACK_HEIGHT);
         banner.prefHeightProperty().bind(Bindings.createDoubleBinding(
                 () -> bannerHeight(content.getWidth()),
                 content.widthProperty()
@@ -3234,7 +3247,7 @@ public final class ProjectPageController {
         Button back = secondaryButton("Back");
         back.getStyleClass().add("small");
         back.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_LEFT, 14));
-        back.setOnAction(event -> showDiscover.run());
+        back.setOnAction(event -> goBack.run());
         Button open = secondaryButton(actionLabel);
         open.getStyleClass().add("small");
         open.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.EXTERNAL_LINK, 14));

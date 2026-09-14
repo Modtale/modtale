@@ -126,7 +126,7 @@ public final class LauncherRuntime {
                 services.projectCardFactory(),
                 projectActions::installSelectedProject,
                 projectActions::installSelectedProjectVersion,
-                () -> navigation.show(LauncherView.DISCOVER),
+                navigation::back,
                 () -> navigation.show(LauncherView.PROJECT),
                 feedback::showToast,
                 settingsController::gameVersion,
@@ -137,6 +137,7 @@ public final class LauncherRuntime {
                 projectActions::toggleFavorite,
                 services.scrollSupport()
         );
+        projectPageController.setPageNavigation(restorePage -> navigation.show(LauncherView.PROJECT, restorePage));
         libraryController.setNavigationActions(projectPageController::openProject, projectPageController::openCreator);
         projectActions.attachOverlay(() -> sceneRoot() instanceof StackPane stack ? stack : null);
         projectActions.setViewHistoryAction(projectPageController::openProjectChangelog);
