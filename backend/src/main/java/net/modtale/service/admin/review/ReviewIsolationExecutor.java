@@ -26,9 +26,26 @@ public final class ReviewIsolationExecutor {
         this.mongo=mongo;this.archive=archive;this.reader=reader;this.journal=journal;
         projects=mongo.getCollection("projects");operations=mongo.getCollection(ReviewRepairJournal.COLLECTION).withReadPreference(ReadPreference.primary()).withReadConcern(ReadConcern.MAJORITY);
     }
-    public Result execute(ReviewRepairPreparation.Prepared prepared,String actor,BooleanSupplier permitted) {
-        permission(permitted);var source=archive.load(prepared.id());
+    public boolean eligible(RawReviewSnapshotReader.Captured captured) {
+        var source=captured.forArchive("00000000-0000-0000-0000-000000000000","inspection",ReviewSnapshotArchive.Action.ISOLATE_REVIEW,1,2);
+        var original=new RawBsonDocument(source.versionBytes()).decode(new org.bson.codecs.DocumentCodec());
+        return fields(original,source)!=null;
+    }
+    public Result receipt(ReviewRepairPreparation.Prepared prepared,String actor) {
+        verifiedSource(prepared,actor);
+        return outcome(prepared,actor);
+    }
+    private ReviewSnapshotArchive.Snapshot verifiedSource(ReviewRepairPreparation.Prepared prepared,String actor) {
+        var source=archive.load(prepared.id());
         if(source.action()!=ReviewSnapshotArchive.Action.ISOLATE_REVIEW || !source.actorId().equals(actor))throw new SecurityException("Repair execution is not permitted");
+        try {
+            var sha=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(source.versionBytes()));
+            if(!sha.equals(prepared.sha256()) || source.createdAt()!=prepared.createdAt() || source.expiresAt()!=prepared.expiresAt())throw new IllegalStateException("Repair intent changed");
+        } catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
+        return source;
+    }
+    public Result execute(ReviewRepairPreparation.Prepared prepared,String actor,BooleanSupplier permitted) {
+        permission(permitted);var source=verifiedSource(prepared,actor);
         var original=new RawBsonDocument(source.versionBytes()).decode(new org.bson.codecs.DocumentCodec());
         Document fields=fields(original,source);if(fields==null)return new Result("INELIGIBLE",null);
         var hello=ReviewRepairIo.database(mongo.getDb()).runCommand(new Document("hello",1),ReadPreference.primary());

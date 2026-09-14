@@ -21,6 +21,9 @@ public class ReviewRepairConfiguration {
     @Bean ReviewRepairWorkflow reviewRepairWorkflow(ReviewRepairPreparation preparation,ReviewIsolationExecutor isolation,AppReviewRepairProperties properties) {
         return new ReviewRepairWorkflow(preparation,isolation,properties.concurrency());
     }
+    @Bean ReviewRepairAccess reviewRepairAccess(net.modtale.service.user.account.AccountService accounts,ReviewRepairWorkflow workflow,RawReviewSnapshotReader reader,ReviewIsolationExecutor isolation) {
+        return new ReviewRepairAccess(accounts,workflow,reader,isolation);
+    }
     @Bean RawReviewSnapshotReader rawReviewSnapshotReader(MongoTemplate mongo){return new RawReviewSnapshotReader(mongo);}
     @Bean ReviewRepairPreparation reviewRepairPreparation(ReviewSnapshotArchive archive,RawReviewSnapshotReader reader,AppReviewRepairProperties properties) {
         return new ReviewRepairPreparation(archive,reader,Clock.systemUTC(),properties.concurrency(),properties.preparationLifetimeMillis());

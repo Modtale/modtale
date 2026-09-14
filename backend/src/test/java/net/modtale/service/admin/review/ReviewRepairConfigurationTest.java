@@ -14,12 +14,12 @@ class ReviewRepairConfigurationTest {
         new ApplicationContextRunner().withUserConfiguration(ReviewRepairConfiguration.class).run(context->{assertFalse(context.containsBean("reviewRepairPreparation"));assertFalse(context.containsBean("reviewRepairWorkflow"));});
     }
     @Test void enabledFeatureRequiresExplicitKeys() {
-        new ApplicationContextRunner().withUserConfiguration(ReviewRepairConfiguration.class).withBean(MongoTemplate.class,()->mock(MongoTemplate.class))
+        new ApplicationContextRunner().withUserConfiguration(ReviewRepairConfiguration.class).withBean(MongoTemplate.class,()->mock(MongoTemplate.class)).withBean(net.modtale.service.user.account.AccountService.class,()->mock(net.modtale.service.user.account.AccountService.class))
                 .withPropertyValues("app.warden.repair.enabled=true").run(context->assertNotNull(context.getStartupFailure()));
     }
     @Test void configuredFeatureConstructsBoundedPreparationWithoutStartingWork() {
         var mongo=mock(MongoTemplate.class,RETURNS_DEEP_STUBS);
-        new ApplicationContextRunner().withUserConfiguration(ReviewRepairConfiguration.class).withBean(MongoTemplate.class,()->mongo)
+        new ApplicationContextRunner().withUserConfiguration(ReviewRepairConfiguration.class).withBean(MongoTemplate.class,()->mongo).withBean(net.modtale.service.user.account.AccountService.class,()->mock(net.modtale.service.user.account.AccountService.class))
                 .withPropertyValues("app.warden.repair.enabled=true","app.warden.repair.active-key=test","app.warden.repair.signing-keys.test="+key)
                 .run(context->{assertNull(context.getStartupFailure());assertNotNull(context.getBean(ReviewRepairPreparation.class));assertNotNull(context.getBean(ReviewSnapshotArchive.class));assertNotNull(context.getBean(ReviewRepairWorkflow.class));});
     }

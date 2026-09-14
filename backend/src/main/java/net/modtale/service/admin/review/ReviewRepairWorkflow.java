@@ -49,6 +49,15 @@ public final class ReviewRepairWorkflow implements AutoCloseable {
         }
     }
 
+    <T> T read(java.util.function.Supplier<T> operation, BooleanSupplier permitted) {
+        try (var admission = admit(permitted); var io = ReviewRepairIo.open(admission::remainingNanos)) {
+            if (!admission.permitted()) throw new SecurityException("Review repair is not permitted");
+            T result = operation.get();
+            if (!admission.permitted()) throw new SecurityException("Review repair is not permitted");
+            return result;
+        }
+    }
+
     private Admission admit(BooleanSupplier permitted) {
         Objects.requireNonNull(permitted);
         if (!permitted.getAsBoolean()) throw new SecurityException("Review repair is not permitted");
