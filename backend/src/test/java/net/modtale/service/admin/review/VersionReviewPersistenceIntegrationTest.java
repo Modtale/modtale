@@ -18,6 +18,52 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @EnabledIfEnvironmentVariable(named="WARDEN_REVIEW_DB_TEST",matches="true")
 class VersionReviewPersistenceIntegrationTest {
+    private net.modtale.model.project.RemoteReviewBinding prepareRemote() {
+        var scan=new ScanResult();scan.setStatus(ScanStatus.SCANNING);scan.setScanState("SCANNING");scan.setScanAttempt(1);
+        scan.setScanRequestId(UUID.randomUUID().toString());version.setScanResult(scan);version.setFileUrl("original.zip");
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update().set("versions.0",version),Project.class);
+        return new RemoteReviewBinding(id,version.getId(),scan.getScanRequestId(),1,version.getFileUrl(),version.getHash(),
+                net.modtale.service.security.scan.ArtifactReviewContext.automaticallyReviewableFingerprint(version),
+                "warden-3.0.0:"+"a".repeat(64),"b".repeat(64),null);
+    }
+    @Test void remoteBindingSurvivesRestartAndAttachesOnlyOneJob() {
+        var binding=prepareRemote();var remote=new net.modtale.service.security.scan.RemoteReviewPersistence(mongo);
+        assertTrue(remote.bind(version,binding));assertTrue(remote.bind(version,binding));
+        var restored=mongo.findById(id,Project.class).getVersions().getFirst();assertEquals(binding,restored.getScanResult().getRemoteReview());
+        var restarted=new net.modtale.service.security.scan.RemoteReviewPersistence(mongo);String job=UUID.randomUUID().toString();
+        assertTrue(restarted.attachJob(restored,binding,job));assertTrue(restarted.attachJob(restored,binding,job));
+        assertFalse(restarted.attachJob(restored,binding,UUID.randomUUID().toString()));assertFalse(restarted.bind(restored,binding));
+        assertEquals(binding.withJobId(job),mongo.findById(id,Project.class).getVersions().getFirst().getScanResult().getRemoteReview());
+    }
+    @Test void changedContextCannotBindOrAttachRemoteJob() {
+        var binding=prepareRemote();var remote=new net.modtale.service.security.scan.RemoteReviewPersistence(mongo);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update().set("versions.0.manifestVersion","changed"),Project.class);
+        assertFalse(remote.bind(version,binding));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update().set("versions.0.manifestVersion",version.getManifestVersion()),Project.class);
+        assertTrue(remote.bind(version,binding));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update().set("versions.0.hash","c".repeat(64)),Project.class);
+        assertFalse(remote.attachJob(version,binding,UUID.randomUUID().toString()));
+    }
+    @Test void newRequestAndCompetingConfigurationCannotReplaceBinding() {
+        var binding=prepareRemote();var remote=new net.modtale.service.security.scan.RemoteReviewPersistence(mongo);
+        assertTrue(remote.bind(version,binding));
+        var other=new RemoteReviewBinding(binding.projectId(),binding.versionId(),binding.requestId(),binding.attempt(),binding.filePath(),
+                binding.artifactSha256(),binding.contextSha256(),binding.policyVersion(),"c".repeat(64),null);
+        assertFalse(remote.bind(version,other));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update().set("versions.0.scanResult.scanRequestId",UUID.randomUUID().toString()),Project.class);
+        assertFalse(remote.attachJob(version,binding,UUID.randomUUID().toString()));assertFalse(remote.bind(version,binding));
+    }
+    @Test void legacyRecoveryCannotReplaceRemoteReviewEvenWithOldSnapshot() {
+        var binding=prepareRemote();var observed=version.getScanResult();var remote=new net.modtale.service.security.scan.RemoteReviewPersistence(mongo);
+        assertTrue(remote.bind(version,binding));
+        var scans=new net.modtale.service.security.scan.ScanPersistenceService(mongo,
+                org.mockito.Mockito.mock(net.modtale.repository.project.ProjectRepository.class),org.mockito.Mockito.mock(net.modtale.service.project.query.ProjectService.class));
+        assertFalse(scans.queueRetryAttempt(id,version.getId(),1,new ScanResult(),observed,1));
+        assertFalse(scans.updateTimedOutScan(id,version.getId(),new ScanResult(),1,observed,1));
+        var restored=mongo.findById(id,Project.class).getVersions().getFirst();
+        assertFalse(scans.queueRetryAttempt(id,version.getId(),1,new ScanResult(),restored.getScanResult(),1));
+        assertEquals(binding,restored.getScanResult().getRemoteReview());
+    }
     @Test void staleRecoveryCannotReplaceAnAttemptThatStartedAfterItsSnapshot() {
         var scan = new ScanResult(); scan.setStatus(ScanStatus.SCANNING); scan.setScanState("QUEUED");
         scan.setScanAttempt(1); scan.setScanTimestamp(System.currentTimeMillis()-120_000);

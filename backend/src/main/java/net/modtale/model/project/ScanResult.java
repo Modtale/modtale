@@ -6,6 +6,11 @@ import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ScanResult {
+    private RemoteReviewBinding remoteReview;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public RemoteReviewBinding getRemoteReview() { return remoteReview; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public void setRemoteReview(RemoteReviewBinding value) { remoteReview = value; }
     private SecurityEvidence securityEvidence;
     private boolean artifactVerified;
     private String reviewedContextSha256;

@@ -17,17 +17,23 @@ class ScanEvidencePersistenceTest {
         converter.setCustomConversions(new net.modtale.config.db.MongoConfig().mongoCustomConversions());
         converter.afterPropertiesSet();
         var original = ScanEvidenceFixtures.complete(true);
+        var remote=new net.modtale.model.project.RemoteReviewBinding("project","version",java.util.UUID.randomUUID().toString(),1,
+                "original.zip","a".repeat(64),"b".repeat(64),"warden-3.0.0:"+"c".repeat(64),"d".repeat(64),null);
+        original.setRemoteReview(remote);
         original.setReviewedContextSha256("c".repeat(64));
         var stored = new Document();
         converter.write(original, stored);
         var restored = converter.read(ScanResult.class, stored);
         assertTrue(ArtifactClearancePolicy.complete(restored));
+        assertEquals(remote,restored.getRemoteReview());
         assertEquals(original.getReviewedContextSha256(), restored.getReviewedContextSha256());
         var mapper = new ObjectMapper();
         var forged = mapper.readValue("{\"artifactVerified\":true,\"reviewedContextSha256\":\"forged\"}", ScanResult.class);
         assertFalse(forged.isArtifactVerified());
         assertNull(forged.getReviewedContextSha256());
         String json = mapper.writeValueAsString(original);
+        assertFalse(json.contains("remoteReview"));
+        assertNull(mapper.readValue("{\"remoteReview\":"+mapper.writeValueAsString(remote)+"}",ScanResult.class).getRemoteReview());
         assertFalse(json.contains("artifactVerified"));
         assertFalse(json.contains("reviewedContextSha256"));
     }
