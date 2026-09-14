@@ -201,6 +201,40 @@ class RemoteReviewStepIntegrationTest {
         long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);while(scheduler.isRunning()&&System.nanoTime()<deadline)Thread.sleep(20);
         scheduler.close();assertEquals(0,posts.get());assertEquals("REMOTE_REVIEW",saved().getScanState());
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"HELD","CANCELLED","EXPIRED"})
+    void terminalRemoteStatusStopsPollingWithoutApprovalOrSyntheticFindings(String state) {
+        route(e->reply(e,200,state));
+        assertEquals("UNAVAILABLE",step.advance(binding).state());
+        var result=saved();assertEquals(ScanStatus.FAILED,result.getStatus());assertEquals("REMOTE_"+state,result.getScanState());
+        assertEquals("REVIEW",result.getVerdict());assertEquals(binding.requestId(),result.getScanRequestId());
+        assertEquals(job,result.getRemoteReview().jobId());assertEquals(state,result.getRemoteStatus().state());
+        assertNull(result.getRemotePoll());assertNull(result.getSecurityEvidence());assertFalse(ArtifactClearancePolicy.cleared(result));
+        assertEquals(0,result.getRiskScore());assertTrue(result.getIssues().isEmpty());assertTrue(result.getScanTimestamp()>0);
+        assertEquals(ProjectVersion.ReviewStatus.PENDING,mongo.findById(project,Project.class).getVersions().getFirst().getReviewStatus());
+        assertTrue(new RemoteReviewDiscovery(mongo).page(null,16).candidates().isEmpty());
+        assertEquals("NO_WORK",new RemoteReviewStep(new RemoteReviewPollStore(mongo),client,storage,completion).advance(result.getRemoteReview()).state());
+        assertEquals(1,gets.get());assertEquals(0,posts.get());verifyNoInteractions(storage);verify(completion,never()).handleRemoteCompletedScan(any(),any());
+    }
+    @Test void expiredTerminalClaimCannotOverwriteOrConsumeAnotherAttempt() {
+        var claim=attached(1000);
+        change("scanResult.remotePoll.leaseUntil",new Date(0));
+        var status=new RemoteReviewClient.Status(job,"HELD",true,1,2,"HELD");
+        assertFalse(polls.finishUnavailable(claim,status));assertEquals("REMOTE_REVIEW",saved().getScanState());
+        var replacement=polls.claim(claim.binding(),30000);assertNotNull(replacement);
+        assertFalse(polls.finishUnavailable(claim,status));assertTrue(polls.isCurrent(replacement));
+        assertTrue(polls.finishUnavailable(replacement,status));assertFalse(polls.finishUnavailable(replacement,status));
+    }
+    @Test void terminalOutcomeRequiresExactJobAndUnchangedContext() {
+        var claim=attached(30000);
+        assertFalse(polls.finishUnavailable(claim,new RemoteReviewClient.Status(UUID.randomUUID().toString(),"HELD",true,1,2,"HELD")));
+        assertFalse(polls.finishUnavailable(claim,new RemoteReviewClient.Status(job,"COMPLETED",true,1,2,"COMPLETED")));
+        assertFalse(polls.finishUnavailable(claim,new RemoteReviewClient.Status(job,"HELD",false,1,2,"HELD")));
+        assertFalse(polls.recordStatusAndRelease(claim,new RemoteReviewClient.Status(job,"HELD",true,1,2,"HELD"),10000));
+        change("manifestVersion","changed");
+        assertFalse(polls.finishUnavailable(claim,new RemoteReviewClient.Status(job,"HELD",true,1,2,"HELD")));
+        assertEquals("REMOTE_REVIEW",saved().getScanState());
+    }
     @Test void lostPostResponseRecoversSameRequestAndRecordsJobWithoutAnotherUpload() {
         var accepted=new AtomicBoolean();route(e->{if(e.getRequestMethod().equals("POST")){accepted.set(true);return;}reply(e,accepted.get()?200:404,accepted.get()?"QUEUED":"AWAITING_UPLOAD");});
         assertEquals("RETRY",step.advance(binding).state());assertNull(saved().getRemoteReview().jobId());ready();

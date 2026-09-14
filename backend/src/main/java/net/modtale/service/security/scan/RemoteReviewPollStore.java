@@ -53,7 +53,7 @@ public final class RemoteReviewPollStore {
     public boolean recordStatusAndRelease(Claim claim,RemoteReviewClient.Status status,long delayMillis) {
         if(delayMillis<100 || delayMillis>3600000)throw new IllegalArgumentException("Invalid poll delay");
         if(status==null || !Objects.equals(claim.binding().jobId(),status.jobId()) || status.jobId()==null
-                || !Set.of("QUEUED","RUNNING","COMPLETED","CANCELLED","EXPIRED","HELD","UPLOADING","AWAITING_UPLOAD").contains(status.state())
+                || !Set.of("QUEUED","RUNNING","COMPLETED","UPLOADING","AWAITING_UPLOAD").contains(status.state())
                 || status.createdAt()<=0 || status.expiresAt()<=status.createdAt() || status.workState()!=null && status.workState().length()>128
                 || Set.of("QUEUED","RUNNING","COMPLETED","HELD").contains(status.state()) && !status.artifactRetained())return false;
         var snapshot=liveSnapshot(claim);if(snapshot==null)return false;
@@ -62,6 +62,24 @@ public final class RemoteReviewPollStore {
         var poll=new Document("token",null).append("leaseUntil",literal(new Date(0))).append("nextPollAt",new Document("$add",List.of("$$NOW",delayMillis)));
         return projects.updateOne(liveQuery(snapshot,claim),patch(snapshot,new Document("remoteStatus",literal(value)).append("remotePoll",poll)),
                 new com.mongodb.client.model.UpdateOptions().collation(BINARY)).getModifiedCount()==1;
+    }
+    public boolean finishUnavailable(Claim claim,RemoteReviewClient.Status status) {
+        if(status==null || status.state()==null || !Set.of("CANCELLED","EXPIRED","HELD").contains(status.state())
+                || status.jobId()==null || !status.jobId().equals(claim.binding().jobId())
+                || status.createdAt()<=0 || status.expiresAt()<=status.createdAt()
+                || status.workState()!=null && status.workState().length()>128
+                || "HELD".equals(status.state()) && !status.artifactRetained())return false;
+        var snapshot=liveSnapshot(claim);if(snapshot==null)return false;
+        var value=new Document("jobId",status.jobId()).append("state",status.state()).append("artifactRetained",status.artifactRetained())
+                .append("createdAt",status.createdAt()).append("expiresAt",status.expiresAt()).append("workState",status.workState());
+        var fields=new Document("remoteStatus",literal(value)).append("remotePoll",literal(null))
+                .append("status","FAILED").append("scanState","REMOTE_"+status.state()).append("verdict","REVIEW")
+                .append("scanTimestamp",new Document("$toLong","$$NOW"))
+                .append("securityEvidence",literal(null)).append("artifactVerified",false)
+                .append("reviewedContextSha256",literal(null)).append("reusedReviewVersion",literal(null))
+                .append("reusedReviewOrigins",literal(null)).append("holdUntilTimestamp",0)
+                .append("reviewerNotes",literal(List.of("Security review did not complete ("+status.state().toLowerCase(Locale.ROOT)+"). No security clearance was granted.")));
+        return projects.updateOne(liveQuery(snapshot,claim),patch(snapshot,fields),new com.mongodb.client.model.UpdateOptions().collation(BINARY)).getModifiedCount()==1;
     }
     private Snapshot liveSnapshot(Claim claim) {
         var snapshot=read(claim.binding());return snapshot!=null && snapshot.poll()!=null && claim.token().equals(snapshot.poll().getString("token"))?snapshot:null;

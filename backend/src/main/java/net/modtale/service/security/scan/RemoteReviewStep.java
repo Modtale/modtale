@@ -38,6 +38,10 @@ public final class RemoteReviewStep {
                 boolean applied=completion.handleRemoteCompletedScan(claim,result);
                 return new Outcome(applied?"APPLIED":"SUPERSEDED",applied?"COMPLETED":null);
             }
+            if(java.util.Set.of("CANCELLED","EXPIRED","HELD").contains(status.state())) {
+                boolean saved=polls.finishUnavailable(claim,status);
+                return new Outcome(saved?"UNAVAILABLE":"SUPERSEDED",saved?status.state():null);
+            }
             boolean saved=polls.recordStatusAndRelease(claim,status,10000);
             return new Outcome(saved?"RECORDED":"SUPERSEDED",saved?status.state():null);
         } catch(RemoteReviewClient.Superseded stale) {return new Outcome("SUPERSEDED",null);}
