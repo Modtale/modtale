@@ -172,6 +172,13 @@ public class WorldModListService {
         item.setExternalId(value(requested.externalId()));
         item.setExternalUrl(value(requested.externalUrl()));
         item.setIcon(value(requested.icon()));
+        if (item.getSource() == ProjectDependency.Source.CURSEFORGE) {
+            item.setAuthor(value(requested.author()));
+            item.setDescription(value(requested.description()));
+            item.setDownloadable(false);
+            item.setUnavailableReason("Install with Modtale Launcher.");
+            return item;
+        }
 
         if (item.getSource() == ProjectDependency.Source.MODTALE || !item.getProjectId().isBlank()) {
             enrichModtaleItem(item, gameVersion, owner);

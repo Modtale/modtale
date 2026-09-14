@@ -48,6 +48,26 @@ public final class WorldModListInstaller {
                     + " temp=" + download.path());
             net.modtale.launcher.model.worldlist.WorldListConfig.validate(list.configs());
             List<Path> installedFiles = new java.util.ArrayList<>(archiveInstaller.extractInstallableEntries(download.path(), settings.hytaleModsDirectory()));
+            for (var item : list.mods()) {
+                if (!"CURSEFORGE".equalsIgnoreCase(item.source())) continue;
+                Long projectId = ModtaleApiClient.curseForgeId(item.externalId());
+                if (projectId == null) projectId = ModtaleApiClient.curseForgeId(item.projectId());
+                if (projectId == null && item.externalId().matches("[1-9][0-9]*")) {
+                    try { projectId = Long.valueOf(item.externalId()); } catch (NumberFormatException ignored) { }
+                }
+                var file = java.util.regex.Pattern.compile("/files/([1-9][0-9]*)(?:[/?#]|$)").matcher(item.externalUrl());
+                if (projectId == null || !file.find()) {
+                    throw new ModtaleApiException("The shared list needs an exact CurseForge file for " + item.title() + ". Create a new share link from the source launcher.");
+                }
+                long fileId;
+                try { fileId = Long.parseLong(file.group(1)); }
+                catch (NumberFormatException ex) { throw new ModtaleApiException("Invalid CurseForge file for " + item.title(), ex); }
+                var response = apiClient.getCurseForgeDownloadUrl(projectId, fileId);
+                DownloadedFile external = apiClient.download(response);
+                try {
+                    installedFiles.addAll(archiveInstaller.installDownloadedFile(external.path(), external.filename(), settings.hytaleModsDirectory(), false));
+                } finally { deleteTemp(external.path()); }
+            }
             installedFiles.addAll(WorldListConfigInstaller.install(list.configs(), "GLOBAL", settings.hytaleModsDirectory()));
             if (installedFiles.isEmpty() && list.configs().isEmpty()) {
                 LOG.warn("Shared list archive had no installable files listId=" + list.id());

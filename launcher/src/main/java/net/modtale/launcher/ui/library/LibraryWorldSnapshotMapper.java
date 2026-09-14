@@ -307,7 +307,9 @@ final class LibraryWorldSnapshotMapper {
                     project.classification(),
                     modtaleProject ? InstalledProject.SOURCE_MODTALE : first(project.source(), "OTHER"),
                     modtaleProject ? "" : first(project.projectId(), project.slug()),
-                    "",
+                    !modtaleProject && InstalledProject.SOURCE_CURSEFORGE.equalsIgnoreCase(project.source())
+                            && project.installedVersionId().matches("[1-9][0-9]*")
+                            ? "https://www.curseforge.com/hytale/mods/" + project.slug() + "/files/" + project.installedVersionId() : "",
                     ""
             );
         }

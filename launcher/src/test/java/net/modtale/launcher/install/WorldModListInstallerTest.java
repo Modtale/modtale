@@ -16,6 +16,34 @@ import org.junit.jupiter.api.io.TempDir;
 class WorldModListInstallerTest {
     @TempDir Path directory;
 
+    @Test void downloadsPinnedCurseForgeFilesDirectlyForCurseForgeOnlyList() throws Exception {
+        Path archive = directory.resolve("list.zip");
+        try (var zip = new ZipOutputStream(Files.newOutputStream(archive))) {
+            zip.putNextEntry(new ZipEntry("modtale-list.json"));
+            zip.write("{}".getBytes()); zip.closeEntry();
+        }
+        Path mod = Files.writeString(directory.resolve("download.jar"), "mod bytes");
+        var item = new net.modtale.launcher.model.worldlist.WorldModListItem("", "Author:Example", "", "", "Example", "1.0", "PLUGIN",
+                "CURSEFORGE", "curseforge:123", "https://www.curseforge.com/hytale/mods/example/files/456", "", false, "");
+        var list = new WorldModList("list", "List", "World", "", "", null, null, null, 0, 0, 1, 0, "", "", "", List.of(item));
+        var client = new ModtaleApiClient("https://example.invalid") {
+            @Override public DownloadedFile download(String path) { return new DownloadedFile(archive, "list.zip", "application/zip"); }
+            @Override public net.modtale.launcher.model.project.DownloadUrlResponse getCurseForgeDownloadUrl(long projectId, long fileId) {
+                assertEquals(123, projectId); assertEquals(456, fileId);
+                return null;
+            }
+            @Override public DownloadedFile download(net.modtale.launcher.model.project.DownloadUrlResponse response) {
+                return new DownloadedFile(mod, "example-1.0.jar", "application/java-archive");
+            }
+        };
+        LauncherSettings settings = new LauncherSettings();
+        settings.setHytaleModsPath(directory.resolve("Mods").toString());
+        var result = new WorldModListInstaller(client).install(list, settings);
+        assertEquals(1, result.installedFiles().size());
+        assertEquals("mod bytes", Files.readString(result.installedFiles().getFirst()));
+        assertFalse(Files.exists(mod));
+    }
+
     @Test void installsGlobalConfigsAndDefersWorldConfigsToWorldSelection() throws Exception {
         Path archive = directory.resolve("list.zip");
         try (var zip = new ZipOutputStream(Files.newOutputStream(archive))) {
