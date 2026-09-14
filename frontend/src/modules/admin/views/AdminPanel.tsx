@@ -1,3 +1,4 @@
+import { ReviewStateDiagnostics } from '../components/ReviewStateDiagnostics';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText, CalendarClock } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
@@ -324,6 +325,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                         reviewingId={loadingReviewId}
                                         onReview={fetchProjectDetails}
                                     />
+                                    <ReviewStateDiagnostics subject={currentUser?.id || currentUser?.username || ''} />
                                 </div>
                             )}
 
