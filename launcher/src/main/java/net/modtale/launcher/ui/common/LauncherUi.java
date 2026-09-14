@@ -92,7 +92,20 @@ public final class LauncherUi {
     }
 
     public static Node toggleCard(CheckBox checkBox) {
-        StackPane card = new StackPane(checkBox);
+        Label caption = new Label();
+        caption.textProperty().bind(checkBox.textProperty());
+        caption.disableProperty().bind(checkBox.disableProperty());
+        caption.getStyleClass().add("native-check");
+        caption.setWrapText(true);
+        caption.setMinWidth(0);
+        caption.setLabelFor(checkBox);
+        caption.setOnMouseClicked(event -> {
+            checkBox.requestFocus();
+            checkBox.fire();
+            event.consume();
+        });
+        HBox card = new HBox(10, checkBox, caption);
+        card.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
         card.getStyleClass().add("toggle-card");
         HBox.setHgrow(card, Priority.ALWAYS);
         return card;

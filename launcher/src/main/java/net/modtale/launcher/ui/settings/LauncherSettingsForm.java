@@ -20,6 +20,7 @@ import net.modtale.launcher.i18n.LauncherI18n.LocaleOption;
 import net.modtale.launcher.settings.LauncherConfig;
 import net.modtale.launcher.settings.LauncherSettings;
 import net.modtale.launcher.ui.common.LauncherView;
+import net.modtale.launcher.ui.library.LibraryToggleBox;
 
 public final class LauncherSettingsForm {
 
@@ -34,10 +35,10 @@ public final class LauncherSettingsForm {
     private final ComboBox<HytaleVersion> hytaleVersionCombo = new ComboBox<>();
     private final ComboBox<String> launcherChannelCombo = new ComboBox<>();
     private final ComboBox<LocaleOption> localeCombo = new ComboBox<>();
-    private final CheckBox includeDependenciesCheck = new CheckBox();
-    private final CheckBox includeOptionalCheck = new CheckBox();
-    private final CheckBox autoUpdatesCheck = new CheckBox();
-    private final CheckBox launcherAutoUpdatesCheck = new CheckBox();
+    private final CheckBox includeDependenciesCheck = new LibraryToggleBox();
+    private final CheckBox includeOptionalCheck = new LibraryToggleBox();
+    private final CheckBox autoUpdatesCheck = new LibraryToggleBox();
+    private final CheckBox launcherAutoUpdatesCheck = new LibraryToggleBox();
 
     public LauncherSettingsForm() {
         LauncherI18n i18n = LauncherI18n.get();
@@ -63,10 +64,10 @@ public final class LauncherSettingsForm {
                 playHytaleGamePathField, playHytaleUserDataPathField, playHytaleJavaPathField);
         launcherChannelCombo.setItems(FXCollections.observableArrayList("stable", "develop"));
         styleCombo(localeCombo, hytaleBranchCombo, hytaleVersionCombo, launcherChannelCombo);
-        includeDependenciesCheck.getStyleClass().add("native-check");
-        includeOptionalCheck.getStyleClass().add("native-check");
-        autoUpdatesCheck.getStyleClass().add("native-check");
-        launcherAutoUpdatesCheck.getStyleClass().add("native-check");
+        includeDependenciesCheck.accessibleTextProperty().bind(includeDependenciesCheck.textProperty());
+        includeOptionalCheck.accessibleTextProperty().bind(includeOptionalCheck.textProperty());
+        autoUpdatesCheck.accessibleTextProperty().bind(autoUpdatesCheck.textProperty());
+        launcherAutoUpdatesCheck.accessibleTextProperty().bind(launcherAutoUpdatesCheck.textProperty());
     }
 
     public TextField modsPathField() {

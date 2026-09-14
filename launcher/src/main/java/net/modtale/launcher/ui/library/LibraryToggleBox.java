@@ -8,8 +8,8 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.layout.StackPane;
 import net.modtale.launcher.ui.common.LauncherIcons;
 
-final class LibraryToggleBox extends CheckBox {
-    LibraryToggleBox() {
+public final class LibraryToggleBox extends CheckBox {
+    public LibraryToggleBox() {
         getStyleClass().setAll("library-toggle-box");
         setFocusTraversable(true);
         setOnMouseClicked(event -> {
