@@ -68,17 +68,27 @@ public final class RemoteReviewClient implements AutoCloseable {
         try { return Optional.of(statusBody(exchange(client.get().uri(uri(binding,"/requests/"+binding.requestId(),false)),200,65536),binding)); }
         catch(Unavailable failure) { if(failure.status()==404)return Optional.empty();throw failure; }
     }
+    public static final class Superseded extends RuntimeException { public Superseded(){super("Remote review ownership changed");} }
     public Status submitOrFind(RemoteReviewBinding binding,byte[] bytes) {
-        if (binding.jobId()!=null) return status(binding);
-        if (bytes==null || bytes.length==0 || bytes.length>100*1024*1024 || !binding.artifactSha256().equals(hash(bytes)))
-            throw new IllegalArgumentException("Original artifact does not match review binding");
-        var found=find(binding);
+        if(binding.jobId()==null)validateOriginal(binding,bytes);
+        return submitOrFind(binding,()->bytes,()->true);
+    }
+    public Status submitOrFind(RemoteReviewBinding binding,java.util.function.Supplier<byte[]> original,java.util.function.BooleanSupplier current) {
+        if(!current.getAsBoolean())throw new Superseded();
+        var found=binding.jobId()!=null?Optional.of(status(binding)):find(binding);
+        if(!current.getAsBoolean())throw new Superseded();
         if(found.isPresent() && !found.get().state().equals("AWAITING_UPLOAD"))return found.get();
+        byte[] bytes=original.get();validateOriginal(binding,bytes);
+        if(!current.getAsBoolean())throw new Superseded();
         var form=new MultipartBodyBuilder();form.part("requestId",binding.requestId());form.part("artifactSha256",binding.artifactSha256());
         form.part("contextSha256",binding.contextSha256());form.part("policyVersion",binding.policyVersion());form.part("reviewConfigSha256",binding.reviewConfigSha256());
         form.part("file",new ByteArrayResource(bytes){@Override public String getFilename(){return "artifact.zip";}});
         return statusBody(exchange(client.post().uri("/api/v1/review-jobs").contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(BodyInserters.fromMultipartData(form.build())),202,65536),found.isPresent()?binding.withJobId(found.get().jobId()):binding);
+                .body(BodyInserters.fromMultipartData(form.build())),202,65536,current),found.isPresent()?binding.withJobId(found.get().jobId()):binding);
+    }
+    private static void validateOriginal(RemoteReviewBinding binding,byte[] bytes) {
+        if(bytes==null || bytes.length==0 || bytes.length>100*1024*1024 || !binding.artifactSha256().equals(hash(bytes)))
+            throw new IllegalArgumentException("Original artifact does not match review binding");
     }
     public Status status(RemoteReviewBinding binding) {
         requireJob(binding);return statusBody(exchange(client.get().uri(uri(binding,"/"+binding.jobId(),true)),200,65536),binding);
@@ -115,17 +125,19 @@ public final class RemoteReviewClient implements AutoCloseable {
         if(!expected.artifactSha256().equals(text(b,"artifactSha256")) || !expected.contextSha256().equals(text(b,"contextSha256"))
                 || !expected.policyVersion().equals(text(b,"policyVersion")) || !expected.reviewConfigSha256().equals(text(b,"reviewConfigSha256")))throw new Unavailable(502);
     }
-    private JsonNode exchange(WebClient.RequestHeadersSpec<?> request,int expected,int max) {
+    private JsonNode exchange(WebClient.RequestHeadersSpec<?> request,int expected,int max) {return exchange(request,expected,max,()->true);}
+    private JsonNode exchange(WebClient.RequestHeadersSpec<?> request,int expected,int max,java.util.function.BooleanSupplier current) {
         if(closed.get() || !slots.tryAcquire())throw new Unavailable(503);
         try {
             if(closed.get())throw new Unavailable(503);
+            if(!current.getAsBoolean())throw new Superseded();
             byte[] bytes=request.exchangeToMono(response->{
                 if(response.statusCode().value()!=expected)return response.releaseBody().then(reactor.core.publisher.Mono.error(new Unavailable(response.statusCode().value())));
                 return response.bodyToMono(byte[].class);
             }).takeUntilOther(stop.asMono()).timeout(timeout).block();
             if(closed.get() || bytes==null || bytes.length==0 || bytes.length>max)throw new Unavailable(502);
             var parsed=mapper.readTree(bytes);if(parsed==null || !parsed.isObject())throw new Unavailable(502);return parsed;
-        }catch(Unavailable failure){throw failure;}catch(Exception failure){throw new Unavailable(503);}finally{slots.release();}
+        }catch(Unavailable | Superseded failure){throw failure;}catch(Exception failure){throw new Unavailable(503);}finally{slots.release();}
     }
     private static String uri(RemoteReviewBinding b,String suffix,boolean request) {
         return "/api/v1/review-jobs"+suffix+"?artifactSha256="+b.artifactSha256()+"&contextSha256="+b.contextSha256()
