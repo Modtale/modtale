@@ -21,9 +21,14 @@ public final class RemoteReviewBootstrap {
         if(current==null)return new Prepared("NO_WORK",null);
         if(current.getScanResult().getRemoteReview()!=null) {
             var retained=persistence.retained(projectId,versionId,attempt,requestId);
-            return new Prepared(retained==null?"CONTEXT_CHANGED":"READY",retained);
+            if(retained!=null)return new Prepared("READY",retained);
+            if(!running.getAsBoolean())throw new RemoteReviewClient.Superseded();
+            return new Prepared(persistence.finishBrokenBinding(projectId,versionId,attempt,requestId)==null?"NO_WORK":"UNAVAILABLE",null);
         }
-        if("REMOTE_REVIEW".equals(current.getScanResult().getScanState()))return new Prepared("MISSING_BINDING",null);
+        if("REMOTE_REVIEW".equals(current.getScanResult().getScanState())) {
+            if(!running.getAsBoolean())throw new RemoteReviewClient.Superseded();
+            return new Prepared(persistence.finishBrokenBinding(projectId,versionId,attempt,requestId)==null?"NO_WORK":"UNAVAILABLE",null);
+        }
         String context=ArtifactReviewContext.automaticallyReviewableFingerprint(current);
         if(context==null) {
             if(!running.getAsBoolean())throw new RemoteReviewClient.Superseded();

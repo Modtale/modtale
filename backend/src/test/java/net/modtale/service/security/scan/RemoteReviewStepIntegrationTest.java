@@ -155,9 +155,66 @@ class RemoteReviewStepIntegrationTest {
         assertEquals("NO_WORK",bootstrap(new RemoteReviewPersistence(mongo)).advance(project,"v",1,binding.requestId()).state());
         assertNull(saved().getRemoteReview());assertEquals(0,posts.get());verifyNoInteractions(storage);
     }
+    @Test void missingBindingStopsDiscoveryWithoutRemoteWork() {
+        change("scanResult.remoteReview",null);
+        var boot=bootstrap(new RemoteReviewPersistence(mongo));
+        assertEquals("UNAVAILABLE",boot.advance(project,"v",1,binding.requestId()).state());
+        assertEquals(ScanStatus.FAILED,saved().getStatus());assertEquals("REMOTE_BINDING_MISSING",saved().getScanState());
+        assertEquals(binding.requestId(),saved().getScanRequestId());assertEquals(1,saved().getScanAttempt());
+        assertFalse(ArtifactClearancePolicy.cleared(saved()));
+        assertTrue(new RemoteReviewDiscovery(mongo).page(null,16).candidates().isEmpty());
+        assertEquals("NO_WORK",boot.advance(project,"v",1,binding.requestId()).state());
+        assertEquals(0,gets.get());assertEquals(0,posts.get());verifyNoInteractions(storage);
+    }
+    @Test void mismatchedAttachedBindingPreservesBlockAndRejectsOldCompletion() {
+        var claim=attached(30000);change("manifestVersion","changed");change("scanResult.verdict","BLOCK");
+        change("scanResult.riskScore",87);
+        assertEquals("UNAVAILABLE",bootstrap(new RemoteReviewPersistence(mongo)).advance(project,"v",1,binding.requestId()).state());
+        assertEquals("REMOTE_BINDING_MISMATCH",saved().getScanState());assertEquals(ScanStatus.FAILED,saved().getStatus());
+        assertEquals("BLOCK",saved().getVerdict());assertEquals(87,saved().getRiskScore());
+        assertEquals(job,saved().getRemoteReview().jobId());assertNull(saved().getRemotePoll());
+        assertFalse(polls.isCurrent(claim));assertFalse(completion.handleRemoteCompletedScan(claim,cleanResult()));
+        assertEquals(ProjectVersion.ReviewStatus.PENDING,mongo.findById(project,Project.class).getVersions().getFirst().getReviewStatus());
+        assertEquals(0,gets.get());assertEquals(0,posts.get());verifyNoInteractions(storage);
+    }
+    @Test void validOrSupersededBindingCannotBeFailed() {
+        var persistence=new RemoteReviewPersistence(mongo);
+        assertNull(persistence.finishBrokenBinding(project,"v",1,binding.requestId()));
+        change("manifestVersion","changed");
+        assertNull(persistence.finishBrokenBinding(project,"v",1,UUID.randomUUID().toString()));
+        assertEquals("REMOTE_REVIEW",saved().getScanState());
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"repair","request","metadata","duplicate"})
+    void concurrentChangeBetweenSnapshotAndFailureWriteIsNotOverwritten(String mutation) {
+        change("manifestVersion","changed");var intercepted=new AtomicBoolean();
+        var settings=com.mongodb.MongoClientSettings.builder().applyConnectionString(new com.mongodb.ConnectionString(
+                "mongodb://127.0.0.1:"+System.getenv().getOrDefault("WARDEN_REVIEW_DB_PORT","27030")+"/?serverSelectionTimeoutMS=3000"))
+                .addCommandListener(new com.mongodb.event.CommandListener() {
+                    @Override public void commandStarted(com.mongodb.event.CommandStartedEvent event) {
+                        if(!event.getCommandName().equals("update") || !intercepted.compareAndSet(false,true))return;
+                        switch(mutation) {
+                            case "repair" -> change("manifestVersion",null);
+                            case "request" -> change("scanResult.scanRequestId",UUID.randomUUID().toString());
+                            case "metadata" -> change("unrecognizedMetadata","preserve this concurrent field");
+                            case "duplicate" -> {
+                                var collection=mongo.getCollection("projects");var root=collection.find().first();
+                                collection.updateOne(new Document("_id",root.get("_id")),new Document("$push",new Document("versions",root.getList("versions",Document.class).getFirst())));
+                            }
+                        }
+                    }
+                }).build();
+        try(var raceClient=MongoClients.create(settings)) {
+            assertNull(new RemoteReviewPersistence(new MongoTemplate(raceClient,database)).finishBrokenBinding(project,"v",1,binding.requestId()));
+        }
+        assertTrue(intercepted.get());assertEquals("REMOTE_REVIEW",saved().getScanState());assertEquals(ScanStatus.SCANNING,saved().getStatus());
+        if(mutation.equals("repair"))assertNotNull(new RemoteReviewPersistence(mongo).retained(project,"v",1,binding.requestId()));
+        if(mutation.equals("metadata"))assertEquals("preserve this concurrent field",mongo.getCollection("projects").find().first().getList("versions",Document.class).getFirst().getString("unrecognizedMetadata"));
+        if(mutation.equals("duplicate"))assertEquals(2,mongo.findById(project,Project.class).getVersions().size());
+    }
     @Test void retainedContextMismatchNeverFetchesAnotherConfiguration() {
         change("manifestVersion","changed");route(this::configuration);
-        assertEquals("CONTEXT_CHANGED",bootstrap(new RemoteReviewPersistence(mongo)).prepare(project,"v",1,binding.requestId()).state());assertEquals(0,gets.get());
+        assertEquals("UNAVAILABLE",bootstrap(new RemoteReviewPersistence(mongo)).prepare(project,"v",1,binding.requestId()).state());assertEquals(0,gets.get());
     }
     @Test void unsupportedContextAndMissingRequestRemainExplicitWithoutHttp() {
         queuedAgain();change("overrideFileUrl","unreviewed.zip");route(this::configuration);var boot=bootstrap(new RemoteReviewPersistence(mongo));

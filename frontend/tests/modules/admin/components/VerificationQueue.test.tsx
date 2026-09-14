@@ -25,7 +25,7 @@ it('separates service failures without hiding prior findings or inventing a malw
     await act(async () => (operations.querySelector('button') as HTMLButtonElement).click());
     expect(onReview).toHaveBeenCalledWith('Expired', 'v');
 });
-it.each([['REMOTE_UNSUPPORTED_CONTEXT', 'Review context unsupported'], ['REMOTE_HELD', 'Review held'], ['REMOTE_CANCELLED', 'Review cancelled'], ['UNKNOWN', 'Review unavailable']])(
+it.each([['REMOTE_BINDING_MISSING', 'Review state needs repair'], ['REMOTE_BINDING_MISMATCH', 'Review state needs repair'], ['REMOTE_UNSUPPORTED_CONTEXT', 'Review context unsupported'], ['REMOTE_HELD', 'Review held'], ['REMOTE_CANCELLED', 'Review cancelled'], ['UNKNOWN', 'Review unavailable']])(
     'keeps %s failures visible when no content reviews remain', async (state, label) => {
         await act(async () => root.render(<VerificationQueue pendingProjects={[item('Failure', 'FAILED', state)]}
             loadingQueue={false} loadingReview={false} onReview={vi.fn()} />));
