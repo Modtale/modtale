@@ -309,7 +309,10 @@ final class LibraryWorldSnapshotMapper {
                     modtaleProject ? "" : first(project.projectId(), project.slug()),
                     !modtaleProject && InstalledProject.SOURCE_CURSEFORGE.equalsIgnoreCase(project.source())
                             && project.installedVersionId().matches("[1-9][0-9]*")
-                            ? "https://www.curseforge.com/hytale/mods/" + project.slug() + "/files/" + project.installedVersionId() : "",
+                            ? (project.slug().matches("[a-zA-Z0-9][a-zA-Z0-9-]*")
+                                    ? "https://www.curseforge.com/hytale/mods/" + project.slug()
+                                    : "https://www.curseforge.com/projects/" + project.projectId().replace("curseforge:", ""))
+                                    + "/files/" + project.installedVersionId() : "",
                     ""
             );
         }
