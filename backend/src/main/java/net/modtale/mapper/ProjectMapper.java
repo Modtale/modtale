@@ -419,6 +419,7 @@ public class ProjectMapper {
         return new AdminVerificationQueueScanDTO(
                 scanResult.getStatus(),
                 scanResult.getVerdict(),
+                scanResult.getScanState(),
                 scanResult.getRiskScore(),
                 scanResult.getKnownIssueCount(),
                 scanResult.getNewIssueCount(),

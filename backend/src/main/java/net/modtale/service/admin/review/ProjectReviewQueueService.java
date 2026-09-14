@@ -49,6 +49,7 @@ public class ProjectReviewQueueService {
                 .include("versions.reviewStatus")
                 .include("versions.scanResult.status")
                 .include("versions.scanResult.verdict")
+                .include("versions.scanResult.scanState")
                 .include("versions.scanResult.riskScore")
                 .include("versions.scanResult.knownIssueCount")
                 .include("versions.scanResult.newIssueCount")

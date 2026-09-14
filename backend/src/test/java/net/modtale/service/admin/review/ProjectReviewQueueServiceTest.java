@@ -55,6 +55,7 @@ class ProjectReviewQueueServiceTest {
         assertTrue(criteria.contains("$not"));
         assertTrue(criteria.contains("SCANNING"));
         assertEquals(1, query.getFieldsObject().get("versions.scanResult.riskScore"));
+        assertEquals(1, query.getFieldsObject().get("versions.scanResult.scanState"));
         assertFalse(query.getFieldsObject().containsKey("versions.scanResult.issues"));
         assertFalse(query.getFieldsObject().containsKey("comments"));
     }

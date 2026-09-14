@@ -639,6 +639,11 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                 {decisionWritten && <p role="status" className="text-sm text-amber-700">A finding decision was saved. Refresh the evidence to inspect the updated history before publishing.</p>}
                                 {decisionWritten && <button type="button" disabled={refreshing} onClick={() => void refreshEvidence()} className="text-sm font-bold text-modtale-accent">{refreshing ? 'Refreshing evidence…' : 'Refresh evidence and restart checklist'}</button>}
                                 {refreshError && <p role="alert" className="text-sm text-red-600">{refreshError}</p>}
+                                {scanResult?.status === 'FAILED' && <div role="status" className="rounded-2xl border border-amber-300 p-5 text-sm text-amber-800 dark:text-amber-200">
+                                    <h4 className="font-bold">Review service attention</h4>
+                                    <p>Security review did not complete. Clearance is withheld. Check the failure before requesting another scan; existing findings remain unresolved.</p>
+                                    <p>{scanResult.scanState === 'REMOTE_EXPIRED' ? 'The review expired.' : scanResult.scanState === 'REMOTE_CANCELLED' ? 'The review was cancelled.' : scanResult.scanState === 'REMOTE_HELD' ? 'The review was held.' : 'The review is unavailable.'}</p>
+                                </div>}
                                 {scanResult?.securityEvidence && (
                                     <div className="rounded-2xl border border-slate-200 dark:border-white/10 p-5 space-y-3">
                                         <div className="flex items-center justify-between gap-3">

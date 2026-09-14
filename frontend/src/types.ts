@@ -362,6 +362,7 @@ export interface Project {
 }
 
 export interface AdminVerificationQueueScan {
+    scanState?: string;
     status?: ScanResult['status'];
     verdict?: ScanResult['verdict'];
     riskScore: number;

@@ -7,6 +7,7 @@ import net.modtale.model.project.ScanStatus;
 public record AdminVerificationQueueScanDTO(
         ScanStatus status,
         String verdict,
+        String scanState,
         int riskScore,
         int knownIssueCount,
         int newIssueCount,
