@@ -177,6 +177,13 @@ class RemoteReviewStepIntegrationTest {
     @Test void schedulerDiscoversBootstrapsUploadsAndSchedulesCompletedReview()throws Exception {
         queuedAgain();route(e->{if(e.getRequestURI().getPath().endsWith("configuration"))configuration(e);
             else if(e.getRequestMethod().equals("POST"))reply(e,202,"COMPLETED");else reply(e,e.getRequestURI().getPath().endsWith("/result")?200:404,"COMPLETED");});
+        when(policy.remoteJobsEnabled()).thenReturn(true);
+        var recovery=mock(ScanRecoveryService.class);var legacyPersistence=mock(ScanPersistenceService.class);
+        var execution=new ScanExecutionService(policy,storage,r->{throw new AssertionError("Legacy dispatch");},legacyPersistence,completion,recovery);
+        execution.enqueueBackgroundScan(project,"v",binding.filePath(),"original.zip",false,1,binding.requestId());
+        execution.recoverStaleScanningVersions();
+        assertEquals("QUEUED",saved().getScanState());assertEquals(binding.requestId(),saved().getScanRequestId());
+        verifyNoInteractions(legacyPersistence,recovery);verify(storage,never()).download(any());
         try(var scheduler=new RemoteReviewScheduler(new RemoteReviewDiscovery(mongo),bootstrap(new RemoteReviewPersistence(mongo)),new RemoteReviewScheduler.Settings(2,4,100,2000))) {
             scheduler.start();long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
             while(mongo.findById(project,Project.class).getVersions().getFirst().getReviewStatus()!=ProjectVersion.ReviewStatus.SCHEDULED && System.nanoTime()<deadline)Thread.sleep(20);

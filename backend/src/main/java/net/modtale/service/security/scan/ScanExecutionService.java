@@ -93,6 +93,8 @@ public class ScanExecutionService {
     }
     public void enqueueBackgroundScan(String projectId, String versionId, String filePath, String originalFilename,
             boolean isManualRescan, int expectedAttempt, String requestId) {
+        // The persisted request is the durable handoff; polling owns remote dispatch.
+        if (wardenService.remoteJobsEnabled()) return;
         taskExecutor.execute(() -> processBackgroundScan(
                 projectId,
                 versionId,
@@ -105,6 +107,7 @@ public class ScanExecutionService {
 
     @Scheduled(fixedDelayString = "${app.security.scan-recovery-check-ms:120000}")
     public void recoverStaleScanningVersions() {
+        if (wardenService.remoteJobsEnabled()) return;
         scanRecoveryService.recoverStaleScanningVersions(this::enqueueBackgroundScan);
     }
 
@@ -125,6 +128,7 @@ public class ScanExecutionService {
             boolean isManualRescan,
             int expectedAttempt, String requestId
     ) {
+        if (wardenService.remoteJobsEnabled()) return;
         if (!(requestId == null ? scanPersistenceService.markAttemptRunning(projectId, versionId, expectedAttempt)
                 : scanPersistenceService.markAttemptRunning(projectId, versionId, expectedAttempt, requestId))) {
             logger.info("Scan attempt skipped because state moved ahead project={} version={} attempt={}", projectId, versionId, expectedAttempt);

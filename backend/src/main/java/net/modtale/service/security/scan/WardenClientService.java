@@ -9,6 +9,8 @@ import net.modtale.model.project.ScanStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Service;
@@ -22,8 +24,16 @@ public class WardenClientService {
     private final WebClient webClient;
     private final AppWardenProperties wardenProperties;
 
-    public WardenClientService(
-            AppWardenProperties wardenProperties) {
+    private final boolean remoteJobsEnabled;
+
+    public WardenClientService(AppWardenProperties wardenProperties) {
+        this(wardenProperties, false);
+    }
+
+    @Autowired
+    public WardenClientService(AppWardenProperties wardenProperties,
+            @Value("${app.warden.jobs.enabled:false}") boolean remoteJobsEnabled) {
+        this.remoteJobsEnabled = remoteJobsEnabled;
         this.wardenProperties = wardenProperties;
         this.webClient = WebClient.builder()
                 .baseUrl(wardenProperties.url())
@@ -31,6 +41,8 @@ public class WardenClientService {
                 .defaultHeader("X-Warden-Api-Key", wardenProperties.apiKey())
                 .build();
     }
+
+    public boolean remoteJobsEnabled() { return remoteJobsEnabled; }
 
     public record PolicyResponse(String policyVersion) {}
 
@@ -48,6 +60,7 @@ public class WardenClientService {
     }
 
     public ScanResult scanFile(byte[] fileBytes, String filename) {
+        if (remoteJobsEnabled) throw new IllegalStateException("Synchronous scans are disabled in remote jobs mode");
         if (!wardenProperties.enabled()) {
             logger.error("Warden scanner is DISABLED. Falling back to manual-review degraded result for file: {}", filename);
             return buildDegradedResult(filename, new IllegalStateException("Warden scanner disabled"));
