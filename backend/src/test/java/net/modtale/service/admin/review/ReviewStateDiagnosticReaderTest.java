@@ -108,5 +108,23 @@ class ReviewStateDiagnosticReaderTest {
         var page=reader.page(null,1);projects.deleteOne(new Document("_id","a"));assertEquals("b",reader.page(page.next(),1).items().getFirst().projectId());
         projects.deleteMany(new Document());v.put("reviewStatus","APPROVED");insert("a",List.of(v));assertEquals(0,reader.page(null,1).examined());
     }
+    @Test void httpPaginationTraversesEmptyDiagnosticPageAndMixedIdentityRoots()throws Exception {
+        String hex="abcdefabcdefabcdefabcdef";var bad=version("bad");scan(bad).put("remotePoll",null);
+        insert(hex,List.of(version("healthy"),bad));insert(new ObjectId(hex),List.of(bad));
+        var controller=new net.modtale.controller.admin.ReviewStateDiagnosticController(reader);
+        var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
+        var mapper=new com.fasterxml.jackson.databind.ObjectMapper();String cursor=null;var types=new ArrayList<String>();int calls=0,examined=0;
+        do {
+            var request=org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/admin/verification/diagnostics/page").param("limit","1");
+            if(cursor!=null)request.param("cursor",cursor);
+            var response=mvc.perform(request).andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                    .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control","no-store")).andReturn().getResponse();
+            var body=mapper.readTree(response.getContentAsString());examined+=body.get("examinedSlots").asInt();
+            if(calls==0) {assertTrue(body.get("items").isEmpty());assertFalse(body.get("nextCursor").isNull());}
+            for(var item:body.get("items")) {types.add(item.get("position").get("projectIdType").asText());assertEquals(hex,item.get("position").get("projectId").asText());}
+            cursor=body.get("nextCursor").isNull()?null:body.get("nextCursor").asText();assertTrue(++calls<=4);
+        } while(cursor!=null);
+        assertEquals(4,calls);assertEquals(3,examined);assertEquals(List.of("STRING","OBJECT_ID"),types);
+    }
     @Test void invalidLimitsFailBeforeDatabaseAccess(){assertThrows(IllegalArgumentException.class,()->reader.page(null,0));assertThrows(IllegalArgumentException.class,()->reader.page(null,65));}
 }
