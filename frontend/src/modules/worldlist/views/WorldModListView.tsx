@@ -1,4 +1,4 @@
-import { configOwnerLabel } from '@/modules/worldlist/utils/configOwner';
+import { configOwners } from '@/modules/worldlist/utils/configOwner';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, useParams } from 'react-router-dom';
@@ -86,6 +86,10 @@ const WorldListProjectCard = ({ item, list, priority }: { item: WorldModListItem
             viewStyle="list"
             isVisible={true}
             disableNavigation={!path}
+            bundledConfigCount={list.configs?.filter(config => {
+                const owners = configOwners(config.path, list.mods);
+                return owners.length === 1 && owners[0].modId === item.modId;
+            }).length}
             versionLabel={item.versionNumber ? `v${item.versionNumber}` : undefined}
         />
     );
@@ -208,18 +212,6 @@ export const WorldModListView: React.FC = () => {
             </section>
 
             {requiresLauncher && <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">This list includes CurseForge mods and is available through Modtale Launcher only. The launcher downloads those mods directly to your device.</p>}
-            {!!list.configs?.length && (
-                <section className="space-y-3 pt-6">
-                    <h2 className="text-lg font-bold">Included configs</h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Config defaults are included in the ZIP. The launcher adds world configs to the worlds you select and preserves existing files.</p>
-                    {list.configs.map(config => (
-                        <details key={`${config.scope}/${config.path}`} className="rounded-xl border border-slate-200 p-4 dark:border-white/10">
-                            <summary className="cursor-pointer text-sm font-medium">{configOwnerLabel(config.path, list.mods)} · {config.scope === 'GLOBAL' ? 'Global mods' : 'World mods'} / {config.path}</summary>
-                            <pre className="mt-3 max-h-80 overflow-auto whitespace-pre text-xs">{config.content}</pre>
-                        </details>
-                    ))}
-                </section>
-            )}
 
             <section className="space-y-4 pt-6">
                 {list.mods.map((item, index) => (
