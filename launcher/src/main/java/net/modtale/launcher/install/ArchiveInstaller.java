@@ -121,7 +121,16 @@ public class ArchiveInstaller {
         return List.copyOf(ids);
     }
 
+    public List<Path> installDependencyBundleArchive(Path archive, Path modsDirectory, Path instanceDirectory) throws IOException {
+        return installModpackArchive(archive, modsDirectory, instanceDirectory, null, false, true);
+    }
+
     private List<Path> installModpackArchive(Path archive, Path modsDirectory, Path instanceDirectory, Set<String> selectedOwners, boolean configsOnly) throws IOException {
+        return installModpackArchive(archive, modsDirectory, instanceDirectory, selectedOwners, configsOnly, false);
+    }
+
+    private List<Path> installModpackArchive(Path archive, Path modsDirectory, Path instanceDirectory,
+            Set<String> selectedOwners, boolean configsOnly, boolean reuseIdenticalFiles) throws IOException {
         Files.createDirectories(modsDirectory);
         Files.createDirectories(instanceDirectory);
         Path stagingDirectory = Files.createTempDirectory("modtale-modpack-");
@@ -144,7 +153,14 @@ public class ArchiveInstaller {
                         .filter(path -> isInstallable(path.getFileName().toString()))
                         .sorted(Comparator.comparing(Path::toString))
                         .toList()) {
-                    Path destination = uniqueDestination(modsDirectory, safeFilename(source.getFileName().toString()));
+                    String filename = safeFilename(source.getFileName().toString());
+                    Path existing = modsDirectory.resolve(filename);
+                    if (reuseIdenticalFiles && Files.isRegularFile(existing, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                            && Files.mismatch(source, existing) == -1) {
+                        installed.add(existing);
+                        continue;
+                    }
+                    Path destination = uniqueDestination(modsDirectory, filename);
                     Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING);
                     installed.add(destination);
                 }

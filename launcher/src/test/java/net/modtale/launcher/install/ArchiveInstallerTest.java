@@ -22,6 +22,23 @@ class ArchiveInstallerTest {
     Path tempDir;
 
     @Test
+    void dependencyBundlesReuseIdenticalFilesWithoutOverwritingDifferentFiles() throws IOException {
+        Path mods = Files.createDirectories(tempDir.resolve("Mods"));
+        Path same = Files.writeString(mods.resolve("same.jar"), "same release");
+        Path different = Files.writeString(mods.resolve("changed.jar"), "old release");
+        Path bundle = tempDir.resolve("bundle.zip");
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(bundle))) {
+            add(zip, "same.jar", "same release");
+            add(zip, "changed.jar", "new release");
+        }
+        List<Path> installed = new ArchiveInstaller().installDependencyBundleArchive(bundle, mods, tempDir);
+        assertTrue(installed.contains(same));
+        assertEquals("old release", Files.readString(different));
+        assertEquals("new release", Files.readString(mods.resolve("changed-2.jar")));
+        try (var files = Files.list(mods)) { assertEquals(3, files.count()); }
+    }
+
+    @Test
     void enablingOneModSeedsOnlyItsDefaultsAndKeepsExistingSettings() throws IOException {
         Path jar = tempDir.resolve("owner.jar");
         try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(jar))) {

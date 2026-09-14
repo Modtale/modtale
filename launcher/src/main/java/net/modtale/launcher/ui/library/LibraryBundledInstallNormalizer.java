@@ -140,10 +140,25 @@ final class LibraryBundledInstallNormalizer {
         Map<String, InstalledProject> byProjectId = new LinkedHashMap<>();
         for (InstalledProject project : projects) {
             if (project != null && !project.projectId().isBlank()) {
-                byProjectId.putIfAbsent(project.projectId(), project);
+                byProjectId.merge(project.projectId(), project, LibraryBundledInstallNormalizer::mergeFiles);
             }
         }
         return List.copyOf(byProjectId.values());
+    }
+
+    private static InstalledProject mergeFiles(InstalledProject existing, InstalledProject incoming) {
+        Map<String, String> files = new LinkedHashMap<>();
+        existing.files().forEach(file -> files.putIfAbsent(normalizedFileKey(file), file));
+        incoming.files().forEach(file -> files.putIfAbsent(normalizedFileKey(file), file));
+        InstalledProject latest = incoming.updatedAt().isAfter(existing.updatedAt()) ? incoming : existing;
+        String versionId = latest.installedVersionId();
+        if (versionId.isBlank() && existing.installedVersion().equals(incoming.installedVersion())) {
+            versionId = first(existing.installedVersionId(), incoming.installedVersionId());
+        }
+        return new InstalledProject(latest.projectId(), latest.slug(), latest.title(), latest.classification(),
+                latest.installedVersion(), versionId, latest.gameVersion(), existing.installedAt(), latest.updatedAt(),
+                List.copyOf(files.values()), latest.dependencyProjectIds(), latest.externalDependencies(), latest.source(),
+                latest.installType(), latest.modpackUnlocked(), latest.bundledProjects(), latest.universeConfigs());
     }
 
     private static List<InstalledProjectReference> references(InstalledProject installed) {

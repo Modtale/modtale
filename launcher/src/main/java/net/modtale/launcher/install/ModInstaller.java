@@ -125,7 +125,10 @@ public class ModInstaller {
                     + " unpack=" + unpackMainDownload
                     + " temp=" + mainDownload.path());
             try {
-                if (isModpack || isBundle) {
+                if (isBundle && !isModpack) {
+                    installedFiles.addAll(archiveInstaller.installDependencyBundleArchive(
+                            mainDownload.path(), options.modsDirectory(), options.instanceDirectory()));
+                } else if (isModpack) {
                     installedFiles.addAll(archiveInstaller.installModpackArchive(
                             mainDownload.path(),
                             options.modsDirectory(),
