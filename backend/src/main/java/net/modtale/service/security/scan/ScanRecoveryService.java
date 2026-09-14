@@ -68,6 +68,7 @@ public class ScanRecoveryService {
                                     : "Previous scan attempt timed out and was re-queued automatically."
                     );
 
+                    queued.setManualRescan(scanResult.isManualRescan());
                     if (scanPersistenceService.queueRetryAttempt(project.getId(), version.getId(), currentAttempt, queued, scanResult, timeoutMs)) {
                         logger.warn(
                                 "Recovered stale scan by retrying project={} version={} previousAttempt={} nextAttempt={}",
@@ -82,7 +83,7 @@ public class ScanRecoveryService {
                                 version.getId(),
                                 version.getFileUrl(),
                                 extractOriginalFilename(version.getFileUrl()),
-                                false,
+                                queued.isManualRescan(),
                                 nextAttempt, queued.getScanRequestId()
                         );
                     }

@@ -56,6 +56,9 @@ class RemoteReviewStepIntegrationTest {
         client=new RemoteReviewClient(new AppWardenProperties("http://127.0.0.1:"+server.getAddress().getPort(),"fixture-key",true,1,600),Duration.ofSeconds(2));
         var repo=mock(net.modtale.repository.project.ProjectRepository.class);when(repo.findById(project)).thenAnswer(i->Optional.ofNullable(mongo.findById(project,Project.class)));
         var projects=mock(net.modtale.service.project.query.ProjectService.class);analysis=mock(net.modtale.service.security.issue.SecurityIssueAnalysisService.class);
+        doAnswer(i->{new net.modtale.service.security.issue.SecurityIssueApprovalService(new net.modtale.service.security.issue.SecurityIssueClassificationService(
+                new net.modtale.config.properties.AppSecurityProperties("fixture",60,120,2,4,15,20,25,2))).markIssuesAcceptedForApprovedVersion(i.getArgument(0));return null;})
+                .when(analysis).markIssuesAcceptedForApprovedVersion(any());
         when(analysis.annotateAgainstBaselines(any(),any())).thenReturn(new net.modtale.service.security.issue.SecurityIssueAnalysisService.ClassificationStats(0,0,0,false));
         policy=mock(WardenClientService.class);when(policy.currentPolicyVersion()).thenReturn(binding.policyVersion());
         completion=new ScanCompletionService(repo,projects,mock(net.modtale.service.communication.ProjectNotificationService.class),mock(net.modtale.service.communication.WebhookService.class),analysis,
@@ -123,6 +126,52 @@ class RemoteReviewStepIntegrationTest {
         result.setSecurityEvidence(new ScanResult.SecurityEvidence(e.policyVersion(),e.artifactSha256(),e.contentSha256(),false,false,"INCOMPLETE",e.entryHashes()));result.setArtifactVerified(false);result.setVerdict("REVIEW");result.setStatus(ScanStatus.SUSPICIOUS);
         assertTrue(completion.handleRemoteCompletedScan(claim,result));assertEquals("REVIEW",saved().getVerdict());assertFalse(ArtifactClearancePolicy.cleared(saved()));
         assertEquals(ProjectVersion.ReviewStatus.PENDING,mongo.findById(project,Project.class).getVersions().getFirst().getReviewStatus());
+    }
+    void queuedAgain() {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(project)),new Update().unset("versions.0.scanResult.remoteReview").set("versions.0.scanResult.scanState","QUEUED"),Project.class);
+    }
+    void configuration(HttpExchange e)throws Exception {
+        byte[] data=mapper.writeValueAsBytes(Map.of("policyVersion",binding.policyVersion(),"reviewConfigSha256",binding.reviewConfigSha256()));
+        e.sendResponseHeaders(200,data.length);e.getResponseBody().write(data);
+    }
+    RemoteReviewBootstrap bootstrap(RemoteReviewPersistence persistence) {return new RemoteReviewBootstrap(persistence,client,step);}
+    @Test void bootstrapBindsQueuedRequestBeforeUploadAndReusesRetainedConfiguration() {
+        queuedAgain();var configurations=new AtomicInteger();
+        route(e->{if(e.getRequestURI().getPath().endsWith("configuration")){configurations.incrementAndGet();configuration(e);}
+            else if(e.getRequestMethod().equals("POST"))reply(e,202,"QUEUED");else reply(e,404,"AWAITING_UPLOAD");});
+        var boot=bootstrap(new RemoteReviewPersistence(mongo));assertEquals("RECORDED",boot.advance(project,"v",1,binding.requestId()).state());
+        assertEquals(job,saved().getRemoteReview().jobId());assertEquals("READY",boot.prepare(project,"v",1,binding.requestId()).state());
+        assertEquals(1,configurations.get());assertEquals(1,posts.get());
+    }
+    @Test void bootstrapRecoversCommittedBindingAcknowledgementLoss() {
+        queuedAgain();route(this::configuration);var persistence=spy(new RemoteReviewPersistence(mongo));
+        doAnswer(i->{assertTrue((Boolean)i.callRealMethod());throw new IllegalStateException("Lost acknowledgement after committed binding");}).when(persistence).bind(any(),any());
+        var prepared=bootstrap(persistence).prepare(project,"v",1,binding.requestId());assertEquals("READY",prepared.state());assertEquals(binding,prepared.binding());
+        assertEquals(prepared.binding(),saved().getRemoteReview());assertEquals(0,posts.get());verifyNoInteractions(storage);
+    }
+    @Test void changedContextDuringConfigurationCannotCreateBindingOrUpload() {
+        queuedAgain();route(e->{change("manifestVersion","changed");configuration(e);});
+        assertEquals("NO_WORK",bootstrap(new RemoteReviewPersistence(mongo)).advance(project,"v",1,binding.requestId()).state());
+        assertNull(saved().getRemoteReview());assertEquals(0,posts.get());verifyNoInteractions(storage);
+    }
+    @Test void retainedContextMismatchNeverFetchesAnotherConfiguration() {
+        change("manifestVersion","changed");route(this::configuration);
+        assertEquals("CONTEXT_CHANGED",bootstrap(new RemoteReviewPersistence(mongo)).prepare(project,"v",1,binding.requestId()).state());assertEquals(0,gets.get());
+    }
+    @Test void unsupportedContextAndMissingRequestRemainExplicitWithoutHttp() {
+        queuedAgain();change("overrideFileUrl","unreviewed.zip");route(this::configuration);var boot=bootstrap(new RemoteReviewPersistence(mongo));
+        assertEquals("UNSUPPORTED_CONTEXT",boot.prepare(project,"v",1,binding.requestId()).state());assertEquals("NO_WORK",boot.prepare(project,"v",1,null).state());assertEquals(0,gets.get());
+    }
+    @Test void manualRescanModeSurvivesBootstrapAttachmentAndCompletesImmediately() {
+        queuedAgain();change("scanResult.manualRescan",true);
+        route(e->{if(e.getRequestURI().getPath().endsWith("configuration"))configuration(e);else reply(e,200,"COMPLETED");});
+        var outcome=bootstrap(new RemoteReviewPersistence(mongo)).advance(project,"v",1,binding.requestId());assertEquals("APPLIED",outcome.state());
+        var version=mongo.findById(project,Project.class).getVersions().getFirst();assertEquals(ProjectVersion.ReviewStatus.APPROVED,version.getReviewStatus());
+        assertNotNull(version.getApprovedSecurityEvidence());assertNull(version.getScanResult());assertEquals(0,posts.get());
+    }
+    @Test void requestModeChangeDuringConfigurationRejectsStaleBinding() {
+        queuedAgain();route(e->{change("scanResult.manualRescan",true);configuration(e);});
+        assertEquals("NO_WORK",bootstrap(new RemoteReviewPersistence(mongo)).prepare(project,"v",1,binding.requestId()).state());assertNull(saved().getRemoteReview());
     }
     @Test void lostPostResponseRecoversSameRequestAndRecordsJobWithoutAnotherUpload() {
         var accepted=new AtomicBoolean();route(e->{if(e.getRequestMethod().equals("POST")){accepted.set(true);return;}reply(e,accepted.get()?200:404,accepted.get()?"QUEUED":"AWAITING_UPLOAD");});

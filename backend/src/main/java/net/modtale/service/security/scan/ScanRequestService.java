@@ -62,6 +62,7 @@ public class ScanRequestService {
         var snapshot = reviewPersistence.captureForRescan(projectId, versionId, VersionReviewSnapshot.rescanToken(version));
         int attempt = scanRoutingService.nextScanAttempt(version.getScanResult());
         ScanResult pending = scanRoutingService.createQueuedScanResult(attempt, "Manual rescan requested.");
+        pending.setManualRescan(true);
         if (!reviewPersistence.queueRescan(snapshot, pending)) throw VersionReviewPersistence.conflict();
         version.setScanResult(pending);
         version.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);

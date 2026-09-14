@@ -1,0 +1,45 @@
+package net.modtale.service.security.scan;
+
+import net.modtale.model.project.RemoteReviewBinding;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
+
+@Service
+@ConditionalOnProperty(name="app.warden.jobs.enabled",havingValue="true")
+public final class RemoteReviewBootstrap {
+    public record Prepared(String state,RemoteReviewBinding binding) {}
+    private final RemoteReviewPersistence persistence;
+    private final RemoteReviewClient client;
+    private final RemoteReviewStep step;
+    public RemoteReviewBootstrap(RemoteReviewPersistence persistence,RemoteReviewClient client,RemoteReviewStep step) {
+        this.persistence=persistence;this.client=client;this.step=step;
+    }
+    public Prepared prepare(String projectId,String versionId,int attempt,String requestId) {
+        var current=persistence.current(projectId,versionId,attempt,requestId);
+        if(current==null)return new Prepared("NO_WORK",null);
+        if(current.getScanResult().getRemoteReview()!=null) {
+            var retained=persistence.retained(projectId,versionId,attempt,requestId);
+            return new Prepared(retained==null?"CONTEXT_CHANGED":"READY",retained);
+        }
+        if("REMOTE_REVIEW".equals(current.getScanResult().getScanState()))return new Prepared("MISSING_BINDING",null);
+        String context=ArtifactReviewContext.automaticallyReviewableFingerprint(current);
+        if(context==null)return new Prepared("UNSUPPORTED_CONTEXT",null);
+        var configuration=client.configuration();
+        var binding=new RemoteReviewBinding(projectId,versionId,requestId,attempt,current.getFileUrl(),current.getHash(),context,
+                configuration.policyVersion(),configuration.reviewConfigSha256(),null,current.getScanResult().isManualRescan());
+        try { persistence.bind(current,binding); }
+        catch(RuntimeException unknown) {
+            var retained=persistence.retained(projectId,versionId,attempt,requestId);
+            if(retained!=null)return new Prepared("READY",retained);
+            throw unknown;
+        }
+        var retained=persistence.retained(projectId,versionId,attempt,requestId);
+        return new Prepared(retained==null?"NO_WORK":"READY",retained);
+    }
+    public RemoteReviewStep.Outcome advance(String projectId,String versionId,int attempt,String requestId) {
+        try {
+            var prepared=prepare(projectId,versionId,attempt,requestId);
+            return prepared.binding()==null?new RemoteReviewStep.Outcome(prepared.state(),null):step.advance(prepared.binding());
+        } catch(RuntimeException unavailable) {return new RemoteReviewStep.Outcome("RETRY",null);}
+    }
+}

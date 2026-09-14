@@ -33,9 +33,11 @@ class ScanRecoveryServiceTest {
         service = new ScanRecoveryService(projectService, scanRoutingService, scanPersistenceService, scanCompletionService);
     }
 
-    @Test
-    void recoverStaleScanningVersionsQueuesRetryWhenAttemptsRemain() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void recoverStaleScanningVersionsQueuesRetryWhenAttemptsRemain(boolean manual) {
         Project project = project("project-1", version("version-1", "files/mod.jar", 1, staleTimestamp()));
+        project.getVersions().getFirst().getScanResult().setManualRescan(manual);
         ScanResult queued = new ScanResult(); queued.setScanRequestId("retry-request");
 
         when(scanRoutingService.scanTimeoutMillis()).thenReturn(60_000L);
@@ -47,7 +49,8 @@ class ScanRecoveryServiceTest {
 
         service.recoverStaleScanningVersions(scheduler);
 
-        verify(scheduler).enqueue("project-1", "version-1", "files/mod.jar", "mod.jar", false, 2, queued.getScanRequestId());
+        org.junit.jupiter.api.Assertions.assertEquals(manual,queued.isManualRescan());
+        verify(scheduler).enqueue("project-1", "version-1", "files/mod.jar", "mod.jar", manual, 2, queued.getScanRequestId());
         verify(scanCompletionService, never()).handleTimedOutScan(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyLong());
         verify(projectService).evictProjectCache(project);
     }

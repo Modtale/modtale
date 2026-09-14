@@ -81,7 +81,7 @@ public final class RemoteReviewPollStore {
         var scan=version.getScanResult();
         if(version.getReviewStatus()!=ProjectVersion.ReviewStatus.PENDING || scan==null || scan.getStatus()!=ScanStatus.SCANNING
                 || !"REMOTE_REVIEW".equals(scan.getScanState()) || !binding.equals(scan.getRemoteReview())
-                || !binding.requestId().equals(scan.getScanRequestId()) || binding.attempt()!=scan.getScanAttempt()
+                || !binding.requestId().equals(scan.getScanRequestId()) || binding.attempt()!=scan.getScanAttempt() || binding.manualRescan()!=scan.isManualRescan()
                 || !binding.artifactSha256().equals(version.getHash()) || !binding.filePath().equals(version.getFileUrl())
                 || !binding.contextSha256().equals(ArtifactReviewContext.automaticallyReviewableFingerprint(version)))return null;
         var rawScan=raw.get("scanResult",Document.class);Document poll;

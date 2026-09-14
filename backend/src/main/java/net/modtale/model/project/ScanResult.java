@@ -6,6 +6,11 @@ import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ScanResult {
+    private boolean manualRescan;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isManualRescan() { return manualRescan; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public void setManualRescan(boolean value) { manualRescan = value; }
     private RemoteReviewStatus remoteStatus;
     public record RemoteReviewStatus(String jobId,String state,boolean artifactRetained,long createdAt,long expiresAt,String workState) {}
     @com.fasterxml.jackson.annotation.JsonIgnore

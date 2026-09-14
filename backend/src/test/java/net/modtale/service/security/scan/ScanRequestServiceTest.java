@@ -31,6 +31,7 @@ class ScanRequestServiceTest {
         project.setVersions(List.of(version));
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
         when(projectVersionAccessService.findById(project, "version-1")).thenReturn(version);
+        when(scanRoutingService.createQueuedScanResult(org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyString())).thenReturn(new ScanResult());
         when(reviewPersistence.queueRescan(any(), any())).thenReturn(false);
         assertThrows(org.springframework.web.server.ResponseStatusException.class,
                 () -> service.triggerRescan("project-1", "version-1", new User()));
@@ -92,6 +93,7 @@ class ScanRequestServiceTest {
         service.triggerRescan("project-1", "version-1", user);
 
         assertSame(queued, version.getScanResult());
+        org.junit.jupiter.api.Assertions.assertTrue(queued.isManualRescan());
         assertEquals(ProjectVersion.ReviewStatus.PENDING, version.getReviewStatus());
         assertNull(version.getScheduledPublishDate());
         verify(scanThrottleService).enforceRescanLimit(user);

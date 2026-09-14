@@ -65,7 +65,7 @@ public class ScanPersistenceService {
     public boolean applyRemoteScanOutcome(RemoteReviewPollStore.Claim claim,ScanResult.RemoteReviewPoll poll,ScanResult result,
             ScanRoutingService.RoutingDecision routing,ProjectVersion version) {
         if(!remoteResultMatches(claim,poll,result,version) || routing.action()==ScanRoutingService.RoutingAction.DEFER)return false;
-        result.setRemoteReview(claim.binding());result.setRemotePoll(null);
+        result.setRemoteReview(claim.binding());result.setRemotePoll(null);result.setManualRescan(claim.binding().manualRescan());
         var binding=claim.binding();
         return applyOutcome(binding.projectId(),binding.versionId(),binding.attempt(),result,routing,version,binding.requestId(),claim,poll);
     }
@@ -148,7 +148,13 @@ public class ScanPersistenceService {
     private Query remoteTarget(Query target,RemoteReviewPollStore.Claim claim,ScanResult.RemoteReviewPoll poll) {
         if(claim==null)return target;
         var raw=target.getQueryObject();var version=raw.get("versions",org.bson.Document.class).get("$elemMatch",org.bson.Document.class);
-        version.put("scanResult.remoteReview",claim.binding());version.put("scanResult.remotePoll",poll);version.put("fileUrl",claim.binding().filePath());
+        version.put("scanResult.manualRescan",claim.binding().manualRescan()?true:new org.bson.Document("$in",java.util.Arrays.asList(false,null)));
+        var b=claim.binding();
+        var bindingFields=new org.bson.Document("projectId",b.projectId()).append("versionId",b.versionId()).append("requestId",b.requestId())
+                .append("attempt",b.attempt()).append("filePath",b.filePath()).append("artifactSha256",b.artifactSha256()).append("contextSha256",b.contextSha256())
+                .append("policyVersion",b.policyVersion()).append("reviewConfigSha256",b.reviewConfigSha256()).append("jobId",b.jobId()).append("manualRescan",b.manualRescan());
+        bindingFields.forEach((key,value)->version.put("scanResult.remoteReview."+key,value));
+        version.put("scanResult.remotePoll",poll);version.put("fileUrl",b.filePath());
         var terms=new java.util.ArrayList<Object>();if(raw.containsKey("$expr"))terms.add(raw.get("$expr"));
         terms.add(new org.bson.Document("$gt",List.of(poll.leaseUntil(),"$$NOW")));
         terms.add(new org.bson.Document("$eq",List.of(new org.bson.Document("$size",new org.bson.Document("$filter",new org.bson.Document("input","$versions")
