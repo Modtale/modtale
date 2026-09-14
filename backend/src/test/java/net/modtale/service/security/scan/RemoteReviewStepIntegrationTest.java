@@ -174,6 +174,26 @@ class RemoteReviewStepIntegrationTest {
         queuedAgain();route(e->{change("scanResult.manualRescan",true);configuration(e);});
         assertEquals("NO_WORK",bootstrap(new RemoteReviewPersistence(mongo)).prepare(project,"v",1,binding.requestId()).state());assertNull(saved().getRemoteReview());
     }
+    @Test void schedulerDiscoversBootstrapsUploadsAndSchedulesCompletedReview()throws Exception {
+        queuedAgain();route(e->{if(e.getRequestURI().getPath().endsWith("configuration"))configuration(e);
+            else if(e.getRequestMethod().equals("POST"))reply(e,202,"COMPLETED");else reply(e,e.getRequestURI().getPath().endsWith("/result")?200:404,"COMPLETED");});
+        try(var scheduler=new RemoteReviewScheduler(new RemoteReviewDiscovery(mongo),bootstrap(new RemoteReviewPersistence(mongo)),new RemoteReviewScheduler.Settings(2,4,100,2000))) {
+            scheduler.start();long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
+            while(mongo.findById(project,Project.class).getVersions().getFirst().getReviewStatus()!=ProjectVersion.ReviewStatus.SCHEDULED && System.nanoTime()<deadline)Thread.sleep(20);
+            assertEquals(ProjectVersion.ReviewStatus.SCHEDULED,mongo.findById(project,Project.class).getVersions().getFirst().getReviewStatus());
+            scheduler.stop();assertEquals("STOPPED",scheduler.status().state());assertEquals(1,posts.get());assertTrue(ArtifactClearancePolicy.cleared(saved()));
+        }
+    }
+    @Test void schedulerShutdownDuringUncooperativeDownloadPreventsLateUpload()throws Exception {
+        queuedAgain();var entered=new CountDownLatch(1);var release=new CountDownLatch(1);
+        route(e->{if(e.getRequestURI().getPath().endsWith("configuration"))configuration(e);else reply(e,404,"AWAITING_UPLOAD");});
+        when(storage.downloadBounded(anyString(),anyInt())).thenAnswer(i->{entered.countDown();long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);
+            while(release.getCount()>0&&System.nanoTime()<deadline)try{release.await(50,TimeUnit.MILLISECONDS);}catch(InterruptedException ignored){}return bytes;});
+        var scheduler=new RemoteReviewScheduler(new RemoteReviewDiscovery(mongo),bootstrap(new RemoteReviewPersistence(mongo)),new RemoteReviewScheduler.Settings(1,4,100,100));
+        scheduler.start();try{assertTrue(entered.await(3,TimeUnit.SECONDS));scheduler.stop();assertEquals("DRAIN_TIMEOUT",scheduler.status().state());assertEquals(0,posts.get());}finally{release.countDown();}
+        long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);while(scheduler.isRunning()&&System.nanoTime()<deadline)Thread.sleep(20);
+        scheduler.close();assertEquals(0,posts.get());assertEquals("REMOTE_REVIEW",saved().getScanState());
+    }
     @Test void lostPostResponseRecoversSameRequestAndRecordsJobWithoutAnotherUpload() {
         var accepted=new AtomicBoolean();route(e->{if(e.getRequestMethod().equals("POST")){accepted.set(true);return;}reply(e,accepted.get()?200:404,accepted.get()?"QUEUED":"AWAITING_UPLOAD");});
         assertEquals("RETRY",step.advance(binding).state());assertNull(saved().getRemoteReview().jobId());ready();

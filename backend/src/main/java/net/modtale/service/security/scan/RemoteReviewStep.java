@@ -18,19 +18,24 @@ public final class RemoteReviewStep {
     public RemoteReviewStep(RemoteReviewPollStore polls,RemoteReviewClient client,StorageService storage,ScanCompletionService completion) {
         this.polls=polls;this.client=client;this.storage=storage;this.completion=completion;
     }
-    public Outcome advance(RemoteReviewBinding binding) {
+    public Outcome advance(RemoteReviewBinding binding) {return advance(binding,()->true);}
+    public Outcome advance(RemoteReviewBinding binding,java.util.function.BooleanSupplier running) {
+        if(!running.getAsBoolean() || Thread.currentThread().isInterrupted())return new Outcome("SHUTDOWN",null);
         if(!slots.tryAcquire())return new Outcome("BUSY",null);
         RemoteReviewPollStore.Claim claim=null;
         try {
             claim=polls.claim(binding,120000);if(claim==null)return new Outcome("NO_WORK",null);
             var acquired=claim;
-            var status=client.submitOrFind(binding,()->storage.downloadBounded(binding.filePath(),100*1024*1024),()->polls.isCurrent(acquired));
+            var status=client.submitOrFind(binding,()->storage.downloadBounded(binding.filePath(),100*1024*1024),()->running.getAsBoolean() && !Thread.currentThread().isInterrupted() && polls.isCurrent(acquired));
+            if(!running.getAsBoolean() || Thread.currentThread().isInterrupted())return new Outcome("SHUTDOWN",null);
             if(binding.jobId()==null) {
                 claim=polls.attachJob(claim,status.jobId());if(claim==null)return new Outcome("SUPERSEDED",null);
             }
             if("COMPLETED".equals(status.state())) {
                 if(!polls.isCurrent(claim))return new Outcome("SUPERSEDED",null);
-                boolean applied=completion.handleRemoteCompletedScan(claim,client.result(claim.binding()));
+                var result=client.result(claim.binding());
+                if(!running.getAsBoolean() || Thread.currentThread().isInterrupted())return new Outcome("SHUTDOWN",null);
+                boolean applied=completion.handleRemoteCompletedScan(claim,result);
                 return new Outcome(applied?"APPLIED":"SUPERSEDED",applied?"COMPLETED":null);
             }
             boolean saved=polls.recordStatusAndRelease(claim,status,10000);

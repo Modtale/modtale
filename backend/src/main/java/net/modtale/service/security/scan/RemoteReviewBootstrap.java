@@ -14,7 +14,9 @@ public final class RemoteReviewBootstrap {
     public RemoteReviewBootstrap(RemoteReviewPersistence persistence,RemoteReviewClient client,RemoteReviewStep step) {
         this.persistence=persistence;this.client=client;this.step=step;
     }
-    public Prepared prepare(String projectId,String versionId,int attempt,String requestId) {
+    public Prepared prepare(String projectId,String versionId,int attempt,String requestId) {return prepare(projectId,versionId,attempt,requestId,()->true);}
+    private Prepared prepare(String projectId,String versionId,int attempt,String requestId,java.util.function.BooleanSupplier running) {
+        if(!running.getAsBoolean())throw new RemoteReviewClient.Superseded();
         var current=persistence.current(projectId,versionId,attempt,requestId);
         if(current==null)return new Prepared("NO_WORK",null);
         if(current.getScanResult().getRemoteReview()!=null) {
@@ -24,7 +26,9 @@ public final class RemoteReviewBootstrap {
         if("REMOTE_REVIEW".equals(current.getScanResult().getScanState()))return new Prepared("MISSING_BINDING",null);
         String context=ArtifactReviewContext.automaticallyReviewableFingerprint(current);
         if(context==null)return new Prepared("UNSUPPORTED_CONTEXT",null);
+        if(!running.getAsBoolean())throw new RemoteReviewClient.Superseded();
         var configuration=client.configuration();
+        if(!running.getAsBoolean())throw new RemoteReviewClient.Superseded();
         var binding=new RemoteReviewBinding(projectId,versionId,requestId,attempt,current.getFileUrl(),current.getHash(),context,
                 configuration.policyVersion(),configuration.reviewConfigSha256(),null,current.getScanResult().isManualRescan());
         try { persistence.bind(current,binding); }
@@ -36,10 +40,12 @@ public final class RemoteReviewBootstrap {
         var retained=persistence.retained(projectId,versionId,attempt,requestId);
         return new Prepared(retained==null?"NO_WORK":"READY",retained);
     }
-    public RemoteReviewStep.Outcome advance(String projectId,String versionId,int attempt,String requestId) {
+    public RemoteReviewStep.Outcome advance(String projectId,String versionId,int attempt,String requestId) {return advance(projectId,versionId,attempt,requestId,()->true);}
+    public RemoteReviewStep.Outcome advance(String projectId,String versionId,int attempt,String requestId,java.util.function.BooleanSupplier running) {
         try {
-            var prepared=prepare(projectId,versionId,attempt,requestId);
-            return prepared.binding()==null?new RemoteReviewStep.Outcome(prepared.state(),null):step.advance(prepared.binding());
+            var prepared=prepare(projectId,versionId,attempt,requestId,running);
+            return prepared.binding()==null?new RemoteReviewStep.Outcome(prepared.state(),null):step.advance(prepared.binding(),running);
+        } catch(RemoteReviewClient.Superseded stopped) {return new RemoteReviewStep.Outcome("SHUTDOWN",null);
         } catch(RuntimeException unavailable) {return new RemoteReviewStep.Outcome("RETRY",null);}
     }
 }
