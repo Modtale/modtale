@@ -1037,7 +1037,13 @@ public final class LauncherLibraryController {
         }, candidates -> {
             StackPane host = overlayHost.get();
             if (host == null) return;
-            ShareConfigSelectionModal.show(host, candidates, selected ->
+            Map<String, String> configTitles = new LinkedHashMap<>();
+            for (InstalledProject project : installedProjects) {
+                if (!project.isModpack()) {
+                    for (String id : worldModIds(project)) configTitles.putIfAbsent(id, project.title());
+                }
+            }
+            ShareConfigSelectionModal.show(host, candidates, configTitles, selected ->
                     feedback.runAsync("Creating " + world.name() + " share link...", () -> {
                         accountController.ensureSignedIn();
                         CreateWorldModListRequest request = snapshotRequest(world);

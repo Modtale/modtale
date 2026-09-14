@@ -100,6 +100,19 @@ class ConfigEditorModalTest {
     }
 
     @Test
+    void configLabelsUseProjectTitlesAndReadableBuiltInNames() {
+        var titles = java.util.Map.of("com.azuredoom:levelingcore", "LevelingCore", "dev.ninesliced:BetterMap", "BetterMap");
+        var leveling = new ConfigFile(directory, directory.resolve("com.azuredoom_levelingcore/levelingcore.json"), "", "com.azuredoom:levelingcore");
+        assertEquals("LevelingCore", ShareConfigSelectionModal.modTitle(leveling, titles));
+        var map = new ConfigFile(directory, directory.resolve("BetterMap/config.json"), "");
+        assertEquals("BetterMap", ShareConfigSelectionModal.modTitle(map, titles));
+        var generator = new ConfigFile(directory, directory.resolve("Hytale_HytaleGenerator/biome_editor.json"), "");
+        assertEquals("World Generation", ShareConfigSelectionModal.modTitle(generator, titles));
+        var unknown = new ConfigFile(directory, directory.resolve("org.example_SpawnTools/config.json"), "");
+        assertEquals("Spawn Tools", ShareConfigSelectionModal.modTitle(unknown, titles));
+    }
+
+    @Test
     void sharingOnlyIncludesExplicitlySelectedConfigs() throws Exception {
         fx(() -> {
             StackPane host = new StackPane();

@@ -25,6 +25,10 @@ import static net.modtale.launcher.ui.common.LauncherUi.secondaryButton;
 
 final class ShareConfigSelectionModal {
     static void show(StackPane host, List<ConfigFile> files, Consumer<List<ConfigFile>> share) {
+        show(host, files, Map.of(), share);
+    }
+
+    static void show(StackPane host, List<ConfigFile> files, Map<String, String> modTitles, Consumer<List<ConfigFile>> share) {
         // A keyboard activation must not stack dialogs while focus is moving into the overlay.
         if (host.lookup(".share-config-overlay") != null) return;
         StackPane overlay = new StackPane();
@@ -44,26 +48,15 @@ final class ShareConfigSelectionModal {
         header.setAlignment(Pos.CENTER_LEFT);
         header.getStyleClass().add("post-download-modal-header");
 
-        Label hint = new Label("Include settings with your mod list, or leave them out to share just the mods.");
-        hint.setWrapText(true);
-        hint.getStyleClass().add("share-config-description");
         VBox rows = new VBox(8);
         Map<ConfigFile, LibraryToggleBox> choices = new LinkedHashMap<>();
-        Map<String, List<ConfigFile>> groups = files.stream().collect(java.util.stream.Collectors.groupingBy(
-                file -> file.label().split(" / ", 2)[0], LinkedHashMap::new, java.util.stream.Collectors.toList()));
-        groups.forEach((scope, group) -> {
-            Label heading = new Label(scope);
-            heading.getStyleClass().add("share-config-section");
-            rows.getChildren().add(heading);
-            for (ConfigFile file : group) {
+        for (ConfigFile file : files) {
                 LibraryToggleBox choice = new LibraryToggleBox();
                 choice.setAccessibleText("Include " + file.label());
                 choices.put(file, choice);
-                Label name = new Label(file.path().getFileName().toString());
+                Label name = new Label(modTitle(file, modTitles));
                 name.getStyleClass().add("share-config-filename");
-                String relative = file.root().relativize(file.path()).toString().replace('\\', '/');
-                String folder = relative.contains("/") ? relative.substring(0, relative.lastIndexOf('/')) : scope;
-                Label path = new Label(folder);
+                Label path = new Label(file.path().getFileName().toString());
                 path.getStyleClass().add("share-config-path");
                 path.setWrapText(true);
                 Tooltip.install(path, new Tooltip(file.label()));
@@ -79,24 +72,20 @@ final class ShareConfigSelectionModal {
                         row.pseudoClassStateChanged(PseudoClass.getPseudoClass("selected"), selected));
                 row.setOnMouseClicked(event -> { choice.fire(); event.consume(); });
                 rows.getChildren().add(row);
-            }
-        });
+        }
         if (files.isEmpty()) {
             Label empty = new Label("No mod settings found. Your list will include mods only.");
             empty.setWrapText(true);
             empty.getStyleClass().add("share-config-description");
             rows.getChildren().add(empty);
         }
-        Label note = new Label("Included files are public. Unmatched mod folders keep their original paths.");
-        note.setWrapText(true);
-        note.getStyleClass().add("share-config-path");
-        VBox body = new VBox(16, hint, rows, note);
+        VBox body = new VBox(rows);
         body.getStyleClass().add("share-config-body");
         ScrollPane scroll = new ScrollPane(body);
         scroll.setFitToWidth(true);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scroll.getStyleClass().add("post-download-modal-scroll");
-        scroll.setPrefViewportHeight(Math.min(460, 130 + files.size() * 82 + groups.size() * 28));
+        scroll.setPrefViewportHeight(Math.min(460, 48 + Math.max(1, files.size()) * 82));
         scroll.setMinHeight(0);
         VBox.setVgrow(scroll, Priority.ALWAYS);
 
@@ -124,4 +113,20 @@ final class ShareConfigSelectionModal {
         host.getChildren().add(overlay);
         Platform.runLater(close::requestFocus);
     }
+    static String modTitle(ConfigFile file, Map<String, String> modTitles) {
+        String title = modTitles.get(file.pluginId());
+        if (title != null && !title.isBlank()) return title;
+        String folder = file.root().relativize(file.path()).getName(0).toString();
+        var matches = modTitles.entrySet().stream()
+                .filter(entry -> entry.getKey().replace(':', '_').equalsIgnoreCase(folder)
+                        || entry.getValue().equalsIgnoreCase(folder))
+                .map(Map.Entry::getValue).distinct().toList();
+        if (matches.size() == 1) return matches.getFirst();
+        if (folder.equals("Hytale_HytaleGenerator")) return "World Generation";
+        if (folder.equals("Hytale_Shop")) return "Shops";
+        String name = folder.contains("_") ? folder.substring(folder.indexOf('_') + 1) : folder;
+        name = name.replaceAll("([a-z0-9])([A-Z])", "$1 $2").replaceAll("[_-]+", " ").trim();
+        return name.isBlank() ? "Mod settings" : Character.toUpperCase(name.charAt(0)) + name.substring(1);
+    }
+
 }
