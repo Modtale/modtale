@@ -30,7 +30,7 @@ public final class ReviewOrphanTargetResolver {
             var binding=mongo.getConverter().read(RemoteReviewBinding.class,rawBinding);
             var scan=original.get("scanResult",Document.class);
             if(!"PENDING".equals(original.get("reviewStatus")) || !"SCANNING".equals(scan.get("status"))
-                    || !"REMOTE_REVIEW".equals(scan.get("scanState")) || binding.jobId()==null
+                    || !"REMOTE_REVIEW".equals(scan.get("scanState")) || binding.jobId()==null || binding.origin()==null
                     || !source.projectId().toString().equals(binding.projectId()) || !binding.versionId().equals(original.get("_id"))
                     || !binding.requestId().equals(scan.get("scanRequestId")) || !(scan.get("manualRescan") instanceof Boolean manual) || manual!=binding.manualRescan()
                     || !(scan.get("scanAttempt") instanceof Integer || scan.get("scanAttempt") instanceof Long)

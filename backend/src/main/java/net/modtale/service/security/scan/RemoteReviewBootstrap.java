@@ -21,7 +21,7 @@ public final class RemoteReviewBootstrap {
         if(current==null)return new Prepared("NO_WORK",null);
         if(current.getScanResult().getRemoteReview()!=null) {
             var retained=persistence.retained(projectId,versionId,attempt,requestId);
-            if(retained!=null)return new Prepared("READY",retained);
+            if(retained!=null && retained.origin()!=null)return new Prepared("READY",retained);
             if(!running.getAsBoolean())throw new RemoteReviewClient.Superseded();
             return new Prepared(persistence.finishBrokenBinding(projectId,versionId,attempt,requestId)==null?"NO_WORK":"UNAVAILABLE",null);
         }
@@ -38,11 +38,11 @@ public final class RemoteReviewBootstrap {
         var configuration=client.configuration();
         if(!running.getAsBoolean())throw new RemoteReviewClient.Superseded();
         var binding=new RemoteReviewBinding(projectId,versionId,requestId,attempt,current.getFileUrl(),current.getHash(),context,
-                configuration.policyVersion(),configuration.reviewConfigSha256(),null,current.getScanResult().isManualRescan());
+                configuration.policyVersion(),configuration.reviewConfigSha256(),null,current.getScanResult().isManualRescan(),configuration.origin());
         try { persistence.bind(current,binding); }
         catch(RuntimeException unknown) {
             var retained=persistence.retained(projectId,versionId,attempt,requestId);
-            if(retained!=null)return new Prepared("READY",retained);
+            if(retained!=null && retained.origin()!=null)return new Prepared("READY",retained);
             throw unknown;
         }
         var retained=persistence.retained(projectId,versionId,attempt,requestId);

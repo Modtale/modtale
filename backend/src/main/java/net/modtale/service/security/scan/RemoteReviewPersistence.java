@@ -16,7 +16,7 @@ public class RemoteReviewPersistence {
     }
 
     public boolean bind(ProjectVersion observed, RemoteReviewBinding binding) {
-        if (binding == null || binding.jobId() != null || !matches(observed,binding)) return false;
+        if (binding == null || binding.origin()==null || binding.jobId() != null || !matches(observed,binding)) return false;
         var version = target(observed,binding).and("scanResult.scanState").in("QUEUED","SCANNING","REMOTE_REVIEW")
                 .orOperator(Criteria.where("scanResult.remoteReview").is(null),Criteria.where("scanResult.remoteReview").is(binding));
         return mongo.updateFirst(query(binding,version), new Update()
@@ -25,7 +25,7 @@ public class RemoteReviewPersistence {
     }
 
     public boolean attachJob(ProjectVersion observed, RemoteReviewBinding binding, String jobId) {
-        if (binding == null || !matches(observed,binding)) return false;
+        if (binding == null || binding.origin()==null || !matches(observed,binding)) return false;
         var attached = binding.withJobId(jobId);
         var version = target(observed,binding).and("scanResult.scanState").is("REMOTE_REVIEW").and("scanResult.remotePoll").exists(false)
                 .orOperator(Criteria.where("scanResult.remoteReview").is(binding),Criteria.where("scanResult.remoteReview").is(attached));
@@ -86,8 +86,10 @@ public class RemoteReviewPersistence {
             if(!"REMOTE_REVIEW".equals(scan.getScanState()))return null;
             reason="REMOTE_BINDING_MISSING";
         } else {
-            if(projectId.equals(binding.projectId()) && "REMOTE_REVIEW".equals(scan.getScanState()) && matches(snapshot.version(),binding))return null;
-            reason="REMOTE_BINDING_MISMATCH";
+            if(projectId.equals(binding.projectId()) && "REMOTE_REVIEW".equals(scan.getScanState()) && matches(snapshot.version(),binding)) {
+                if(binding.origin()!=null)return null;
+                reason="REMOTE_ORIGIN_UNVERIFIED";
+            } else reason="REMOTE_BINDING_MISMATCH";
         }
         var uniqueness=new org.bson.Document("$eq",java.util.List.of(new org.bson.Document("$size",new org.bson.Document("$filter",
                 new org.bson.Document("input","$versions").append("as","v").append("cond",new org.bson.Document("$eq",java.util.List.of("$$v._id",new org.bson.Document("$literal",versionId)))))),1));
@@ -96,7 +98,7 @@ public class RemoteReviewPersistence {
                 .append("verdict","BLOCK".equals(scan.getVerdict())?"BLOCK":"REVIEW").append("scanTimestamp",new org.bson.Document("$toLong","$$NOW"))
                 .append("securityEvidence",null).append("artifactVerified",false).append("reviewedContextSha256",null)
                 .append("reusedReviewVersion",null).append("reusedReviewOrigins",null).append("holdUntilTimestamp",0)
-                .append("remotePoll",null).append("reviewerNotes",java.util.List.of("The stored review job no longer matches this version or its binding is missing. Repair review state before requesting another scan. No security clearance was granted."));
+                .append("remotePoll",null).append("reviewerNotes",java.util.List.of(reason.equals("REMOTE_ORIGIN_UNVERIFIED")?"The original review service identity was not recorded. Reconcile the original job before requesting another scan. No security clearance was granted.":"The stored review job no longer matches this version or its binding is missing. Repair review state before requesting another scan. No security clearance was granted."));
         var updated=new org.bson.Document("$mergeObjects",java.util.List.of("$$v",new org.bson.Document("scanResult",new org.bson.Document("$mergeObjects",java.util.List.of("$$v.scanResult",fields)))));
         var patch=java.util.List.of(new org.bson.Document("$set",new org.bson.Document("versions",new org.bson.Document("$map",new org.bson.Document("input","$versions").append("as","v")
                 .append("in",new org.bson.Document("$cond",java.util.List.of(new org.bson.Document("$eq",java.util.List.of("$$v",new org.bson.Document("$literal",snapshot.rawVersion()))),updated,"$$v")))))));

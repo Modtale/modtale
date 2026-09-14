@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Service
 @ConditionalOnProperty(name="app.warden.jobs.enabled",havingValue="true")
 public final class RemoteReviewClient implements AutoCloseable {
-    public record Configuration(String policyVersion,String reviewConfigSha256) {}
+    public record Configuration(String policyVersion,String reviewConfigSha256,RemoteReviewOrigin origin) {}
     public record Status(String jobId,String state,boolean artifactRetained,long createdAt,long expiresAt,String workState) {}
     public static final class Unavailable extends RuntimeException {
         private final int status;
@@ -59,13 +59,24 @@ public final class RemoteReviewClient implements AutoCloseable {
                 .codecs(c->c.defaultCodecs().maxInMemorySize(16*1024*1024)).build();
     }
     public Configuration configuration() {
-        var body=exchange(client.get().uri("/api/v1/review-jobs/configuration"),200,65536);
+        var origin=origin();
+        var body=exchange(scoped(client.get().uri("/api/v1/review-jobs/configuration"),origin),200,65536);
         fields(body,"policyVersion","reviewConfigSha256");String policy=text(body,"policyVersion"),config=text(body,"reviewConfigSha256");
         if (!policy.matches("warden-3\\.0\\.0:[0-9a-f]{64}") || !digest(config)) throw new Unavailable(502);
-        return new Configuration(policy,config);
+        return new Configuration(policy,config,origin);
+    }
+    public RemoteReviewOrigin origin() {
+        var body=exchange(client.get().uri("/api/v1/review-jobs/identity"),200,65536);fields(body,"deploymentId","callerScope");
+        try{return new RemoteReviewOrigin(text(body,"deploymentId"),text(body,"callerScope"));}
+        catch(IllegalArgumentException invalid){throw new Unavailable(502);}
+    }
+    public static final class MissingOrigin extends RuntimeException {public MissingOrigin(){super("Remote review origin is unavailable");}}
+    private static WebClient.RequestHeadersSpec<?> scoped(WebClient.RequestHeadersSpec<?> request,RemoteReviewOrigin origin) {
+        if(origin==null)throw new MissingOrigin();
+        return request.header("X-Warden-Deployment-Id",origin.deploymentId()).header("X-Warden-Caller-Scope",origin.callerScope());
     }
     public Optional<Status> find(RemoteReviewBinding binding) {
-        try { return Optional.of(statusBody(exchange(client.get().uri(uri(binding,"/requests/"+binding.requestId(),false)),200,65536),binding)); }
+        try { return Optional.of(statusBody(exchange(scoped(client.get().uri(uri(binding,"/requests/"+binding.requestId(),false)),binding.origin()),200,65536),binding)); }
         catch(Unavailable failure) { if(failure.status()==404)return Optional.empty();throw failure; }
     }
     public static final class Superseded extends RuntimeException { public Superseded(){super("Remote review ownership changed");} }
@@ -83,21 +94,21 @@ public final class RemoteReviewClient implements AutoCloseable {
         var form=new MultipartBodyBuilder();form.part("requestId",binding.requestId());form.part("artifactSha256",binding.artifactSha256());
         form.part("contextSha256",binding.contextSha256());form.part("policyVersion",binding.policyVersion());form.part("reviewConfigSha256",binding.reviewConfigSha256());
         form.part("file",new ByteArrayResource(bytes){@Override public String getFilename(){return "artifact.zip";}});
-        return statusBody(exchange(client.post().uri("/api/v1/review-jobs").contentType(MediaType.MULTIPART_FORM_DATA)
-                .body(BodyInserters.fromMultipartData(form.build())),202,65536,current),found.isPresent()?binding.withJobId(found.get().jobId()):binding);
+        return statusBody(exchange(scoped(client.post().uri("/api/v1/review-jobs").contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(BodyInserters.fromMultipartData(form.build())),binding.origin()),202,65536,current),found.isPresent()?binding.withJobId(found.get().jobId()):binding);
     }
     private static void validateOriginal(RemoteReviewBinding binding,byte[] bytes) {
         if(bytes==null || bytes.length==0 || bytes.length>100*1024*1024 || !binding.artifactSha256().equals(hash(bytes)))
             throw new IllegalArgumentException("Original artifact does not match review binding");
     }
     public Status status(RemoteReviewBinding binding) {
-        requireJob(binding);return statusBody(exchange(client.get().uri(uri(binding,"/"+binding.jobId(),true)),200,65536),binding);
+        requireJob(binding);return statusBody(exchange(scoped(client.get().uri(uri(binding,"/"+binding.jobId(),true)),binding.origin()),200,65536),binding);
     }
     public Status cancel(RemoteReviewBinding binding) {
-        requireJob(binding);return statusBody(exchange(client.delete().uri(uri(binding,"/"+binding.jobId(),true)),200,65536),binding);
+        requireJob(binding);return statusBody(exchange(scoped(client.delete().uri(uri(binding,"/"+binding.jobId(),true)),binding.origin()),200,65536),binding);
     }
     public ScanResult result(RemoteReviewBinding binding) {
-        requireJob(binding);var body=exchange(client.get().uri(uri(binding,"/"+binding.jobId()+"/result",true)),200,16*1024*1024);
+        requireJob(binding);var body=exchange(scoped(client.get().uri(uri(binding,"/"+binding.jobId()+"/result",true)),binding.origin()),200,16*1024*1024);
         fields(body,"jobId","requestId","binding","completedAt","scan");identity(body,binding);
         if(number(body,"completedAt")<=0 || !body.path("scan").isObject())throw new Unavailable(502);
         try {

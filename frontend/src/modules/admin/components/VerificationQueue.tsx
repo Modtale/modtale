@@ -107,7 +107,7 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
                         </div>
                         <div className="flex items-center gap-2">
                             {needsService && <div className="text-sm text-amber-700 dark:text-amber-300">
-                                {scan?.scanState === 'REMOTE_ISOLATED' ? 'Local review isolated' : ['REMOTE_BINDING_MISSING', 'REMOTE_BINDING_MISMATCH'].includes(scan?.scanState || '') ? 'Review state needs repair' : scan?.scanState === 'REMOTE_UNSUPPORTED_CONTEXT' ? 'Review context unsupported' : scan?.scanState === 'REMOTE_EXPIRED' ? 'Review expired' : scan?.scanState === 'REMOTE_CANCELLED' ? 'Review cancelled' : scan?.scanState === 'REMOTE_HELD' ? 'Review held' : 'Review unavailable'}
+                                {scan?.scanState === 'REMOTE_ORIGIN_UNVERIFIED' ? 'Original review service unverified' : scan?.scanState === 'REMOTE_CONTEXT_CONFLICT' ? 'Review service context conflict' : scan?.scanState === 'REMOTE_ISOLATED' ? 'Local review isolated' : ['REMOTE_BINDING_MISSING', 'REMOTE_BINDING_MISMATCH'].includes(scan?.scanState || '') ? 'Review state needs repair' : scan?.scanState === 'REMOTE_UNSUPPORTED_CONTEXT' ? 'Review context unsupported' : scan?.scanState === 'REMOTE_EXPIRED' ? 'Review expired' : scan?.scanState === 'REMOTE_CANCELLED' ? 'Review cancelled' : scan?.scanState === 'REMOTE_HELD' ? 'Review held' : 'Review unavailable'}
                                 <span className="block text-xs">Security clearance withheld</span>
                             </div>}
                             {scan?.status === 'SCANNING' && (

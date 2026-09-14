@@ -127,4 +127,10 @@ class ReviewStateDiagnosticReaderTest {
         assertEquals(4,calls);assertEquals(3,examined);assertEquals(List.of("STRING","OBJECT_ID"),types);
     }
     @Test void invalidLimitsFailBeforeDatabaseAccess(){assertThrows(IllegalArgumentException.class,()->reader.page(null,0));assertThrows(IllegalArgumentException.class,()->reader.page(null,65));}
+    @Test void malformedOriginIsDiagnosedWithoutExposingItsPayload() {
+        var v=version("v");scan(v).put("scanState","REMOTE_REVIEW");scan(v).put("remoteReview",binding("a","v").append("origin",new Document("deploymentId","private".repeat(100000)).append("callerScope",List.of("bad"))));
+        insert("a",List.of(v));var before=projects.find().first();var page=reader.page(null,1);
+        assertTrue(page.items().getFirst().reasons().contains(INVALID_BINDING));assertFalse(page.toString().contains("private"));assertEquals(before,projects.find().first());
+    }
+
 }

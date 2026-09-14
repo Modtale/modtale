@@ -137,7 +137,7 @@ public class ScanPersistenceService {
     }
 
     static boolean remoteResultMatches(RemoteReviewPollStore.Claim claim,ScanResult.RemoteReviewPoll poll,ScanResult result,ProjectVersion version) {
-        if(claim==null || claim.binding().jobId()==null || poll==null || !claim.token().equals(poll.token()) || poll.leaseUntil()==null
+        if(claim==null || claim.binding().origin()==null || claim.binding().jobId()==null || poll==null || !claim.token().equals(poll.token()) || poll.leaseUntil()==null
                 || poll.nextPollAt()==null || result==null || version==null || result.getSecurityEvidence()==null)return false;
         var b=claim.binding();var e=result.getSecurityEvidence();
         return b.versionId().equals(version.getId()) && b.artifactSha256().equals(version.getHash()) && b.filePath().equals(version.getFileUrl())
@@ -152,7 +152,7 @@ public class ScanPersistenceService {
         var b=claim.binding();
         var bindingFields=new org.bson.Document("projectId",b.projectId()).append("versionId",b.versionId()).append("requestId",b.requestId())
                 .append("attempt",b.attempt()).append("filePath",b.filePath()).append("artifactSha256",b.artifactSha256()).append("contextSha256",b.contextSha256())
-                .append("policyVersion",b.policyVersion()).append("reviewConfigSha256",b.reviewConfigSha256()).append("jobId",b.jobId()).append("manualRescan",b.manualRescan());
+                .append("policyVersion",b.policyVersion()).append("reviewConfigSha256",b.reviewConfigSha256()).append("origin",new org.bson.Document("deploymentId",b.origin().deploymentId()).append("callerScope",b.origin().callerScope())).append("jobId",b.jobId()).append("manualRescan",b.manualRescan());
         bindingFields.forEach((key,value)->version.put("scanResult.remoteReview."+key,value));
         version.put("scanResult.remotePoll",poll);version.put("fileUrl",b.filePath());
         var terms=new java.util.ArrayList<Object>();if(raw.containsKey("$expr"))terms.add(raw.get("$expr"));

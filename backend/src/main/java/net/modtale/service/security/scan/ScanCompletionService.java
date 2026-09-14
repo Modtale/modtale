@@ -67,6 +67,7 @@ public class ScanCompletionService {
     }
     public boolean handleRemoteCompletedScan(RemoteReviewPollStore.Claim claim,ScanResult result) {
         var binding=claim.binding();
+        if(binding.origin()==null)return false;
         if(result==null || !binding.requestId().equals(result.getScanRequestId()))return false;
         return complete(binding.projectId(),binding.versionId(),binding.attempt(),binding.manualRescan(),result,binding.requestId(),claim);
     }

@@ -52,6 +52,7 @@ public final class ReviewStateDiagnosticReader {
             view.append("binding_"+key,text(binding+"."+key,key.equals("filePath")?4096:128));
         view.append("binding_attempt",integer(binding+".attempt")).append("binding_manualType",type(binding+".manualRescan"))
                 .append("binding_manual",bool(binding+".manualRescan")).append("binding_jobType",type(binding+".jobId"));
+        view.append("originType",type(binding+".origin")).append("originDeployment",text(binding+".origin.deploymentId",36)).append("originCaller",text(binding+".origin.callerScope",64));
         String poll=scan+".remotePoll";
         view.append("pollSize",new Document("$cond",List.of(eq(type(poll),"object"),new Document("$size",new Document("$objectToArray",poll)),0)))
                 .append("pollToken",text(poll+".token",36)).append("pollTokenType",type(poll+".token"))
@@ -94,9 +95,14 @@ public final class ReviewStateDiagnosticReader {
                 if(!"object".equals(bindingType) || !"bool".equals(row.getString("binding_manualType"))
                         || !Set.of("missing","null","string").contains(row.getString("binding_jobType"))
                         || "string".equals(row.getString("binding_jobType")) && !uuid(row.getString("binding_jobId")))throw new IllegalArgumentException();
+                net.modtale.model.project.RemoteReviewOrigin origin=null;
+                if(!Set.of("missing","null").contains(row.getString("originType"))) {
+                    if(!"object".equals(row.getString("originType")))throw new IllegalArgumentException();
+                    origin=new net.modtale.model.project.RemoteReviewOrigin(row.getString("originDeployment"),row.getString("originCaller"));
+                }
                 binding=new RemoteReviewBinding(row.getString("binding_projectId"),row.getString("binding_versionId"),row.getString("binding_requestId"),row.getInteger("binding_attempt",0),
                         row.getString("binding_filePath"),row.getString("binding_artifactSha256"),row.getString("binding_contextSha256"),row.getString("binding_policyVersion"),
-                        row.getString("binding_reviewConfigSha256"),row.getString("binding_jobId"),Boolean.TRUE.equals(row.get("binding_manual")));
+                        row.getString("binding_reviewConfigSha256"),row.getString("binding_jobId"),Boolean.TRUE.equals(row.get("binding_manual")),origin);
             } catch(IllegalArgumentException invalid) {reasons.add(Reason.INVALID_BINDING);}
             if(binding!=null && (!remote || !project.equals(binding.projectId()) || !Objects.equals(row.getString("versionId"),binding.versionId())
                     || !Objects.equals(row.getString("request"),binding.requestId()) || row.getInteger("attempt",0)!=binding.attempt()

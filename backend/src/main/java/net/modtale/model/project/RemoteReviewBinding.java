@@ -2,10 +2,15 @@ package net.modtale.model.project;
 
 public record RemoteReviewBinding(String projectId, String versionId, String requestId, int attempt,
         String filePath, String artifactSha256, String contextSha256, String policyVersion,
-        String reviewConfigSha256, String jobId, boolean manualRescan) {
+        String reviewConfigSha256, String jobId, boolean manualRescan, RemoteReviewOrigin origin) {
     public RemoteReviewBinding(String projectId,String versionId,String requestId,int attempt,String filePath,String artifactSha256,
             String contextSha256,String policyVersion,String reviewConfigSha256,String jobId) {
         this(projectId,versionId,requestId,attempt,filePath,artifactSha256,contextSha256,policyVersion,reviewConfigSha256,jobId,false);
+    }
+    // Legacy records remain readable, but their missing origin cannot authorize remote requests.
+    public RemoteReviewBinding(String projectId,String versionId,String requestId,int attempt,String filePath,String artifactSha256,
+            String contextSha256,String policyVersion,String reviewConfigSha256,String jobId,boolean manualRescan) {
+        this(projectId,versionId,requestId,attempt,filePath,artifactSha256,contextSha256,policyVersion,reviewConfigSha256,jobId,manualRescan,null);
     }
     public RemoteReviewBinding {
         if (!text(projectId,128) || !text(versionId,128) || !uuid(requestId) || attempt < 1
@@ -16,7 +21,7 @@ public record RemoteReviewBinding(String projectId, String versionId, String req
     }
     public RemoteReviewBinding withJobId(String value) {
         if (!uuid(value) || jobId != null && !jobId.equals(value)) throw new IllegalArgumentException("Remote job identity cannot change");
-        return new RemoteReviewBinding(projectId,versionId,requestId,attempt,filePath,artifactSha256,contextSha256,policyVersion,reviewConfigSha256,value,manualRescan);
+        return new RemoteReviewBinding(projectId,versionId,requestId,attempt,filePath,artifactSha256,contextSha256,policyVersion,reviewConfigSha256,value,manualRescan,origin);
     }
     private static boolean text(String value,int max) { return value != null && !value.isBlank() && value.length() <= max && value.chars().noneMatch(Character::isISOControl); }
     private static boolean digest(String value) { return value != null && value.matches("[0-9a-f]{64}"); }

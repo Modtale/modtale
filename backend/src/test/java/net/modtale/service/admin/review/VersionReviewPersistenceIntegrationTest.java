@@ -24,7 +24,7 @@ class VersionReviewPersistenceIntegrationTest {
         mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update().set("versions.0",version),Project.class);
         return new RemoteReviewBinding(id,version.getId(),scan.getScanRequestId(),1,version.getFileUrl(),version.getHash(),
                 net.modtale.service.security.scan.ArtifactReviewContext.automaticallyReviewableFingerprint(version),
-                "warden-3.0.0:"+"a".repeat(64),"b".repeat(64),null);
+                "warden-3.0.0:"+"a".repeat(64),"b".repeat(64),null,false,new net.modtale.model.project.RemoteReviewOrigin("11111111-1111-1111-1111-111111111111","e".repeat(64)));
     }
     @Test void remoteBindingSurvivesRestartAndAttachesOnlyOneJob() {
         var binding=prepareRemote();var remote=new net.modtale.service.security.scan.RemoteReviewPersistence(mongo);
@@ -48,7 +48,7 @@ class VersionReviewPersistenceIntegrationTest {
         var binding=prepareRemote();var remote=new net.modtale.service.security.scan.RemoteReviewPersistence(mongo);
         assertTrue(remote.bind(version,binding));
         var other=new RemoteReviewBinding(binding.projectId(),binding.versionId(),binding.requestId(),binding.attempt(),binding.filePath(),
-                binding.artifactSha256(),binding.contextSha256(),binding.policyVersion(),"c".repeat(64),null);
+                binding.artifactSha256(),binding.contextSha256(),binding.policyVersion(),"c".repeat(64),null,false,new net.modtale.model.project.RemoteReviewOrigin("11111111-1111-1111-1111-111111111111","e".repeat(64)));
         assertFalse(remote.bind(version,other));
         mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update().set("versions.0.scanResult.scanRequestId",UUID.randomUUID().toString()),Project.class);
         assertFalse(remote.attachJob(version,binding,UUID.randomUUID().toString()));assertFalse(remote.bind(version,binding));

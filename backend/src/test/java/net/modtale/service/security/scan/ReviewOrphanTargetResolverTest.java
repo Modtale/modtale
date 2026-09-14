@@ -66,4 +66,9 @@ class ReviewOrphanTargetResolverTest {
         assertThrows(IllegalStateException.class,()->resolver.resolve(source.id(),"actor"));
     }
 
+    @Test void legacyBindingWithoutOriginCannotBecomeACancellationTarget() {
+        fixture.fixture.attached(30000);fixture.fixture.change("scanResult.remoteReview.origin",null);fixture.isolateExpiredBrokenPoll();
+        assertThrows(IllegalStateException.class,()->resolver.resolve(fixture.prepared.id(),"actor"));
+    }
+
 }

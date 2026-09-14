@@ -60,7 +60,7 @@ class ArtifactReviewLineageIntegrationTest {
         String request=UUID.randomUUID().toString();target.setFileUrl("original.zip");result.setScanRequestId(request);
         mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update().set("versions.1.fileUrl","original.zip").set("versions.1.scanResult.scanRequestId",request),Project.class);
         var current=mongo.findById(id,Project.class).getVersions().get(1);
-        var binding=new RemoteReviewBinding(id,"target",request,1,"original.zip",target.getHash(),result.getReviewedContextSha256(),result.getSecurityEvidence().policyVersion(),"c".repeat(64),null);
+        var binding=new RemoteReviewBinding(id,"target",request,1,"original.zip",target.getHash(),result.getReviewedContextSha256(),result.getSecurityEvidence().policyVersion(),"c".repeat(64),null,false,new net.modtale.model.project.RemoteReviewOrigin("11111111-1111-1111-1111-111111111111","e".repeat(64)));
         assertTrue(new RemoteReviewPersistence(mongo).bind(current,binding));var polls=new RemoteReviewPollStore(mongo);
         var claim=polls.claim(binding,30000);assertNotNull(claim);return polls.attachJob(claim,UUID.randomUUID().toString());
     }

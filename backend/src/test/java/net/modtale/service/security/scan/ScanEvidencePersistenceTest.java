@@ -18,7 +18,7 @@ class ScanEvidencePersistenceTest {
         converter.afterPropertiesSet();
         var original = ScanEvidenceFixtures.complete(true);
         var remote=new net.modtale.model.project.RemoteReviewBinding("project","version",java.util.UUID.randomUUID().toString(),1,
-                "original.zip","a".repeat(64),"b".repeat(64),"warden-3.0.0:"+"c".repeat(64),"d".repeat(64),null);
+                "original.zip","a".repeat(64),"b".repeat(64),"warden-3.0.0:"+"c".repeat(64),"d".repeat(64),null,false,new net.modtale.model.project.RemoteReviewOrigin("11111111-1111-1111-1111-111111111111","e".repeat(64)));
         original.setManualRescan(true);
         original.setRemoteReview(remote);
         original.setRemoteStatus(new ScanResult.RemoteReviewStatus(java.util.UUID.randomUUID().toString(),"QUEUED",true,1000,2000,null));
@@ -28,7 +28,7 @@ class ScanEvidencePersistenceTest {
         converter.write(original, stored);
         var restored = converter.read(ScanResult.class, stored);
         assertTrue(ArtifactClearancePolicy.complete(restored));
-        assertEquals(remote,restored.getRemoteReview());
+        assertEquals(remote,restored.getRemoteReview());assertEquals(remote.origin(),restored.getRemoteReview().origin());
         assertTrue(restored.isManualRescan());
         assertEquals(original.getRemoteStatus(),restored.getRemoteStatus());
         assertEquals(original.getRemotePoll(),restored.getRemotePoll());

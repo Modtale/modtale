@@ -21,6 +21,7 @@ public final class RemoteReviewStep {
     public Outcome advance(RemoteReviewBinding binding) {return advance(binding,()->true);}
     public Outcome advance(RemoteReviewBinding binding,java.util.function.BooleanSupplier running) {
         if(!running.getAsBoolean() || Thread.currentThread().isInterrupted())return new Outcome("SHUTDOWN",null);
+        if(binding.origin()==null)return new Outcome("UNVERIFIED_ORIGIN",null);
         if(!slots.tryAcquire())return new Outcome("BUSY",null);
         RemoteReviewPollStore.Claim claim=null;
         try {
@@ -46,6 +47,10 @@ public final class RemoteReviewStep {
             return new Outcome(saved?"RECORDED":"SUPERSEDED",saved?status.state():null);
         } catch(RemoteReviewClient.Superseded stale) {return new Outcome("SUPERSEDED",null);}
         catch(RuntimeException unavailable) {
+            if(claim!=null && unavailable instanceof RemoteReviewClient.Unavailable conflict && conflict.status()==409) {
+                try {return new Outcome(polls.finishContextConflict(claim)?"UNAVAILABLE":"SUPERSEDED",null);}
+                catch(RuntimeException unknown){return new Outcome("UNKNOWN",null);}
+            }
             if(claim!=null)try {if(polls.release(claim,30000))return new Outcome("RETRY",null);}catch(RuntimeException unknown) { /* Ownership expires in the database. */ }
             return new Outcome("UNKNOWN",null);
         } finally {slots.release();}

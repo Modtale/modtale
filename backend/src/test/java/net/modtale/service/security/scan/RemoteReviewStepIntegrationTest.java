@@ -26,9 +26,11 @@ class RemoteReviewStepIntegrationTest {
     ScanCompletionService completion;net.modtale.service.security.issue.SecurityIssueAnalysisService analysis;
     WardenClientService policy;
     byte[] bytes="inert original".getBytes();String project="abcdefabcdefabcdefabcdef",job=UUID.randomUUID().toString();
-    AtomicInteger posts=new AtomicInteger(),gets=new AtomicInteger();ObjectMapper mapper=new ObjectMapper();
+    RemoteReviewOrigin origin=new RemoteReviewOrigin("11111111-1111-1111-1111-111111111111","e".repeat(64));
+    AtomicInteger identityGets=new AtomicInteger(),posts=new AtomicInteger(),gets=new AtomicInteger();ObjectMapper mapper=new ObjectMapper();
     interface Handler {void handle(HttpExchange e)throws Exception;}
-    void route(Handler handler){server.createContext("/api/v1/review-jobs",e->{try{if(e.getRequestMethod().equals("POST")){posts.incrementAndGet();e.getRequestBody().readAllBytes();}else gets.incrementAndGet();handler.handle(e);}catch(Exception failure){throw new RuntimeException(failure);}finally{e.close();}});}
+    void route(Handler handler){server.createContext("/api/v1/review-jobs",e->{try{if(e.getRequestURI().getPath().endsWith("/identity")){identityGets.incrementAndGet();byte[] body=mapper.writeValueAsBytes(origin);e.sendResponseHeaders(200,body.length);e.getResponseBody().write(body);return;}
+        assertEquals(origin.deploymentId(),e.getRequestHeaders().getFirst("X-Warden-Deployment-Id"));assertEquals(origin.callerScope(),e.getRequestHeaders().getFirst("X-Warden-Caller-Scope"));if(e.getRequestMethod().equals("POST")){posts.incrementAndGet();e.getRequestBody().readAllBytes();}else gets.incrementAndGet();handler.handle(e);}catch(Exception failure){throw new RuntimeException(failure);}finally{e.close();}});}
     void reply(HttpExchange e,int code,String state)throws Exception {
         var body=new LinkedHashMap<String,Object>();body.put("jobId",job);body.put("requestId",binding.requestId());
         body.put("binding",Map.of("artifactSha256",binding.artifactSha256(),"contextSha256",binding.contextSha256(),"policyVersion",binding.policyVersion(),"reviewConfigSha256",binding.reviewConfigSha256()));
@@ -53,7 +55,7 @@ class RemoteReviewStepIntegrationTest {
         var version=new ProjectVersion();version.setId("v");version.setFileUrl("original.zip");version.setHash(HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)));
         var scan=new ScanResult();scan.setStatus(ScanStatus.SCANNING);scan.setScanState("SCANNING");scan.setScanAttempt(1);scan.setScanRequestId(UUID.randomUUID().toString());version.setScanResult(scan);
         var root=new Project();root.setId(project);root.setVersions(List.of(version));mongo.insert(root);
-        binding=new RemoteReviewBinding(project,"v",scan.getScanRequestId(),1,version.getFileUrl(),version.getHash(),ArtifactReviewContext.automaticallyReviewableFingerprint(version),"warden-3.0.0:"+"b".repeat(64),"c".repeat(64),null);
+        binding=new RemoteReviewBinding(project,"v",scan.getScanRequestId(),1,version.getFileUrl(),version.getHash(),ArtifactReviewContext.automaticallyReviewableFingerprint(version),"warden-3.0.0:"+"b".repeat(64),"c".repeat(64),null,false,origin);
         assertTrue(new RemoteReviewPersistence(mongo).bind(version,binding));polls=new RemoteReviewPollStore(mongo);storage=mock(StorageService.class);when(storage.downloadBounded(binding.filePath(),100*1024*1024)).thenReturn(bytes);
         server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());server.start();
         client=new RemoteReviewClient(new AppWardenProperties("http://127.0.0.1:"+server.getAddress().getPort(),"fixture-key",true,1,600),Duration.ofSeconds(2));
@@ -145,7 +147,7 @@ class RemoteReviewStepIntegrationTest {
         var candidate=new RemoteReviewDiscovery(mongo).page(null,16).candidates().getFirst();
         var boot=bootstrap(new RemoteReviewPersistence(mongo));assertEquals("RECORDED",boot.advance(candidate.projectId(),candidate.versionId(),candidate.attempt(),candidate.requestId()).state());
         assertEquals(job,saved().getRemoteReview().jobId());assertEquals("READY",boot.prepare(project,"v",1,binding.requestId()).state());
-        assertEquals(1,configurations.get());assertEquals(1,posts.get());
+        assertEquals(origin,saved().getRemoteReview().origin());assertEquals(1,identityGets.get());assertEquals(1,configurations.get());assertEquals(1,posts.get());
     }
     @Test void bootstrapRecoversCommittedBindingAcknowledgementLoss() {
         queuedAgain();route(this::configuration);var persistence=spy(new RemoteReviewPersistence(mongo));
@@ -410,4 +412,24 @@ class RemoteReviewStepIntegrationTest {
     @Test void competingStepCannotDispatchUnderExistingLiveClaim() {
         assertNotNull(polls.claim(binding,120000));route(e->reply(e,404,"AWAITING_UPLOAD"));assertEquals("NO_WORK",step.advance(binding).state());assertEquals(0,gets.get());verifyNoInteractions(storage);
     }
+    @Test void legacyOriginRoutesOnceToOperationsWithoutNetworkOrBackfill() {
+        change("scanResult.remoteReview.origin",null);change("scanResult.verdict","BLOCK");var old=saved().getRemoteReview();
+        route(e->reply(e,200,"COMPLETED"));var boot=bootstrap(new RemoteReviewPersistence(mongo));
+        assertEquals("UNAVAILABLE",boot.advance(project,"v",1,binding.requestId()).state());assertEquals("REMOTE_ORIGIN_UNVERIFIED",saved().getScanState());assertEquals(ScanStatus.FAILED,saved().getStatus());
+        assertEquals("BLOCK",saved().getVerdict());assertEquals(old,saved().getRemoteReview());assertNull(saved().getRemoteReview().origin());assertFalse(saved().isArtifactVerified());
+        assertEquals("NO_WORK",boot.advance(project,"v",1,binding.requestId()).state());assertEquals(0,gets.get());assertEquals(0,posts.get());assertEquals(0,identityGets.get());verifyNoInteractions(storage);
+    }
+    @Test void remoteContextConflictPreservesBindingAndBlockWithoutPollingAgain() {
+        change("scanResult.verdict","BLOCK");route(e->reply(e,409,"QUEUED"));var before=saved().getRemoteReview();
+        assertEquals("UNAVAILABLE",step.advance(binding).state());assertEquals("REMOTE_CONTEXT_CONFLICT",saved().getScanState());assertEquals(before,saved().getRemoteReview());assertEquals("BLOCK",saved().getVerdict());
+        assertEquals("NO_WORK",step.advance(binding).state());assertEquals(1,gets.get());assertEquals(0,posts.get());verifyNoInteractions(storage);
+    }
+    @Test void aConflictArrivingAfterLocalContextChangeCannotOverwriteNewState() {
+        route(e->{change("manifestVersion","concurrent");reply(e,409,"QUEUED");});assertEquals("SUPERSEDED",step.advance(binding).state());assertEquals("REMOTE_REVIEW",saved().getScanState());
+    }
+    @Test void changingOriginAfterCompletionSnapshotRejectsTheFinalWrite() {
+        var claim=attached(30000);when(policy.currentPolicyVersion()).thenAnswer(i->{change("scanResult.remoteReview.origin.deploymentId","22222222-2222-2222-2222-222222222222");return binding.policyVersion();});
+        assertFalse(completion.handleRemoteCompletedScan(claim,cleanResult()));assertEquals("REMOTE_REVIEW",saved().getScanState());assertFalse(saved().isArtifactVerified());
+    }
+
 }
