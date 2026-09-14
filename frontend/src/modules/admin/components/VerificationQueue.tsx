@@ -9,7 +9,7 @@ interface VerificationQueueProps {
     loadFailed?: boolean;
     loadingReview: boolean;
     reviewingId?: string;
-    onReview: (id: string) => void;
+    onReview: (id: string, versionId?: string) => void;
 }
 
 export const VerificationQueue: React.FC<VerificationQueueProps> = ({
@@ -53,7 +53,7 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
         const risk = scan?.riskScore || 0;
 
         return (
-            <div key={mod.id} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl backdrop-blur-md p-6 flex flex-col md:flex-row gap-8 hover:shadow-xl transition-all duration-300 group hover:border-modtale-accent/20">
+            <div key={JSON.stringify([mod.id, targetVersion?.id])} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl backdrop-blur-md p-6 flex flex-col md:flex-row gap-8 hover:shadow-xl transition-all duration-300 group hover:border-modtale-accent/20">
                 <div className="w-full md:w-32 h-32 rounded-2xl overflow-hidden bg-slate-100 dark:bg-white/5 relative shrink-0 shadow-inner">
                     <img src={mod.imageUrl} className="w-full h-full object-cover" alt="" onError={(e) => e.currentTarget.src = '/assets/favicon.svg'} />
                     {isProjectPending && (
@@ -78,6 +78,7 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
                         </div>
                     </div>
 
+                    {isProjectPending && targetVersion && <p className="text-sm text-slate-500">Version {targetVersion.versionNumber}</p>}
                     {isProjectPending ? (
                         <p className="text-slate-600 dark:text-slate-400 text-sm mb-6 line-clamp-2 leading-relaxed font-medium">{mod.description}</p>
                     ) : (
@@ -92,7 +93,7 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
                             <button
-                                onClick={() => onReview(mod.id)}
+                                onClick={() => onReview(mod.id, targetVersion?.id)}
                                 className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-black text-sm flex items-center gap-2 hover:bg-slate-800 dark:hover:bg-slate-200 transition-all shadow-lg shadow-black/10 dark:shadow-white/5 hover:scale-105 active:scale-95"
                             >
                                 {loadingReview && reviewingId === mod.id ? 'Loading...' : needsService ? 'Open diagnostics' : <><Shield className="w-4 h-4" /> Verify {isProjectPending ? 'Project' : 'Update'}</>}

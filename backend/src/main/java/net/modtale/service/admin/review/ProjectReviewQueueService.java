@@ -29,10 +29,7 @@ public class ProjectReviewQueueService {
                         )
                 )
         );
-        Criteria noVersionIsScanning = Criteria.where("versions").not().elemMatch(
-                Criteria.where("scanResult.status").is(ScanStatus.SCANNING)
-        );
-        Query query = new Query(new Criteria().andOperator(reviewCandidate, noVersionIsScanning));
+        Query query = new Query(reviewCandidate);
 
         query.fields()
                 .include("id")

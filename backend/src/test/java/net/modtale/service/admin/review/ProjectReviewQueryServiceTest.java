@@ -39,6 +39,31 @@ class ProjectReviewQueryServiceTest {
         assertEquals(2, queue.getFirst().pendingVersion().scan().newIssueCount());
     }
 
+    @Test void scanningSiblingCannotHideFailedOrReadyVersions() {
+        var queues=mock(ProjectReviewQueueService.class);
+        var service=new ProjectReviewQueryService(mock(UserRepository.class),mock(ProjectService.class),queues,mock(ProjectListingQueryService.class));
+        var project=queueProject("p","date",ScanStatus.SCANNING,"REVIEW",0,0);
+        var scanning=project.getVersions().getFirst();
+        var failed=queueProject("failed","date",ScanStatus.FAILED,"REVIEW",0,0).getVersions().getFirst();
+        var ready=queueProject("ready","date",ScanStatus.SUSPICIOUS,"REVIEW",50,1).getVersions().getFirst();
+        var approved=queueProject("approved","date",ScanStatus.CLEAN,"ALLOW",0,0).getVersions().getFirst();
+        approved.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        project.setVersions(List.of(scanning,failed,ready,approved));when(queues.getVerificationQueue()).thenReturn(List.of(project));
+        var result=service.getVerificationQueue();assertEquals(2,result.size());
+        assertEquals(List.of("ready-version","failed-version"),result.stream().map(v->v.pendingVersion().id()).toList());
+        assertEquals(List.of("p","p"),result.stream().map(AdminVerificationQueueItemDTO::id).toList());
+    }
+
+    @Test void pendingProjectWithApprovedVersionsRetainsContentReviewRow() {
+        var queues=mock(ProjectReviewQueueService.class);
+        var service=new ProjectReviewQueryService(mock(UserRepository.class),mock(ProjectService.class),queues,mock(ProjectListingQueryService.class));
+        var project=queueProject("p","date",ScanStatus.CLEAN,"ALLOW",0,0);project.setStatus(ProjectStatus.PENDING);
+        project.getVersions().getFirst().setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        when(queues.getVerificationQueue()).thenReturn(List.of(project));
+        var result=service.getVerificationQueue();assertEquals(1,result.size());
+        org.junit.jupiter.api.Assertions.assertNull(result.getFirst().pendingVersion());
+    }
+
     private static Project queueProject(
             String id,
             String updatedAt,

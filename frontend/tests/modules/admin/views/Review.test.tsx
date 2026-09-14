@@ -26,6 +26,17 @@ describe('Review security clearance status', () => {
             await act(async () => next!.click());
         }
     }
+    it('keeps the queue-selected version when a pending sibling appears first', async () => {
+        const project = refreshed();
+        await act(async () => root.render(<Review reviewingProject={{...project, selectedVersionId: 'version'}} onClose={vi.fn()} onApprove={vi.fn()} onReject={vi.fn()} setStatus={vi.fn()} canDecide={true} />));
+        vi.mocked(adminClient.publishProject).mockClear();
+        for (let step=0; step<4; step++) {
+            await act(async () => container.querySelectorAll<HTMLInputElement>('input[type=checkbox]').forEach(input => input.click()));
+            await click('Next Step');
+        }
+        await click('Approve & Publish');
+        expect(adminClient.publishProject).toHaveBeenCalledWith('project', 'fresh-project', 'version');
+    });
     it('requires refreshed evidence before publishing after a finding decision changes the snapshot', async () => {
         vi.mocked(adminClient.publishProject).mockClear();
         await render(clear, true, 'project-snapshot', 2);

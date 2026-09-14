@@ -92,7 +92,9 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
 
     const pendingVersion = refreshedReview !== null && refreshedReview.source === reviewingProject
         ? mod.versions.find((v: ProjectVersion) => v.id === refreshedReview.versionId)
-        : mod.versions.find((v: ProjectVersion) => v.reviewStatus === 'PENDING') || mod.versions[0];
+        : reviewingProject.selectedVersionId
+            ? mod.versions.find((v: ProjectVersion) => v.id === reviewingProject.selectedVersionId)
+            : mod.versions.find((v: ProjectVersion) => v.reviewStatus === 'PENDING') || mod.versions[0];
     useEffect(() => setDecisionWritten(false), [pendingVersion?.id, pendingVersion?.reviewToken]);
     const [reasoningIssue, setReasoningIssue] = useState<number | null>(null);
     useEffect(() => setReasoningIssue(null), [pendingVersion?.id, mod.reviewToken]);

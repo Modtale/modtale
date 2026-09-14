@@ -40,12 +40,31 @@ public class ProjectReviewQueryService {
 
     public List<AdminVerificationQueueItemDTO> getVerificationQueue() {
         return projectReviewQueueService.getVerificationQueue().stream()
-                .map(ProjectMapper::toVerificationQueueItemDTO)
+                .flatMap(ProjectReviewQueryService::queueItems)
                 .filter(Objects::nonNull)
                 .sorted(Comparator
                         .comparingInt(ProjectReviewQueryService::queuePriority).reversed()
                         .thenComparing(item -> item.updatedAt() == null ? "" : item.updatedAt()))
                 .toList();
+    }
+
+    private static java.util.stream.Stream<AdminVerificationQueueItemDTO> queueItems(Project project) {
+        if (project == null) return java.util.stream.Stream.empty();
+        var versions = project.getVersions();
+        if (versions == null || versions.isEmpty()) {
+            return project.getStatus() == net.modtale.model.project.ProjectStatus.PENDING
+                    ? java.util.stream.Stream.of(ProjectMapper.toVerificationQueueItemDTO(project, null))
+                    : java.util.stream.Stream.empty();
+        }
+        if (project.getStatus() == net.modtale.model.project.ProjectStatus.PENDING
+                && versions.stream().filter(Objects::nonNull).noneMatch(v -> v.getReviewStatus() == net.modtale.model.project.ProjectVersion.ReviewStatus.PENDING
+                    || v.getScanResult() != null && v.getScanResult().getStatus() == ScanStatus.SCANNING)) {
+            return java.util.stream.Stream.of(ProjectMapper.toVerificationQueueItemDTO(project, null));
+        }
+        return versions.stream().filter(Objects::nonNull)
+                .filter(v -> v.getReviewStatus() == net.modtale.model.project.ProjectVersion.ReviewStatus.PENDING)
+                .filter(v -> v.getScanResult() == null || v.getScanResult().getStatus() != ScanStatus.SCANNING)
+                .map(v -> ProjectMapper.toVerificationQueueItemDTO(project, v));
     }
 
     private static int queuePriority(AdminVerificationQueueItemDTO item) {

@@ -151,13 +151,19 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         }
     };
 
-    const fetchProjectDetails = async (id: string) => {
+    const fetchProjectDetails = async (id: string, versionId?: string) => {
         if (loadingReview) return;
         setLoadingReview(true);
         setLoadingReviewId(id);
         try {
             const data = await adminClient.getReviewDetails(id);
-            setReviewingProject(data);
+            if (versionId) {
+                const selected = data.mod.versions.filter((version: any) => version.id === versionId);
+                if (selected.length !== 1 || selected[0].reviewStatus !== 'PENDING' || selected[0].scanResult?.status === 'SCANNING') {
+                    throw new Error('This version is no longer ready for review. Refresh the queue.');
+                }
+            }
+            setReviewingProject({ ...data, selectedVersionId: versionId });
         } catch (e) {
             setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, "We could not load this project's review details.") });
         } finally {

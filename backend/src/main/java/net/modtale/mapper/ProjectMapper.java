@@ -390,6 +390,11 @@ public class ProjectMapper {
                         .findFirst()
                         .orElseGet(() -> project.getVersions().stream().filter(java.util.Objects::nonNull).findFirst().orElse(null));
 
+        return toVerificationQueueItemDTO(project, pendingVersion);
+    }
+
+    public static AdminVerificationQueueItemDTO toVerificationQueueItemDTO(Project project, ProjectVersion pendingVersion) {
+        if (project == null) return null;
         return new AdminVerificationQueueItemDTO(
                 project.getId(),
                 project.getTitle(),

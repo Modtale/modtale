@@ -52,8 +52,8 @@ class ProjectReviewQueueServiceTest {
         Query query = queryCaptor.getValue();
         String criteria = query.getQueryObject().toString();
         assertTrue(criteria.contains("$or"));
-        assertTrue(criteria.contains("$not"));
-        assertTrue(criteria.contains("SCANNING"));
+        assertFalse(criteria.contains("$not"));
+        assertFalse(criteria.contains("SCANNING"));
         assertEquals(1, query.getFieldsObject().get("versions.scanResult.riskScore"));
         assertEquals(1, query.getFieldsObject().get("versions.scanResult.scanState"));
         assertFalse(query.getFieldsObject().containsKey("versions.scanResult.issues"));

@@ -216,6 +216,18 @@ class RemoteReviewStepIntegrationTest {
         assertEquals("NO_WORK",new RemoteReviewStep(new RemoteReviewPollStore(mongo),client,storage,completion).advance(result.getRemoteReview()).state());
         assertEquals(1,gets.get());assertEquals(0,posts.get());verifyNoInteractions(storage);verify(completion,never()).handleRemoteCompletedScan(any(),any());
     }
+    @Test void databaseQueueKeepsFailedVersionVisibleBesideScanningSibling() {
+        route(e->reply(e,200,"HELD"));assertEquals("UNAVAILABLE",step.advance(binding).state());
+        var sibling=new ProjectVersion();sibling.setId("scanning-sibling");sibling.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
+        var scan=new ScanResult();scan.setStatus(ScanStatus.SCANNING);sibling.setScanResult(scan);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(project)),new Update().set("status",ProjectStatus.PUBLISHED).push("versions",sibling),Project.class);
+        var queue=new net.modtale.service.admin.review.ProjectReviewQueueService(mongo);
+        var queries=new net.modtale.service.admin.review.ProjectReviewQueryService(mock(net.modtale.repository.user.UserRepository.class),
+                mock(net.modtale.service.project.query.ProjectService.class),queue,mock(net.modtale.service.project.query.ProjectListingQueryService.class));
+        var rows=queries.getVerificationQueue();assertEquals(1,rows.size());assertEquals("v",rows.getFirst().pendingVersion().id());
+        assertEquals("REMOTE_HELD",rows.getFirst().pendingVersion().scan().scanState());
+        assertEquals(ScanStatus.FAILED,rows.getFirst().pendingVersion().scan().status());
+    }
     @Test void expiredTerminalClaimCannotOverwriteOrConsumeAnotherAttempt() {
         var claim=attached(1000);
         change("scanResult.remotePoll.leaseUntil",new Date(0));

@@ -23,7 +23,7 @@ it('separates service failures without hiding prior findings or inventing a malw
     expect(operations.textContent).toContain('Review expired'); expect(operations.textContent).toContain('Security clearance withheld');
     expect(operations.textContent).not.toContain('Risk 75'); expect(operations.textContent).toContain('New 2 · Known 1');
     await act(async () => (operations.querySelector('button') as HTMLButtonElement).click());
-    expect(onReview).toHaveBeenCalledWith('Expired');
+    expect(onReview).toHaveBeenCalledWith('Expired', 'v');
 });
 it.each([['REMOTE_HELD', 'Review held'], ['REMOTE_CANCELLED', 'Review cancelled'], ['UNKNOWN', 'Review unavailable']])(
     'keeps %s failures visible when no content reviews remain', async (state, label) => {
@@ -32,3 +32,12 @@ it.each([['REMOTE_HELD', 'Review held'], ['REMOTE_CANCELLED', 'Review cancelled'
         expect(container.querySelector('[aria-label="Content and security review"]')).toBeNull();
         expect(container.textContent).toContain(label); expect(container.textContent).not.toContain('All Caught Up');
     });
+
+it('opens the exact version when multiple queue rows belong to one project', async () => {
+    const first=item('Project', 'SUSPICIOUS');const second=item('Project', 'FAILED', 'REMOTE_HELD');
+    second.pendingVersion!.id='second';second.pendingVersion!.versionNumber='2';const onReview=vi.fn();
+    await act(async () => root.render(<VerificationQueue pendingProjects={[first,second]} loadingQueue={false} loadingReview={false} onReview={onReview} />));
+    const buttons=container.querySelectorAll('button');expect(buttons).toHaveLength(2);
+    await act(async () => (buttons[1] as HTMLButtonElement).click());expect(onReview).toHaveBeenLastCalledWith('Project','second');
+    await act(async () => (buttons[0] as HTMLButtonElement).click());expect(onReview).toHaveBeenLastCalledWith('Project','v');
+});
