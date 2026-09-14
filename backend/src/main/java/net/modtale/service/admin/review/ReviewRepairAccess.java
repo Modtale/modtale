@@ -37,6 +37,9 @@ public final class ReviewRepairAccess {
     public ReviewIsolationExecutor.Result execute(ReviewRepairPreparation.Prepared prepared) {
         var authority=authority();validate(prepared);return workflow.isolate(prepared,authority.actor(),authority.allowed());
     }
+    public Receipt closeExpired(ReviewRepairPreparation.Prepared prepared) {
+        var authority=authority();validate(prepared);return receiptView(workflow.closeExpired(prepared,authority.actor(),authority.allowed()));
+    }
     public record Receipt(Position position,String versionId,String beforeSha256,String state,String afterSha256) {}
     public Receipt receipt(ReviewRepairPreparation.Prepared prepared) {
         var authority=authority();validate(prepared);return workflow.read(()->{

@@ -91,3 +91,12 @@ export async function recoverRepair(id: string, signal: AbortSignal): Promise<Re
     if (prepared.id !== id || data.receipt.beforeSha256 !== prepared.sha256 || result.state === 'INELIGIBLE') throw invalid();
     return { prepared, target, result };
 }
+
+export async function closeExpiredRepair(pending: PendingRepair, signal: AbortSignal): Promise<RepairResult> {
+    const prepared = validatePrepared(pending.prepared); const target = validateTarget(pending.target);
+    const config = { signal, skipCsrfRetry: true };
+    const { data } = await api.post('/admin/verification/repairs/close-expired', prepared, config);
+    if (JSON.stringify(validateTarget(data)) !== JSON.stringify(target) || data.beforeSha256 !== prepared.sha256) throw invalid();
+    const result = validateResult(data); if (result.state === 'INELIGIBLE') throw invalid();
+    return result;
+}

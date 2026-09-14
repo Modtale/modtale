@@ -108,4 +108,19 @@ class ReviewRepairAccessIntegrationTest {
         assertEquals("UNKNOWN",access.recover(prepared.id()).receipt().state());assertEquals(before,fixture.version());assertEquals(operation,fixture.operation());
     }
 
+    @Test void explicitClosureHttpActionPreservesOriginalIdentityAndDoesNotChangeVersion()throws Exception {
+        var capture=fixture.reader.capture("p",0,"v");long now=System.currentTimeMillis();String id=UUID.randomUUID().toString();
+        fixture.archive.retain(capture.forArchive(id,"actor",ReviewSnapshotArchive.Action.ISOLATE_REVIEW,now-20000,now-10000));
+        var prepared=new ReviewRepairPreparation.Prepared(id,capture.sha256(),now-20000,now-10000);
+        assertNull(fixture.journal.claim(prepared,"actor",ReviewSnapshotArchive.Action.ISOLATE_REVIEW,()->true));var before=fixture.version();
+        var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(new net.modtale.controller.admin.ReviewRepairController(access)).build();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/admin/verification/repairs/close-expired")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsBytes(prepared)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control","no-store"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.state").value("NOT_APPLIED"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.beforeSha256").value(prepared.sha256()));
+        assertEquals(before,fixture.version());assertEquals(position,access.receipt(prepared).position());assertEquals("NOT_APPLIED",access.recover(id).receipt().state());
+    }
+
 }

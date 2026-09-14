@@ -81,3 +81,18 @@ it.each(['id', 'digest', 'outcome'])('rejects inconsistent recovered %s', async 
     if (kind === 'outcome') data.receipt.state = 'INELIGIBLE';
     vi.mocked(api.get).mockResolvedValueOnce({ data }); await expect(recoverRepair(prepared.id, new AbortController().signal)).rejects.toThrow();
 });
+
+it('closes only the explicit original intent and disables mutation replay', async () => {
+    const { closeExpiredRepair } = await import('@/modules/admin/api/reviewRepair'); const signal = new AbortController().signal;
+    vi.mocked(api.post).mockResolvedValueOnce({ data: { ...target, beforeSha256: prepared.sha256, state: 'NOT_APPLIED', afterSha256: null } });
+    expect(await closeExpiredRepair({ target, prepared }, signal)).toEqual({ state: 'NOT_APPLIED', afterSha256: null });
+    expect(api.post).toHaveBeenLastCalledWith('/admin/verification/repairs/close-expired', prepared, { signal, skipCsrfRetry: true });
+});
+it.each(['identity', 'digest', 'outcome'])('rejects an inconsistent closure %s', async kind => {
+    const { closeExpiredRepair } = await import('@/modules/admin/api/reviewRepair');
+    const value = { ...target, beforeSha256: prepared.sha256, state: 'NOT_APPLIED', afterSha256: null };
+    if (kind === 'identity') value.versionId = 'different';
+    if (kind === 'digest') value.beforeSha256 = 'b'.repeat(64);
+    if (kind === 'outcome') value.state = 'INELIGIBLE';
+    vi.mocked(api.post).mockResolvedValueOnce({ data: value }); await expect(closeExpiredRepair({ target, prepared }, new AbortController().signal)).rejects.toThrow();
+});

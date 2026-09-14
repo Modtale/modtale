@@ -33,7 +33,7 @@ class ReviewRepairControllerTest {
     void auth(String...permissions){SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("actor",null,Arrays.stream(permissions).map(SimpleGrantedAuthority::new).toList()));}
     @Test void everyRouteRequiresBothPermissionsBeforeServiceAccess() {
         for(String permission:List.of("PROJECT_REVIEW_READ","PROJECT_VERSION_RESCAN","PROJECT_REVIEW_DECIDE","ROLE_USER")) {
-            auth(permission);assertThrows(AccessDeniedException.class,()->controller.operations(null,25));assertThrows(AccessDeniedException.class,()->controller.recover("invalid"));assertThrows(AccessDeniedException.class,()->controller.capabilities());assertThrows(AccessDeniedException.class,()->controller.inspect(null));assertThrows(AccessDeniedException.class,()->controller.prepare(null));
+            auth(permission);assertThrows(AccessDeniedException.class,()->controller.closeExpired(null));assertThrows(AccessDeniedException.class,()->controller.operations(null,25));assertThrows(AccessDeniedException.class,()->controller.recover("invalid"));assertThrows(AccessDeniedException.class,()->controller.capabilities());assertThrows(AccessDeniedException.class,()->controller.inspect(null));assertThrows(AccessDeniedException.class,()->controller.prepare(null));
             assertThrows(AccessDeniedException.class,()->controller.execute(null));assertThrows(AccessDeniedException.class,()->controller.receipt(null));
         }
         verifyNoInteractions(access);

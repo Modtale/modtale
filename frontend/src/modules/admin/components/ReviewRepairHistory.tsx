@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { recoverRepair, repairOperations, type RecoveredRepair, type RepairOperationPage } from '../api/reviewRepair';
+import { closeExpiredRepair, recoverRepair, repairOperations, type RecoveredRepair, type RepairOperationPage } from '../api/reviewRepair';
 
 export function ReviewRepairHistory() {
     const [page, setPage] = useState<RepairOperationPage | null>(null);
     const [receipt, setReceipt] = useState<RecoveredRepair | null>(null);
     const [loading, setLoading] = useState(false);
+    const [confirmClose, setConfirmClose] = useState(false);
     const [message, setMessage] = useState('');
     const [revision, setRevision] = useState(0);
     const request = useRef<AbortController | null>(null);
@@ -13,9 +14,9 @@ export function ReviewRepairHistory() {
     useEffect(() => { if (revision) heading.current?.focus(); }, [revision]);
     async function run<T>(task: (signal: AbortSignal) => Promise<T>, accept: (value: T) => void) {
         if (request.current) return;
-        const controller = new AbortController(); request.current = controller; setLoading(true); setMessage(''); setReceipt(null);
+        const controller = new AbortController(); request.current = controller; setLoading(true); setMessage(''); setReceipt(null); setConfirmClose(false);
         try { const value = await task(controller.signal); if (!controller.signal.aborted) accept(value); }
-        catch { if (!controller.signal.aborted) setMessage('Operation history could not be verified. Try again; no repair was submitted.'); }
+        catch { if (!controller.signal.aborted) setMessage('The operation receipt could not be verified. The outcome remains unconfirmed; check the receipt again.'); }
         finally { if (!controller.signal.aborted) { request.current = null; setLoading(false); setRevision(value => value + 1); } }
     }
     function load(cursor: string | null) {
@@ -40,7 +41,15 @@ export function ReviewRepairHistory() {
             <p>Operation reference: {receipt.prepared.id}</p>
             <p>Original project <bdi>{JSON.stringify(receipt.target.position.projectId)}</bdi> ({receipt.target.position.projectIdType}), position {receipt.target.position.versionIndex}, version <bdi>{receipt.target.versionId}</bdi>.</p>
             <p>Original record SHA-256: {receipt.prepared.sha256}</p>
-            <p>{receipt.result.state === 'APPLIED' ? 'The receipt confirms local isolation was applied. It does not establish the current version state or approve the mod.' : receipt.result.state === 'NOT_APPLIED' ? 'The receipt confirms isolation was not applied.' : 'The outcome remains unconfirmed. Do not repeat this repair; an operator must reconcile it.'}</p>
+            {receipt.result.state === 'UNKNOWN' && <div className="space-y-2">
+                <p>An expired attempt can be closed without repeating isolation. The server checks expiry; a committed isolation result is preserved. This does not approve the mod or cancel its remote job.</p>
+                {!confirmClose ? <button type="button" disabled={loading} className="rounded-lg border px-3 py-2" onClick={() => setConfirmClose(true)}>Close expired attempt</button> : <>
+                    <p>Confirm closing operation {receipt.prepared.id}. Closing a pending attempt prevents it from applying isolation. Any completed result stays unchanged. Refresh diagnostics before considering another action.</p>
+                    <button type="button" disabled={loading} className="rounded-lg border px-3 py-2" onClick={() => void run(signal => closeExpiredRepair(receipt, signal), result => setReceipt({ ...receipt, result }))}>Confirm closing expired attempt</button>
+                    <button type="button" disabled={loading} className="rounded-lg border px-3 py-2" onClick={() => setConfirmClose(false)}>Keep attempt unchanged</button>
+                </>}
+            </div>}
+            <p>{receipt.result.state === 'APPLIED' ? 'The receipt confirms local isolation was applied. It does not establish the current version state or approve the mod.' : receipt.result.state === 'NOT_APPLIED' ? 'The receipt confirms isolation was not applied.' : 'The outcome remains unconfirmed. Do not repeat isolation. An expired attempt may be closed; otherwise check its receipt again.'}</p>
         </div>}
     </section>;
 }

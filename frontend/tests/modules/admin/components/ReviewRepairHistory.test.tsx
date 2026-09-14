@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { ReviewRepairHistory } from '@/modules/admin/components/ReviewRepairHistory';
 import * as repair from '@/modules/admin/api/reviewRepair';
-vi.mock('@/modules/admin/api/reviewRepair', () => ({ repairOperations: vi.fn(), recoverRepair: vi.fn() }));
+vi.mock('@/modules/admin/api/reviewRepair', () => ({ repairOperations: vi.fn(), recoverRepair: vi.fn(), closeExpiredRepair: vi.fn() }));
 let root: Root; let container: HTMLDivElement;
 const id = '11111111-1111-1111-1111-111111111111';
 const page: repair.RepairOperationPage = { items: [{ id, recordedState: 'APPLIED' }], nextCursor: 'r1.' + id, order: 'OPERATION_ID' };
@@ -41,4 +41,24 @@ it.each(['page', 'receipt'])('aborts and discards late %s results after access i
 it('blocks duplicate in-flight requests synchronously', async () => {
     vi.mocked(repair.repairOperations).mockImplementationOnce(() => new Promise(() => {}));
     const button = container.querySelector('button')!; await act(async () => { button.click(); button.click(); }); expect(repair.repairOperations).toHaveBeenCalledTimes(1);
+});
+
+it('requires explicit confirmation before closing the recovered attempt', async () => {
+    await click('Load operation history'); await click('Check receipt ' + id); expect(repair.closeExpiredRepair).not.toHaveBeenCalled();
+    await click('Close expired attempt'); expect(repair.closeExpiredRepair).not.toHaveBeenCalled(); await click('Keep attempt unchanged');
+    expect(container.textContent).not.toContain('Confirm closing expired attempt'); await click('Close expired attempt');
+    vi.mocked(repair.closeExpiredRepair).mockResolvedValueOnce({ state: 'NOT_APPLIED', afterSha256: null }); await click('Confirm closing expired attempt');
+    expect(repair.closeExpiredRepair).toHaveBeenCalledExactlyOnceWith(recovered, expect.any(AbortSignal)); expect(container.textContent).toContain('confirms isolation was not applied');
+    expect(container.textContent).not.toContain('Close expired attempt'); expect(container.textContent).toContain('original');
+});
+it('does not assume closure succeeded after a lost response or automatically retry it', async () => {
+    await click('Load operation history'); await click('Check receipt ' + id); await click('Close expired attempt');
+    vi.mocked(repair.closeExpiredRepair).mockRejectedValueOnce(new Error('private')); await click('Confirm closing expired attempt');
+    expect(container.textContent).toContain('outcome remains unconfirmed'); expect(container.textContent).not.toContain('private'); expect(container.textContent).not.toContain('Close expired attempt');
+    await click('Check receipt ' + id); expect(repair.closeExpiredRepair).toHaveBeenCalledTimes(1);
+});
+it('preserves a winning applied receipt returned by closure', async () => {
+    await click('Load operation history'); await click('Check receipt ' + id); await click('Close expired attempt');
+    vi.mocked(repair.closeExpiredRepair).mockResolvedValueOnce({ state: 'APPLIED', afterSha256: 'b'.repeat(64) }); await click('Confirm closing expired attempt');
+    expect(container.textContent).toContain('confirms local isolation was applied'); expect(container.textContent).not.toContain('Close expired attempt');
 });

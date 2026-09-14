@@ -62,6 +62,40 @@ public final class ReviewRepairJournal {
             var current=read(claim.id());return current!=null && claim.token().equals(current.get("token")) && "UNKNOWN".equals(current.get("state"));
         }
     }
+    /** Closes an expired claim; never grants a new execution token or changes a version. */
+    public boolean closeExpired(ReviewRepairPreparation.Prepared prepared,String actor,BooleanSupplier permitted) {
+        requirePermission(permitted);
+        var source=archive.load(prepared.id());
+        if(!source.actorId().equals(actor) || source.action()!=ReviewSnapshotArchive.Action.ISOLATE_REVIEW
+                || source.createdAt()!=prepared.createdAt() || source.expiresAt()!=prepared.expiresAt()
+                || !digest(source.versionBytes()).equals(prepared.sha256()))throw unavailable();
+        var stored=read(prepared.id());
+        if(!closable(stored,prepared,actor))return false;
+        var conditions=List.of(new Document("$gte",List.of("$$NOW",new Date(prepared.expiresAt()))),
+                new Document("$eq",List.of(new Document("$size",new Document("$objectToArray","$$ROOT")),stored.size())),
+                new Document("$eq",List.of(new Document("$type","$createdAt"),"long")),
+                new Document("$eq",List.of(new Document("$type","$expiresAt"),"long")));
+        var query=new Document(stored).append("$expr",new Document("$and",conditions));
+        var resolution=new Document("kind","EXPIRED_CLAIM_CLOSED").append("actorId",new Document("$literal",actor))
+                .append("previousState",stored.getString("state")).append("closedAt","$$NOW");
+        requirePermission(permitted);
+        // A competing isolation must update this same journal document in its version transaction.
+        // Either its terminal receipt wins, or this write prevents that transaction from committing.
+        return ReviewRepairIo.collection(operations).updateOne(query,List.of(new Document("$set",new Document("state","NOT_APPLIED")
+                .append("afterSha256",null).append("finishedAt","$$NOW").append("resolution",resolution))),new UpdateOptions().collation(BINARY)).getModifiedCount()==1;
+    }
+    private static boolean closable(Document stored,ReviewRepairPreparation.Prepared prepared,String actor) {
+        if(stored==null || !(stored.get("token") instanceof String token) || !uuid(token)
+                || !actor.equals(stored.get("actor")) || !"ISOLATE_REVIEW".equals(stored.get("action"))
+                || !prepared.sha256().equals(stored.get("sha256")) || !Long.valueOf(prepared.createdAt()).equals(stored.get("createdAt"))
+                || !Long.valueOf(prepared.expiresAt()).equals(stored.get("expiresAt")))return false;
+        return switch(Objects.toString(stored.get("state"),"")) {
+            case "RESERVED" -> stored.size()==8;
+            case "EXECUTING" -> stored.size()==9 && stored.get("startedAt") instanceof Date;
+            case "UNKNOWN" -> stored.size()==10 && stored.get("startedAt") instanceof Date && stored.get("uncertainAt") instanceof Date;
+            default -> false;
+        };
+    }
     private static boolean executing(Document stored,Document reserved) {
         var expected=new Document(reserved);expected.put("state","EXECUTING");
         if(stored.size()!=9 || !(stored.get("startedAt") instanceof Date))return false;

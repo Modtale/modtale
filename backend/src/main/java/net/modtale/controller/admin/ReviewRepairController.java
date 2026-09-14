@@ -19,6 +19,7 @@ public class ReviewRepairController {
     @PostMapping("/inspect") public ResponseEntity<ReviewRepairAccess.Preview> inspect(@RequestBody ReviewRepairAccess.Inspect request){return response(access.inspect(request));}
     @PostMapping("/prepare") public ResponseEntity<ReviewRepairPreparation.Prepared> prepare(@RequestBody ReviewRepairAccess.Prepare request){return response(access.prepare(request));}
     @PostMapping("/execute") public ResponseEntity<ReviewIsolationExecutor.Result> execute(@RequestBody ReviewRepairPreparation.Prepared request){return response(access.execute(request));}
+    @PostMapping("/close-expired") public ResponseEntity<ReviewRepairAccess.Receipt> closeExpired(@RequestBody ReviewRepairPreparation.Prepared request){return response(access.closeExpired(request));}
     @PostMapping("/receipt") public ResponseEntity<ReviewRepairAccess.Receipt> receipt(@RequestBody ReviewRepairPreparation.Prepared request){return response(access.receipt(request));}
     private static <T> ResponseEntity<T> response(T value){return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(value);}
     @ExceptionHandler(SecurityException.class) ResponseEntity<Void> forbidden(){return ResponseEntity.status(HttpStatus.FORBIDDEN).cacheControl(CacheControl.noStore()).build();}

@@ -36,6 +36,17 @@ public final class ReviewIsolationExecutor {
         var prepared=new ReviewRepairPreparation.Prepared(source.id(),sourceDigest(source),source.createdAt(),source.expiresAt());
         return new Recovered(prepared,receipt(source,prepared));
     }
+    public Receipt closeExpired(ReviewRepairPreparation.Prepared prepared,String actor,BooleanSupplier permitted) {
+        permission(permitted);var source=verifiedSource(prepared,actor);
+        var hello=ReviewRepairIo.database(mongo.getDb()).runCommand(new Document("hello",1),ReadPreference.primary());
+        if(!(hello.get("setName") instanceof String) && !"isdbgrid".equals(hello.get("msg")))throw new IllegalStateException("Review isolation requires transaction support");
+        try {journal.closeExpired(prepared,actor,permitted);}
+        catch(MongoException unknown) {
+            // An acknowledgement loss does not justify another write. Only read back the receipt.
+            try(var cleanup=ReviewRepairIo.cleanup()){return receipt(source,prepared);}
+        }
+        return receipt(source,prepared);
+    }
     public boolean eligible(RawReviewSnapshotReader.Captured captured) {
         var source=captured.forArchive("00000000-0000-0000-0000-000000000000","inspection",ReviewSnapshotArchive.Action.ISOLATE_REVIEW,1,2);
         var original=new RawBsonDocument(source.versionBytes()).decode(new org.bson.codecs.DocumentCodec());
