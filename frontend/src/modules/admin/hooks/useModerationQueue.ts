@@ -8,6 +8,7 @@ export function useModerationQueue(enabled: boolean, subject: string) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [loaded, setLoaded] = useState(false);
+    const [navigation, setNavigation] = useState({ revision: 0, target: 'page' as 'page' | 'error' });
     const access = useRef({ enabled, subject }); access.current = { enabled, subject };
     const generation = useRef(0);
     const request = useRef<AbortController | null>(null);
@@ -15,7 +16,7 @@ export function useModerationQueue(enabled: boolean, subject: string) {
     const nextCursor = useRef<string | null>(null);
     const attemptedCursor = useRef<string | null>(null);
     const failed = useRef(false);
-    const load = useCallback(async (position: string | null, background = false) => {
+    const load = useCallback(async (position: string | null, background = false, focus = false) => {
         if (!access.current.enabled || (background && (request.current || failed.current))) return;
         request.current?.abort(); const controller = new AbortController(); request.current = controller;
         const epoch = ++generation.current; const owner = access.current.subject;
@@ -27,8 +28,11 @@ export function useModerationQueue(enabled: boolean, subject: string) {
             if (!current()) return;
             cursor.current = position; nextCursor.current = response.nextCursor;
             setPage(response); setPageSubject(owner); failed.current = false; setError(null); setLoaded(true);
+            if (focus) setNavigation(previous => ({ revision: previous.revision + 1, target: 'page' }));
         } catch (failure) {
-            if (current() && !controller.signal.aborted) { failed.current = true; setError(extractApiErrorMessage(failure, 'We could not load this queue page.')); }
+            if (current() && !controller.signal.aborted) { failed.current = true; setError(extractApiErrorMessage(failure, 'We could not load this queue page.'));
+                if (focus) setNavigation(previous => ({ revision: previous.revision + 1, target: 'error' }));
+            }
         } finally {
             if (generation.current === epoch) { request.current = null; setLoading(false); }
         }
@@ -36,14 +40,14 @@ export function useModerationQueue(enabled: boolean, subject: string) {
     useEffect(() => {
         generation.current++; request.current?.abort(); request.current = null;
         cursor.current = null; nextCursor.current = null; attemptedCursor.current = null; failed.current = false;
-        setPage(empty); setPageSubject(subject); setError(null); setLoaded(false); setLoading(false);
+        setPage(empty); setPageSubject(subject); setError(null); setLoaded(false); setLoading(false); setNavigation({ revision: 0, target: 'page' });
         if (enabled) void load(null);
         return () => { generation.current++; request.current?.abort(); request.current = null; };
     }, [enabled, subject, load]);
     const refresh = useCallback((background = false) => load(cursor.current, background), [load]);
-    const restart = useCallback(() => load(null), [load]);
-    const next = useCallback(() => { if (!request.current && nextCursor.current) void load(nextCursor.current); }, [load]);
-    const retry = useCallback(() => load(attemptedCursor.current), [load]);
+    const restart = useCallback(() => load(null, false, true), [load]);
+    const next = useCallback(() => { if (!request.current && nextCursor.current) void load(nextCursor.current, false, true); }, [load]);
+    const retry = useCallback(() => load(attemptedCursor.current, false, true), [load]);
     const visible = enabled && pageSubject === subject;
-    return { page: visible ? page : empty, loading, error: visible ? error : null, loaded: visible && loaded, refresh, restart, next, retry };
+    return { page: visible ? page : empty, loading, error: visible ? error : null, loaded: visible && loaded, refresh, restart, next, retry, navigation };
 }

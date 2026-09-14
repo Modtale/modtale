@@ -18,7 +18,7 @@ interface VerificationQueueProps {
 export const VerificationQueue: React.FC<VerificationQueueProps> = ({
                                                                         pendingProjects, loadingQueue, loadFailed, loadingReview, reviewingId, onReview, hasMore = false, unavailableItems = 0, loaded = true
                                                                     }) => {
-    const Surface = loadingQueue ? SkeletonSurface : React.Fragment;
+    const Surface = loadingQueue && pendingProjects.length === 0 ? SkeletonSurface : React.Fragment;
     if (loadingQueue && pendingProjects.length === 0) {
         pendingProjects = Array.from({ length: 3 }, (_, index) => ({
             id: `pending-${index}`, title: 'Project review title', author: 'Creator name',

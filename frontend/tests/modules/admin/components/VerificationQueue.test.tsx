@@ -46,3 +46,13 @@ it('does not claim completion when an empty page still has continuation or repai
     await act(async () => root.render(<VerificationQueue pendingProjects={[]} loadingQueue={false} loadingReview={false} onReview={vi.fn()} hasMore unavailableItems={25} />));
     expect(container.textContent).toContain('Continue to the next page');expect(container.textContent).not.toContain('All Caught Up');
 });
+
+it('keeps the focused review button mounted during refresh of loaded rows', async () => {
+    const props={pendingProjects:[item('Project','SUSPICIOUS')],loadingReview:false,onReview:vi.fn()};
+    await act(async () => root.render(<VerificationQueue {...props} loadingQueue={false} />));
+    const button=container.querySelector('button')!;button.focus();
+    await act(async () => root.render(<VerificationQueue {...props} loadingQueue />));
+    expect(document.activeElement).toBe(button);expect(button.closest('[inert]')).toBeNull();
+    await act(async () => root.render(<VerificationQueue {...props} loadingQueue={false} />));
+    expect(document.activeElement).toBe(button);
+});

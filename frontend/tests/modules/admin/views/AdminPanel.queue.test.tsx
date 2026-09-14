@@ -19,6 +19,7 @@ it('uses the bounded API, continues repair-only pages and opens the chosen versi
     expect(container.textContent).toContain('Continue to the next page');
     const next=[...container.querySelectorAll('button')].find(b=>b.textContent==='Next page')!;
     await act(async () => next.click());expect(container.textContent).toContain('Found project');expect(next.disabled).toBe(true);
+    expect(document.activeElement?.textContent).toBe('Verification Queue');
     expect(vi.mocked(api.get).mock.calls[1][1]).toMatchObject({params:{cursor:'1.s.0.YQ',limit:25}});
     await act(async () => [...container.querySelectorAll('button')].find(b=>b.textContent?.includes('Verify Update'))!.click());
     expect(container.textContent).toContain('Selected version v');
@@ -27,4 +28,14 @@ it('uses the bounded API, continues repair-only pages and opens the chosen versi
 it('does not load a queue without review-read permission', async () => {
     await act(async () => root.render(<AdminPanel currentUser={{id:'user',adminPermissions:[]}} />));
     expect(container.textContent).toContain('Access Denied');expect(api.get).not.toHaveBeenCalled();
+});
+
+it('focuses the error notice after explicit navigation fails', async () => {
+    vi.mocked(api.get).mockResolvedValueOnce({data:{items:[],nextCursor:'1.s.0.YQ',unavailableItems:0,order:'PROJECT_VERSION'}})
+        .mockRejectedValueOnce(new Error('failed'));
+    await act(async () => root.render(<AdminPanel currentUser={user} />));
+    const next=[...container.querySelectorAll('button')].find(b=>b.textContent==='Next page')!;
+    await act(async () => next.click());
+    expect(document.activeElement?.getAttribute('role')).toBe('alert');
+    expect(document.activeElement?.textContent).toContain('Retry');
 });

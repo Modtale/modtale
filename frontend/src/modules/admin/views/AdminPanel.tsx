@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText, CalendarClock } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
 import { StatusModal } from '@/components/ui/StatusModal';
@@ -83,6 +83,12 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     const loadingQueue = queue.loading;
     const queueError = queue.error;
     const fetchQueue = queue.refresh;
+    const queueHeading = useRef<HTMLHeadingElement>(null);
+    const queueFailure = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (queue.navigation.revision === 0 || !canReadReviewQueue || activeTab !== 'verification' || reviewingProject) return;
+        (queue.navigation.target === 'error' ? queueFailure.current : queueHeading.current)?.focus();
+    }, [queue.navigation, canReadReviewQueue, activeTab, reviewingProject]);
     const firstAllowedTab = (Object.keys(tabAccess) as AdminTab[]).find(tab => tabAccess[tab]);
 
     useEffect(() => {
@@ -282,11 +288,11 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                             {activeTab === 'verification' && canReadReviewQueue && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="mb-8">
-                                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-normal">Verification Queue</h1>
+                                        <h1 ref={queueHeading} tabIndex={-1} className="text-3xl font-black text-slate-900 dark:text-white tracking-normal">Verification Queue</h1>
                                         <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Review pending projects and updates. Pages are ordered by project and version, not risk.</p>
                                     </div>
                                     {queueError && (
-                                        <div className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                                        <div ref={queueFailure} tabIndex={-1} role="alert" className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
                                             <span>{queueError}</span>
                                             <button type="button" onClick={() => void queue.retry()} className="shrink-0 rounded-lg border border-current px-3 py-1.5 font-bold hover:bg-red-100 dark:hover:bg-red-500/10">
                                                 Retry
@@ -296,7 +302,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                     <div className="mb-4 flex flex-wrap items-center gap-3">
                                         <button type="button" onClick={() => void queue.restart()} className="rounded-lg border px-3 py-2 text-sm font-bold">Refresh from start</button>
                                         <button type="button" disabled={loadingQueue || !queue.page.nextCursor} onClick={queue.next} className="rounded-lg border px-3 py-2 text-sm font-bold disabled:opacity-50">Next page</button>
-                                        <span className="text-sm text-slate-500">{pendingProjects.length} entries on this page{loadingQueue ? ' · Loading…' : ''}</span>
+                                        <span role="status" aria-live="polite" className="text-sm text-slate-500">{pendingProjects.length} entries on this page{loadingQueue ? ' · Loading…' : ''}</span>
                                     </div>
                                     {queue.page.unavailableItems > 0 && <p role="status" className="mb-4 text-sm text-amber-700">{queue.page.unavailableItems} entries on this page cannot be opened safely and need data repair. Continue to inspect other entries.</p>}
                                     <VerificationQueue

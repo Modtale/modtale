@@ -18,7 +18,7 @@ it('replaces pages rather than accumulating an unbounded list', async () => {
 it('late next-page responses cannot replace a fresh restart', async () => {
     const old=deferred();vi.mocked(getModerationQueuePage).mockResolvedValueOnce(page('first','cursor')).mockReturnValueOnce(old.promise).mockResolvedValueOnce(page('fresh'));
     await act(async () => root.render(<Host />));await act(async () => state.next());await act(async () => { await state.restart(); });
-    await act(async () => old.resolve(page('stale')));expect(container.textContent).toBe('fresh');
+    await act(async () => old.resolve(page('stale')));expect(container.textContent).toBe('fresh');expect(state.navigation).toEqual({revision:1,target:'page'});
     expect(vi.mocked(getModerationQueuePage).mock.calls[1][1].aborted).toBe(true);
 });
 it('retains the page on failed continuation and retries the failed cursor', async () => {
