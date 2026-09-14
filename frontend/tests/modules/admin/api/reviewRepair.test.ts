@@ -46,3 +46,38 @@ it('accepts an authenticated receipt for the saved original identity', async () 
     vi.mocked(api.post).mockResolvedValueOnce({ data: { ...target, beforeSha256: prepared.sha256, state: 'APPLIED', afterSha256: 'b'.repeat(64) } });
     expect(await repairReceipt(prepared, target, new AbortController().signal)).toEqual({ state: 'APPLIED', afterSha256: 'b'.repeat(64) });
 });
+
+it('validates bounded ordered history and sends actor-free pagination', async () => {
+    const { repairOperations } = await import('@/modules/admin/api/reviewRepair');
+    const signal = new AbortController().signal;
+    const data = { items: [{ id: prepared.id, recordedState: 'UNKNOWN' }], nextCursor: null, order: 'OPERATION_ID' };
+    vi.mocked(api.get).mockResolvedValueOnce({ data }); expect(await repairOperations(null, signal)).toEqual(data);
+    expect(api.get).toHaveBeenLastCalledWith('/admin/verification/repairs/operations', { params: { limit: 25 }, signal });
+});
+it.each(['oversize', 'duplicate', 'backwards', 'state', 'cursor', 'order'])('rejects invalid history %s', async kind => {
+    const { repairOperations } = await import('@/modules/admin/api/reviewRepair');
+    const item = { id: prepared.id, recordedState: 'UNKNOWN' };
+    const data = { items: [item], nextCursor: null as string | null, order: 'OPERATION_ID' };
+    if (kind === 'oversize') data.items = Array(26).fill(item);
+    if (kind === 'duplicate') data.items = [item, item];
+    if (kind === 'state') item.recordedState = 'APPROVED';
+    if (kind === 'cursor') data.nextCursor = `r1.${prepared.id}`;
+    if (kind === 'order') data.order = 'DATE';
+    vi.mocked(api.get).mockResolvedValueOnce({ data });
+    await expect(repairOperations(kind === 'backwards' ? `r1.${prepared.id}` : null, new AbortController().signal)).rejects.toThrow();
+});
+it('recovers original intent by ID without browser state or mutation', async () => {
+    const { recoverRepair } = await import('@/modules/admin/api/reviewRepair');
+    const result = { state: 'APPLIED' as const, afterSha256: 'b'.repeat(64) };
+    vi.mocked(api.get).mockResolvedValueOnce({ data: { prepared, receipt: { ...target, beforeSha256: prepared.sha256, ...result } } });
+    expect(await recoverRepair(prepared.id, new AbortController().signal)).toEqual({ prepared, target, result });
+    expect(api.post).not.toHaveBeenCalled();
+});
+it.each(['id', 'digest', 'outcome'])('rejects inconsistent recovered %s', async kind => {
+    const { recoverRepair } = await import('@/modules/admin/api/reviewRepair');
+    const data = { prepared: { ...prepared }, receipt: { ...target, beforeSha256: prepared.sha256, state: 'UNKNOWN', afterSha256: null } };
+    if (kind === 'id') data.prepared.id = '22222222-2222-2222-2222-222222222222';
+    if (kind === 'digest') data.receipt.beforeSha256 = 'c'.repeat(64);
+    if (kind === 'outcome') data.receipt.state = 'INELIGIBLE';
+    vi.mocked(api.get).mockResolvedValueOnce({ data }); await expect(recoverRepair(prepared.id, new AbortController().signal)).rejects.toThrow();
+});

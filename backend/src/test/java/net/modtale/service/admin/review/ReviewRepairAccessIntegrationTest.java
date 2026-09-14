@@ -95,4 +95,17 @@ class ReviewRepairAccessIntegrationTest {
         var receipt=access.receipt(prepared);assertEquals(position,receipt.position());assertEquals("v",receipt.versionId());assertEquals(prepared.sha256(),receipt.beforeSha256());
     }
 
+    @Test void recoverByIdRestoresAuthenticatedIntentWithoutExecutingIt() {
+        var prepared=prepare();var before=fixture.version();var recovered=access.recover(prepared.id());
+        assertEquals(prepared,recovered.prepared());assertEquals(position,recovered.receipt().position());assertEquals("UNKNOWN",recovered.receipt().state());assertEquals(before,fixture.version());assertNull(fixture.operation());
+        access.execute(prepared);var applied=access.recover(prepared.id());assertEquals("APPLIED",applied.receipt().state());assertEquals(prepared,applied.prepared());
+        when(accounts.getCurrentUser(any())).thenReturn(ReviewRepairAccessTest.user("other"));assertThrows(SecurityException.class,()->access.recover(prepared.id()));
+    }
+    @Test void operationDiscoveryAndRecoveryNeverReclaimAnUnknownClaim() {
+        var prepared=prepare();var claim=fixture.journal.claim(prepared,"actor",ReviewSnapshotArchive.Action.ISOLATE_REVIEW,()->true);fixture.journal.markUnknown(claim,()->true);
+        new ReviewRepairOperationReader(fixture.mongo).initialize();var before=fixture.version();var operation=fixture.operation();
+        var page=access.operations(null,25);assertEquals(List.of(new ReviewRepairOperationReader.Item(prepared.id(),"UNKNOWN")),page.items());
+        assertEquals("UNKNOWN",access.recover(prepared.id()).receipt().state());assertEquals(before,fixture.version());assertEquals(operation,fixture.operation());
+    }
+
 }

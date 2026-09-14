@@ -14,6 +14,8 @@ public class ReviewRepairController {
     private final ReviewRepairAccess access;
     public ReviewRepairController(ReviewRepairAccess access){this.access=access;}
     @GetMapping("/capabilities") public ResponseEntity<ReviewRepairAccess.Capability> capabilities(){return response(access.capability());}
+    @GetMapping("/operations") public ResponseEntity<ReviewRepairOperationReader.Page> operations(@RequestParam(required=false) String cursor,@RequestParam(defaultValue="25") int limit){return response(access.operations(cursor,limit));}
+    @GetMapping("/operations/{id}") public ResponseEntity<ReviewRepairAccess.Recovered> recover(@PathVariable String id){return response(access.recover(id));}
     @PostMapping("/inspect") public ResponseEntity<ReviewRepairAccess.Preview> inspect(@RequestBody ReviewRepairAccess.Inspect request){return response(access.inspect(request));}
     @PostMapping("/prepare") public ResponseEntity<ReviewRepairPreparation.Prepared> prepare(@RequestBody ReviewRepairAccess.Prepare request){return response(access.prepare(request));}
     @PostMapping("/execute") public ResponseEntity<ReviewIsolationExecutor.Result> execute(@RequestBody ReviewRepairPreparation.Prepared request){return response(access.execute(request));}

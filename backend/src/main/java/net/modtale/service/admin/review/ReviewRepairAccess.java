@@ -41,10 +41,22 @@ public final class ReviewRepairAccess {
     public Receipt receipt(ReviewRepairPreparation.Prepared prepared) {
         var authority=authority();validate(prepared);return workflow.read(()->{
             var receipt=isolation.receipt(prepared,authority.actor());
-            boolean objectId=receipt.projectId() instanceof ObjectId;
-            var position=new Position(objectId?"OBJECT_ID":"STRING",objectId?((ObjectId)receipt.projectId()).toHexString():(String)receipt.projectId(),receipt.versionIndex());
-            return new Receipt(position,receipt.versionId(),receipt.beforeSha256(),receipt.outcome().state(),receipt.outcome().afterSha256());
+            return receiptView(receipt);
         },authority.allowed());
+    }
+    public ReviewRepairOperationReader.Page operations(String cursor,int limit) {
+        var authority=authority();return workflow.read(()->isolation.operations(authority.actor(),cursor,limit),authority.allowed());
+    }
+    public record Recovered(ReviewRepairPreparation.Prepared prepared,Receipt receipt) {}
+    public Recovered recover(String id) {
+        var authority=authority();
+        if(id==null || !id.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"))throw invalid();
+        return workflow.read(()->{var recovered=isolation.recover(id,authority.actor());return new Recovered(recovered.prepared(),receiptView(recovered.receipt()));},authority.allowed());
+    }
+    private static Receipt receiptView(ReviewIsolationExecutor.Receipt receipt) {
+        boolean objectId=receipt.projectId() instanceof ObjectId;
+        var position=new Position(objectId?"OBJECT_ID":"STRING",objectId?((ObjectId)receipt.projectId()).toHexString():(String)receipt.projectId(),receipt.versionIndex());
+        return new Receipt(position,receipt.versionId(),receipt.beforeSha256(),receipt.outcome().state(),receipt.outcome().afterSha256());
     }
     private record Authority(String actor,BooleanSupplier allowed) {}
     private Authority authority() {

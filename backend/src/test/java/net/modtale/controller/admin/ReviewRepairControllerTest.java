@@ -33,7 +33,7 @@ class ReviewRepairControllerTest {
     void auth(String...permissions){SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("actor",null,Arrays.stream(permissions).map(SimpleGrantedAuthority::new).toList()));}
     @Test void everyRouteRequiresBothPermissionsBeforeServiceAccess() {
         for(String permission:List.of("PROJECT_REVIEW_READ","PROJECT_VERSION_RESCAN","PROJECT_REVIEW_DECIDE","ROLE_USER")) {
-            auth(permission);assertThrows(AccessDeniedException.class,()->controller.capabilities());assertThrows(AccessDeniedException.class,()->controller.inspect(null));assertThrows(AccessDeniedException.class,()->controller.prepare(null));
+            auth(permission);assertThrows(AccessDeniedException.class,()->controller.operations(null,25));assertThrows(AccessDeniedException.class,()->controller.recover("invalid"));assertThrows(AccessDeniedException.class,()->controller.capabilities());assertThrows(AccessDeniedException.class,()->controller.inspect(null));assertThrows(AccessDeniedException.class,()->controller.prepare(null));
             assertThrows(AccessDeniedException.class,()->controller.execute(null));assertThrows(AccessDeniedException.class,()->controller.receipt(null));
         }
         verifyNoInteractions(access);
@@ -64,6 +64,17 @@ class ReviewRepairControllerTest {
         var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/admin/verification/repairs/capabilities"))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andExpect(jsonPath("$.action").value("ISOLATE_LOCAL_REVIEW"));
+    }
+
+    @Test void operationDiscoveryAndRecoveryUseNoStoreHttpResponses()throws Exception {
+        String id="11111111-1111-1111-1111-111111111111";var prepared=new ReviewRepairPreparation.Prepared(id,"a".repeat(64),1,2);
+        when(access.operations(null,25)).thenReturn(new ReviewRepairOperationReader.Page(List.of(new ReviewRepairOperationReader.Item(id,"UNKNOWN")),null,"OPERATION_ID"));
+        when(access.recover(id)).thenReturn(new ReviewRepairAccess.Recovered(prepared,new ReviewRepairAccess.Receipt(new ReviewRepairAccess.Position("STRING","p",0),"v",prepared.sha256(),"UNKNOWN",null)));
+        var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/admin/verification/repairs/operations"))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andExpect(jsonPath("$.items[0].id").value(id));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/admin/verification/repairs/operations/"+id))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andExpect(jsonPath("$.prepared.id").value(id)).andExpect(jsonPath("$.receipt.beforeSha256").value(prepared.sha256()));
     }
 
 }

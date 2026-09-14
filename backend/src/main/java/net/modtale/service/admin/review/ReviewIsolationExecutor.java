@@ -18,13 +18,23 @@ public final class ReviewIsolationExecutor {
     private final ReviewSnapshotArchive archive;
     private final RawReviewSnapshotReader reader;
     private final ReviewRepairJournal journal;
+    private final ReviewRepairOperationReader operationReader;
     private final MongoCollection<Document> projects,operations;
     private static final Collation BINARY=Collation.builder().locale("simple").build();
     private static final TransactionOptions OPTIONS=TransactionOptions.builder().readConcern(ReadConcern.SNAPSHOT)
             .readPreference(ReadPreference.primary()).writeConcern(WriteConcern.MAJORITY.withJournal(true)).maxCommitTime(5000L,TimeUnit.MILLISECONDS).build();
     public ReviewIsolationExecutor(MongoTemplate mongo,ReviewSnapshotArchive archive,RawReviewSnapshotReader reader,ReviewRepairJournal journal) {
-        this.mongo=mongo;this.archive=archive;this.reader=reader;this.journal=journal;
+        this.mongo=mongo;this.archive=archive;this.reader=reader;this.journal=journal;operationReader=new ReviewRepairOperationReader(mongo);
         projects=mongo.getCollection("projects");operations=mongo.getCollection(ReviewRepairJournal.COLLECTION).withReadPreference(ReadPreference.primary()).withReadConcern(ReadConcern.MAJORITY);
+    }
+    public void initializeDiscovery(){operationReader.initialize();}
+    public ReviewRepairOperationReader.Page operations(String actor,String cursor,int limit){return operationReader.page(actor,cursor,limit);}
+    public record Recovered(ReviewRepairPreparation.Prepared prepared,Receipt receipt) {}
+    public Recovered recover(String id,String actor) {
+        var source=archive.load(id);
+        if(source.action()!=ReviewSnapshotArchive.Action.ISOLATE_REVIEW || !source.actorId().equals(actor))throw new SecurityException("Repair recovery is not permitted");
+        var prepared=new ReviewRepairPreparation.Prepared(source.id(),sourceDigest(source),source.createdAt(),source.expiresAt());
+        return new Recovered(prepared,receipt(source,prepared));
     }
     public boolean eligible(RawReviewSnapshotReader.Captured captured) {
         var source=captured.forArchive("00000000-0000-0000-0000-000000000000","inspection",ReviewSnapshotArchive.Action.ISOLATE_REVIEW,1,2);
@@ -33,18 +43,21 @@ public final class ReviewIsolationExecutor {
     }
     public record Receipt(Result outcome,Object projectId,int versionIndex,String versionId,String beforeSha256) {}
     public Receipt receipt(ReviewRepairPreparation.Prepared prepared,String actor) {
-        var source=verifiedSource(prepared,actor);
+        return receipt(verifiedSource(prepared,actor),prepared);
+    }
+    private Receipt receipt(ReviewSnapshotArchive.Snapshot source,ReviewRepairPreparation.Prepared prepared) {
         String versionId=new RawBsonDocument(source.versionBytes()).getString("_id").getValue();
-        return new Receipt(outcome(prepared,actor),source.projectId(),source.versionIndex(),versionId,prepared.sha256());
+        return new Receipt(outcome(prepared,source.actorId()),source.projectId(),source.versionIndex(),versionId,prepared.sha256());
     }
     private ReviewSnapshotArchive.Snapshot verifiedSource(ReviewRepairPreparation.Prepared prepared,String actor) {
         var source=archive.load(prepared.id());
         if(source.action()!=ReviewSnapshotArchive.Action.ISOLATE_REVIEW || !source.actorId().equals(actor))throw new SecurityException("Repair execution is not permitted");
-        try {
-            var sha=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(source.versionBytes()));
-            if(!sha.equals(prepared.sha256()) || source.createdAt()!=prepared.createdAt() || source.expiresAt()!=prepared.expiresAt())throw new IllegalStateException("Repair intent changed");
-        } catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
+        if(!sourceDigest(source).equals(prepared.sha256()) || source.createdAt()!=prepared.createdAt() || source.expiresAt()!=prepared.expiresAt())throw new IllegalStateException("Repair intent changed");
         return source;
+    }
+    private static String sourceDigest(ReviewSnapshotArchive.Snapshot source) {
+        try {return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(source.versionBytes()));}
+        catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
     }
     public Result execute(ReviewRepairPreparation.Prepared prepared,String actor,BooleanSupplier permitted) {
         permission(permitted);var source=verifiedSource(prepared,actor);

@@ -24,7 +24,7 @@ class ReviewRepairAccessTest {
     @Test void neitherReadNorRescanAloneAuthorizesAnyRepairOperation() {
         var prepared=new ReviewRepairPreparation.Prepared(UUID.randomUUID().toString(),"a".repeat(64),1,2);
         for(var permissions:List.of(Set.of(AdminPermission.PROJECT_REVIEW_READ),Set.of(AdminPermission.PROJECT_VERSION_RESCAN),Set.of(AdminPermission.PROJECT_REVIEW_DECIDE))) {
-            actor.setAdminPermissions(permissions);assertThrows(SecurityException.class,()->access.capability());
+            actor.setAdminPermissions(permissions);assertThrows(SecurityException.class,()->access.operations(null,25));assertThrows(SecurityException.class,()->access.recover(prepared.id()));assertThrows(SecurityException.class,()->access.capability());
             assertThrows(SecurityException.class,()->access.inspect(null));assertThrows(SecurityException.class,()->access.prepare(null));
             assertThrows(SecurityException.class,()->access.execute(prepared));assertThrows(SecurityException.class,()->access.receipt(prepared));
         }

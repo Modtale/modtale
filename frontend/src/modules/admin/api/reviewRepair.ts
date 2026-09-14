@@ -67,3 +67,27 @@ export async function repairReceipt(prepared: PreparedRepair, target: RepairTarg
     if (JSON.stringify(validateTarget(data)) !== JSON.stringify(expected) || data.beforeSha256 !== prepared.sha256) throw invalid();
     return validateResult(data);
 }
+
+export type RepairOperation = { id: string; recordedState: 'RESERVED' | 'EXECUTING' | 'UNKNOWN' | 'APPLIED' | 'NOT_APPLIED' };
+export type RepairOperationPage = { items: RepairOperation[]; nextCursor: string | null; order: 'OPERATION_ID' };
+export type RecoveredRepair = PendingRepair & { result: RepairResult };
+export async function repairOperations(cursor: string | null, signal: AbortSignal): Promise<RepairOperationPage> {
+    if (cursor !== null && !/^r1\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(cursor)) throw invalid();
+    const { data } = await api.get('/admin/verification/repairs/operations', { params: { ...(cursor === null ? {} : { cursor }), limit: 25 }, signal });
+    if (!data || data.order !== 'OPERATION_ID' || !Array.isArray(data.items) || data.items.length > 25) throw invalid();
+    let previous = cursor?.slice(3) ?? '';
+    const items: RepairOperation[] = data.items.map((item: RepairOperation) => {
+        if (!item || typeof item.id !== 'string' || !uuid.test(item.id) || item.id <= previous || !['RESERVED', 'EXECUTING', 'UNKNOWN', 'APPLIED', 'NOT_APPLIED'].includes(item.recordedState)) throw invalid();
+        previous = item.id;
+        return { id: item.id, recordedState: item.recordedState };
+    });
+    if (data.nextCursor !== null && (items.length !== 25 || data.nextCursor !== `r1.${previous}`)) throw invalid();
+    return { items, nextCursor: data.nextCursor, order: 'OPERATION_ID' };
+}
+export async function recoverRepair(id: string, signal: AbortSignal): Promise<RecoveredRepair> {
+    if (!uuid.test(id)) throw invalid();
+    const { data } = await api.get(`/admin/verification/repairs/operations/${id}`, { signal });
+    const prepared = validatePrepared(data?.prepared); const target = validateTarget(data?.receipt); const result = validateResult(data?.receipt);
+    if (prepared.id !== id || data.receipt.beforeSha256 !== prepared.sha256 || result.state === 'INELIGIBLE') throw invalid();
+    return { prepared, target, result };
+}
