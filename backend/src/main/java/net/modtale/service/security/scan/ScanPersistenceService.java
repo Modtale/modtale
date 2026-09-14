@@ -116,7 +116,9 @@ public class ScanPersistenceService {
         return false;
     }
 
-    public boolean queueRetryAttempt(String projectId, String versionId, int currentAttempt, ScanResult queued) {
+    public boolean queueRetryAttempt(String projectId, String versionId, int currentAttempt, ScanResult queued, ScanResult observed, long timeoutMillis) {
+        Query target = recoveryQuery(projectId, versionId, currentAttempt, observed, timeoutMillis);
+        if (target == null) return false;
         Update retryUpdate = new Update()
                 .set("versions.$.scanResult", queued)
                 .set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.PENDING)
@@ -124,20 +126,43 @@ public class ScanPersistenceService {
                 .set("updatedAt", LocalDateTime.now().toString());
 
         return mongoTemplate.updateFirst(
-                buildVersionAttemptQuery(projectId, versionId, currentAttempt, "SCANNING", "QUEUED", "WAITING_RETRY", null),
+                target,
                 retryUpdate,
                 Project.class
         ).getModifiedCount() > 0;
     }
 
     public boolean updateFailedScan(String projectId, String versionId, ScanResult failed, int expectedAttempt) {
+        return updateFailure(projectId, failed, buildVersionAttemptQuery(projectId, versionId, expectedAttempt, "SCANNING", "QUEUED", "WAITING_RETRY", null));
+    }
+    public boolean updateTimedOutScan(String projectId, String versionId, ScanResult failed, int expectedAttempt,
+            ScanResult observed, long timeoutMillis) {
+        Query target = recoveryQuery(projectId, versionId, expectedAttempt, observed, timeoutMillis);
+        return target != null && updateFailure(projectId, failed, target);
+    }
+    private Query recoveryQuery(String projectId, String versionId, int attempt, ScanResult observed, long timeoutMillis) {
+        if (observed == null || observed.getStatus() != ScanStatus.SCANNING || timeoutMillis <= 0
+                || Math.max(1, observed.getScanAttempt()) != attempt) return null;
+        String state = observed.getScanState();
+        if (state != null && !java.util.Set.of("SCANNING", "QUEUED", "WAITING_RETRY").contains(state)) return null;
+        long expires;
+        try { expires = Math.addExact(Math.max(0, observed.getScanTimestamp()), timeoutMillis); }
+        catch (ArithmeticException overflow) { return null; }
+        var raw = buildVersionAttemptQuery(projectId, versionId, attempt, state).getQueryObject();
+        var version = raw.get("versions", org.bson.Document.class).get("$elemMatch", org.bson.Document.class);
+        version.put("scanResult.scanTimestamp", observed.getScanTimestamp() == 0
+                ? new org.bson.Document("$in", java.util.Arrays.asList(0L, null)) : observed.getScanTimestamp());
+        raw.put("$expr", new org.bson.Document("$lt", List.of(expires, new org.bson.Document("$toLong", "$$NOW"))));
+        return new org.springframework.data.mongodb.core.query.BasicQuery(raw);
+    }
+    private boolean updateFailure(String projectId, ScanResult failed, Query target) {
         Update update = new Update()
                 .set("versions.$.scanResult", failed)
                 .set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.PENDING)
                 .set("versions.$.scheduledPublishDate", null)
                 .set("updatedAt", LocalDateTime.now().toString());
 
-        boolean modified = mongoTemplate.updateFirst(buildVersionAttemptQuery(projectId, versionId, expectedAttempt, "SCANNING", "QUEUED", "WAITING_RETRY", null), update, Project.class)
+        boolean modified = mongoTemplate.updateFirst(target, update, Project.class)
                 .getModifiedCount() > 0;
 
         Project project = projectRepository.findById(projectId).orElse(null);

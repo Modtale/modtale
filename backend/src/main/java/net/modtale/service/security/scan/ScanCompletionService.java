@@ -198,10 +198,10 @@ public class ScanCompletionService {
             String projectId,
             String versionId,
             String originalFilename,
-            int expectedAttempt
+            int expectedAttempt, ScanResult observed, long timeoutMillis
     ) {
         ScanResult timedOut = scanRoutingService.buildScanTimeoutResult(originalFilename, expectedAttempt);
-        boolean applied = scanPersistenceService.updateFailedScan(projectId, versionId, timedOut, expectedAttempt);
+        boolean applied = scanPersistenceService.updateTimedOutScan(projectId, versionId, timedOut, expectedAttempt, observed, timeoutMillis);
         if (!applied) {
             return;
         }

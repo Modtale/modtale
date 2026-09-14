@@ -18,6 +18,56 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @EnabledIfEnvironmentVariable(named="WARDEN_REVIEW_DB_TEST",matches="true")
 class VersionReviewPersistenceIntegrationTest {
+    @Test void staleRecoveryCannotReplaceAnAttemptThatStartedAfterItsSnapshot() {
+        var scan = new ScanResult(); scan.setStatus(ScanStatus.SCANNING); scan.setScanState("QUEUED");
+        scan.setScanAttempt(1); scan.setScanTimestamp(System.currentTimeMillis()-120_000);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)), new Update()
+                .set("versions.0.reviewStatus", ProjectVersion.ReviewStatus.PENDING).set("versions.0.scanResult", scan), Project.class);
+        var scans = new net.modtale.service.security.scan.ScanPersistenceService(mongo,
+                org.mockito.Mockito.mock(net.modtale.repository.project.ProjectRepository.class),
+                org.mockito.Mockito.mock(net.modtale.service.project.query.ProjectService.class));
+        assertTrue(scans.markAttemptRunning(id,"version-a",1));
+        var queued = new ScanResult(); queued.setStatus(ScanStatus.SCANNING); queued.setScanState("QUEUED"); queued.setScanAttempt(2);
+        assertFalse(scans.queueRetryAttempt(id,"version-a",1,queued,scan,60_000));
+        assertFalse(scans.updateTimedOutScan(id,"version-a",new ScanResult(),1,scan,60_000));
+        assertEquals("SCANNING",mongo.findById(id,Project.class).getVersions().getFirst().getScanResult().getScanState());
+    }
+    @Test void recoveryRequiresDatabaseExpiryAndAllowsOnlyOneStaleRetry() {
+        var scans = new net.modtale.service.security.scan.ScanPersistenceService(mongo,
+                org.mockito.Mockito.mock(net.modtale.repository.project.ProjectRepository.class),
+                org.mockito.Mockito.mock(net.modtale.service.project.query.ProjectService.class));
+        var observed = new ScanResult(); observed.setStatus(ScanStatus.SCANNING); observed.setScanState("SCANNING");
+        observed.setScanAttempt(1); observed.setScanTimestamp(System.currentTimeMillis()+86_400_000);
+        var query = Query.query(Criteria.where("_id").is(id));
+        mongo.updateFirst(query,new Update().set("versions.0.reviewStatus",ProjectVersion.ReviewStatus.PENDING)
+                .set("versions.0.scanResult",observed).set("futureField","preserve"),Project.class);
+        var queued = new ScanResult(); queued.setStatus(ScanStatus.SCANNING); queued.setScanState("QUEUED"); queued.setScanAttempt(2);
+        assertFalse(scans.queueRetryAttempt(id,"version-a",1,queued,observed,60_000));
+        assertFalse(scans.updateTimedOutScan(id,"version-a",new ScanResult(),1,observed,60_000));
+        observed.setScanTimestamp(System.currentTimeMillis()-120_000);
+        mongo.updateFirst(query,new Update().set("versions.0.scanResult",observed),Project.class);
+        // Same state/attempt but a newer timestamp must reject the stale recovery snapshot.
+        mongo.updateFirst(query,new Update().set("versions.0.scanResult.scanTimestamp",System.currentTimeMillis()),Project.class);
+        assertFalse(scans.queueRetryAttempt(id,"version-a",1,queued,observed,60_000));
+        mongo.updateFirst(query,new Update().set("versions.0.scanResult",observed),Project.class);
+        assertTrue(scans.queueRetryAttempt(id,"version-a",1,queued,observed,60_000));
+        assertFalse(scans.queueRetryAttempt(id,"version-a",1,queued,observed,60_000));
+        assertEquals("preserve",mongo.getCollection("projects").find().first().getString("futureField"));
+        assertEquals(2,mongo.findById(id,Project.class).getVersions().getFirst().getScanResult().getScanAttempt());
+    }
+    @Test void expiredTerminalRecoveryIsConditionalAndPreservesOtherVersions() {
+        var scans = new net.modtale.service.security.scan.ScanPersistenceService(mongo,
+                org.mockito.Mockito.mock(net.modtale.repository.project.ProjectRepository.class),
+                org.mockito.Mockito.mock(net.modtale.service.project.query.ProjectService.class));
+        var observed=new ScanResult(); observed.setStatus(ScanStatus.SCANNING); observed.setScanState("WAITING_RETRY");
+        observed.setScanAttempt(3); observed.setScanTimestamp(0);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update()
+                .set("versions.0.reviewStatus",ProjectVersion.ReviewStatus.PENDING).set("versions.0.scanResult",observed),Project.class);
+        var failed=new ScanResult(); failed.setStatus(ScanStatus.FAILED); failed.setScanState("FAILED");
+        assertTrue(scans.updateTimedOutScan(id,"version-a",failed,3,observed,60_000));
+        assertFalse(scans.updateTimedOutScan(id,"version-a",failed,3,observed,60_000));
+        assertEquals("version-b",mongo.findById(id,Project.class).getVersions().get(1).getId());
+    }
     @Test void metadataRepairPreservesVersionsEvidenceAndUnknownFields() {
         mongo.updateFirst(Query.query(Criteria.where("_id").is(id)), new Update().set("futureField", "retain"), Project.class);
         var repairs = new ProjectReviewPersistence(mongo);

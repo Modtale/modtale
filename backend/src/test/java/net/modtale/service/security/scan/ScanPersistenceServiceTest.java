@@ -81,7 +81,8 @@ class ScanPersistenceServiceTest {
         MongoTemplate mongo=mock(MongoTemplate.class);
         when(mongo.updateFirst(any(Query.class),any(Update.class),eq(Project.class))).thenReturn(UpdateResult.acknowledged(1,1L,null));
         var service=new ScanPersistenceService(mongo,mock(ProjectRepository.class),mock(ProjectService.class));
-        service.queueRetryAttempt("project","version",1,new ScanResult());
+        var observed = new ScanResult(); observed.setStatus(ScanStatus.SCANNING); observed.setScanState("QUEUED"); observed.setScanAttempt(1);
+        service.queueRetryAttempt("project","version",1,new ScanResult(),observed,60_000);
         var capture=ArgumentCaptor.forClass(Query.class);
         verify(mongo).updateFirst(capture.capture(),any(Update.class),eq(Project.class));
         assertTrue(capture.getValue().getQueryObject().toString().contains("QUEUED"));
