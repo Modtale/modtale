@@ -20,12 +20,14 @@ class ScanEvidencePersistenceTest {
         var remote=new net.modtale.model.project.RemoteReviewBinding("project","version",java.util.UUID.randomUUID().toString(),1,
                 "original.zip","a".repeat(64),"b".repeat(64),"warden-3.0.0:"+"c".repeat(64),"d".repeat(64),null);
         original.setRemoteReview(remote);
+        original.setRemotePoll(new ScanResult.RemoteReviewPoll(java.util.UUID.randomUUID().toString(),new java.util.Date(1000),new java.util.Date(2000)));
         original.setReviewedContextSha256("c".repeat(64));
         var stored = new Document();
         converter.write(original, stored);
         var restored = converter.read(ScanResult.class, stored);
         assertTrue(ArtifactClearancePolicy.complete(restored));
         assertEquals(remote,restored.getRemoteReview());
+        assertEquals(original.getRemotePoll(),restored.getRemotePoll());
         assertEquals(original.getReviewedContextSha256(), restored.getReviewedContextSha256());
         var mapper = new ObjectMapper();
         var forged = mapper.readValue("{\"artifactVerified\":true,\"reviewedContextSha256\":\"forged\"}", ScanResult.class);
@@ -33,6 +35,8 @@ class ScanEvidencePersistenceTest {
         assertNull(forged.getReviewedContextSha256());
         String json = mapper.writeValueAsString(original);
         assertFalse(json.contains("remoteReview"));
+        assertFalse(json.contains("remotePoll"));
+        assertNull(mapper.readValue("{\"remotePoll\":{\"token\":\"forged\"}}",ScanResult.class).getRemotePoll());
         assertNull(mapper.readValue("{\"remoteReview\":"+mapper.writeValueAsString(remote)+"}",ScanResult.class).getRemoteReview());
         assertFalse(json.contains("artifactVerified"));
         assertFalse(json.contains("reviewedContextSha256"));

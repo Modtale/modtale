@@ -27,7 +27,7 @@ public class RemoteReviewPersistence {
     public boolean attachJob(ProjectVersion observed, RemoteReviewBinding binding, String jobId) {
         if (binding == null || !matches(observed,binding)) return false;
         var attached = binding.withJobId(jobId);
-        var version = target(observed,binding).and("scanResult.scanState").is("REMOTE_REVIEW")
+        var version = target(observed,binding).and("scanResult.scanState").is("REMOTE_REVIEW").and("scanResult.remotePoll").exists(false)
                 .orOperator(Criteria.where("scanResult.remoteReview").is(binding),Criteria.where("scanResult.remoteReview").is(attached));
         return mongo.updateFirst(query(binding,version),new Update()
                 .set("versions.$.scanResult.remoteReview",attached),Project.class).getMatchedCount() == 1;

@@ -6,6 +6,12 @@ import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ScanResult {
+    private RemoteReviewPoll remotePoll;
+    public record RemoteReviewPoll(String token, java.util.Date leaseUntil, java.util.Date nextPollAt) {}
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public RemoteReviewPoll getRemotePoll() { return remotePoll; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public void setRemotePoll(RemoteReviewPoll value) { remotePoll = value; }
     private RemoteReviewBinding remoteReview;
     @com.fasterxml.jackson.annotation.JsonIgnore
     public RemoteReviewBinding getRemoteReview() { return remoteReview; }

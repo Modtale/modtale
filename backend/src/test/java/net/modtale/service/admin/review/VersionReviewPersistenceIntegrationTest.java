@@ -64,6 +64,69 @@ class VersionReviewPersistenceIntegrationTest {
         assertFalse(scans.queueRetryAttempt(id,version.getId(),1,new ScanResult(),restored.getScanResult(),1));
         assertEquals(binding,restored.getScanResult().getRemoteReview());
     }
+    private net.modtale.service.security.scan.RemoteReviewPollStore pollStore() {
+        return new net.modtale.service.security.scan.RemoteReviewPollStore(mongo);
+    }
+    private RemoteReviewBinding boundRemote() {
+        var binding=prepareRemote();assertTrue(new net.modtale.service.security.scan.RemoteReviewPersistence(mongo).bind(version,binding));return binding;
+    }
+    @Test void onlyOneConcurrentPollerOwnsTheRetainedRequest()throws Exception {
+        var binding=boundRemote();var start=new java.util.concurrent.CountDownLatch(1);
+        try(var executor=java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var a=executor.submit(()->{start.await();return pollStore().claim(binding,30000);});
+            var b=executor.submit(()->{start.await();return pollStore().claim(binding,30000);});start.countDown();
+            var first=a.get();var second=b.get();assertTrue((first==null)!=(second==null));
+            assertTrue(pollStore().isCurrent(first==null?second:first));assertNull(pollStore().claim(binding,30000));
+        }
+    }
+    @Test void pollLeaseTakeoverFencesExpiredOwnerAndPreservesUnrelatedFields() {
+        var binding=boundRemote();mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update()
+                .set("versions.0.unmodeledField","keep").set("versions.1.rejectionReason","sibling").set("title","keep title"),Project.class);
+        var old=pollStore().claim(binding,30000);assertNotNull(old);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update().set("versions.0.scanResult.remotePoll.leaseUntil",new Date(0)),Project.class);
+        assertFalse(pollStore().isCurrent(old));assertFalse(pollStore().release(old,100));assertNull(pollStore().attachJob(old,UUID.randomUUID().toString()));
+        var next=pollStore().claim(binding,30000);assertNotNull(next);assertNotEquals(old.token(),next.token());assertFalse(pollStore().release(old,100));
+        assertTrue(pollStore().isCurrent(next));var project=mongo.findById(id,Project.class);assertEquals("keep title",project.getTitle());assertEquals("sibling",project.getVersions().get(1).getRejectionReason());
+        assertNotNull(project.getVersions().getFirst().getScanResult().getRemotePoll());
+        assertEquals("keep",mongo.getCollection("projects").find().first().getList("versions",Document.class).getFirst().getString("unmodeledField"));
+    }
+    @Test void completedPollPersistsDatabaseDelayAndCannotBeReused() {
+        var binding=boundRemote();var before=client.getDatabase(database).runCommand(new Document("hello",1)).getDate("localTime");
+        var owner=pollStore().claim(binding,30000);assertNotNull(owner);
+        var after=client.getDatabase(database).runCommand(new Document("hello",1)).getDate("localTime");
+        var acquired=mongo.findById(id,Project.class).getVersions().getFirst().getScanResult().getRemotePoll();
+        assertTrue(acquired.leaseUntil().getTime()>=before.getTime()+30000);assertTrue(acquired.leaseUntil().getTime()<=after.getTime()+30000);
+        assertTrue(pollStore().release(owner,30000));assertFalse(pollStore().release(owner,100));assertFalse(pollStore().isCurrent(owner));assertNull(pollStore().claim(binding,30000));
+        var state=mongo.findById(id,Project.class).getVersions().getFirst().getScanResult().getRemotePoll();assertNull(state.token());assertEquals(new Date(0),state.leaseUntil());
+        assertTrue(state.nextPollAt().getTime()>System.currentTimeMillis());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update().set("versions.0.scanResult.remotePoll.nextPollAt",new Date(0)),Project.class);
+        assertNotNull(pollStore().claim(binding,30000));
+    }
+    @Test void onlyLivePollCanAttachJobAndMustUseUpdatedBindingAfterward() {
+        var binding=boundRemote();var owner=pollStore().claim(binding,30000);String job=UUID.randomUUID().toString();
+        assertFalse(new net.modtale.service.security.scan.RemoteReviewPersistence(mongo).attachJob(version,binding,job));
+        var attached=pollStore().attachJob(owner,job);assertNotNull(attached);assertEquals(binding.withJobId(job),attached.binding());
+        assertFalse(pollStore().isCurrent(owner));assertTrue(pollStore().isCurrent(attached));assertNotNull(pollStore().attachJob(attached,job));
+        assertThrows(IllegalArgumentException.class,()->pollStore().attachJob(attached,UUID.randomUUID().toString()));assertTrue(pollStore().release(attached,100));
+    }
+    @Test void contextAndRequestChangesInvalidatePollOwnership() {
+        var binding=boundRemote();var owner=pollStore().claim(binding,30000);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update().set("versions.0.manifestVersion","new runtime"),Project.class);
+        assertFalse(pollStore().isCurrent(owner));assertFalse(pollStore().release(owner,100));assertNull(pollStore().claim(binding,30000));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update().set("versions.0.manifestVersion",version.getManifestVersion())
+                .set("versions.0.scanResult.scanRequestId",UUID.randomUUID().toString()),Project.class);
+        assertFalse(pollStore().isCurrent(owner));assertNull(pollStore().attachJob(owner,UUID.randomUUID().toString()));
+    }
+    @Test void malformedPollAndDuplicateVersionIdentityCannotBeClaimed() {
+        var binding=boundRemote();mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update()
+                .set("versions.0.scanResult.remotePoll",new Document("leaseUntil","bad")),Project.class);assertNull(pollStore().claim(binding,30000));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update().unset("versions.0.scanResult.remotePoll")
+                .set("versions.1._id",version.getId()),Project.class);assertNull(pollStore().claim(binding,30000));
+    }
+    @Test void pollIntervalsAreBoundedBeforeDatabaseWork() {
+        var binding=boundRemote();assertThrows(IllegalArgumentException.class,()->pollStore().claim(binding,999));assertThrows(IllegalArgumentException.class,()->pollStore().claim(binding,120001));
+        var owner=pollStore().claim(binding,30000);assertThrows(IllegalArgumentException.class,()->pollStore().release(owner,99));assertThrows(IllegalArgumentException.class,()->pollStore().release(owner,3600001));
+    }
     @Test void staleRecoveryCannotReplaceAnAttemptThatStartedAfterItsSnapshot() {
         var scan = new ScanResult(); scan.setStatus(ScanStatus.SCANNING); scan.setScanState("QUEUED");
         scan.setScanAttempt(1); scan.setScanTimestamp(System.currentTimeMillis()-120_000);
