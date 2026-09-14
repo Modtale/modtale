@@ -66,6 +66,7 @@ class ScanServiceTest {
         project.setVersions(List.of(version));
 
         ScanResult pendingScan = new ScanResult();
+        pendingScan.setScanRequestId("queued-request");
 
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
         when(projectVersionAccessService.findById(project, "version-1")).thenReturn(version);
@@ -87,7 +88,7 @@ class ScanServiceTest {
                 eq("https://cdn.modtale.net/files/generated-mod.jar"),
                 originalFilename.capture(),
                 eq(true),
-                eq(2)
+                eq(2), eq(pendingScan.getScanRequestId())
         );
         assertTrue(originalFilename.getValue().endsWith("generated-mod.jar"));
     }

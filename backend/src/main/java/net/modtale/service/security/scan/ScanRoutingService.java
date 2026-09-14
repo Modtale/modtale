@@ -20,6 +20,7 @@ public class ScanRoutingService {
 
     public ScanResult createQueuedScanResult(int attempt, String note) {
         ScanResult pending = new ScanResult();
+        pending.setScanRequestId(java.util.UUID.randomUUID().toString());
         pending.setStatus(ScanStatus.SCANNING);
         pending.setScanState("QUEUED");
         pending.setRiskScore(0);

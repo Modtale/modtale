@@ -80,6 +80,7 @@ class ScanRequestServiceTest {
         version.setReviewStatus(ProjectVersion.ReviewStatus.SCHEDULED);
         project.setVersions(List.of(version));
         ScanResult queued = new ScanResult();
+        queued.setScanRequestId("queued-request");
         queued.setStatus(ScanStatus.SCANNING);
 
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
@@ -96,7 +97,7 @@ class ScanRequestServiceTest {
         verify(scanThrottleService).enforceRescanLimit(user);
         verify(reviewPersistence).queueRescan(any(), any());
         verify(projectService).evictProjectCache(project);
-        verify(scanExecutionService).enqueueBackgroundScan("project-1", "version-1", "files/mod.jar", "mod.jar", true, 2);
+        verify(scanExecutionService).enqueueBackgroundScan("project-1", "version-1", "files/mod.jar", "mod.jar", true, 2, queued.getScanRequestId());
     }
 
     @Test

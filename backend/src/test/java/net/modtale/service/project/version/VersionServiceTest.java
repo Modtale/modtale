@@ -140,6 +140,7 @@ class VersionServiceTest {
         when(validationService.getAllowedGameVersions()).thenReturn(List.of("1.21.0"));
         when(versionArtifactService.prepareVersionArtifact(project, file))
                 .thenReturn(new VersionArtifactService.PreparedVersionArtifact(ProjectClassification.DATA, "/files/data/bundle.zip", "sha-256"));
+        queuedScan.setScanRequestId("initial-request");
         when(scanService.createQueuedScanResult(1, "Initial scan queued.")).thenReturn(queuedScan);
         DependencyReferenceRequest dependency = dependency("dep-1", "2.0.0");
         when(versionDependencyService.resolveRequestedDependencies(List.of(dependency), false, false))
@@ -164,7 +165,7 @@ class VersionServiceTest {
         assertEquals(queuedScan, savedVersion.getScanResult());
         verify(reviewPersistence).applyVersionList(any());
         verify(projectService).evictProjectCache(project);
-        verify(scanService).enqueueBackgroundScan("project-1", savedVersion.getId(), "/files/data/bundle.zip", "bundle.zip", false, 1);
+        verify(scanService).enqueueBackgroundScan("project-1", savedVersion.getId(), "/files/data/bundle.zip", "bundle.zip", false, 1, queuedScan.getScanRequestId());
     }
 
     @Test
@@ -206,7 +207,7 @@ class VersionServiceTest {
         verify(reviewPersistence).applyVersionList(any());
         verify(projectService).evictProjectCache(project);
         verify(scanService, never()).createQueuedScanResult(1, "Initial scan queued.");
-        verify(scanService, never()).enqueueBackgroundScan("project-1", savedVersion.getId(), "/files/data/bundle.zip", "bundle.zip", false, 1);
+        verify(scanService, never()).enqueueBackgroundScan("project-1", savedVersion.getId(), "/files/data/bundle.zip", "bundle.zip", false, 1, null);
     }
 
     @Test
@@ -285,7 +286,7 @@ class VersionServiceTest {
                 "project-1", "1.0.0", List.of("1.21.0"), file, "Replacement notes", null, null,
                 ProjectVersion.Channel.RELEASE, true, user));
         verify(projectDeletionService, never()).deleteVersionFile(any(ProjectVersion.class));
-        verify(scanService, never()).enqueueBackgroundScan(anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyInt());
+        verify(scanService, never()).enqueueBackgroundScan(anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyInt(), any());
         project.setVersions(new ArrayList<>(List.of(existing)));
         clearInvocations(reviewPersistence, scanService);
         when(reviewPersistence.applyVersionList(any())).thenReturn(true);
@@ -314,7 +315,7 @@ class VersionServiceTest {
         verify(projectDeletionService).deleteVersionFile(existing);
         verify(reviewPersistence).applyVersionList(any());
         verify(projectService).evictProjectCache(project);
-        verify(scanService).enqueueBackgroundScan("project-1", savedVersion.getId(), "/files/data/replacement.zip", "replacement.zip", false, 1);
+        verify(scanService).enqueueBackgroundScan("project-1", savedVersion.getId(), "/files/data/replacement.zip", "replacement.zip", false, 1, null);
     }
 
     @Test
@@ -363,7 +364,7 @@ class VersionServiceTest {
         assertEquals("version-old", project.getVersions().get(1).getId());
         assertEquals(List.of("1.20.0"), project.getVersions().get(1).getGameVersions());
         assertEquals(ProjectVersion.ReviewStatus.PENDING, project.getVersions().get(1).getReviewStatus());
-        verify(scanService).enqueueBackgroundScan("project-1", "version-old", "/files/data/old.zip", "/files/data/old.zip", false, 1);
+        verify(scanService).enqueueBackgroundScan("project-1", "version-old", "/files/data/old.zip", "/files/data/old.zip", false, 1, null);
         verify(projectDeletionService, never()).deleteVersionFile(existing);
     }
 
@@ -439,7 +440,7 @@ class VersionServiceTest {
         when(reviewPersistence.applyVersionEdit(any(), anyString(), anyBoolean(), anyBoolean())).thenReturn(false);
         assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> service.updateVersion(
                 "project-1", "version-1", null, null, List.of("new"), null, null, user));
-        verify(scanService, never()).enqueueBackgroundScan(anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyInt());
+        verify(scanService, never()).enqueueBackgroundScan(anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyInt(), any());
         verify(projectService, never()).evictProjectCache(any());
         verify(projectRepository, never()).save(any());
         clearInvocations(reviewPersistence, scanService);
@@ -449,7 +450,7 @@ class VersionServiceTest {
         service.updateVersion("project-1", "version-1", null, null, List.of("new"), null, null, user);
         var order = inOrder(reviewPersistence, scanService);
         order.verify(reviewPersistence).applyVersionEdit(any(), eq("version-1"), eq(true), eq(false));
-        order.verify(scanService).enqueueBackgroundScan("project-1", "version-1", "mods/mod.jar", "mods/mod.jar", false, 2);
+        order.verify(scanService).enqueueBackgroundScan("project-1", "version-1", "mods/mod.jar", "mods/mod.jar", false, 2, queued.getScanRequestId());
         assertEquals(ProjectVersion.ReviewStatus.PENDING, version.getReviewStatus());
     }
 

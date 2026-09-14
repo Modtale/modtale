@@ -83,7 +83,7 @@ public class ScanRecoveryService {
                                 version.getFileUrl(),
                                 extractOriginalFilename(version.getFileUrl()),
                                 false,
-                                nextAttempt
+                                nextAttempt, queued.getScanRequestId()
                         );
                     }
                 } else {
@@ -119,7 +119,7 @@ public class ScanRecoveryService {
                 String filePath,
                 String originalFilename,
                 boolean isManualRescan,
-                int expectedAttempt
+                int expectedAttempt, String requestId
         );
     }
 }

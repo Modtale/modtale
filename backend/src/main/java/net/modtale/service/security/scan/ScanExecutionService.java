@@ -89,13 +89,17 @@ public class ScanExecutionService {
             boolean isManualRescan,
             int expectedAttempt
     ) {
+        enqueueBackgroundScan(projectId, versionId, filePath, originalFilename, isManualRescan, expectedAttempt, null);
+    }
+    public void enqueueBackgroundScan(String projectId, String versionId, String filePath, String originalFilename,
+            boolean isManualRescan, int expectedAttempt, String requestId) {
         taskExecutor.execute(() -> processBackgroundScan(
                 projectId,
                 versionId,
                 filePath,
                 originalFilename,
                 isManualRescan,
-                expectedAttempt
+                expectedAttempt, requestId
         ));
     }
 
@@ -119,9 +123,10 @@ public class ScanExecutionService {
             String filePath,
             String originalFilename,
             boolean isManualRescan,
-            int expectedAttempt
+            int expectedAttempt, String requestId
     ) {
-        if (!scanPersistenceService.markAttemptRunning(projectId, versionId, expectedAttempt)) {
+        if (!(requestId == null ? scanPersistenceService.markAttemptRunning(projectId, versionId, expectedAttempt)
+                : scanPersistenceService.markAttemptRunning(projectId, versionId, expectedAttempt, requestId))) {
             logger.info("Scan attempt skipped because state moved ahead project={} version={} attempt={}", projectId, versionId, expectedAttempt);
             return;
         }
@@ -130,15 +135,12 @@ public class ScanExecutionService {
 
         try {
             byte[] fileBytes = storageService.download(filePath);
-            scanCompletionService.handleCompletedScan(
-                    projectId,
-                    versionId,
-                    expectedAttempt,
-                    isManualRescan,
-                    wardenService.scanFile(fileBytes, originalFilename)
-            );
+            var result = wardenService.scanFile(fileBytes, originalFilename);
+            if (requestId == null) scanCompletionService.handleCompletedScan(projectId, versionId, expectedAttempt, isManualRescan, result);
+            else scanCompletionService.handleCompletedScan(projectId, versionId, expectedAttempt, isManualRescan, result, requestId);
         } catch (RuntimeException e) {
-            scanCompletionService.handleScanFailure(projectId, versionId, originalFilename, expectedAttempt, e);
+            if (requestId == null) scanCompletionService.handleScanFailure(projectId, versionId, originalFilename, expectedAttempt, e);
+            else scanCompletionService.handleScanFailure(projectId, versionId, originalFilename, expectedAttempt, e, requestId);
         }
     }
 }

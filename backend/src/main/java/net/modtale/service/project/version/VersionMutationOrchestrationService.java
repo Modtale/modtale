@@ -126,7 +126,7 @@ public class VersionMutationOrchestrationService {
                 filePath,
                 file.getOriginalFilename(),
                 false,
-                1
+                1, version.getScanResult() == null ? null : version.getScanResult().getScanRequestId()
         );
     }
 
@@ -157,7 +157,7 @@ public class VersionMutationOrchestrationService {
                 version.getFileUrl(),
                 version.getFileUrl(),
                 false,
-                1
+                1, version.getScanResult() == null ? null : version.getScanResult().getScanRequestId()
         );
     }
 
@@ -178,7 +178,7 @@ public class VersionMutationOrchestrationService {
 
     public void enqueueContextChangeScan(Project project, ProjectVersion version) {
         scanService.enqueueBackgroundScan(project.getId(), version.getId(), version.getFileUrl(), version.getFileUrl(),
-                false, version.getScanResult().getScanAttempt());
+                false, version.getScanResult().getScanAttempt(), version.getScanResult().getScanRequestId());
     }
 
     public void deleteCachedArtifact(String path) { projectDeletionService.deleteStoredFile(path); }

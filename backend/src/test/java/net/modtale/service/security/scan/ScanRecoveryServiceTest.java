@@ -36,7 +36,7 @@ class ScanRecoveryServiceTest {
     @Test
     void recoverStaleScanningVersionsQueuesRetryWhenAttemptsRemain() {
         Project project = project("project-1", version("version-1", "files/mod.jar", 1, staleTimestamp()));
-        ScanResult queued = new ScanResult();
+        ScanResult queued = new ScanResult(); queued.setScanRequestId("retry-request");
 
         when(scanRoutingService.scanTimeoutMillis()).thenReturn(60_000L);
         when(scanRoutingService.scanMaxRetries()).thenReturn(2);
@@ -47,7 +47,7 @@ class ScanRecoveryServiceTest {
 
         service.recoverStaleScanningVersions(scheduler);
 
-        verify(scheduler).enqueue("project-1", "version-1", "files/mod.jar", "mod.jar", false, 2);
+        verify(scheduler).enqueue("project-1", "version-1", "files/mod.jar", "mod.jar", false, 2, queued.getScanRequestId());
         verify(scanCompletionService, never()).handleTimedOutScan(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyLong());
         verify(projectService).evictProjectCache(project);
     }
@@ -66,7 +66,7 @@ class ScanRecoveryServiceTest {
 
         verify(scanCompletionService).handleTimedOutScan("project-1", "version-1", "mod.jar", 3, exhausted.getScanResult(), 60_000L);
         verify(scanCompletionService).handleTimedOutScan("project-1", "version-2", "uploaded-artifact", 1, missingFile.getScanResult(), 60_000L);
-        verify(scheduler, never()).enqueue(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.anyInt());
+        verify(scheduler, never()).enqueue(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.any());
     }
 
     @Test
@@ -83,7 +83,7 @@ class ScanRecoveryServiceTest {
 
         service.recoverStaleScanningVersions(scheduler);
 
-        verify(scheduler, never()).enqueue(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.anyInt());
+        verify(scheduler, never()).enqueue(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.any());
         verify(scanPersistenceService, never()).queueRetryAttempt(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyLong());
         verify(scanCompletionService, never()).handleTimedOutScan(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyLong());
         verify(projectService).evictProjectCache(project);

@@ -78,7 +78,7 @@ public class ScanRequestService {
                 version.getFileUrl(),
                 originalFilename,
                 true,
-                attempt
+                attempt, pending.getScanRequestId()
         );
     }
 

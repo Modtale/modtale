@@ -32,6 +32,9 @@ public class ScanPersistenceService {
     }
 
     public boolean markAttemptRunning(String projectId, String versionId, int attempt) {
+        return markAttemptRunning(projectId, versionId, attempt, null);
+    }
+    public boolean markAttemptRunning(String projectId, String versionId, int attempt, String requestId) {
         Update update = new Update()
                 .set("versions.$.scanResult.status", ScanStatus.SCANNING)
                 .set("versions.$.scanResult.scanState", "SCANNING")
@@ -41,7 +44,7 @@ public class ScanPersistenceService {
                 .set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.PENDING)
                 .set("updatedAt", LocalDateTime.now().toString());
 
-        return mongoTemplate.updateFirst(buildVersionAttemptQuery(projectId, versionId, attempt, "QUEUED"), update, Project.class)
+        return mongoTemplate.updateFirst(bindRequest(buildVersionAttemptQuery(projectId, versionId, attempt, "QUEUED"), requestId), update, Project.class)
                 .getModifiedCount() > 0;
     }
 
@@ -53,6 +56,11 @@ public class ScanPersistenceService {
             ScanRoutingService.RoutingDecision routingDecision,
             ProjectVersion reviewedVersion
     ) {
+        return applyScanOutcome(projectId, versionId, expectedAttempt, scanResult, routingDecision, reviewedVersion, null);
+    }
+    public boolean applyScanOutcome(String projectId, String versionId, int expectedAttempt, ScanResult scanResult,
+            ScanRoutingService.RoutingDecision routingDecision, ProjectVersion reviewedVersion, String requestId) {
+        scanResult.setScanRequestId(requestId);
         if (routingDecision.action() == ScanRoutingService.RoutingAction.SCHEDULE
                 || routingDecision.action() == ScanRoutingService.RoutingAction.APPROVE_NOW) {
             String context = ArtifactReviewContext.automaticallyReviewableFingerprint(reviewedVersion);
@@ -97,7 +105,7 @@ public class ScanPersistenceService {
         }
 
         String expectedHash = scanResult.getSecurityEvidence() == null ? null : scanResult.getSecurityEvidence().artifactSha256();
-        Query target = buildVersionAttemptQueryBound(projectId, versionId, expectedAttempt, expectedHash, reviewedVersion, "SCANNING");
+        Query target = bindRequest(buildVersionAttemptQueryBound(projectId, versionId, expectedAttempt, expectedHash, reviewedVersion, "SCANNING"), requestId);
         boolean automatic = routingDecision.action() == ScanRoutingService.RoutingAction.APPROVE_NOW
                 || routingDecision.action() == ScanRoutingService.RoutingAction.SCHEDULE;
         boolean linked = scanResult.getReusedReviewVersion() != null;
@@ -108,8 +116,8 @@ public class ScanPersistenceService {
             var hold = new Update().set("versions.$.scanResult", scanResult)
                     .set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.PENDING)
                     .set("versions.$.scheduledPublishDate", null).set("updatedAt", LocalDateTime.now().toString());
-            if (mongoTemplate.updateFirst(buildVersionAttemptQueryBound(projectId, versionId, expectedAttempt, expectedHash,
-                    reviewedVersion, "SCANNING"), hold, Project.class).getModifiedCount() > 0)
+            if (mongoTemplate.updateFirst(bindRequest(buildVersionAttemptQueryBound(projectId, versionId, expectedAttempt, expectedHash,
+                    reviewedVersion, "SCANNING"), requestId), hold, Project.class).getModifiedCount() > 0)
                 projectRepository.findById(projectId).ifPresent(projectService::evictProjectCache);
         }
         // A held fallback must not make the caller announce an approval.
@@ -133,11 +141,16 @@ public class ScanPersistenceService {
     }
 
     public boolean updateFailedScan(String projectId, String versionId, ScanResult failed, int expectedAttempt) {
-        return updateFailure(projectId, failed, buildVersionAttemptQuery(projectId, versionId, expectedAttempt, "SCANNING", "QUEUED", "WAITING_RETRY", null));
+        return updateFailedScan(projectId, versionId, failed, expectedAttempt, null);
+    }
+    public boolean updateFailedScan(String projectId, String versionId, ScanResult failed, int expectedAttempt, String requestId) {
+        failed.setScanRequestId(requestId);
+        return updateFailure(projectId, failed, bindRequest(buildVersionAttemptQuery(projectId, versionId, expectedAttempt, "SCANNING", "QUEUED", "WAITING_RETRY", null), requestId));
     }
     public boolean updateTimedOutScan(String projectId, String versionId, ScanResult failed, int expectedAttempt,
             ScanResult observed, long timeoutMillis) {
         Query target = recoveryQuery(projectId, versionId, expectedAttempt, observed, timeoutMillis);
+        if (observed != null) failed.setScanRequestId(observed.getScanRequestId());
         return target != null && updateFailure(projectId, failed, target);
     }
     private Query recoveryQuery(String projectId, String versionId, int attempt, ScanResult observed, long timeoutMillis) {
@@ -153,6 +166,12 @@ public class ScanPersistenceService {
         version.put("scanResult.scanTimestamp", observed.getScanTimestamp() == 0
                 ? new org.bson.Document("$in", java.util.Arrays.asList(0L, null)) : observed.getScanTimestamp());
         raw.put("$expr", new org.bson.Document("$lt", List.of(expires, new org.bson.Document("$toLong", "$$NOW"))));
+        return bindRequest(new org.springframework.data.mongodb.core.query.BasicQuery(raw), observed.getScanRequestId());
+    }
+    private Query bindRequest(Query query, String requestId) {
+        var raw = query.getQueryObject();
+        raw.get("versions", org.bson.Document.class).get("$elemMatch", org.bson.Document.class)
+                .put("scanResult.scanRequestId", requestId);
         return new org.springframework.data.mongodb.core.query.BasicQuery(raw);
     }
     private boolean updateFailure(String projectId, ScanResult failed, Query target) {

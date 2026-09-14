@@ -59,6 +59,11 @@ public class ScanCompletionService {
             boolean isManualRescan,
             ScanResult scanResult
     ) {
+        handleCompletedScan(projectId, versionId, expectedAttempt, isManualRescan, scanResult, null);
+    }
+    public void handleCompletedScan(String projectId, String versionId, int expectedAttempt, boolean isManualRescan,
+            ScanResult scanResult, String requestId) {
+        scanResult.setScanRequestId(requestId);
         securityIssueAnalysisService.normalizeScanResult(scanResult);
         scanResult.setScanAttempt(expectedAttempt);
 
@@ -133,7 +138,8 @@ public class ScanCompletionService {
             targetVersion.setSecurityApprovalProjectId(project.getId());
             securityIssueAnalysisService.markIssuesAcceptedForApprovedVersion(targetVersion);
         }
-        if (!scanPersistenceService.applyScanOutcome(projectId, versionId, expectedAttempt, scanResult, routingDecision, targetVersion)) {
+        if (!(requestId == null ? scanPersistenceService.applyScanOutcome(projectId, versionId, expectedAttempt, scanResult, routingDecision, targetVersion)
+                : scanPersistenceService.applyScanOutcome(projectId, versionId, expectedAttempt, scanResult, routingDecision, targetVersion, requestId))) {
             logger.info("Scan result ignored because a newer attempt already exists project={} version={} attempt={}", projectId, versionId, expectedAttempt);
             return;
         }
@@ -179,8 +185,13 @@ public class ScanCompletionService {
             int expectedAttempt,
             RuntimeException exception
     ) {
+        handleScanFailure(projectId, versionId, originalFilename, expectedAttempt, exception, null);
+    }
+    public void handleScanFailure(String projectId, String versionId, String originalFilename, int expectedAttempt,
+            RuntimeException exception, String requestId) {
         ScanResult degraded = scanRoutingService.buildPipelineErrorResult(exception, originalFilename, expectedAttempt);
-        boolean applied = scanPersistenceService.updateFailedScan(projectId, versionId, degraded, expectedAttempt);
+        boolean applied = requestId == null ? scanPersistenceService.updateFailedScan(projectId, versionId, degraded, expectedAttempt)
+                : scanPersistenceService.updateFailedScan(projectId, versionId, degraded, expectedAttempt, requestId);
 
         if (applied) {
             Project project = projectRepository.findById(projectId).orElse(null);

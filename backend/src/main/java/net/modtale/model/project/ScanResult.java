@@ -42,6 +42,11 @@ public class ScanResult {
     private int riskScore;
     private int confidenceScore;
     private int scanAttempt;
+    private String scanRequestId;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public String getScanRequestId() { return scanRequestId; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public void setScanRequestId(String value) { scanRequestId = value; }
 
     private long scanTimestamp;
     private long holdUntilTimestamp;

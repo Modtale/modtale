@@ -231,6 +231,7 @@ class LifecycleServiceTest {
         project.setVersions(new ArrayList<>(List.of(uploadedDraftVersion)));
 
         ScanResult queuedScan = new ScanResult(ScanStatus.SCANNING, 0, List.of());
+        queuedScan.setScanRequestId("submission-request");
 
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
         when(accessControlService.hasProjectPermission(project, user, "PROJECT_STATUS_SUBMIT")).thenReturn(true);
@@ -238,7 +239,7 @@ class LifecycleServiceTest {
 
         when(reviewPersistence.submitDraft(any())).thenReturn(false);
         assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> lifecycleService.submitProject("project-1", user));
-        verify(scanService, never()).enqueueBackgroundScan(anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyInt());
+        verify(scanService, never()).enqueueBackgroundScan(anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyInt(), any());
         verify(webhookService, never()).triggerAdminNewProjectWebhook(any());
         project.setStatus(ProjectStatus.DRAFT); uploadedDraftVersion.setScanResult(null);
         when(reviewPersistence.submitDraft(any())).thenReturn(true);
@@ -256,7 +257,7 @@ class LifecycleServiceTest {
                 "/files/data/bundle.zip",
                 "/files/data/bundle.zip",
                 false,
-                1
+                1, queuedScan.getScanRequestId()
         );
         verify(webhookService, never()).triggerAdminNewProjectWebhook(project);
     }

@@ -68,6 +68,51 @@ class VersionReviewPersistenceIntegrationTest {
         assertFalse(scans.updateTimedOutScan(id,"version-a",failed,3,observed,60_000));
         assertEquals("version-b",mongo.findById(id,Project.class).getVersions().get(1).getId());
     }
+    @Test void oldAttemptOneCannotFailAReplacementAttemptOne() throws Exception {
+        var scans = new net.modtale.service.security.scan.ScanPersistenceService(mongo,
+                org.mockito.Mockito.mock(net.modtale.repository.project.ProjectRepository.class),
+                org.mockito.Mockito.mock(net.modtale.service.project.query.ProjectService.class));
+        var current = new ScanResult(); current.setStatus(ScanStatus.SCANNING); current.setScanState("SCANNING"); current.setScanAttempt(1); current.setScanRequestId("new-request");
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update()
+                .set("versions.0.reviewStatus",ProjectVersion.ReviewStatus.PENDING).set("versions.0.scanResult",current),Project.class);
+        var failed = new ScanResult(); failed.setStatus(ScanStatus.FAILED);
+        assertFalse(scans.updateFailedScan(id,"version-a",failed,1));
+        assertEquals(ScanStatus.SCANNING,mongo.findById(id,Project.class).getVersions().getFirst().getScanResult().getStatus());
+        assertFalse(scans.updateFailedScan(id,"version-a",failed,1,"old-request"));
+        // Reproduce the pre-fix predicate directly: it only distinguishes attempt/state, so it matches the replacement.
+        var legacy = scans.getClass().getDeclaredMethod("buildVersionAttemptQuery",String.class,String.class,int.class,String[].class);
+        legacy.setAccessible(true);
+        var query = (Query)legacy.invoke(scans,id,"version-a",1,new String[]{"SCANNING","QUEUED","WAITING_RETRY",null});
+        assertEquals(1,mongo.updateFirst(query,new Update().set("versions.$.scanResult",failed),Project.class).getModifiedCount());
+
+    }
+    @Test void requestIdentityBindsClaimsOutcomesAndRecoveryEvenWhenAttemptAndTimestampMatch() {
+        var scans = new net.modtale.service.security.scan.ScanPersistenceService(mongo,
+                org.mockito.Mockito.mock(net.modtale.repository.project.ProjectRepository.class),
+                org.mockito.Mockito.mock(net.modtale.service.project.query.ProjectService.class));
+        var current = new ScanResult(); current.setStatus(ScanStatus.SCANNING); current.setScanState("QUEUED");
+        current.setScanAttempt(1); current.setScanRequestId("replacement"); current.setScanTimestamp(System.currentTimeMillis()-120_000);
+        var query=Query.query(Criteria.where("_id").is(id));
+        mongo.updateFirst(query,new Update().set("versions.0.reviewStatus",ProjectVersion.ReviewStatus.PENDING)
+                .set("versions.0.scanResult",current),Project.class);
+        assertEquals("replacement",mongo.findById(id,Project.class).getVersions().getFirst().getScanResult().getScanRequestId());
+        assertFalse(scans.markAttemptRunning(id,"version-a",1));
+        assertFalse(scans.markAttemptRunning(id,"version-a",1,"obsolete"));
+        current.setScanRequestId("obsolete");
+        assertFalse(scans.queueRetryAttempt(id,"version-a",1,new ScanResult(),current,60_000));
+        assertFalse(scans.updateTimedOutScan(id,"version-a",new ScanResult(),1,current,60_000));
+        assertTrue(scans.markAttemptRunning(id,"version-a",1,"replacement"));
+        assertFalse(scans.markAttemptRunning(id,"version-a",1,"replacement"));
+        mongo.updateFirst(query,new Update().set("versions.0.hash","b".repeat(64)),Project.class);
+        var reviewed=mongo.findById(id,Project.class).getVersions().getFirst();
+        var result=ScanEvidenceFixtures.complete(false);
+        var routing=new net.modtale.service.security.scan.ScanRoutingService.RoutingDecision(
+                net.modtale.service.security.scan.ScanRoutingService.RoutingAction.REQUIRE_REVIEW,0);
+        assertFalse(scans.applyScanOutcome(id,"version-a",1,result,routing,reviewed));
+        assertFalse(scans.applyScanOutcome(id,"version-a",1,result,routing,reviewed,"obsolete"));
+        assertTrue(scans.applyScanOutcome(id,"version-a",1,result,routing,reviewed,"replacement"));
+        assertEquals("replacement",mongo.findById(id,Project.class).getVersions().getFirst().getScanResult().getScanRequestId());
+    }
     @Test void metadataRepairPreservesVersionsEvidenceAndUnknownFields() {
         mongo.updateFirst(Query.query(Criteria.where("_id").is(id)), new Update().set("futureField", "retain"), Project.class);
         var repairs = new ProjectReviewPersistence(mongo);
