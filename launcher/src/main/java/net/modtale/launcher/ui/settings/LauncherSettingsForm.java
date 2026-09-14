@@ -24,7 +24,6 @@ import net.modtale.launcher.ui.common.LauncherView;
 public final class LauncherSettingsForm {
 
     private final TextField modsPathField = new TextField();
-    private final TextField gameVersionField = new TextField();
     private final TextField hytaleGamePathField = new TextField();
     private final TextField hytaleUserDataPathField = new TextField();
     private final TextField hytaleJavaPathField = new TextField();
@@ -60,7 +59,7 @@ public final class LauncherSettingsForm {
             }
         });
         hytaleBranchCombo.setOnAction(event -> hytaleVersionCombo.getItems().clear());
-        styleInput(modsPathField, gameVersionField, hytaleGamePathField, hytaleUserDataPathField, hytaleJavaPathField,
+        styleInput(modsPathField, hytaleGamePathField, hytaleUserDataPathField, hytaleJavaPathField,
                 playHytaleGamePathField, playHytaleUserDataPathField, playHytaleJavaPathField);
         launcherChannelCombo.setItems(FXCollections.observableArrayList("stable", "develop"));
         styleCombo(localeCombo, hytaleBranchCombo, hytaleVersionCombo, launcherChannelCombo);
@@ -72,10 +71,6 @@ public final class LauncherSettingsForm {
 
     public TextField modsPathField() {
         return modsPathField;
-    }
-
-    public TextField gameVersionField() {
-        return gameVersionField;
     }
 
     public TextField hytaleGamePathField() {
@@ -143,7 +138,6 @@ public final class LauncherSettingsForm {
 
     public void applyTo(LauncherSettings settings, LauncherView currentView, ModtaleApiClient apiClient) {
         settings.setHytaleModsPath(modsPathField.getText());
-        settings.setGameVersion(gameVersionField.getText());
         boolean playView = currentView == LauncherView.PLAY;
         settings.setHytaleGamePath(playView ? playHytaleGamePathField.getText() : hytaleGamePathField.getText());
         settings.setHytaleUserDataPath(playView ? playHytaleUserDataPathField.getText() : hytaleUserDataPathField.getText());
@@ -168,7 +162,6 @@ public final class LauncherSettingsForm {
 
     public void reloadFrom(LauncherSettings settings) {
         modsPathField.setText(settings.getHytaleModsPath());
-        gameVersionField.setText(settings.getGameVersion());
         hytaleGamePathField.setText(settings.getHytaleGamePath());
         hytaleUserDataPathField.setText(settings.getHytaleUserDataPath());
         hytaleJavaPathField.setText(settings.getHytaleJavaPath());

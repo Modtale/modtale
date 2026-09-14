@@ -265,13 +265,12 @@ public final class LauncherSettingsController {
         VBox defaults = settingsSection("settings.library.section", "settings.library.description",
                 LauncherIcons.Glyph.BOX);
         GridPane grid = settingsGrid();
-        addField(grid, 0, I18N.binding("settings.library.gameVersion"), form.gameVersionField());
         VBox toggles = new VBox(10,
                 toggleCard(form.includeDependenciesCheck()),
                 toggleCard(form.includeOptionalCheck()),
                 toggleCard(form.autoUpdatesCheck()));
         toggles.getStyleClass().add("settings-toggle-row");
-        addField(grid, 1, I18N.binding("settings.library.projectDefaults"), toggles);
+        addField(grid, 0, I18N.binding("settings.library.projectDefaults"), toggles);
         defaults.getChildren().add(grid);
         return defaults;
     }

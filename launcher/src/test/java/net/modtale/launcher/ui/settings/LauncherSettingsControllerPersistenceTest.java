@@ -40,12 +40,12 @@ class LauncherSettingsControllerPersistenceTest {
             var buttons = view.lookupAll(".settings-category").stream()
                     .map(node -> (javafx.scene.control.ToggleButton) node).toList();
             assertEquals(4, buttons.size());
-            controller.form().gameVersionField().setText("0.6.0");
+            controller.form().includeOptionalCheck().setSelected(true);
             buttons.forEach(button -> { button.fire(); button.fire(); });
             assertEquals(1, buttons.stream().filter(javafx.scene.control.ToggleButton::isSelected).count());
-            assertEquals("0.6.0", controller.form().gameVersionField().getText());
+            assertEquals(true, controller.form().includeOptionalCheck().isSelected());
             controller.saveFromFields(false);
-            assertEquals("0.6.0", controller.settings().getGameVersion());
+            assertEquals(true, controller.settings().isIncludeOptionalDependencies());
         });
     }
 
@@ -56,6 +56,7 @@ class LauncherSettingsControllerPersistenceTest {
             LauncherSettings settings = new LauncherSettings();
             String userData = root.resolve("custom/UserData").toString();
             String mods = root.resolve("separate/Mods").toString();
+            settings.setGameVersion("0.6.0");
             settings.setHytaleUserDataPath(userData);
             settings.setHytaleModsPath(mods);
             store.save(settings);
@@ -63,6 +64,7 @@ class LauncherSettingsControllerPersistenceTest {
                 var controller = new LauncherSettingsController(store,
                         new ModtaleApiClient("http://localhost"), () -> null, () -> view);
                 controller.saveFromFields(false);
+                assertEquals("0.6.0", store.load().getGameVersion());
                 assertEquals(userData, store.load().getHytaleUserDataPath());
                 assertEquals(mods, store.load().getHytaleModsPath());
             }
