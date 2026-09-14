@@ -41,7 +41,6 @@ for slug in ['modtale-launcher','modpacks-v2']:
    if (A/mp4).exists():
     shutil.copy(A/mp4,B/'articles/assets'/mp4)
     fig.clear();nv=s.new_tag('video',src='assets/'+mp4,poster='assets/'+name,controls=True,preload='metadata');fig.append(nv)
-    cap=s.new_tag('figcaption');cap.string=v.get('aria-label','');fig.append(cap)
  for el in article.select('[style]'):del el['style']
  css='body{background:#0b1220;color:#dce5f4;font:17px/1.7 Inter,system-ui;margin:0 auto;max-width:880px;padding:48px 24px}h1,h2,h3,strong{color:#fff}h1{font-size:46px;line-height:1.15}a{color:#8abbff}figure{margin:32px 0}img,video{width:100%;height:auto;border-radius:16px}figcaption{font-size:14px;color:#9caec6}section{margin:38px 0}@font-face{font-family:Inter;src:url(../source/Inter-Regular.ttf)}'
  out='<!doctype html><meta charset="utf-8"><title>'+s.title.get_text()+'</title><style>'+css+'</style><a href="../index.html">← Media brief</a>'+str(article)

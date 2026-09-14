@@ -12,7 +12,6 @@ Modtale now has a place on your desktop. The launcher brings project browsing, i
 
 The context matters as much as the download. Project descriptions, documentation, comments, and release information stay close at hand, so you can find out what a mod does—and what it needs—before adding it to your setup.
 
-Download the latest LevelingCore release, enable it in Arcanum and Greenhaven, and confirm it in the library.
 
 ### Your worlds don’t all need the same mods
 
@@ -20,7 +19,6 @@ Your long-running survival world and the creative world where you try things out
 
 You still get a central place to see installed projects and manage updates. The difference is that you can keep a world’s mod selection intentional: try something in one place, leave another world’s combination alone, and see what belongs where.
 
-Search for LevelingCore in the library, enable and disable it in Tidewater, then return to the full mod list.
 
 The launcher uses your linked Hytale account for the game’s official authentication. A Modtale account is optional for browsing and installing projects. Sign in for account features such as favorites, notifications, and sharing mod lists. Your Modtale account and your Hytale account serve different purposes: launching the game uses Hytale’s official authentication.
 
@@ -30,13 +28,11 @@ A great world can draw from more than one community. You can now browse CurseFor
 
 Open a project to read its description, check its releases, and download it through the same familiar flow. Its source stays visible, and the installed mod joins your local library, where you choose the worlds it belongs in. Finding something on another platform doesn’t have to mean maintaining another mods folder.
 
-Browse CurseForge, expand and scroll BetterMap’s release notes, download from the changelog, and enable it in a world.
 
 ## A home for the everyday details
 
 The Play screen puts your game installation, launch options, and Modtale discoveries together. The library gives installed projects their own version controls, so checking for updates and looking through available releases happen where you already manage your worlds.
 
-Find an available Hexcode update, install the patch, and see the new version enabled in Arcanum.
 
 Supported mod configs are accessible from the library, with the mod and world they belong to kept in view. You can inspect a world’s setup before changing it instead of working backward from an unfamiliar filename.
 
@@ -48,7 +44,6 @@ Getting a setup right takes time. Signing in with Modtale lets you keep launcher
 
 When the account’s saved setup differs from this device, the launcher shows both before you choose. Load the saved setup from Modtale, or keep this device’s setup as the one your account remembers. Existing configs are backed up before replacement, and installation paths stay specific to each computer.
 
-Load the saved setup from Modtale, watch the full restore, and see installed projects enabled in the library.
 
 Your world saves stay on your device, including their terrain and progress; the synced project list currently covers Modtale installs.
 
@@ -60,7 +55,6 @@ Grouped cosmetic categories bring the part you’re editing into focus. There’
 
 Owned cosmetics are distinguished from preview-only items. When you apply an outfit, the previous official look is saved under Previous looks , giving you a way back if yesterday’s style turns out to be the one you prefer.
 
-Start with a popular skin, customize its hairstyle, color, and clothing, then save and reopen your own version.
 
 ## Make room for your next adventure
 

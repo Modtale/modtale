@@ -12,7 +12,6 @@ A new modpack starts in the website’s release editor. Search for the projects 
 
 Version choices include game-version compatibility, with alpha and beta releases available when you need them. If a mod needs supporting projects, the editor can prompt you to add those too. You can review the combination before it becomes someone else’s installation.
 
-Create Trailbound on the website, choose mod releases, add BetterMap, save its config overrides, and upload the first pack version.
 
 Everything you include belongs to the pack. Its mods install together, as one complete setup. Each entry keeps its selected version, so a new release from a mod author doesn’t silently change the combination you chose.
 
@@ -34,7 +33,6 @@ A pack’s best combination might span more than one catalog. The editor now let
 
 For a CurseForge mod, paste its specific file-page link in the external-project picker. Review the resolved project and file, then add it to the pack. Its source stays visible in the contents list, and you can attach its config defaults through the same per-mod controls.
 
-Add a CurseForge file-page link, review the resolved BetterMap release, and include it alongside Modtale projects in the pack.
 
 Packs containing CurseForge mods require Modtale Launcher . The website makes that requirement clear, and the launcher downloads those mods directly from CurseForge to the player’s device. They aren’t bundled into a redistributable website ZIP.
 
@@ -50,7 +48,6 @@ They can look through the list before choosing Install with launcher , or Downlo
 
 On the shared page, choose Make modpack to carry the list into the website’s creation flow. Recorded mod versions and supported configs become the starting point for your draft. Review the imported contents, fill in the project details, and shape it into a release.
 
-Open a shared mod list, choose Make modpack, name the project, and review the imported Implement Weapons and More Armor versions in the website editor.
 
 If an entry is missing a usable reference or a recorded version, it needs your attention before it can become part of the pack. Importing a list doesn’t publish it: you still decide what’s ready to share more widely.
 
