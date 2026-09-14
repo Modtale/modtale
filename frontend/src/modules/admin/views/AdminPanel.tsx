@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText, CalendarClock } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
 import { StatusModal } from '@/components/ui/StatusModal';
@@ -12,7 +12,7 @@ import { PlatformAnalytics } from '../components/PlatformAnalytics';
 import { AuditLogs } from '../components/AuditLogs';
 import { StatusIncidents } from '../components/StatusIncidents';
 import { AdminPermission, hasAdminPermission, hasAnyAdminPermission, isAdminUser } from '../utils/access';
-import type { AdminVerificationQueueItem } from '@/types';
+import { useModerationQueue } from '../hooks/useModerationQueue';
 
 interface AdminPanelProps {
     currentUser: any;
@@ -23,11 +23,6 @@ type AdminTab = 'users' | 'verification' | 'reports' | 'projects' | 'analytics' 
 export function AdminPanel({ currentUser }: AdminPanelProps) {
     const [activeTab, setActiveTab] = useState<AdminTab>('verification');
     const [status, setStatus] = useState<any>(null);
-
-    const [pendingProjects, setPendingProjects] = useState<AdminVerificationQueueItem[]>([]);
-    const [loadingQueue, setLoadingQueue] = useState(false);
-    const [queueError, setQueueError] = useState<string | null>(null);
-    const queueRequestInFlight = useRef(false);
 
     const [reviewingProject, setReviewingProject] = useState<any>(null);
     const [loadingReview, setLoadingReview] = useState(false);
@@ -83,16 +78,14 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         canUseProjectManagement,
         canUseUserManagement
     ]);
+    const queue = useModerationQueue(canReadReviewQueue, currentUser?.id || currentUser?.username || '');
+    const pendingProjects = queue.page.items;
+    const loadingQueue = queue.loading;
+    const queueError = queue.error;
+    const fetchQueue = queue.refresh;
     const firstAllowedTab = (Object.keys(tabAccess) as AdminTab[]).find(tab => tabAccess[tab]);
 
     useEffect(() => {
-        if (canReadReviewQueue) {
-            fetchQueue();
-        } else {
-            setPendingProjects([]);
-            setQueueError(null);
-        }
-
         if (canReadReports) {
             fetchReports();
         } else {
@@ -119,23 +112,6 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
             setActiveTab(firstAllowedTab);
         }
     }, [activeTab, firstAllowedTab, isAdmin, tabAccess]);
-
-    const fetchQueue = async (background = false) => {
-        if (!canReadReviewQueue || queueRequestInFlight.current) return;
-        queueRequestInFlight.current = true;
-        if (!background) setLoadingQueue(true);
-        try {
-            const data = await adminClient.getVerificationQueue();
-            if (!Array.isArray(data)) throw new Error('The verification queue returned an invalid response.');
-            setPendingProjects(data);
-            setQueueError(null);
-        } catch (e) {
-            setQueueError(extractApiErrorMessage(e, 'We could not load the verification queue.'));
-        } finally {
-            queueRequestInFlight.current = false;
-            if (!background) setLoadingQueue(false);
-        }
-    };
 
     const fetchReports = async () => {
         if (!canReadReports) return;
@@ -307,20 +283,29 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="mb-8">
                                         <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-normal">Verification Queue</h1>
-                                        <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Review pending projects and updates.</p>
+                                        <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Review pending projects and updates. Pages are ordered by project and version, not risk.</p>
                                     </div>
                                     {queueError && (
                                         <div className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
                                             <span>{queueError}</span>
-                                            <button type="button" onClick={() => fetchQueue()} className="shrink-0 rounded-lg border border-current px-3 py-1.5 font-bold hover:bg-red-100 dark:hover:bg-red-500/10">
+                                            <button type="button" onClick={() => void queue.retry()} className="shrink-0 rounded-lg border border-current px-3 py-1.5 font-bold hover:bg-red-100 dark:hover:bg-red-500/10">
                                                 Retry
                                             </button>
                                         </div>
                                     )}
+                                    <div className="mb-4 flex flex-wrap items-center gap-3">
+                                        <button type="button" onClick={() => void queue.restart()} className="rounded-lg border px-3 py-2 text-sm font-bold">Refresh from start</button>
+                                        <button type="button" disabled={loadingQueue || !queue.page.nextCursor} onClick={queue.next} className="rounded-lg border px-3 py-2 text-sm font-bold disabled:opacity-50">Next page</button>
+                                        <span className="text-sm text-slate-500">{pendingProjects.length} entries on this page{loadingQueue ? ' · Loading…' : ''}</span>
+                                    </div>
+                                    {queue.page.unavailableItems > 0 && <p role="status" className="mb-4 text-sm text-amber-700">{queue.page.unavailableItems} entries on this page cannot be opened safely and need data repair. Continue to inspect other entries.</p>}
                                     <VerificationQueue
                                         pendingProjects={pendingProjects}
                                         loadingQueue={loadingQueue}
                                         loadFailed={queueError !== null}
+                                        hasMore={queue.page.nextCursor !== null}
+                                        unavailableItems={queue.page.unavailableItems}
+                                        loaded={queue.loaded}
                                         loadingReview={loadingReview}
                                         reviewingId={loadingReviewId}
                                         onReview={fetchProjectDetails}

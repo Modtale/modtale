@@ -8,12 +8,15 @@ interface VerificationQueueProps {
     loadingQueue: boolean;
     loadFailed?: boolean;
     loadingReview: boolean;
+    hasMore?: boolean;
+    unavailableItems?: number;
+    loaded?: boolean;
     reviewingId?: string;
     onReview: (id: string, versionId?: string) => void;
 }
 
 export const VerificationQueue: React.FC<VerificationQueueProps> = ({
-                                                                        pendingProjects, loadingQueue, loadFailed, loadingReview, reviewingId, onReview
+                                                                        pendingProjects, loadingQueue, loadFailed, loadingReview, reviewingId, onReview, hasMore = false, unavailableItems = 0, loaded = true
                                                                     }) => {
     const Surface = loadingQueue ? SkeletonSurface : React.Fragment;
     if (loadingQueue && pendingProjects.length === 0) {
@@ -28,14 +31,17 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
         return null;
     }
 
+    if (pendingProjects.length === 0 && (hasMore || unavailableItems > 0 || !loaded)) {
+        return <p className="py-8 text-center text-slate-500">{hasMore ? 'No openable entries on this page. Continue to the next page.' : unavailableItems > 0 ? 'Some entries require data repair before they can be reviewed.' : 'Queue has not loaded yet.'}</p>;
+    }
     if (pendingProjects.length === 0) {
         return (
             <div className="text-center py-32 bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-md">
                 <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                     <CheckCircle className="w-10 h-10 text-emerald-500" />
                 </div>
-                <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">All Caught Up!</h3>
-                <p className="text-slate-500 font-medium">No projects or versions pending verification.</p>
+                <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">No entries on this page</h3>
+                <p className="text-slate-500 font-medium">Refresh from the start to check for new or changed reviews.</p>
             </div>
         );
     }

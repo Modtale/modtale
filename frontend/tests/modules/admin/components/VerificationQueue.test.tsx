@@ -41,3 +41,8 @@ it('opens the exact version when multiple queue rows belong to one project', asy
     await act(async () => (buttons[1] as HTMLButtonElement).click());expect(onReview).toHaveBeenLastCalledWith('Project','second');
     await act(async () => (buttons[0] as HTMLButtonElement).click());expect(onReview).toHaveBeenLastCalledWith('Project','v');
 });
+
+it('does not claim completion when an empty page still has continuation or repair entries', async () => {
+    await act(async () => root.render(<VerificationQueue pendingProjects={[]} loadingQueue={false} loadingReview={false} onReview={vi.fn()} hasMore unavailableItems={25} />));
+    expect(container.textContent).toContain('Continue to the next page');expect(container.textContent).not.toContain('All Caught Up');
+});
