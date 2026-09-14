@@ -419,6 +419,23 @@ class RemoteReviewStepIntegrationTest {
         assertEquals("BLOCK",saved().getVerdict());assertEquals(old,saved().getRemoteReview());assertNull(saved().getRemoteReview().origin());assertFalse(saved().isArtifactVerified());
         assertEquals("NO_WORK",boot.advance(project,"v",1,binding.requestId()).state());assertEquals(0,gets.get());assertEquals(0,posts.get());assertEquals(0,identityGets.get());verifyNoInteractions(storage);
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void legacyWriterWinningInitialBindingRoutesImmediatelyEvenAfterLostAcknowledgement(boolean lostAcknowledgement) {
+        queuedAgain();change("scanResult.verdict","BLOCK");route(this::configuration);
+        var persistence=spy(new RemoteReviewPersistence(mongo));
+        var legacy=new RemoteReviewBinding(binding.projectId(),binding.versionId(),binding.requestId(),binding.attempt(),binding.filePath(),
+                binding.artifactSha256(),binding.contextSha256(),binding.policyVersion(),binding.reviewConfigSha256(),job,binding.manualRescan());
+        doAnswer(i->{change("scanResult.remoteReview",legacy);change("scanResult.scanState","REMOTE_REVIEW");
+            if(lostAcknowledgement)throw new IllegalStateException("Unknown binding acknowledgement");return i.callRealMethod();}).when(persistence).bind(any(),any());
+        var boot=bootstrap(persistence);var prepared=boot.prepare(project,"v",1,binding.requestId());
+        assertEquals("UNAVAILABLE",prepared.state());assertNull(prepared.binding());
+        assertEquals(ScanStatus.FAILED,saved().getStatus());assertEquals("REMOTE_ORIGIN_UNVERIFIED",saved().getScanState());
+        assertEquals(legacy,saved().getRemoteReview());assertEquals("BLOCK",saved().getVerdict());assertFalse(saved().isArtifactVerified());
+        assertEquals("NO_WORK",boot.advance(project,"v",1,binding.requestId()).state());
+        assertEquals(1,identityGets.get());assertEquals(1,gets.get());assertEquals(0,posts.get());verifyNoInteractions(storage);
+        assertTrue(new RemoteReviewDiscovery(mongo).page(null,16).candidates().isEmpty());
+    }
     @Test void remoteContextConflictPreservesBindingAndBlockWithoutPollingAgain() {
         change("scanResult.verdict","BLOCK");route(e->reply(e,409,"QUEUED"));var before=saved().getRemoteReview();
         assertEquals("UNAVAILABLE",step.advance(binding).state());assertEquals("REMOTE_CONTEXT_CONFLICT",saved().getScanState());assertEquals(before,saved().getRemoteReview());assertEquals("BLOCK",saved().getVerdict());

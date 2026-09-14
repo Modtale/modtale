@@ -19,16 +19,8 @@ public final class RemoteReviewBootstrap {
         if(!running.getAsBoolean())throw new RemoteReviewClient.Superseded();
         var current=persistence.current(projectId,versionId,attempt,requestId);
         if(current==null)return new Prepared("NO_WORK",null);
-        if(current.getScanResult().getRemoteReview()!=null) {
-            var retained=persistence.retained(projectId,versionId,attempt,requestId);
-            if(retained!=null && retained.origin()!=null)return new Prepared("READY",retained);
-            if(!running.getAsBoolean())throw new RemoteReviewClient.Superseded();
-            return new Prepared(persistence.finishBrokenBinding(projectId,versionId,attempt,requestId)==null?"NO_WORK":"UNAVAILABLE",null);
-        }
-        if("REMOTE_REVIEW".equals(current.getScanResult().getScanState())) {
-            if(!running.getAsBoolean())throw new RemoteReviewClient.Superseded();
-            return new Prepared(persistence.finishBrokenBinding(projectId,versionId,attempt,requestId)==null?"NO_WORK":"UNAVAILABLE",null);
-        }
+        if(current.getScanResult().getRemoteReview()!=null || "REMOTE_REVIEW".equals(current.getScanResult().getScanState()))
+            return retainedOrBroken(projectId,versionId,attempt,requestId,running);
         String context=ArtifactReviewContext.automaticallyReviewableFingerprint(current);
         if(context==null) {
             if(!running.getAsBoolean())throw new RemoteReviewClient.Superseded();
@@ -41,12 +33,17 @@ public final class RemoteReviewBootstrap {
                 configuration.policyVersion(),configuration.reviewConfigSha256(),null,current.getScanResult().isManualRescan(),configuration.origin());
         try { persistence.bind(current,binding); }
         catch(RuntimeException unknown) {
-            var retained=persistence.retained(projectId,versionId,attempt,requestId);
-            if(retained!=null && retained.origin()!=null)return new Prepared("READY",retained);
+            var recovered=retainedOrBroken(projectId,versionId,attempt,requestId,running);
+            if(!"NO_WORK".equals(recovered.state()))return recovered;
             throw unknown;
         }
+        return retainedOrBroken(projectId,versionId,attempt,requestId,running);
+    }
+    private Prepared retainedOrBroken(String projectId,String versionId,int attempt,String requestId,java.util.function.BooleanSupplier running) {
         var retained=persistence.retained(projectId,versionId,attempt,requestId);
-        return new Prepared(retained==null?"NO_WORK":"READY",retained);
+        if(retained!=null && retained.origin()!=null)return new Prepared("READY",retained);
+        if(!running.getAsBoolean())throw new RemoteReviewClient.Superseded();
+        return new Prepared(persistence.finishBrokenBinding(projectId,versionId,attempt,requestId)==null?"NO_WORK":"UNAVAILABLE",null);
     }
     public RemoteReviewStep.Outcome advance(String projectId,String versionId,int attempt,String requestId) {return advance(projectId,versionId,attempt,requestId,()->true);}
     public RemoteReviewStep.Outcome advance(String projectId,String versionId,int attempt,String requestId,java.util.function.BooleanSupplier running) {
