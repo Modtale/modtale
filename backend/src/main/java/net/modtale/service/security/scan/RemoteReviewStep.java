@@ -13,9 +13,10 @@ public final class RemoteReviewStep {
     private final RemoteReviewPollStore polls;
     private final RemoteReviewClient client;
     private final StorageService storage;
+    private final ScanCompletionService completion;
     private final Semaphore slots=new Semaphore(2);
-    public RemoteReviewStep(RemoteReviewPollStore polls,RemoteReviewClient client,StorageService storage) {
-        this.polls=polls;this.client=client;this.storage=storage;
+    public RemoteReviewStep(RemoteReviewPollStore polls,RemoteReviewClient client,StorageService storage,ScanCompletionService completion) {
+        this.polls=polls;this.client=client;this.storage=storage;this.completion=completion;
     }
     public Outcome advance(RemoteReviewBinding binding) {
         if(!slots.tryAcquire())return new Outcome("BUSY",null);
@@ -26,6 +27,11 @@ public final class RemoteReviewStep {
             var status=client.submitOrFind(binding,()->storage.downloadBounded(binding.filePath(),100*1024*1024),()->polls.isCurrent(acquired));
             if(binding.jobId()==null) {
                 claim=polls.attachJob(claim,status.jobId());if(claim==null)return new Outcome("SUPERSEDED",null);
+            }
+            if("COMPLETED".equals(status.state())) {
+                if(!polls.isCurrent(claim))return new Outcome("SUPERSEDED",null);
+                boolean applied=completion.handleRemoteCompletedScan(claim,client.result(claim.binding()));
+                return new Outcome(applied?"APPLIED":"SUPERSEDED",applied?"COMPLETED":null);
             }
             boolean saved=polls.recordStatusAndRelease(claim,status,10000);
             return new Outcome(saved?"RECORDED":"SUPERSEDED",saved?status.state():null);

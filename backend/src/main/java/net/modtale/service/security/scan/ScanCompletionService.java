@@ -63,6 +63,15 @@ public class ScanCompletionService {
     }
     public void handleCompletedScan(String projectId, String versionId, int expectedAttempt, boolean isManualRescan,
             ScanResult scanResult, String requestId) {
+        complete(projectId,versionId,expectedAttempt,isManualRescan,scanResult,requestId,null);
+    }
+    public boolean handleRemoteCompletedScan(RemoteReviewPollStore.Claim claim,ScanResult result) {
+        var binding=claim.binding();
+        if(result==null || !binding.requestId().equals(result.getScanRequestId()))return false;
+        return complete(binding.projectId(),binding.versionId(),binding.attempt(),false,result,binding.requestId(),claim);
+    }
+    private boolean complete(String projectId,String versionId,int expectedAttempt,boolean isManualRescan,
+            ScanResult scanResult,String requestId,RemoteReviewPollStore.Claim remote) {
         scanResult.setScanRequestId(requestId);
         securityIssueAnalysisService.normalizeScanResult(scanResult);
         scanResult.setScanAttempt(expectedAttempt);
@@ -70,13 +79,21 @@ public class ScanCompletionService {
         Project project = projectRepository.findById(projectId).orElse(null);
         if (project == null) {
             logger.warn("Scan completed but project no longer exists project={} version={} attempt={}", projectId, versionId, expectedAttempt);
-            return;
+            return false;
         }
 
         ProjectVersion targetVersion = projectVersionAccessService.findById(project, versionId);
         if (targetVersion == null) {
             logger.warn("Scan completed but version no longer exists project={} version={} attempt={}", projectId, versionId, expectedAttempt);
-            return;
+            return false;
+        }
+
+        ScanResult.RemoteReviewPoll remotePoll=null;
+        if(remote!=null) {
+            var current=targetVersion.getScanResult();
+            if(current==null || !remote.binding().equals(current.getRemoteReview()) || !"REMOTE_REVIEW".equals(current.getScanState()))return false;
+            remotePoll=current.getRemotePoll();
+            if(!ScanPersistenceService.remoteResultMatches(remote,remotePoll,scanResult,targetVersion))return false;
         }
 
         if (scanResult.getSecurityEvidence() == null || !java.util.Objects.equals(targetVersion.getHash(),
@@ -91,7 +108,9 @@ public class ScanCompletionService {
         ScanRoutingService.RoutingDecision routingDecision =
                 scanRoutingService.decideRouting(scanResult, classification, isManualRescan);
 
-        scanResult.setReviewedContextSha256(ArtifactReviewContext.automaticallyReviewableFingerprint(targetVersion));
+        if(remote==null)scanResult.setReviewedContextSha256(ArtifactReviewContext.automaticallyReviewableFingerprint(targetVersion));
+        if(remote!=null && routingDecision.action()==ScanRoutingService.RoutingAction.DEFER)
+            routingDecision=new ScanRoutingService.RoutingDecision(ScanRoutingService.RoutingAction.REQUIRE_REVIEW,0);
         if (scanResult.getReviewedContextSha256() == null) {
             scanResult.setReusedReviewVersion(null);
             scanResult.setReusedReviewApprovedAt(0);
@@ -138,10 +157,11 @@ public class ScanCompletionService {
             targetVersion.setSecurityApprovalProjectId(project.getId());
             securityIssueAnalysisService.markIssuesAcceptedForApprovedVersion(targetVersion);
         }
-        if (!(requestId == null ? scanPersistenceService.applyScanOutcome(projectId, versionId, expectedAttempt, scanResult, routingDecision, targetVersion)
+        if (!(remote!=null ? scanPersistenceService.applyRemoteScanOutcome(remote,remotePoll,scanResult,routingDecision,targetVersion)
+                : requestId == null ? scanPersistenceService.applyScanOutcome(projectId, versionId, expectedAttempt, scanResult, routingDecision, targetVersion)
                 : scanPersistenceService.applyScanOutcome(projectId, versionId, expectedAttempt, scanResult, routingDecision, targetVersion, requestId))) {
             logger.info("Scan result ignored because a newer attempt already exists project={} version={} attempt={}", projectId, versionId, expectedAttempt);
-            return;
+            return false;
         }
 
         Project refreshed = projectRepository.findById(projectId).orElse(null);
@@ -176,6 +196,7 @@ public class ScanCompletionService {
                 }
             }
         }
+        return true;
     }
 
     public void handleScanFailure(

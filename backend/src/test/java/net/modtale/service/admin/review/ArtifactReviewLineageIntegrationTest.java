@@ -56,6 +56,29 @@ class ArtifactReviewLineageIntegrationTest {
         return new ScanPersistenceService(mongo,mock(ProjectRepository.class),mock(ProjectService.class)).applyScanOutcome(
                 id,"target",1,result,new ScanRoutingService.RoutingDecision(ScanRoutingService.RoutingAction.APPROVE_NOW,0),target);
     }
+    private RemoteReviewPollStore.Claim remoteClaim() {
+        String request=UUID.randomUUID().toString();target.setFileUrl("original.zip");result.setScanRequestId(request);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update().set("versions.1.fileUrl","original.zip").set("versions.1.scanResult.scanRequestId",request),Project.class);
+        var current=mongo.findById(id,Project.class).getVersions().get(1);
+        var binding=new RemoteReviewBinding(id,"target",request,1,"original.zip",target.getHash(),result.getReviewedContextSha256(),result.getSecurityEvidence().policyVersion(),"c".repeat(64),null);
+        assertTrue(new RemoteReviewPersistence(mongo).bind(current,binding));var polls=new RemoteReviewPollStore(mongo);
+        var claim=polls.claim(binding,30000);assertNotNull(claim);return polls.attachJob(claim,UUID.randomUUID().toString());
+    }
+    @Test void remoteCompletionCombinesLiveLeaseWithValidSourceGuard() {
+        var claim=remoteClaim();var poll=mongo.findById(id,Project.class).getVersions().get(1).getScanResult().getRemotePoll();
+        assertTrue(new ScanPersistenceService(mongo,mock(ProjectRepository.class),mock(ProjectService.class)).applyRemoteScanOutcome(claim,poll,result,
+                new ScanRoutingService.RoutingDecision(ScanRoutingService.RoutingAction.APPROVE_NOW,0),target));
+        var stored=mongo.findById(id,Project.class);assertEquals(ProjectVersion.ReviewStatus.APPROVED,stored.getVersions().get(1).getReviewStatus());
+        assertEquals(Set.of("source"),stored.getVersions().get(1).getApprovedReviewOrigins().keySet());
+    }
+    @Test void remoteHeldFallbackCannotWriteAfterPollOwnershipExpires() {
+        var claim=remoteClaim();var poll=mongo.findById(id,Project.class).getVersions().get(1).getScanResult().getRemotePoll();
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update().set("versions.0.reviewStatus",ProjectVersion.ReviewStatus.REJECTED)
+                .set("versions.1.scanResult.remotePoll.leaseUntil",new Date(0)),Project.class);
+        assertFalse(new ScanPersistenceService(mongo,mock(ProjectRepository.class),mock(ProjectService.class)).applyRemoteScanOutcome(claim,poll,result,
+                new ScanRoutingService.RoutingDecision(ScanRoutingService.RoutingAction.APPROVE_NOW,0),target));
+        assertEquals("REMOTE_REVIEW",mongo.findById(id,Project.class).getVersions().get(1).getScanResult().getScanState());
+    }
     @Test void sourceGuardPublishesOnlyTargetAndRetainsOriginProof() {
         assertTrue(apply());var stored=mongo.findById(id,Project.class);
         assertEquals(ProjectVersion.ReviewStatus.APPROVED,stored.getVersions().get(1).getReviewStatus());

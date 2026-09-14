@@ -23,6 +23,8 @@ import static org.mockito.Mockito.*;
 class RemoteReviewStepIntegrationTest {
     MongoClient db;MongoTemplate mongo;String database;HttpServer server;RemoteReviewClient client;
     RemoteReviewPollStore polls;StorageService storage;RemoteReviewStep step;RemoteReviewBinding binding;
+    ScanCompletionService completion;net.modtale.service.security.issue.SecurityIssueAnalysisService analysis;
+    WardenClientService policy;
     byte[] bytes="inert original".getBytes();String project="abcdefabcdefabcdefabcdef",job=UUID.randomUUID().toString();
     AtomicInteger posts=new AtomicInteger(),gets=new AtomicInteger();ObjectMapper mapper=new ObjectMapper();
     interface Handler {void handle(HttpExchange e)throws Exception;}
@@ -31,20 +33,45 @@ class RemoteReviewStepIntegrationTest {
         var body=new LinkedHashMap<String,Object>();body.put("jobId",job);body.put("requestId",binding.requestId());
         body.put("binding",Map.of("artifactSha256",binding.artifactSha256(),"contextSha256",binding.contextSha256(),"policyVersion",binding.policyVersion(),"reviewConfigSha256",binding.reviewConfigSha256()));
         body.put("state",state);body.put("artifactRetained",!Set.of("UPLOADING","AWAITING_UPLOAD").contains(state));body.put("createdAt",1000L);body.put("expiresAt",2000L);body.put("workState",null);
+        if(e.getRequestURI().getPath().endsWith("/result")) {
+            body.remove("state");body.remove("artifactRetained");body.remove("createdAt");body.remove("expiresAt");body.remove("workState");
+            body.put("completedAt",1500L);body.put("scan",cleanResult());
+        }
         byte[] data=mapper.writeValueAsBytes(body);e.sendResponseHeaders(code,data.length);e.getResponseBody().write(data);
     }
     @BeforeEach void setup()throws Exception {
         String port=System.getenv().getOrDefault("WARDEN_REVIEW_DB_PORT","27030");if(!Set.of("27029","27030").contains(port))throw new IllegalArgumentException();
-        db=MongoClients.create("mongodb://127.0.0.1:"+port+"/?serverSelectionTimeoutMS=3000");database="warden_remote_step_"+UUID.randomUUID().toString().replace("-","");mongo=new MongoTemplate(db,database);
+        db=MongoClients.create("mongodb://127.0.0.1:"+port+"/?serverSelectionTimeoutMS=3000");database="warden_remote_step_"+UUID.randomUUID().toString().replace("-","");
+        var factory=new org.springframework.data.mongodb.core.SimpleMongoClientDatabaseFactory(db,database);
+        var conversions=new net.modtale.config.db.MongoConfig().mongoCustomConversions(new net.modtale.config.db.MongoArtifactManifestStore(factory));
+        var context=new org.springframework.data.mongodb.core.mapping.MongoMappingContext();context.setSimpleTypeHolder(conversions.getSimpleTypeHolder());context.afterPropertiesSet();
+        var converter=new org.springframework.data.mongodb.core.convert.MappingMongoConverter(new org.springframework.data.mongodb.core.convert.DefaultDbRefResolver(factory),context);
+        converter.setCustomConversions(conversions);converter.afterPropertiesSet();mongo=new MongoTemplate(factory,converter);
         var version=new ProjectVersion();version.setId("v");version.setFileUrl("original.zip");version.setHash(HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)));
         var scan=new ScanResult();scan.setStatus(ScanStatus.SCANNING);scan.setScanState("SCANNING");scan.setScanAttempt(1);scan.setScanRequestId(UUID.randomUUID().toString());version.setScanResult(scan);
         var root=new Project();root.setId(project);root.setVersions(List.of(version));mongo.insert(root);
         binding=new RemoteReviewBinding(project,"v",scan.getScanRequestId(),1,version.getFileUrl(),version.getHash(),ArtifactReviewContext.automaticallyReviewableFingerprint(version),"warden-3.0.0:"+"b".repeat(64),"c".repeat(64),null);
         assertTrue(new RemoteReviewPersistence(mongo).bind(version,binding));polls=new RemoteReviewPollStore(mongo);storage=mock(StorageService.class);when(storage.downloadBounded(binding.filePath(),100*1024*1024)).thenReturn(bytes);
         server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());server.start();
-        client=new RemoteReviewClient(new AppWardenProperties("http://127.0.0.1:"+server.getAddress().getPort(),"fixture-key",true,1,600),Duration.ofSeconds(2));step=new RemoteReviewStep(polls,client,storage);
+        client=new RemoteReviewClient(new AppWardenProperties("http://127.0.0.1:"+server.getAddress().getPort(),"fixture-key",true,1,600),Duration.ofSeconds(2));
+        var repo=mock(net.modtale.repository.project.ProjectRepository.class);when(repo.findById(project)).thenAnswer(i->Optional.ofNullable(mongo.findById(project,Project.class)));
+        var projects=mock(net.modtale.service.project.query.ProjectService.class);analysis=mock(net.modtale.service.security.issue.SecurityIssueAnalysisService.class);
+        when(analysis.annotateAgainstBaselines(any(),any())).thenReturn(new net.modtale.service.security.issue.SecurityIssueAnalysisService.ClassificationStats(0,0,0,false));
+        policy=mock(WardenClientService.class);when(policy.currentPolicyVersion()).thenReturn(binding.policyVersion());
+        completion=new ScanCompletionService(repo,projects,mock(net.modtale.service.communication.ProjectNotificationService.class),mock(net.modtale.service.communication.WebhookService.class),analysis,
+                new ScanRoutingService(new net.modtale.config.properties.AppSecurityProperties("fixture",60,120,2,4,15,20,25,2)),
+                new ScanPersistenceService(mongo,repo,projects),new net.modtale.service.project.access.ProjectVersionAccessService(null),policy);
+        completion=spy(completion);
+        doAnswer(invocation->{try{return invocation.callRealMethod();}catch(RuntimeException failure){throw new AssertionError("Completion failed",failure);}})
+                .when(completion).handleRemoteCompletedScan(any(),any());
+        step=new RemoteReviewStep(polls,client,storage,completion);
     }
     @AfterEach void cleanup(){if(client!=null)client.close();if(server!=null)server.stop(0);if(db!=null){db.getDatabase(database).drop();db.close();}}
+    ScanResult cleanResult() {
+        var result=ScanEvidenceFixtures.complete(true);var old=result.getSecurityEvidence();
+        result.setSecurityEvidence(new ScanResult.SecurityEvidence(binding.policyVersion(),binding.artifactSha256(),old.contentSha256(),true,true,old.reviewState(),old.entryHashes()));
+        result.setReviewedContextSha256(binding.contextSha256());result.setScanRequestId(binding.requestId());return result;
+    }
     ScanResult saved(){return mongo.findById(project,Project.class).getVersions().getFirst().getScanResult();}
     void change(String field,Object value){mongo.updateFirst(Query.query(Criteria.where("_id").is(project)),new Update().set("versions.0."+field,value),Project.class);}
     void ready(){change("scanResult.remotePoll.nextPollAt",new Date(0));}
@@ -52,8 +79,50 @@ class RemoteReviewStepIntegrationTest {
         var found=new AtomicBoolean();route(e->{if(e.getRequestMethod().equals("POST")){found.set(true);reply(e,202,"QUEUED");}else reply(e,found.get()?200:404,found.get()?"COMPLETED":"AWAITING_UPLOAD");});
         assertEquals("RECORDED",step.advance(binding).state());assertEquals(job,saved().getRemoteReview().jobId());assertEquals("QUEUED",saved().getRemoteStatus().state());assertNull(saved().getRemotePoll().token());
         assertEquals("NO_WORK",step.advance(saved().getRemoteReview()).state());ready();
-        var outcome=new RemoteReviewStep(new RemoteReviewPollStore(mongo),client,storage).advance(saved().getRemoteReview());assertEquals("COMPLETED",outcome.remoteState());
-        assertEquals("REMOTE_REVIEW",saved().getScanState());assertFalse(saved().isArtifactVerified());assertEquals(1,posts.get());verify(storage,times(1)).downloadBounded(anyString(),anyInt());
+        var outcome=new RemoteReviewStep(new RemoteReviewPollStore(mongo),client,storage,completion).advance(saved().getRemoteReview());assertEquals("COMPLETED",outcome.remoteState(),outcome.toString());
+        assertEquals("APPLIED",outcome.state());assertEquals("COMPLETED",saved().getScanState());assertTrue(saved().isArtifactVerified());
+        assertEquals(ProjectVersion.ReviewStatus.SCHEDULED,mongo.findById(project,Project.class).getVersions().getFirst().getReviewStatus());assertEquals(binding.contextSha256(),saved().getReviewedContextSha256());assertEquals(1,posts.get());verify(storage,times(1)).downloadBounded(anyString(),anyInt());
+    }
+    RemoteReviewPollStore.Claim attached(long lease) {
+        var claim=polls.claim(binding,lease);assertNotNull(claim);var attached=polls.attachJob(claim,job);assertNotNull(attached);return attached;
+    }
+    @Test void contextChangeDuringResultReadCannotScheduleVersion() {
+        route(e->{if(e.getRequestURI().getPath().endsWith("/result"))change("manifestVersion","changed");reply(e,200,"COMPLETED");});
+        assertEquals("SUPERSEDED",step.advance(binding).state());assertEquals("REMOTE_REVIEW",saved().getScanState());
+        assertEquals(ProjectVersion.ReviewStatus.PENDING,mongo.findById(project,Project.class).getVersions().getFirst().getReviewStatus());
+    }
+    @Test void contextChangeAfterCompletionSnapshotStillFailsPublicationWrite() {
+        var claim=attached(30000);when(policy.currentPolicyVersion()).thenAnswer(i->{change("manifestVersion","changed at commit");return binding.policyVersion();});
+        assertFalse(completion.handleRemoteCompletedScan(claim,cleanResult()));assertEquals("REMOTE_REVIEW",saved().getScanState());
+    }
+    @Test void databaseLeaseExpiryDuringPolicyCheckRejectsResultWithoutChangingStoredPoll()throws Exception {
+        var claim=attached(1000);when(policy.currentPolicyVersion()).thenAnswer(i->{Thread.sleep(1100);return binding.policyVersion();});
+        assertFalse(completion.handleRemoteCompletedScan(claim,cleanResult()));assertEquals(claim.token(),saved().getRemotePoll().token());assertEquals("REMOTE_REVIEW",saved().getScanState());
+    }
+    @Test void wrongOriginalResultContextAndRequestAreRejected() {
+        var claim=attached(30000);var result=cleanResult();result.setReviewedContextSha256("d".repeat(64));assertFalse(completion.handleRemoteCompletedScan(claim,result));
+        result=cleanResult();result.setScanRequestId(UUID.randomUUID().toString());assertFalse(completion.handleRemoteCompletedScan(claim,result));
+        assertEquals("REMOTE_REVIEW",saved().getScanState());
+    }
+    @Test void missingCurrentPolicyRequiresReviewAndCannotSchedule() {
+        var claim=attached(30000);when(policy.currentPolicyVersion()).thenReturn(null);
+        assertTrue(completion.handleRemoteCompletedScan(claim,cleanResult()));assertEquals("REVIEW",saved().getVerdict());
+        assertEquals(ProjectVersion.ReviewStatus.PENDING,mongo.findById(project,Project.class).getVersions().getFirst().getReviewStatus());
+        assertFalse(completion.handleRemoteCompletedScan(claim,cleanResult()));
+    }
+    @Test void terminalRemoteFailureDoesNotCreateAnotherLocalScanAttempt() {
+        var claim=attached(30000);var result=cleanResult();var e=result.getSecurityEvidence();
+        result.setSecurityEvidence(new ScanResult.SecurityEvidence(e.policyVersion(),e.artifactSha256(),e.contentSha256(),true,false,"RATE_LIMITED",e.entryHashes()));
+        result.setVerdict("REVIEW");result.setStatus(ScanStatus.SUSPICIOUS);
+        assertTrue(completion.handleRemoteCompletedScan(claim,result));assertEquals("COMPLETED",saved().getScanState());
+        assertEquals(binding.requestId(),saved().getScanRequestId());assertEquals(job,saved().getRemoteReview().jobId());
+        assertEquals(ProjectVersion.ReviewStatus.PENDING,mongo.findById(project,Project.class).getVersions().getFirst().getReviewStatus());
+    }
+    @Test void incompleteRemoteEvidenceRemainsManualReview() {
+        var claim=attached(30000);var result=cleanResult();var e=result.getSecurityEvidence();
+        result.setSecurityEvidence(new ScanResult.SecurityEvidence(e.policyVersion(),e.artifactSha256(),e.contentSha256(),false,false,"INCOMPLETE",e.entryHashes()));result.setArtifactVerified(false);result.setVerdict("REVIEW");result.setStatus(ScanStatus.SUSPICIOUS);
+        assertTrue(completion.handleRemoteCompletedScan(claim,result));assertEquals("REVIEW",saved().getVerdict());assertFalse(ArtifactClearancePolicy.cleared(saved()));
+        assertEquals(ProjectVersion.ReviewStatus.PENDING,mongo.findById(project,Project.class).getVersions().getFirst().getReviewStatus());
     }
     @Test void lostPostResponseRecoversSameRequestAndRecordsJobWithoutAnotherUpload() {
         var accepted=new AtomicBoolean();route(e->{if(e.getRequestMethod().equals("POST")){accepted.set(true);return;}reply(e,accepted.get()?200:404,accepted.get()?"QUEUED":"AWAITING_UPLOAD");});

@@ -60,6 +60,18 @@ public class ScanPersistenceService {
     }
     public boolean applyScanOutcome(String projectId, String versionId, int expectedAttempt, ScanResult scanResult,
             ScanRoutingService.RoutingDecision routingDecision, ProjectVersion reviewedVersion, String requestId) {
+        return applyOutcome(projectId,versionId,expectedAttempt,scanResult,routingDecision,reviewedVersion,requestId,null,null);
+    }
+    public boolean applyRemoteScanOutcome(RemoteReviewPollStore.Claim claim,ScanResult.RemoteReviewPoll poll,ScanResult result,
+            ScanRoutingService.RoutingDecision routing,ProjectVersion version) {
+        if(!remoteResultMatches(claim,poll,result,version) || routing.action()==ScanRoutingService.RoutingAction.DEFER)return false;
+        result.setRemoteReview(claim.binding());result.setRemotePoll(null);
+        var binding=claim.binding();
+        return applyOutcome(binding.projectId(),binding.versionId(),binding.attempt(),result,routing,version,binding.requestId(),claim,poll);
+    }
+    private boolean applyOutcome(String projectId,String versionId,int expectedAttempt,ScanResult scanResult,
+            ScanRoutingService.RoutingDecision routingDecision,ProjectVersion reviewedVersion,String requestId,
+            RemoteReviewPollStore.Claim remote,ScanResult.RemoteReviewPoll poll) {
         scanResult.setScanRequestId(requestId);
         if (routingDecision.action() == ScanRoutingService.RoutingAction.SCHEDULE
                 || routingDecision.action() == ScanRoutingService.RoutingAction.APPROVE_NOW) {
@@ -105,23 +117,50 @@ public class ScanPersistenceService {
         }
 
         String expectedHash = scanResult.getSecurityEvidence() == null ? null : scanResult.getSecurityEvidence().artifactSha256();
-        Query target = bindRequest(buildVersionAttemptQueryBound(projectId, versionId, expectedAttempt, expectedHash, reviewedVersion, "SCANNING"), requestId);
+        Query target = bindRequest(buildVersionAttemptQueryBound(projectId, versionId, expectedAttempt, expectedHash, reviewedVersion, remote==null?"SCANNING":"REMOTE_REVIEW"), requestId);
         boolean automatic = routingDecision.action() == ScanRoutingService.RoutingAction.APPROVE_NOW
                 || routingDecision.action() == ScanRoutingService.RoutingAction.SCHEDULE;
         boolean linked = scanResult.getReusedReviewVersion() != null;
         boolean validOrigins = !automatic || ArtifactReviewLineage.bind(mongoTemplate, projectId, scanResult, target);
-        if (validOrigins && mongoTemplate.updateFirst(target, update, Project.class).getModifiedCount() > 0) return true;
+        if (validOrigins && outcomeWrite(remoteTarget(target,remote,poll),update,remote)) return true;
         if (automatic && linked) {
             ArtifactReviewLineage.invalidate(scanResult);
             var hold = new Update().set("versions.$.scanResult", scanResult)
                     .set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.PENDING)
                     .set("versions.$.scheduledPublishDate", null).set("updatedAt", LocalDateTime.now().toString());
-            if (mongoTemplate.updateFirst(bindRequest(buildVersionAttemptQueryBound(projectId, versionId, expectedAttempt, expectedHash,
-                    reviewedVersion, "SCANNING"), requestId), hold, Project.class).getModifiedCount() > 0)
+            if (outcomeWrite(remoteTarget(bindRequest(buildVersionAttemptQueryBound(projectId, versionId, expectedAttempt, expectedHash,
+                    reviewedVersion, remote==null?"SCANNING":"REMOTE_REVIEW"), requestId),remote,poll),hold,remote))
                 projectRepository.findById(projectId).ifPresent(projectService::evictProjectCache);
         }
         // A held fallback must not make the caller announce an approval.
         return false;
+    }
+
+    static boolean remoteResultMatches(RemoteReviewPollStore.Claim claim,ScanResult.RemoteReviewPoll poll,ScanResult result,ProjectVersion version) {
+        if(claim==null || claim.binding().jobId()==null || poll==null || !claim.token().equals(poll.token()) || poll.leaseUntil()==null
+                || poll.nextPollAt()==null || result==null || version==null || result.getSecurityEvidence()==null)return false;
+        var b=claim.binding();var e=result.getSecurityEvidence();
+        return b.versionId().equals(version.getId()) && b.artifactSha256().equals(version.getHash()) && b.filePath().equals(version.getFileUrl())
+                && b.contextSha256().equals(ArtifactReviewContext.automaticallyReviewableFingerprint(version))
+                && b.contextSha256().equals(result.getReviewedContextSha256()) && b.requestId().equals(result.getScanRequestId())
+                && b.artifactSha256().equals(e.artifactSha256()) && b.policyVersion().equals(e.policyVersion());
+    }
+    private Query remoteTarget(Query target,RemoteReviewPollStore.Claim claim,ScanResult.RemoteReviewPoll poll) {
+        if(claim==null)return target;
+        var raw=target.getQueryObject();var version=raw.get("versions",org.bson.Document.class).get("$elemMatch",org.bson.Document.class);
+        version.put("scanResult.remoteReview",claim.binding());version.put("scanResult.remotePoll",poll);version.put("fileUrl",claim.binding().filePath());
+        var terms=new java.util.ArrayList<Object>();if(raw.containsKey("$expr"))terms.add(raw.get("$expr"));
+        terms.add(new org.bson.Document("$gt",List.of(poll.leaseUntil(),"$$NOW")));
+        terms.add(new org.bson.Document("$eq",List.of(new org.bson.Document("$size",new org.bson.Document("$filter",new org.bson.Document("input","$versions")
+                .append("as","v").append("cond",new org.bson.Document("$eq",List.of("$$v._id",new org.bson.Document("$literal",claim.binding().versionId())))))),1)));
+        raw.put("$expr",new org.bson.Document("$and",terms));
+        return new org.springframework.data.mongodb.core.query.BasicQuery(raw).collation(org.springframework.data.mongodb.core.query.Collation.of("simple"));
+    }
+    private boolean outcomeWrite(Query query,Update update,RemoteReviewPollStore.Claim remote) {
+        if(remote==null)return mongoTemplate.updateFirst(query,update,Project.class).getModifiedCount()>0;
+        var durable=new MongoTemplate(mongoTemplate.getMongoDatabaseFactory(),mongoTemplate.getConverter());
+        durable.setWriteConcern(com.mongodb.WriteConcern.MAJORITY.withJournal(true).withWTimeout(10,java.util.concurrent.TimeUnit.SECONDS));
+        return durable.updateFirst(query,update,Project.class).getModifiedCount()>0;
     }
 
     public boolean queueRetryAttempt(String projectId, String versionId, int currentAttempt, ScanResult queued, ScanResult observed, long timeoutMillis) {
