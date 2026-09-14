@@ -18,9 +18,28 @@ java {
 
 repositories {
     mavenCentral()
+    exclusiveContent {
+        forRepository {
+            ivy {
+                name = 'modtaleJavafx'
+                url = uri('https://github.com/Modtale/jfx/releases/download')
+                patternLayout {
+                    artifact '[revision]/[artifact]-[revision]-[classifier].[ext]'
+                }
+                metadataSources { artifact() }
+            }
+        }
+        filter { includeGroup 'net.modtale.javafx' }
+    }
 }
 
 def currentOs = org.gradle.internal.os.OperatingSystem.current()
+if (currentOs.isLinux()) {
+    configurations.configureEach {
+        exclude group: 'org.openjfx', module: 'javafx-graphics'
+    }
+}
+
 
 def packagingJavaLauncher = javaToolchains.launcherFor {
     languageVersion = JavaLanguageVersion.of(25)
@@ -41,7 +60,11 @@ dependencies {
     implementation 'com.vladsch.flexmark:flexmark-html2md-converter:0.64.8'
     implementation 'net.java.dev.jna:jna:5.19.1'
     implementation "org.openjfx:javafx-base:26.0.2:${javafxPlatform()}"
-    implementation "org.openjfx:javafx-graphics:26.0.2:${javafxPlatform()}"
+    if (currentOs.isLinux()) {
+        implementation "net.modtale.javafx:javafx-graphics:26.0.2-modtale.1:${javafxPlatform()}"
+    } else {
+        implementation "org.openjfx:javafx-graphics:26.0.2:${javafxPlatform()}"
+    }
     implementation "org.openjfx:javafx-controls:26.0.2:${javafxPlatform()}"
 
     testImplementation 'org.junit.jupiter:junit-jupiter:6.1.3'
@@ -199,42 +222,6 @@ def packagedJna = tasks.register('packageHostJna', Jar) {
             }
         }
         includeEmptyDirs = false
-    }
-}
-
-def waylandBackend = null
-if (currentOs.isLinux()) {
-    def graphicsName = "javafx-graphics-26.0.2-${javafxPlatform()}.jar"
-    def graphicsJar = configurations.runtimeClasspath.filter { it.name == graphicsName }
-    def nativeDirectory = providers.gradleProperty('waylandNativeDir')
-    waylandBackend = tasks.register('buildWaylandBackend', Exec) {
-        group = 'build'
-        description = 'Builds the pinned native Wayland/EGL backend for JavaFX.'
-        inputs.files(graphicsJar)
-        inputs.file('native/openjfx-wayland.patch')
-        inputs.file('scripts/build_wayland_backend.py')
-        if (nativeDirectory.isPresent()) inputs.dir(nativeDirectory.get())
-        def output = layout.buildDirectory.file("native-javafx/${graphicsName}")
-        outputs.file(output)
-        doFirst {
-            def args = ['python3', file('scripts/build_wayland_backend.py').absolutePath,
-                        '--base-jar', graphicsJar.singleFile.absolutePath,
-                        '--output', output.get().asFile.absolutePath,
-                        '--work', layout.buildDirectory.dir('openjfx-wayland').get().asFile.absolutePath,
-                        '--patch', file('native/openjfx-wayland.patch').absolutePath,
-                        '--java-home', packagingJavaLauncher.get().metadata.installationPath.asFile.absolutePath,
-                        '--gradle', new File(gradle.gradleHomeDir, 'bin/gradle').absolutePath]
-            if (nativeDirectory.isPresent()) args += ['--native-dir', file(nativeDirectory.get()).absolutePath]
-            commandLine args
-        }
-    }
-    runtimeClasspathFiles = files(configurations.runtimeClasspath.filter { it.name != graphicsName }, waylandBackend)
-    tasks.named('run', JavaExec) {
-        classpath = files(sourceSets.main.output, runtimeClasspathFiles)
-    }
-    tasks.named('test', Test) {
-        classpath = files(sourceSets.test.output, sourceSets.main.output,
-                configurations.testRuntimeClasspath.filter { it.name != graphicsName }, waylandBackend)
     }
 }
 

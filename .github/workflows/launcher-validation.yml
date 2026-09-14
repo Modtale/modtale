@@ -40,8 +40,8 @@ jobs:
       - name: Install Linux display dependencies
         if: runner.os == 'Linux'
         run: |
-          sudo bash scripts/install_linux_build_dependencies.sh
-          sudo apt-get install -y weston libgl1-mesa-dri
+          sudo bash scripts/install_linux_runtime_dependencies.sh
+          sudo apt-get install -y weston libgl1-mesa-dri binutils
       - name: Test and build the native application image
         run: |
           chmod +x gradlew

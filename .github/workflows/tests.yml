@@ -175,7 +175,7 @@ jobs:
 
       - name: Install Wayland compositor for JavaFX tests
         run: |
-          sudo bash scripts/install_linux_build_dependencies.sh
+          sudo bash scripts/install_linux_runtime_dependencies.sh
           sudo apt-get install -y weston libgl1-mesa-dri
 
       - name: Run launcher tests
