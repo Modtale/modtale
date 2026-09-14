@@ -31,7 +31,7 @@ class ReviewRepairAccessIntegrationTest {
     }
     @Test void exactPreviewPreparationExecutionAndReceiptAreComposed() {
         var before=fixture.version();var prepared=prepare();assertEquals(before,fixture.version());assertNull(fixture.operation());
-        var result=access.execute(prepared);assertEquals("APPLIED",result.state());assertEquals(result,access.receipt(prepared));
+        var result=access.execute(prepared);assertEquals("APPLIED",result.state());var receipt=access.receipt(prepared);assertEquals(result.state(),receipt.state());assertEquals(result.afterSha256(),receipt.afterSha256());assertEquals(position,receipt.position());assertEquals("v",receipt.versionId());assertEquals(prepared.sha256(),receipt.beforeSha256());
         assertEquals("BLOCK",fixture.version().get("scanResult",org.bson.Document.class).get("verdict"));
     }
     @Test void anotherModeratorCannotUseAnExistingPreparedActionOrReceipt() {
@@ -77,6 +77,22 @@ class ReviewRepairAccessIntegrationTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control","no-store"))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.state").value("APPLIED"));
         assertEquals("actor",fixture.operation().get("actor"));
+    }
+
+    @Test void typedProjectSavePreservesIsolationAndHistoricalReceipt() {
+        var prepared=prepare();access.execute(prepared);var originalMarker=fixture.version().get("reviewIsolation",org.bson.Document.class);
+        var project=fixture.mongo.findById("p",net.modtale.model.project.Project.class);
+        assertNotNull(project.getVersions().getFirst().getReviewIsolation());project.getVersions().getFirst().setVersionNumber("edited");fixture.mongo.save(project);
+        assertEquals(originalMarker,fixture.version().get("reviewIsolation",org.bson.Document.class));
+        var receipt=access.receipt(prepared);assertEquals("APPLIED",receipt.state());assertEquals(position,receipt.position());assertEquals(prepared.sha256(),receipt.beforeSha256());
+        assertNotEquals(receipt.afterSha256(),fixture.reader.capture("p",0,"v").sha256());
+        fixture.projects.deleteOne(new org.bson.Document("_id","p"));assertEquals(receipt,access.receipt(prepared));
+    }
+    @Test void objectIdReceiptsRetainOriginalBsonIdentity() {
+        var version=fixture.version();String id="abcdefabcdefabcdefabcdef";fixture.projects.deleteMany(new org.bson.Document());
+        fixture.projects.insertOne(new org.bson.Document("_id",new org.bson.types.ObjectId(id)).append("versions",List.of(version)));
+        position=new ReviewRepairAccess.Position("OBJECT_ID",id,0);var prepared=prepare();access.execute(prepared);
+        var receipt=access.receipt(prepared);assertEquals(position,receipt.position());assertEquals("v",receipt.versionId());assertEquals(prepared.sha256(),receipt.beforeSha256());
     }
 
 }

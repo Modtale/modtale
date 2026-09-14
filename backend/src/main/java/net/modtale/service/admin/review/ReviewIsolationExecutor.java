@@ -31,9 +31,11 @@ public final class ReviewIsolationExecutor {
         var original=new RawBsonDocument(source.versionBytes()).decode(new org.bson.codecs.DocumentCodec());
         return fields(original,source)!=null;
     }
-    public Result receipt(ReviewRepairPreparation.Prepared prepared,String actor) {
-        verifiedSource(prepared,actor);
-        return outcome(prepared,actor);
+    public record Receipt(Result outcome,Object projectId,int versionIndex,String versionId,String beforeSha256) {}
+    public Receipt receipt(ReviewRepairPreparation.Prepared prepared,String actor) {
+        var source=verifiedSource(prepared,actor);
+        String versionId=new RawBsonDocument(source.versionBytes()).getString("_id").getValue();
+        return new Receipt(outcome(prepared,actor),source.projectId(),source.versionIndex(),versionId,prepared.sha256());
     }
     private ReviewSnapshotArchive.Snapshot verifiedSource(ReviewRepairPreparation.Prepared prepared,String actor) {
         var source=archive.load(prepared.id());

@@ -40,7 +40,7 @@ class ReviewRepairControllerTest {
     }
     @Test void preparedAndReceiptResponsesAreBoundedAndNotCacheable()throws Exception {
         var prepared=new ReviewRepairPreparation.Prepared(UUID.randomUUID().toString(),"a".repeat(64),1,2);
-        when(access.prepare(any())).thenReturn(prepared);when(access.receipt(any())).thenReturn(new ReviewIsolationExecutor.Result("UNKNOWN",null));
+        when(access.prepare(any())).thenReturn(prepared);when(access.receipt(any())).thenReturn(new ReviewRepairAccess.Receipt(new ReviewRepairAccess.Position("STRING","p",0),"v",prepared.sha256(),"UNKNOWN",null));
         var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
         mvc.perform(post("/api/v1/admin/verification/repairs/prepare").contentType("application/json").content("{\"id\":\""+prepared.id()+"\",\"position\":{\"projectIdType\":\"STRING\",\"projectId\":\"p\",\"versionIndex\":0},\"versionId\":\"v\",\"expectedSha256\":\""+prepared.sha256()+"\"}"))
                 .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andExpect(jsonPath("$.id").value(prepared.id())).andExpect(jsonPath("$.actor").doesNotExist());

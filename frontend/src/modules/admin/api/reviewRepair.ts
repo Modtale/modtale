@@ -61,6 +61,9 @@ export async function executeRepair(prepared: PreparedRepair, signal: AbortSigna
     const config = { signal, skipCsrfRetry: true };
     return validateResult((await api.post('/admin/verification/repairs/execute', validatePrepared(prepared), config)).data);
 }
-export async function repairReceipt(prepared: PreparedRepair, signal: AbortSignal): Promise<RepairResult> {
-    return validateResult((await api.post('/admin/verification/repairs/receipt', validatePrepared(prepared), { signal })).data);
+export async function repairReceipt(prepared: PreparedRepair, target: RepairTarget, signal: AbortSignal): Promise<RepairResult> {
+    const expected = validateTarget(target);
+    const { data } = await api.post('/admin/verification/repairs/receipt', validatePrepared(prepared), { signal });
+    if (JSON.stringify(validateTarget(data)) !== JSON.stringify(expected) || data.beforeSha256 !== prepared.sha256) throw invalid();
+    return validateResult(data);
 }

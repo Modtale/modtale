@@ -17,7 +17,7 @@ public class ReviewRepairController {
     @PostMapping("/inspect") public ResponseEntity<ReviewRepairAccess.Preview> inspect(@RequestBody ReviewRepairAccess.Inspect request){return response(access.inspect(request));}
     @PostMapping("/prepare") public ResponseEntity<ReviewRepairPreparation.Prepared> prepare(@RequestBody ReviewRepairAccess.Prepare request){return response(access.prepare(request));}
     @PostMapping("/execute") public ResponseEntity<ReviewIsolationExecutor.Result> execute(@RequestBody ReviewRepairPreparation.Prepared request){return response(access.execute(request));}
-    @PostMapping("/receipt") public ResponseEntity<ReviewIsolationExecutor.Result> receipt(@RequestBody ReviewRepairPreparation.Prepared request){return response(access.receipt(request));}
+    @PostMapping("/receipt") public ResponseEntity<ReviewRepairAccess.Receipt> receipt(@RequestBody ReviewRepairPreparation.Prepared request){return response(access.receipt(request));}
     private static <T> ResponseEntity<T> response(T value){return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(value);}
     @ExceptionHandler(SecurityException.class) ResponseEntity<Void> forbidden(){return ResponseEntity.status(HttpStatus.FORBIDDEN).cacheControl(CacheControl.noStore()).build();}
     @ExceptionHandler({IllegalArgumentException.class,org.springframework.http.converter.HttpMessageNotReadableException.class}) ResponseEntity<Void> invalid(){return ResponseEntity.badRequest().cacheControl(CacheControl.noStore()).build();}

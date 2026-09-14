@@ -1,6 +1,6 @@
 import { expect, it, vi, beforeEach } from 'vitest';
 import { api } from '@/utils/api';
-import { executeRepair, inspectRepair, prepareRepair, repairAvailable, restorePending, validatePrepared, validateResult, validateTarget } from '@/modules/admin/api/reviewRepair';
+import { executeRepair, repairReceipt, inspectRepair, prepareRepair, repairAvailable, restorePending, validatePrepared, validateResult, validateTarget } from '@/modules/admin/api/reviewRepair';
 vi.mock('@/utils/api', () => ({ api: { get: vi.fn(), post: vi.fn() } }));
 const target = { position: { projectIdType: 'STRING' as const, projectId: 'p', versionIndex: 0 }, versionId: 'v' };
 const preview = { ...target, sha256: 'a'.repeat(64), eligible: true, effect: 'ISOLATE_LOCAL_REVIEW' as const };
@@ -30,4 +30,19 @@ it('disables shared-client replay for isolation submission', async () => {
     vi.mocked(api.post).mockResolvedValueOnce({ data: { state: 'UNKNOWN', afterSha256: null } });
     const signal = new AbortController().signal; await executeRepair(prepared, signal);
     expect(api.post).toHaveBeenLastCalledWith('/admin/verification/repairs/execute', prepared, { signal, skipCsrfRetry: true });
+});
+
+it.each(['project', 'type', 'position', 'version', 'digest'])('rejects a receipt bound to another %s', async field => {
+    const expected = field === 'type' ? { ...target, position: { ...target.position, projectId: 'a'.repeat(24) } } : target;
+    const value = { ...expected, position: { ...expected.position }, beforeSha256: prepared.sha256, state: 'APPLIED', afterSha256: 'b'.repeat(64) };
+    if (field === 'project') value.position.projectId = 'other';
+    if (field === 'type') { value.position.projectIdType = 'OBJECT_ID' as 'STRING'; value.position.projectId = 'a'.repeat(24); }
+    if (field === 'position') value.position.versionIndex = 1;
+    if (field === 'version') value.versionId = 'other';
+    if (field === 'digest') value.beforeSha256 = 'c'.repeat(64);
+    vi.mocked(api.post).mockResolvedValueOnce({ data: value }); await expect(repairReceipt(prepared, expected, new AbortController().signal)).rejects.toThrow();
+});
+it('accepts an authenticated receipt for the saved original identity', async () => {
+    vi.mocked(api.post).mockResolvedValueOnce({ data: { ...target, beforeSha256: prepared.sha256, state: 'APPLIED', afterSha256: 'b'.repeat(64) } });
+    expect(await repairReceipt(prepared, target, new AbortController().signal)).toEqual({ state: 'APPLIED', afterSha256: 'b'.repeat(64) });
 });

@@ -67,9 +67,9 @@ function RepairPanel({ subject, selected, onReady, onLock, onDismiss }: RepairPa
         void run(signal => executeRepair(prepared, signal), acceptResult, () => acceptResult({ state: 'UNKNOWN', afterSha256: null }));
     }
     function checkReceipt() {
-        if (!prepared || busy.current || available !== true) return;
+        if (!prepared || !target || busy.current || available !== true) return;
         setStage('checking'); setMessage('');
-        void run(signal => repairReceipt(prepared, signal), acceptResult, () => { setResult({ state: 'UNKNOWN', afterSha256: null }); setMessage('The receipt is unavailable. The outcome remains unconfirmed.'); setStage('result'); });
+        void run(signal => repairReceipt(prepared, target, signal), acceptResult, () => { setResult({ state: 'UNKNOWN', afterSha256: null }); setMessage('The receipt is unavailable. The outcome remains unconfirmed.'); setStage('result'); });
     }
     function dismiss() { setTarget(null); setPreview(null); setPrepared(null); setResult(null); setStage('idle'); setMessage(''); onDismiss(); }
     return <section aria-label="Repair controls" className="space-y-3">

@@ -37,8 +37,14 @@ public final class ReviewRepairAccess {
     public ReviewIsolationExecutor.Result execute(ReviewRepairPreparation.Prepared prepared) {
         var authority=authority();validate(prepared);return workflow.isolate(prepared,authority.actor(),authority.allowed());
     }
-    public ReviewIsolationExecutor.Result receipt(ReviewRepairPreparation.Prepared prepared) {
-        var authority=authority();validate(prepared);return workflow.read(()->isolation.receipt(prepared,authority.actor()),authority.allowed());
+    public record Receipt(Position position,String versionId,String beforeSha256,String state,String afterSha256) {}
+    public Receipt receipt(ReviewRepairPreparation.Prepared prepared) {
+        var authority=authority();validate(prepared);return workflow.read(()->{
+            var receipt=isolation.receipt(prepared,authority.actor());
+            boolean objectId=receipt.projectId() instanceof ObjectId;
+            var position=new Position(objectId?"OBJECT_ID":"STRING",objectId?((ObjectId)receipt.projectId()).toHexString():(String)receipt.projectId(),receipt.versionIndex());
+            return new Receipt(position,receipt.versionId(),receipt.beforeSha256(),receipt.outcome().state(),receipt.outcome().afterSha256());
+        },authority.allowed());
     }
     private record Authority(String actor,BooleanSupplier allowed) {}
     private Authority authority() {

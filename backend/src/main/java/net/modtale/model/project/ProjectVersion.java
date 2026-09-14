@@ -3,6 +3,22 @@ package net.modtale.model.project;
 import java.util.List;
 
 public class ProjectVersion {
+    private ReviewIsolation reviewIsolation;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public ReviewIsolation getReviewIsolation() { return reviewIsolation; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public void setReviewIsolation(ReviewIsolation value) { reviewIsolation = value; }
+    public record ReviewIsolation(String operationId, String actorId, String beforeSha256, java.util.Date isolatedAt) {
+        public ReviewIsolation {
+            if (operationId == null || !operationId.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+                    || actorId == null || actorId.isBlank() || actorId.length() > 256
+                    || beforeSha256 == null || !beforeSha256.matches("[0-9a-f]{64}") || isolatedAt == null)
+                throw new IllegalArgumentException("Invalid review isolation provenance");
+            isolatedAt = new java.util.Date(isolatedAt.getTime());
+        }
+        @Override public java.util.Date isolatedAt() { return new java.util.Date(isolatedAt.getTime()); }
+    }
+
     private List<net.modtale.model.project.ModpackConfigReference> modpackConfigs;
     public List<net.modtale.model.project.ModpackConfigReference> getModpackConfigs() { return modpackConfigs; }
     public void setModpackConfigs(List<net.modtale.model.project.ModpackConfigReference> value) { modpackConfigs = value; }
