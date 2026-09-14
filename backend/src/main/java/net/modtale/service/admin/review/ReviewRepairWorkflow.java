@@ -7,7 +7,9 @@ import java.util.function.LongSupplier;
 
 /** Shared, fail-fast admission for preparation and isolation; owns no background workers. */
 public final class ReviewRepairWorkflow implements AutoCloseable {
-    public record Status(String state, int active) {}
+    public record Status(String state, int active, int overdue) {
+        public Status(String state, int active) { this(state, active, 0); }
+    }
     private final ReviewRepairPreparation preparation;
     private final ReviewIsolationExecutor isolation;
     private final int concurrency;
@@ -15,6 +17,7 @@ public final class ReviewRepairWorkflow implements AutoCloseable {
     private final LongSupplier ticker;
     private boolean accepting = true;
     private int active;
+    private final java.util.Set<Admission> admissions = new java.util.HashSet<>();
 
     public ReviewRepairWorkflow(ReviewRepairPreparation preparation, ReviewIsolationExecutor isolation, int concurrency) {
         this(preparation, isolation, concurrency, 30000, System::nanoTime);
@@ -54,12 +57,15 @@ public final class ReviewRepairWorkflow implements AutoCloseable {
             if (active >= concurrency) throw new IllegalStateException("Review repair is busy");
             var admission = new Admission(permitted, ticker.getAsLong());
             active++;
+            admissions.add(admission);
             return admission;
         }
     }
 
     public synchronized Status status() {
-        return new Status(accepting ? "OPEN" : active == 0 ? "CLOSED" : "DRAINING", active);
+        long now = ticker.getAsLong();
+        int overdue = (int) admissions.stream().filter(admission -> now - admission.started >= durationNanos).count();
+        return new Status(accepting ? "OPEN" : active == 0 ? "CLOSED" : "DRAINING", active, overdue);
     }
 
     // In-flight calls retain their slots until they actually return. A commit already entered may complete.
@@ -88,7 +94,7 @@ public final class ReviewRepairWorkflow implements AutoCloseable {
         }
         @Override public void close() {
             synchronized (ReviewRepairWorkflow.this) {
-                if (!released) { released = true; active--; }
+                if (!released) { released = true; active--; admissions.remove(this); }
             }
         }
     }

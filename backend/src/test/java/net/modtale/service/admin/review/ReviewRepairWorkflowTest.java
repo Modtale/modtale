@@ -117,4 +117,23 @@ class ReviewRepairWorkflowTest {
         assertThrows(IllegalArgumentException.class, () -> new ReviewRepairWorkflow(preparation, isolation, 3));
         assertThrows(IllegalArgumentException.class, () -> new ReviewRepairWorkflow(preparation, isolation, 1, 999, System::nanoTime));
     }
+    @Test void overdueWorkRemainsCountedUntilItActuallyReturns() throws Exception {
+        var ticks = new AtomicLong();var entered = new CountDownLatch(1);var release = new CountDownLatch(1);
+        var workflow = new ReviewRepairWorkflow(preparation, isolation, 1, 1000, ticks::get);
+        when(isolation.execute(eq(prepared), eq("actor"), any())).thenAnswer(i -> {
+            entered.countDown();assertTrue(release.await(5, TimeUnit.SECONDS));return new ReviewIsolationExecutor.Result("UNKNOWN", null);
+        });
+        try (var worker = Executors.newSingleThreadExecutor()) {
+            var running = worker.submit(() -> workflow.isolate(prepared, "actor", () -> true));
+            try {
+                assertTrue(entered.await(5, TimeUnit.SECONDS));ticks.set(1000000000L);
+                assertEquals(new ReviewRepairWorkflow.Status("OPEN", 1, 1), workflow.status());
+                assertThrows(IllegalStateException.class, () -> workflow.prepare(request, () -> true));
+                workflow.close();assertEquals(new ReviewRepairWorkflow.Status("DRAINING", 1, 1), workflow.status());
+            } finally { release.countDown(); }
+            running.get(5, TimeUnit.SECONDS);
+        }
+        assertEquals(new ReviewRepairWorkflow.Status("CLOSED", 0, 0), workflow.status());
+    }
+
 }
