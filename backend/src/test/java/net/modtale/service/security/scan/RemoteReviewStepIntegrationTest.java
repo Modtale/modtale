@@ -310,6 +310,50 @@ class RemoteReviewStepIntegrationTest {
         assertEquals("NO_WORK",new RemoteReviewStep(new RemoteReviewPollStore(mongo),client,storage,completion).advance(result.getRemoteReview()).state());
         assertEquals(1,gets.get());assertEquals(0,posts.get());verifyNoInteractions(storage);verify(completion,never()).handleRemoteCompletedScan(any(),any());
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"HELD","CANCELLED","EXPIRED"})
+    void terminalServiceOutcomePreservesSecurityBlockAndFindings(String state) {
+        change("scanResult.verdict","BLOCK");change("scanResult.riskScore",87);
+        change("scanResult.issues",List.of(new Document("type","RetainedFinding")));
+        route(e->reply(e,200,state));assertEquals("UNAVAILABLE",step.advance(binding).state());
+        assertEquals("BLOCK",saved().getVerdict());assertEquals(87,saved().getRiskScore());
+        assertEquals("RetainedFinding",saved().getIssues().getFirst().getType());assertEquals(ScanStatus.FAILED,saved().getStatus());
+        assertEquals("REMOTE_"+state,saved().getScanState());assertFalse(ArtifactClearancePolicy.cleared(saved()));
+        assertEquals(binding.requestId(),saved().getScanRequestId());assertEquals(job,saved().getRemoteReview().jobId());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(project)),new Update().set("status",ProjectStatus.PUBLISHED),Project.class);
+        var reader=new net.modtale.service.admin.review.ModerationQueuePageReader(mongo);
+        for(var filter:List.of(net.modtale.service.admin.review.ModerationQueuePageReader.Filter.SECURITY,net.modtale.service.admin.review.ModerationQueuePageReader.Filter.OPERATIONS)) {
+            var rows=reader.page(null,25,filter).items();assertEquals(1,rows.size());assertEquals("BLOCK",rows.getFirst().pendingVersion().scan().verdict());
+        }
+        assertEquals(1,gets.get());assertEquals(0,posts.get());verifyNoInteractions(storage);
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"verdict","context","lease"})
+    void terminalFailureWriteRejectsChangesAfterLiveSnapshot(String mutation) {
+        var claim=attached(30000);var intercepted=new AtomicBoolean();
+        var settings=com.mongodb.MongoClientSettings.builder().applyConnectionString(new com.mongodb.ConnectionString(
+                "mongodb://127.0.0.1:"+System.getenv().getOrDefault("WARDEN_REVIEW_DB_PORT","27030")+"/?serverSelectionTimeoutMS=3000"))
+                .addCommandListener(new com.mongodb.event.CommandListener() {
+                    @Override public void commandStarted(com.mongodb.event.CommandStartedEvent event) {
+                        if(!event.getCommandName().equals("update") || !intercepted.compareAndSet(false,true))return;
+                        switch(mutation) {
+                            case "verdict" -> change("scanResult.verdict","BLOCK");
+                            case "context" -> change("manifestVersion","changed during write");
+                            case "lease" -> change("scanResult.remotePoll.token",UUID.randomUUID().toString());
+                        }
+                    }
+                }).build();
+        try(var raceClient=MongoClients.create(settings)) {
+            assertFalse(new RemoteReviewPollStore(new MongoTemplate(raceClient,database)).finishUnavailable(claim,
+                    new RemoteReviewClient.Status(job,"HELD",true,1,2,"HELD")));
+        }
+        assertTrue(intercepted.get());assertEquals("REMOTE_REVIEW",saved().getScanState());assertEquals(ScanStatus.SCANNING,saved().getStatus());
+        if(mutation.equals("verdict")) {
+            assertEquals("BLOCK",saved().getVerdict());
+            assertTrue(polls.finishUnavailable(claim,new RemoteReviewClient.Status(job,"HELD",true,1,2,"HELD")));
+            assertEquals("BLOCK",saved().getVerdict());
+        }
+    }
     @Test void databaseQueueKeepsFailedVersionVisibleBesideScanningSibling() {
         route(e->reply(e,200,"HELD"));assertEquals("UNAVAILABLE",step.advance(binding).state());
         var sibling=new ProjectVersion();sibling.setId("scanning-sibling");sibling.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);

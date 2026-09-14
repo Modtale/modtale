@@ -73,7 +73,7 @@ public final class RemoteReviewPollStore {
         var value=new Document("jobId",status.jobId()).append("state",status.state()).append("artifactRetained",status.artifactRetained())
                 .append("createdAt",status.createdAt()).append("expiresAt",status.expiresAt()).append("workState",status.workState());
         var fields=new Document("remoteStatus",literal(value)).append("remotePoll",literal(null))
-                .append("status","FAILED").append("scanState","REMOTE_"+status.state()).append("verdict","REVIEW")
+                .append("status","FAILED").append("scanState","REMOTE_"+status.state()).append("verdict","BLOCK".equals(snapshot.scan().get("verdict"))?"BLOCK":"REVIEW")
                 .append("scanTimestamp",new Document("$toLong","$$NOW"))
                 .append("securityEvidence",literal(null)).append("artifactVerified",false)
                 .append("reviewedContextSha256",literal(null)).append("reusedReviewVersion",literal(null))
