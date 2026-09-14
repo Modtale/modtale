@@ -1,5 +1,0 @@
-Find a mod. Download it. Choose where it belongs.
-
-The Modtale Launcher takes LevelingCore from its project page into your worlds, with the installed version right there in your library.
-
-https://modtale.net/launcher
