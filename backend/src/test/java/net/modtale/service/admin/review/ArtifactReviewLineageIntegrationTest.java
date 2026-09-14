@@ -141,12 +141,13 @@ class ArtifactReviewLineageIntegrationTest {
         var loaded=readyForManual();var version=loaded.getVersions().get(1);
         var persistence=new VersionReviewPersistence(mongo);
         var snapshot=persistence.capture(id,"target",VersionReviewSnapshot.token(version));accept(version);
-        var realCollection=mongo.getCollection("projects");var intercepted=spy(realCollection);
+        var realCollection=mongo.getCollection("projects");var intercepted=spy(realCollection.withWriteConcern(com.mongodb.WriteConcern.MAJORITY.withJournal(true)));
         doReturn(intercepted).when(mongo).getCollection("projects");
+        doReturn(intercepted).when(intercepted).withWriteConcern(any(com.mongodb.WriteConcern.class));
         doAnswer(invocation -> {
             realCollection.updateOne(new Document(),Updates.set("versions.0.reviewStatus","REJECTED"));
             return invocation.callRealMethod();
-        }).when(intercepted).updateOne(any(org.bson.conversions.Bson.class),any(org.bson.conversions.Bson.class));
+        }).when(intercepted).updateOne(any(org.bson.conversions.Bson.class),any(org.bson.conversions.Bson.class),any(com.mongodb.client.model.UpdateOptions.class));
         assertFalse(persistence.apply(snapshot,version));
         assertEquals(ProjectVersion.ReviewStatus.PENDING,mongo.findById(id,Project.class).getVersions().get(1).getReviewStatus());
     }

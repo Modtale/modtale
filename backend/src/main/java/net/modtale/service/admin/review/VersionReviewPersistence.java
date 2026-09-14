@@ -28,18 +28,19 @@ public class VersionReviewPersistence {
     private Snapshot capture(String projectId, String versionId, String expectedToken, boolean rescan) {
         var entity=mongo.getConverter().getMappingContext().getPersistentEntity(Project.class);
         var filter=new QueryMapper(mongo.getConverter()).getMappedObject(new Document("_id",projectId),entity);
-        Document project=mongo.getCollection(mongo.getCollectionName(Project.class)).find(filter).first();
-        if(project==null || !(project.get("versions") instanceof List<?> versions)) throw conflict();
-        for(Object item:versions) if(item instanceof Document stored) {
-            var version=mongo.getConverter().read(ProjectVersion.class,stored);
-            if(Objects.equals(versionId,version.getId())) {
-                if (rescan) {
-                    if (expectedToken == null || !expectedToken.equals(VersionReviewSnapshot.rescanToken(version))) throw conflict();
-                } else VersionReviewSnapshot.requireCurrent(version,expectedToken);
-                return new Snapshot(project.get("_id"),stored);
-            }
-        }
-        throw conflict();
+        Document project=mongo.getCollection(mongo.getCollectionName(Project.class)).withReadPreference(com.mongodb.ReadPreference.primary())
+                .withReadConcern(com.mongodb.ReadConcern.MAJORITY).find(filter)
+                .collation(com.mongodb.client.model.Collation.builder().locale("simple").build()).maxTime(5,java.util.concurrent.TimeUnit.SECONDS).first();
+        if(versionId==null || project==null || !(project.get("versions") instanceof List<?> versions)) throw conflict();
+        var matches=versions.stream().filter(item->item instanceof Document stored && versionId.equals(stored.get("_id"))).toList();
+        if(matches.size()!=1)throw conflict();
+        var stored=(Document)matches.getFirst();
+        ProjectVersion version;
+        try {version=mongo.getConverter().read(ProjectVersion.class,stored);}catch(RuntimeException invalid){throw conflict();}
+        if (rescan) {
+            if (expectedToken == null || !expectedToken.equals(VersionReviewSnapshot.rescanToken(version))) throw conflict();
+        } else VersionReviewSnapshot.requireCurrent(version,expectedToken);
+        return new Snapshot(project.get("_id"),stored);
     }
     public boolean apply(Snapshot snapshot, ProjectVersion reviewed) {
         var originGuard = new org.springframework.data.mongodb.core.query.Query();
@@ -83,9 +84,15 @@ public class VersionReviewPersistence {
     private boolean applyUpdate(Snapshot snapshot, Update update, Document originGuard) {
         var entity=mongo.getConverter().getMappingContext().getPersistentEntity(Project.class);
         var mapped=new UpdateMapper(mongo.getConverter()).getMappedObject(update.getUpdateObject(),entity);
-        var filter=Filters.and(Filters.eq("_id",snapshot.projectId()),new Document("versions",new Document("$eq",snapshot.version())));
+        if(!(snapshot.version().get("_id") instanceof String versionId))return false;
+        var unique=new Document("$eq",List.of(new Document("$size",new Document("$filter",
+                new Document("input",new Document("$cond",List.of(new Document("$isArray","$versions"),"$versions",List.of())))
+                        .append("as","v").append("cond",new Document("$eq",List.of("$$v._id",new Document("$literal",versionId)))))),1));
+        var filter=Filters.and(Filters.eq("_id",snapshot.projectId()),new Document("versions",new Document("$eq",snapshot.version())),new Document("$expr",unique));
         if (!originGuard.isEmpty()) filter = Filters.and(filter, originGuard);
-        return mongo.getCollection(mongo.getCollectionName(Project.class)).updateOne(filter,mapped).getModifiedCount()>0;
+        return mongo.getCollection(mongo.getCollectionName(Project.class)).withWriteConcern(com.mongodb.WriteConcern.MAJORITY.withJournal(true)
+                .withWTimeout(10,java.util.concurrent.TimeUnit.SECONDS)).updateOne(filter,mapped,
+                        new com.mongodb.client.model.UpdateOptions().collation(com.mongodb.client.model.Collation.builder().locale("simple").build())).getModifiedCount()>0;
     }
     public static ResponseStatusException conflict() {
         return new ResponseStatusException(HttpStatus.CONFLICT,"This version changed while the decision was being applied. Refresh its evidence before deciding.");

@@ -276,6 +276,44 @@ class VersionReviewPersistenceIntegrationTest {
         assertFalse(nextIssue.isResolved());
         assertFalse(net.modtale.service.security.scan.ArtifactClearancePolicy.cleared(nextScan));
     }
+    @Test void duplicateVersionIdentityIsRejectedBeforeSnapshotCapture() {
+        var collection=mongo.getCollection("projects");var raw=collection.find().first();var duplicate=raw.getList("versions",Document.class).getFirst();
+        collection.updateOne(new Document("_id",raw.get("_id")),new Document("$push",new Document("versions",duplicate)));
+        assertThrows(ResponseStatusException.class,()->persistence.captureForRescan(id,version.getId(),VersionReviewSnapshot.rescanToken(version)));
+        assertThrows(ResponseStatusException.class,()->persistence.capture(id,version.getId(),VersionReviewSnapshot.token(version)));
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"rescan","decision","finding"})
+    void duplicateInsertedAfterSnapshotPreventsEveryVersionDecisionWrite(String action) {
+        var snapshot=persistence.captureForRescan(id,version.getId(),VersionReviewSnapshot.rescanToken(version));
+        var duplicate=new Document(snapshot.version());duplicate.put("versionNumber","concurrent duplicate");
+        var collection=mongo.getCollection("projects");collection.updateOne(new Document("_id",snapshot.projectId()),new Document("$push",new Document("versions",duplicate)));
+        var before=collection.find().first();boolean applied;
+        switch(action) {
+            case "rescan" -> applied=persistence.queueRescan(snapshot,queued());
+            case "finding" -> applied=persistence.appendFindingReview(snapshot,"new decision");
+            default -> {version.setReviewStatus(ProjectVersion.ReviewStatus.REJECTED);applied=persistence.apply(snapshot,version);}
+        }
+        assertFalse(applied);assertEquals(before,collection.find().first());
+    }
+    @Test void unrelatedMalformedSiblingDoesNotPreventCapturingUniqueVersion() {
+        var collection=mongo.getCollection("projects");var raw=collection.find().first();
+        collection.updateOne(new Document("_id",raw.get("_id")),new Document("$push",new Document("versions",new Document("$each",List.of(
+                new Document("_id","broken").append("scanResult","invalid"))).append("$position",0))));
+        var snapshot=persistence.captureForRescan(id,version.getId(),VersionReviewSnapshot.rescanToken(version));
+        assertTrue(persistence.queueRescan(snapshot,queued()));
+    }
+    @Test void caseInsensitiveCollectionCannotHideAChangedSnapshot() {
+        var collection=mongo.getCollection("projects");var original=collection.find().first();collection.drop();
+        mongo.getDb().createCollection("projects",new com.mongodb.client.model.CreateCollectionOptions().collation(
+                com.mongodb.client.model.Collation.builder().locale("en").collationStrength(com.mongodb.client.model.CollationStrength.SECONDARY).build()));
+        collection=mongo.getCollection("projects");collection.insertOne(original);
+        collection.updateOne(new Document("_id",original.get("_id")),new Document("$set",new Document("versions.0.versionNumber","release")));
+        var current=mongo.findById(id,Project.class).getVersions().getFirst();
+        var snapshot=persistence.captureForRescan(id,current.getId(),VersionReviewSnapshot.rescanToken(current));
+        collection.updateOne(new Document("_id",original.get("_id")),new Document("$set",new Document("versions.0.versionNumber","RELEASE")));
+        assertFalse(persistence.queueRescan(snapshot,queued()));
+    }
     private ScanResult queued() {
         var scan = new ScanResult(); scan.setStatus(ScanStatus.SCANNING);
         scan.setScanState("QUEUED"); scan.setScanAttempt(2); return scan;
