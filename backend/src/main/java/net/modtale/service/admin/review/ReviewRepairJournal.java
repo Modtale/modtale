@@ -31,7 +31,7 @@ public final class ReviewRepairJournal {
         var record=new Document("_id",prepared.id()).append("token",UUID.randomUUID().toString()).append("sha256",prepared.sha256())
                 .append("actor",actor).append("action",action.name()).append("createdAt",prepared.createdAt()).append("expiresAt",prepared.expiresAt()).append("state","RESERVED");
         requirePermission(permitted);
-        try {operations.insertOne(record);}
+        try {ReviewRepairIo.collection(operations).insertOne(record);}
         catch(MongoException uncertain) {
             var existing=read(prepared.id());
             if(existing==null)throw unavailable();
@@ -41,7 +41,7 @@ public final class ReviewRepairJournal {
         var query=new Document(record).append("$expr",new Document("$and",List.of(new Document("$gte",List.of("$$NOW",new Date(prepared.createdAt()))),
                 new Document("$lt",List.of("$$NOW",new Date(prepared.expiresAt()))))));
         try {
-            var armed=operations.findOneAndUpdate(query,List.of(new Document("$set",new Document("state","EXECUTING").append("startedAt","$$NOW"))),
+            var armed=ReviewRepairIo.collection(operations).findOneAndUpdate(query,List.of(new Document("$set",new Document("state","EXECUTING").append("startedAt","$$NOW"))),
                     new FindOneAndUpdateOptions().collation(BINARY).returnDocument(ReturnDocument.AFTER));
             requirePermission(permitted);
             return armed!=null && executing(armed,record)?new Claim(prepared.id(),record.getString("token")):null;
@@ -57,7 +57,7 @@ public final class ReviewRepairJournal {
         if(!"EXECUTING".equals(stored.get("state")) || stored.size()!=9 || !(stored.get("startedAt") instanceof Date))return false;
         requirePermission(permitted);
         try {
-            return operations.updateOne(stored,List.of(new Document("$set",new Document("state","UNKNOWN").append("uncertainAt","$$NOW"))),new UpdateOptions().collation(BINARY)).getModifiedCount()==1;
+            return ReviewRepairIo.collection(operations).updateOne(stored,List.of(new Document("$set",new Document("state","UNKNOWN").append("uncertainAt","$$NOW"))),new UpdateOptions().collation(BINARY)).getModifiedCount()==1;
         } catch(MongoException uncertain) {
             var current=read(claim.id());return current!=null && claim.token().equals(current.get("token")) && "UNKNOWN".equals(current.get("state"));
         }
@@ -67,7 +67,7 @@ public final class ReviewRepairJournal {
         if(stored.size()!=9 || !(stored.get("startedAt") instanceof Date))return false;
         var copy=new Document(stored);copy.remove("startedAt");return expected.equals(copy);
     }
-    private Document read(String id){return operations.find(new Document("_id",id)).collation(BINARY).maxTime(5,TimeUnit.SECONDS).first();}
+    private Document read(String id){return ReviewRepairIo.collection(operations).find(new Document("_id",id)).collation(BINARY).maxTime(5,TimeUnit.SECONDS).first();}
     private static String digest(byte[] bytes){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));}catch(Exception invalid){throw unavailable();}}
     private static boolean uuid(String id){return id!=null && id.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");}
     private static void requirePermission(BooleanSupplier permitted){if(permitted==null||!permitted.getAsBoolean())throw new SecurityException("Repair execution is not permitted");}

@@ -33,7 +33,7 @@ public final class ReviewRepairWorkflow implements AutoCloseable {
 
     public ReviewRepairPreparation.Prepared prepare(ReviewRepairPreparation.Request request, BooleanSupplier permitted) {
         Objects.requireNonNull(request);
-        try (var admission = admit(permitted)) {
+        try (var admission = admit(permitted); var io = ReviewRepairIo.open(admission::remainingNanos)) {
             return preparation.prepare(request, admission::permitted);
         }
     }
@@ -41,7 +41,7 @@ public final class ReviewRepairWorkflow implements AutoCloseable {
     public ReviewIsolationExecutor.Result isolate(ReviewRepairPreparation.Prepared prepared, String actor, BooleanSupplier permitted) {
         Objects.requireNonNull(prepared);
         Objects.requireNonNull(actor);
-        try (var admission = admit(permitted)) {
+        try (var admission = admit(permitted); var io = ReviewRepairIo.open(admission::remainingNanos)) {
             return isolation.execute(prepared, actor, admission::permitted);
         }
     }
@@ -75,6 +75,10 @@ public final class ReviewRepairWorkflow implements AutoCloseable {
             boolean allowed = permission.getAsBoolean();
             checkpoint();
             return allowed;
+        }
+        long remainingNanos() {
+            checkpoint();
+            return durationNanos - (ticker.getAsLong() - started);
         }
         private void checkpoint() {
             synchronized (ReviewRepairWorkflow.this) {

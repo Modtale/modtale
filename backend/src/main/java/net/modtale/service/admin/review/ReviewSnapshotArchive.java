@@ -88,14 +88,14 @@ public final class ReviewSnapshotArchive {
         } catch(RuntimeException invalid) {throw unavailable();}
     }
     private static void insertExact(MongoCollection<Document> collection,Document record) {
-        try {collection.insertOne(record);}
+        try {ReviewRepairIo.collection(collection).insertOne(record);}
         catch(MongoException uncertain) {
             // An acknowledged exact read can recover an inserted record, including lost write acknowledgements.
             var restored=read(collection,record.getString("_id"));if(!record.equals(restored))throw unavailable();
         }
     }
     private static Document read(MongoCollection<Document> collection,String id) {
-        return collection.find(new Document("_id",id)).collation(Collation.builder().locale("simple").build()).maxTime(5,TimeUnit.SECONDS).first();
+        return ReviewRepairIo.collection(collection).find(new Document("_id",id)).collation(Collation.builder().locale("simple").build()).maxTime(5,TimeUnit.SECONDS).first();
     }
     private static String tag(Document record,byte[] key) {
         try {

@@ -109,14 +109,23 @@ class ReviewIsolationExecutorTest {
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings={"shutdown","deadline"})
     void workflowCancellationAfterVersionWriteAbortsRepair(String mode) {
-        var prepared=prepare();var before=version();var intercepted=spy(reader);var ticks=new java.util.concurrent.atomic.AtomicLong();
+        var prepared=prepare();var before=version();var intercepted=spy(reader);var ticks=new java.util.concurrent.atomic.AtomicLong();var reachedWrite=new AtomicBoolean();
         var preparation=new ReviewRepairPreparation(archive,reader,Clock.systemUTC(),1,60000);
         var workflow=new ReviewRepairWorkflow(preparation,new ReviewIsolationExecutor(mongo,archive,intercepted,journal),1,1000,ticks::get);
         doAnswer(i->{var result=(RawReviewSnapshotReader.Captured)i.callRealMethod();if(!result.sha256().equals(prepared.sha256())) {
+            reachedWrite.set(true);
             if(mode.equals("shutdown"))workflow.close();else ticks.addAndGet(1000000000L);
         }return result;}).when(intercepted).capture(any(ClientSession.class),eq("p"),eq(0),eq("v"));
         assertEquals("UNKNOWN",workflow.isolate(prepared,"actor",()->true).state());assertEquals(before,version());assertEquals("UNKNOWN",operation().get("state"));
+        assertTrue(reachedWrite.get());
         assertEquals(new ReviewRepairWorkflow.Status(mode.equals("shutdown")?"CLOSED":"OPEN",0),workflow.status());
+    }
+
+    @Test void completeWorkflowUsesDriverTimeoutsAndCommitsRepair() {
+        var prepared=prepare();var preparation=new ReviewRepairPreparation(archive,reader,Clock.systemUTC(),1,60000);
+        try(var workflow=new ReviewRepairWorkflow(preparation,executor(),1)) {
+            assertEquals("APPLIED",workflow.isolate(prepared,"actor",()->true).state());assertEquals("APPLIED",operation().get("state"));
+        }
     }
 
 }

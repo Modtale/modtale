@@ -31,16 +31,16 @@ public final class ReviewIsolationExecutor {
         if(source.action()!=ReviewSnapshotArchive.Action.ISOLATE_REVIEW || !source.actorId().equals(actor))throw new SecurityException("Repair execution is not permitted");
         var original=new RawBsonDocument(source.versionBytes()).decode(new org.bson.codecs.DocumentCodec());
         Document fields=fields(original,source);if(fields==null)return new Result("INELIGIBLE",null);
-        var hello=mongo.getDb().runCommand(new Document("hello",1),ReadPreference.primary());
+        var hello=ReviewRepairIo.database(mongo.getDb()).runCommand(new Document("hello",1),ReadPreference.primary());
         if(!(hello.get("setName") instanceof String) && !"isdbgrid".equals(hello.get("msg")))throw new IllegalStateException("Review isolation requires transaction support");
         permission(permitted);
         var claim=journal.claim(prepared,actor,ReviewSnapshotArchive.Action.ISOLATE_REVIEW,permitted);
         if(claim==null)return outcome(prepared,actor);
         boolean commitAttempted=false;
-        try(var session=mongo.getMongoDatabaseFactory().getSession(ClientSessionOptions.builder().causallyConsistent(false).build())) {
+        try(var session=mongo.getMongoDatabaseFactory().getSession(ReviewRepairIo.sessionOptions())) {
             try {
-                session.startTransaction(OPTIONS);permission(permitted);
-                var op=operations.find(session,new Document("_id",claim.id()).append("token",claim.token()).append("state","EXECUTING")).collation(BINARY).maxTime(5,TimeUnit.SECONDS).first();
+                session.startTransaction(ReviewRepairIo.transactionOptions(OPTIONS));permission(permitted);
+                var op=ReviewRepairIo.collection(operations,session).find(session,new Document("_id",claim.id()).append("token",claim.token()).append("state","EXECUTING")).collation(BINARY).maxTime(5,TimeUnit.SECONDS).first();
                 if(op==null)throw new IllegalStateException("Repair claim changed");
                 var current=reader.capture(session,source.projectId(),source.versionIndex(),original.getString("_id"));
                 String result;String after=null;
@@ -51,28 +51,30 @@ public final class ReviewIsolationExecutor {
                     var scan=original.get("scanResult",Document.class);var poll=scan.get("remotePoll");
                     if(poll instanceof Document p && p.get("leaseUntil") instanceof Date lease)conditions.add(new Document("$gte",List.of("$$NOW",lease)));
                     permission(permitted);
-                    long changed=projects.updateOne(session,new Document("_id",source.projectId()).append("$expr",new Document("$and",conditions)),
+                    long changed=ReviewRepairIo.collection(projects,session).updateOne(session,new Document("_id",source.projectId()).append("$expr",new Document("$and",conditions)),
                             new Document("$set",set).append("$currentDate",new Document(prefix+"reviewIsolation.isolatedAt",true)),new UpdateOptions().collation(BINARY)).getModifiedCount();
                     if(changed==1) {after=reader.capture(session,source.projectId(),source.versionIndex(),original.getString("_id")).sha256();result="APPLIED";}
                     else result="NOT_APPLIED";
                 }
                 var outcome=new Document("state",result).append("afterSha256",after);
-                if(operations.updateOne(session,op,List.of(new Document("$set",outcome.append("finishedAt","$$NOW"))),new UpdateOptions().collation(BINARY)).getModifiedCount()!=1)throw new IllegalStateException("Repair claim changed");
+                if(ReviewRepairIo.collection(operations,session).updateOne(session,op,List.of(new Document("$set",outcome.append("finishedAt","$$NOW"))),new UpdateOptions().collation(BINARY)).getModifiedCount()!=1)throw new IllegalStateException("Repair claim changed");
                 permission(permitted);commitAttempted=true;session.commitTransaction();return new Result(result,after);
             } catch(RuntimeException failure) {
                 if(!commitAttempted)try{session.abortTransaction();}catch(RuntimeException ignored){}
                 throw failure;
             }
         } catch(RuntimeException uncertain) {
+            try(var cleanup=ReviewRepairIo.cleanup()) {
             // Conservative bookkeeping for an already-owned operation remains necessary after permission loss.
             if(uncertain instanceof SecurityException) {try{journal.markUnknown(claim,()->true);}catch(RuntimeException ignored){}throw uncertain;}
             try {var observed=outcome(prepared,actor);if(!observed.state().equals("UNKNOWN"))return observed;}catch(RuntimeException ignored){}
             try{journal.markUnknown(claim,()->true);}catch(RuntimeException ignored){}
             return new Result("UNKNOWN",null);
+            }
         }
     }
     private Result outcome(ReviewRepairPreparation.Prepared prepared,String actor) {
-        var record=operations.find(new Document("_id",prepared.id())).collation(BINARY).maxTime(5,TimeUnit.SECONDS).first();
+        var record=ReviewRepairIo.collection(operations).find(new Document("_id",prepared.id())).collation(BINARY).maxTime(5,TimeUnit.SECONDS).first();
         if(record==null || !actor.equals(record.get("actor")) || !prepared.sha256().equals(record.get("sha256"))
                 || !Long.valueOf(prepared.createdAt()).equals(record.get("createdAt")) || !Long.valueOf(prepared.expiresAt()).equals(record.get("expiresAt"))
                 || !"ISOLATE_REVIEW".equals(record.get("action")))return new Result("UNKNOWN",null);
