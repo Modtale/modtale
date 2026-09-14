@@ -246,11 +246,17 @@ final class ModtaleApiTransport {
     }
 
     static HttpRequest.Builder requestBuilder(URI uri) {
-        return HttpRequest.newBuilder(uri)
+        HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
                 .timeout(Duration.ofSeconds(60))
                 .header("Accept", "application/json")
                 .header(CLIENT_HEADER_NAME, CLIENT_HEADER_VALUE)
                 .header("User-Agent", "ModtaleLauncher/0.1");
+        // Cleartext HTTP/2 upgrades can reject request bodies before the API sees them.
+        // HTTPS continues to negotiate HTTP/2 normally through ALPN.
+        if ("http".equalsIgnoreCase(uri.getScheme())) {
+            builder.version(HttpClient.Version.HTTP_1_1);
+        }
+        return builder;
     }
 
     private HttpRequest.Builder writeRequestBuilder(URI uri) {
