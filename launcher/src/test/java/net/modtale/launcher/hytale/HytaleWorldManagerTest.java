@@ -78,6 +78,24 @@ class HytaleWorldManagerTest {
     }
 
     @Test
+    void readsAssetPackManifestInsideZipFolder() throws Exception {
+        Path userData = tempDir.resolve("UserData");
+        Files.createDirectories(userData.resolve("Saves"));
+        Path mods = Files.createDirectories(userData.resolve("Mods"));
+        try (var output = new java.util.zip.ZipOutputStream(Files.newOutputStream(mods.resolve("More_Armor.zip")))) {
+            output.putNextEntry(new ZipEntry("More Armor/manifest.json"));
+            output.write("{\"Group\":\"Charlock Castle\",\"Name\":\"More Armor\",\"Version\":\"0.1.2\"}".getBytes(StandardCharsets.UTF_8));
+            output.closeEntry();
+        }
+        LauncherSettings settings = new LauncherSettings();
+        settings.setHytaleUserDataPath(userData.toString());
+        var installed = new HytaleWorldManager().loadInstalledMods(settings);
+        assertEquals(1, installed.size());
+        assertEquals("Charlock Castle:More Armor", installed.getFirst().id());
+        assertEquals("0.1.2", installed.getFirst().version());
+    }
+
+    @Test
     void readsWorldPreviewFromSaveFolder() throws Exception {
         Path userData = tempDir.resolve("UserData");
         Path world = userData.resolve(Path.of("Saves", "New World"));

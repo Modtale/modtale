@@ -279,9 +279,14 @@ public final class HytaleWorldManager {
 
     private HytaleInstalledMod installedModFromJar(Path jar) {
         String fallbackName = jar.getFileName() == null ? jar.toString() : jar.getFileName().toString();
-        String baseName = fallbackName.replaceFirst("(?i)\\.jar$", "");
+        String baseName = fallbackName.replaceFirst("(?i)\\.(jar|zip)$", "");
         try (ZipFile zip = new ZipFile(jar.toFile())) {
             ZipEntry manifest = zip.getEntry("manifest.json");
+            if (manifest == null) {
+                var nested = zip.stream().filter(entry -> !entry.isDirectory()
+                        && entry.getName().matches("[^/]+/manifest\\.json")).limit(2).toList();
+                if (nested.size() == 1) manifest = nested.getFirst();
+            }
             if (manifest == null) {
                 return installedMod(baseName, baseName, "", "", "", jar);
             }
@@ -343,7 +348,7 @@ public final class HytaleWorldManager {
 
     private static boolean isJar(Path path) {
         String name = path.getFileName() == null ? "" : path.getFileName().toString().toLowerCase(Locale.ROOT);
-        return name.endsWith(".jar");
+        return name.endsWith(".jar") || name.endsWith(".zip");
     }
 
     public record HytaleWorld(
