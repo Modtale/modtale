@@ -1,7 +1,11 @@
 from pathlib import Path
 from PIL import Image,ImageDraw,ImageFont
-import json,subprocess,shutil,sys
+import argparse,json,subprocess,shutil,sys
 B=Path(__file__).resolve().parents[1];A=B.parents[1]/'frontend/public/assets/news';TMP=B/'source/renders';TMP.mkdir(exist_ok=True)
+parser=argparse.ArgumentParser(description='Render social videos from the reviewed article demos.')
+parser.add_argument('--only',nargs='+',help='Regenerate named output stems, such as 05-curseforge-browse or combined-overview.')
+args=parser.parse_args()
+selected=set(args.only or [])
 W,H=1280,1024
 bold=lambda n:ImageFont.truetype(str(B/'source/Inter-ExtraBold.ttf'),n)
 regular=lambda n:ImageFont.truetype(str(B/'source/Inter-Regular.ttf'),n)
@@ -36,7 +40,9 @@ for p in posts:
  if not source.exists():source=B/'source'/(p['clip']+'.mp4')
  if not source.exists():continue
  out=B/'twitter'/p['video']
- if out.exists():continue
+ if selected:
+  if out.stem not in selected:continue
+ elif out.exists():continue
  duration=float(json.loads(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','json',str(source)]))['format']['duration'])
  footer='MODPACKS V2' if p['clip'] in ['modpack-creation','modlist-to-pack','modpack-curseforge'] else 'SINCE JUNE' if p['clip'] in ['open-source','project-galleries'] else 'MODTALE LAUNCHER'
  encode(p['id'],source,0,duration,p['title'],p['subtitle'],out,footer);finish(out)
@@ -47,7 +53,7 @@ trailer=[
 ('modpack-creation.mp4',5,5,'Build a pack right on Modtale.','Choose mods, releases, and config defaults.'),
 ('browse-projects.mp4',12,4,'From project to your worlds.','Find a mod. Install it where you want it.'),
 ('world-library.mp4',7,4,'Your worlds. Your mod choices.','Search, enable, and disable from your library.'),
-('curseforge-mods.mp4',15,4,'More mods. One library.','Browse CurseForge and explore release notes.'),
+('curseforge-mods.mp4',6,4,'More mods. One library.','Browse CurseForge and explore release notes.'),
 ('mod-configs.mp4',6,3.5,'Tune your setup.','Edit supported configs with the right world in view.'),
 ('account-sync.mp4',11,5,'Bring your setup with you.','Restore Modtale installs, settings, and configs.'),
 ('wardrobe.mp4',5,4,'Make it a little more you.','Try a look. Make it yours. Save it.'),
@@ -59,7 +65,9 @@ intro=[
 ('wardrobe.mp4',7,3,'And make it a little more you.','A wardrobe for your next adventure.'),
 ('launcher-play.jpg',0,3,'Two updates. One Modtale.','See what is new at modtale.net/news')]
 for name,seq,out in [('combined-overview',trailer,B/'discord/combined-overview.mp4'),('intro',intro,B/'twitter/01-update-overview.mp4')]:
- if out.exists():continue
+ if selected:
+  if out.stem not in selected:continue
+ elif out.exists():continue
  parts=[];time=0;timeline=[]
  for i,(src,start,dur,title,sub) in enumerate(seq):
   part=TMP/f'{name}-{i}.mp4';encode(f'{name}-{i}',A/src,start,dur,title,sub,part,'MODPACKS V2 + LAUNCHER',True);parts.append(part)
