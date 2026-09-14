@@ -40,8 +40,11 @@ class RemoteReviewStepIntegrationTest {
         byte[] data=mapper.writeValueAsBytes(body);e.sendResponseHeaders(code,data.length);e.getResponseBody().write(data);
     }
     @BeforeEach void setup()throws Exception {
-        String port=System.getenv().getOrDefault("WARDEN_REVIEW_DB_PORT","27030");if(!Set.of("27029","27030").contains(port))throw new IllegalArgumentException();
-        db=MongoClients.create("mongodb://127.0.0.1:"+port+"/?serverSelectionTimeoutMS=3000");database="warden_remote_step_"+UUID.randomUUID().toString().replace("-","");
+        setup(System.getenv().getOrDefault("WARDEN_REVIEW_DB_PORT","27030"),false);
+    }
+    void setup(String port,boolean replica) throws Exception {
+        if(!(replica?Set.of("27031","27032"):Set.of("27029","27030")).contains(port))throw new IllegalArgumentException();
+        db=MongoClients.create("mongodb://127.0.0.1:"+port+"/?directConnection=true&serverSelectionTimeoutMS=3000");database="warden_remote_step_"+UUID.randomUUID().toString().replace("-","");
         var factory=new org.springframework.data.mongodb.core.SimpleMongoClientDatabaseFactory(db,database);
         var conversions=new net.modtale.config.db.MongoConfig().mongoCustomConversions(new net.modtale.config.db.MongoArtifactManifestStore(factory));
         var context=new org.springframework.data.mongodb.core.mapping.MongoMappingContext();context.setSimpleTypeHolder(conversions.getSimpleTypeHolder());context.afterPropertiesSet();
