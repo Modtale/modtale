@@ -13,7 +13,7 @@ vi.mock('@/modules/worldlist/api/worldListClient', () => ({
     }) },
     worldListDownloadUrl: () => '/download',
 }));
-vi.mock('@/modules/project/components/ProjectCard', () => ({ ProjectCard: ({ project, bundledConfigCount }: any) => <div data-testid={project.id}>{bundledConfigCount > 0 ? 'Configs bundled' : 'No configs'}</div> }));
+vi.mock('@/modules/project/components/ProjectCard', () => ({ ProjectCard: ({ project, bundledConfigCount, sourceLabel, disableNavigation }: any) => <div data-testid={project.id} data-source={sourceLabel} data-static={disableNavigation}>{bundledConfigCount > 0 ? 'Configs bundled' : 'No configs'}</div> }));
 
 it('marks only the owning mod card and removes the separate config section', async () => {
     const container = document.createElement('div');
@@ -48,5 +48,7 @@ it('offers only launcher installation for a list containing CurseForge mods', as
         expect(container.querySelector('a[href="/download"]')).toBeNull();
         expect(container.textContent).toContain('Install');
         expect(container.textContent).toContain('CurseForge');
+        expect(container.textContent).toContain('Launcher only');
+        expect(container.querySelector('[data-source=CurseForge]')?.getAttribute('data-static')).toBe('true');
     } finally { await act(async () => root.unmount()); }
 });

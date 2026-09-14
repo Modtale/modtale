@@ -44,6 +44,7 @@ public record CreateWorldModListRequest(
             title = value(title);
             versionNumber = value(versionNumber);
             classification = value(classification);
+            if ("MOD".equalsIgnoreCase(classification)) classification = "PLUGIN";
             source = value(source);
             externalId = value(externalId);
             externalUrl = value(externalUrl);

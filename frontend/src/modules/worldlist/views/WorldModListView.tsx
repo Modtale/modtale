@@ -67,7 +67,7 @@ const worldListItemToProject = (item: WorldModListItem, list: WorldModList): Pro
 };
 
 const projectPathForItem = (project: Project, item: WorldModListItem) => {
-    if (!item.projectId && !item.slug) return undefined;
+    if (item.source === 'CURSEFORGE' || (!item.projectId && !item.slug)) return undefined;
     return SiteRoutes.project(project);
 };
 
@@ -91,7 +91,7 @@ const WorldListProjectCard = ({ item, list, priority }: { item: WorldModListItem
                 const owners = configOwners(config.path, list.mods);
                 return owners.length === 1 && owners[0].modId === item.modId;
             }).length}
-            versionLabel={item.versionNumber ? `v${item.versionNumber}` : undefined}
+            versionLabel={item.versionNumber ? (item.source === 'CURSEFORGE' ? item.versionNumber : `v${item.versionNumber}`) : undefined}
         />
     );
 };

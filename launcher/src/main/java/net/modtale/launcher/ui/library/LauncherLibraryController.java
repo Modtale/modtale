@@ -1258,9 +1258,15 @@ public final class LauncherLibraryController {
                 availableMods
         ).stream().map(item -> {
             ProjectMeta meta = projectMetadata.get(item.projectId().isBlank() ? item.externalId() : item.projectId());
-            if (meta == null || meta.icon() == null || meta.icon().isBlank()) return item;
-            return new CreateWorldModListRequest.Item(item.modId(), item.projectId(), item.slug(), item.title(),
-                    item.versionNumber(), item.classification(), item.source(), item.externalId(), item.externalUrl(), meta.icon(), meta.author(), meta.description());
+            if (meta == null) return item;
+            String slug = meta.slug() == null || meta.slug().isBlank() ? item.slug() : meta.slug();
+            String externalUrl = item.externalUrl();
+            if ("CURSEFORGE".equals(item.source()) && !slug.contains(":")) {
+                externalUrl = externalUrl.replace("/mods/" + item.slug() + "/files/", "/mods/" + slug + "/files/");
+            }
+            return new CreateWorldModListRequest.Item(item.modId(), item.projectId(), slug, item.title(),
+                    item.versionNumber(), item.classification(), item.source(), item.externalId(), externalUrl,
+                    meta.icon() == null || meta.icon().isBlank() ? item.icon() : meta.icon(), meta.author(), meta.description());
         }).toList();
 
         return new CreateWorldModListRequest(
