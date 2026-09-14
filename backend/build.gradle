@@ -56,7 +56,7 @@ dependencies {
 
 tasks.named('test') {
     // Explicit database checks must exercise the current database, not cached results.
-    if (System.getenv('WARDEN_REVIEW_DB_TEST') == 'true') {
+    if (System.getenv('WARDEN_REVIEW_DB_TEST') == 'true' || System.getenv('WARDEN_REPAIR_TX_DB_TEST') == 'true') {
         outputs.upToDateWhen { false }
     }
     useJUnitPlatform()

@@ -25,12 +25,14 @@ public final class RawReviewSnapshotReader {
     public RawReviewSnapshotReader(MongoTemplate mongo) {
         projects=mongo.getCollection("projects").withDocumentClass(RawBsonDocument.class).withReadPreference(ReadPreference.primary()).withReadConcern(ReadConcern.MAJORITY);
     }
-    public Captured capture(Object projectId,int versionIndex,String versionId) {
+    public Captured capture(Object projectId,int versionIndex,String versionId) {return capture(null,projectId,versionIndex,versionId);}
+    public Captured capture(com.mongodb.client.ClientSession session,Object projectId,int versionIndex,String versionId) {
         if(!(projectId instanceof ObjectId || projectId instanceof String s && !s.isEmpty() && s.length()<=128
                 && java.nio.charset.StandardCharsets.UTF_8.newEncoder().canEncode(s)) || versionIndex<0 || versionIndex>16*1024*1024
                 || versionId==null || versionId.isBlank() || versionId.length()>128 || versionId.chars().anyMatch(Character::isISOControl)
                 || !java.nio.charset.StandardCharsets.UTF_8.newEncoder().canEncode(versionId))throw new IllegalArgumentException("Invalid review snapshot position");
-        var root=projects.find(new Document("_id",projectId)).collation(Collation.builder().locale("simple").build()).maxTime(5,TimeUnit.SECONDS).first();
+        var query=new Document("_id",projectId);
+        var root=(session==null?projects.find(query):projects.find(session,query)).collation(Collation.builder().locale("simple").build()).maxTime(5,TimeUnit.SECONDS).first();
         if(root==null)throw conflict();
         var buffer=root.getByteBuffer().asNIO();byte[] bytes=new byte[buffer.remaining()];buffer.get(bytes);
         if(bytes.length>ReviewSnapshotArchive.MAX_BYTES)throw conflict();
