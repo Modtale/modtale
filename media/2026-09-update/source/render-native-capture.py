@@ -39,8 +39,8 @@ def render(manifest_path, output):
         for i, (start, end, speed) in enumerate(segments):
             part = work / f'{i}.mp4'
             subprocess.run([
-                'ffmpeg', '-v', 'error', '-y', '-ss', str(start), '-t', str(end-start), '-i', str(source),
-                '-vf', f'setpts=(PTS-STARTPTS)/{speed},scale=1920:1200:flags=lanczos,setsar=1,fps=60',
+                'ffmpeg', '-v', 'error', '-y', '-i', str(source),
+                '-vf', f'trim=start={start}:end={end},setpts=(PTS-STARTPTS)/{speed},scale=1920:1200:flags=lanczos,setsar=1,fps=60',
                 '-an', '-c:v', 'libx264', '-preset', 'fast', '-crf', '16', '-threads', '2', str(part)], check=True)
             parts.append(part)
         listing = work / 'parts.txt'
