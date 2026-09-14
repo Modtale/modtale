@@ -14,6 +14,7 @@ public class ReviewRepairConfiguration {
     @Bean ReviewSnapshotArchive reviewSnapshotArchive(MongoTemplate mongo,AppReviewRepairProperties properties) {
         return new ReviewSnapshotArchive(mongo,properties.activeKey(),properties.decodedKeys());
     }
+    @Bean ReviewRepairJournal reviewRepairJournal(MongoTemplate mongo,ReviewSnapshotArchive archive){return new ReviewRepairJournal(mongo,archive);}
     @Bean RawReviewSnapshotReader rawReviewSnapshotReader(MongoTemplate mongo){return new RawReviewSnapshotReader(mongo);}
     @Bean ReviewRepairPreparation reviewRepairPreparation(ReviewSnapshotArchive archive,RawReviewSnapshotReader reader,AppReviewRepairProperties properties) {
         return new ReviewRepairPreparation(archive,reader,Clock.systemUTC(),properties.concurrency(),properties.preparationLifetimeMillis());
