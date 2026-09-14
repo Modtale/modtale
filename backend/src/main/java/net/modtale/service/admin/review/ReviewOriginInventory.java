@@ -12,6 +12,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /** Read-only inventory of retained origin fields, not proof of a job's origin or permission to reconcile it. */
+@org.springframework.stereotype.Service
 public final class ReviewOriginInventory {
     public enum OriginState { MISSING, INVALID, RECORDED, UNREADABLE_BINDING }
     public record Item(Object projectId,int versionIndex,String versionId,boolean ambiguousVersion,

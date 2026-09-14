@@ -1,3 +1,4 @@
+import { ReviewOrigins } from '../components/ReviewOrigins';
 import { ReviewStateDiagnostics } from '../components/ReviewStateDiagnostics';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText, CalendarClock } from 'lucide-react';
@@ -326,6 +327,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                         onReview={fetchProjectDetails}
                                     />
                                     <ReviewStateDiagnostics subject={currentUser?.id || currentUser?.username || ''} canRepair={canRescanVersions} />
+                                    <ReviewOrigins subject={currentUser?.id || currentUser?.username || ''} />
                                 </div>
                             )}
 

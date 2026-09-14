@@ -77,4 +77,19 @@ class ReviewOriginInventoryTest {
         assertThrows(IllegalArgumentException.class,()->inventory.page(null,0));assertThrows(IllegalArgumentException.class,()->inventory.page(null,65));
         insert("a",List.of(version("v",binding())));var page=inventory.page(null,1);assertThrows(UnsupportedOperationException.class,()->page.items().clear());
     }
+    @Test void realInventoryToHttpPreservesEmptyContinuationAndFailedVersionReference() throws Exception {
+        insert("a",List.of(new Document("_id","empty"),version("v",binding()).append("reviewStatus","APPROVED")));
+        var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(new net.modtale.controller.admin.ReviewOriginController(inventory)).build();
+        var first=mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/admin/verification/origins/page").param("limit","1"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items").isEmpty()).andReturn();
+        String cursor=new com.fasterxml.jackson.databind.ObjectMapper().readTree(first.getResponse().getContentAsString()).path("nextCursor").asText();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/admin/verification/origins/page").param("limit","1").param("cursor",cursor))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control","no-store"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].jobId").value(job))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].position.versionIndex").value(1))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].originState").value("MISSING"));
+    }
+
 }
