@@ -51,8 +51,8 @@ for p in posts:
 trailer=[
 ('launcher-play.jpg',0,3,'Meet your next Hytale setup.','Modpacks v2 + the Modtale Launcher'),
 ('modpack-creation.mp4',5,5,'Build a pack right on Modtale.','Choose mods, releases, and config defaults.'),
-('browse-projects.mp4',12,4,'From project to your worlds.','Find a mod. Install it where you want it.'),
-('world-library.mp4',7,4,'Your worlds. Your mod choices.','Search, enable, and disable from your library.'),
+('browse-projects.mp4',7,4,'From project to your worlds.','Find a mod. Install it where you want it.'),
+('world-library.mp4',4.9,4,'Your worlds. Your mod choices.','Search, enable, and disable from your library.'),
 ('curseforge-mods.mp4',6,4,'More mods. One library.','Browse CurseForge and explore release notes.'),
 ('mod-configs.mp4',6,3.5,'Tune your setup.','Edit supported configs with the right world in view.'),
 ('account-sync.mp4',11,5,'Bring your setup with you.','Restore Modtale installs, settings, and configs.'),
@@ -61,7 +61,7 @@ trailer=[
 intro=[
 ('browse-projects.mp4',0,3,'Meet the Modtale Launcher.','Discover. Download. Play.'),
 ('modpack-creation.mp4',20,3,'Meet Modpacks v2.','Build your lineup. Bring your configs.'),
-('world-library.mp4',8,3,'Give every world its own setup.','Search, enable, and disable mods.'),
+('world-library.mp4',6,3,'Give every world its own setup.','Search, enable, and disable mods.'),
 ('wardrobe.mp4',7,3,'And make it a little more you.','A wardrobe for your next adventure.'),
 ('launcher-play.jpg',0,3,'Two updates. One Modtale.','See what is new at modtale.net/news')]
 for name,seq,out in [('combined-overview',trailer,B/'discord/combined-overview.mp4'),('intro',intro,B/'twitter/01-update-overview.mp4')]:

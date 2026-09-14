@@ -16,9 +16,9 @@
       ],
       "format": {
         "duration": "15.000000",
-        "size": "1282842"
+        "size": "1478853"
       },
-      "sha256": "e90ea16f77a3220492cf62179c84c8c55520862bf5fc1e4019ae99c876aa70e0",
+      "sha256": "af82a708bf4f5aa96827441ab5590f69b4fada7b2689abdc154098863ea66d9c",
       "fullDecode": "passed"
     },
     {
@@ -57,10 +57,10 @@
         }
       ],
       "format": {
-        "duration": "20.450000",
-        "size": "1777145"
+        "duration": "18.900000",
+        "size": "2079014"
       },
-      "sha256": "c0ea8b5c809485a950c7e129c9aa8446494558536d78c666e00b15d5ceca6667",
+      "sha256": "4caad9eb375e26cbfe961d5f604aef299f873bc27c0d3740f8a1c0bd3b2b9df5",
       "fullDecode": "passed"
     },
     {
@@ -78,10 +78,10 @@
         }
       ],
       "format": {
-        "duration": "16.300000",
-        "size": "848474"
+        "duration": "28.750000",
+        "size": "1292180"
       },
-      "sha256": "12abb822840b1a32cfa5cf7aca90c601ceb46ce4702e8f7e8f9c631311626cdd",
+      "sha256": "dd622c8dcce3a08b065801bc404afd8eb117f9def08d15859f6cb606b98dd64c",
       "fullDecode": "passed"
     },
     {
@@ -99,10 +99,10 @@
         }
       ],
       "format": {
-        "duration": "26.800000",
-        "size": "3153563"
+        "duration": "16.300000",
+        "size": "1468931"
       },
-      "sha256": "ea15da0b51cb00a511a74abcde812f76c5a07bbc1a1806f8089de91f0b1e45a1",
+      "sha256": "44754595b33b0ecaa8e8ecf5352146fb38c3e3bec982992a6d3b95f9230a8be2",
       "fullDecode": "passed"
     },
     {
@@ -289,9 +289,9 @@
       ],
       "format": {
         "duration": "36.000000",
-        "size": "2800775"
+        "size": "1933644"
       },
-      "sha256": "4b7138207afdfbcf707924b87a7b3b63202cdea6bdd4214476db4cb413a48f5a",
+      "sha256": "b2fb6aa8afd61fee506e955741b92a8eb63b472e0a0451e00fa6ab01c1a3c6b2",
       "fullDecode": "passed"
     }
   ],
