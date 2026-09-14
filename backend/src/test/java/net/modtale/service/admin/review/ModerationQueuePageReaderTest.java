@@ -53,6 +53,19 @@ class ModerationQueuePageReaderTest {
         var page=reader.page(null,1);projects.deleteOne(new Document("_id","a"));
         assertEquals("next",reader.page(page.next(),1).items().getFirst().pendingVersion().id());
     }
+    @Test void httpCursorRoundTripContinuesActualDatabasePage()throws Exception {
+        insert("a","PUBLISHED",List.of(version("one","FAILED"),version("two","FAILED")));
+        var controller=new net.modtale.controller.admin.ModerationQueuePageController(reader);
+        var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
+        var first=mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/admin/verification/queue/page").param("limit","1"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk()).andReturn();
+        var body=new com.fasterxml.jackson.databind.ObjectMapper().readTree(first.getResponse().getContentAsString());
+        assertEquals("one",body.get("items").get(0).get("pendingVersion").get("id").asText());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/admin/verification/queue/page").param("limit","1").param("cursor",body.get("nextCursor").asText()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].pendingVersion.id").value("two"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.nextCursor").isEmpty());
+    }
     @Test void invalidLimitsAndCursorAreRejectedBeforeRead() {
         assertThrows(IllegalArgumentException.class,()->reader.page(null,0));assertThrows(IllegalArgumentException.class,()->reader.page(null,51));
         assertThrows(IllegalArgumentException.class,()->new ModerationQueuePageReader.Cursor(42,0));
