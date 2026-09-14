@@ -87,6 +87,11 @@ class HytaleWorldManagerTest {
             output.write("{\"Group\":\"Charlock Castle\",\"Name\":\"More Armor\",\"Version\":\"0.1.2\"}".getBytes(StandardCharsets.UTF_8));
             output.closeEntry();
         }
+        try (var output = new java.util.zip.ZipOutputStream(Files.newOutputStream(mods.resolve("download-bundle.zip")))) {
+            output.putNextEntry(new ZipEntry("README.txt"));
+            output.write("Extract the bundled mods".getBytes(StandardCharsets.UTF_8));
+            output.closeEntry();
+        }
         LauncherSettings settings = new LauncherSettings();
         settings.setHytaleUserDataPath(userData.toString());
         var installed = new HytaleWorldManager().loadInstalledMods(settings);

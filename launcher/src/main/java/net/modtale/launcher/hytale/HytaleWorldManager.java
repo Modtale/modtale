@@ -94,6 +94,7 @@ public final class HytaleWorldManager {
                     .filter(Files::isRegularFile)
                     .filter(HytaleWorldManager::isJar)
                     .map(this::installedModFromJar)
+                    .filter(java.util.Objects::nonNull)
                     .sorted(Comparator.comparing(HytaleInstalledMod::name, String.CASE_INSENSITIVE_ORDER))
                     .toList();
         } catch (IOException ex) {
@@ -288,6 +289,7 @@ public final class HytaleWorldManager {
                 if (nested.size() == 1) manifest = nested.getFirst();
             }
             if (manifest == null) {
+                if (fallbackName.toLowerCase(Locale.ROOT).endsWith(".zip")) return null;
                 return installedMod(baseName, baseName, "", "", "", jar);
             }
             try (InputStream input = zip.getInputStream(manifest)) {
