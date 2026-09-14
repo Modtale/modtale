@@ -161,7 +161,44 @@ class RemoteReviewStepIntegrationTest {
     }
     @Test void unsupportedContextAndMissingRequestRemainExplicitWithoutHttp() {
         queuedAgain();change("overrideFileUrl","unreviewed.zip");route(this::configuration);var boot=bootstrap(new RemoteReviewPersistence(mongo));
-        assertEquals("UNSUPPORTED_CONTEXT",boot.prepare(project,"v",1,binding.requestId()).state());assertEquals("NO_WORK",boot.prepare(project,"v",1,null).state());assertEquals(0,gets.get());
+        assertEquals("UNAVAILABLE",boot.prepare(project,"v",1,binding.requestId()).state());assertEquals("NO_WORK",boot.prepare(project,"v",1,null).state());assertEquals(0,gets.get());
+    }
+    @Test void unsupportedSetupPreservesRequestAndFindingsAndStopsAutomaticPolling() {
+        queuedAgain();change("overrideFileUrl","unreviewed.zip");change("scanResult.manualRescan",true);
+        change("scanResult.verdict","BLOCK");change("scanResult.riskScore",42);
+        change("scanResult.issues",List.of(new org.bson.Document("type","RetainedFinding")));
+        route(this::configuration);var boot=bootstrap(new RemoteReviewPersistence(mongo));
+        assertEquals("UNAVAILABLE",boot.advance(project,"v",1,binding.requestId()).state());
+        var result=saved();assertEquals(ScanStatus.FAILED,result.getStatus());assertEquals("REMOTE_UNSUPPORTED_CONTEXT",result.getScanState());
+        assertEquals(binding.requestId(),result.getScanRequestId());assertEquals(1,result.getScanAttempt());assertTrue(result.isManualRescan());
+        assertEquals("BLOCK",result.getVerdict());assertEquals(42,result.getRiskScore());assertEquals("RetainedFinding",result.getIssues().getFirst().getType());
+        assertFalse(ArtifactClearancePolicy.cleared(result));assertNull(result.getRemoteReview());
+        assertTrue(new RemoteReviewDiscovery(mongo).page(null,16).candidates().isEmpty());
+        assertEquals("NO_WORK",bootstrap(new RemoteReviewPersistence(mongo)).advance(project,"v",1,binding.requestId()).state());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(project)),new Update().set("status",ProjectStatus.PUBLISHED),Project.class);
+        var failures=new net.modtale.service.admin.review.ModerationQueuePageReader(mongo).page(null,25,net.modtale.service.admin.review.ModerationQueuePageReader.Filter.OPERATIONS);
+        assertEquals(1,failures.items().size());assertEquals("REMOTE_UNSUPPORTED_CONTEXT",failures.items().getFirst().pendingVersion().scan().scanState());
+        assertEquals(0,gets.get());assertEquals(0,posts.get());verifyNoInteractions(storage);
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"context","request","verdict","binding","duplicate"})
+    void unsupportedSetupRejectsConcurrentChange(String mutation) {
+        queuedAgain();change("overrideFileUrl","unreviewed.zip");var persistence=new RemoteReviewPersistence(mongo);
+        var observed=persistence.current(project,"v",1,binding.requestId());assertNotNull(observed);
+        switch(mutation) {
+            case "context" -> change("overrideFileUrl",null);
+            case "request" -> change("scanResult.scanRequestId",UUID.randomUUID().toString());
+            case "verdict" -> change("scanResult.verdict","BLOCK");
+            case "binding" -> change("scanResult.remoteReview",binding);
+            case "duplicate" -> mongo.updateFirst(Query.query(Criteria.where("_id").is(project)),new Update().push("versions",observed),Project.class);
+        }
+        assertFalse(persistence.finishUnsupportedContext(project,observed));assertEquals(ScanStatus.SCANNING,saved().getStatus());
+    }
+    @Test void supportedOrAlreadyBoundContextCannotBeFinishedAsUnsupported() {
+        var persistence=new RemoteReviewPersistence(mongo);
+        assertFalse(persistence.finishUnsupportedContext(project,persistence.current(project,"v",1,binding.requestId())));
+        queuedAgain();assertFalse(persistence.finishUnsupportedContext(project,persistence.current(project,"v",1,binding.requestId())));
+        assertEquals("QUEUED",saved().getScanState());
     }
     @Test void manualRescanModeSurvivesBootstrapAttachmentAndCompletesImmediately() {
         queuedAgain();change("scanResult.manualRescan",true);

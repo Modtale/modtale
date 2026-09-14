@@ -33,6 +33,32 @@ public class RemoteReviewPersistence {
                 .set("versions.$.scanResult.remoteReview",attached),Project.class).getMatchedCount() == 1;
     }
 
+    public boolean finishUnsupportedContext(String projectId,ProjectVersion observed) {
+        if(projectId==null || observed==null || observed.getId()==null || observed.getScanResult()==null
+                || observed.getReviewStatus()!=ProjectVersion.ReviewStatus.PENDING
+                || ArtifactReviewContext.automaticallyReviewableFingerprint(observed)!=null)return false;
+        var scan=observed.getScanResult();
+        if(scan.getStatus()!=ScanStatus.SCANNING || !java.util.Set.of("QUEUED","SCANNING").contains(Objects.toString(scan.getScanState(),""))
+                || scan.getRemoteReview()!=null || scan.getScanAttempt()<1 || scan.getScanRequestId()==null
+                || !scan.getScanRequestId().matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"))return false;
+        var version=ArtifactReviewContext.bindSnapshot(Criteria.where("_id").is(observed.getId())
+                .and("hash").is(observed.getHash()).and("fileUrl").is(observed.getFileUrl())
+                .and("reviewStatus").is(ProjectVersion.ReviewStatus.PENDING)
+                .and("scanResult.status").is(ScanStatus.SCANNING).and("scanResult.scanState").is(scan.getScanState()).and("scanResult.verdict").is(scan.getVerdict())
+                .and("scanResult.scanRequestId").is(scan.getScanRequestId()).and("scanResult.scanAttempt").is(scan.getScanAttempt())
+                .and("scanResult.manualRescan").in(scan.isManualRescan()?java.util.List.of(true):java.util.Arrays.asList(false,null))
+                .and("scanResult.remoteReview").is(null).and("scanResult.remotePoll").exists(false),observed);
+        return mongo.updateFirst(query(projectId,observed.getId(),version),new Update()
+                .set("versions.$.scanResult.status",ScanStatus.FAILED).set("versions.$.scanResult.scanState","REMOTE_UNSUPPORTED_CONTEXT")
+                .set("versions.$.scanResult.verdict","BLOCK".equals(scan.getVerdict())?"BLOCK":"REVIEW")
+                .set("versions.$.scanResult.scanTimestamp",System.currentTimeMillis())
+                .set("versions.$.scanResult.securityEvidence",null).set("versions.$.scanResult.artifactVerified",false)
+                .set("versions.$.scanResult.reviewedContextSha256",null).set("versions.$.scanResult.reusedReviewVersion",null)
+                .set("versions.$.scanResult.reusedReviewOrigins",null).set("versions.$.scanResult.holdUntilTimestamp",0)
+                .set("versions.$.scanResult.reviewerNotes",java.util.List.of("Security review cannot cover this version's current dependencies, runtime metadata or supplemental content. Resolve the review context before requesting another scan. No security clearance was granted.")),Project.class)
+                .getModifiedCount()==1;
+    }
+
     public ProjectVersion current(String projectId,String versionId,int attempt,String requestId) {
         if(projectId==null || versionId==null || attempt<1 || requestId==null || !requestId.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"))return null;
         var entity=mongo.getConverter().getMappingContext().getPersistentEntity(Project.class);
@@ -72,9 +98,12 @@ public class RemoteReviewPersistence {
                 .and("scanResult.manualRescan").in(binding.manualRescan()?java.util.List.of(true):java.util.Arrays.asList(false,null)),observed);
     }
     private static Query query(RemoteReviewBinding binding,Criteria version) {
-        var query=Query.query(Criteria.where("_id").is(binding.projectId()).and("versions").elemMatch(version));
+        return query(binding.projectId(),binding.versionId(),version);
+    }
+    private static Query query(String projectId,String versionId,Criteria version) {
+        var query=Query.query(Criteria.where("_id").is(projectId).and("versions").elemMatch(version));
         query.addCriteria(Criteria.where("$expr").is(new org.bson.Document("$eq",java.util.List.of(new org.bson.Document("$size",new org.bson.Document("$filter",
-                new org.bson.Document("input","$versions").append("as","v").append("cond",new org.bson.Document("$eq",java.util.List.of("$$v._id",new org.bson.Document("$literal",binding.versionId())))))),1))));
+                new org.bson.Document("input","$versions").append("as","v").append("cond",new org.bson.Document("$eq",java.util.List.of("$$v._id",new org.bson.Document("$literal",versionId)))))),1))));
         return query.collation(Collation.of("simple"));
     }
 }

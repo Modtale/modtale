@@ -25,7 +25,10 @@ public final class RemoteReviewBootstrap {
         }
         if("REMOTE_REVIEW".equals(current.getScanResult().getScanState()))return new Prepared("MISSING_BINDING",null);
         String context=ArtifactReviewContext.automaticallyReviewableFingerprint(current);
-        if(context==null)return new Prepared("UNSUPPORTED_CONTEXT",null);
+        if(context==null) {
+            if(!running.getAsBoolean())throw new RemoteReviewClient.Superseded();
+            return new Prepared(persistence.finishUnsupportedContext(projectId,current)?"UNAVAILABLE":"NO_WORK",null);
+        }
         if(!running.getAsBoolean())throw new RemoteReviewClient.Superseded();
         var configuration=client.configuration();
         if(!running.getAsBoolean())throw new RemoteReviewClient.Superseded();
