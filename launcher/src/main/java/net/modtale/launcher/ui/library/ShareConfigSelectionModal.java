@@ -50,28 +50,75 @@ final class ShareConfigSelectionModal {
 
         VBox rows = new VBox(8);
         Map<ConfigFile, LibraryToggleBox> choices = new LinkedHashMap<>();
-        for (ConfigFile file : files) {
+        Map<String, List<ConfigFile>> groups = new LinkedHashMap<>();
+        files.stream().sorted(java.util.Comparator.comparing(file -> modTitle(file, modTitles), String.CASE_INSENSITIVE_ORDER))
+                .forEach(file -> groups.computeIfAbsent(modTitle(file, modTitles), ignored -> new java.util.ArrayList<>()).add(file));
+        for (var group : groups.entrySet()) {
+            VBox configRows = new VBox(6);
+            configRows.getStyleClass().add("share-config-files");
+            configRows.setVisible(false);
+            configRows.setManaged(false);
+            Label count = new Label();
+            count.getStyleClass().add("share-config-path");
+            Runnable updateCount = () -> {
+                long selected = group.getValue().stream().filter(file -> choices.containsKey(file) && choices.get(file).isSelected()).count();
+                count.setText(selected > 0 ? selected + " / " + group.getValue().size() + " selected"
+                        : group.getValue().size() + (group.getValue().size() == 1 ? " file" : " files"));
+            };
+            Label title = new Label(group.getKey());
+            title.getStyleClass().add("share-config-filename");
+            HBox.setHgrow(title, Priority.ALWAYS);
+            title.setMaxWidth(Double.MAX_VALUE);
+            StackPane icon = new StackPane(LauncherIcons.icon(LauncherIcons.Glyph.SLIDERS, 20));
+            icon.getStyleClass().add("share-config-file-icon");
+            StackPane arrow = new StackPane(LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_RIGHT, 16));
+            HBox heading = new HBox(14, icon, title, count, arrow);
+            heading.setAlignment(Pos.CENTER_LEFT);
+            heading.setMaxWidth(Double.MAX_VALUE);
+            Button expand = new Button(null, heading);
+            expand.setMaxWidth(Double.MAX_VALUE);
+            heading.prefWidthProperty().bind(expand.widthProperty().subtract(32));
+            expand.getStyleClass().add("share-config-group-toggle");
+            expand.setAccessibleText("Show configs for " + group.getKey());
+            expand.setOnAction(event -> {
+                boolean open = !configRows.isVisible();
+                configRows.setVisible(open);
+                configRows.setManaged(open);
+                arrow.getChildren().setAll(LauncherIcons.icon(open ? LauncherIcons.Glyph.CHEVRON_DOWN : LauncherIcons.Glyph.CHEVRON_RIGHT, 16));
+                expand.setAccessibleText((open ? "Hide" : "Show") + " configs for " + group.getKey());
+            });
+            group.getValue().sort(java.util.Comparator.comparing(file -> file.path().toString(), String.CASE_INSENSITIVE_ORDER));
+            for (ConfigFile file : group.getValue()) {
                 LibraryToggleBox choice = new LibraryToggleBox();
                 choice.setAccessibleText("Include " + file.label());
                 choices.put(file, choice);
-                Label name = new Label(modTitle(file, modTitles));
+                Label name = new Label(file.path().getFileName().toString());
                 name.getStyleClass().add("share-config-filename");
-                Label path = new Label(file.path().getFileName().toString());
-                path.getStyleClass().add("share-config-path");
-                path.setWrapText(true);
-                Tooltip.install(path, new Tooltip(file.label()));
-                VBox copy = new VBox(4, name, path);
-                copy.setMinWidth(0);
+                name.setWrapText(true);
+                VBox copy = new VBox(3, name);
+                var relative = file.root().relativize(file.path());
+                if (relative.getNameCount() > 2 || group.getValue().stream().filter(other -> other.path().getFileName().equals(file.path().getFileName())).count() > 1) {
+                    Label path = new Label(relative.toString());
+                    path.getStyleClass().add("share-config-path");
+                    path.setWrapText(true);
+                    copy.getChildren().add(path);
+                }
+                Tooltip.install(copy, new Tooltip(file.label()));
                 HBox.setHgrow(copy, Priority.ALWAYS);
-                StackPane icon = new StackPane(LauncherIcons.icon(LauncherIcons.Glyph.SLIDERS, 20));
-                icon.getStyleClass().add("share-config-file-icon");
-                HBox row = new HBox(14, choice, icon, copy);
+                HBox row = new HBox(14, choice, copy);
                 row.setAlignment(Pos.CENTER_LEFT);
                 row.getStyleClass().add("share-config-row");
-                choice.selectedProperty().addListener((obs, old, selected) ->
-                        row.pseudoClassStateChanged(PseudoClass.getPseudoClass("selected"), selected));
+                choice.selectedProperty().addListener((obs, old, selected) -> {
+                    row.pseudoClassStateChanged(PseudoClass.getPseudoClass("selected"), selected);
+                    updateCount.run();
+                });
                 row.setOnMouseClicked(event -> { choice.fire(); event.consume(); });
-                rows.getChildren().add(row);
+                configRows.getChildren().add(row);
+            }
+            updateCount.run();
+            VBox card = new VBox(expand, configRows);
+            card.getStyleClass().add("share-config-group");
+            rows.getChildren().add(card);
         }
         if (files.isEmpty()) {
             Label empty = new Label("No mod settings found. Your list will include mods only.");
@@ -85,7 +132,7 @@ final class ShareConfigSelectionModal {
         scroll.setFitToWidth(true);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scroll.getStyleClass().add("post-download-modal-scroll");
-        scroll.setPrefViewportHeight(Math.min(460, 48 + Math.max(1, files.size()) * 82));
+        scroll.setPrefViewportHeight(Math.min(460, 48 + Math.max(1, groups.size()) * 82));
         scroll.setMinHeight(0);
         VBox.setVgrow(scroll, Priority.ALWAYS);
 

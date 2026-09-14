@@ -113,6 +113,35 @@ class ConfigEditorModalTest {
     }
 
     @Test
+    void groupedConfigsKeepIndependentSelectionsWhenCollapsed() throws Exception {
+        fx(() -> {
+            StackPane host = new StackPane();
+            new Scene(host, 1000, 760);
+            var first = new ConfigFile(directory, directory.resolve("Author_Mod/config.json"), "World config", "Author:Mod");
+            var second = new ConfigFile(directory, directory.resolve("Author_Mod/rewards.json"), "Rewards", "Author:Mod");
+            var third = new ConfigFile(directory, directory.resolve("Other/config.json"), "Other config", "Other");
+            var result = new java.util.concurrent.atomic.AtomicReference<java.util.List<ConfigFile>>();
+            ShareConfigSelectionModal.show(host, java.util.List.of(first, second, third),
+                    java.util.Map.of("Author:Mod", "Example Mod", "Other", "Other Mod"), result::set);
+            host.applyCss(); host.layout();
+            var groups = host.lookupAll(".share-config-group-toggle");
+            assertEquals(2, groups.size());
+            var expand = (Button) groups.stream().filter(node -> "Show configs for Example Mod".equals(node.getAccessibleText())).findFirst().orElseThrow();
+            var card = (javafx.scene.layout.VBox) expand.getParent();
+            var files = card.getChildren().get(1);
+            assertFalse(files.isVisible());
+            expand.fire();
+            assertTrue(files.isVisible());
+            for (var node : ((Parent) files).lookupAll(".library-toggle-box")) ((LibraryToggleBox) node).setSelected(true);
+            expand.fire();
+            assertFalse(files.isVisible());
+            button(host, "Create shared list").fire();
+            assertEquals(java.util.List.of(first, second), result.get());
+            return null;
+        });
+    }
+
+    @Test
     void sharingOnlyIncludesExplicitlySelectedConfigs() throws Exception {
         fx(() -> {
             StackPane host = new StackPane();
