@@ -63,6 +63,10 @@ public final class ReviewSnapshotArchive {
         record.append("tag",tag(record,keys.get(activeKey)));insertExact(metadata,record);
         var restored=load(snapshot.id());if(!same(snapshot,restored))throw unavailable();return restored;
     }
+    public Snapshot find(String id) {
+        if(!uuid(id))throw new IllegalArgumentException("Invalid snapshot identity");
+        return read(metadata,id)==null?null:load(id);
+    }
     public Snapshot load(String id) {
         if(!uuid(id))throw new IllegalArgumentException("Invalid snapshot identity");
         var record=read(metadata,id);if(record==null)throw unavailable();
