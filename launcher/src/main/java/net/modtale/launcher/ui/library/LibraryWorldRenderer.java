@@ -345,17 +345,16 @@ final class LibraryWorldRenderer {
             shell.getChildren().add(contentsCard);
         }
         ProjectCardInteraction.addHoverAnimationWithIndependentContent(shell, icon);
-        ProjectSummary target = navigationTarget(model);
-        if (target != null) {
+        if (!toggle.isDisabled()) {
             shell.setCursor(Cursor.HAND);
-            shell.setOnMouseClicked(event -> {
-                if (event.getButton() == MouseButton.PRIMARY && event.isStillSincePress()
-                        && !isNestedControl(event.getTarget(), shell)) {
-                    openProject.accept(target);
-                    event.consume();
-                }
-            });
         }
+        shell.setOnMouseClicked(event -> {
+            if (event.getButton() == MouseButton.PRIMARY && event.isStillSincePress()
+                    && !isNestedControl(event.getTarget(), shell)) {
+                toggle.fire();
+                event.consume();
+            }
+        });
         return shell;
     }
 
@@ -364,8 +363,7 @@ final class LibraryWorldRenderer {
         while (node != null && node != card) {
             if (node instanceof ButtonBase || node instanceof ComboBoxBase<?> || node instanceof LibraryToggleBox
                     || node.getStyleClass().contains("author-link")
-                    || node.getStyleClass().contains("library-world-version-row")
-                    || node.getStyleClass().contains("library-world-content-card")) {
+                    || node.getStyleClass().contains("library-world-project-title")) {
                 return true;
             }
             node = node.getParent();
@@ -403,6 +401,16 @@ final class LibraryWorldRenderer {
         copy.setAlignment(Pos.CENTER_LEFT);
         Label title = new Label(display.title());
         title.getStyleClass().add("library-world-project-title");
+        ProjectSummary target = navigationTarget(model);
+        if (target != null) {
+            title.setCursor(Cursor.HAND);
+            title.setOnMouseClicked(event -> {
+                if (event.getButton() == MouseButton.PRIMARY && event.isStillSincePress()) {
+                    openProject.accept(target);
+                    event.consume();
+                }
+            });
+        }
 
         String subtitleText = projectMetaLine(model);
         HBox subtitle = new HBox(4);
@@ -585,16 +593,6 @@ final class LibraryWorldRenderer {
         header.getStyleClass().add("library-world-content-header");
         header.setAlignment(Pos.CENTER_LEFT);
         header.setPickOnBounds(true);
-        header.setOnMouseClicked(event -> {
-            Node target = event.getTarget() instanceof Node node ? node : null;
-            while (target != null && target != header) {
-                if (target == toggle) {
-                    return;
-                }
-                target = target.getParent();
-            }
-            toggleModpackContents.accept(model.installed());
-        });
 
         VBox card = new VBox(8);
         card.getStyleClass().add("library-world-content-card");

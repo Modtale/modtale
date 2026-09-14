@@ -46,7 +46,7 @@ class LibraryCardInteractionTest {
     }
 
     @Test
-    void cardAndAuthorRouteSeparatelyAndNestedActionsStayInLibrary() throws Exception {
+    void cardTogglesWhileTitleAuthorAndControlsKeepTheirActions() throws Exception {
         FutureTask<Void> task = new FutureTask<>(() -> {
             AtomicInteger pages = new AtomicInteger();
             AtomicInteger creators = new AtomicInteger();
@@ -96,21 +96,50 @@ class LibraryCardInteractionTest {
             toggle.setOnAction(toggles::incrementAndGet);
             click(toggle, MouseButton.PRIMARY);
             assertEquals(1, toggles.get());
-            assertEquals(1, pages.get());
+            assertTrue(toggle.isSelected());
+            click(card, MouseButton.PRIMARY);
+            assertEquals(2, toggles.get());
+            assertFalse(toggle.isSelected());
+            click(card.lookup(".library-world-project-copy"), MouseButton.PRIMARY);
+            assertEquals(3, toggles.get());
+            assertTrue(toggle.isSelected());
+            click(card, MouseButton.SECONDARY);
+            assertEquals(3, toggles.get());
+            click(card.lookup(".library-world-project-title"), MouseButton.PRIMARY);
+            click(card.lookup(".author-link"), MouseButton.PRIMARY);
+            for (Node button : card.lookupAll(".library-icon-action")) {
+                click(button, MouseButton.PRIMARY);
+            }
+            assertEquals(3, toggles.get());
+            assertEquals(2, pages.get());
+            assertEquals(2, creators.get());
+            toggle.setDisable(true);
+            click(card, MouseButton.PRIMARY);
+            assertEquals(3, toggles.get());
+            toggle.setDisable(false);
             ComboBox<String> combo = new ComboBox<>();
             VBox controls = new VBox(combo);
             controls.getStyleClass().add("library-world-version-row");
             VBox contents = new VBox();
             contents.getStyleClass().add("library-world-content-card");
             card.getChildren().addAll(controls, contents);
-            for (Node nested : List.of(combo, controls, contents)) {
+            click(combo, MouseButton.PRIMARY);
+            assertEquals(3, toggles.get());
+            for (Node nested : List.of(controls, contents)) {
                 click(nested, MouseButton.PRIMARY);
-                assertEquals(1, pages.get());
+                assertEquals(2, pages.get());
             }
+            assertEquals(5, toggles.get());
             VBox local = (VBox) method.invoke(renderer, null, model("local:file", "LOCAL"), List.of());
             assertNull(local.lookup(".author-link"));
             click(local.lookup(".library-world-project-title"), MouseButton.PRIMARY);
-            assertEquals(1, pages.get());
+            assertEquals(2, pages.get());
+            var localToggle = (LibraryToggleBox) local.lookup(".library-toggle-box");
+            localToggle.setDisable(false);
+            localToggle.setOnAction(toggles::incrementAndGet);
+            click(local, MouseButton.PRIMARY);
+            assertTrue(localToggle.isSelected());
+            assertEquals(6, toggles.get());
             return null;
         });
         Platform.runLater(task);
