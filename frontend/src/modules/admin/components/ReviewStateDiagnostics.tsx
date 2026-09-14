@@ -1,19 +1,24 @@
+import { ReviewRepairPanel } from './ReviewRepairPanel';
+import type { RepairTarget } from '../api/reviewRepair';
 import { useEffect, useRef, useState } from 'react';
 import { diagnosticReasons, getDiagnosticPage, type DiagnosticPage } from '../api/reviewDiagnostics';
 
-export function ReviewStateDiagnostics({ subject }: { subject: string }) {
-    return <DiagnosticPanel key={subject} />;
+export function ReviewStateDiagnostics({ subject, canRepair = false }: { subject: string; canRepair?: boolean }) {
+    return <DiagnosticPanel key={`${subject}:${canRepair}`} subject={subject} canRepair={canRepair} />;
 }
-function DiagnosticPanel() {
+function DiagnosticPanel({ subject, canRepair }: { subject: string; canRepair: boolean }) {
     const [open, setOpen] = useState(false);
     return <section className="mt-8 border-t border-slate-200 pt-6 dark:border-white/10" aria-label="Review state diagnostics">
         <button type="button" aria-expanded={open} aria-controls="review-state-diagnostic-content" onClick={() => setOpen(!open)} className="rounded-lg border px-3 py-2 text-sm font-bold">
             {open ? 'Hide scan diagnostics' : 'Inspect scan diagnostics'}
         </button>
-        {open && <DiagnosticContents />}
+        {open && <DiagnosticContents subject={subject} canRepair={canRepair} />}
     </section>;
 }
-function DiagnosticContents() {
+function DiagnosticContents({ subject, canRepair }: { subject: string; canRepair: boolean }) {
+    const [selected, setSelected] = useState<RepairTarget | null>(null);
+    const [repairAvailable, setRepairAvailable] = useState(false);
+    const [repairLocked, setRepairLocked] = useState(false);
     const [page, setPage] = useState<DiagnosticPage | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
@@ -49,6 +54,7 @@ function DiagnosticContents() {
     return <div id="review-state-diagnostic-content" className="mt-4 space-y-4">
         <h2 ref={heading} tabIndex={-1} className="text-xl font-bold">Scan state diagnostics</h2>
         <p className="text-sm text-slate-600 dark:text-slate-300">Find stored scan records that need operator attention. These checks examine review state, not whether a mod is safe. Record positions can change; an operator must recheck current state before repairing it.</p>
+        {canRepair && <ReviewRepairPanel subject={subject} selected={selected} onReady={setRepairAvailable} onLock={setRepairLocked} onDismiss={() => setSelected(null)} />}
         {error && <div ref={failure} tabIndex={-1} role="alert" className="rounded-lg border border-amber-400 p-3">
             <p>We could not load this diagnostic page. Any entries below are from the last successful load.</p>
             <button type="button" disabled={loading} onClick={() => void load(attempted.current)} className="mt-2 rounded-lg border px-3 py-2">Retry diagnostics</button>
@@ -64,6 +70,7 @@ function DiagnosticContents() {
                 <p className="break-all"><strong>Project record:</strong> <bdi>{JSON.stringify(item.position.projectId)}</bdi> ({item.position.projectIdType === 'STRING' ? 'string ID' : 'ObjectId'})</p>
                 <p><strong>Stored version position:</strong> {item.position.versionIndex} (zero-based)</p>
                 <p className="break-all"><strong>Version:</strong> <bdi>{item.versionId ?? 'Identifier unavailable'}</bdi></p>
+                {canRepair && repairAvailable && <button type="button" disabled={loading || error || repairLocked || !item.versionId} onClick={() => setSelected({ position: item.position, versionId: item.versionId! })} className="mt-2 rounded-lg border px-3 py-2 disabled:opacity-50">Preview local isolation</button>}
                 <ul className="mt-2 list-disc space-y-1 pl-5">{item.reasons.map(reason => <li key={reason}>{diagnosticReasons[reason]}</li>)}</ul>
             </li>)}
         </ul>}

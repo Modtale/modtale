@@ -325,7 +325,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                         reviewingId={loadingReviewId}
                                         onReview={fetchProjectDetails}
                                     />
-                                    <ReviewStateDiagnostics subject={currentUser?.id || currentUser?.username || ''} />
+                                    <ReviewStateDiagnostics subject={currentUser?.id || currentUser?.username || ''} canRepair={canRescanVersions} />
                                 </div>
                             )}
 

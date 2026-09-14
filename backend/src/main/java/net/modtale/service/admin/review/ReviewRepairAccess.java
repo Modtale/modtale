@@ -20,6 +20,8 @@ public final class ReviewRepairAccess {
     public ReviewRepairAccess(AccountService accounts,ReviewRepairWorkflow workflow,RawReviewSnapshotReader reader,ReviewIsolationExecutor isolation) {
         this.accounts=accounts;this.workflow=workflow;this.reader=reader;this.isolation=isolation;
     }
+    public record Capability(String action) {}
+    public Capability capability() {var authority=authority();return workflow.read(()->new Capability("ISOLATE_LOCAL_REVIEW"),authority.allowed());}
     public Preview inspect(Inspect request) {
         var authority=authority();if(request==null)throw invalid();Object project=project(request.position());
         return workflow.read(()->{

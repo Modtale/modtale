@@ -33,7 +33,7 @@ class ReviewRepairControllerTest {
     void auth(String...permissions){SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("actor",null,Arrays.stream(permissions).map(SimpleGrantedAuthority::new).toList()));}
     @Test void everyRouteRequiresBothPermissionsBeforeServiceAccess() {
         for(String permission:List.of("PROJECT_REVIEW_READ","PROJECT_VERSION_RESCAN","PROJECT_REVIEW_DECIDE","ROLE_USER")) {
-            auth(permission);assertThrows(AccessDeniedException.class,()->controller.inspect(null));assertThrows(AccessDeniedException.class,()->controller.prepare(null));
+            auth(permission);assertThrows(AccessDeniedException.class,()->controller.capabilities());assertThrows(AccessDeniedException.class,()->controller.inspect(null));assertThrows(AccessDeniedException.class,()->controller.prepare(null));
             assertThrows(AccessDeniedException.class,()->controller.execute(null));assertThrows(AccessDeniedException.class,()->controller.receipt(null));
         }
         verifyNoInteractions(access);
@@ -59,4 +59,11 @@ class ReviewRepairControllerTest {
         new org.springframework.boot.test.context.runner.ApplicationContextRunner().withUserConfiguration(ReviewRepairController.class)
                 .run(context->{assertNull(context.getStartupFailure());assertFalse(context.containsBean("reviewRepairController"));});
     }
+    @Test void capabilityUsesAuthenticatedNoStoreContract()throws Exception {
+        when(access.capability()).thenReturn(new ReviewRepairAccess.Capability("ISOLATE_LOCAL_REVIEW"));
+        var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/admin/verification/repairs/capabilities"))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andExpect(jsonPath("$.action").value("ISOLATE_LOCAL_REVIEW"));
+    }
+
 }

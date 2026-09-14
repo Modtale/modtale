@@ -1,3 +1,5 @@
+import * as repair from '@/modules/admin/api/reviewRepair';
+vi.mock('@/modules/admin/api/reviewRepair', async original => ({ ...await original<object>(), repairAvailable: vi.fn(), inspectRepair: vi.fn() }));
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
@@ -7,7 +9,7 @@ vi.mock('@/modules/admin/api/reviewDiagnostics', async original => ({ ...await o
 let root: Root;let container: HTMLDivElement;
 const empty: DiagnosticPage={items:[],nextCursor:null,examinedSlots:25,scope:'PENDING_SCAN_STRUCTURE'};
 const records: DiagnosticPage={...empty,items:[{position:{projectIdType:'STRING',projectId:'a',versionIndex:3},versionId:null,reasons:['DUPLICATE_VERSION_ID']}]};
-beforeEach(async()=>{vi.mocked(getDiagnosticPage).mockReset();container=document.createElement('div');document.body.append(container);root=createRoot(container);await act(async()=>root.render(<ReviewStateDiagnostics subject="one"/>));});
+beforeEach(async()=>{vi.mocked(getDiagnosticPage).mockReset();vi.mocked(repair.repairAvailable).mockReset();vi.mocked(repair.inspectRepair).mockReset();sessionStorage.clear();container=document.createElement('div');document.body.append(container);root=createRoot(container);await act(async()=>root.render(<ReviewStateDiagnostics subject="one"/>));});
 afterEach(async()=>{await act(async()=>root.unmount());container.remove();});
 async function click(text: string){const button=[...container.querySelectorAll('button')].find(b=>b.textContent===text)!;expect(button).toBeTruthy();await act(async()=>button.click());}
 it('loads on demand, explains ambiguity, and offers no repair or clearance action',async()=>{
@@ -34,4 +36,17 @@ it('replaces pages instead of accumulating records',async()=>{
     vi.mocked(getDiagnosticPage).mockResolvedValueOnce({...records,nextCursor:'d1.v.1.s.25.YQ'});await click('Inspect scan diagnostics');
     vi.mocked(getDiagnosticPage).mockResolvedValueOnce(empty);await click('Next diagnostic page');expect(container.querySelector('[aria-label="Diagnostic records"]')).toBeNull();
     expect(container.textContent).toContain('Refresh from start');
+});
+
+it('requires both the permission prop and server capability for preview controls',async()=>{
+    const valid={...records,items:[{...records.items[0],versionId:'v'}]};
+    vi.mocked(repair.repairAvailable).mockResolvedValueOnce(true);vi.mocked(getDiagnosticPage).mockResolvedValueOnce(valid);
+    await act(async()=>root.render(<ReviewStateDiagnostics subject="one" canRepair/>));await click('Inspect scan diagnostics');expect(container.textContent).toContain('Preview local isolation');
+    let resolve!: (value: repair.RepairPreview)=>void;vi.mocked(repair.inspectRepair).mockImplementationOnce(()=>new Promise(r=>{resolve=r;}));await click('Preview local isolation');
+    const signal=vi.mocked(repair.inspectRepair).mock.calls[0][1];await act(async()=>root.render(<ReviewStateDiagnostics subject="one" canRepair={false}/>));
+    expect(signal.aborted).toBe(true);await act(async()=>resolve({position:valid.items[0].position,versionId:'v',sha256:'a'.repeat(64),eligible:true,effect:'ISOLATE_LOCAL_REVIEW'}));expect(container.textContent).not.toContain('Prepare isolation');
+});
+it('hides repair buttons when the server feature is disabled',async()=>{
+    vi.mocked(repair.repairAvailable).mockResolvedValueOnce(false);vi.mocked(getDiagnosticPage).mockResolvedValueOnce({...records,items:[{...records.items[0],versionId:'v'}]});
+    await act(async()=>root.render(<ReviewStateDiagnostics subject="one" canRepair/>));await click('Inspect scan diagnostics');expect(container.textContent).not.toContain('Preview local isolation');
 });
