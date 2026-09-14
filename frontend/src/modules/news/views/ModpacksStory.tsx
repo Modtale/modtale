@@ -129,6 +129,10 @@ export function ModpacksStory() {
                     stays yours. Give a setup a permanent home by turning it
                     into a modpack project.
                 </aside>
+                <FeatureDemo
+                    clip="modlist-sharing"
+                    alt="Choose LevelingCore configs, create a mixed Modtale and CurseForge list, open it on the website, and install and enable its five mods in the launcher."
+                />
                 <h3>A working setup is a head start</h3>
                 <p>
                     On the shared page, choose <strong>Make modpack</strong> to
@@ -137,10 +141,6 @@ export function ModpacksStory() {
                     point for your draft. Review the imported contents, fill in
                     the project details, and shape it into a release.
                 </p>
-                <FeatureDemo
-                    clip="modlist-to-pack"
-                    alt="Open a shared mod list, choose Make modpack, name the project, and review the imported Implement Weapons and More Armor versions in the website editor."
-                />
                 <p>
                     If an entry is missing a usable reference or a recorded
                     version, it needs your attention before it can become part
