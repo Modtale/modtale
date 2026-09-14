@@ -4,7 +4,9 @@ import jakarta.validation.Valid;
 import java.util.List;
 import net.modtale.model.dto.admin.AdminProjectDTO;
 import net.modtale.model.dto.admin.AdminProjectReviewDTO;
-import net.modtale.model.dto.admin.AdminVerificationQueueItemDTO;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.CacheControl;
 import net.modtale.model.dto.project.ProjectSummaryDTO;
 import net.modtale.model.dto.request.admin.RejectReasonRequest;
 import net.modtale.model.project.Project;
@@ -46,8 +48,10 @@ public class ProjectManagementController {
 
     @GetMapping("/verification/queue")
     @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_REVIEW_READ', authentication)")
-    public ResponseEntity<List<AdminVerificationQueueItemDTO>> getVerificationQueue() {
-        return ResponseEntity.ok(projectReviewAdminService.getVerificationQueue());
+    public ResponseEntity<ProblemDetail> getVerificationQueue() {
+        return ResponseEntity.status(HttpStatus.GONE).cacheControl(CacheControl.noStore())
+                .header("Link", "</api/v1/admin/verification/queue/page>; rel=\"successor-version\"")
+                .body(ProblemDetail.forStatusAndDetail(HttpStatus.GONE, "Use the paginated moderation queue endpoint. Refresh the application to load the current review interface."));
     }
 
     @GetMapping("/projects/{id}/review-details")

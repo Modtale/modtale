@@ -22,6 +22,10 @@ class ModerationQueuePageControllerTest {
     @Configuration @EnableMethodSecurity static class Config {
         @Bean ModerationQueuePageReader reader(){return mock(ModerationQueuePageReader.class);}
         @Bean ModerationQueuePageController controller(ModerationQueuePageReader reader){return new ModerationQueuePageController(reader);}
+        @Bean net.modtale.service.admin.review.ProjectReviewAdminService reviews(){return mock(net.modtale.service.admin.review.ProjectReviewAdminService.class);}
+        @Bean net.modtale.service.user.account.AccountService accounts(){return mock(net.modtale.service.user.account.AccountService.class);}
+        @Bean net.modtale.service.admin.project.ProjectAdminOperationsService operations(){return mock(net.modtale.service.admin.project.ProjectAdminOperationsService.class);}
+        @Bean ProjectManagementController legacy(net.modtale.service.user.account.AccountService accounts,net.modtale.service.admin.review.ProjectReviewAdminService reviews,net.modtale.service.admin.project.ProjectAdminOperationsService operations){return new ProjectManagementController(accounts,reviews,operations);}
         @Bean(name="apiSecurity") Permissions permissions(){return new Permissions();}
     }
     public static class Permissions {
@@ -29,6 +33,10 @@ class ModerationQueuePageControllerTest {
     }
     @Autowired ModerationQueuePageController controller;
     @Autowired ModerationQueuePageReader reader;
+    @Autowired ProjectManagementController legacy;
+    @Autowired net.modtale.service.admin.review.ProjectReviewAdminService reviews;
+    @Autowired net.modtale.service.user.account.AccountService accounts;
+    @Autowired net.modtale.service.admin.project.ProjectAdminOperationsService operations;
     @BeforeEach void setup(){reset(reader);auth("PROJECT_REVIEW_READ");}
     @AfterEach void cleanup(){SecurityContextHolder.clearContext();}
     void auth(String permission){SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("reviewer",null,List.of(new SimpleGrantedAuthority(permission))));}
@@ -48,6 +56,18 @@ class ModerationQueuePageControllerTest {
         var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
         for(String limit:List.of("0","51","2147483648","no"))mvc.perform(get("/api/v1/admin/verification/queue/page").param("limit",limit)).andExpect(status().isBadRequest());
         mvc.perform(get("/api/v1/admin/verification/queue/page").param("cursor","invalid")).andExpect(status().isBadRequest());verifyNoInteractions(reader);
+    }
+    @Test void retiredEndpointReturnsExplicitMigrationWithoutReadingServices()throws Exception {
+        var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(legacy).build();
+        mvc.perform(get("/api/v1/admin/verification/queue")).andExpect(status().isGone())
+                .andExpect(header().string("Cache-Control","no-store"))
+                .andExpect(header().string("Link","</api/v1/admin/verification/queue/page>; rel=\"successor-version\""))
+                .andExpect(jsonPath("$.status").value(410));
+        verifyNoInteractions(reader,reviews,accounts,operations);
+    }
+    @Test void retiredEndpointStillRequiresReviewReadPermission() {
+        auth("PROJECT_REVIEW_DECIDE");assertThrows(AccessDeniedException.class,()->legacy.getVerificationQueue());
+        verifyNoInteractions(reader,reviews,accounts,operations);
     }
     @Test void exactTypedCursorIsPassedToReader() {
         var cursor=new ModerationQueuePageReader.Cursor(new org.bson.types.ObjectId(),8);

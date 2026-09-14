@@ -1,16 +1,10 @@
 package net.modtale.service.admin.review;
 
-import java.util.Comparator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
 import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.mapper.ProjectMapper;
 import net.modtale.model.dto.admin.AdminAuthorStatsDTO;
 import net.modtale.model.dto.admin.AdminProjectReviewDTO;
-import net.modtale.model.dto.admin.AdminVerificationQueueItemDTO;
 import net.modtale.model.project.Project;
-import net.modtale.model.project.ScanStatus;
 import net.modtale.model.user.User;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.project.query.ProjectListingQueryService;
@@ -23,68 +17,16 @@ public class ProjectReviewQueryService {
 
     private final UserRepository userRepository;
     private final ProjectService projectService;
-    private final ProjectReviewQueueService projectReviewQueueService;
     private final ProjectListingQueryService projectListingQueryService;
 
     public ProjectReviewQueryService(
             UserRepository userRepository,
             ProjectService projectService,
-            ProjectReviewQueueService projectReviewQueueService,
             ProjectListingQueryService projectListingQueryService
     ) {
         this.userRepository = userRepository;
         this.projectService = projectService;
-        this.projectReviewQueueService = projectReviewQueueService;
         this.projectListingQueryService = projectListingQueryService;
-    }
-
-    public List<AdminVerificationQueueItemDTO> getVerificationQueue() {
-        return projectReviewQueueService.getVerificationQueue().stream()
-                .flatMap(ProjectReviewQueryService::queueItems)
-                .filter(Objects::nonNull)
-                .sorted(Comparator
-                        .comparingInt(ProjectReviewQueryService::queuePriority).reversed()
-                        .thenComparing(item -> item.updatedAt() == null ? "" : item.updatedAt()))
-                .toList();
-    }
-
-    private static java.util.stream.Stream<AdminVerificationQueueItemDTO> queueItems(Project project) {
-        if (project == null) return java.util.stream.Stream.empty();
-        var versions = project.getVersions();
-        if (versions == null || versions.isEmpty()) {
-            return project.getStatus() == net.modtale.model.project.ProjectStatus.PENDING
-                    ? java.util.stream.Stream.of(ProjectMapper.toVerificationQueueItemDTO(project, null))
-                    : java.util.stream.Stream.empty();
-        }
-        if (project.getStatus() == net.modtale.model.project.ProjectStatus.PENDING
-                && versions.stream().filter(Objects::nonNull).noneMatch(v -> v.getReviewStatus() == net.modtale.model.project.ProjectVersion.ReviewStatus.PENDING
-                    || v.getScanResult() != null && v.getScanResult().getStatus() == ScanStatus.SCANNING)) {
-            return java.util.stream.Stream.of(ProjectMapper.toVerificationQueueItemDTO(project, null));
-        }
-        return versions.stream().filter(Objects::nonNull)
-                .filter(v -> v.getReviewStatus() == net.modtale.model.project.ProjectVersion.ReviewStatus.PENDING)
-                .filter(v -> v.getScanResult() == null || v.getScanResult().getStatus() != ScanStatus.SCANNING)
-                .map(v -> ProjectMapper.toVerificationQueueItemDTO(project, v));
-    }
-
-    private static int queuePriority(AdminVerificationQueueItemDTO item) {
-        if (item.pendingVersion() == null || item.pendingVersion().scan() == null) return 2_000;
-        var scan = item.pendingVersion().scan();
-        String verdict = scan.verdict() == null ? "" : scan.verdict().toUpperCase(Locale.ROOT);
-        int riskScore = scan.riskScore();
-
-        if ("BLOCK".equals(verdict) || scan.status() == ScanStatus.INFECTED) {
-            return 8_000 + riskScore + scan.newIssueCount() * 10 + scan.escalatedIssueCount() * 15;
-        }
-        if (scan.newIssueCount() > 0 || scan.escalatedIssueCount() > 0) {
-            return 6_000 + riskScore + scan.newIssueCount() * 6 + scan.escalatedIssueCount() * 10;
-        }
-        if ("REVIEW".equals(verdict)
-                || scan.status() == ScanStatus.SUSPICIOUS
-                || scan.status() == ScanStatus.FLAGGED) {
-            return 4_000 + riskScore;
-        }
-        return 2_000 + riskScore;
     }
 
     public AdminProjectReviewDTO getProjectReviewDetails(String id) {

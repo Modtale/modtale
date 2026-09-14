@@ -1,8 +1,6 @@
 package net.modtale.service.admin.review;
 
-import java.util.List;
 import net.modtale.model.dto.admin.AdminProjectReviewDTO;
-import net.modtale.model.dto.admin.AdminVerificationQueueItemDTO;
 import net.modtale.model.user.User;
 import org.springframework.stereotype.Service;
 
@@ -18,10 +16,6 @@ public class ProjectReviewAdminService {
     ) {
         this.projectReviewQueryService = projectReviewQueryService;
         this.projectReviewDecisionService = projectReviewDecisionService;
-    }
-
-    public List<AdminVerificationQueueItemDTO> getVerificationQueue() {
-        return projectReviewQueryService.getVerificationQueue();
     }
 
     public AdminProjectReviewDTO getProjectReviewDetails(String id) {

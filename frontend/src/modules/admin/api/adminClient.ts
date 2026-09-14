@@ -1,5 +1,4 @@
 import { api } from '@/utils/api';
-import type { AdminVerificationQueueItem } from '@/types';
 
 export interface InspectionWindow {
     identity: string; content: string; format: string; start: number; end: number; totalCharacters: number;
@@ -50,7 +49,6 @@ export const adminClient = {
     getUserRaw: async (userId: string) => (await api.get(`/admin/users/${userId}/raw`)).data,
     updateUserRaw: async (userId: string, data: any) => (await api.put(`/admin/users/${userId}/raw`, data)).data,
 
-    getVerificationQueue: async (): Promise<AdminVerificationQueueItem[]> => (await api.get('/admin/verification/queue')).data,
     getReviewDetails: async (id: string) => (await api.get(`/admin/projects/${id}/review-details`)).data,
     getCurrentAdmin: async () => (await api.get('/user/me')).data,
 
