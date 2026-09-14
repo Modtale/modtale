@@ -13,6 +13,7 @@ import { AuditLogs } from '../components/AuditLogs';
 import { StatusIncidents } from '../components/StatusIncidents';
 import { AdminPermission, hasAdminPermission, hasAnyAdminPermission, isAdminUser } from '../utils/access';
 import { useModerationQueue } from '../hooks/useModerationQueue';
+import type { QueueFilter } from '../api/moderationQueue';
 
 interface AdminPanelProps {
     currentUser: any;
@@ -21,6 +22,7 @@ interface AdminPanelProps {
 type AdminTab = 'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'logs' | 'status';
 
 export function AdminPanel({ currentUser }: AdminPanelProps) {
+    const [queueFilter, setQueueFilter] = useState<QueueFilter>('ALL');
     const [activeTab, setActiveTab] = useState<AdminTab>('verification');
     const [status, setStatus] = useState<any>(null);
 
@@ -78,7 +80,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         canUseProjectManagement,
         canUseUserManagement
     ]);
-    const queue = useModerationQueue(canReadReviewQueue, currentUser?.id || currentUser?.username || '');
+    const queue = useModerationQueue(canReadReviewQueue, currentUser?.id || currentUser?.username || '', queueFilter);
     const pendingProjects = queue.page.items;
     const loadingQueue = queue.loading;
     const queueError = queue.error;
@@ -300,6 +302,12 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                         </div>
                                     )}
                                     <div className="mb-4 flex flex-wrap items-center gap-3">
+                                        <label htmlFor="moderation-queue-filter" className="text-sm font-bold">Queue view</label>
+                                        <select id="moderation-queue-filter" value={queueFilter} onChange={event => setQueueFilter(event.target.value as QueueFilter)} className="rounded-lg border px-3 py-2 text-sm dark:bg-slate-900">
+                                            <option value="ALL">All pending reviews</option>
+                                            <option value="SECURITY">Security findings</option>
+                                            <option value="OPERATIONS">Review service failures</option>
+                                        </select>
                                         <button type="button" onClick={() => void queue.restart()} className="rounded-lg border px-3 py-2 text-sm font-bold">Refresh from start</button>
                                         <button type="button" disabled={loadingQueue || !queue.page.nextCursor} onClick={queue.next} className="rounded-lg border px-3 py-2 text-sm font-bold disabled:opacity-50">Next page</button>
                                         <span role="status" aria-live="polite" className="text-sm text-slate-500">{pendingProjects.length} entries on this page{loadingQueue ? ' · Loading…' : ''}</span>

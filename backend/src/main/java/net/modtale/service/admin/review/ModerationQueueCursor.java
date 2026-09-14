@@ -13,13 +13,16 @@ public final class ModerationQueueCursor {
         String value=id instanceof ObjectId objectId?objectId.toHexString():(String)id;
         if(!StandardCharsets.UTF_8.newEncoder().canEncode(value))throw new IllegalArgumentException("Invalid queue cursor");
         String encoded=Base64.getUrlEncoder().withoutPadding().encodeToString(value.getBytes(StandardCharsets.UTF_8));
-        return "1."+type+"."+cursor.versionIndex()+"."+encoded;
+        return (cursor.filter()==ModerationQueuePageReader.Filter.ALL?"1.":"2."+cursor.filter().name()+".")+type+"."+cursor.versionIndex()+"."+encoded;
     }
     public static ModerationQueuePageReader.Cursor decode(String token) {
         if(token==null)return null;
-        if(token.length()>800 || !token.matches("1\\.[os]\\.(0|[1-9][0-9]{0,7})\\.[A-Za-z0-9_-]{1,684}"))throw new IllegalArgumentException("Invalid queue cursor");
+        if(token.length()>800 || !token.matches("(1|2\\.(SECURITY|OPERATIONS))\\.[os]\\.(0|[1-9][0-9]{0,7})\\.[A-Za-z0-9_-]{1,684}"))throw new IllegalArgumentException("Invalid queue cursor");
         try {
-            var fields=token.split("\\.",4);
+            boolean filtered=token.startsWith("2.");
+            var parts=token.split("\\.");
+            var filter=filtered?ModerationQueuePageReader.Filter.valueOf(parts[1]):ModerationQueuePageReader.Filter.ALL;
+            var fields=filtered?new String[]{parts[0],parts[2],parts[3],parts[4]}:parts;
             byte[] bytes=Base64.getUrlDecoder().decode(fields[3]);
             String value=StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT).onUnmappableCharacter(CodingErrorAction.REPORT)
                     .decode(ByteBuffer.wrap(bytes)).toString();
@@ -28,7 +31,7 @@ public final class ModerationQueueCursor {
                 if(!value.matches("[0-9a-f]{24}"))throw new IllegalArgumentException("Invalid queue cursor");
                 id=new ObjectId(value);
             }
-            var cursor=new ModerationQueuePageReader.Cursor(id,Long.parseLong(fields[2]));
+            var cursor=new ModerationQueuePageReader.Cursor(id,Long.parseLong(fields[2]),filter);
             if(!encode(cursor).equals(token))throw new IllegalArgumentException("Invalid queue cursor");
             return cursor;
         } catch(CharacterCodingException | IllegalArgumentException invalid) {throw new IllegalArgumentException("Invalid queue cursor");}

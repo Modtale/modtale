@@ -66,6 +66,23 @@ class ModerationQueuePageReaderTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.items[0].pendingVersion.id").value("two"))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.nextCursor").isEmpty());
     }
+    @Test void filtersApplyBeforeLimitsAndRetainOverlappingSecurityFailures() {
+        var versions=new ArrayList<Document>();for(int i=0;i<60;i++)versions.add(version("ordinary"+i,"CLEAN"));
+        versions.add(version("security","SUSPICIOUS"));versions.add(version("failure","FAILED"));
+        var both=version("both","FAILED");both.get("scanResult",Document.class).put("newIssueCount",1);versions.add(both);
+        insert("a","PUBLISHED",versions);
+        var first=reader.page(null,1,ModerationQueuePageReader.Filter.SECURITY);assertEquals("security",first.items().getFirst().pendingVersion().id());
+        assertEquals(ModerationQueuePageReader.Filter.SECURITY,first.next().filter());
+        assertEquals("both",reader.page(first.next(),1,ModerationQueuePageReader.Filter.SECURITY).items().getFirst().pendingVersion().id());
+        var failed=reader.page(null,50,ModerationQueuePageReader.Filter.OPERATIONS);
+        assertEquals(List.of("failure","both"),failed.items().stream().map(row->row.pendingVersion().id()).toList());
+        assertThrows(IllegalArgumentException.class,()->reader.page(first.next(),1,ModerationQueuePageReader.Filter.OPERATIONS));
+    }
+    @Test void knownCountsAloneDoNotPutCleanResultsInSecurityFilter() {
+        var known=version("vetted","CLEAN");known.get("scanResult",Document.class).put("knownIssueCount",8);insert("a","PUBLISHED",List.of(known));
+        assertTrue(reader.page(null,50,ModerationQueuePageReader.Filter.SECURITY).items().isEmpty());
+        assertEquals(1,reader.page(null,50).items().size());
+    }
     @Test void invalidLimitsAndCursorAreRejectedBeforeRead() {
         assertThrows(IllegalArgumentException.class,()->reader.page(null,0));assertThrows(IllegalArgumentException.class,()->reader.page(null,51));
         assertThrows(IllegalArgumentException.class,()->new ModerationQueuePageReader.Cursor(42,0));

@@ -14,10 +14,12 @@ import java.util.concurrent.TimeUnit;
 
 @Service
 public final class ModerationQueuePageReader {
-    public record Cursor(Object projectId,long versionIndex) {
+    public enum Filter { ALL, SECURITY, OPERATIONS }
+    public record Cursor(Object projectId,long versionIndex,Filter filter) {
+        public Cursor(Object projectId,long versionIndex) {this(projectId,versionIndex,Filter.ALL);}
         public Cursor {
             if (!(projectId instanceof ObjectId || projectId instanceof String s && !s.isEmpty() && s.codePointCount(0,s.length())<=128)
-                    || versionIndex<0 || versionIndex>16*1024*1024) throw new IllegalArgumentException("Invalid queue cursor");
+                    || versionIndex<0 || versionIndex>16*1024*1024 || filter==null) throw new IllegalArgumentException("Invalid queue cursor");
         }
     }
     public record Page(List<AdminVerificationQueueItemDTO> items,Cursor next,int unavailableItems) {
@@ -27,7 +29,9 @@ public final class ModerationQueuePageReader {
     public ModerationQueuePageReader(MongoTemplate mongo) {
         projects=mongo.getCollection(mongo.getCollectionName(Project.class)).withReadPreference(ReadPreference.primary()).withReadConcern(ReadConcern.MAJORITY);
     }
-    public Page page(Cursor cursor,int limit) {
+    public Page page(Cursor cursor,int limit) {return page(cursor,limit,Filter.ALL);}
+    public Page page(Cursor cursor,int limit,Filter filter) {
+        if(filter==null || cursor!=null && cursor.filter()!=filter)throw new IllegalArgumentException("Queue filter changed");
         if(limit<1 || limit>50)throw new IllegalArgumentException("Invalid queue page size");
         var stages=new ArrayList<Document>();
         var match=new Document("status",new Document("$in",List.of("PENDING","PUBLISHED")))
@@ -47,6 +51,12 @@ public final class ModerationQueuePageReader {
                 new Document("queueVersion.reviewStatus","PENDING").append("queueVersion.scanResult.status",new Document("$ne","SCANNING"))))));
         if(cursor!=null)stages.add(new Document("$match",new Document("$expr",new Document("$or",List.of(
                 new Document("$gt",List.of("$_id",literal(cursor.projectId()))),new Document("$gt",List.of("$queueIndex",cursor.versionIndex())))))));
+        if(filter==Filter.OPERATIONS)stages.add(new Document("$match",new Document("queueVersion.scanResult.status","FAILED")));
+        if(filter==Filter.SECURITY)stages.add(new Document("$match",new Document("$or",List.of(
+                new Document("queueVersion.scanResult.status",new Document("$in",List.of("INFECTED","FLAGGED","SUSPICIOUS"))),
+                new Document("queueVersion.scanResult.verdict","BLOCK"),
+                new Document("queueVersion.scanResult.newIssueCount",new Document("$gt",0)),
+                new Document("queueVersion.scanResult.escalatedIssueCount",new Document("$gt",0))))));
         stages.add(new Document("$limit",limit+1));
         var projection=new Document("_id",1).append("queueIndex",1).append("queueProjectOnly",1)
                 .append("title",text("$title",256)).append("description",text("$description",1024)).append("author",text("$author",128))
@@ -76,7 +86,7 @@ public final class ModerationQueuePageReader {
                     only?null:new AdminVerificationQueueVersionDTO(versionId,row.getString("versionNumber"),row.getString("changelog"),ProjectVersion.ReviewStatus.PENDING,scan)));
         }
         Cursor next=null;
-        if(more) {var last=rows.getLast();next=new Cursor(last.get("_id"),((Number)last.get("queueIndex")).longValue());}
+        if(more) {var last=rows.getLast();next=new Cursor(last.get("_id"),((Number)last.get("queueIndex")).longValue(),filter);}
         return new Page(items,next,unavailable);
     }
     private static boolean validId(String s) {return s!=null && !s.isBlank() && s.codePointCount(0,s.length())<=128 && s.chars().noneMatch(Character::isISOControl);}

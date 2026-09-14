@@ -41,16 +41,16 @@ class ModerationQueuePageControllerTest {
     @AfterEach void cleanup(){SecurityContextHolder.clearContext();}
     void auth(String permission){SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("reviewer",null,List.of(new SimpleGrantedAuthority(permission))));}
     @Test void permissionIsCheckedBeforeCursorOrDatabaseAccess() {
-        auth("PROJECT_REVIEW_DECIDE");assertThrows(AccessDeniedException.class,()->controller.read("bad",25));verifyNoInteractions(reader);
+        auth("PROJECT_REVIEW_DECIDE");assertThrows(AccessDeniedException.class,()->controller.read("bad",25,ModerationQueuePageReader.Filter.ALL));verifyNoInteractions(reader);
     }
     @Test void httpUsesDefaultPageSizeAndReturnsContinuationEvenWhenAllRowsAreUnavailable()throws Exception {
         var next=new ModerationQueuePageReader.Cursor("project",7);
-        when(reader.page(null,25)).thenReturn(new ModerationQueuePageReader.Page(List.of(),next,25));
+        when(reader.page(null,25,ModerationQueuePageReader.Filter.ALL)).thenReturn(new ModerationQueuePageReader.Page(List.of(),next,25));
         var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
         mvc.perform(get("/api/v1/admin/verification/queue/page")).andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store"))
                 .andExpect(jsonPath("$.nextCursor").value(ModerationQueueCursor.encode(next))).andExpect(jsonPath("$.unavailableItems").value(25))
                 .andExpect(jsonPath("$.order").value("PROJECT_VERSION")).andExpect(jsonPath("$.items").isEmpty());
-        verify(reader).page(null,25);
+        verify(reader).page(null,25,ModerationQueuePageReader.Filter.ALL);
     }
     @Test void invalidHttpParametersNeverReachTheDatabase()throws Exception {
         var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
@@ -69,9 +69,15 @@ class ModerationQueuePageControllerTest {
         auth("PROJECT_REVIEW_DECIDE");assertThrows(AccessDeniedException.class,()->legacy.getVerificationQueue());
         verifyNoInteractions(reader,reviews,accounts,operations);
     }
+    @Test void filterMismatchAndUnknownFilterCannotReadDatabase()throws Exception {
+        var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller).build();
+        var cursor=ModerationQueueCursor.encode(new ModerationQueuePageReader.Cursor("a",1,ModerationQueuePageReader.Filter.SECURITY));
+        mvc.perform(get("/api/v1/admin/verification/queue/page").param("filter","OPERATIONS").param("cursor",cursor)).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/v1/admin/verification/queue/page").param("filter","UNKNOWN")).andExpect(status().isBadRequest());verifyNoInteractions(reader);
+    }
     @Test void exactTypedCursorIsPassedToReader() {
         var cursor=new ModerationQueuePageReader.Cursor(new org.bson.types.ObjectId(),8);
-        when(reader.page(cursor,1)).thenReturn(new ModerationQueuePageReader.Page(List.of(),null,0));
-        var result=controller.read(ModerationQueueCursor.encode(cursor),1);assertNull(result.getBody().nextCursor());verify(reader).page(cursor,1);
+        when(reader.page(cursor,1,ModerationQueuePageReader.Filter.ALL)).thenReturn(new ModerationQueuePageReader.Page(List.of(),null,0));
+        var result=controller.read(ModerationQueueCursor.encode(cursor),1,ModerationQueuePageReader.Filter.ALL);assertNull(result.getBody().nextCursor());verify(reader).page(cursor,1,ModerationQueuePageReader.Filter.ALL);
     }
 }

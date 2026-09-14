@@ -12,7 +12,13 @@ it.each([null, [], {...empty,order:'RISK'}, {...empty,nextCursor:3}, {...empty,u
 it('sends bounded pagination and cancellation and rejects a nonadvancing page', async () => {
     const signal=new AbortController().signal;vi.mocked(api.get).mockResolvedValueOnce({data:empty});
     await getModerationQueuePage(null,signal);
-    expect(api.get).toHaveBeenLastCalledWith('/admin/verification/queue/page',{params:{cursor:undefined,limit:25},signal});
+    expect(api.get).toHaveBeenLastCalledWith('/admin/verification/queue/page',{params:{cursor:undefined,limit:25,filter:'ALL'},signal});
     vi.mocked(api.get).mockResolvedValueOnce({data:{...empty,nextCursor:'1.s.0.YQ'}});
     await expect(getModerationQueuePage('1.s.0.YQ',signal)).rejects.toThrow('did not advance');
+});
+
+it('binds the returned page and continuation to the selected filter', () => {
+    expect(validateQueuePage({...empty,filter:'SECURITY',nextCursor:'2.SECURITY.s.0.YQ'},'SECURITY').filter).toBe('SECURITY');
+    expect(() => validateQueuePage({...empty,filter:'OPERATIONS'},'SECURITY')).toThrow();
+    expect(() => validateQueuePage({...empty,filter:'SECURITY',nextCursor:'1.s.0.YQ'},'SECURITY')).toThrow();
 });

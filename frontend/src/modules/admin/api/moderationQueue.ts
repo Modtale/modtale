@@ -1,11 +1,13 @@
 import { api } from '@/utils/api';
 import type { AdminVerificationQueueItem } from '@/types';
-export interface QueuePage { items: AdminVerificationQueueItem[]; nextCursor: string | null; unavailableItems: number; order: 'PROJECT_VERSION'; }
-const cursorValid = (value: unknown): value is string => typeof value === 'string' && value.length <= 800 && /^1\.[os]\.(0|[1-9][0-9]{0,7})\.[A-Za-z0-9_-]{1,684}$/.test(value);
-export function validateQueuePage(value: unknown): QueuePage {
+export type QueueFilter = 'ALL' | 'SECURITY' | 'OPERATIONS';
+export interface QueuePage { filter?: QueueFilter; items: AdminVerificationQueueItem[]; nextCursor: string | null; unavailableItems: number; order: 'PROJECT_VERSION'; }
+const cursorValid = (value: unknown): value is string => typeof value === 'string' && value.length <= 800 && /^(1|2\.(SECURITY|OPERATIONS))\.[os]\.(0|[1-9][0-9]{0,7})\.[A-Za-z0-9_-]{1,684}$/.test(value);
+const cursorMatchesFilter = (cursor: string, filter: QueueFilter) => filter === 'ALL' ? cursor.startsWith('1.') : cursor.startsWith(`2.${filter}.`);
+export function validateQueuePage(value: unknown, filter: QueueFilter = 'ALL'): QueuePage {
     const page = value as QueuePage;
-    if (!page || !Array.isArray(page.items) || page.items.length > 25 || page.order !== 'PROJECT_VERSION'
-        || (page.nextCursor !== null && !cursorValid(page.nextCursor)) || !Number.isInteger(page.unavailableItems)
+    if (!page || (page.filter ?? 'ALL') !== filter || !Array.isArray(page.items) || page.items.length > 25 || page.order !== 'PROJECT_VERSION'
+        || (page.nextCursor !== null && (!cursorValid(page.nextCursor) || !cursorMatchesFilter(page.nextCursor, filter))) || !Number.isInteger(page.unavailableItems)
         || page.unavailableItems < 0 || page.unavailableItems + page.items.length > 25) throw new Error('Invalid moderation queue response.');
     const keys = new Set<string>();
     for (const row of page.items) {
@@ -29,10 +31,10 @@ export function validateQueuePage(value: unknown): QueuePage {
     }
     return page;
 }
-export async function getModerationQueuePage(cursor: string | null, signal: AbortSignal): Promise<QueuePage> {
-    if (cursor !== null && !cursorValid(cursor)) throw new Error('Invalid moderation queue cursor.');
-    const response = await api.get('/admin/verification/queue/page', { params: { cursor: cursor ?? undefined, limit: 25 }, signal });
-    const page = validateQueuePage(response.data);
+export async function getModerationQueuePage(cursor: string | null, signal: AbortSignal, filter: QueueFilter = 'ALL'): Promise<QueuePage> {
+    if (cursor !== null && (!cursorValid(cursor) || !cursorMatchesFilter(cursor, filter))) throw new Error('Invalid moderation queue cursor.');
+    const response = await api.get('/admin/verification/queue/page', { params: { cursor: cursor ?? undefined, limit: 25, filter }, signal });
+    const page = validateQueuePage(response.data, filter);
     if (cursor !== null && page.nextCursor === cursor) throw new Error('The moderation queue did not advance. Refresh the queue.');
     return page;
 }
