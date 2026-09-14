@@ -9855,3 +9855,37 @@
 .settings-detail .settings-card-title { -fx-font-size: 18px; }
 .settings-detail .toggle-card { -fx-alignment: center-left; }
 .settings-detail .native-check { -fx-wrap-text: true; }
+
+.share-config-modal { -fx-font-family: "Inter"; }
+.share-config-body { -fx-padding: 20px 24px 24px; }
+.share-config-description { -fx-text-fill: #cbd5e1; -fx-font-size: 14px; }
+.share-config-section {
+    -fx-font-family: "Inter SemiBold";
+    -fx-font-size: 12px;
+    -fx-text-fill: #94a3b8;
+    -fx-padding: 6px 0 2px;
+}
+.share-config-row {
+    -fx-padding: 14px;
+    -fx-background-color: rgba(30,41,59,0.35);
+    -fx-background-radius: 12px;
+    -fx-border-color: rgba(255,255,255,0.10);
+    -fx-border-radius: 12px;
+    -fx-cursor: hand;
+}
+.share-config-row:hover { -fx-background-color: rgba(51,65,85,0.4); }
+.share-config-row:selected {
+    -fx-background-color: rgba(37,99,235,0.14);
+    -fx-border-color: rgba(96,165,250,0.55);
+}
+.share-config-file-icon {
+    -fx-min-width: 40px; -fx-max-width: 40px;
+    -fx-min-height: 40px; -fx-max-height: 40px;
+    -fx-background-color: rgba(148,163,184,0.08);
+    -fx-background-radius: 10px;
+    -fx-border-color: rgba(148,163,184,0.12);
+    -fx-border-radius: 10px;
+}
+.share-config-file-icon .svg-icon { -fx-stroke: #94a3b8; }
+.share-config-filename { -fx-font-family: "Inter SemiBold"; -fx-font-size: 14px; -fx-text-fill: #f8fafc; }
+.share-config-path { -fx-font-size: 12px; -fx-text-fill: #94a3b8; }

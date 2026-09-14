@@ -103,13 +103,26 @@ class ConfigEditorModalTest {
     void sharingOnlyIncludesExplicitlySelectedConfigs() throws Exception {
         fx(() -> {
             StackPane host = new StackPane();
-            new Scene(host, 900, 700);
+            net.modtale.launcher.ui.common.LauncherFonts.load();
+            host.getStyleClass().add("app-root");
+            Scene scene = new Scene(host, 1000, 760);
+            scene.getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
             var file = new ConfigFile(directory, directory.resolve("Example/config.json"), "World mods / Example/config.json");
             var result = new java.util.concurrent.atomic.AtomicReference<java.util.List<ConfigFile>>();
             ShareConfigSelectionModal.show(host, java.util.List.of(file), result::set);
             host.applyCss();
             host.layout();
-            var choice = find(host, javafx.scene.control.CheckBox.class);
+            var choice = find(host, LibraryToggleBox.class);
+            assertNotNull(choice);
+            ShareConfigSelectionModal.show(host, java.util.List.of(file), result::set);
+            assertEquals(1, host.getChildren().size(), "Sharing dialog cannot stack");
+            if (System.getenv("MODTALE_SHARE_SNAPSHOT") != null) {
+                var image = host.snapshot(null, null);
+                var output = new java.awt.image.BufferedImage((int) image.getWidth(), (int) image.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                for (int y = 0; y < output.getHeight(); y++) for (int x = 0; x < output.getWidth(); x++)
+                    output.setRGB(x, y, image.getPixelReader().getArgb(x, y));
+                javax.imageio.ImageIO.write(output, "png", Path.of(System.getenv("MODTALE_SHARE_SNAPSHOT")).toFile());
+            }
             assertFalse(choice.isSelected());
             button(host, "Create shared list").fire();
             assertEquals(java.util.List.of(), result.get());
