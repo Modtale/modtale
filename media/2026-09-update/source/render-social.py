@@ -44,7 +44,7 @@ for p in posts:
   if out.stem not in selected:continue
  elif out.exists():continue
  duration=float(json.loads(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','json',str(source)]))['format']['duration'])
- footer='MODPACKS V2' if p['clip'] in ['modpack-creation','modlist-to-pack','modpack-curseforge'] else 'SINCE JUNE' if p['clip'] in ['open-source','project-galleries'] else 'MODTALE LAUNCHER'
+ footer='MODPACKS V2' if p['clip'] in ['modpack-creation','modlist-to-pack','modlist-sharing','modpack-curseforge'] else 'SINCE JUNE' if p['clip'] in ['open-source','project-galleries'] else 'MODTALE LAUNCHER'
  encode(p['id'],source,0,duration,p['title'],p['subtitle'],out,footer);finish(out)
 
 # Deliberate editorial excerpts, played at the source's edited 1x rate.
