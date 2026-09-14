@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FeatureDemo } from '../components/FeatureDemo';
-import mediaVersions from '@/data/newsMediaVersions.json';
 
 export function ModpacksStory() {
     return (
@@ -73,16 +72,6 @@ export function ModpacksStory() {
                     to check where the files will go. There’s no need to construct
                     an entire overrides archive just to include a config file.
                 </p>
-                <figure className="news-demo news-config-detail">
-                    <img
-                        src={`/assets/news/modpack-configs.jpg?v=${mediaVersions['modpack-configs']}`}
-                        width={500}
-                        height={740}
-                        loading="lazy"
-                        decoding="async"
-                        alt="BetterMap’s attached config file, text preview, mod folder, installation path, and Save configs control in the website editor."
-                    />
-                </figure>
                 <p>
                     These files travel with the release and are applied when
                     the pack is enabled in a universe. Existing settings are
@@ -104,10 +93,6 @@ export function ModpacksStory() {
                     in the contents list, and you can attach its config defaults
                     through the same per-mod controls.
                 </p>
-                <FeatureDemo
-                    clip="modpack-curseforge"
-                    alt="Add a CurseForge file-page link, review the resolved BetterMap release, and include it alongside Modtale projects in the pack."
-                />
                 <p>
                     Packs containing CurseForge mods require{' '}
                     <strong>Modtale Launcher</strong>. The website makes that
@@ -190,11 +175,6 @@ export function ModpacksStory() {
                     direction, <strong>Unlock modpack</strong> turns those
                     contents into individually managed mods.
                 </p>
-                <FeatureDemo
-                    clip="pack-contents"
-                    still
-                    alt="An installed More Weapons, More Armor! pack expanded in the launcher library to show its included mods and versions."
-                />
                 <p>
                     For a closer look at browsing, downloading, and managing
                     mods on desktop, read the{' '}
