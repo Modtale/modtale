@@ -47,6 +47,7 @@ class ModtaleNewsClientTest {
         server.createContext("/rss.xml", exchange -> {
             assertNull(exchange.getRequestHeaders().getFirst("Cookie"));
             assertNull(exchange.getRequestHeaders().getFirst("Authorization"));
+            assertNull(exchange.getRequestHeaders().getFirst("Upgrade"));
             byte[] response = bytes(RSS);
             exchange.sendResponseHeaders(200, response.length);
             try (var body = exchange.getResponseBody()) { body.write(response); }

@@ -20,6 +20,7 @@ import net.modtale.launcher.settings.LauncherConfig;
 public final class ModtaleNewsClient {
     private static final int MAX_FEED_BYTES = 2 * 1024 * 1024;
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8))
+            .version(HttpClient.Version.HTTP_1_1)
             .followRedirects(HttpClient.Redirect.NORMAL).build();
     private final URI feed;
 
