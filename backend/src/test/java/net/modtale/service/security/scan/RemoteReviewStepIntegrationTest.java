@@ -139,7 +139,8 @@ class RemoteReviewStepIntegrationTest {
         queuedAgain();var configurations=new AtomicInteger();
         route(e->{if(e.getRequestURI().getPath().endsWith("configuration")){configurations.incrementAndGet();configuration(e);}
             else if(e.getRequestMethod().equals("POST"))reply(e,202,"QUEUED");else reply(e,404,"AWAITING_UPLOAD");});
-        var boot=bootstrap(new RemoteReviewPersistence(mongo));assertEquals("RECORDED",boot.advance(project,"v",1,binding.requestId()).state());
+        var candidate=new RemoteReviewDiscovery(mongo).page(null,16).candidates().getFirst();
+        var boot=bootstrap(new RemoteReviewPersistence(mongo));assertEquals("RECORDED",boot.advance(candidate.projectId(),candidate.versionId(),candidate.attempt(),candidate.requestId()).state());
         assertEquals(job,saved().getRemoteReview().jobId());assertEquals("READY",boot.prepare(project,"v",1,binding.requestId()).state());
         assertEquals(1,configurations.get());assertEquals(1,posts.get());
     }
