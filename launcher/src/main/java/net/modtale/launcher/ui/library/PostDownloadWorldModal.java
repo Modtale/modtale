@@ -165,7 +165,8 @@ final class PostDownloadWorldModal {
         body.getStyleClass().add("post-download-modal-body");
         body.getChildren().add(summaryRow());
         if (!configs.isEmpty()) {
-            Label note = new Label(configs.size() + " config defaults will be added to the selected worlds. Existing settings are kept.");
+            Label note = new Label(configs.size() + (configs.size() == 1 ? " config file" : " config files")
+                    + " will be added to the selected worlds. Existing settings are kept.");
             note.setWrapText(true);
             body.getChildren().add(note);
         }
