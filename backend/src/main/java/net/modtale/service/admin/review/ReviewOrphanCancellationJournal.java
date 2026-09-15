@@ -115,8 +115,16 @@ public final class ReviewOrphanCancellationJournal {
         return receipt(claim.prepared(),actor,permitted);
     }
     public Receipt receipt(Prepared prepared,String actor,BooleanSupplier permitted) {
-        permission(permitted);var target=resolver.resolve(prepared.isolationId(),actor);permission(permitted);var stored=read(prepared.isolationId());
-        if(!prepared.equals(authenticate(stored,actor,target)))throw unavailable();
+        permission(permitted);Objects.requireNonNull(prepared);
+        var recovered=recover(prepared.isolationId(),actor,permitted);
+        if(!prepared.equals(recovered.prepared()))throw unavailable();
+        permission(permitted);return recovered;
+    }
+    /** Read-only recovery of the original signed intent, including after expiry. */
+    public Receipt recover(String isolationId,String actor,BooleanSupplier permitted) {
+        permission(permitted);if(!uuid(isolationId))throw new IllegalArgumentException("Invalid cancellation identity");
+        var target=resolver.resolve(isolationId,actor);permission(permitted);var stored=read(isolationId);
+        var prepared=authenticate(stored,actor,target);
         String state=stored.getString("state");Observation observation=stored.containsKey("observation")?observation(stored.get("observation",Document.class)):null;
         permission(permitted);return new Receipt(prepared,state,observation,stored.containsKey("finishedAt")?stored.getDate("finishedAt").getTime():null);
     }

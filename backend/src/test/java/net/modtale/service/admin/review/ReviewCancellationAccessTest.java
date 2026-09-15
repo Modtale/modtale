@@ -29,7 +29,7 @@ class ReviewCancellationAccessTest {
     @Test void allOperationsRequireBothPermissionsBeforeValidationOrWork() {
         for(var permissions:List.of(Set.of(AdminPermission.PROJECT_REVIEW_READ),Set.of(AdminPermission.PROJECT_VERSION_RESCAN),Set.of(AdminPermission.PROJECT_REVIEW_DECIDE))) {
             actor.setAdminPermissions(permissions);
-            assertThrows(SecurityException.class,()->access.prepare(null));assertThrows(SecurityException.class,()->access.execute(null));
+            assertThrows(SecurityException.class,()->access.recover(null));assertThrows(SecurityException.class,()->access.prepare(null));assertThrows(SecurityException.class,()->access.execute(null));
             assertThrows(SecurityException.class,()->access.receipt(null));assertThrows(SecurityException.class,()->access.check(null));assertThrows(SecurityException.class,()->access.checkReceipt(null));
         }
         verifyNoInteractions(journal,executor,reconciler);
@@ -39,7 +39,7 @@ class ReviewCancellationAccessTest {
         when(accounts.getCurrentUser(any())).thenReturn(null);assertThrows(SecurityException.class,()->access.check(check));verifyNoInteractions(journal,executor,reconciler);
     }
     @Test void malformedRequestsNeverReachComponents() {
-        assertThrows(IllegalArgumentException.class,()->access.prepare("wrong"));
+        assertThrows(IllegalArgumentException.class,()->access.recover("wrong"));assertThrows(IllegalArgumentException.class,()->access.prepare("wrong"));
         assertThrows(IllegalArgumentException.class,()->access.execute(new ReviewOrphanCancellationJournal.Prepared(original.isolationId(),original.targetSha256(),1,120002)));
         assertThrows(IllegalArgumentException.class,()->access.receipt(new ReviewOrphanCancellationJournal.Prepared(original.isolationId(),"A".repeat(64),1,2)));
         assertThrows(IllegalArgumentException.class,()->access.check(new ReviewCancellationAccess.Check("bad",original)));
@@ -74,6 +74,12 @@ class ReviewCancellationAccessTest {
         when(executor.execute(any(),anyString(),any())).thenAnswer(i->{workflow.close();assertThrows(IllegalStateException.class,()->i.<BooleanSupplier>getArgument(2).getAsBoolean());return null;});
         assertThrows(IllegalStateException.class,()->access.execute(original));assertEquals("CLOSED",workflow.status().state());
         assertThrows(IllegalStateException.class,()->access.prepare(original.isolationId()));verifyNoInteractions(journal);
+    }
+    @Test void recoveryUsesOnlyKnownIsolationIdentityAndNeverPreparesOrDispatches() {
+        var expected=new ReviewOrphanCancellationJournal.Receipt(original,"PREPARED",null,null);
+        when(journal.recover(eq(original.isolationId()),eq("actor"),any())).thenAnswer(i->{assertTrue(i.<BooleanSupplier>getArgument(2).getAsBoolean());return expected;});
+        assertEquals(expected,access.recover(original.isolationId()));
+        verify(journal).recover(eq(original.isolationId()),eq("actor"),any());verifyNoMoreInteractions(journal);verifyNoInteractions(executor,reconciler);
     }
     @Test void localReceiptLookupsNeverInvokeRemoteOperationsOrRenewPreparation() {
         var receipt=new ReviewOrphanCancellationJournal.Receipt(original,"UNKNOWN",null,2L);

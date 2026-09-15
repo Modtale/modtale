@@ -36,6 +36,36 @@ class ReviewOrphanCancellationJournalTest {
         assertEquals("BLOCK",fixture.fixture.saved().getVerdict());assertEquals(before.get("reviewStatus"),fixture.raw().get("reviewStatus"));
         assertEquals(0,fixture.fixture.gets.get());assertEquals(0,fixture.fixture.posts.get());verifyNoInteractions(fixture.fixture.storage);
     }
+    @Test void expiredIntentRecoveryIsReadOnlyAndNeverRenewsCancellationAuthority() {
+        var old=create(fixture.fixture.mongo,Clock.fixed(Instant.now().minusSeconds(3600),ZoneOffset.UTC));
+        var prepared=old.prepare(fixture.prepared.id(),"actor",()->true);var before=operations().find().first();var version=fixture.raw();
+        var recovered=create(fixture.fixture.mongo,Clock.systemUTC()).recover(prepared.isolationId(),"actor",()->true);
+        assertEquals(prepared,recovered.prepared());assertEquals("PREPARED",recovered.state());assertNull(recovered.observation());
+        assertThrows(IllegalStateException.class,()->prepare());assertNull(journal.claim(recovered.prepared(),"actor",()->true));
+        assertEquals(before,operations().find().first());assertEquals(version,fixture.raw());
+        assertEquals(0,fixture.fixture.gets.get());assertEquals(0,fixture.fixture.posts.get());verifyNoInteractions(fixture.fixture.storage);
+    }
+    @Test void unknownOutcomeRecoveryAfterRestartRetainsOriginalObservationAndNoToken() {
+        var prepared=prepare();var claim=journal.claim(prepared,"actor",()->true);assertTrue(journal.beginDispatch(claim,"actor",()->true)>0);
+        var receipt=journal.record(claim,"actor",new ReviewOrphanCancellationJournal.Observation("UNKNOWN",null,503),()->true);
+        var before=operations().find().first();
+        assertEquals(receipt,create(fixture.fixture.mongo,Clock.systemUTC()).recover(prepared.isolationId(),"actor",()->true));
+        assertEquals(before,operations().find().first());assertNull(journal.claim(prepared,"actor",()->true));
+        assertEquals(0,fixture.fixture.gets.get());assertEquals(0,fixture.fixture.posts.get());
+    }
+    @Test void missingCancellationRecoveryDoesNotPrepareOrCreateAnArchive() {
+        var before=fixture.fixture.mongo.getCollection(ReviewSnapshotArchive.METADATA).countDocuments();
+        assertThrows(IllegalStateException.class,()->journal.recover(fixture.prepared.id(),"actor",()->true));
+        assertEquals(0,operations().countDocuments());assertEquals(before,fixture.fixture.mongo.getCollection(ReviewSnapshotArchive.METADATA).countDocuments());
+    }
+    @Test void recoveryRequiresOriginalActorAndCurrentPermissionBeforeReturningEvidence() {
+        var prepared=prepare();var before=operations().find().first();
+        assertThrows(SecurityException.class,()->journal.recover(prepared.isolationId(),"other",()->true));
+        assertThrows(SecurityException.class,()->journal.recover("invalid","actor",()->false));
+        var calls=new java.util.concurrent.atomic.AtomicInteger();
+        assertThrows(SecurityException.class,()->journal.recover(prepared.isolationId(),"actor",()->calls.incrementAndGet()<3));
+        assertEquals(before,operations().find().first());
+    }
     @Test void concurrentCallersCanObtainOnlyOneExecutionToken()throws Exception {
         var prepared=prepare();var start=new CountDownLatch(1);
         try(var pool=Executors.newFixedThreadPool(2)) {
@@ -62,7 +92,7 @@ class ReviewOrphanCancellationJournalTest {
             case "expiry"->new Document("intent.expiresAt",prepared.expiresAt()+1);case "extra"->new Document("extra",true);case "numericType"->new Document("intent.target.binding.attempt",1L);
             default->new Document("state",List.of("PREPARED"));};
         operations().updateOne(new Document("_id",prepared.isolationId()),new Document("$set",change));var before=operations().find().first();
-        assertThrows(IllegalStateException.class,()->journal.claim(prepared,"actor",()->true));assertEquals(before,operations().find().first());
+        assertThrows(IllegalStateException.class,()->journal.claim(prepared,"actor",()->true));assertThrows(IllegalStateException.class,()->journal.recover(prepared.isolationId(),"actor",()->true));assertEquals(before,operations().find().first());
     }
     @Test void permissionAndArchiveAuthorityAreRequiredBeforeCreatingIntent() {
         assertThrows(SecurityException.class,()->journal.prepare(fixture.prepared.id(),"actor",()->false));assertThrows(SecurityException.class,()->journal.prepare(fixture.prepared.id(),"other",()->true));

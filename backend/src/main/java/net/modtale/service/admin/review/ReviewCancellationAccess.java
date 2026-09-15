@@ -24,6 +24,10 @@ public final class ReviewCancellationAccess {
         var authority=authority();uuid(isolationId);
         return workflow.call(allowed->journal.prepare(isolationId,authority.actor(),allowed),authority.allowed());
     }
+    public ReviewOrphanCancellationJournal.Receipt recover(String isolationId) {
+        var authority=authority();uuid(isolationId);
+        return workflow.call(allowed->journal.recover(isolationId,authority.actor(),allowed),authority.allowed());
+    }
     public ReviewOrphanCancellationExecutor.Execution execute(ReviewOrphanCancellationJournal.Prepared original) {
         var authority=authority();validate(original);
         return workflow.call(allowed->executor.execute(original,authority.actor(),allowed),authority.allowed());
