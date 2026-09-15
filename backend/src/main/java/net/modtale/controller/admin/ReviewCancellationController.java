@@ -15,6 +15,7 @@ public class ReviewCancellationController {
     private final ReviewCancellationAccess access;
     public ReviewCancellationController(ReviewCancellationAccess access){this.access=access;}
     @GetMapping("/capabilities") public ResponseEntity<ReviewCancellationAccess.Capability> capabilities(){return response(access.capability());}
+    @GetMapping("/targets/{id}") public ResponseEntity<ReviewOrphanCancellationJournal.Preview> preview(@PathVariable String id){return response(access.preview(id));}
     @GetMapping("/operations/{id}") public ResponseEntity<ReviewOrphanCancellationJournal.Receipt> recover(@PathVariable String id){return response(access.recover(id));}
     @PostMapping("/prepare") public ResponseEntity<ReviewOrphanCancellationJournal.Prepared> prepare(@RequestBody Prepare request){return response(access.prepare(request==null?null:request.isolationId()));}
     @PostMapping("/execute") public ResponseEntity<ReviewOrphanCancellationExecutor.Execution> execute(@RequestBody ReviewOrphanCancellationJournal.Prepared request){return response(access.execute(request));}

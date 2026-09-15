@@ -33,11 +33,21 @@ class ReviewCancellationControllerTest {
     void auth(String...permissions){SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("actor",null,Arrays.stream(permissions).map(SimpleGrantedAuthority::new).toList()));}
     @Test void allRoutesRequireBothPermissionsBeforeAccess() {
         for(String permission:List.of("PROJECT_REVIEW_READ","PROJECT_VERSION_RESCAN","PROJECT_REVIEW_DECIDE","ROLE_USER")) {
-            auth(permission);assertThrows(AccessDeniedException.class,()->controller.capabilities());assertThrows(AccessDeniedException.class,()->controller.prepare(null));
+            auth(permission);assertThrows(AccessDeniedException.class,()->controller.preview(id));assertThrows(AccessDeniedException.class,()->controller.capabilities());assertThrows(AccessDeniedException.class,()->controller.prepare(null));
             assertThrows(AccessDeniedException.class,()->controller.execute(null));assertThrows(AccessDeniedException.class,()->controller.receipt(null));
             assertThrows(AccessDeniedException.class,()->controller.recover(id));assertThrows(AccessDeniedException.class,()->controller.check(null));assertThrows(AccessDeniedException.class,()->controller.checkReceipt(null));
         }
         SecurityContextHolder.clearContext();var missing=assertThrows(IllegalArgumentException.class,()->controller.capabilities());Throwable root=missing;while(root.getCause()!=null)root=root.getCause();assertInstanceOf(org.springframework.security.authentication.AuthenticationCredentialsNotFoundException.class,root);verifyNoInteractions(access);
+    }
+    @Test void previewIsReadOnlyNoStoreAndContainsOnlyConfirmationFields()throws Exception {
+        when(access.preview(id)).thenReturn(new ReviewOrphanCancellationJournal.Preview(id,"OBJECT_ID","0123456789abcdef01234567",2,"v",checkId,id,"b".repeat(64),"a".repeat(64),"c".repeat(64)));
+        MockMvcBuilders.standaloneSetup(controller).build().perform(get("/api/v1/admin/verification/cancellations/targets/"+id))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store"))
+                .andExpect(jsonPath("$.projectIdType").value("OBJECT_ID")).andExpect(jsonPath("$.versionIndex").value(2))
+                .andExpect(jsonPath("$.targetSha256").value("a".repeat(64))).andExpect(jsonPath("$.jobId").value(id))
+                .andExpect(jsonPath("$.binding").doesNotExist()).andExpect(jsonPath("$.filePath").doesNotExist()).andExpect(jsonPath("$.actor").doesNotExist())
+                .andExpect(jsonPath("$.origin").doesNotExist()).andExpect(jsonPath("$.token").doesNotExist());
+        verify(access).preview(id);verifyNoMoreInteractions(access);
     }
     @Test void preparationAndExecutionRemainSeparateHttpActions()throws Exception {
         var mvc=MockMvcBuilders.standaloneSetup(controller).build();when(access.prepare(id)).thenReturn(original);

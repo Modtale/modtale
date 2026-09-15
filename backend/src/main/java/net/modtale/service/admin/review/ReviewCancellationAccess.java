@@ -25,6 +25,10 @@ public final class ReviewCancellationAccess {
         var authority=authority();
         return workflow.call(allowed->new Capability("CANCEL_ORIGINAL_REVIEW"),authority.allowed());
     }
+    public ReviewOrphanCancellationJournal.Preview preview(String isolationId) {
+        var authority=authority();uuid(isolationId);
+        return workflow.call(allowed->journal.preview(isolationId,authority.actor(),allowed),authority.allowed());
+    }
     public ReviewOrphanCancellationJournal.Prepared prepare(String isolationId) {
         var authority=authority();uuid(isolationId);
         return workflow.call(allowed->journal.prepare(isolationId,authority.actor(),allowed),authority.allowed());

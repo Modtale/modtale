@@ -28,7 +28,7 @@ class ReviewCancellationAccessTest {
     @AfterEach void cleanup(){workflow.close();SecurityContextHolder.clearContext();}
     @Test void allOperationsRequireBothPermissionsBeforeValidationOrWork() {
         for(var permissions:List.of(Set.of(AdminPermission.PROJECT_REVIEW_READ),Set.of(AdminPermission.PROJECT_VERSION_RESCAN),Set.of(AdminPermission.PROJECT_REVIEW_DECIDE))) {
-            actor.setAdminPermissions(permissions);assertThrows(SecurityException.class,()->access.capability());
+            actor.setAdminPermissions(permissions);assertThrows(SecurityException.class,()->access.capability());assertThrows(SecurityException.class,()->access.preview(null));
             assertThrows(SecurityException.class,()->access.recover(null));assertThrows(SecurityException.class,()->access.prepare(null));assertThrows(SecurityException.class,()->access.execute(null));
             assertThrows(SecurityException.class,()->access.receipt(null));assertThrows(SecurityException.class,()->access.check(null));assertThrows(SecurityException.class,()->access.checkReceipt(null));
         }
@@ -39,12 +39,19 @@ class ReviewCancellationAccessTest {
         when(accounts.getCurrentUser(any())).thenReturn(null);assertThrows(SecurityException.class,()->access.check(check));verifyNoInteractions(journal,executor,reconciler);
     }
     @Test void malformedRequestsNeverReachComponents() {
-        assertThrows(IllegalArgumentException.class,()->access.recover("wrong"));assertThrows(IllegalArgumentException.class,()->access.prepare("wrong"));
+        assertThrows(IllegalArgumentException.class,()->access.preview("wrong"));assertThrows(IllegalArgumentException.class,()->access.recover("wrong"));assertThrows(IllegalArgumentException.class,()->access.prepare("wrong"));
         assertThrows(IllegalArgumentException.class,()->access.execute(new ReviewOrphanCancellationJournal.Prepared(original.isolationId(),original.targetSha256(),1,120002)));
         assertThrows(IllegalArgumentException.class,()->access.receipt(new ReviewOrphanCancellationJournal.Prepared(original.isolationId(),"A".repeat(64),1,2)));
         assertThrows(IllegalArgumentException.class,()->access.check(new ReviewCancellationAccess.Check("bad",original)));
         assertThrows(IllegalArgumentException.class,()->access.checkReceipt(new ReviewCancellationAccess.Check(check.id(),null)));
         verifyNoInteractions(journal,executor,reconciler);
+    }
+    @Test void previewRechecksAccountAndNeverPreparesAnOperation() {
+        when(journal.preview(eq(original.isolationId()),eq("actor"),any())).thenAnswer(i->{
+            assertTrue(i.<BooleanSupplier>getArgument(2).getAsBoolean());actor.setAdminPermissions(Set.of());return null;
+        });
+        assertThrows(SecurityException.class,()->access.preview(original.isolationId()));
+        verify(journal).preview(eq(original.isolationId()),eq("actor"),any());verifyNoMoreInteractions(journal);verifyNoInteractions(executor,reconciler);
     }
     @Test void capabilityUsesAdmissionWithoutRemoteDiscovery() {
         assertEquals("CANCEL_ORIGINAL_REVIEW",access.capability().action());verifyNoInteractions(journal,executor,reconciler);

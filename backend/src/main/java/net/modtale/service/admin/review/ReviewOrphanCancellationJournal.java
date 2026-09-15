@@ -40,6 +40,20 @@ public final class ReviewOrphanCancellationJournal {
         operations=mongo.getCollection(COLLECTION).withReadPreference(ReadPreference.primary()).withReadConcern(ReadConcern.MAJORITY)
                 .withWriteConcern(WriteConcern.MAJORITY.withJournal(true).withWTimeout(5,TimeUnit.SECONDS)).withTimeout(5000,TimeUnit.MILLISECONDS);
     }
+    public record Preview(String isolationId,String projectIdType,String projectId,int versionIndex,String versionId,
+                          String requestId,String jobId,String beforeSha256,String targetSha256,String artifactSha256) {}
+    /** Original archived target only; does not prepare an operation or contact the remote service. */
+    public Preview preview(String isolationId,String actor,BooleanSupplier permitted) {
+        permission(permitted);if(!uuid(isolationId))throw new IllegalArgumentException("Invalid cancellation identity");
+        var original=resolver.resolve(isolationId,actor);permission(permitted);
+        boolean objectId=original.projectId() instanceof org.bson.types.ObjectId;
+        var binding=original.binding();
+        var result=new Preview(original.isolationId(),objectId?"OBJECT_ID":"STRING",
+                objectId?((org.bson.types.ObjectId)original.projectId()).toHexString():(String)original.projectId(),
+                original.versionIndex(),binding.versionId(),binding.requestId(),binding.jobId(),original.beforeSha256(),
+                digest(bytes(target(original))),binding.artifactSha256());
+        permission(permitted);return result;
+    }
     public Prepared prepare(String isolationId,String actor,BooleanSupplier permitted) {
         permission(permitted);var target=resolver.resolve(isolationId,actor);permission(permitted);
         var stored=read(isolationId);

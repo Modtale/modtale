@@ -36,6 +36,26 @@ class ReviewOrphanCancellationJournalTest {
         assertEquals("BLOCK",fixture.fixture.saved().getVerdict());assertEquals(before.get("reviewStatus"),fixture.raw().get("reviewStatus"));
         assertEquals(0,fixture.fixture.gets.get());assertEquals(0,fixture.fixture.posts.get());verifyNoInteractions(fixture.fixture.storage);
     }
+    @Test void previewUsesAuthenticatedOriginalTargetAndMatchesPreparedDigestWithoutCreatingWork() {
+        var before=fixture.raw();long archives=fixture.fixture.mongo.getCollection(ReviewSnapshotArchive.METADATA).countDocuments();
+        var preview=journal.preview(fixture.prepared.id(),"actor",()->true);
+        assertEquals(fixture.prepared.id(),preview.isolationId());assertEquals(fixture.prepared.sha256(),preview.beforeSha256());
+        assertEquals(fixture.fixture.job,preview.jobId());assertEquals(0,preview.versionIndex());
+        assertEquals(0,operations().countDocuments());assertEquals(archives,fixture.fixture.mongo.getCollection(ReviewSnapshotArchive.METADATA).countDocuments());assertEquals(before,fixture.raw());
+        fixture.fixture.change("scanResult.remoteReview.jobId",UUID.randomUUID().toString());
+        assertEquals(preview,journal.preview(fixture.prepared.id(),"actor",()->true));
+        fixture.fixture.mongo.getCollection("projects").deleteMany(new Document());
+        assertEquals(preview,journal.preview(fixture.prepared.id(),"actor",()->true));
+        assertEquals(preview.targetSha256(),prepare().targetSha256());
+        assertEquals(0,fixture.fixture.gets.get());assertEquals(0,fixture.fixture.posts.get());verifyNoInteractions(fixture.fixture.storage);
+    }
+    @Test void previewRejectsUnconfirmedIsolationRevokedPermissionAndOtherActors() {
+        assertThrows(SecurityException.class,()->journal.preview(fixture.prepared.id(),"other",()->true));
+        assertThrows(SecurityException.class,()->journal.preview("invalid","actor",()->false));
+        var calls=new java.util.concurrent.atomic.AtomicInteger();assertThrows(SecurityException.class,()->journal.preview(fixture.prepared.id(),"actor",()->calls.incrementAndGet()<3));
+        fixture.fixture.mongo.getCollection(ReviewRepairJournal.COLLECTION).updateOne(new Document("_id",fixture.prepared.id()),new Document("$set",new Document("state","UNKNOWN")));
+        assertThrows(IllegalStateException.class,()->journal.preview(fixture.prepared.id(),"actor",()->true));assertEquals(0,operations().countDocuments());
+    }
     @Test void expiredIntentRecoveryIsReadOnlyAndNeverRenewsCancellationAuthority() {
         var old=create(fixture.fixture.mongo,Clock.fixed(Instant.now().minusSeconds(3600),ZoneOffset.UTC));
         var prepared=old.prepare(fixture.prepared.id(),"actor",()->true);var before=operations().find().first();var version=fixture.raw();
