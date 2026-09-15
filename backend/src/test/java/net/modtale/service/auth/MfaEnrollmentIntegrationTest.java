@@ -20,7 +20,7 @@ class MfaEnrollmentIntegrationTest {
     private TwoFactorService factors; private MfaEnrollmentService service;
     @BeforeEach void setup(){
         String port=System.getenv().getOrDefault("WARDEN_REVIEW_DB_PORT","27030");
-        if(!Set.of("27029","27030").contains(port))throw new IllegalArgumentException("Unexpected test port");
+        if(!Set.of("27029","27030","27031","27032").contains(port))throw new IllegalArgumentException("Unexpected test port");
         client=MongoClients.create("mongodb://127.0.0.1:"+port+"/?serverSelectionTimeoutMS=3000");
         database="warden_mfa_test_"+UUID.randomUUID().toString().replace("-", "");
         mongo=new MongoTemplate(client,database);factors=mock(TwoFactorService.class);service=new MfaEnrollmentService(mongo,factors);

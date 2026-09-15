@@ -18,7 +18,7 @@ class FavoritePersistenceIntegrationTest {
     private String database;
     @BeforeEach void setup() {
         String port = System.getenv().getOrDefault("WARDEN_REVIEW_DB_PORT", "27030");
-        if (!Set.of("27029", "27030").contains(port)) throw new IllegalArgumentException("Unexpected test database port");
+        if (!Set.of("27029", "27030", "27031", "27032").contains(port)) throw new IllegalArgumentException("Unexpected test database port");
         client = MongoClients.create("mongodb://127.0.0.1:" + port + "/?serverSelectionTimeoutMS=3000");
         database = "warden_favorite_test_" + UUID.randomUUID().toString().replace("-", "");
         mongo = new MongoTemplate(client, database); favorites = new FavoritePersistence(mongo);
