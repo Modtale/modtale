@@ -74,6 +74,25 @@ public final class ProjectMutationPreparation {
         var transitions=validate(before.versionBytes(),after.versionBytes(),intent.projectId(),mutation);permission(permitted);
         return new Recovered(new Prepared(id,beforeId,afterId,payload.getString("beforeSha256"),payload.getString("afterSha256"),mutation,intent.createdAt(),intent.expiresAt()),before,after,transitions);
     }
+    public static Set<net.modtale.model.user.ApiKey.ApiPermission> requiredPermissions(byte[] beforeBytes,byte[] afterBytes,Object projectId,Mutation mutation) {
+        Objects.requireNonNull(mutation);var transitions=validate(beforeBytes,afterBytes,projectId,mutation);
+        var permissions=EnumSet.noneOf(net.modtale.model.user.ApiKey.ApiPermission.class);
+        if(mutation==Mutation.SUBMISSION)permissions.add(net.modtale.model.user.ApiKey.ApiPermission.PROJECT_STATUS_SUBMIT);
+        boolean membershipChanged=false,moved=false;
+        for(var transition:transitions) {
+            if(transition.beforeIndex()<0){permissions.add(net.modtale.model.user.ApiKey.ApiPermission.VERSION_CREATE);membershipChanged=true;}
+            else if(transition.afterIndex()<0){permissions.add(net.modtale.model.user.ApiKey.ApiPermission.VERSION_DELETE);membershipChanged=true;}
+            else {
+                moved|=transition.beforeIndex()!=transition.afterIndex();
+                if(transition.changes().stream().anyMatch(change->mutation!=Mutation.SUBMISSION || change!=VersionReviewTransition.Change.REVIEW))
+                    permissions.add(net.modtale.model.user.ApiKey.ApiPermission.VERSION_EDIT);
+            }
+        }
+        var before=decode(beforeBytes);var after=decode(afterBytes);
+        if(moved && !membershipChanged || !Arrays.equals(bytes(new Document("v",before.get("childProjectIds"))),bytes(new Document("v",after.get("childProjectIds")))))
+            permissions.add(net.modtale.model.user.ApiKey.ApiPermission.VERSION_EDIT);
+        if(permissions.isEmpty())throw invalid();return Set.copyOf(permissions);
+    }
     private static List<VersionReviewTransition.Transition> validate(byte[] beforeBytes,byte[] afterBytes,Object projectId,Mutation mutation) {
         var before=decode(beforeBytes);var after=decode(afterBytes);if(!projectId.equals(before.get("_id")) || !projectId.equals(after.get("_id")))throw invalid();
         var allowed=mutation==Mutation.VERSION_LIST?LIST_FIELDS:SUBMIT_FIELDS;var fields=new HashSet<>(before.keySet());fields.addAll(after.keySet());

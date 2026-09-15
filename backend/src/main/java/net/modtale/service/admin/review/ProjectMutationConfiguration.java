@@ -26,4 +26,9 @@ public class ProjectMutationConfiguration {
         return new ProjectMutationOwnerAuthority(accounts,access,keys,mongo);
     }
 
+    @Bean ProjectMutationOwnerAccess projectMutationOwnerAccess(ReviewRepairWorkflow budget,ProjectMutationOwnerAuthority authority,
+            ProjectMutationPreparation preparation,ProjectMutationExecutor executor,ProjectMutationReferenceReader history) {
+        return new ProjectMutationOwnerAccess(budget,authority,preparation,executor,history);
+    }
+
 }

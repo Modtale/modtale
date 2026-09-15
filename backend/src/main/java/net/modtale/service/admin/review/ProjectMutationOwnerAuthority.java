@@ -27,6 +27,9 @@ public final class ProjectMutationOwnerAuthority {
     public ProjectMutationOwnerAuthority(AccountService accounts,AccessControlService access,ApiKeyRepository keys,MongoTemplate mongo) {
         this.accounts=Objects.requireNonNull(accounts);this.access=Objects.requireNonNull(access);this.keys=Objects.requireNonNull(keys);this.mongo=Objects.requireNonNull(mongo);
     }
+    public String actor() {
+        var user=current(SecurityContextHolder.getContext().getAuthentication());if(user==null)throw denied();return user.getId();
+    }
     public Bound bind(Object projectId,Set<ApiKey.ApiPermission> requested) {
         if(!(projectId instanceof ObjectId || projectId instanceof String s && !s.isBlank() && s.length()<=128)
                 || requested==null || requested.isEmpty() || !PERMISSIONS.containsAll(requested))throw denied();
