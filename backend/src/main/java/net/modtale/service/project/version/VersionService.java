@@ -27,6 +27,8 @@ import org.springframework.web.multipart.MultipartFile;
 public class VersionService {
 
     private final ProjectReviewPersistence reviewPersistence;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private net.modtale.service.admin.review.ProjectMutationOwnerAccess retainedMutations;
     private final ProjectService projectService;
     private final ProjectAccessService projectAccessService;
     private final ProjectMutationGuard projectMutationGuard;
@@ -130,6 +132,18 @@ public class VersionService {
 
         ProjectVersion version = projectVersionAccessService.requireById(project, versionId,
                 () -> new VersionNotFoundException("We couldn't find that project version."));
+        if (retainedMutations != null) {
+            var outcome=retainedMutations.removeVersion(snapshot.raw(),versionId);
+            if (!"APPLIED".equals(outcome.state())) throw ProjectReviewSnapshot.conflict();
+            project.getVersions().removeIf(existing -> existing.getId().equals(versionId));
+            projectService.evictProjectCache(project);
+            // Historical artifact references remain retained; visible deletion does not authorize storage cleanup.
+            return;
+        }
+        if (version.getRetainedRemoteReview()!=null || version.getVersionMutation()!=null || version.getReviewReplacement()!=null
+                || version.getReviewIsolation()!=null || version.getReplacementSecurityHold()!=null
+                || version.getScanResult()!=null && version.getScanResult().getRemoteReview()!=null)
+            throw new net.modtale.exception.InvalidVersionRequestException("Retained review history must be available before removing this version.");
         project.getVersions().removeIf(existing -> existing.getId().equals(versionId));
         if (!reviewPersistence.applyVersionList(snapshot)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(project);

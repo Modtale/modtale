@@ -57,4 +57,32 @@ class ProjectMutationOwnerAccessTest {
         var prepared=prepare();base.base.base.fixture.mongo.getCollection("projects").updateOne(new Document("_id",base.root().get("_id")),new Document("$set",new Document("authorId","other")));
         assertThrows(SecurityException.class,()->owner.apply(prepared));assertEquals(2,base.root().getList("versions",Document.class).size());
     }
+    net.modtale.service.project.version.VersionService deletionService(boolean retained,
+            net.modtale.service.project.lifecycle.ProjectDeletionService files,net.modtale.service.project.query.ProjectService projects){
+        var mongo=base.base.base.fixture.mongo;var access=mock(net.modtale.service.project.access.ProjectAccessService.class);
+        when(access.requireVersionPermission(anyString(),any(),eq("VERSION_DELETE"),anyString())).thenAnswer(call->mongo.findById(call.getArgument(0),net.modtale.model.project.Project.class));
+        var versions=mock(net.modtale.service.project.access.ProjectVersionAccessService.class);
+        when(versions.requireById(any(),anyString(),any())).thenAnswer(call->{var project=(net.modtale.model.project.Project)call.getArgument(0);return project.getVersions().stream().filter(v->v.getId().equals(call.getArgument(1))).findFirst().orElseThrow();});
+        var service=new net.modtale.service.project.version.VersionService(new ProjectReviewPersistence(mongo),projects,access,
+                new net.modtale.service.project.access.ProjectMutationGuard(),versions,mongo,mock(net.modtale.service.project.version.VersionManifestService.class),files,
+                mock(net.modtale.service.project.version.VersionCreationCommandHandler.class),mock(net.modtale.service.project.version.VersionUpdateCommandHandler.class));
+        if(retained)org.springframework.test.util.ReflectionTestUtils.setField(service,"retainedMutations",owner);return service;
+    }
+    @Test void productionDeletionServiceRetainsOriginalRemoteHistoryAndArtifact(){
+        var files=mock(net.modtale.service.project.lifecycle.ProjectDeletionService.class);var projects=mock(net.modtale.service.project.query.ProjectService.class);
+        Object id=base.root().get("_id");var original=VersionMutationPreparationTest.bytes(base.root());
+        deletionService(true,files,projects).deleteVersion(id.toString(),"v",user);
+        assertEquals(List.of("w"),base.root().getList("versions",Document.class).stream().map(v->v.getString("_id")).toList());
+        var reader=new ProjectMutationReferenceReader(base.base.base.fixture.mongo,base.base.base.archive,base.base.service,base.executor());
+        var page=reader.page(id,null,64,()->true);assertEquals(1,page.operationIds().size());
+        assertArrayEquals(original,reader.read(id,page.operationIds().getFirst(),()->true).evidence().before().versionBytes());
+        verifyNoInteractions(files);verify(projects).evictProjectCache(any(net.modtale.model.project.Project.class));
+        assertEquals(0,base.base.base.fixture.posts.get());assertEquals(0,base.base.base.fixture.gets.get());
+    }
+    @Test void disabledRuntimeCannotDeleteVersionWithLiveReviewBinding(){
+        var files=mock(net.modtale.service.project.lifecycle.ProjectDeletionService.class);var projects=mock(net.modtale.service.project.query.ProjectService.class);var before=base.root();
+        assertThrows(net.modtale.exception.InvalidVersionRequestException.class,()->deletionService(false,files,projects).deleteVersion(before.get("_id").toString(),"v",user));
+        assertEquals(before,base.root());verifyNoInteractions(files,projects);
+    }
+
 }

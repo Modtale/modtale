@@ -25,6 +25,22 @@ public final class ProjectMutationOwnerAccess {
             return preparation.prepare(new ProjectMutationPreparation.Request(id,projectId,expectedSha256,actor,mutation,proposal),permitted);
         },()->true);
     }
+    public ProjectMutationExecutor.Result removeVersion(org.bson.Document original,String versionId) {
+        byte[] before=bytes(Objects.requireNonNull(original));
+        var proposed=new org.bson.RawBsonDocument(before).decode(new org.bson.codecs.DocumentCodec());
+        var versions=new java.util.ArrayList<>(proposed.getList("versions",org.bson.Document.class));
+        if(versionId==null || versions.stream().filter(version->versionId.equals(version.get("_id"))).count()!=1)throw invalid();
+        versions.removeIf(version->versionId.equals(version.get("_id")));proposed.put("versions",versions);
+        String sha;
+        try{sha=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(before));}
+        catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
+        var prepared=prepare(java.util.UUID.randomUUID().toString(),original.get("_id"),sha,ProjectMutationPreparation.Mutation.VERSION_LIST,bytes(proposed));
+        return apply(prepared);
+    }
+    private static byte[] bytes(org.bson.Document value) {
+        var buffer=new org.bson.RawBsonDocument(value,new org.bson.codecs.DocumentCodec()).getByteBuffer().asNIO();
+        if(buffer.remaining()>ReviewSnapshotArchive.MAX_BYTES)throw invalid();var bytes=new byte[buffer.remaining()];buffer.get(bytes);return bytes;
+    }
     public ProjectMutationExecutor.Result apply(ProjectMutationPreparation.Prepared prepared) {
         Objects.requireNonNull(prepared);
         return budget.call(allowed->{
