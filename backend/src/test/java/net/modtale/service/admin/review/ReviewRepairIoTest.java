@@ -31,4 +31,33 @@ class ReviewRepairIoTest {
             assertSame(collection,worker.submit(()->ReviewRepairIo.collection(collection)).get(5,TimeUnit.SECONDS));verifyNoInteractions(collection);
         }
     }
+    @Test void nestedWorkCannotExtendItsParentDeadline() {
+        MongoCollection<Document> collection=mock(MongoCollection.class,RETURNS_SELF);
+        var parent=new AtomicLong(TimeUnit.MILLISECONDS.toNanos(75));
+        try(var outer=ReviewRepairIo.open(parent::get);var inner=ReviewRepairIo.open(()->TimeUnit.SECONDS.toNanos(30))) {
+            ReviewRepairIo.collection(collection);verify(collection).withTimeout(75,TimeUnit.MILLISECONDS);
+            parent.set(1);ReviewRepairIo.collection(collection);verify(collection).withTimeout(1,TimeUnit.MILLISECONDS);
+            assertEquals(1,inner.remainingNanos());
+            parent.set(0);assertEquals(0,inner.remainingNanos());assertThrows(IllegalStateException.class,()->ReviewRepairIo.collection(collection));
+            assertThrows(IllegalStateException.class,ReviewRepairIo::sessionOptions);
+            assertThrows(IllegalStateException.class,()->ReviewRepairIo.transactionOptions(com.mongodb.TransactionOptions.builder().build()));
+        }
+    }
+    @Test void shorterChildBudgetExpiresWithoutChangingParent() {
+        MongoCollection<Document> collection=mock(MongoCollection.class,RETURNS_SELF);var child=new AtomicLong(TimeUnit.MILLISECONDS.toNanos(20));
+        try(var parent=ReviewRepairIo.open(()->TimeUnit.SECONDS.toNanos(30))) {
+            try(var inner=ReviewRepairIo.open(child::get)) {
+                ReviewRepairIo.collection(collection);verify(collection).withTimeout(20,TimeUnit.MILLISECONDS);
+                child.set(0);assertThrows(IllegalStateException.class,()->ReviewRepairIo.collection(collection));
+            }
+            ReviewRepairIo.collection(collection);verify(collection).withTimeout(5000,TimeUnit.MILLISECONDS);
+        }
+    }
+    @Test void nestedOrdinaryScopeInsideCleanupRemainsBoundedByCleanup() {
+        MongoCollection<Document> collection=mock(MongoCollection.class,RETURNS_SELF);
+        try(var parent=ReviewRepairIo.open(()->0);var cleanup=ReviewRepairIo.cleanup();var inner=ReviewRepairIo.open(()->1)) {
+            ReviewRepairIo.collection(collection);verify(collection).withTimeout(1,TimeUnit.MILLISECONDS);
+        }
+    }
+
 }

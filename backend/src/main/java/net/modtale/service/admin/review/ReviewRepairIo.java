@@ -14,18 +14,25 @@ final class ReviewRepairIo implements AutoCloseable {
     private final LongSupplier remainingNanos;
     private boolean closed;
 
-    private ReviewRepairIo(LongSupplier remainingNanos) {
-        this.remainingNanos = remainingNanos;
+    private ReviewRepairIo(LongSupplier remainingNanos, boolean independent) {
+        java.util.Objects.requireNonNull(remainingNanos);
         previous = CURRENT.get();
+        this.remainingNanos = independent || previous == null ? remainingNanos
+                : () -> Math.min(previous.remainingNanos.getAsLong(), remainingNanos.getAsLong());
         CURRENT.set(this);
     }
 
-    static ReviewRepairIo open(LongSupplier remainingNanos) { return new ReviewRepairIo(remainingNanos); }
+    static ReviewRepairIo open(LongSupplier remainingNanos) { return new ReviewRepairIo(remainingNanos, false); }
 
     // Only conservative receipt reconciliation/bookkeeping may enter this independent cleanup budget.
     static ReviewRepairIo cleanup() {
         long started = System.nanoTime();
-        return open(() -> TimeUnit.SECONDS.toNanos(5) - (System.nanoTime() - started));
+        return new ReviewRepairIo(() -> TimeUnit.SECONDS.toNanos(5) - (System.nanoTime() - started), true);
+    }
+
+    long remainingNanos() {
+        if (closed) throw new IllegalStateException("Review repair I/O scope is closed");
+        return remainingNanos.getAsLong();
     }
 
     private static long timeoutMillis() {

@@ -57,7 +57,7 @@ final class ReviewRemoteStatusObserver implements AutoCloseable {
                     var reading=ReviewRepairIo.collection(observations).findOneAndUpdate(exact(reserved),List.of(new Document("$set",new Document("state","READING").append("startedAt","$$NOW"))),
                             new FindOneAndUpdateOptions().collation(BINARY).returnDocument(ReturnDocument.AFTER));
                     if(reading==null)return false;decoded(reading,id,expected,target,allowed);return allowed.getAsBoolean();
-                },remaining);
+                },io::remainingNanos);
                 observation=new ReviewOrphanCancellationJournal.Observation("REMOTE_STATUS",status,null);
             }catch(RemoteReviewClient.Unavailable failure) {
                 int code=failure.status();String kind=code==404?"NOT_FOUND":code==409?"CONTEXT_CONFLICT":code==401||code==403||code==429?"UNAVAILABLE":"UNKNOWN";
