@@ -7,7 +7,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -18,7 +18,7 @@ class ReviewReplacementEvidenceReaderTest {
     ReviewOrphanTargetResolver resolver;
     ReviewReplacementEvidenceReader reader;
     @BeforeEach void setup()throws Exception {
-        fixture.setup();current=new ReviewRemoteTargetReader(fixture.fixture.mongo);
+        fixture.setup();new ReviewReplacementAdmissionReader(fixture.fixture.mongo).initialize();current=new ReviewRemoteTargetReader(fixture.fixture.mongo);
         resolver=spy(new ReviewOrphanTargetResolver(fixture.fixture.mongo,fixture.archive,fixture.isolation));
         reader=new ReviewReplacementEvidenceReader(current,resolver,new ReviewReplacementHistoryReader(fixture.fixture.mongo,fixture.archive,current));
     }
@@ -68,9 +68,10 @@ class ReviewReplacementEvidenceReaderTest {
         Object id=fixture.raw().get("_id");
         assertThrows(SecurityException.class,()->guarded.capture(id,0,"v",()->false));
         verifyNoInteractions(observed,resolver);
-        var calls=new AtomicInteger();
-        assertThrows(SecurityException.class,()->guarded.capture(id,0,"v",()->calls.incrementAndGet()<3));
-        verify(resolver).resolve(fixture.prepared.id(),"actor");assertEquals(3,calls.get());
+        var permitted=new AtomicBoolean(true);
+        doAnswer(call->{var target=call.callRealMethod();permitted.set(false);return target;}).when(resolver).resolve(fixture.prepared.id(),"actor");
+        assertThrows(SecurityException.class,()->guarded.capture(id,0,"v",permitted::get));
+        verify(resolver).resolve(fixture.prepared.id(),"actor");
     }
 
     @ParameterizedTest @ValueSource(strings={"projectType","position"})

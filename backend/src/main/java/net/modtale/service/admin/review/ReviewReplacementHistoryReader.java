@@ -20,9 +20,15 @@ public final class ReviewReplacementHistoryReader {
     private final ReviewSnapshotArchive archive;
     private final ReviewRemoteTargetReader targets;
     private final MongoCollection<Document> operations;
+    private final ReviewReplacementAdmissionReader admissions;
     public ReviewReplacementHistoryReader(MongoTemplate mongo,ReviewSnapshotArchive archive,ReviewRemoteTargetReader targets) {
         this.archive=Objects.requireNonNull(archive);this.targets=Objects.requireNonNull(targets);
         operations=mongo.getCollection(ReviewRepairJournal.COLLECTION).withReadPreference(ReadPreference.primary()).withReadConcern(ReadConcern.MAJORITY);
+        admissions=new ReviewReplacementAdmissionReader(mongo);
+    }
+
+    public void requireUntracked(String requestId,BooleanSupplier permitted) {
+        if(admissions.hasRequest(requestId,permitted))throw inconsistent();
     }
 
     public Link verifyHead(Object projectId,int versionIndex,RemoteReviewBinding current,Object rawReference,BooleanSupplier permitted) {

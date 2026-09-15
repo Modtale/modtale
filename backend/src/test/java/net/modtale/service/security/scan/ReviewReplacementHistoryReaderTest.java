@@ -46,10 +46,12 @@ class ReviewReplacementHistoryReaderTest {
         assertEquals(0,fixture.fixture.fixture.gets.get());assertEquals(0,fixture.fixture.fixture.posts.get());
     }
 
-    @ParameterizedTest @ValueSource(strings={"shape","id","digest","request","extra","receipt","archive","config","origin"})
+    @ParameterizedTest @ValueSource(strings={"missing","null","shape","id","digest","request","extra","receipt","archive","config","origin"})
     void damagedHeadCannotBeSignedIntoAnotherReplacement(String corruption) {
         var f=fixture.fixture.fixture;
         switch(corruption) {
+            case "missing" -> f.mongo.getCollection("projects").updateOne(new Document("_id",fixture.fixture.raw().get("_id")),new Document("$unset",new Document("versions.0.reviewReplacement","")));
+            case "null" -> f.change("reviewReplacement",null);
             case "shape" -> f.change("reviewReplacement","invalid");
             case "id" -> f.change("reviewReplacement.operationId",UUID.randomUUID().toString());
             case "digest" -> f.change("reviewReplacement.beforeSha256","a".repeat(64));

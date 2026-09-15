@@ -26,6 +26,7 @@ public final class ReviewReplacementEvidenceReader {
         var version=new RawBsonDocument(captured.snapshot().versionBytes()).decode(new DocumentCodec());
         var scan=version.get("scanResult",Document.class);
         Object prior=version.get("reviewReplacement");
+        if(prior==null)history.requireUntracked(captured.binding().requestId(),permitted);
         var previous=prior==null?null:history.verifyHead(projectId,versionIndex,captured.binding(),prior,permitted);
         Object reference=version.get("reviewIsolation");
         if(reference==null) {
