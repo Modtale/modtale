@@ -31,4 +31,11 @@ public class ProjectMutationConfiguration {
         return new ProjectMutationOwnerAccess(budget,authority,preparation,executor,history);
     }
 
+    @Bean(destroyMethod="close")
+    @ConditionalOnProperty(name="app.warden.jobs.enabled",havingValue="true")
+    ProjectMutationJobAccounting projectMutationJobAccounting(MongoTemplate mongo,ReviewRepairWorkflow budget,ProjectMutationReferenceReader history,
+            net.modtale.service.security.scan.RemoteReviewClient client,AppReviewRepairProperties properties) {
+        return new ProjectMutationJobAccounting(mongo,budget,history,client,properties.concurrency());
+    }
+
 }
