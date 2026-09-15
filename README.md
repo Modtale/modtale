@@ -1,6 +1,10 @@
 <div align="center">
 <a href="https://modtale.net">
-<img src="logo.svg" alt="Modtale Logo" width="850" height="132">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="frontend/public/assets/logo_light.svg">
+    <source media="(prefers-color-scheme: light)" srcset="frontend/public/assets/logo.svg">
+    <img src="frontend/public/assets/logo.svg" alt="Modtale" width="560">
+  </picture>
 </a>
 
 <p align="center">
