@@ -1139,6 +1139,9 @@ public final class LauncherLibraryController {
             return worldManager.loadWorlds(settingsController.settings());
         }, loadedWorlds -> {
             worlds = loadedWorlds;
+            worldConfigs.clear();
+            loadingWorldConfigs.clear();
+            configScanGeneration++;
             renderWorldRows();
             renderWorldDetail();
             feedback.log("Enabled " + selection.modIds().size() + " mod" + LibraryProjectSupport.plural(selection.modIds().size())
