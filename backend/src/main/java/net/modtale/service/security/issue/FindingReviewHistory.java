@@ -51,6 +51,8 @@ public final class FindingReviewHistory {
 
     /** This gate removes no findings and grants no automatic clearance. The caller must CAS the head. */
     public static void requireManualApproval(MongoTemplate mongo, String projectId, ProjectVersion version) {
+        if(version.getReplacementSecurityHold()!=null)throw new ResponseStatusException(HttpStatus.CONFLICT,
+                "Resolve the retained security block before approving this version.");
         var events = load(mongo, projectId, version.getId(), version.getFindingReviewHead());
         var assessments = new FindingDecisionValidity().assess(projectId, version, events, null, System.currentTimeMillis());
         if (assessments.values().stream().anyMatch(value -> value.state() == FindingDecisionValidity.State.INVALID_RECORD))

@@ -3,6 +3,11 @@ package net.modtale.model.project;
 import java.util.List;
 
 public class ProjectVersion {
+    private String replacementSecurityHold;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public String getReplacementSecurityHold() { return replacementSecurityHold; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public void setReplacementSecurityHold(String value) { replacementSecurityHold=value; }
     private ReviewReplacement reviewReplacement;
     @com.fasterxml.jackson.annotation.JsonIgnore
     public ReviewReplacement getReviewReplacement() { return reviewReplacement; }

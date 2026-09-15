@@ -33,7 +33,7 @@ final class SecurityIssueBaselineService {
             if (excludeVersionId != null && excludeVersionId.equals(version.getId())) {
                 continue;
             }
-            if (version.getReviewStatus() != ProjectVersion.ReviewStatus.APPROVED) {
+            if (version.getReplacementSecurityHold()!=null || version.getReviewStatus() != ProjectVersion.ReviewStatus.APPROVED) {
                 continue;
             }
 

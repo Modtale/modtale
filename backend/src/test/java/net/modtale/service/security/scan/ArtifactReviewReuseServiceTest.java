@@ -48,6 +48,13 @@ class ArtifactReviewReuseServiceTest {
         assertEquals("1.0", result.getReusedReviewVersion());
         assertEquals(project.getVersions().getFirst().getSecurityApprovedAt(), result.getReusedReviewApprovedAt());
     }
+    @Test void retainedReplacementBlockPreventsReuseAsSourceOrTarget() {
+        for(int index:List.of(0,1)) {
+            var result=ScanEvidenceFixtures.complete(false);var project=project(result);
+            project.getVersions().get(index).setReplacementSecurityHold(UUID.randomUUID().toString());
+            service.annotate(project,"new",result);assertNull(result.getReusedReviewVersion());
+        }
+    }
     @Test void staleRejectedUnverifiedOrChangedArtifactsCannotReuse() {
         for (String scenario : List.of("stale", "rejected", "unverified", "changed", "policy", "blocked", "incomplete")) {
             ScanResult result = ScanEvidenceFixtures.complete(false);

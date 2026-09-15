@@ -33,6 +33,15 @@ class SecurityIssueBaselineServiceTest {
 
         assertTrue(service.collectApprovedIssueBaselines(project, null, evaluationService).loose().isEmpty());
     }
+    @Test void aRetainedBlockCannotSupplyKnownFindingBaselines() {
+        var version=approvedVersion("held","1.0");
+        version.setApprovedIssueBaselines(List.of(new ProjectVersion.ApprovedIssueBaseline("si:held","sl:held","HIGH",9,80,123L)));
+        var project=new Project();project.setVersions(List.of(version));
+        assertEquals(1,service.collectApprovedIssueBaselines(project,null,evaluationService).exact().size());
+        version.setReplacementSecurityHold(java.util.UUID.randomUUID().toString());
+        var blocked=service.collectApprovedIssueBaselines(project,null,evaluationService);
+        assertTrue(blocked.exact().isEmpty());assertTrue(blocked.loose().isEmpty());
+    }
 
     @Test
     void collectApprovedIssueBaselinesUsesStoredBaselinesAndSkipsExcludedOrUnapprovedVersions() {

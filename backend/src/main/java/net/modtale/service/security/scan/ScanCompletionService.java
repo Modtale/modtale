@@ -138,16 +138,18 @@ public class ScanCompletionService {
             notes.add("The current inspection policy could not validate this result. A fresh review is required.");
             scanResult.setReviewerNotes(notes);
         }
-        if (targetVersion.getFindingReviewHead() != null) {
+        if (targetVersion.getFindingReviewHead() != null || targetVersion.getReplacementSecurityHold()!=null) {
             scanResult.setReusedReviewVersion(null);
             scanResult.setReusedReviewApprovedAt(0);
             if (!"BLOCK".equals(scanResult.getVerdict()) && scanResult.getStatus() != ScanStatus.INFECTED) {
-                scanResult.setVerdict("REVIEW");
+                scanResult.setVerdict(targetVersion.getReplacementSecurityHold()!=null?"BLOCK":"REVIEW");
                 scanResult.setStatus(ScanStatus.SUSPICIOUS);
             }
             routingDecision = new ScanRoutingService.RoutingDecision(ScanRoutingService.RoutingAction.REQUIRE_REVIEW, 0);
-            var notes = new java.util.ArrayList<>(scanResult.getReviewerNotes());
-            notes.add("Recorded finding decisions require a current moderator review before publication.");
+            var notes = new java.util.ArrayList<>(scanResult.getReviewerNotes()==null?java.util.List.<String>of():scanResult.getReviewerNotes());
+            notes.add(targetVersion.getReplacementSecurityHold()!=null
+                    ? "A retained security block from an earlier review must be resolved before publication."
+                    : "Recorded finding decisions require a current moderator review before publication.");
             scanResult.setReviewerNotes(notes);
         }
         boolean approvedImmediately = routingDecision.action() == ScanRoutingService.RoutingAction.APPROVE_NOW;

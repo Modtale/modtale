@@ -36,6 +36,9 @@ public final class ReviewReplacementExecutor {
     public Result stage(ReviewReplacementPreparation.Prepared prepared,String actor,BooleanSupplier permitted) {
         permission(permitted);var source=verify(prepared,actor,permitted).before();
         var original=new RawBsonDocument(source.versionBytes()).decode(new DocumentCodec());
+        Object priorHold=original.get("replacementSecurityHold");
+        if(priorHold!=null && (!(priorHold instanceof String value) || !value.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")))
+            throw new IllegalStateException("Replacement security hold is inconsistent");
         var binding=new Document();mongo.getConverter().write(prepared.replacement(),binding);
         var hello=ReviewRepairIo.database(mongo.getDb()).runCommand(new Document("hello",1),ReadPreference.primary());
         if(!(hello.get("setName") instanceof String) && !"isdbgrid".equals(hello.get("msg")))throw new IllegalStateException("Replacement requires transaction support");
@@ -54,13 +57,15 @@ public final class ReviewReplacementExecutor {
                 String state="NOT_APPLIED",after=null;
                 if(Arrays.equals(source.versionBytes(),current.versionBytes())) {
                     var scan=new Document(original.get("scanResult",Document.class));
+                    Object hold=priorHold!=null?priorHold:"BLOCK".equals(scan.get("verdict")) || "INFECTED".equals(scan.get("status"))?prepared.id():null;
                     scan.put("status","SCANNING");scan.put("scanState","REPLACEMENT_HELD");
                     scan.put("scanRequestId",prepared.replacement().requestId());scan.put("scanAttempt",prepared.replacement().attempt());
                     scan.put("manualRescan",true);scan.put("remoteReview",binding);scan.remove("remotePoll");scan.remove("remoteStatus");
-                    scan.put("verdict","BLOCK".equals(scan.get("verdict"))?"BLOCK":"REVIEW");scan.put("artifactVerified",false);
+                    scan.put("verdict",hold!=null?"BLOCK":"REVIEW");scan.put("artifactVerified",false);
                     for(String field:List.of("securityEvidence","reviewedContextSha256","reusedReviewVersion","reusedReviewOrigins"))scan.put(field,null);
                     scan.put("reusedReviewApprovedAt",0L);
                     var fields=new Document("scanResult",scan).append("reviewStatus","PENDING").append("scheduledPublishDate",null)
+                            .append("replacementSecurityHold",hold)
                             .append("securityApprovedAt",0L)
                             .append("reviewReplacement",new Document("operationId",prepared.id()).append("beforeSha256",prepared.beforeSha256()).append("requestId",prepared.replacement().requestId()));
                     for(String field:List.of("securityApprovalProjectId","approvedSecurityEvidence","approvedSecurityContextSha256","approvedReviewOrigins","approvedFindingReviewHead"))fields.put(field,null);

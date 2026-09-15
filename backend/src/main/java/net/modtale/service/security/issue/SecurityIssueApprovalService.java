@@ -22,6 +22,8 @@ public class SecurityIssueApprovalService {
 
     public void markIssuesAcceptedForApprovedVersion(ProjectVersion version) {
         if (version == null) return;
+        if(version.getReplacementSecurityHold()!=null)throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.CONFLICT,"Resolve the retained security block before approving this version.");
         // Only the conditional manual approval writer may attest a reviewed finding-history head.
         version.setApprovedFindingReviewHead(null);
         if (version.getScanResult() == null) {
@@ -107,6 +109,7 @@ public class SecurityIssueApprovalService {
         int pruned = 0;
         for (ProjectVersion version : project.getVersions()) {
             if (version == null
+                    || version.getReplacementSecurityHold()!=null
                     || version.getReviewStatus() != ProjectVersion.ReviewStatus.APPROVED
                     || version.getScanResult() == null) {
                 continue;

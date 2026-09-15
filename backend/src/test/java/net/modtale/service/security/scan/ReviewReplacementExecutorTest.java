@@ -50,6 +50,17 @@ class ReviewReplacementExecutorTest {
         assertEquals("NOT_APPLIED",executor().stage(prepared,"new-moderator",()->true).state());assertNull(admission(prepared.id()));
         assertEquals(before,fixture.fixture.raw());
     }
+    @ParameterizedTest @ValueSource(strings={"BLOCK","INFECTED","inherited"})
+    void stagingRetainsTheEarliestUnresolvedAdverseReference(String reason) {
+        var f=fixture.fixture.fixture;String inherited=java.util.UUID.randomUUID().toString();
+        if(reason.equals("BLOCK"))f.change("scanResult.verdict","BLOCK");
+        else if(reason.equals("INFECTED"))f.change("scanResult.status","INFECTED");
+        else f.change("replacementSecurityHold",inherited);
+        var prepared=prepare();assertEquals("APPLIED",executor().stage(prepared,"new-moderator",()->true).state());
+        var version=f.mongo.findById(f.project,net.modtale.model.project.Project.class).getVersions().getFirst();
+        assertEquals(reason.equals("inherited")?inherited:prepared.id(),version.getReplacementSecurityHold());
+        assertEquals("BLOCK",version.getScanResult().getVerdict());
+    }
 
     @Test void admissionInsertFailureRollsBackVersionAndCannotBeReexecuted() {
         var prepared=prepare();var before=fixture.fixture.raw();

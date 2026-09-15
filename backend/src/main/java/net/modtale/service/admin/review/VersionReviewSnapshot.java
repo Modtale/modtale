@@ -28,6 +28,8 @@ public final class VersionReviewSnapshot {
         try {
             @SuppressWarnings("unchecked") Map<String,Object> fields=mapper.convertValue(version,Map.class);
             fields.remove("downloadCount");
+            fields.put("replacementSecurityHold",version.getReplacementSecurityHold());
+            fields.put("reviewReplacement",version.getReviewReplacement());
             var scan=version.getScanResult();
             fields.put("verifiedArtifact",scan!=null && scan.isArtifactVerified());
             fields.put("reusedOrigins",scan==null ? null : scan.getReusedReviewOrigins());

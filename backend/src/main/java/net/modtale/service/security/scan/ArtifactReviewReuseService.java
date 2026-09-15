@@ -19,7 +19,7 @@ public class ArtifactReviewReuseService {
         ProjectVersion target = project.getVersions().stream().filter(Objects::nonNull)
                 .filter(version -> Objects.equals(currentVersionId, version.getId())).findFirst().orElse(null);
         String context = ArtifactReviewContext.fingerprint(target);
-        if (context == null || target.getFindingReviewHead() != null) return;
+        if (context == null || target.getReplacementSecurityHold()!=null || target.getFindingReviewHead() != null) return;
         long now = System.currentTimeMillis();
         for (ProjectVersion version : project.getVersions()) {
             if (version == null || Objects.equals(version.getId(), currentVersionId)

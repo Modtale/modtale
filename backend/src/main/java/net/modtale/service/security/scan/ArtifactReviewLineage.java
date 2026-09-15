@@ -13,7 +13,7 @@ import org.springframework.data.mongodb.core.query.*;
 /** Flattened approval ancestry; copied approvals never become independent trust roots. */
 public final class ArtifactReviewLineage {
     private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
-    private static final List<String> FIELDS = List.of("_id", "hash", "reviewStatus", "findingReviewHead", "approvedFindingReviewHead",
+    private static final List<String> FIELDS = List.of("_id", "hash", "reviewStatus", "replacementSecurityHold", "findingReviewHead", "approvedFindingReviewHead",
             "securityApprovalProjectId", "approvedSecurityEvidence", "approvedSecurityContextSha256", "securityApprovedAt", "approvedReviewOrigins",
             "gameVersions", "dependencies", "manifestId", "manifestVersion", "overrideFileUrl", "modpackConfigs");
     private ArtifactReviewLineage() {}
@@ -24,7 +24,7 @@ public final class ArtifactReviewLineage {
     }
     private static boolean validId(String id) { return id != null && id.matches("[a-zA-Z0-9_-]{1,128}"); }
     public static String stamp(ProjectVersion source) {
-        if (source == null || source.getReviewStatus() != ProjectVersion.ReviewStatus.APPROVED
+        if (source == null || source.getReplacementSecurityHold()!=null || source.getReviewStatus() != ProjectVersion.ReviewStatus.APPROVED
                 || !Objects.equals(source.getFindingReviewHead(), source.getApprovedFindingReviewHead()) || !wellFormed(source.getApprovedReviewOrigins())) return null;
         var evidence = source.getApprovedSecurityEvidence();
         String context = ArtifactReviewContext.fingerprint(source);

@@ -31,7 +31,7 @@ class ArtifactReviewLineageTest {
         assertFalse(ArtifactReviewLineage.valid(project, lineage));
     }
     @Test void changedRevokedExpiredOrLegacySourceCannotBeReused() {
-        for (String change : List.of("hash", "context", "decision", "expiry", "legacy", "missing")) {
+        for (String change : List.of("hash", "context", "decision", "expiry", "legacy", "missing", "hold")) {
             var root = source("root"); var project = new Project(); project.setId("p"); project.setVersions(List.of(root));
             var lineage = ArtifactReviewLineage.extend(project, root);
             switch (change) {
@@ -41,6 +41,7 @@ class ArtifactReviewLineageTest {
                 case "expiry" -> root.setSecurityApprovedAt(System.currentTimeMillis() - 31L * 86400000);
                 case "legacy" -> root.setApprovedReviewOrigins(null);
                 case "missing" -> project.setVersions(List.of());
+                case "hold" -> root.setReplacementSecurityHold(UUID.randomUUID().toString());
             }
             assertFalse(ArtifactReviewLineage.valid(project, lineage), change);
         }
