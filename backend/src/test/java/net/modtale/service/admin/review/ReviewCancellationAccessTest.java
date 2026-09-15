@@ -28,7 +28,7 @@ class ReviewCancellationAccessTest {
     @AfterEach void cleanup(){workflow.close();SecurityContextHolder.clearContext();}
     @Test void allOperationsRequireBothPermissionsBeforeValidationOrWork() {
         for(var permissions:List.of(Set.of(AdminPermission.PROJECT_REVIEW_READ),Set.of(AdminPermission.PROJECT_VERSION_RESCAN),Set.of(AdminPermission.PROJECT_REVIEW_DECIDE))) {
-            actor.setAdminPermissions(permissions);
+            actor.setAdminPermissions(permissions);assertThrows(SecurityException.class,()->access.capability());
             assertThrows(SecurityException.class,()->access.recover(null));assertThrows(SecurityException.class,()->access.prepare(null));assertThrows(SecurityException.class,()->access.execute(null));
             assertThrows(SecurityException.class,()->access.receipt(null));assertThrows(SecurityException.class,()->access.check(null));assertThrows(SecurityException.class,()->access.checkReceipt(null));
         }
@@ -45,6 +45,10 @@ class ReviewCancellationAccessTest {
         assertThrows(IllegalArgumentException.class,()->access.check(new ReviewCancellationAccess.Check("bad",original)));
         assertThrows(IllegalArgumentException.class,()->access.checkReceipt(new ReviewCancellationAccess.Check(check.id(),null)));
         verifyNoInteractions(journal,executor,reconciler);
+    }
+    @Test void capabilityUsesAdmissionWithoutRemoteDiscovery() {
+        assertEquals("CANCEL_ORIGINAL_REVIEW",access.capability().action());verifyNoInteractions(journal,executor,reconciler);
+        workflow.close();assertThrows(IllegalStateException.class,()->access.capability());
     }
     @Test void preparationUsesServerActorAndDoesNotDispatch() {
         when(journal.prepare(eq(original.isolationId()),eq("actor"),any())).thenAnswer(i->{assertTrue(i.<BooleanSupplier>getArgument(2).getAsBoolean());return original;});

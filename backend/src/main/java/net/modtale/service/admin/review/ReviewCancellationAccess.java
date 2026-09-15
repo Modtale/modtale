@@ -20,6 +20,11 @@ public final class ReviewCancellationAccess {
             ReviewCancellationReconciler reconciler) {
         this.accounts=accounts;this.workflow=workflow;this.journal=journal;this.executor=executor;this.reconciler=reconciler;
     }
+    public record Capability(String action) {}
+    public Capability capability() {
+        var authority=authority();
+        return workflow.call(allowed->new Capability("CANCEL_ORIGINAL_REVIEW"),authority.allowed());
+    }
     public ReviewOrphanCancellationJournal.Prepared prepare(String isolationId) {
         var authority=authority();uuid(isolationId);
         return workflow.call(allowed->journal.prepare(isolationId,authority.actor(),allowed),authority.allowed());
