@@ -114,6 +114,13 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     const hasScanIssues = !!scanResult && scanResult.status !== 'SCANNING' && !securityCleared;
     const isScanning = scanResult?.status === 'SCANNING';
 
+    const [findingSearch, setFindingSearch] = useState('');
+    const [findingFocus, setFindingFocus] = useState('all');
+    const [findingPage, setFindingPage] = useState(0);
+    useEffect(() => {
+        setFindingSearch(''); setFindingFocus('all'); setFindingPage(0);
+    }, [mod.id, mod.reviewToken, pendingVersion?.id, pendingVersion?.reviewToken]);
+
     const orderedIssues = useMemo(() => {
         const severityRank = (value?: string) => {
             if (value === 'CRITICAL') return 4;
@@ -137,6 +144,19 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             return severityRank(b.severity) - severityRank(a.severity);
         });
     }, [scanIssues]);
+    const matchingIssues = useMemo(() => {
+        const search = findingSearch.trim().toLowerCase();
+        return orderedIssues.filter(({ issue }) => {
+            if (findingFocus === 'new' && issue.knownIssue) return false;
+            if (findingFocus === 'seen' && !issue.knownIssue) return false;
+            if (findingFocus === 'always' && (issue.reviewCadence || '').toUpperCase() !== 'ALWAYS') return false;
+            return !search || [issue.type, issue.filePath, issue.description].some(value => value?.toLowerCase().includes(search));
+        });
+    }, [orderedIssues, findingSearch, findingFocus]);
+    const findingPages = Math.max(1, Math.ceil(matchingIssues.length / 100));
+    const visibleFindingPage = Math.min(findingPage, findingPages - 1);
+    const visibleIssues = matchingIssues.slice(visibleFindingPage * 100, (visibleFindingPage + 1) * 100);
+
 
     useEffect(() => {
         if (!pendingVersion?.dependencies) return;
@@ -734,7 +754,30 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                         {showScanDetails && (
                                             <div className="p-4 bg-white dark:bg-black/20 space-y-2 border-t border-red-200 dark:border-red-900/50">
                                                 {orderedIssues.length === 0 && <p className="text-sm text-slate-600 dark:text-slate-300">No heuristic findings were emitted. Review the evidence and reviewer notes before deciding.</p>}
-                                                {orderedIssues.map(({ issue, originalIndex }) => (
+                                                {orderedIssues.length > 0 && <div className="space-y-2 pb-3">
+                                                    <div className="flex flex-wrap gap-3">
+                                                        <input aria-label="Search findings" placeholder="Search finding, file or description…" value={findingSearch}
+                                                            onChange={event => { setFindingSearch(event.target.value); setFindingPage(0); }}
+                                                            className="min-w-0 rounded-lg border border-slate-300 dark:border-slate-700 bg-transparent px-3 py-2 text-sm dark:text-white" />
+                                                        <select aria-label="Finding focus" value={findingFocus}
+                                                            onChange={event => { setFindingFocus(event.target.value); setFindingPage(0); }}
+                                                            className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm dark:text-white">
+                                                            <option value="all">All findings</option><option value="new">Not previously seen</option>
+                                                            <option value="seen">Previously seen</option><option value="always">Always review</option>
+                                                        </select>
+                                                    </div>
+                                                    <p className="text-xs text-slate-600 dark:text-slate-300" role="status">
+                                                        Showing {matchingIssues.length ? visibleFindingPage * 100 + 1 : 0}–{Math.min((visibleFindingPage + 1) * 100, matchingIssues.length)} of {matchingIssues.length} matching findings ({orderedIssues.length} total).
+                                                        {' '}Filters only change this view; previously seen findings may still require review.
+                                                    </p>
+                                                    {matchingIssues.length === 0 && <p className="text-sm text-slate-600 dark:text-slate-300">No findings match these filters.</p>}
+                                                    {findingPages > 1 && <nav aria-label="Finding pages" className="flex items-center gap-3 text-sm dark:text-slate-200">
+                                                        <button type="button" disabled={visibleFindingPage === 0} onClick={() => setFindingPage(visibleFindingPage - 1)}>Previous findings</button>
+                                                        <span>Page {visibleFindingPage + 1} of {findingPages}</span>
+                                                        <button type="button" disabled={visibleFindingPage + 1 >= findingPages} onClick={() => setFindingPage(visibleFindingPage + 1)}>Next findings</button>
+                                                    </nav>}
+                                                </div>}
+                                                {visibleIssues.map(({ issue, originalIndex }) => (
                                                     <div key={originalIndex} className="text-sm bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-slate-200 dark:border-white/5">
                                                         <div className="flex flex-wrap items-center justify-between gap-2">
                                                         <div className="flex-1 min-w-0 pr-4">

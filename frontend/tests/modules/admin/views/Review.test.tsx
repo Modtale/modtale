@@ -216,4 +216,61 @@ describe('Review security clearance status', () => {
         expect(container.querySelectorAll('section[aria-label="Earlier finding reasoning"]')).toHaveLength(1);
         expect(container.textContent).toContain('Current occurrence reasoning');expect(container.textContent).not.toContain('Stale occurrence reasoning');
     });
+    async function searchFindings(value: string) {
+        const input = container.querySelector<HTMLInputElement>('input[aria-label="Search findings"]')!;
+        await act(async () => {
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+    }
+    async function focusFindings(value: string) {
+        const select = container.querySelector<HTMLSelectElement>('select[aria-label="Finding focus"]')!;
+        await act(async () => { select.value = value; select.dispatchEvent(new Event('change', { bubbles: true })); });
+    }
+    async function showFindings() {
+        const show = container.querySelector<HTMLButtonElement>('button[aria-label="Show findings"]');
+        if (show) await act(async () => show.click());
+    }
+    it('bounds rendered findings and preserves original IDs through pages and search', async () => {
+        const issues = Array.from({ length: 250 }, (_, index) => ({ type: 'Network', severity: 'LOW',
+            description: `Occurrence ${index}`, filePath: `Mod${index}.class`, lineStart: index + 1, lineEnd: index + 1, baselineVersion: '0.9' }));
+        vi.mocked(loadPriorFindingReasoning).mockReset().mockResolvedValue(earlierResponse('Last occurrence reasoning'));
+        await render({ ...twoFindings, issues }, true, 'snapshot', 2, earlierSources); await showFindings();
+        expect(container.querySelectorAll('button[aria-label^="Earlier reasoning for finding"]')).toHaveLength(100);
+        expect(container.textContent).toContain('Showing 1–100 of 250 matching findings (250 total)');
+        await click('Next findings');
+        expect(container.querySelector('button[aria-label="Earlier reasoning for finding 101"]')).toBeTruthy();
+        expect(container.querySelector('button[aria-label="Earlier reasoning for finding 1"]')).toBeNull();
+        await searchFindings('Mod249.class');
+        expect(container.querySelectorAll('button[aria-label^="Earlier reasoning for finding"]')).toHaveLength(1);
+        expect(container.textContent).toContain('Showing 1–1 of 1 matching findings (250 total)');
+        await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="Earlier reasoning for finding 250"]')!.click());
+        expect(loadPriorFindingReasoning).toHaveBeenCalledExactlyOnceWith('project', 'version', 'baseline', 249, 'snapshot');
+    });
+    it('keeps previously seen and always-review findings visible by default', async () => {
+        const issues = [{ ...twoFindings.issues[0], description: 'Fresh occurrence', knownIssue: false },
+            { ...twoFindings.issues[1], description: 'Seen sensitive occurrence', knownIssue: true, reviewCadence: 'ALWAYS' }];
+        await render({ ...twoFindings, issues }, true, 'snapshot', 2, earlierSources); await showFindings();
+        expect(container.textContent).toContain('Fresh occurrence'); expect(container.textContent).toContain('Seen sensitive occurrence');
+        await focusFindings('seen');
+        expect(container.textContent).not.toContain('Fresh occurrence'); expect(container.textContent).toContain('Seen sensitive occurrence');
+        expect(container.textContent).toContain('previously seen findings may still require review');
+        await focusFindings('always');
+        expect(container.querySelectorAll('button[aria-label^="Earlier reasoning for finding"]')).toHaveLength(1);
+        await focusFindings('new');
+        expect(container.textContent).toContain('Fresh occurrence'); expect(container.textContent).not.toContain('Seen sensitive occurrence');
+        await focusFindings('all');
+        expect(container.querySelectorAll('button[aria-label^="Earlier reasoning for finding"]')).toHaveLength(2);
+    });
+    it('distinguishes empty filters from no evidence and resets them for a new snapshot', async () => {
+        await render(twoFindings, true, 'snapshot', 2, earlierSources); await showFindings();
+        await searchFindings('not-present'); await focusFindings('seen');
+        expect(container.textContent).toContain('No findings match these filters');
+        expect(container.textContent).not.toContain('No heuristic findings were emitted');
+        await render(twoFindings, true, 'fresh-snapshot', 2, earlierSources);
+        expect(container.querySelector<HTMLInputElement>('input[aria-label="Search findings"]')?.value).toBe('');
+        expect(container.querySelector<HTMLSelectElement>('select[aria-label="Finding focus"]')?.value).toBe('all');
+        expect(container.querySelectorAll('button[aria-label^="Earlier reasoning for finding"]')).toHaveLength(2);
+    });
+
 });
