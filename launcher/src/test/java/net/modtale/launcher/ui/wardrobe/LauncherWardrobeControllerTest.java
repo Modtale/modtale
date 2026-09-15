@@ -87,6 +87,20 @@ class LauncherWardrobeControllerTest {
         }
     }
 
+    @Test void savedTabDoesNotKeepAnUnsavedCatalogSkinSelected() throws Exception {
+        try (Harness h = new Harness()) {
+            h.store.saveItem(CAPE);
+            fx(() -> { button(h.root(), "Skins").fire(); return null; });
+            await(() -> h.root().lookup("#wardrobe-look-" + SKIN.id()) != null);
+            fx(() -> { button(h.root(), "Saved looks").fire(); return null; });
+            await(() -> card(h.root(), "Catalog cape") != null);
+            fx(() -> { button(h.root(), "Apply to Alice").fire(); return null; });
+            Apply applied = h.gateway.applies.poll(5, TimeUnit.SECONDS);
+            assertNotNull(applied);
+            assertEquals(CAPE.id(), applied.item().id(), "Saved looks must apply the displayed saved selection, not a stale catalog skin");
+        }
+    }
+
     @Test void rediscoveredSavedLookInitializesDialogFromStoredMetadataAndSavesAsynchronously() throws Exception {
         try (Harness h = new Harness()) {
             WardrobeItem saved = new WardrobeItem(SKIN.id(), SKIN.kind(), "My favorite outfit", true, "Adventures", SKIN.payload());

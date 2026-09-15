@@ -160,8 +160,12 @@ public final class LauncherWardrobeController implements AutoCloseable {
         request++; tab = value; page = 1; totalPages = 1; search.clear();
         if (selected != null) {
             if (value == Tab.SAVED) selected = store.items().stream()
-                    .filter(item -> item.id().equals(selected.id())).findFirst().orElse(selected);
-            selectedName.setText(displayedLookName(selected));
+                    .filter(item -> item.id().equals(selected.id())).findFirst().orElse(null);
+            if (selected == null) {
+                selectedName.setText("");
+                selectedDetail.setText("");
+                preview.clear();
+            } else selectedName.setText(displayedLookName(selected));
         }
         root.getChildren().removeAll(columns, editor.view());
         if (value == Tab.CUSTOMIZE) { root.getChildren().add(editor.view()); editor.refresh(); return; }
