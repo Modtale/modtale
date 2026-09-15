@@ -32,9 +32,12 @@ class RemoteReviewStepIntegrationTest {
     void route(Handler handler){server.createContext("/api/v1/review-jobs",e->{try{if(e.getRequestURI().getPath().endsWith("/identity")){identityGets.incrementAndGet();byte[] body=mapper.writeValueAsBytes(origin);e.sendResponseHeaders(200,body.length);e.getResponseBody().write(body);return;}
         assertEquals(origin.deploymentId(),e.getRequestHeaders().getFirst("X-Warden-Deployment-Id"));assertEquals(origin.callerScope(),e.getRequestHeaders().getFirst("X-Warden-Caller-Scope"));if(e.getRequestMethod().equals("POST")){posts.incrementAndGet();e.getRequestBody().readAllBytes();}else gets.incrementAndGet();handler.handle(e);}catch(Exception failure){throw new RuntimeException(failure);}finally{e.close();}});}
     void reply(HttpExchange e,int code,String state)throws Exception {
+        reply(e,code,state,null);
+    }
+    void reply(HttpExchange e,int code,String state,String workState)throws Exception {
         var body=new LinkedHashMap<String,Object>();body.put("jobId",job);body.put("requestId",binding.requestId());
         body.put("binding",Map.of("artifactSha256",binding.artifactSha256(),"contextSha256",binding.contextSha256(),"policyVersion",binding.policyVersion(),"reviewConfigSha256",binding.reviewConfigSha256()));
-        body.put("state",state);body.put("artifactRetained",!Set.of("UPLOADING","AWAITING_UPLOAD").contains(state));body.put("createdAt",1000L);body.put("expiresAt",2000L);body.put("workState",null);
+        body.put("state",state);body.put("artifactRetained",!Set.of("UPLOADING","AWAITING_UPLOAD").contains(state));body.put("createdAt",1000L);body.put("expiresAt",2000L);body.put("workState",workState);
         if(e.getRequestURI().getPath().endsWith("/result")) {
             body.remove("state");body.remove("artifactRetained");body.remove("createdAt");body.remove("expiresAt");body.remove("workState");
             body.put("completedAt",1500L);body.put("scan",cleanResult());
