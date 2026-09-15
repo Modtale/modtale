@@ -174,8 +174,11 @@ public final class ReviewOrphanCancellationJournal {
         var result=new Observation(doc.getString("kind"),parsed,doc.getInteger("httpStatus"));if(!Arrays.equals(bytes(doc),bytes(observationDocument(result))))throw unavailable();return result;
     }
     static void validateObservation(Observation observation,ReviewOrphanTargetResolver.Target target) {
+        validateObservation(observation,target.binding());
+    }
+    static void validateObservation(Observation observation,net.modtale.model.project.RemoteReviewBinding binding) {
         Objects.requireNonNull(observation);var status=observation.status();if(status==null)return;
-        if(!target.binding().jobId().equals(status.jobId()) || !Set.of("QUEUED","RUNNING","COMPLETED","CANCELLED","EXPIRED","HELD","UPLOADING","AWAITING_UPLOAD").contains(Objects.toString(status.state(),""))
+        if(!binding.jobId().equals(status.jobId()) || !Set.of("QUEUED","RUNNING","COMPLETED","CANCELLED","EXPIRED","HELD","UPLOADING","AWAITING_UPLOAD").contains(Objects.toString(status.state(),""))
                 || status.createdAt()<=0 || status.expiresAt()<=status.createdAt() || status.workState()!=null && status.workState().length()>128
                 || Set.of("QUEUED","RUNNING","COMPLETED","HELD").contains(status.state()) && !status.artifactRetained())throw unavailable();
     }
