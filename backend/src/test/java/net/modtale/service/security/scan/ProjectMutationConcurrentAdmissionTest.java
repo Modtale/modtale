@@ -38,7 +38,7 @@ class ProjectMutationConcurrentAdmissionTest {
         var decisions=prepared();var f=base.f();var projects=spy(f.mongo.getCollection("projects"));
         doReturn(projects).when(projects).withReadPreference(any());doReturn(projects).when(projects).withReadConcern(any());doReturn(projects).when(projects).withWriteConcern(any());doReturn(projects).when(projects).withTimeout(anyLong(),any());
         var mongo=spy(f.mongo);doReturn(projects).when(mongo).getCollection("projects");var snapshotsReady=new CountDownLatch(2);var writes=new AtomicInteger();
-        doAnswer(call->{if(writes.getAndIncrement()<2){snapshotsReady.countDown();assertTrue(snapshotsReady.await(10,TimeUnit.SECONDS));}return call.callRealMethod();})
+        doAnswer(call->{assertTrue(f.mongo.collectionExists(ProjectMutationActivator.ADMISSIONS));if(writes.getAndIncrement()<2){snapshotsReady.countDown();assertTrue(snapshotsReady.await(10,TimeUnit.SECONDS));}return call.callRealMethod();})
                 .when(projects).updateOne(any(ClientSession.class),any(Bson.class),any(Bson.class),any(UpdateOptions.class));
         try(var budget=new ReviewRepairWorkflow(mock(ReviewRepairPreparation.class),mock(ReviewIsolationExecutor.class),2);var workers=Executors.newFixedThreadPool(2)){
             var archive=base.base.base.base.base.base.archive;var activator=new ProjectMutationActivator(mongo,budget,base.base.service,archive,new ReviewRepairJournal(f.mongo,archive));

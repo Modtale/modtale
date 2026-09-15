@@ -31,6 +31,7 @@ public final class ProjectMutationActivator {
         preparation.verifyCurrent(prepared,actor,allowed);var source=archive.load(prepared.id());var projected=projected(source);String afterSha=digest(bytes(projected));
         var hello=ReviewRepairIo.database(mongo.getDb()).runCommand(new Document("hello",1),ReadPreference.primary());
         if(!(hello.get("setName") instanceof String) && !"isdbgrid".equals(hello.get("msg")))throw invalid();
+        ensureAdmissionCollection(allowed);
         var claim=journal.claim(new ReviewRepairPreparation.Prepared(source.id(),prepared.decisionSha256(),source.createdAt(),source.expiresAt()),actor,source.action(),allowed);
         if(claim==null)return receiptWithinBudget(prepared,actor,allowed);
         try {
@@ -77,6 +78,18 @@ public final class ProjectMutationActivator {
                 try{journal.markUnknown(claim,()->true);}catch(RuntimeException ignored){}return new Result("UNKNOWN",null);
             }
         }
+    }
+    private void ensureAdmissionCollection(BooleanSupplier allowed) {
+        permission(allowed);
+        var database=ReviewRepairIo.database(mongo.getDb().withReadPreference(ReadPreference.primary())
+                .withWriteConcern(WriteConcern.MAJORITY.withJournal(true)));
+        // Avoid implicit namespace creation inside competing admission transactions.
+        if(database.listCollections().filter(new Document("name",ADMISSIONS)).first()==null) {
+            permission(allowed);
+            try{database.createCollection(ADMISSIONS);}
+            catch(MongoCommandException concurrent){if(concurrent.getErrorCode()!=48)throw concurrent;}
+        }
+        permission(allowed);
     }
     public Result receipt(ProjectMutationAdmissionPreparation.Prepared prepared,String actor,BooleanSupplier permitted) {
         return budget.call(allowed->receiptWithinBudget(prepared,actor,allowed),permitted);
