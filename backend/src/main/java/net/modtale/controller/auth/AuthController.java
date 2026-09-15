@@ -282,7 +282,8 @@ public class AuthController {
     }
 
     private void createSession(User user, HttpServletRequest request, HttpServletResponse response) {
-        HttpSession session = request.getSession(true);
+        if (request.getSession(false) != null) request.changeSessionId();
+        else request.getSession(true);
 
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         Authentication authentication = new UsernamePasswordAuthenticationToken(
