@@ -21,4 +21,9 @@ public class ProjectMutationConfiguration {
     @Bean ProjectMutationWorkflow projectMutationWorkflow(ReviewRepairWorkflow budget,ProjectMutationPreparation preparation,ProjectMutationExecutor executor,ProjectMutationReferenceReader history) {
         return new ProjectMutationWorkflow(budget,preparation,executor,history);
     }
+    @Bean ProjectMutationOwnerAuthority projectMutationOwnerAuthority(net.modtale.service.user.account.AccountService accounts,
+            net.modtale.service.security.access.AccessControlService access,net.modtale.repository.user.ApiKeyRepository keys,MongoTemplate mongo) {
+        return new ProjectMutationOwnerAuthority(accounts,access,keys,mongo);
+    }
+
 }
