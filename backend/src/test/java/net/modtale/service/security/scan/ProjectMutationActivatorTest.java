@@ -47,10 +47,11 @@ class ProjectMutationActivatorTest {
         var allowed=new AtomicBoolean(true);doAnswer(call->{call.callRealMethod();allowed.set(false);return null;}).when(admissions).insertOne(any(ClientSession.class),any(Document.class));
         var before=version();assertThrows(SecurityException.class,()->activator(mongo).activate(decision,"moderator",allowed::get));assertEquals(before,version());assertEquals(0,f().mongo.getCollection(ProjectMutationActivator.ADMISSIONS).countDocuments());
     }
-    @Test void lostCommitReplyRecoversWithoutRepeatingActivation(){
+    @ParameterizedTest @ValueSource(booleans={false,true})
+    void lostCommitReplyRecoversWithoutRepeatingActivation(boolean conflictLabel){
         var mongo=spy(f().mongo);var factory=spy(mongo.getMongoDatabaseFactory());doReturn(factory).when(mongo).getMongoDatabaseFactory();
-        doAnswer(call->{var session=spy((ClientSession)call.callRealMethod());doAnswer(commit->{commit.callRealMethod();throw new MongoException("lost commit reply");}).when(session).commitTransaction();return session;}).when(factory).getSession(any(ClientSessionOptions.class));
-        var result=activator(mongo).activate(decision,"moderator",()->true);assertEquals("APPLIED",result.state());assertEquals(result,activate());assertEquals(1,f().mongo.getCollection(ProjectMutationActivator.ADMISSIONS).countDocuments());
+        doAnswer(call->{var session=spy((ClientSession)call.callRealMethod());doAnswer(commit->{commit.callRealMethod();var failure=new MongoException(conflictLabel?112:0,"lost commit reply");if(conflictLabel)failure.addLabel(MongoException.TRANSIENT_TRANSACTION_ERROR_LABEL);throw failure;}).when(session).commitTransaction();return session;}).when(factory).getSession(any(ClientSessionOptions.class));
+        var result=activator(mongo).activate(decision,"moderator",()->true);assertEquals("APPLIED",result.state());assertEquals(result,activate());assertEquals(1,f().mongo.getCollection(ProjectMutationActivator.ADMISSIONS).countDocuments());verify(factory,times(1)).getSession(any(ClientSessionOptions.class));
     }
     @Test void collisionCannotLeaveVersionActivatedWithoutItsOwnAdmission(){
         f().mongo.getCollection(ProjectMutationActivator.ADMISSIONS).insertOne(new Document("_id",decision.binding().requestId()).append("decisionId","other"));var before=version();

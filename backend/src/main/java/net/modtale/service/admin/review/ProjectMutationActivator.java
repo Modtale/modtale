@@ -32,7 +32,10 @@ public final class ProjectMutationActivator {
         var hello=ReviewRepairIo.database(mongo.getDb()).runCommand(new Document("hello",1),ReadPreference.primary());
         if(!(hello.get("setName") instanceof String) && !"isdbgrid".equals(hello.get("msg")))throw invalid();
         var claim=journal.claim(new ReviewRepairPreparation.Prepared(source.id(),prepared.decisionSha256(),source.createdAt(),source.expiresAt()),actor,source.action(),allowed);
-        if(claim==null)return receiptWithinBudget(prepared,actor,allowed);boolean commitAttempted=false;
+        if(claim==null)return receiptWithinBudget(prepared,actor,allowed);
+        try {
+        for(int transactionAttempt=0;;transactionAttempt++){
+        boolean commitAttempted=false;
         try(var session=mongo.getMongoDatabaseFactory().getSession(ReviewRepairIo.sessionOptions())) {
             try {
                 session.startTransaction(ReviewRepairIo.transactionOptions(OPTIONS));permission(allowed);
@@ -56,7 +59,17 @@ public final class ProjectMutationActivator {
                 var fields=new Document("state",state).append("afterSha256",after).append("mutationId",prepared.mutationId()).append("requestId",prepared.binding().requestId()).append("finishedAt","$$NOW");
                 if(operations.updateOne(session,op,List.of(new Document("$set",fields)),new UpdateOptions().collation(BINARY)).getModifiedCount()!=1)throw invalid();
                 permission(allowed);commitAttempted=true;session.commitTransaction();return new Result(state,after);
-            }catch(RuntimeException failure){if(!commitAttempted)try{session.abortTransaction();}catch(RuntimeException ignored){}throw failure;}
+            }catch(RuntimeException failure){
+                boolean aborted=false;
+                if(!commitAttempted)try{session.abortTransaction();aborted=true;}catch(RuntimeException ignored){}
+                if(!commitAttempted && aborted && transactionAttempt<2 && failure instanceof MongoException conflict
+                        && conflict.getCode()==112 && conflict.hasErrorLabel(MongoException.TRANSIENT_TRANSACTION_ERROR_LABEL)){
+                    permission(allowed);continue;
+                }
+                throw failure;
+            }
+        }
+        }
         }catch(RuntimeException uncertain) {
             try(var cleanup=ReviewRepairIo.cleanup()) {
                 if(uncertain instanceof SecurityException){try{journal.markUnknown(claim,()->true);}catch(RuntimeException ignored){}throw uncertain;}
