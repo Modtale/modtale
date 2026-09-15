@@ -30,6 +30,7 @@ public final class VersionReviewSnapshot {
             fields.remove("downloadCount");
             fields.put("replacementSecurityHold",version.getReplacementSecurityHold());
             fields.put("reviewReplacement",version.getReviewReplacement());
+            fields.put("retainedRemoteReview",version.getRetainedRemoteReview());
             var scan=version.getScanResult();
             fields.put("verifiedArtifact",scan!=null && scan.isArtifactVerified());
             fields.put("reusedOrigins",scan==null ? null : scan.getReusedReviewOrigins());

@@ -57,6 +57,8 @@ public class VersionReviewPersistence {
                 .set("versions.$.rejectionReason",reviewed.getRejectionReason())
                 .set("versions.$.scheduledPublishDate",reviewed.getScheduledPublishDate())
                 .set("versions.$.scanResult",reviewed.getScanResult())
+                .set("versions.$.retainedRemoteReview", original!=null && original.getRemoteReview()!=null && reviewed.getScanResult()==null
+                        ? original.getRemoteReview() : originalVersion.getRetainedRemoteReview())
                 .set("versions.$.securityApprovalProjectId", reviewed.getSecurityApprovalProjectId())
                 .set("versions.$.approvedReviewOrigins",reviewed.getApprovedReviewOrigins())
                 .set("versions.$.approvedFindingReviewHead", reviewed.getApprovedFindingReviewHead())
@@ -68,7 +70,8 @@ public class VersionReviewPersistence {
         return applyUpdate(snapshot, update, originGuard.getQueryObject());
     }
     public boolean queueRescan(Snapshot snapshot, net.modtale.model.project.ScanResult queued) {
-        if (snapshot.version().get("scanResult") instanceof Document scan && scan.get("remoteReview") != null)
+        if (snapshot.version().get("retainedRemoteReview")!=null || snapshot.version().get("reviewReplacement")!=null
+                || snapshot.version().get("scanResult") instanceof Document scan && scan.get("remoteReview") != null)
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "This version has a retained remote review. A replacement scan must preserve its review history first.");
         return applyUpdate(snapshot, new Update()

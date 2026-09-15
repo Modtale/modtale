@@ -36,7 +36,8 @@ public final class ArtifactReviewContext {
     }
     public static org.springframework.data.mongodb.core.query.Criteria bindSnapshot(
             org.springframework.data.mongodb.core.query.Criteria criteria, ProjectVersion version) {
-        return criteria.and("replacementSecurityHold").is(version.getReplacementSecurityHold())
+        return criteria.and("retainedRemoteReview").is(version.getRetainedRemoteReview())
+                .and("replacementSecurityHold").is(version.getReplacementSecurityHold())
                 .and("reviewReplacement").is(version.getReviewReplacement())
                 .and("findingReviewHead").is(version.getFindingReviewHead()).and("gameVersions").is(version.getGameVersions())
                 .and("dependencies").is(version.getDependencies())

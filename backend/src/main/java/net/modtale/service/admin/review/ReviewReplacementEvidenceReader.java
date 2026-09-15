@@ -30,7 +30,7 @@ public final class ReviewReplacementEvidenceReader {
         var previous=prior==null?null:history.verifyHead(projectId,versionIndex,captured.binding(),prior,permitted);
         Object reference=version.get("reviewIsolation");
         if(reference==null) {
-            if("REMOTE_ISOLATED".equals(scan.get("scanState")))throw inconsistent();
+            if(scan!=null && "REMOTE_ISOLATED".equals(scan.get("scanState")))throw inconsistent();
             permission(permitted);return new Evidence(captured,null,previous);
         }
         ProjectVersion.ReviewIsolation isolation;

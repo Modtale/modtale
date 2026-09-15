@@ -91,7 +91,8 @@ public class ScanPersistenceService {
 
         switch (routingDecision.action()) {
             case APPROVE_NOW -> {
-                update.set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.APPROVED)
+                update.set("versions.$.retainedRemoteReview", remote!=null ? remote.binding() : reviewedVersion.getRetainedRemoteReview())
+                        .set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.APPROVED)
                         .set("versions.$.securityApprovalProjectId", reviewedVersion.getSecurityApprovalProjectId())
                         .set("versions.$.approvedReviewOrigins", reviewedVersion.getApprovedReviewOrigins())
                         .set("versions.$.approvedFindingReviewHead", null)

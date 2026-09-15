@@ -40,7 +40,8 @@ public class ScheduledReleaseExecutionService {
                     .and("reviewStatus").is(ProjectVersion.ReviewStatus.SCHEDULED)
                     .and("scheduledPublishDate").is(version.getScheduledPublishDate())
                     .and("hash").is(version.getHash())
-                    .and("scanResult.scanAttempt").is(scan == null ? null : scan.getScanAttempt());
+                    .and("scanResult.scanAttempt").is(scan == null ? null : scan.getScanAttempt())
+                    .and("scanResult.remoteReview").is(scan == null ? null : scan.getRemoteReview());
             ArtifactReviewContext.bindSnapshot(versionMatch, version);
             long now = System.currentTimeMillis();
             boolean valid = ArtifactClearancePolicy.boundToVersion(version)
@@ -63,6 +64,7 @@ public class ScheduledReleaseExecutionService {
                 version.setSecurityApprovalProjectId(project.getId());
                 issueAnalysis.markIssuesAcceptedForApprovedVersion(version);
                 update.set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.APPROVED)
+                        .set("versions.$.retainedRemoteReview", scan.getRemoteReview()!=null ? scan.getRemoteReview() : version.getRetainedRemoteReview())
                         .set("versions.$.securityApprovalProjectId", version.getSecurityApprovalProjectId())
                         .set("versions.$.approvedReviewOrigins", version.getApprovedReviewOrigins())
                         .set("versions.$.approvedFindingReviewHead", null)

@@ -56,7 +56,8 @@ public final class ReviewReplacementExecutor {
                 var current=reader.capture(session,source.projectId(),source.versionIndex(),original.getString("_id"));
                 String state="NOT_APPLIED",after=null;
                 if(Arrays.equals(source.versionBytes(),current.versionBytes())) {
-                    var scan=new Document(original.get("scanResult",Document.class));
+                    var previousScan=original.get("scanResult",Document.class);
+                    var scan=previousScan==null ? new Document() : new Document(previousScan);
                     Object hold=priorHold!=null?priorHold:"BLOCK".equals(scan.get("verdict")) || "INFECTED".equals(scan.get("status"))?prepared.id():null;
                     scan.put("status","SCANNING");scan.put("scanState","REPLACEMENT_HELD");
                     scan.put("scanRequestId",prepared.replacement().requestId());scan.put("scanAttempt",prepared.replacement().attempt());
@@ -75,7 +76,7 @@ public final class ReviewReplacementExecutor {
                             new Document("$lt",List.of("$$NOW",new Date(prepared.expiresAt()))))));
                     permission(permitted);
                     if(ReviewRepairIo.collection(projects,session).updateOne(session,query,new Document("$set",set)
-                            .append("$unset",new Document(prefix+"reviewIsolation","")),new UpdateOptions().collation(BINARY)).getModifiedCount()==1) {
+                            .append("$unset",new Document(prefix+"reviewIsolation","").append(prefix+"retainedRemoteReview","")),new UpdateOptions().collation(BINARY)).getModifiedCount()==1) {
                         after=reader.capture(session,source.projectId(),source.versionIndex(),original.getString("_id")).sha256();
                         var admission=new Document("_id",prepared.id()).append("beforeArchiveId",source.id()).append("beforeSha256",prepared.beforeSha256())
                                 .append("afterSha256",after).append("actor",actor).append("projectId",source.projectId()).append("versionIndex",source.versionIndex())

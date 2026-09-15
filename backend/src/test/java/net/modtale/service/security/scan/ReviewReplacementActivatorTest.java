@@ -101,5 +101,14 @@ class ReviewReplacementActivatorTest {
         assertNotNull(approved.getApprovedSecurityEvidence());assertEquals(f.binding.artifactSha256(),approved.getApprovedSecurityEvidence().artifactSha256());
         assertEquals(f.binding.requestId(),approved.getReviewReplacement().requestId());assertEquals(1,f.posts.get());
         verify(f.storage,times(1)).downloadBounded(anyString(),anyInt());
+        assertNull(approved.getScanResult());assertEquals(f.binding.withJobId(f.job),approved.getRetainedRemoteReview());
+        var preparation=base.base.fixture;
+        assertEquals(approved.getRetainedRemoteReview(),preparation.targets.capture(preparation.fixture.raw().get("_id"),0,"v").binding());
+        var next=preparation.preparation.prepare(preparation.request(),()->true);
+        assertEquals(f.binding.attempt()+1,next.replacement().attempt());
+        assertEquals("APPLIED",base.base.executor.stage(next,"new-moderator",()->true).state());
+        assertEquals(next.replacement(),f.saved().getRemoteReview());
+        assertNull(f.mongo.findById(f.project,net.modtale.model.project.Project.class).getVersions().getFirst().getRetainedRemoteReview());
+
     }
 }

@@ -98,6 +98,7 @@ public class SecurityIssueApprovalService {
         version.setSecurityApprovedAt(!reusableEvidence ? 0 : scanResult.getReusedReviewApprovedAt() > 0
                 ? scanResult.getReusedReviewApprovedAt() : Instant.now().toEpochMilli());
         version.setApprovedIssueBaselines(approvedIssueBaselines);
+        if (scanResult.getRemoteReview()!=null) version.setRetainedRemoteReview(scanResult.getRemoteReview());
         version.setScanResult(null);
     }
 

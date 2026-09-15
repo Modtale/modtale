@@ -26,7 +26,7 @@ public final class ReviewRemoteTargetReader {
     public RemoteReviewBinding validate(Object projectId,Document original) {
         try {
             var scan=original.get("scanResult",Document.class);
-            var raw=scan.get("remoteReview",Document.class);
+            var raw=scan==null ? original.get("retainedRemoteReview",Document.class) : scan.get("remoteReview",Document.class);
             // Do not let mapping conversions manufacture a usable remote identity from malformed BSON.
             for(String field:List.of("projectId","versionId","requestId","filePath","artifactSha256",
                     "contextSha256","policyVersion","reviewConfigSha256","jobId"))
@@ -38,9 +38,9 @@ public final class ReviewRemoteTargetReader {
                     || !(origin.get("callerScope") instanceof String))throw unavailable();
             var binding=mongo.getConverter().read(RemoteReviewBinding.class,raw);
             if(!projectId.toString().equals(binding.projectId()) || !binding.versionId().equals(original.get("_id"))
-                    || !binding.requestId().equals(scan.get("scanRequestId"))
+                    || scan!=null && (!binding.requestId().equals(scan.get("scanRequestId"))
                     || !(scan.get("manualRescan") instanceof Boolean manual) || manual!=binding.manualRescan()
-                    || attempt(scan.get("scanAttempt"))!=attempt
+                    || attempt(scan.get("scanAttempt"))!=attempt)
                     || !binding.filePath().equals(original.get("fileUrl")) || !binding.artifactSha256().equals(original.get("hash")))throw unavailable();
             // Poll/result corruption must not prevent retaining an otherwise intact artifact identity.
             var context=new Document();

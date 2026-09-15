@@ -53,6 +53,8 @@ public class ProjectReviewPersistence {
             String path = "versions." + index + ".";
             update.set(path + "reviewStatus", version.getReviewStatus()).set(path + "rejectionReason", version.getRejectionReason())
                     .set(path + "scheduledPublishDate", version.getScheduledPublishDate()).set(path + "scanResult", version.getScanResult())
+                    .set(path + "retainedRemoteReview", scan!=null && scan.getRemoteReview()!=null && version.getScanResult()==null
+                            ? scan.getRemoteReview() : original.getRetainedRemoteReview())
                     .set(path + "securityApprovalProjectId", version.getSecurityApprovalProjectId())
                     .set(path + "approvedReviewOrigins", version.getApprovedReviewOrigins())
                     .set(path + "approvedFindingReviewHead", version.getApprovedFindingReviewHead())
