@@ -236,7 +236,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                             {loading ? mediaPlaceholder : finalBanner ? (
                                 <div className="flex flex-col items-end">
                                     <div className="flex items-center gap-2"><ImageIcon className="w-4 h-4" /> {t('project:changeBanner')}</div>
-                                    <span className="text-[10px] font-medium text-white/50">{t('project:shortRecommendedBannerSize')} · Max 10 MB · {IMAGE_FORMAT_LABEL} · {IMAGE_DIMENSION_LABEL}</span>
+                                    <span className="text-[10px] font-medium text-white/50">{t('project:shortRecommendedBannerSize')}</span>
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center">
