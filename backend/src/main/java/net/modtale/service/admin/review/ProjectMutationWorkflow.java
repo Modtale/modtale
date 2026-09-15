@@ -18,10 +18,20 @@ public final class ProjectMutationWorkflow {
         return budget.call(allowed->preparation.capture(projectId,allowed),permitted);
     }
     public ProjectMutationPreparation.Prepared prepare(ProjectMutationPreparation.Request request,BooleanSupplier permitted) {
-        return budget.call(allowed->preparation.prepare(request,allowed),permitted);
+        return budget.call(allowed->{
+            var current=preparation.capture(request.projectId(),allowed);
+            if(!current.sha256().equals(request.expectedSha256()))throw new IllegalStateException("Project mutation state changed");
+            history.requireHeldHeads(current.projectId(),current.bytes(),allowed);
+            return preparation.prepare(request,allowed);
+        },permitted);
     }
     public ProjectMutationExecutor.Result apply(ProjectMutationPreparation.Prepared prepared,String actor,BooleanSupplier permitted) {
-        return budget.call(allowed->executor.apply(prepared,actor,allowed),permitted);
+        return budget.call(allowed->{
+            var recovered=preparation.recover(prepared.id(),actor,allowed);
+            if(!prepared.equals(recovered.prepared()))throw new IllegalStateException("Project mutation evidence changed");
+            history.requireHeldHeads(recovered.before().projectId(),recovered.before().versionBytes(),allowed);
+            return executor.apply(prepared,actor,allowed);
+        },permitted);
     }
     public ProjectMutationPreparation.Recovered recover(String id,String actor,BooleanSupplier permitted) {
         return budget.call(allowed->preparation.recover(id,actor,allowed),permitted);

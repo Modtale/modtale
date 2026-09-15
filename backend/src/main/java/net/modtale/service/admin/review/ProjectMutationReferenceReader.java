@@ -73,6 +73,37 @@ public final class ProjectMutationReferenceReader {
         if(!Arrays.equals(bytes(expected),bytes(reference)))throw unavailable();
         permission(permitted);return new History(recovered,receipt,applied);
     }
+    /** Verifies the current held projection only; later admitted states require their own authenticated transition. */
+    public void requireHeldHeads(Object projectId,byte[] projectBytes,BooleanSupplier permitted) {
+        permission(permitted);project(projectId);
+        if(projectBytes==null || projectBytes.length>ReviewSnapshotArchive.MAX_BYTES)throw unavailable();
+        var current=new RawBsonDocument(projectBytes).decode(new DocumentCodec());
+        if(!projectId.equals(current.get("_id")) || !Arrays.equals(projectBytes,bytes(current)))throw unavailable();
+        var versions=current.getList("versions",Document.class);VersionReviewTransition.classify(versions,versions);
+        var groups=new HashMap<String,Map<String,Document>>();
+        for(var version:versions) {
+            permission(permitted);Object pointer=version.get("versionMutation");
+            var scan=version.get("scanResult") instanceof Document doc?doc:null;
+            if(pointer==null) {
+                if(scan!=null && "MUTATION_HELD".equals(scan.get("scanState")))throw unavailable();
+                continue;
+            }
+            if(!(pointer instanceof Document ref) || ref.size()!=3 || !(ref.get("operationId") instanceof String id)
+                    || !id.matches(UUID) || !(ref.get("beforeSha256") instanceof String sha) || !sha.matches("[0-9a-f]{64}")
+                    || !(ref.get("requestId") instanceof String request) || !request.matches(UUID)
+                    || scan==null || !"MUTATION_HELD".equals(scan.get("scanState")))throw unavailable();
+            var archived=groups.get(id);
+            if(archived==null) {
+                var verified=read(projectId,id,permitted);var root=new RawBsonDocument(verified.applied().versionBytes()).decode(new DocumentCodec());
+                archived=new HashMap<>();for(var item:root.getList("versions",Document.class))archived.put(item.getString("_id"),item);
+                groups.put(id,archived);
+            }
+            var original=archived.get(version.getString("_id"));if(original==null)throw unavailable();
+            var difference=VersionReviewTransition.classify(List.of(original),List.of(version)).getFirst();
+            if(difference.changes().stream().anyMatch(change->change!=VersionReviewTransition.Change.METADATA))throw unavailable();
+        }
+        permission(permitted);
+    }
     private static void project(Object id) {
         if(!(id instanceof ObjectId || id instanceof String s && !s.isEmpty() && s.length()<=128
                 && java.nio.charset.StandardCharsets.UTF_8.newEncoder().canEncode(s)))throw invalid();

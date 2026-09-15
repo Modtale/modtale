@@ -77,4 +77,55 @@ class ProjectMutationReferenceReaderTest {
         assertThrows(RuntimeException.class,()->reader.read(id,prepared.id(),()->true));
     }
 
+    @Test void heldHeadAllowsMetadataAndPositionChangesWithoutNewReview(){
+        var prepared=base.base.service.prepare(base.base.request(),()->true);base.executor().apply(prepared,"owner",()->true);
+        var current=base.root();var versions=current.getList("versions",Document.class);versions.get(1).put("changelog","Updated description");
+        Collections.reverse(versions);reader.requireHeldHeads(project(),VersionMutationPreparationTest.bytes(current),()->true);
+    }
+    @ParameterizedTest @ValueSource(strings={"missingPointer","request","attempt","context","artifact","hold","state","unknown","pointer"})
+    void heldHeadRejectsAlteredSecurityProjection(String change){
+        var prepared=base.base.service.prepare(base.base.request(),()->true);base.executor().apply(prepared,"owner",()->true);
+        var current=base.root();var version=current.getList("versions",Document.class).get(1);var scan=version.get("scanResult",Document.class);
+        switch(change){
+            case "missingPointer" -> version.remove("versionMutation");
+            case "request" -> scan.put("scanRequestId",UUID.randomUUID().toString());
+            case "attempt" -> scan.put("scanAttempt",1L);
+            case "context" -> version.put("gameVersions",List.of("altered"));
+            case "artifact" -> version.put("fileUrl","altered.jar");
+            case "hold" -> version.put("replacementSecurityHold",UUID.randomUUID().toString());
+            case "state" -> scan.put("scanState","COMPLETE");
+            case "unknown" -> version.put("futureAuthority",true);
+            case "pointer" -> version.get("versionMutation",Document.class).put("beforeSha256","0".repeat(64));
+        }
+        assertThrows(RuntimeException.class,()->reader.requireHeldHeads(project(),VersionMutationPreparationTest.bytes(current),()->true));
+    }
+    @Test void workflowCanApplySecondContextChangeWhileAuthenticatingPriorGroup(){
+        var first=base.base.service.prepare(base.base.request(),()->true);base.executor().apply(first,"owner",()->true);
+        var budget=new ReviewRepairWorkflow(org.mockito.Mockito.mock(ReviewRepairPreparation.class),org.mockito.Mockito.mock(ReviewIsolationExecutor.class),1);
+        var workflow=new ProjectMutationWorkflow(budget,base.base.service,base.executor(),reader);
+        var current=workflow.capture(project(),()->true);var proposed=new RawBsonDocument(current.bytes()).decode(new org.bson.codecs.DocumentCodec());
+        proposed.getList("versions",Document.class).get(1).put("gameVersions",List.of("new-runtime"));
+        var request=new ProjectMutationPreparation.Request(UUID.randomUUID().toString(),project(),current.sha256(),"owner",ProjectMutationPreparation.Mutation.VERSION_LIST,VersionMutationPreparationTest.bytes(proposed));
+        var second=workflow.prepare(request,()->true);assertEquals("APPLIED",workflow.apply(second,"owner",()->true).state());
+        reader.requireHeldHeads(project(),VersionMutationPreparationTest.bytes(base.root()),()->true);
+        assertEquals(2,base.root().getList("versions",Document.class).get(1).get("scanResult",Document.class).get("scanAttempt"));
+        assertEquals(0,budget.status().active());budget.close();
+    }
+
+    @ParameterizedTest @ValueSource(booleans={false,true})
+    void workflowRejectsLostPriorReferenceBeforePreparationOrApplication(boolean afterPreparation){
+        var first=base.base.service.prepare(base.base.request(),()->true);base.executor().apply(first,"owner",()->true);
+        var budget=new ReviewRepairWorkflow(org.mockito.Mockito.mock(ReviewRepairPreparation.class),org.mockito.Mockito.mock(ReviewIsolationExecutor.class),1);
+        var workflow=new ProjectMutationWorkflow(budget,base.base.service,base.executor(),reader);var current=workflow.capture(project(),()->true);
+        var proposed=new RawBsonDocument(current.bytes()).decode(new org.bson.codecs.DocumentCodec());proposed.getList("versions",Document.class).get(1).put("gameVersions",List.of("changed"));
+        var request=new ProjectMutationPreparation.Request(UUID.randomUUID().toString(),project(),current.sha256(),"owner",ProjectMutationPreparation.Mutation.VERSION_LIST,VersionMutationPreparationTest.bytes(proposed));
+        var prepared=afterPreparation?workflow.prepare(request,()->true):null;
+        mongo().getCollection(ProjectMutationExecutor.REFERENCES).deleteOne(new Document("_id",first.id()));
+        if(afterPreparation)assertThrows(RuntimeException.class,()->workflow.apply(prepared,"owner",()->true));
+        else assertThrows(RuntimeException.class,()->workflow.prepare(request,()->true));
+        assertArrayEquals(current.bytes(),VersionMutationPreparationTest.bytes(base.root()));
+        assertNull(mongo().getCollection(ReviewRepairJournal.COLLECTION).find(new Document("_id",request.id())).first());
+        assertEquals(0,budget.status().active());budget.close();
+    }
+
 }
