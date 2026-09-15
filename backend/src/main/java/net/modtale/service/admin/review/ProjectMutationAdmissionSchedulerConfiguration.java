@@ -9,6 +9,15 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 @ConditionalOnProperty(name="app.warden.repair.admission.scheduler.enabled",havingValue="true")
 public class ProjectMutationAdmissionSchedulerConfiguration {
     @Bean(destroyMethod="close")
+    ProjectMutationRecoveryScheduler projectMutationRecoveryScheduler(ProjectMutationAttemptRecovery recovery,ProjectMutationAdmissionScheduler admission,
+            @Value("${app.warden.repair.admission.scheduler.page-size:16}") int pageSize,
+            @Value("${app.warden.repair.admission.scheduler.poll-millis:1000}") long poll,
+            @Value("${app.warden.repair.admission.scheduler.drain-millis:10000}") long drain) {
+        java.util.Objects.requireNonNull(admission);
+        return new ProjectMutationRecoveryScheduler(recovery,new ProjectMutationRecoveryScheduler.Settings(1,pageSize,poll,drain));
+    }
+
+    @Bean(destroyMethod="close")
     ProjectMutationAdmissionScheduler projectMutationAdmissionScheduler(ProjectMutationDiscovery discovery,ProjectMutationAutomaticAdmission automatic,
             RemoteReviewScheduler delivery,
             @Value("${app.warden.repair.enabled:false}") boolean repair,

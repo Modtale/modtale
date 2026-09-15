@@ -9,6 +9,8 @@ import java.time.Clock;
 @Configuration(proxyBeanMethods=false)
 @ConditionalOnProperty(name="app.warden.repair.enabled",havingValue="true")
 public class ProjectMutationConfiguration {
+    @Bean(initMethod="initialize") ProjectMutationAttemptRecovery projectMutationAttemptRecovery(MongoTemplate mongo,ReviewRepairWorkflow budget,ProjectMutationAdmissionAttempts attempts,ReviewSnapshotArchive archive) {return new ProjectMutationAttemptRecovery(mongo,budget,attempts,archive);}
+
     @Bean ProjectMutationAdmissionAttempts projectMutationAdmissionAttempts(MongoTemplate mongo,ReviewRepairWorkflow budget) {return new ProjectMutationAdmissionAttempts(mongo,budget);}
 
     @Bean ProjectMutationDiscovery projectMutationDiscovery(MongoTemplate mongo) {return new ProjectMutationDiscovery(mongo);}

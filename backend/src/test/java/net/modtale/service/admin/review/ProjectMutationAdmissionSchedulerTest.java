@@ -32,12 +32,12 @@ class ProjectMutationAdmissionSchedulerTest {
     }
     @Test void schedulerRequiresExplicitFlagDependenciesAndStopsWithContext(){
         new ApplicationContextRunner().withUserConfiguration(ProjectMutationAdmissionSchedulerConfiguration.class).run(context->assertFalse(context.containsBean("projectMutationAdmissionScheduler")));
-        empty();var runner=new ApplicationContextRunner().withUserConfiguration(ProjectMutationAdmissionSchedulerConfiguration.class).withBean(ProjectMutationDiscovery.class,()->discovery)
-                .withBean(ProjectMutationAutomaticAdmission.class,()->automatic).withPropertyValues("app.warden.repair.admission.scheduler.enabled=true");
+        empty();var recovery=mock(ProjectMutationAttemptRecovery.class);when(recovery.page(any(),anyInt())).thenReturn(new ProjectMutationAttemptRecovery.Page(List.of(),null,0,0));var runner=new ApplicationContextRunner().withUserConfiguration(ProjectMutationAdmissionSchedulerConfiguration.class).withBean(ProjectMutationDiscovery.class,()->discovery)
+                .withBean(ProjectMutationAttemptRecovery.class,()->recovery).withBean(ProjectMutationAutomaticAdmission.class,()->automatic).withPropertyValues("app.warden.repair.admission.scheduler.enabled=true");
         runner.run(context->assertNotNull(context.getStartupFailure()));var delivery=mock(RemoteReviewScheduler.class);
         runner.withBean(RemoteReviewScheduler.class,()->delivery).run(context->assertNotNull(context.getStartupFailure()));
-        var reference=new AtomicReference<ProjectMutationAdmissionScheduler>();runner.withBean(RemoteReviewScheduler.class,()->delivery)
-                .withPropertyValues("app.warden.repair.enabled=true","app.warden.jobs.enabled=true").run(context->{assertNull(context.getStartupFailure());reference.set(context.getBean(ProjectMutationAdmissionScheduler.class));assertTrue(reference.get().isRunning());});
-        assertEquals("STOPPED",reference.get().status().state());
+        var recovered=new AtomicReference<ProjectMutationRecoveryScheduler>();var reference=new AtomicReference<ProjectMutationAdmissionScheduler>();runner.withBean(RemoteReviewScheduler.class,()->delivery)
+                .withPropertyValues("app.warden.repair.enabled=true","app.warden.jobs.enabled=true").run(context->{assertNull(context.getStartupFailure());reference.set(context.getBean(ProjectMutationAdmissionScheduler.class));assertTrue(reference.get().isRunning());recovered.set(context.getBean(ProjectMutationRecoveryScheduler.class));assertTrue(recovered.get().isRunning());});
+        assertEquals("STOPPED",reference.get().status().state());assertEquals("STOPPED",recovered.get().status().state());
     }
 }
