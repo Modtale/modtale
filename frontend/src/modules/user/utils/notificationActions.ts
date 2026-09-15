@@ -20,8 +20,9 @@ export const resolveNotificationAction = (
 
     if (notification.type === 'ORG_INVITE') {
         const orgId = notification.metadata?.orgId;
-        return orgId
-            ? { endpoint: `/orgs/${orgId}/invite/${accept ? 'accept' : 'decline'}` }
+        const requestId = notification.metadata?.requestId;
+        return orgId && requestId
+            ? { endpoint: `/orgs/${orgId}/invite/${accept ? 'accept' : 'decline'}`, body: { requestId } }
             : null;
     }
 

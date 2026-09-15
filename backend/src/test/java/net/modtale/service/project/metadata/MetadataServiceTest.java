@@ -149,4 +149,43 @@ class MetadataServiceTest {
         assertEquals("Use {{gallery-carousel}} only once in the project description.", error.getMessage());
         verify(projectRepository, never()).save(existing);
     }
+    @Test
+    void metadataCannotAttachAnArbitraryStoredFileAsTheProjectImage() {
+        var existing = new Project();
+        existing.setId("project-1");
+        existing.setClassification(ProjectClassification.DATA);
+        existing.setImageUrl("owned-image.png");
+        var updated = new Project();
+        updated.setImageUrl("another-project-file.jar");
+        var user = new User();
+        user.setId("user-1");
+        when(projectService.getRawProjectById("project-1")).thenReturn(existing);
+        when(accessControlService.hasProjectPermission(existing, user, "PROJECT_EDIT_METADATA")).thenReturn(true);
+
+        assertThrows(InvalidProjectRequestException.class, () -> service.updateMetadata("project-1", updated, user));
+
+        verify(projectRepository, never()).save(existing);
+        verify(projectService, never()).evictProjectCache(existing);
+        assertEquals("owned-image.png", existing.getImageUrl());
+    }
+
+    @Test
+    void metadataMayRetainTheExistingProjectImage() {
+        var existing = new Project();
+        existing.setId("project-1");
+        existing.setClassification(ProjectClassification.DATA);
+        existing.setImageUrl("owned-image.png");
+        var updated = new Project();
+        updated.setImageUrl("owned-image.png");
+        var user = new User();
+        user.setId("user-1");
+        when(projectService.getRawProjectById("project-1")).thenReturn(existing);
+        when(accessControlService.hasProjectPermission(existing, user, "PROJECT_EDIT_METADATA")).thenReturn(true);
+
+        service.updateMetadata("project-1", updated, user);
+
+        verify(projectRepository).save(existing);
+        assertEquals("owned-image.png", existing.getImageUrl());
+    }
+
 }

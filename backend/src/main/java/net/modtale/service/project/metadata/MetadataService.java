@@ -104,7 +104,8 @@ public class MetadataService {
         existing.setHmWikiSlug(updated.getHmWikiSlug() != null ? updated.getHmWikiSlug().trim() : null);
         existing.setGalleryCarouselEnabled(updated.isGalleryCarouselEnabled());
         if (updated.getLinks() != null) existing.setLinks(updated.getLinks());
-        if (updated.getImageUrl() != null) existing.setImageUrl(updated.getImageUrl());
+        if (updated.getImageUrl() != null && !java.util.Objects.equals(updated.getImageUrl(), existing.getImageUrl()))
+            throw new InvalidProjectRequestException("Use the project image upload endpoint to change its image.");
 
         projectRepository.save(existing);
         projectService.evictProjectCache(existing);
