@@ -58,15 +58,17 @@ public final class RemoteReviewClient implements AutoCloseable {
                 .defaultHeader("X-Warden-Api-Key",properties.apiKey())
                 .codecs(c->c.defaultCodecs().maxInMemorySize(16*1024*1024)).build();
     }
-    public Configuration configuration() {
-        var origin=origin();
-        var body=exchange(scoped(client.get().uri("/api/v1/review-jobs/configuration"),origin),200,65536);
+    public Configuration configuration() {return configuration(()->true,timeout::toNanos);}
+    public Configuration configuration(java.util.function.BooleanSupplier current,java.util.function.LongSupplier remainingNanos) {
+        var origin=origin(current,remainingNanos);
+        var body=exchange(scoped(client.get().uri("/api/v1/review-jobs/configuration"),origin),200,65536,current,remainingNanos);
         fields(body,"policyVersion","reviewConfigSha256");String policy=text(body,"policyVersion"),config=text(body,"reviewConfigSha256");
         if (!policy.matches("warden-3\\.0\\.0:[0-9a-f]{64}") || !digest(config)) throw new Unavailable(502);
         return new Configuration(policy,config,origin);
     }
-    public RemoteReviewOrigin origin() {
-        var body=exchange(client.get().uri("/api/v1/review-jobs/identity"),200,65536);fields(body,"deploymentId","callerScope");
+    public RemoteReviewOrigin origin() {return origin(()->true,timeout::toNanos);}
+    private RemoteReviewOrigin origin(java.util.function.BooleanSupplier current,java.util.function.LongSupplier remainingNanos) {
+        var body=exchange(client.get().uri("/api/v1/review-jobs/identity"),200,65536,current,remainingNanos);fields(body,"deploymentId","callerScope");
         try{return new RemoteReviewOrigin(text(body,"deploymentId"),text(body,"callerScope"));}
         catch(IllegalArgumentException invalid){throw new Unavailable(502);}
     }

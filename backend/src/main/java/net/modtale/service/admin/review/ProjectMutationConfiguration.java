@@ -35,6 +35,12 @@ public class ProjectMutationConfiguration {
         return new ProjectMutationPriorWorkReader(mongo,budget,history);
     }
 
+    @Bean
+    @ConditionalOnProperty(name="app.warden.jobs.enabled",havingValue="true")
+    ProjectMutationAdmissionPreparation projectMutationAdmissionPreparation(MongoTemplate mongo,ReviewRepairWorkflow budget,ReviewSnapshotArchive archive,ProjectMutationReferenceReader history,ProjectMutationPriorWorkReader prior,ProjectMutationJobAccounting accounting,net.modtale.service.security.scan.RemoteReviewClient client,AppReviewRepairProperties properties) {
+        return new ProjectMutationAdmissionPreparation(mongo,budget,archive,history,prior,accounting,client,Clock.systemUTC(),Math.min(120000,properties.preparationLifetimeMillis()));
+    }
+
     @Bean(destroyMethod="close")
     @ConditionalOnProperty(name="app.warden.jobs.enabled",havingValue="true")
     ProjectMutationJobAccounting projectMutationJobAccounting(MongoTemplate mongo,ReviewRepairWorkflow budget,ProjectMutationReferenceReader history,

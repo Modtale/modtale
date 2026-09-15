@@ -35,6 +35,12 @@ final class ReviewRepairIo implements AutoCloseable {
         return remainingNanos.getAsLong();
     }
 
+    static long currentRemainingNanos() {
+        var scope=CURRENT.get();
+        if(scope==null)throw new IllegalStateException("Review repair I/O scope is required");
+        return scope.remainingNanos();
+    }
+
     private static long timeoutMillis() {
         long nanos = CURRENT.get().remainingNanos.getAsLong();
         if (nanos <= 0) throw new IllegalStateException("Review repair I/O deadline exceeded");

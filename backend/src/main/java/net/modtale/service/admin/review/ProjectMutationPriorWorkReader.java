@@ -23,7 +23,10 @@ public final class ProjectMutationPriorWorkReader {
         this.budget=Objects.requireNonNull(budget);this.history=Objects.requireNonNull(history);targets=new ReviewRemoteTargetReader(mongo);
     }
     public Inventory read(Object projectId,String mutationId,BooleanSupplier permitted) {
-        return budget.call(allowed->{var walk=new Walk(projectId,allowed);walk.visit(mutationId);return new Inventory(mutationId,new ArrayList<>(walk.groups.keySet()),walk.work);},permitted);
+        return budget.call(allowed->readWithinBudget(projectId,mutationId,allowed),permitted);
+    }
+    Inventory readWithinBudget(Object projectId,String mutationId,BooleanSupplier permitted) {
+        var walk=new Walk(projectId,permitted);walk.visit(mutationId);return new Inventory(mutationId,new ArrayList<>(walk.groups.keySet()),walk.work);
     }
     private final class Walk {
         final Object projectId;final BooleanSupplier allowed;

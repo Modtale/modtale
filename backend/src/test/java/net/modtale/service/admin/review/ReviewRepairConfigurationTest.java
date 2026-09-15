@@ -25,6 +25,16 @@ class ReviewRepairConfigurationTest {
                 .withPropertyValues("app.warden.repair.enabled=true","app.warden.repair.active-key=test","app.warden.repair.signing-keys.test="+key)
                 .run(context->{assertNull(context.getStartupFailure());assertNotNull(context.getBean(ReviewRepairPreparation.class));assertNotNull(context.getBean(ReviewSnapshotArchive.class));assertNotNull(context.getBean(ReviewRepairWorkflow.class));assertNotNull(context.getBean(ProjectMutationWorkflow.class));assertNotNull(context.getBean(ProjectMutationOwnerAuthority.class));assertNotNull(context.getBean(ProjectMutationReferenceReader.class));});
     }
+    @Test void remoteAdmissionUsesTheExistingRuntimeWithoutDispatching() {
+        var mongo=mock(MongoTemplate.class,RETURNS_DEEP_STUBS);var remote=mock(net.modtale.service.security.scan.RemoteReviewClient.class);
+        new ApplicationContextRunner().withUserConfiguration(ReviewRepairConfiguration.class).withBean(MongoTemplate.class,()->mongo)
+                .withBean(net.modtale.service.security.scan.RemoteReviewClient.class,()->remote)
+                .withBean(net.modtale.service.user.account.AccountService.class,()->mock(net.modtale.service.user.account.AccountService.class))
+                .withBean(net.modtale.service.security.access.AccessControlService.class,()->mock(net.modtale.service.security.access.AccessControlService.class))
+                .withBean(net.modtale.repository.user.ApiKeyRepository.class,()->mock(net.modtale.repository.user.ApiKeyRepository.class))
+                .withPropertyValues("app.warden.repair.enabled=true","app.warden.jobs.enabled=true","app.warden.repair.active-key=test","app.warden.repair.signing-keys.test="+key)
+                .run(context->{assertNull(context.getStartupFailure());assertNotNull(context.getBean(ProjectMutationAdmissionPreparation.class));assertNotNull(context.getBean(ProjectMutationPriorWorkReader.class));verifyNoInteractions(remote);});
+    }
     @Test void invalidKeysAndLimitsFailWithoutEchoingSecretValues() {
         for(String value:List.of("secret",Base64.getEncoder().encodeToString(new byte[31]),key.replace("=",""))) {
             var failure=assertThrows(IllegalArgumentException.class,()->new AppReviewRepairProperties(true,"test",Map.of("test",value),1,1000));
