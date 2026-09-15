@@ -221,16 +221,20 @@ public final class LauncherSettingsSyncService {
         }
 
         int installed = 0;
+        int attempted = 0;
+        List<LauncherSettingsSnapshot.InstalledProjectSnapshot> projects = snapshot.installedProjects().stream()
+                .filter(project -> project.getProjectId() != null && !project.getProjectId().isBlank())
+                .toList();
         List<String> warnings = new ArrayList<>();
-        for (LauncherSettingsSnapshot.InstalledProjectSnapshot projectSnapshot : snapshot.installedProjects()) {
-            if (projectSnapshot.getProjectId() == null || projectSnapshot.getProjectId().isBlank()) {
-                continue;
-            }
+        for (LauncherSettingsSnapshot.InstalledProjectSnapshot projectSnapshot : projects) {
+            String position = " • " + (++attempted) + " of " + projects.size();
+            String title = projectSnapshot.getTitle().isBlank() ? "mod" : projectSnapshot.getTitle();
+            progress.update("Restoring your mods", "Checking " + title + position);
             try {
                 ProjectDetail project = apiClient.getProject(projectSnapshot.getProjectId());
                 ProjectVersion version = resolveVersion(project, projectSnapshot, settings);
                 progress.update("Restoring your mods", "Downloading " + project.title()
-                        + " • " + (installed + 1) + " of " + snapshot.installedProjects().size());
+                        + position);
                 InstallResult result = installer.install(project, version, installOptions(settings, projectSnapshot, version));
                 settings.upsertInstalledProject(result.installedProject().withModpackUnlocked(projectSnapshot.isModpackUnlocked()));
                 settingsStore.save(settings);
