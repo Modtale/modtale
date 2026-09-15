@@ -94,3 +94,62 @@ it('updates earlier assessments when policy changes between history pages', asyn
     expect(container.textContent).toContain('Policy changed since the first page');
     expect(container.textContent).not.toContain('Show retained reasoning');
 });
+
+it('reveals an acceptance when it expires without further interaction', async () => {
+    vi.useFakeTimers();
+    try {
+        const expiry = Date.now() + 1000;
+        vi.mocked(findingReviews.history).mockResolvedValue({ events: [{ ...event, expiresAt: expiry }], nextOffset: null,
+            assessments: { decision: { state: 'APPLICABLE', explanation: 'Matched at load time' } } });
+        await render(); await click('Finding decisions and history');
+        expect(container.querySelectorAll('li')).toHaveLength(0);
+        await act(async () => { vi.advanceTimersByTime(1001); });
+        expect(container.querySelectorAll('li')).toHaveLength(1);
+        expect(container.textContent).toContain('expired since the assessment');
+        expect(container.textContent).not.toContain('Show retained reasoning');
+    } finally { vi.useRealTimers(); }
+});
+
+it('discards old history when the review snapshot changes during loading', async () => {
+    let finish!: (value: any) => void;
+    vi.mocked(findingReviews.history).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    await render(); await click('Finding decisions and history');
+    await render(true, 'new-snapshot');
+    await act(async () => { finish({ events: [event], nextOffset: null }); });
+    expect(container.textContent).not.toContain(event.rationale);
+    expect(container.querySelector('[aria-expanded=true]')).toBeNull();
+    await click('Finding decisions and history');
+    expect(findingReviews.history).toHaveBeenLastCalledWith('project', 'version', 'new-snapshot', 0);
+    expect(container.textContent).toContain('No recorded finding decisions');
+});
+
+it('does not apply a late save callback to another snapshot', async () => {
+    let finish!: (value: any) => void;
+    vi.mocked(findingReviews.record).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    await render(); await click('Finding decisions and history'); await reasoning(); await click('Record decision');
+    await render(true, 'new-snapshot');
+    await act(async () => { finish(event); });
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain('Decision saved');
+    await click('Finding decisions and history');
+    expect(container.querySelector('textarea')?.value).toBe('');
+});
+
+it('submits only once when two clicks occur before the UI disables the button', async () => {
+    let finish!: (value: any) => void;
+    vi.mocked(findingReviews.record).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    await render(); await click('Finding decisions and history'); await reasoning();
+    const button = [...container.querySelectorAll('button')].find(b => b.textContent === 'Record decision')!;
+    await act(async () => { button.click(); button.click(); });
+    expect(findingReviews.record).toHaveBeenCalledOnce();
+    await act(async () => { finish(event); });
+    expect(onSaved).toHaveBeenCalledOnce();
+});
+
+it('never collapses a review requirement as an acceptance', async () => {
+    vi.mocked(findingReviews.history).mockResolvedValue({ events: [{ ...event, disposition: 'REQUIRE_REVIEW' }], nextOffset: null,
+        assessments: { decision: { state: 'APPLICABLE', explanation: 'Unexpected assessment' } } });
+    await render(); await click('Finding decisions and history');
+    expect(container.querySelectorAll('li')).toHaveLength(1);
+    expect(container.textContent).not.toContain('Show retained reasoning');
+});
