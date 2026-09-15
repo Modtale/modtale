@@ -33,7 +33,7 @@ class ReviewRepairConfigurationTest {
                 .withBean(net.modtale.service.security.access.AccessControlService.class,()->mock(net.modtale.service.security.access.AccessControlService.class))
                 .withBean(net.modtale.repository.user.ApiKeyRepository.class,()->mock(net.modtale.repository.user.ApiKeyRepository.class))
                 .withPropertyValues("app.warden.repair.enabled=true","app.warden.jobs.enabled=true","app.warden.repair.active-key=test","app.warden.repair.signing-keys.test="+key)
-                .run(context->{assertNull(context.getStartupFailure());assertNotNull(context.getBean(ProjectMutationAdmissionPreparation.class));assertNotNull(context.getBean(ProjectMutationPriorWorkReader.class));verifyNoInteractions(remote);});
+                .run(context->{assertNull(context.getStartupFailure());assertNotNull(context.getBean(ProjectMutationAdmissionPreparation.class));assertNotNull(context.getBean(ProjectMutationActivator.class));assertNotNull(context.getBean(ProjectMutationPriorWorkReader.class));verifyNoInteractions(remote);});
     }
     @Test void invalidKeysAndLimitsFailWithoutEchoingSecretValues() {
         for(String value:List.of("secret",Base64.getEncoder().encodeToString(new byte[31]),key.replace("=",""))) {
