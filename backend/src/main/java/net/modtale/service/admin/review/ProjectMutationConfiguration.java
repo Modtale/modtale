@@ -31,6 +31,10 @@ public class ProjectMutationConfiguration {
         return new ProjectMutationOwnerAccess(budget,authority,preparation,executor,history);
     }
 
+    @Bean ProjectMutationPriorWorkReader projectMutationPriorWorkReader(MongoTemplate mongo,ReviewRepairWorkflow budget,ProjectMutationReferenceReader history) {
+        return new ProjectMutationPriorWorkReader(mongo,budget,history);
+    }
+
     @Bean(destroyMethod="close")
     @ConditionalOnProperty(name="app.warden.jobs.enabled",havingValue="true")
     ProjectMutationJobAccounting projectMutationJobAccounting(MongoTemplate mongo,ReviewRepairWorkflow budget,ProjectMutationReferenceReader history,
