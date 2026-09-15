@@ -34,8 +34,13 @@ jobs:
       - uses: actions/setup-java@v6.0.1
         with:
           distribution: temurin
-          java-version: 26
+          java-version: |
+            25
+            26
           check-latest: true
+      - name: Set up Rust
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+
       - uses: gradle/actions/setup-gradle@v6.3.0
       - name: Install Linux display dependencies
         if: runner.os == 'Linux'
@@ -64,10 +69,20 @@ jobs:
               sleep 0.1
             done
             test -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"
-            env -u DISPLAY GDK_BACKEND=wayland ./gradlew test jpackageImage
+            env -u DISPLAY GDK_BACKEND=wayland ./gradlew test testBootstrap jpackageAppImage
           else
-            ./gradlew test jpackageImage
+            ./gradlew test testBootstrap jpackageAppImage
           fi
+      - name: Validate packaged runtime setup and offline reuse
+        run: |
+          case "$RUNNER_OS" in
+            Windows) launcher="build/jpackage/app-image/Modtale Launcher/Modtale Launcher.exe" ;;
+            macOS) launcher="build/jpackage/app-image/Modtale Launcher.app/Contents/MacOS/Modtale Launcher" ;;
+            Linux) launcher="build/jpackage/app-image/Modtale Launcher/bin/Modtale Launcher" ;;
+          esac
+          python bootstrap/smoke.py "$launcher" "$JAVA_HOME"
+          python bootstrap/smoke.py "$launcher" "$JAVA_HOME" --hytale
+          python bootstrap/smoke.py "$launcher"
       - name: Upload validation reports
         if: always()
         uses: actions/upload-artifact@v7.0.1
@@ -76,3 +91,4 @@ jobs:
           path: |
             launcher/build/reports/tests
             launcher/build/test-results
+            launcher/build/reports/package-size.json

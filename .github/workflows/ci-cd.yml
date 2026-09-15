@@ -870,8 +870,13 @@ jobs:
         uses: actions/setup-java@v6.0.1
         with:
           distribution: temurin
-          java-version: 26
+          java-version: |
+            25
+            26
           check-latest: true
+
+      - name: Set up Rust
+        run: rustup toolchain install stable --profile minimal && rustup default stable
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6.3.0
