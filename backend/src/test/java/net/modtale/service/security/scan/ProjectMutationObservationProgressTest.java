@@ -42,15 +42,15 @@ class ProjectMutationObservationProgressTest {
     }
     @AfterEach void cleanup(){base.cleanup();}
     @Test void multipleJobsContinueAcrossRestartWithoutRepeatingCompletedReads()throws Exception{
-        var candidate=base.candidate();assertEquals("WAITING",base.automatic.advance(candidate,()->true).state());assertEquals(1,reads.get());assertEquals(1,base.f().mongo.getCollection(PROGRESS).countDocuments());
-        Thread.sleep(1100);assertEquals("ADMITTED",base.create().advance(candidate,()->true).state());assertEquals(2,reads.get());assertEquals(2,base.f().mongo.getCollection(PROGRESS).countDocuments());assertEquals(0,base.f().posts.get());
+        var candidate=base.candidate();assertEquals("YIELDED",base.automatic.advance(candidate,()->true).state());assertEquals(1,reads.get());assertEquals(1,base.f().mongo.getCollection(PROGRESS).countDocuments());
+        Thread.sleep(150);assertEquals("ADMITTED",base.create().advance(candidate,()->true).state());assertEquals(2,reads.get());assertEquals(2,base.f().mongo.getCollection(PROGRESS).countDocuments());assertEquals(0,base.f().posts.get());
     }
     @Test void lostCheckpointWriteReplyRecoversExactStoredProgress()throws Exception{
         var mongo=spy(base.f().mongo);var collection=spy(base.f().mongo.getCollection(PROGRESS));
         doReturn(collection).when(collection).withReadPreference(any());doReturn(collection).when(collection).withReadConcern(any());doReturn(collection).when(collection).withWriteConcern(any());doReturn(collection).when(collection).withTimeout(anyLong(),any());
         doReturn(collection).when(mongo).getCollection(PROGRESS);var writes=new AtomicInteger();doAnswer(call->{call.callRealMethod();writes.incrementAndGet();throw new com.mongodb.MongoException("lost checkpoint acknowledgment");}).when(collection).insertOne(any(Document.class));
         var coordinator=new ProjectMutationAutomaticAdmission(mongo,base.base.base.budget,base.base.base.history,base.base.prior,base.attempts,base.base.base.accounting,base.base.service,base.activator,base.base.base.base.base.base.archive);
-        var candidate=base.candidate();assertEquals("WAITING",coordinator.advance(candidate,()->true).state());assertEquals(1,writes.get());Thread.sleep(1100);
+        var candidate=base.candidate();assertEquals("YIELDED",coordinator.advance(candidate,()->true).state());assertEquals(1,writes.get());Thread.sleep(1100);
         assertEquals("ADMITTED",base.create().advance(candidate,()->true).state());assertEquals(2,reads.get());assertEquals(0,base.f().posts.get());
     }
     @Test void slowReadYieldsWithinChildDeadlineAndRetainsUncertainty(){
@@ -64,13 +64,13 @@ class ProjectMutationObservationProgressTest {
         }
     }
     @Test void onlyUnfinishedJobGetsANewObservation()throws Exception{
-        secondState="RUNNING";var candidate=base.candidate();assertEquals("WAITING",base.automatic.advance(candidate,()->true).state());Thread.sleep(1100);
+        secondState="RUNNING";var candidate=base.candidate();assertEquals("YIELDED",base.automatic.advance(candidate,()->true).state());Thread.sleep(1100);
         assertEquals("WAITING",base.create().advance(candidate,()->true).state());assertEquals(2,reads.get());assertEquals(1,base.f().mongo.getCollection(PROGRESS).countDocuments());
         secondState="COMPLETED";Thread.sleep(1100);assertEquals("ADMITTED",base.create().advance(candidate,()->true).state());assertEquals(3,reads.get());assertEquals(0,base.f().posts.get());
     }
     @ParameterizedTest @ValueSource(strings={"scope","missingReceipt","changedReceipt"})
     void progressCannotSubstituteForAuthenticatedOriginalEvidence(String change)throws Exception{
-        var candidate=base.candidate();assertEquals("WAITING",base.automatic.advance(candidate,()->true).state());var collection=base.f().mongo.getCollection(PROGRESS);var progress=collection.find().first();assertNotNull(progress);
+        var candidate=base.candidate();assertEquals("YIELDED",base.automatic.advance(candidate,()->true).state());var collection=base.f().mongo.getCollection(PROGRESS);var progress=collection.find().first();assertNotNull(progress);
         if(change.equals("scope"))collection.updateOne(new Document("_id",progress.get("_id")),new Document("$set",new Document("scope.projectId","other")));
         else if(change.equals("missingReceipt"))base.f().mongo.getCollection(ProjectMutationJobAccounting.COLLECTION).deleteOne(new Document("_id",progress.get("observationId")));
         else base.f().mongo.getCollection(ProjectMutationJobAccounting.COLLECTION).updateOne(new Document("_id",progress.get("observationId")),new Document("$set",new Document("observation.status.state","RUNNING").append("observation.status.workState","RUNNING")));

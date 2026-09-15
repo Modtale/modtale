@@ -15,7 +15,7 @@ import java.util.function.BooleanSupplier;
 /** Durable scheduling bookkeeping only. Callers must authenticate candidates and outcome evidence. */
 public final class ProjectMutationAdmissionAttempts {
     public static final String COLLECTION="project_mutation_admission_attempts";
-    public enum Outcome { WAITING, ATTENTION, ADMITTED }
+    public enum Outcome { WAITING, YIELDED, ATTENTION, ADMITTED }
     public record Scope(Object projectId,String versionId,String mutationId,String requestId,int scanAttempt) {
         public Scope {
             if(!(projectId instanceof ObjectId || projectId instanceof String s && !s.isEmpty() && s.length()<=128)
@@ -41,7 +41,7 @@ public final class ProjectMutationAdmissionAttempts {
             permission(allowed);try{ReviewRepairIo.collection(records).insertOne(initial);}catch(MongoException uncertain){/* Exact read-back below; creation itself never grants a claim. */}
             stored=read(scope.requestId());
         }
-        var status=decode(scope,stored);if(!"WAITING".equals(status.state()) || status.attempts()>=maxAttempts)return null;
+        var status=decode(scope,stored);if(!Set.of("WAITING","YIELDED").contains(status.state()) || status.attempts()>=maxAttempts)return null;
         int sequence=status.attempts()+1;String token=UUID.randomUUID().toString(),decision=decision(scope,sequence);
         var attempt=new Document("sequence",sequence).append("token",token).append("decisionId",decision).append("heldSha256",heldSha256);
         var nextAttempt=new Document("$mergeObjects",List.of(literal(attempt),new Document("startedAt","$$NOW")));
@@ -59,10 +59,10 @@ public final class ProjectMutationAdmissionAttempts {
     Status finishWithinBudget(Claim claim,Outcome outcome,BooleanSupplier allowed) {
         permission(allowed);Objects.requireNonNull(outcome);var stored=read(claim.scope().requestId());var current=decode(claim.scope(),stored);
         if(!claim.equals(current.current()))throw invalid();if(!"RUNNING".equals(current.state())){if(outcome!=current.outcome())throw invalid();return current;}
-        String state=outcome==Outcome.WAITING && current.attempts()>=maxAttempts?"ATTENTION":outcome.name();
+        String state=continuation(outcome) && current.attempts()>=maxAttempts?"ATTENTION":outcome.name();
         var history=new ArrayList<>(stored.getList("attempts",Document.class));var last=history.removeLast();
         var completed=new Document("$mergeObjects",List.of(literal(last),new Document("outcome",outcome.name()).append("finishedAt","$$NOW")));
-        var fields=new Document("state",state).append("nextAttemptAt",new Document("$add",List.of("$$NOW",cooldownMillis)))
+        var fields=new Document("state",state).append("nextAttemptAt",new Document("$add",List.of("$$NOW",outcome==Outcome.YIELDED?100L:cooldownMillis)))
                 .append("attempts",new Document("$concatArrays",List.of(literal(history),List.of(completed))));
         permission(allowed);try{ReviewRepairIo.collection(records).updateOne(exact(stored),List.of(new Document("$set",fields)),new UpdateOptions().collation(BINARY));}
         catch(MongoException uncertain){/* A lost finish reply never starts another attempt. */}
@@ -83,12 +83,13 @@ public final class ProjectMutationAdmissionAttempts {
             if(item.size()==5){if(!last || !"RUNNING".equals(state))throw invalid();}
             else {
                 if(item.size()!=7 || !(item.get("finishedAt") instanceof Date end) || end.before(start))throw invalid();outcome=Outcome.valueOf(item.getString("outcome"));previous=end;
-                if(!last && outcome!=Outcome.WAITING || last && (!state.equals(outcome.name()) && !(outcome==Outcome.WAITING && "ATTENTION".equals(state))))throw invalid();
+                if(!last && !continuation(outcome) || last && (!state.equals(outcome.name()) && !(continuation(outcome) && "ATTENTION".equals(state))))throw invalid();
                 if(last && next.getTime()<=end.getTime())throw invalid();
             }
         }
         return new Status(state,history.size(),claim,outcome,next.getTime());
     }
+    private static boolean continuation(Outcome outcome){return outcome==Outcome.WAITING || outcome==Outcome.YIELDED;}
     private Document read(String id){return ReviewRepairIo.collection(records).find(new Document("_id",id)).collation(BINARY).maxTime(5,TimeUnit.SECONDS).first();}
     private static Document exact(Document stored){return new Document("_id",stored.get("_id")).append("$expr",new Document("$eq",List.of("$$ROOT",literal(stored))));}
     private static Document scope(Scope s){return new Document("projectId",s.projectId()).append("versionId",s.versionId()).append("mutationId",s.mutationId()).append("requestId",s.requestId()).append("scanAttempt",s.scanAttempt());}

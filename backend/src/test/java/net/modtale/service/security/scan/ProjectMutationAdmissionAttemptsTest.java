@@ -7,6 +7,8 @@ import net.modtale.service.admin.review.*;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import java.util.*;
@@ -35,6 +37,19 @@ class ProjectMutationAdmissionAttemptsTest {
         var limit=attempts.finish(second,ProjectMutationAdmissionAttempts.Outcome.WAITING,()->true);assertEquals("ATTENTION",limit.state());Thread.sleep(250);assertNull(begin());
         assertEquals(2,mongo().getCollection(ProjectMutationAdmissionAttempts.COLLECTION).find().first().getList("attempts",Document.class).size());
     }
+    @Test void verifiedProgressCanContinuePromptlyButStillConsumesAttemptCapacity()throws Exception{
+        var ledger=new ProjectMutationAdmissionAttempts(mongo(),base.budget,2,60000);var first=ledger.begin(scope,"a".repeat(64),()->true);
+        var yielded=ledger.finish(first,ProjectMutationAdmissionAttempts.Outcome.YIELDED,()->true);assertEquals("YIELDED",yielded.state());
+        var stored=mongo().getCollection(ProjectMutationAdmissionAttempts.COLLECTION).find().first();long finished=stored.getList("attempts",Document.class).getFirst().getDate("finishedAt").getTime();assertEquals(100,yielded.nextAttemptAt()-finished);
+        assertEquals(yielded,ledger.finish(first,ProjectMutationAdmissionAttempts.Outcome.YIELDED,()->true));Thread.sleep(150);
+        var restarted=new ProjectMutationAdmissionAttempts(mongo(),base.budget,2,60000);var second=restarted.begin(scope,"a".repeat(64),()->true);assertNotNull(second);assertEquals(2,second.sequence());assertNotEquals(first.token(),second.token());
+        var capped=restarted.finish(second,ProjectMutationAdmissionAttempts.Outcome.YIELDED,()->true);assertEquals("ATTENTION",capped.state());assertEquals(ProjectMutationAdmissionAttempts.Outcome.YIELDED,capped.outcome());Thread.sleep(150);assertNull(restarted.begin(scope,"a".repeat(64),()->true));
+    }
+    @Test void yieldingNeverShortensTheNextUnfinishedJobCooldown()throws Exception{
+        var ledger=new ProjectMutationAdmissionAttempts(mongo(),base.budget,3,60000);var first=ledger.begin(scope,"a".repeat(64),()->true);ledger.finish(first,ProjectMutationAdmissionAttempts.Outcome.YIELDED,()->true);Thread.sleep(150);
+        var second=ledger.begin(scope,"a".repeat(64),()->true);assertNotNull(second);var waiting=ledger.finish(second,ProjectMutationAdmissionAttempts.Outcome.WAITING,()->true);
+        var stored=mongo().getCollection(ProjectMutationAdmissionAttempts.COLLECTION).find().first();long finished=stored.getList("attempts",Document.class).getLast().getDate("finishedAt").getTime();assertEquals(60000,waiting.nextAttemptAt()-finished);assertNull(ledger.begin(scope,"a".repeat(64),()->true));
+    }
     @Test void finishedAttemptIsIdempotentButCannotChangeOutcome(){
         var claim=begin();var done=attempts.finish(claim,ProjectMutationAdmissionAttempts.Outcome.ADMITTED,()->true);
         assertEquals(done,attempts.finish(claim,ProjectMutationAdmissionAttempts.Outcome.ADMITTED,()->true));assertNull(begin());
@@ -44,11 +59,13 @@ class ProjectMutationAdmissionAttemptsTest {
         begin();var other=new ProjectMutationAdmissionAttempts.Scope(scope.projectId().toString(),scope.versionId(),scope.mutationId(),scope.requestId(),scope.scanAttempt());
         assertThrows(IllegalStateException.class,()->attempts.begin(other,"a".repeat(64),()->true));assertThrows(SecurityException.class,()->attempts.status(scope,()->false));
     }
-    @Test void independentWorkersCannotClaimTheSameGeneration()throws Exception {
+    @ParameterizedTest @ValueSource(booleans={false,true})
+    void independentWorkersCannotClaimTheSameGeneration(boolean yielded)throws Exception {
+        if(yielded){attempts.finish(begin(),ProjectMutationAdmissionAttempts.Outcome.YIELDED,()->true);Thread.sleep(150);}
         try(var budget=new ReviewRepairWorkflow(mock(ReviewRepairPreparation.class),mock(ReviewIsolationExecutor.class),1);var workers=Executors.newFixedThreadPool(2)) {
             var second=create(mongo(),budget);var start=new CountDownLatch(1);
             var a=workers.submit(()->{start.await();return begin();});var b=workers.submit(()->{start.await();return second.begin(scope,"b".repeat(64),()->true);});start.countDown();
-            var claims=Arrays.asList(a.get(10,TimeUnit.SECONDS),b.get(10,TimeUnit.SECONDS));assertEquals(1,claims.stream().filter(Objects::nonNull).count());assertEquals(1,attempts.status(scope,()->true).attempts());
+            var claims=Arrays.asList(a.get(10,TimeUnit.SECONDS),b.get(10,TimeUnit.SECONDS));assertEquals(1,claims.stream().filter(Objects::nonNull).count());assertEquals(yielded?2:1,attempts.status(scope,()->true).attempts());
         }
     }
     @Test void alteredRetainedAttemptIsNotReinterpreted(){

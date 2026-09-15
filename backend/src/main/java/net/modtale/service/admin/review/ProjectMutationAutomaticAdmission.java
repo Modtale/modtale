@@ -41,16 +41,16 @@ public final class ProjectMutationAutomaticAdmission {
         if(claim==null){var state=attempts.statusWithinBudget(scope,allowed);return new Result(state.state(),state.current()==null?null:state.current().decisionId());}
         var inventory=prior.readWithinBudget(candidate.projectId(),candidate.mutationId(),allowed);
         if(inventory.work().stream().anyMatch(work->work.kind()==ProjectMutationPriorWorkReader.Kind.UNRESOLVED))return finish(claim,ProjectMutationAdmissionAttempts.Outcome.ATTENTION,allowed);
-        var observations=new LinkedHashMap<String,String>();boolean waiting=false,attention=false;int reads=0;
+        var observations=new LinkedHashMap<String,String>();boolean waiting=false,attention=false,yielded=false,madeProgress=false;int reads=0;
         for(var work:inventory.work()) {
             if(work.kind()!=ProjectMutationPriorWorkReader.Kind.REMOTE_JOB)continue;
             String key=work.mutationId()+"/"+work.versionId();String id=UUID.nameUUIDFromBytes(("automatic-status-1:"+claim.decisionId()+":"+key).getBytes(StandardCharsets.UTF_8)).toString();
             var receipt=progress.completed(scope,work,allowed);
             if(receipt==null) {
                 // Leave time to retain the result and finish bookkeeping before yielding this generation.
-                if(reads>=1 || ReviewRepairIo.currentRemainingNanos()<TimeUnit.SECONDS.toNanos(10)){waiting=true;break;}
+                if(reads>=1 || ReviewRepairIo.currentRemainingNanos()<TimeUnit.SECONDS.toNanos(10)){yielded=true;break;}
                 receipt=accounting.checkWithinBudget(id,candidate.projectId(),work.mutationId(),work.versionId(),allowed,java.time.Duration.ofSeconds(5));reads++;
-                if(ProjectMutationObservationProgress.isCompleted(receipt))progress.retain(scope,work,receipt,allowed);
+                if(ProjectMutationObservationProgress.isCompleted(receipt)){progress.retain(scope,work,receipt,allowed);madeProgress=true;}
             }
             observations.put(key,receipt.id());
             if(!Set.of("OBSERVED","UNKNOWN").contains(receipt.state()) || receipt.observation()==null){attention=true;continue;}
@@ -66,7 +66,7 @@ public final class ProjectMutationAutomaticAdmission {
         }
         if(attention)return finish(claim,ProjectMutationAdmissionAttempts.Outcome.ATTENTION,allowed);
         if(waiting)return finish(claim,ProjectMutationAdmissionAttempts.Outcome.WAITING,allowed);
-        if(ReviewRepairIo.currentRemainingNanos()<TimeUnit.SECONDS.toNanos(10))return finish(claim,ProjectMutationAdmissionAttempts.Outcome.WAITING,allowed);
+        if(yielded || ReviewRepairIo.currentRemainingNanos()<TimeUnit.SECONDS.toNanos(10))return finish(claim,madeProgress?ProjectMutationAdmissionAttempts.Outcome.YIELDED:ProjectMutationAdmissionAttempts.Outcome.WAITING,allowed);
         ProjectMutationAdmissionPreparation.Prepared prepared;
         try {
             prepared=preparation.prepareWithinBudget(new ProjectMutationAdmissionPreparation.Request(claim.decisionId(),candidate.projectId(),candidate.versionIndex(),candidate.versionId(),captured.sha256(),candidate.mutationId(),ACTOR,observations,false),allowed);
