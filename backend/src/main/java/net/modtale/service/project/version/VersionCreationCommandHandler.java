@@ -28,6 +28,8 @@ import org.springframework.web.multipart.MultipartFile;
 public class VersionCreationCommandHandler {
 
     private final ProjectReviewPersistence reviewPersistence;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private net.modtale.service.admin.review.ProjectMutationOwnerAccess retainedMutations;
     private final ProjectService projectService;
     private final ProjectAccessService projectAccessService;
     private final ProjectMutationGuard projectMutationGuard;
@@ -77,6 +79,10 @@ public class VersionCreationCommandHandler {
         ensureProjectIsWithinDailyVersionLimit(project);
         ensureVersionNumberIsUnique(duplicateTargets, replaceExisting);
 
+        if(retainedMutations==null && duplicateTargets.stream().anyMatch(version->version.getRetainedRemoteReview()!=null || version.getVersionMutation()!=null
+                || version.getReviewReplacement()!=null || version.getReviewIsolation()!=null || version.getReplacementSecurityHold()!=null
+                || version.getScanResult()!=null && version.getScanResult().getRemoteReview()!=null))
+            throw new InvalidVersionRequestException("Retained review history must be available before replacing this version.");
         VersionArtifactService.PreparedVersionArtifact preparedArtifact =
                 versionMutationOrchestrationService.prepareVersionArtifact(project, file);
         boolean modpack = preparedArtifact.classification() == ProjectClassification.MODPACK;
@@ -115,6 +121,11 @@ public class VersionCreationCommandHandler {
                 ? replaceMatchingVersionTargets(project, versionNumber, gameVersions, changedTargets)
                 : List.of();
         project.getVersions().add(0, version);
+        if(retainedMutations!=null) {
+            var outcome=retainedMutations.editVersion(snapshot.raw(),reviewPersistence.versionUploadProposal(snapshot));
+            if(!"APPLIED".equals(outcome.state()))throw ProjectReviewSnapshot.conflict();
+            projectService.evictProjectCache(project);return;
+        }
         if (!reviewPersistence.applyVersionList(snapshot)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(project);
         versionMutationOrchestrationService.enqueueInitialScan(project, version, file, modpack, preparedArtifact.filePath());
@@ -210,7 +221,7 @@ public class VersionCreationCommandHandler {
             existing.setGameVersions(removeRequestedGameVersions(existing.getGameVersions(), gameVersions));
             existing.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
             existing.setScheduledPublishDate(null); existing.setScanResult(null);
-            if (versionMutationOrchestrationService.prepareContextChangeScan(project, existing, previousScan)) changedTargets.add(existing);
+            if (retainedMutations==null && versionMutationOrchestrationService.prepareContextChangeScan(project, existing, previousScan)) changedTargets.add(existing);
         }
         return replacedVersions;
     }

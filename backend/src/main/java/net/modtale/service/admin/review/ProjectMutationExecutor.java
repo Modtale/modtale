@@ -100,7 +100,11 @@ public final class ProjectMutationExecutor {
     private static Document project(ProjectMutationPreparation.Recovered recovered,Document before,Document proposed) {
         var prepared=recovered.prepared();Object status=before.get("status");
         if(!(status instanceof String) || !Set.of("DRAFT","PENDING","PUBLISHED","UNLISTED","PRIVATE").contains(status)
-                || !Objects.equals(before.get("classification"),proposed.get("classification")))throw invalid();
+                )throw invalid();
+        boolean classificationChanged=!Objects.equals(before.get("classification"),proposed.get("classification"));
+        if(classificationChanged && (!(before.get("classification") instanceof String oldType) || !(proposed.get("classification") instanceof String newType)
+                || !Set.of("DATA","PLUGIN").contains(oldType) || !Set.of("DATA","PLUGIN").contains(newType)
+                || recovered.transitions().stream().noneMatch(transition->transition.beforeIndex()<0)))throw invalid();
         var old=before.getList("versions",Document.class);var desired=proposed.getList("versions",Document.class);var versions=new ArrayList<Document>(Collections.nCopies(desired.size(),null));
         for(var transition:recovered.transitions()) {
             if(transition.afterIndex()<0)continue;var next=desired.get(transition.afterIndex());Document original;
@@ -130,7 +134,7 @@ public final class ProjectMutationExecutor {
             versions.set(transition.afterIndex(),next);
         }
         if(versions.isEmpty() && !Set.of("DRAFT","PRIVATE").contains(status))throw invalid();
-        var after=new Document(before);after.put("versions",versions);after.put("updatedAt",java.time.LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(prepared.createdAt()),java.time.ZoneOffset.UTC).toString());
+        var after=new Document(before);if(classificationChanged)after.put("classification",proposed.get("classification"));after.put("versions",versions);after.put("updatedAt",java.time.LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(prepared.createdAt()),java.time.ZoneOffset.UTC).toString());
         if(prepared.mutation()==ProjectMutationPreparation.Mutation.SUBMISSION){after.put("status","PENDING");after.put("expiresAt",null);}
         else if(proposed.containsKey("childProjectIds"))after.put("childProjectIds",proposed.get("childProjectIds"));
         if(bytes(after).length>ReviewSnapshotArchive.MAX_BYTES)throw invalid();return after;

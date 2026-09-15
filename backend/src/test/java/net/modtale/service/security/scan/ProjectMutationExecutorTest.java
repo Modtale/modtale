@@ -130,4 +130,13 @@ class ProjectMutationExecutorTest {
         assertArrayEquals(captured.bytes(),VersionMutationPreparationTest.bytes(root()));
     }
 
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void classificationChangeRequiresNewUploadAndSupportedTypes(boolean added){
+        base.base.fixture.mongo.getCollection("projects").updateOne(new Document("_id",root().get("_id")),new Document("$set",new Document("classification","DATA")));
+        var captured=base.service.capture(root().get("_id"),()->true);var proposed=added?new RawBsonDocument(base.request().proposedProject()).decode(new DocumentCodec()):root();
+        proposed.put("classification",added?"MODPACK":"PLUGIN");
+        var request=new ProjectMutationPreparation.Request(UUID.randomUUID().toString(),captured.projectId(),captured.sha256(),"owner",ProjectMutationPreparation.Mutation.VERSION_LIST,VersionMutationPreparationTest.bytes(proposed));
+        var prepared=base.service.prepare(request,()->true);assertThrows(IllegalStateException.class,()->executor().apply(prepared,"owner",()->true));assertArrayEquals(captured.bytes(),VersionMutationPreparationTest.bytes(root()));
+    }
+
 }

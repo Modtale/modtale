@@ -183,4 +183,42 @@ class ProjectMutationOwnerAccessTest {
         assertEquals(scan,base.root().getList("versions",Document.class).getFirst().get("scanResult"));
     }
 
+    net.modtale.service.project.version.VersionCreationCommandHandler uploadHandler(boolean retained,
+            net.modtale.service.project.version.VersionMutationOrchestrationService orchestration){
+        var mongo=base.base.base.fixture.mongo;var access=mock(net.modtale.service.project.access.ProjectAccessService.class);
+        when(access.requireVersionPermission(anyString(),any(),eq("VERSION_CREATE"),anyString())).thenAnswer(call->mongo.findById(call.getArgument(0),net.modtale.model.project.Project.class));
+        var handler=new net.modtale.service.project.version.VersionCreationCommandHandler(new ProjectReviewPersistence(mongo),mock(net.modtale.service.project.query.ProjectService.class),access,
+                new net.modtale.service.project.access.ProjectMutationGuard(),orchestration,new net.modtale.config.properties.AppLimitProperties(10,5,10,5,5,5,20,10));
+        if(retained)org.springframework.test.util.ReflectionTestUtils.setField(handler,"retainedMutations",owner);return handler;
+    }
+    void uploadFixture(){
+        base.base.base.fixture.mongo.getCollection("projects").updateOne(new Document("_id",base.root().get("_id")),new Document("$set",new Document("classification","DATA")));
+        base.base.base.fixture.change("versionNumber","1.0");base.base.base.fixture.change("gameVersions",List.of("a","b"));
+    }
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void productionUploadRetainsFullAndPartialReplacementHistory(boolean partial){
+        uploadFixture();base.base.base.fixture.change("scanResult.verdict","BLOCK");var before=VersionMutationPreparationTest.bytes(base.root());
+        var orchestration=mock(net.modtale.service.project.version.VersionMutationOrchestrationService.class);
+        when(orchestration.prepareVersionArtifact(any(),any())).thenReturn(new net.modtale.service.project.version.VersionArtifactService.PreparedVersionArtifact(net.modtale.model.project.ProjectClassification.DATA,"new.zip","d".repeat(64)));
+        uploadHandler(true,orchestration).addVersion(base.root().get("_id").toString(),"1.0",partial?List.of("a"):List.of("a","b"),
+                new org.springframework.mock.web.MockMultipartFile("file","new.zip","application/zip",new byte[]{1}),null,null,null,null,true,user);
+        var versions=base.root().getList("versions",Document.class);assertEquals(partial?3:2,versions.size());assertEquals("new.zip",versions.getFirst().get("fileUrl"));
+        assertEquals("MUTATION_HELD",versions.getFirst().get("scanResult",Document.class).get("scanState"));
+        if(partial){var old=versions.stream().filter(v->"v".equals(v.get("_id"))).findFirst().orElseThrow();assertEquals(List.of("b"),old.get("gameVersions"));assertEquals("BLOCK",old.get("scanResult",Document.class).get("verdict"));assertEquals(2,old.get("scanResult",Document.class).get("scanAttempt"));}
+        var ref=base.base.base.fixture.mongo.getCollection(ProjectMutationExecutor.REFERENCES).find().first();assertArrayEquals(before,base.base.base.archive.load(ref.getString("beforeArchiveId")).versionBytes());
+        verify(orchestration,never()).enqueueInitialScan(any(),any(),any(),anyBoolean(),any());verify(orchestration,never()).enqueueContextChangeScan(any(),any());verify(orchestration,never()).deleteVersionFile(any());
+    }
+    @Test void disabledRuntimeRejectsTrackedReplacementBeforeUpload(){
+        uploadFixture();var before=base.root();var orchestration=mock(net.modtale.service.project.version.VersionMutationOrchestrationService.class);
+        assertThrows(net.modtale.exception.InvalidVersionRequestException.class,()->uploadHandler(false,orchestration).addVersion(before.get("_id").toString(),"1.0",List.of("a"),null,null,null,null,null,true,user));
+        assertEquals(before,base.root());verify(orchestration,never()).prepareVersionArtifact(any(),any());
+    }
+    @Test void validatedUploadCanChangeDataProjectToPlugin(){
+        uploadFixture();var orchestration=mock(net.modtale.service.project.version.VersionMutationOrchestrationService.class);
+        when(orchestration.prepareVersionArtifact(any(),any())).thenAnswer(call->{((net.modtale.model.project.Project)call.getArgument(0)).setClassification(net.modtale.model.project.ProjectClassification.PLUGIN);
+            return new net.modtale.service.project.version.VersionArtifactService.PreparedVersionArtifact(net.modtale.model.project.ProjectClassification.PLUGIN,"new.jar","d".repeat(64));});
+        uploadHandler(true,orchestration).addVersion(base.root().get("_id").toString(),"2.0",List.of("a"),new org.springframework.mock.web.MockMultipartFile("file","new.jar","application/java-archive",new byte[]{1}),null,null,null,null,false,user);
+        assertEquals("PLUGIN",base.root().get("classification"));assertEquals("new.jar",base.root().getList("versions",Document.class).getFirst().get("fileUrl"));
+    }
+
 }

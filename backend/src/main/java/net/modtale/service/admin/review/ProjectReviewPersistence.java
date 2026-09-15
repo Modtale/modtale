@@ -24,6 +24,19 @@ public class ProjectReviewPersistence {
         ProjectReviewSnapshot.requireCurrent(project, token);
         return new Snapshot(raw, project);
     }
+    public Document versionUploadProposal(Snapshot snapshot) {
+        var codec=new org.bson.codecs.DocumentCodec();var proposed=new org.bson.RawBsonDocument(snapshot.raw(),codec).decode(codec);
+        var originals=new HashMap<String,Document>();for(var original:proposed.getList("versions",Document.class))
+            if(originals.put(original.getString("_id"),original)!=null)throw ProjectReviewSnapshot.conflict();
+        var versions=new ArrayList<Document>();
+        for(var version:snapshot.project().getVersions()) {
+            var mapped=new Document();mongo.getConverter().write(version,mapped);var original=originals.get(version.getId());
+            if(original==null)versions.add(mapped);
+            else {if(mapped.containsKey("gameVersions"))original.put("gameVersions",mapped.get("gameVersions"));else original.remove("gameVersions");versions.add(original);}
+        }
+        proposed.put("versions",versions);proposed.put("classification",snapshot.project().getClassification()==null?null:snapshot.project().getClassification().name());
+        proposed.put("childProjectIds",snapshot.project().getChildProjectIds());return proposed;
+    }
     public Document versionEditProposal(Snapshot snapshot,String versionId,boolean childIdsChanged) {
         var codec=new org.bson.codecs.DocumentCodec();
         var proposed=new org.bson.RawBsonDocument(snapshot.raw(),codec).decode(codec);
