@@ -7,7 +7,7 @@ First off, thank you for considering contributing to Modtale! We are a community
 ### Prerequisites
 
 * **Node.js:** v22.12.0+
-* **Java JDK:** 21 (Amazon Corretto or OpenJDK)
+* **Java JDK:** 26 (Eclipse Temurin or OpenJDK)
 * **MongoDB:** Local instance or Atlas
 * **Warden (Mock Mode):** Since our security scanner is closed-source, external contributors must set `WARDEN_ENABLED=false` in their backend configuration to run the API locally.
 
