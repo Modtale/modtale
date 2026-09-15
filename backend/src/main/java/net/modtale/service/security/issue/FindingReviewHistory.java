@@ -51,6 +51,8 @@ public final class FindingReviewHistory {
 
     /** This gate removes no findings and grants no automatic clearance. The caller must CAS the head. */
     public static void requireManualApproval(MongoTemplate mongo, String projectId, ProjectVersion version) {
+        if(version.getScanResult()!=null && "MUTATION_HELD".equals(version.getScanResult().getScanState()))throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.CONFLICT,"The changed version is awaiting retained review admission.");
         if(version.getReplacementSecurityHold()!=null)throw new ResponseStatusException(HttpStatus.CONFLICT,
                 "Resolve the retained security block before approving this version.");
         var events = load(mongo, projectId, version.getId(), version.getFindingReviewHead());

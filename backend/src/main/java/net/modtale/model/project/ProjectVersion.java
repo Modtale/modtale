@@ -3,6 +3,11 @@ package net.modtale.model.project;
 import java.util.List;
 
 public class ProjectVersion {
+    private ReviewReplacement versionMutation;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public ReviewReplacement getVersionMutation() { return versionMutation; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public void setVersionMutation(ReviewReplacement value) { versionMutation=value; }
     private RemoteReviewBinding retainedRemoteReview;
     @com.fasterxml.jackson.annotation.JsonIgnore
     public RemoteReviewBinding getRetainedRemoteReview() { return retainedRemoteReview; }
