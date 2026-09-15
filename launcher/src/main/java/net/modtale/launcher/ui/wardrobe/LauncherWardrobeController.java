@@ -142,7 +142,12 @@ public final class LauncherWardrobeController implements AutoCloseable {
             if (item.kind() == WardrobeItem.Kind.CAPE) {
                 editor.editCape(payload(item).path("cape").asText());
                 selectTab(Tab.CUSTOMIZE); tabs.get(Tab.CUSTOMIZE).setSelected(true);
-            } else { editor.edit(item); selectTab(Tab.CUSTOMIZE); tabs.get(Tab.CUSTOMIZE).setSelected(true); }
+            } else {
+                editor.edit(item, () -> {
+                    if (disposed || selected != item) return;
+                    selectTab(Tab.CUSTOMIZE); tabs.get(Tab.CUSTOMIZE).setSelected(true);
+                });
+            }
         });
         customize.setMaxWidth(Double.MAX_VALUE);
         inspector.getChildren().addAll(previewNode, selectedName, selectedDetail, save, customize, apply);

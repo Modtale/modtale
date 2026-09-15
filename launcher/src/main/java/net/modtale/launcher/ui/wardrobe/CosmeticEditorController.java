@@ -360,11 +360,19 @@ public final class CosmeticEditorController implements AutoCloseable {
     }
 
     public void edit(WardrobeItem item) {
+        edit(item, () -> {});
+    }
+
+    public void edit(WardrobeItem item, Runnable onOpened) {
         if (draft != null && draft.dirty() && !confirm("Replace your draft?", "Discard the unapplied edits and open this look?")) return;
-        long revision = draftRevision;
+        long revision = ++draftRevision;
         feedback.runAsync("Preparing outfit", () -> api.hydrate(item), hydrated -> {
             if (disposed || revision != draftRevision) return;
-            try { draft = new OutfitDraft(JSON.readTree(hydrated.payload()).path("skin")); refresh(); changed(); browse(); }
+            try {
+                draft = new OutfitDraft(JSON.readTree(hydrated.payload()).path("skin"));
+                preview.clear();
+                refresh(); changed(); browse(); onOpened.run();
+            }
             catch (IOException e) { feedback.showToast("Could not open outfit", message(e)); }
         });
     }
