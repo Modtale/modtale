@@ -274,27 +274,31 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
         const missing = dependencies
             .filter(dep => dep.source === 'MODTALE' && !metaCache[dep.projectId])
             .map(dep => dep.projectId);
-        const externalCache: Record<string, DependencyMeta> = {};
-        dependencies
-            .filter(dep => isExternalDependency(dep) && !metaCache[dep.projectId])
-            .forEach(dep => {
-                externalCache[dep.projectId] = { title: dep.projectTitle, author: getSourceLabel(dep.source), icon: '', source: dep.source, url: dep.externalUrl };
-            });
-
-        if (Object.keys(externalCache).length) {
-            setMetaCache(prev => ({ ...prev, ...externalCache }));
-        }
-        if (!missing.length) return;
+        const missingExternal = dependencies.filter(dep => isExternalDependency(dep) && !metaCache[dep.projectId]);
+        if (!missing.length && !missingExternal.length) return;
 
         let cancelled = false;
-        Promise.all([...new Set(missing)].map(async id => {
+        const internalLookups = [...new Set(missing)].map(async id => {
             try {
                 const data = await projectClient.getDependencyMeta(id);
                 return [id, { title: data.title, author: data.author, icon: data.icon }] as const;
             } catch {
                 return [id, { title: id, author: 'Unknown', icon: '' }] as const;
             }
-        })).then(entries => {
+        });
+        const externalLookups = missingExternal.map(async dep => {
+            let icon = dep.icon || '';
+            if (!icon && dep.externalUrl) {
+                try {
+                    const data = await projectClient.resolveExternalProject(dep.externalUrl);
+                    icon = data.iconUrl || '';
+                } catch {
+                    // Keep the reference usable when its provider is unavailable.
+                }
+            }
+            return [dep.projectId, { title: dep.projectTitle, author: getSourceLabel(dep.source), icon, source: dep.source, url: dep.externalUrl }] as const;
+        });
+        Promise.all([...internalLookups, ...externalLookups]).then(entries => {
             if (!cancelled) setMetaCache(prev => ({ ...prev, ...Object.fromEntries(entries) }));
         });
         return () => { cancelled = true; };
@@ -572,6 +576,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
             id: createUuid(),
             projectId,
             projectTitle: title,
+            icon: resolved.iconUrl,
             versionNumber: version,
             dependencyType,
             source,
@@ -839,7 +844,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                                                 {depType === 'OPTIONAL' ? <FileText className="w-4 h-4" /> : depType === 'EMBEDDED' ? <CheckSquare className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
                                             </div>
                                         )}
-                                        {isExternal ? (
+                                        {isExternal && !meta?.icon ? (
                                             <div className="w-8 h-8 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-300 flex items-center justify-center shrink-0">
                                                 <ExternalLink className="w-4 h-4" />
                                             </div>
@@ -854,7 +859,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                                                 <div className={`text-xs ${theme.colors.textMuted} flex items-center gap-1.5 min-w-0`}>
                                                     <span className="truncate max-w-[110px]">{isExternal && dependency?.externalUrl ? <a href={dependency.externalUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:underline">{getSourceLabel(dependency.source)}<ExternalLink className="w-3 h-3" /></a> : `by ${meta?.author || '...'}`}</span>
                                                     <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-white/20"></span>
-                                                    <span className={`font-mono ${theme.colors.bgSurfaceAlt} px-1.5 py-0.5 rounded`}>v{dependency?.versionNumber}</span>
+                                                    <span title={dependency?.versionNumber} className={`${theme.colors.bgSurfaceAlt} px-1.5 py-0.5 rounded truncate`}>{isExternal ? dependency?.versionNumber : `v${dependency?.versionNumber}`}</span>
                                                 </div>
                                             )}
                                         </div>
