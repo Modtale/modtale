@@ -8,6 +8,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import java.time.Clock;
 
 @Configuration(proxyBeanMethods=false)
+@Import(ProjectMutationConfiguration.class)
 @ConditionalOnProperty(name="app.warden.repair.enabled",havingValue="true")
 @EnableConfigurationProperties(AppReviewRepairProperties.class)
 public class ReviewRepairConfiguration {

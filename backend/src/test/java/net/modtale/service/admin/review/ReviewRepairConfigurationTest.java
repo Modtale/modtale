@@ -11,7 +11,7 @@ import static org.mockito.Mockito.*;
 class ReviewRepairConfigurationTest {
     String key=Base64.getEncoder().encodeToString(new byte[32]);
     @Test void featureIsAbsentByDefault() {
-        new ApplicationContextRunner().withUserConfiguration(ReviewRepairConfiguration.class).run(context->{assertFalse(context.containsBean("reviewRepairPreparation"));assertFalse(context.containsBean("reviewRepairWorkflow"));});
+        new ApplicationContextRunner().withUserConfiguration(ReviewRepairConfiguration.class).run(context->{assertFalse(context.containsBean("reviewRepairPreparation"));assertFalse(context.containsBean("reviewRepairWorkflow"));assertFalse(context.containsBean("projectMutationWorkflow"));});
     }
     @Test void enabledFeatureRequiresExplicitKeys() {
         new ApplicationContextRunner().withUserConfiguration(ReviewRepairConfiguration.class).withBean(MongoTemplate.class,()->mock(MongoTemplate.class)).withBean(net.modtale.service.user.account.AccountService.class,()->mock(net.modtale.service.user.account.AccountService.class))
@@ -21,7 +21,7 @@ class ReviewRepairConfigurationTest {
         var mongo=mock(MongoTemplate.class,RETURNS_DEEP_STUBS);
         new ApplicationContextRunner().withUserConfiguration(ReviewRepairConfiguration.class).withBean(MongoTemplate.class,()->mongo).withBean(net.modtale.service.user.account.AccountService.class,()->mock(net.modtale.service.user.account.AccountService.class))
                 .withPropertyValues("app.warden.repair.enabled=true","app.warden.repair.active-key=test","app.warden.repair.signing-keys.test="+key)
-                .run(context->{assertNull(context.getStartupFailure());assertNotNull(context.getBean(ReviewRepairPreparation.class));assertNotNull(context.getBean(ReviewSnapshotArchive.class));assertNotNull(context.getBean(ReviewRepairWorkflow.class));});
+                .run(context->{assertNull(context.getStartupFailure());assertNotNull(context.getBean(ReviewRepairPreparation.class));assertNotNull(context.getBean(ReviewSnapshotArchive.class));assertNotNull(context.getBean(ReviewRepairWorkflow.class));assertNotNull(context.getBean(ProjectMutationWorkflow.class));assertNotNull(context.getBean(ProjectMutationReferenceReader.class));});
     }
     @Test void invalidKeysAndLimitsFailWithoutEchoingSecretValues() {
         for(String value:List.of("secret",Base64.getEncoder().encodeToString(new byte[31]),key.replace("=",""))) {
