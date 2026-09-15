@@ -3,6 +3,18 @@ package net.modtale.model.project;
 import java.util.List;
 
 public class ProjectVersion {
+    private ReviewReplacement reviewReplacement;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public ReviewReplacement getReviewReplacement() { return reviewReplacement; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public void setReviewReplacement(ReviewReplacement value) { reviewReplacement=value; }
+    public record ReviewReplacement(String operationId,String beforeSha256,String requestId) {
+        public ReviewReplacement {
+            if(operationId==null || !operationId.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+                    || requestId==null || !requestId.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+                    || beforeSha256==null || !beforeSha256.matches("[0-9a-f]{64}"))throw new IllegalArgumentException("Invalid replacement provenance");
+        }
+    }
     private ReviewIsolation reviewIsolation;
     @com.fasterxml.jackson.annotation.JsonIgnore
     public ReviewIsolation getReviewIsolation() { return reviewIsolation; }

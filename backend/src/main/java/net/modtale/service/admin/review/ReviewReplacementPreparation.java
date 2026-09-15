@@ -27,6 +27,7 @@ public final class ReviewReplacementPreparation {
     }
     public record Prepared(String id,String beforeArchiveId,String beforeSha256,long createdAt,long expiresAt,
                            RemoteReviewBinding replacement,String isolationId,String isolationBeforeSha256) {}
+    public record Recovered(Prepared prepared,ReviewSnapshotArchive.Snapshot before) {}
     private final ReviewReplacementEvidenceReader evidence;
     private final ReviewRemoteTargetReader targets;
     private final RawReviewSnapshotReader snapshots;
@@ -79,6 +80,9 @@ public final class ReviewReplacementPreparation {
 
     /** Recovery is read-only and remains possible after expiry or changes to the current version. */
     public Prepared recover(String id,String actor,BooleanSupplier permitted) {
+        return recoverEvidence(id,actor,permitted).prepared();
+    }
+    public Recovered recoverEvidence(String id,String actor,BooleanSupplier permitted) {
         permission(permitted);
         var intent=archive.load(id);permission(permitted);
         if(intent.action()!=ReviewSnapshotArchive.Action.REPLACEMENT_INTENT || !intent.actorId().equals(actor)
@@ -99,7 +103,7 @@ public final class ReviewReplacementPreparation {
         var result=new Prepared(id,before.id(),payload.getString("beforeSha256"),intent.createdAt(),intent.expiresAt(),
                 replacement(id,old,configuration),isolation==null?null:isolation.getString("operationId"),
                 isolation==null?null:isolation.getString("beforeSha256"));
-        permission(permitted);return result;
+        permission(permitted);return new Recovered(result,before);
     }
 
     private static RemoteReviewBinding replacement(String id,RemoteReviewBinding old,Configuration config) {
