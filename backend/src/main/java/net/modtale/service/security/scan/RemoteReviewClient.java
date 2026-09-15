@@ -101,8 +101,9 @@ public final class RemoteReviewClient implements AutoCloseable {
         if(bytes==null || bytes.length==0 || bytes.length>100*1024*1024 || !binding.artifactSha256().equals(hash(bytes)))
             throw new IllegalArgumentException("Original artifact does not match review binding");
     }
-    public Status status(RemoteReviewBinding binding) {
-        requireJob(binding);return statusBody(exchange(scoped(client.get().uri(uri(binding,"/"+binding.jobId(),true)),binding.origin()),200,65536),binding);
+    public Status status(RemoteReviewBinding binding) {return status(binding,()->true,timeout::toNanos);}
+    public Status status(RemoteReviewBinding binding,java.util.function.BooleanSupplier current,java.util.function.LongSupplier remainingNanos) {
+        requireJob(binding);return statusBody(exchange(scoped(client.get().uri(uri(binding,"/"+binding.jobId(),true)),binding.origin()),200,65536,current,remainingNanos),binding);
     }
     public Status cancel(RemoteReviewBinding binding) {return cancel(binding,()->true,timeout::toNanos);}
     public Status cancel(RemoteReviewBinding binding,java.util.function.BooleanSupplier current,java.util.function.LongSupplier remainingNanos) {

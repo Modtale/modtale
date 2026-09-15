@@ -120,6 +120,12 @@ public final class ReviewOrphanCancellationJournal {
         String state=stored.getString("state");Observation observation=stored.containsKey("observation")?observation(stored.get("observation",Document.class)):null;
         permission(permitted);return new Receipt(prepared,state,observation,stored.containsKey("finishedAt")?stored.getDate("finishedAt").getTime():null);
     }
+    /** Original target for observation only; this never returns or restores an execution token. */
+    public ReviewOrphanTargetResolver.Target reconciliationTarget(Prepared prepared,String actor,BooleanSupplier permitted) {
+        permission(permitted);var target=resolver.resolve(prepared.isolationId(),actor);permission(permitted);var stored=read(prepared.isolationId());
+        if(!prepared.equals(authenticate(stored,actor,target)) || "PREPARED".equals(stored.get("state")))throw unavailable();
+        permission(permitted);return target;
+    }
     private Document ownedRecord(Claim claim,String actor) {
         if(claim==null || !uuid(claim.token()))throw unavailable();
         var target=resolver.resolve(claim.prepared().isolationId(),actor);var stored=read(claim.prepared().isolationId());
@@ -132,12 +138,12 @@ public final class ReviewOrphanCancellationJournal {
                 new Document("$eq",List.of(new Document("$type","$intent.createdAt"),"long")),new Document("$eq",List.of(new Document("$type","$intent.expiresAt"),"long")),
                 new Document("$eq",List.of(new Document("$type","$intent.target.versionIndex"),"int")),new Document("$eq",List.of(new Document("$type","$intent.target.binding.attempt"),"int"))));
     }
-    private static Document observationDocument(Observation observation) {
+    static Document observationDocument(Observation observation) {
         var status=observation.status();Document encoded=status==null?null:new Document("jobId",status.jobId()).append("state",status.state()).append("artifactRetained",status.artifactRetained())
                 .append("createdAt",status.createdAt()).append("expiresAt",status.expiresAt()).append("workState",status.workState());
         return new Document("kind",observation.kind()).append("status",encoded).append("httpStatus",observation.httpStatus());
     }
-    private static Observation observation(Document doc) {
+    static Observation observation(Document doc) {
         if(doc==null || doc.size()!=3)throw unavailable();var status=doc.get("status",Document.class);RemoteReviewClient.Status parsed=null;
         if(status!=null) {
             if(status.size()!=6 || !(status.get("artifactRetained") instanceof Boolean) || !(status.get("createdAt") instanceof Long) || !(status.get("expiresAt") instanceof Long))throw unavailable();
@@ -145,7 +151,7 @@ public final class ReviewOrphanCancellationJournal {
         }
         var result=new Observation(doc.getString("kind"),parsed,doc.getInteger("httpStatus"));if(!Arrays.equals(bytes(doc),bytes(observationDocument(result))))throw unavailable();return result;
     }
-    private static void validateObservation(Observation observation,ReviewOrphanTargetResolver.Target target) {
+    static void validateObservation(Observation observation,ReviewOrphanTargetResolver.Target target) {
         Objects.requireNonNull(observation);var status=observation.status();if(status==null)return;
         if(!target.binding().jobId().equals(status.jobId()) || !Set.of("QUEUED","RUNNING","COMPLETED","CANCELLED","EXPIRED","HELD","UPLOADING","AWAITING_UPLOAD").contains(Objects.toString(status.state(),""))
                 || status.createdAt()<=0 || status.expiresAt()<=status.createdAt() || status.workState()!=null && status.workState().length()>128
