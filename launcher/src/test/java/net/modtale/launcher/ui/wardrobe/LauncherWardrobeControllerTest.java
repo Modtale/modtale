@@ -87,6 +87,22 @@ class LauncherWardrobeControllerTest {
         }
     }
 
+    @Test void selectingALookKeepsLoadedThumbnailNodes() throws Exception {
+        try (Harness h = new Harness()) {
+            fx(() -> { button(h.root(), "Skins").fire(); return null; });
+            await(() -> h.root().lookup("#wardrobe-look-" + SKIN.id()) != null);
+            fx(() -> {
+                Button original = (Button) h.root().lookup("#wardrobe-look-" + SKIN.id());
+                Node artwork = original.getGraphic();
+                original.fire();
+                assertSame(original, h.root().lookup("#wardrobe-look-" + SKIN.id()));
+                assertSame(artwork, original.getGraphic());
+                assertTrue(original.getPseudoClassStates().contains(javafx.css.PseudoClass.getPseudoClass("selected")));
+                return null;
+            });
+        }
+    }
+
     @Test void savedTabDoesNotKeepAnUnsavedCatalogSkinSelected() throws Exception {
         try (Harness h = new Harness()) {
             h.store.saveItem(CAPE);

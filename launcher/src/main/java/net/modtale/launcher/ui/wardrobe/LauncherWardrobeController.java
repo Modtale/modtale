@@ -205,7 +205,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
             busy = false;
             if (error != null) { totalPages = Math.max(1, page); entries = List.of(); renderCards(); setStatus(message(error) + "  Try Search again."); }
             else { entries = items.items(); totalPages = requestedTab == Tab.SKINS && items.hasNext()
-                    ? Math.max(totalPages, items.totalPages()) : items.totalPages(); setStatus(""); if (selected == null && !entries.isEmpty()) select(entries.getFirst()); else renderCards(); }
+                    ? Math.max(totalPages, items.totalPages()) : items.totalPages(); setStatus(""); renderCards(); if (selected == null && !entries.isEmpty()) select(entries.getFirst()); }
             updateSelectionActions();
         }));
     }
@@ -325,7 +325,10 @@ public final class LauncherWardrobeController implements AutoCloseable {
             if (java.nio.file.Files.isRegularFile(assets) && payload.path("skin").isObject()) preview.showLocal(assets, payload.path("skin"));
             else { preview.clear(); selectedDetail.setText("Set your Hytale game directory in Settings to preview this look."); }
         } else preview.show(item.kind() == WardrobeItem.Kind.CAPE ? activeUsername() : payload.path("username").asText("NPC"), payload.path("skinId").asText(""), payload.path("cape").asText(""));
-        updateSelectionActions(); renderCards();
+        updateSelectionActions();
+        for (Node card : cards.getChildren()) {
+            card.pseudoClassStateChanged(SELECTED, ("wardrobe-look-" + item.id()).equals(card.getId()));
+        }
     }
 
     private void updateSelectionActions() {
