@@ -78,8 +78,8 @@ class PriorFindingReasoningServiceTest {
         assertThrows(ResponseStatusException.class,f::read);
     }
     @Test void revokedAndSupersededAcceptancesNeverReappear() {
-        for(boolean revoke:new boolean[]{true,false}) {
-            var f=new Fixture();var e=f.event;
+        for(boolean scoringChanged:new boolean[]{true,false}) for(boolean revoke:new boolean[]{true,false}) {
+            var f=new Fixture();if(scoringChanged) bindThenChangeScoring(f);var e=f.event;
             var next=new FindingReviewService.Event("next","project","source","event",2,e.actorId(),e.createdAt()+1,e.expiresAt(),
                     revoke?FindingReviewService.Disposition.REVOKE:FindingReviewService.Disposition.ACCEPT,"Corrected earlier review conclusion",e.scope(),e.artifactSha256(),e.contentSha256(),e.policyVersion(),e.contextSha256(),e.finding(),revoke?e.id():null,revoke?null:e.id());
             f.source.setFindingReviewHead("next");f.source.setApprovedFindingReviewHead("next");when(f.mongo.findById("next",FindingReviewService.Event.class,FindingReviewService.COLLECTION)).thenReturn(next);
@@ -102,11 +102,21 @@ class PriorFindingReasoningServiceTest {
         var f = new Fixture(); f.target.getScanResult().getIssues().getFirst().setConfidence(90);
         assertTrue(f.read().decisions().isEmpty());
     }
-    @Test void newReasoningBindingCannotMatchChangedDescriptionsFilesOrSeverity() {
-        for (String change : List.of("description", "file", "severity")) {
+    @Test void newReasoningBindingCannotMatchChangedSecurityEvidence() {
+        for (String change : List.of("description", "file", "severity", "policy", "category", "type", "start", "end", "evidence", "cadence", "tactics")) {
             var f = new Fixture(); var scan = f.target.getScanResult(); var issue = scan.getIssues().getFirst();
             f.source.getApprovedIssueBaselines().getFirst().setReasoningEvidenceIdentity(IssueEvidenceIdentity.from(scan).reasoningIdentity(issue));
+            issue.setConfidence(90);
             switch (change) {
+                case "category" -> issue.setCategory("Changed category");
+                case "type" -> issue.setType("Changed type");
+                case "start" -> issue.setLineStart(8);
+                case "end" -> issue.setLineEnd(12);
+                case "evidence" -> issue.setEvidenceLevel("CORRELATED");
+                case "cadence" -> issue.setReviewCadence("ALWAYS");
+                case "tactics" -> issue.setTactics(List.of("EXECUTION"));
+                case "policy" -> { var e = scan.getSecurityEvidence();
+                    scan.setSecurityEvidence(new ScanResult.SecurityEvidence("warden-3.0.0:" + "c".repeat(64), e.artifactSha256(), e.contentSha256(), true, false, e.reviewState(), e.entryHashes())); }
                 case "description" -> issue.setDescription("Different destination");
                 case "severity" -> issue.setSeverity("HIGH");
                 case "file" -> { var e = scan.getSecurityEvidence(); var entries = Map.of("Mod.class", "c".repeat(64));
@@ -114,6 +124,33 @@ class PriorFindingReasoningServiceTest {
             }
             assertTrue(f.read().decisions().isEmpty(), change);
         }
+    }
+
+    private static void bindThenChangeScoring(Fixture f) {
+        var scan = f.target.getScanResult(); var issue = scan.getIssues().getFirst();
+        f.source.getApprovedIssueBaselines().getFirst().setReasoningEvidenceIdentity(
+                IssueEvidenceIdentity.from(scan).reasoningIdentity(issue));
+        issue.setConfidence(90);
+    }
+
+    @Test void changedReasoningBindingDuringReadRejectsTheWholeResponse() {
+        var f = new Fixture(); bindThenChangeScoring(f);
+        doAnswer(call -> {
+            f.source.getApprovedIssueBaselines().getFirst().setReasoningEvidenceIdentity("re1:" + "a".repeat(64));
+            return f.event;
+        }).when(f.mongo).findById("event", FindingReviewService.Event.class, FindingReviewService.COLLECTION);
+        assertThrows(ResponseStatusException.class, f::read);
+    }
+
+    @Test void outstandingReviewRequirementPreventsScoringIndependentReasoning() {
+        var f = new Fixture(); bindThenChangeScoring(f); var e = f.event;
+        var next = new FindingReviewService.Event("next", "project", "source", "event", 2,
+                e.actorId(), e.createdAt() + 1, e.expiresAt(), FindingReviewService.Disposition.REQUIRE_REVIEW,
+                "New evidence requires investigation", e.scope(), e.artifactSha256(), e.contentSha256(),
+                e.policyVersion(), e.contextSha256(), e.finding(), null, null);
+        f.source.setFindingReviewHead("next"); f.source.setApprovedFindingReviewHead("next");
+        when(f.mongo.findById("next", FindingReviewService.Event.class, FindingReviewService.COLLECTION)).thenReturn(next);
+        assertThrows(ResponseStatusException.class, f::read);
     }
 
 }
