@@ -22,6 +22,7 @@ public class ReviewCancellationController {
     @PostMapping("/receipt") public ResponseEntity<ReviewOrphanCancellationJournal.Receipt> receipt(@RequestBody ReviewOrphanCancellationJournal.Prepared request){return response(access.receipt(request));}
     @PostMapping("/checks") public ResponseEntity<ReviewCancellationReconciler.Receipt> check(@RequestBody ReviewCancellationAccess.Check request){return response(access.check(request));}
     @PostMapping("/checks/receipt") public ResponseEntity<ReviewCancellationReconciler.Receipt> checkReceipt(@RequestBody ReviewCancellationAccess.Check request){return response(access.checkReceipt(request));}
+    @PostMapping("/checks/history") public ResponseEntity<ReviewObservationReader.Page> history(@RequestBody ReviewCancellationAccess.History request){return response(access.history(request));}
     private static <T> ResponseEntity<T> response(T value){return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(value);}
     @ExceptionHandler(SecurityException.class) ResponseEntity<Void> forbidden(){return ResponseEntity.status(HttpStatus.FORBIDDEN).cacheControl(CacheControl.noStore()).build();}
     @ExceptionHandler({IllegalArgumentException.class,org.springframework.http.converter.HttpMessageNotReadableException.class}) ResponseEntity<Void> invalid(){return ResponseEntity.badRequest().cacheControl(CacheControl.noStore()).build();}

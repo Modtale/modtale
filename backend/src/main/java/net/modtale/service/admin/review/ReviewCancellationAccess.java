@@ -53,6 +53,16 @@ public final class ReviewCancellationAccess {
         var authority=authority();validate(request);
         return workflow.call(allowed->reconciler.receipt(request.id(),request.original(),authority.actor(),allowed),authority.allowed());
     }
+    public record History(ReviewOrphanCancellationJournal.Prepared original,String cursor,int limit) {}
+    public ReviewObservationReader.Page history(History request) {
+        var authority=authority();if(request==null)throw invalid();validate(request.original());
+        if(request.limit()<1 || request.limit()>25)throw invalid();
+        if(request.cursor()!=null) {
+            String prefix="c1."+request.original().isolationId()+".";
+            if(!request.cursor().startsWith(prefix))throw invalid();uuid(request.cursor().substring(prefix.length()));
+        }
+        return workflow.call(allowed->reconciler.history(request.original(),authority.actor(),request.cursor(),request.limit(),allowed),authority.allowed());
+    }
     private record Authority(String actor,BooleanSupplier allowed) {}
     private Authority authority() {
         User user=current();if(!allowed(user))throw new SecurityException("Review cancellation is not permitted");

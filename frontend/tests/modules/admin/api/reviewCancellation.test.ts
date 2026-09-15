@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { api } from '@/utils/api';
-import { cancellationAvailable, previewCancellation, prepareCancellation, recoverCancellation, cancellationReceipt, executeCancellation, checkCancellation, cancellationCheckReceipt, validateCancellationPreview, validateCancellationIntent, validateCancellationReceipt, validateCheckReceipt, restoreCancellation, saveCancellation, cancellationStorageKey } from '@/modules/admin/api/reviewCancellation';
+import { cancellationHistory, cancellationAvailable, previewCancellation, prepareCancellation, recoverCancellation, cancellationReceipt, executeCancellation, checkCancellation, cancellationCheckReceipt, validateCancellationPreview, validateCancellationIntent, validateCancellationReceipt, validateCheckReceipt, restoreCancellation, saveCancellation, cancellationStorageKey } from '@/modules/admin/api/reviewCancellation';
 vi.mock('@/utils/api', () => ({ api: { get: vi.fn(), post: vi.fn() } }));
 const id = '11111111-1111-1111-1111-111111111111', job = '22222222-2222-2222-2222-222222222222', checkId = '33333333-3333-3333-3333-333333333333';
 const preview = { isolationId: id, projectIdType: 'STRING' as const, projectId: 'p', versionIndex: 0, versionId: 'v', requestId: id, jobId: job, beforeSha256: 'b'.repeat(64), targetSha256: 'a'.repeat(64), artifactSha256: 'c'.repeat(64) };
@@ -75,4 +75,28 @@ it('separates new checks from receipt lookup using the same saved check ID', asy
     vi.mocked(api.post).mockResolvedValue({ data: later }); expect(await checkCancellation(preview, check, signal)).toEqual(later); expect(await cancellationCheckReceipt(preview, check, signal)).toEqual(later);
     expect(api.post).toHaveBeenNthCalledWith(1, '/admin/verification/cancellations/checks', check, { signal, skipCsrfRetry: true });
     expect(api.post).toHaveBeenNthCalledWith(2, '/admin/verification/cancellations/checks/receipt', check, { signal, skipCsrfRetry: true });
+});
+
+it('discovers references without dispatch and rejects wrong scope before a request', async () => {
+    const page = { items: [{ id: checkId, recordedState: 'READING' }], nextCursor: null, order: 'OBSERVATION_ID' };
+    vi.mocked(api.post).mockResolvedValue({ data: page });
+    expect(await cancellationHistory(preview, original, null, signal)).toEqual(page);
+    expect(api.post).toHaveBeenCalledWith('/admin/verification/cancellations/checks/history', { original, cursor: null, limit: 10 }, { signal, skipCsrfRetry: true });
+    await expect(cancellationHistory(preview, original, `c1.${job}.${checkId}`, signal)).rejects.toThrow();expect(api.post).toHaveBeenCalledTimes(1);
+});
+it.each([
+    { items: [{ id: checkId, recordedState: 'APPROVED' }], nextCursor: null, order: 'OBSERVATION_ID' },
+    { items: [{ id: checkId, recordedState: 'READING' }, { id: checkId, recordedState: 'READING' }], nextCursor: null, order: 'OBSERVATION_ID' },
+    { items: [], nextCursor: `c1.${id}.${checkId}`, order: 'OBSERVATION_ID' },
+    { items: [], nextCursor: null, order: 'CHRONOLOGICAL' },
+    { items: [{ id: checkId, recordedState: 'READING', token: 'private' }], nextCursor: null, order: 'OBSERVATION_ID' },
+])('rejects malformed or misleading history', async data => {
+    vi.mocked(api.post).mockResolvedValue({ data });await expect(cancellationHistory(preview, original, null, signal)).rejects.toThrow();
+});
+it('validates forward-only pages and exact continuation', async () => {
+    const ids = Array.from({ length: 10 }, (_, i) => `44444444-4444-4444-4444-${String(i).padStart(12, '0')}`);
+    const data = { items: ids.map(id => ({ id, recordedState: 'UNKNOWN' })), nextCursor: `c1.${id}.${ids[9]}`, order: 'OBSERVATION_ID' };
+    vi.mocked(api.post).mockResolvedValue({ data });expect((await cancellationHistory(preview, original, null, signal)).nextCursor).toBe(data.nextCursor);
+    await expect(cancellationHistory(preview, original, data.nextCursor, signal)).rejects.toThrow();
+    vi.mocked(api.post).mockResolvedValue({ data: { ...data, nextCursor: `c1.${job}.${ids[9]}` } });await expect(cancellationHistory(preview, original, null, signal)).rejects.toThrow();
 });

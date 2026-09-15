@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { cancellationAvailable, previewCancellation, prepareCancellation, executeCancellation, recoverCancellation, checkCancellation, cancellationCheckReceipt, restoreCancellation, saveCancellation, cancellationStorageKey, type CancellationPreview, type CancellationIntent, type CancellationReceipt, type CheckReceipt, type CancellationObservation } from '../api/reviewCancellation';
+import { cancellationHistory, type ObservationHistory, cancellationAvailable, previewCancellation, prepareCancellation, executeCancellation, recoverCancellation, checkCancellation, cancellationCheckReceipt, restoreCancellation, saveCancellation, cancellationStorageKey, type CancellationPreview, type CancellationIntent, type CancellationReceipt, type CheckReceipt, type CancellationObservation } from '../api/reviewCancellation';
 
 type Props = { subject: string; isolationId: string };
 export function ReviewCancellationPanel(props: Props) { return <Panel key={JSON.stringify([props.subject, props.isolationId])} {...props} />; }
@@ -9,6 +9,7 @@ function Panel({ subject, isolationId }: Props) {
     const [preview, setPreview] = useState<CancellationPreview | null>(null);
     const [original, setOriginal] = useState<CancellationIntent | null>(null);
     const [receipt, setReceipt] = useState<CancellationReceipt | null>(null);
+    const [history, setHistory] = useState<ObservationHistory | null>(null);
     const [later, setLater] = useState<CheckReceipt[]>([]);
     const [checkId, setCheckId] = useState<string | null>(null);
     const [confirmed, setConfirmed] = useState(false);
@@ -84,6 +85,20 @@ function Panel({ subject, isolationId }: Props) {
             const value = await cancellationCheckReceipt(preview, { id: checkId, original }, signal); if (!signal.aborted) retainLater(value);
         });
     }
+    function loadHistory(cursor: string | null) {
+        if (!preview || !original || !receipt || receipt.state === 'PREPARED') return;
+        void run(async signal => {
+            const value = await cancellationHistory(preview, original, cursor, signal);
+            if (!signal.aborted) setHistory(value);
+        });
+    }
+    function recoverHistory(id: string) {
+        if (!preview || !original) return;
+        void run(async signal => {
+            const value = await cancellationCheckReceipt(preview, { id, original }, signal);
+            if (!signal.aborted) retainLater(value);
+        });
+    }
     function finishCheck() {
         if (!preview || !original || !checkId || !later.some(v => v.id === checkId && ['OBSERVED', 'UNKNOWN'].includes(v.state))) return;
         try { persist(preview, original, null); setCheckId(null); setRevision(v => v + 1); } catch { setMessage('The reference could not be saved. Keep using receipt recovery.'); }
@@ -108,7 +123,15 @@ function Panel({ subject, isolationId }: Props) {
         {receipt && receipt.state !== 'PREPARED' && !corrupt && !checkId && <button disabled={disabled || later.length >= 20} onClick={newCheck} type="button">Request a new status observation</button>}
         {checkId && <div><p>Saved observation reference: {checkId}</p><button disabled={disabled || corrupt} onClick={recoverCheck} type="button">Recover observation receipt</button>
             {later.some(v => v.id === checkId && ['OBSERVED', 'UNKNOWN'].includes(v.state)) && <button disabled={disabled} onClick={finishCheck} type="button">Finish this observation lookup</button>}</div>}
-        {later.length > 0 && <div><h5>Later status observations</h5><p>These separate responses do not replace the original outcome or prove which request caused a state change. Up to 20 observations are shown in this view; server history discovery is not available here.</p>
+        {receipt && receipt.state !== 'PREPARED' && <div>
+            <button disabled={disabled} onClick={() => loadHistory(null)} type="button">Find retained observations</button>
+            {history && <div><p>References are ordered by ID, not time. Refresh to find newly retained observations. Recover a receipt to verify its outcome.</p>
+                {history.items.length === 0 && <p>No retained observation references were found.</p>}
+                <ul>{history.items.map(item => <li key={item.id} className="break-all">{item.id}: recorded {item.recordedState} <button disabled={disabled} onClick={() => recoverHistory(item.id)} type="button">Recover receipt {item.id}</button></li>)}</ul>
+                {history.nextCursor && <button disabled={disabled} onClick={() => loadHistory(history.nextCursor)} type="button">Next observation references</button>}
+            </div>}
+        </div>}
+        {later.length > 0 && <div><h5>Later status observations</h5><p>These separate responses do not replace the original outcome or prove which request caused a state change. Up to 20 verified receipts are shown in this view. Use retained observation references to recover other receipts.</p>
             <ul>{later.map(item => <li key={item.id} className="break-all">{item.id}: {item.state}<Observation value={item.observation} />{item.receivedAt !== null && <p>Receipt retained: {item.receivedAt} milliseconds since Unix epoch</p>}</li>)}</ul></div>}
     </section>;
 }

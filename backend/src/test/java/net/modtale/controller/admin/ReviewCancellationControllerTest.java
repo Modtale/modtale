@@ -33,7 +33,7 @@ class ReviewCancellationControllerTest {
     void auth(String...permissions){SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("actor",null,Arrays.stream(permissions).map(SimpleGrantedAuthority::new).toList()));}
     @Test void allRoutesRequireBothPermissionsBeforeAccess() {
         for(String permission:List.of("PROJECT_REVIEW_READ","PROJECT_VERSION_RESCAN","PROJECT_REVIEW_DECIDE","ROLE_USER")) {
-            auth(permission);assertThrows(AccessDeniedException.class,()->controller.preview(id));assertThrows(AccessDeniedException.class,()->controller.capabilities());assertThrows(AccessDeniedException.class,()->controller.prepare(null));
+            auth(permission);assertThrows(AccessDeniedException.class,()->controller.history(null));assertThrows(AccessDeniedException.class,()->controller.preview(id));assertThrows(AccessDeniedException.class,()->controller.capabilities());assertThrows(AccessDeniedException.class,()->controller.prepare(null));
             assertThrows(AccessDeniedException.class,()->controller.execute(null));assertThrows(AccessDeniedException.class,()->controller.receipt(null));
             assertThrows(AccessDeniedException.class,()->controller.recover(id));assertThrows(AccessDeniedException.class,()->controller.check(null));assertThrows(AccessDeniedException.class,()->controller.checkReceipt(null));
         }
@@ -93,5 +93,15 @@ class ReviewCancellationControllerTest {
         new org.springframework.boot.test.context.runner.ApplicationContextRunner().withUserConfiguration(ReviewCancellationController.class)
                 .withPropertyValues("app.warden.repair.enabled=true","app.warden.jobs.enabled=true")
                 .run(c->{assertNull(c.getStartupFailure());assertFalse(c.containsBean("reviewCancellationController"));});
+    }
+    @Test void historyReturnsOnlyReferencesWithoutDispatchAndIsNotCacheable()throws Exception {
+        var request=new ReviewCancellationAccess.History(original,null,10);
+        when(access.history(request)).thenReturn(new ReviewObservationReader.Page(List.of(new ReviewObservationReader.Item(checkId,"READING")),null,"OBSERVATION_ID"));
+        MockMvcBuilders.standaloneSetup(controller).build().perform(post("/api/v1/admin/verification/cancellations/checks/history")
+                .contentType("application/json").content("{\"original\":"+body()+",\"cursor\":null,\"limit\":10}"))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store"))
+                .andExpect(jsonPath("$.items[0].id").value(checkId)).andExpect(jsonPath("$.items[0].recordedState").value("READING"))
+                .andExpect(jsonPath("$.items[0].observation").doesNotExist()).andExpect(jsonPath("$.order").value("OBSERVATION_ID"));
+        verify(access).history(request);verifyNoMoreInteractions(access);
     }
 }

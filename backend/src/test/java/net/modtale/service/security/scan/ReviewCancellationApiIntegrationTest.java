@@ -47,6 +47,7 @@ class ReviewCancellationApiIntegrationTest {
         var workflow=new ReviewRepairWorkflow(preparation,base.fixture.isolation,1);
         var executor=new ReviewOrphanCancellationExecutor(journal,f.client,1,Duration.ofSeconds(5));
         var reconciler=new ReviewCancellationReconciler(f.mongo,journal,f.client,1,Duration.ofSeconds(5));
+        reconciler.initializeDiscovery();
         context=new AnnotationConfigApplicationContext();context.getEnvironment().getPropertySources().addFirst(new org.springframework.core.env.MapPropertySource("test",Map.of("app.warden.repair.cancellation.enabled","true")));context.register(MethodSecurity.class);
         context.registerBean("apiSecurity",Permissions.class,Permissions::new);
         context.registerBean(ReviewRepairWorkflow.class,()->workflow);context.registerBean(ReviewOrphanCancellationExecutor.class,()->executor);context.registerBean(ReviewCancellationReconciler.class,()->reconciler);
@@ -77,6 +78,9 @@ class ReviewCancellationApiIntegrationTest {
         assertEquals(observed,postJson("/checks",check));assertEquals(observed,postJson("/checks/receipt",check));assertEquals(1,reads.get());
         context.close();open();assertEquals(initial,getJson("/operations/"+base.fixture.prepared.id()));assertEquals(observed,postJson("/checks/receipt",check));
         assertEquals(executed,postJson("/execute",original));assertEquals(observed,postJson("/checks",check));assertEquals(1,cancellations.get());assertEquals(1,reads.get());
+        var history=postJson("/checks/history",Map.of("original",original,"limit",10));
+        assertEquals(id,history.path("items").get(0).path("id").asText());assertEquals(1,history.path("items").size());
+        assertEquals(1,reads.get());assertEquals(1,cancellations.get());
         var second=postJson("/checks",Map.of("id",UUID.randomUUID().toString(),"original",original));assertEquals("COMPLETED",second.path("observation").path("status").path("state").asText());
         assertEquals(initial,getJson("/operations/"+base.fixture.prepared.id()));assertEquals(observed,postJson("/checks/receipt",check));
         assertEquals(2,f.mongo.getCollection(ReviewCancellationReconciler.COLLECTION).countDocuments());assertEquals(before,base.fixture.raw());

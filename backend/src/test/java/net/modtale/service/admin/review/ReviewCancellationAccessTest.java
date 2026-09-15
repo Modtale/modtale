@@ -28,7 +28,7 @@ class ReviewCancellationAccessTest {
     @AfterEach void cleanup(){workflow.close();SecurityContextHolder.clearContext();}
     @Test void allOperationsRequireBothPermissionsBeforeValidationOrWork() {
         for(var permissions:List.of(Set.of(AdminPermission.PROJECT_REVIEW_READ),Set.of(AdminPermission.PROJECT_VERSION_RESCAN),Set.of(AdminPermission.PROJECT_REVIEW_DECIDE))) {
-            actor.setAdminPermissions(permissions);assertThrows(SecurityException.class,()->access.capability());assertThrows(SecurityException.class,()->access.preview(null));
+            actor.setAdminPermissions(permissions);assertThrows(SecurityException.class,()->access.history(null));assertThrows(SecurityException.class,()->access.capability());assertThrows(SecurityException.class,()->access.preview(null));
             assertThrows(SecurityException.class,()->access.recover(null));assertThrows(SecurityException.class,()->access.prepare(null));assertThrows(SecurityException.class,()->access.execute(null));
             assertThrows(SecurityException.class,()->access.receipt(null));assertThrows(SecurityException.class,()->access.check(null));assertThrows(SecurityException.class,()->access.checkReceipt(null));
         }
@@ -100,5 +100,19 @@ class ReviewCancellationAccessTest {
         assertEquals(receipt,access.receipt(original));assertEquals(later,access.checkReceipt(check));
         verify(journal).receipt(eq(original),eq("actor"),any());verify(reconciler).receipt(eq(check.id()),eq(original),eq("actor"),any());
         verifyNoMoreInteractions(journal,reconciler);verifyNoInteractions(executor);
+    }
+    @Test void historyUsesSharedAdmissionAndRefusesResultsAfterAccountRevocation() {
+        var request=new ReviewCancellationAccess.History(original,null,10);
+        when(reconciler.history(eq(original),eq("actor"),isNull(),eq(10),any())).thenAnswer(i->{
+            assertEquals(1,workflow.status().active());assertTrue(i.<BooleanSupplier>getArgument(4).getAsBoolean());
+            actor.setAdminPermissions(Set.of());return new ReviewObservationReader.Page(List.of(),null,"OBSERVATION_ID");
+        });
+        assertThrows(SecurityException.class,()->access.history(request));assertEquals(0,workflow.status().active());verifyNoInteractions(journal,executor);
+    }
+    @Test void malformedHistoryNeverReachesTheReader() {
+        for(var request:List.of(new ReviewCancellationAccess.History(original,null,0),new ReviewCancellationAccess.History(original,null,26),
+                new ReviewCancellationAccess.History(original,"c1."+check.id()+"."+check.id(),10),new ReviewCancellationAccess.History(null,null,10)))
+            assertThrows(IllegalArgumentException.class,()->access.history(request));
+        verifyNoInteractions(journal,executor,reconciler);
     }
 }

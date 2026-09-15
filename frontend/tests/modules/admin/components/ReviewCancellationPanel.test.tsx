@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { ReviewCancellationPanel } from '@/modules/admin/components/ReviewCancellationPanel';
 import * as client from '@/modules/admin/api/reviewCancellation';
-vi.mock('@/modules/admin/api/reviewCancellation', async importOriginal => ({ ...await importOriginal<typeof client>(), cancellationAvailable: vi.fn(), previewCancellation: vi.fn(), prepareCancellation: vi.fn(), executeCancellation: vi.fn(), recoverCancellation: vi.fn(), checkCancellation: vi.fn(), cancellationCheckReceipt: vi.fn() }));
+vi.mock('@/modules/admin/api/reviewCancellation', async importOriginal => ({ ...await importOriginal<typeof client>(), cancellationHistory: vi.fn(), cancellationAvailable: vi.fn(), previewCancellation: vi.fn(), prepareCancellation: vi.fn(), executeCancellation: vi.fn(), recoverCancellation: vi.fn(), checkCancellation: vi.fn(), cancellationCheckReceipt: vi.fn() }));
 const id = '11111111-1111-1111-1111-111111111111';
 const preview: client.CancellationPreview = { isolationId: id, projectIdType: 'STRING', projectId: 'p', versionIndex: 0, versionId: 'original', requestId: id, jobId: '22222222-2222-2222-2222-222222222222', beforeSha256: 'b'.repeat(64), targetSha256: 'a'.repeat(64), artifactSha256: 'c'.repeat(64) };
 const original = { isolationId: id, targetSha256: preview.targetSha256, createdAt: 1000, expiresAt: 2000 };
@@ -80,4 +80,24 @@ it('double clicks cannot start concurrent preparation', async () => {
 });
 it('disabled capability hides the panel and makes no target requests', async () => {
     await act(async () => root.render(<div />)); vi.mocked(client.cancellationAvailable).mockResolvedValueOnce(false); await render(); expect(container.textContent).toBe(''); expect(client.previewCancellation).not.toHaveBeenCalled();
+});
+
+it('recovers retained observations after reopening without issuing another remote check', async () => {
+    const checkId = '33333333-3333-3333-3333-333333333333';
+    await act(async () => root.render(<div />)); sessionStorage.clear(); await render();
+    await click('Recover original cancellation receipt');
+    vi.mocked(client.cancellationHistory).mockResolvedValue({ items: [{ id: checkId, recordedState: 'OBSERVED' }], nextCursor: null, order: 'OBSERVATION_ID' });
+    vi.mocked(client.cancellationCheckReceipt).mockResolvedValue({ id: checkId, original, state: 'READING', observation: null, receivedAt: null });
+    await click('Find retained observations');expect(client.cancellationCheckReceipt).not.toHaveBeenCalled();
+    await click(`Recover receipt ${checkId}`);expect(client.checkCancellation).not.toHaveBeenCalled();expect(client.executeCancellation).not.toHaveBeenCalled();
+    expect(container.textContent).toContain('Original cancellation outcome');expect(container.textContent).toContain('HTTP 503');
+    expect(container.textContent).toContain(`${checkId}: READING`);expect(client.restoreCancellation(sessionStorage.getItem(key)!).checkId).toBeNull();
+});
+it('late history responses are discarded when the account changes', async () => {
+    await click('Recover original cancellation receipt');
+    let resolve!: (value: client.ObservationHistory) => void;
+    vi.mocked(client.cancellationHistory).mockImplementationOnce(() => new Promise(r => { resolve = r; }));
+    await click('Find retained observations');const signal = vi.mocked(client.cancellationHistory).mock.calls[0][3];await render('other');expect(signal.aborted).toBe(true);
+    await act(async () => resolve({ items: [{ id: '33333333-3333-3333-3333-333333333333', recordedState: 'READING' }], nextCursor: null, order: 'OBSERVATION_ID' }));
+    expect(container.textContent).not.toContain('33333333-3333-3333-3333-333333333333');
 });

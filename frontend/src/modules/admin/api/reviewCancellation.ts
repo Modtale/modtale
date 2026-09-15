@@ -115,3 +115,20 @@ async function checkRequest(path: string, preview: CancellationPreview, check: C
 }
 export const checkCancellation = (preview: CancellationPreview, check: CancellationCheck, signal: AbortSignal) => checkRequest('checks', preview, check, signal);
 export const cancellationCheckReceipt = (preview: CancellationPreview, check: CancellationCheck, signal: AbortSignal) => checkRequest('checks/receipt', preview, check, signal);
+
+export type ObservationHistory = { items: { id: string; recordedState: CheckReceipt['state'] }[]; nextCursor: string | null; order: 'OBSERVATION_ID' };
+export async function cancellationHistory(preview: CancellationPreview, original: CancellationIntent, cursor: string | null, signal: AbortSignal): Promise<ObservationHistory> {
+    const p = validateCancellationPreview(preview, preview.isolationId), intent = validateCancellationIntent(original, p);
+    const prefix = `c1.${intent.isolationId}.`;
+    let after = '';
+    if (cursor !== null) { if (!cursor.startsWith(prefix)) throw invalid(); after = text(cursor.slice(prefix.length), uuid); }
+    const r = object((await api.post(`${base}/checks/history`, { original: intent, cursor, limit: 10 }, noReplay(signal))).data, ['items', 'nextCursor', 'order']);
+    if (r.order !== 'OBSERVATION_ID' || !Array.isArray(r.items) || r.items.length > 10) throw invalid();
+    const items = r.items.map(value => {
+        const item = object(value, ['id', 'recordedState']), id = text(item.id, uuid);
+        if (id <= after || !['RESERVED', 'READING', 'OBSERVED', 'UNKNOWN'].includes(item.recordedState as string)) throw invalid();
+        after = id; return { id, recordedState: item.recordedState as CheckReceipt['state'] };
+    });
+    if (r.nextCursor !== null && (items.length !== 10 || r.nextCursor !== prefix + after)) throw invalid();
+    return { items, nextCursor: r.nextCursor as string | null, order: 'OBSERVATION_ID' };
+}
