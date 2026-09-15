@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { ReviewCancellationPanel } from './ReviewCancellationPanel';
 import { closeExpiredRepair, recoverRepair, repairOperations, type RecoveredRepair, type RepairOperationPage } from '../api/reviewRepair';
 
-export function ReviewRepairHistory() {
+export function ReviewRepairHistory({ subject }: { subject?: string }) {
     const [page, setPage] = useState<RepairOperationPage | null>(null);
     const [receipt, setReceipt] = useState<RecoveredRepair | null>(null);
     const [loading, setLoading] = useState(false);
@@ -51,5 +52,6 @@ export function ReviewRepairHistory() {
             </div>}
             <p>{receipt.result.state === 'APPLIED' ? 'The receipt confirms local isolation was applied. It does not establish the current version state or approve the mod.' : receipt.result.state === 'NOT_APPLIED' ? 'The receipt confirms isolation was not applied.' : 'The outcome remains unconfirmed. Do not repeat isolation. An expired attempt may be closed; otherwise check its receipt again.'}</p>
         </div>}
+        {subject && receipt?.result.state === 'APPLIED' && <ReviewCancellationPanel subject={subject} isolationId={receipt.prepared.id} />}
     </section>;
 }

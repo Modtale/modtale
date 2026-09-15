@@ -92,6 +92,6 @@ function RepairPanel({ subject, selected, onReady, onLock, onDismiss }: RepairPa
             {result?.state === 'UNKNOWN' && <button type="button" disabled={working || available !== true} className="rounded-lg border px-3 py-2 disabled:opacity-50" onClick={checkReceipt}>Check operation receipt</button>}
             {!working && stage !== 'corrupt' && result?.state !== 'UNKNOWN' && <button type="button" className="ml-2 rounded-lg border px-3 py-2" onClick={dismiss}>{terminal ? 'Close repair result' : 'Cancel repair preview'}</button>}
         </div>}
-        {available === true && <ReviewRepairHistory />}
+        {available === true && <ReviewRepairHistory subject={subject} />}
     </section>;
 }
