@@ -2664,6 +2664,14 @@ public final class ProjectPageController {
             return;
         }
 
+        double scrollOffset = 0;
+        if (changelogOverlay != null
+                && changelogOverlay.lookup(".project-changelog-scroll") instanceof ScrollPane previous) {
+            double range = Math.max(0, previous.getContent().getLayoutBounds().getHeight()
+                    - previous.getViewportBounds().getHeight());
+            scrollOffset = previous.getVvalue() * range;
+        }
+        final double retainedOffset = scrollOffset;
         hideChangelogOverlay();
         hideGalleryOverlay();
         hideCommentDeleteOverlay();
@@ -2694,7 +2702,17 @@ public final class ProjectPageController {
         host.getChildren().add(overlay);
         StackPane.setAlignment(overlay, Pos.CENTER);
         changelogOverlay = overlay;
-        Platform.runLater(overlay::requestFocus);
+        Platform.runLater(() -> {
+            if (changelogOverlay != overlay) return;
+            overlay.applyCss();
+            overlay.layout();
+            if (overlay.lookup(".project-changelog-scroll") instanceof ScrollPane scroll) {
+                double range = Math.max(0, scroll.getContent().getLayoutBounds().getHeight()
+                        - scroll.getViewportBounds().getHeight());
+                scroll.setVvalue(range > 0 ? Math.min(1, retainedOffset / range) : 0);
+            }
+            overlay.requestFocus();
+        });
     }
 
     private VBox changelogModal(List<ChangelogEntry> entries, boolean loading) {
