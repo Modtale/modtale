@@ -85,4 +85,39 @@ class ProjectMutationExecutorTest {
         assertEquals("NOT_APPLIED",executor().apply(prepared,"owner",()->true).state());assertInstanceOf(Long.class,root().get("unknownCounter"));
     }
 
+    @Test void appliedArchiveRetainsExactCommittedRootAfterDeletion(){
+        var prepared=base.service.prepare(base.request(),()->true);var result=executor().apply(prepared,"owner",()->true);
+        var ref=base.base.fixture.mongo.getCollection(ProjectMutationExecutor.REFERENCES).find().first();
+        var applied=base.base.archive.load(ref.getString("afterArchiveId"));
+        assertEquals(ReviewSnapshotArchive.Action.PROJECT_MUTATION_APPLIED,applied.action());
+        assertArrayEquals(VersionMutationPreparationTest.bytes(root()),applied.versionBytes());
+        assertEquals(prepared.createdAt(),root().getList("versions",Document.class).get(1).get("scanResult",Document.class).get("scanTimestamp"));
+        base.base.fixture.mongo.getCollection("projects").deleteMany(new Document());
+        assertEquals(result,executor().receipt(prepared,"owner",()->true));
+    }
+    @Test void appliedReceiptRejectsChangedDigestOrMissingArchiveBinding(){
+        var prepared=base.service.prepare(base.request(),()->true);executor().apply(prepared,"owner",()->true);
+        var ops=base.base.fixture.mongo.getCollection(ReviewRepairJournal.COLLECTION);var query=new Document("_id",prepared.id());
+        ops.updateOne(query,new Document("$set",new Document("afterSha256","0".repeat(64))));
+        assertThrows(IllegalStateException.class,()->executor().receipt(prepared,"owner",()->true));
+        ops.updateOne(query,new Document("$unset",new Document("afterArchiveId","")));
+        assertEquals("UNKNOWN",executor().receipt(prepared,"owner",()->true).state());
+    }
+    @Test void lostAppliedArchiveReplyRecoversExactCandidate(){
+        var prepared=base.service.prepare(base.request(),()->true);var archive=spy(base.base.archive);
+        doAnswer(call->{var snapshot=(ReviewSnapshotArchive.Snapshot)call.getArgument(0);var result=call.callRealMethod();
+            if(snapshot.action()==ReviewSnapshotArchive.Action.PROJECT_MUTATION_APPLIED)throw new MongoException("lost archive reply");return result;
+        }).when(archive).retain(any(ReviewSnapshotArchive.Snapshot.class));
+        var result=new ProjectMutationExecutor(base.base.fixture.mongo,base.service,archive,journal).apply(prepared,"owner",()->true);
+        assertEquals("APPLIED",result.state());assertEquals(result,executor().receipt(prepared,"owner",()->true));
+    }
+
+    @Test void retryAfterRetentionBeforeClaimUsesIdenticalProjection(){
+        var prepared=base.service.prepare(base.request(),()->true);var archive=spy(base.base.archive);var allowed=new AtomicBoolean(true);
+        doAnswer(call->{var result=call.callRealMethod();allowed.set(false);return result;}).when(archive).retain(any(ReviewSnapshotArchive.Snapshot.class));
+        assertThrows(SecurityException.class,()->new ProjectMutationExecutor(base.base.fixture.mongo,base.service,archive,journal).apply(prepared,"owner",allowed::get));
+        assertEquals(0,base.base.fixture.mongo.getCollection(ReviewRepairJournal.COLLECTION).countDocuments());
+        assertEquals("APPLIED",executor().apply(prepared,"owner",()->true).state());
+    }
+
 }

@@ -31,6 +31,11 @@ public final class ProjectMutationExecutor {
         var before=decode(recovered.before().versionBytes());var proposed=decode(recovered.after().versionBytes());
         var after=project(recovered,before,proposed);String afterSha=digest(bytes(after));
         var intent=archive.load(prepared.id());
+        var applied=new ReviewSnapshotArchive.Snapshot(appliedArchiveId(prepared.id()),intent.projectId(),0,actor,
+                ReviewSnapshotArchive.Action.PROJECT_MUTATION_APPLIED,prepared.createdAt(),prepared.expiresAt(),bytes(after));
+        permission(permitted);
+        try{archive.retain(applied);}catch(RuntimeException uncertain){var found=archive.find(applied.id());if(found==null || !same(applied,found))throw uncertain;}
+        permission(permitted);
         var hello=ReviewRepairIo.database(mongo.getDb()).runCommand(new Document("hello",1),ReadPreference.primary());
         if(!(hello.get("setName") instanceof String) && !"isdbgrid".equals(hello.get("msg")))throw invalid();
         var claim=journal.claim(new ReviewRepairPreparation.Prepared(intent.id(),digest(intent.versionBytes()),intent.createdAt(),intent.expiresAt()),actor,ReviewSnapshotArchive.Action.PROJECT_MUTATION_INTENT,permitted);
@@ -61,10 +66,10 @@ public final class ProjectMutationExecutor {
                     }
                     ReviewRepairIo.collection(mongo.getCollection(REFERENCES),session).insertOne(session,new Document("_id",prepared.id()).append("projectId",intent.projectId())
                             .append("actor",actor).append("beforeArchiveId",prepared.beforeArchiveId()).append("beforeSha256",prepared.beforeSha256())
-                            .append("afterSha256",afterSha).append("versions",changes));
+                            .append("afterArchiveId",applied.id()).append("afterSha256",afterSha).append("versions",changes));
                     state="APPLIED";appliedSha=afterSha;
                 }
-                if(operations.updateOne(session,op,List.of(new Document("$set",new Document("state",state).append("afterSha256",appliedSha).append("finishedAt","$$NOW"))),new UpdateOptions().collation(BINARY)).getModifiedCount()!=1)throw invalid();
+                if(operations.updateOne(session,op,List.of(new Document("$set",new Document("state",state).append("afterSha256",appliedSha).append("afterArchiveId",appliedSha==null?null:applied.id()).append("finishedAt","$$NOW"))),new UpdateOptions().collation(BINARY)).getModifiedCount()!=1)throw invalid();
                 permission(permitted);commitAttempted=true;session.commitTransaction();return new Result(state,appliedSha);
             } catch(RuntimeException failure){if(!commitAttempted)try{session.abortTransaction();}catch(RuntimeException ignored){}throw failure;}
         } catch(RuntimeException uncertain) {
@@ -82,7 +87,14 @@ public final class ProjectMutationExecutor {
         if(op==null || !actor.equals(op.get("actor")) || !source.action().name().equals(op.get("action")) || !digest(source.versionBytes()).equals(op.get("sha256"))
                 || !Long.valueOf(source.createdAt()).equals(op.get("createdAt")) || !Long.valueOf(source.expiresAt()).equals(op.get("expiresAt")) || !(op.get("finishedAt") instanceof Date))return new Result("UNKNOWN",null);
         if("NOT_APPLIED".equals(op.get("state")) && op.get("afterSha256")==null)return new Result("NOT_APPLIED",null);
-        if("APPLIED".equals(op.get("state")) && op.get("afterSha256") instanceof String sha && sha.matches("[0-9a-f]{64}"))return new Result("APPLIED",sha);
+        if("APPLIED".equals(op.get("state")) && op.get("afterSha256") instanceof String sha && sha.matches("[0-9a-f]{64}")
+                && appliedArchiveId(prepared.id()).equals(op.get("afterArchiveId"))) {
+            var applied=archive.load(op.getString("afterArchiveId"));
+            if(!applied.projectId().equals(source.projectId()) || applied.versionIndex()!=0 || !actor.equals(applied.actorId())
+                    || applied.action()!=ReviewSnapshotArchive.Action.PROJECT_MUTATION_APPLIED || applied.createdAt()!=prepared.createdAt()
+                    || applied.expiresAt()!=prepared.expiresAt() || !sha.equals(digest(applied.versionBytes())))throw invalid();
+            permission(permitted);return new Result("APPLIED",sha);
+        }
         return new Result("UNKNOWN",null);
     }
     private static Document project(ProjectMutationPreparation.Recovered recovered,Document before,Document proposed) {
@@ -101,7 +113,7 @@ public final class ProjectMutationExecutor {
             boolean held=transition.beforeIndex()<0 || transition.changes().stream().anyMatch(change->change!=VersionReviewTransition.Change.METADATA)
                     || prepared.mutation()==ProjectMutationPreparation.Mutation.SUBMISSION && original.get("scanResult")==null;
             if(held)next=VersionMutationExecutor.projectVersion(prepared.id(),transition.beforeSha256()==null?prepared.beforeSha256():transition.beforeSha256(),
-                    prepared.id()+":"+transition.versionId(),original,next);
+                    prepared.id()+":"+transition.versionId(),original,next,prepared.createdAt());
             else {
                 // Only the listed owner metadata changes are copied; all review and unknown fields remain byte-preserved.
                 var retained=new Document(original);for(var field:List.of("gameVersions","dependencies","incompatibleProjectIds","changelog","channel","versionNumber","releaseDate")) {
@@ -111,11 +123,13 @@ public final class ProjectMutationExecutor {
             versions.set(transition.afterIndex(),next);
         }
         if(versions.isEmpty() && !Set.of("DRAFT","PRIVATE").contains(status))throw invalid();
-        var after=new Document(before);after.put("versions",versions);after.put("updatedAt",java.time.LocalDateTime.now().toString());
+        var after=new Document(before);after.put("versions",versions);after.put("updatedAt",java.time.LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(prepared.createdAt()),java.time.ZoneOffset.UTC).toString());
         if(prepared.mutation()==ProjectMutationPreparation.Mutation.SUBMISSION){after.put("status","PENDING");after.put("expiresAt",null);}
         else if(proposed.containsKey("childProjectIds"))after.put("childProjectIds",proposed.get("childProjectIds"));
         if(bytes(after).length>ReviewSnapshotArchive.MAX_BYTES)throw invalid();return after;
     }
+    private static String appliedArchiveId(String id){return UUID.nameUUIDFromBytes(("project-mutation-applied-1:"+id).getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();}
+    private static boolean same(ReviewSnapshotArchive.Snapshot a,ReviewSnapshotArchive.Snapshot b){return a.id().equals(b.id()) && a.projectId().equals(b.projectId()) && a.versionIndex()==b.versionIndex() && a.actorId().equals(b.actorId()) && a.action()==b.action() && a.createdAt()==b.createdAt() && a.expiresAt()==b.expiresAt() && Arrays.equals(a.versionBytes(),b.versionBytes());}
     private static Document decode(byte[] data){return new RawBsonDocument(data).decode(new DocumentCodec());}
     private static byte[] bytes(Document doc){var buffer=new RawBsonDocument(doc,new DocumentCodec()).getByteBuffer().asNIO();var data=new byte[buffer.remaining()];buffer.get(data);return data;}
     private static String digest(byte[] data){try{return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(data));}catch(Exception impossible){throw new IllegalStateException(impossible);}}

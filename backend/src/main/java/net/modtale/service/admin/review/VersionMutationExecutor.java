@@ -96,9 +96,9 @@ public final class VersionMutationExecutor {
         return new Result("UNKNOWN",null);
     }
     private static Document projected(VersionMutationPreparation.Prepared prepared,Document before,Document proposed) {
-        return projectVersion(prepared.id(),prepared.beforeSha256(),prepared.id(),before,proposed);
+        return projectVersion(prepared.id(),prepared.beforeSha256(),prepared.id(),before,proposed,prepared.createdAt());
     }
-    static Document projectVersion(String operationId,String beforeSha256,String requestSeed,Document before,Document proposed) {
+    static Document projectVersion(String operationId,String beforeSha256,String requestSeed,Document before,Document proposed,long timestamp) {
         var fields=new HashSet<>(before.keySet());fields.addAll(proposed.keySet());
         for(var field:fields)if(!EDITABLE.contains(field) && !RESET.contains(field)
                 && (before.containsKey(field)!=proposed.containsKey(field) || !Arrays.equals(bytes(new Document("v",before.get(field))),bytes(new Document("v",proposed.get(field))))))throw invalid();
@@ -113,7 +113,7 @@ public final class VersionMutationExecutor {
         if(priorAttempt!=null && (!(priorAttempt instanceof Integer || priorAttempt instanceof Long) || ((Number)priorAttempt).longValue()<1 || ((Number)priorAttempt).longValue()>=Integer.MAX_VALUE))throw invalid();
         int attempt=priorAttempt==null?1:Math.toIntExact(((Number)priorAttempt).longValue()+1);
         var scan=new Document("status","SCANNING").append("scanState","MUTATION_HELD").append("scanRequestId",request)
-                .append("scanAttempt",attempt).append("scanTimestamp",System.currentTimeMillis()).append("manualRescan",false).append("verdict",hold==null?"REVIEW":"BLOCK");
+                .append("scanAttempt",attempt).append("scanTimestamp",timestamp).append("manualRescan",false).append("verdict",hold==null?"REVIEW":"BLOCK");
         next.put("scanResult",scan);for(var field:RESET)if(!field.equals("scanResult"))next.put(field,null);
         next.put("reviewStatus","PENDING");next.put("securityApprovedAt",0L);next.put("replacementSecurityHold",hold);
         next.put("versionMutation",new Document("operationId",operationId).append("beforeSha256",beforeSha256).append("requestId",request));
