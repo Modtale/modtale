@@ -1256,23 +1256,13 @@
     -fx-border-color: rgba(148, 163, 184, 0.28);
 }
 
-.provider-picker .arrow-button {
-    -fx-padding: 0 0 0 5px;
-    -fx-background-color: transparent;
-}
-
-.provider-picker .arrow {
-    -fx-background-color: #94a3b8;
-    -fx-padding: 2.5px 4px 2.5px 4px;
-}
-
-.provider-picker > .label {
+.provider-picker .label {
     -fx-padding: 0;
     -fx-text-fill: #e2e8f0;
 }
 
-.provider-picker > .label .text {
-    -fx-fill: #e2e8f0;
+.provider-picker .svg-icon {
+    -fx-stroke: #94a3b8;
 }
 
 .toolbar-pill {
