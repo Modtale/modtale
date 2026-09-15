@@ -4,7 +4,7 @@ import { FileCode2, X } from 'lucide-react';
 import { ModalPortal } from '@/components/ui/ModalPortal';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { Input } from './FormShared';
-import { CONFIG_EXTENSIONS, MAX_CONFIG_FILE_BYTES, MAX_CONFIG_FILES, MAX_CONFIG_TOTAL_BYTES, configFileName, configPath, readConfigBytes, validateModConfigs, type ModConfig } from '../utils/modpackConfigs';
+import { CONFIG_EXTENSIONS, MAX_CONFIG_FILE_BYTES, MAX_CONFIG_FILES, MAX_CONFIG_TOTAL_BYTES, configFileName, configPath, safeConfigSegment, readConfigBytes, validateModConfigs, type ModConfig } from '../utils/modpackConfigs';
 import { projectClient } from '../api/projectClient';
 import { theme } from '@/styles/theme';
 
@@ -26,6 +26,7 @@ export function ModConfigFields({ projectId, title, source = 'MODTALE', versionN
     const [draft, setDraft] = useState<ModConfig[]>([]);
     const [folder, setFolder] = useState('');
     const [suggestedFolder, setSuggestedFolder] = useState('');
+    const [override, setOverride] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [preview, setPreview] = useState<{ name: string; text: string } | null>(null);
@@ -42,9 +43,11 @@ export function ModConfigFields({ projectId, title, source = 'MODTALE', versionN
         setLoading(true);
         projectClient.getProjectFull(projectId).then(project => {
             if (!active) return;
-            const version = project.versions?.find(item => item.versionNumber === versionNumber);
+            const version = versionNumber
+                ? project.versions?.find(item => item.versionNumber === versionNumber)
+                : [...(project.versions || [])].sort((a, b) => Date.parse(b.releaseDate) - Date.parse(a.releaseDate))[0];
             const identity = version?.manifestId?.split(':');
-            if (identity?.length === 2 && identity.every(part => part && !/[\\/]/.test(part))) {
+            if (identity?.length === 2 && identity.every(part => safeConfigSegment(part) && !part.includes('/'))) {
                 const suggestion = identity.join('_');
                 setSuggestedFolder(suggestion);
                 if (!folderEdited.current) setFolder(suggestion);
@@ -59,6 +62,7 @@ export function ModConfigFields({ projectId, title, source = 'MODTALE', versionN
         setFolder(parts[0] === 'Universe' ? parts[2] : parts[0] === 'Mods' ? parts[1] : parts[3] || '');
         folderEdited.current = configs.length > 0;
         setSuggestedFolder('');
+        setOverride(false);
         setError(null);
         setPreview(null);
         setOpen(true);
@@ -99,12 +103,18 @@ export function ModConfigFields({ projectId, title, source = 'MODTALE', versionN
                         <input ref={folderInput} type="file" multiple {...{ webkitdirectory: '', directory: '' }} className="hidden" onChange={event => { void addFiles(Array.from(event.target.files || []), true); event.target.value = ''; }} />
                         {preview && <pre className={`mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all text-xs ${theme.colors.textSecondary}`}>{preview.text}</pre>}
                     </div>
-                    <label className={`block text-xs font-bold ${theme.colors.textSecondary}`}>Mod folder<Input value={folder} onChange={event => { folderEdited.current = true; setFolder(event.target.value); }} placeholder="Group_PluginName" className="mt-2 !font-normal" /><span className={`block mt-1.5 text-[11px] font-normal ${theme.colors.textMuted}`}>{loading ? 'Checking the mod’s manifest…' : suggestedFolder === folder && folder ? 'From the mod’s manifest. Change it only if needed.' : 'Use the exact folder name created by the mod.'}</span></label>
+                    <div className={`rounded-xl border ${theme.colors.border} p-3 space-y-2`}>
+                        <div className="flex items-center justify-between gap-3"><span className={`text-xs font-bold ${theme.colors.textSecondary}`}>Install location</span><button type="button" onClick={() => setOverride(value => !value)} className={`text-xs ${theme.colors.accent} hover:underline`}>{override ? 'Hide override' : 'Change'}</button></div>
+                        <p className={`text-sm ${theme.colors.textPrimary}`}>{loading ? 'Detecting from the mod…' : folder ? `${title} config folder` : 'Choose the mod’s existing config folder'}</p>
+                        {folder && <p className={`text-xs break-all ${theme.colors.textMuted}`}>{folder}{suggestedFolder === folder ? ' · Detected automatically' : ''}</p>}
+                        {!loading && !folder && <button type="button" onClick={() => folderInput.current?.click()} className={`text-xs ${theme.colors.accent} hover:underline`}>Import config folder</button>}
+                        {override && <label className={`block text-xs ${theme.colors.textSecondary}`}>Custom mod folder<Input value={folder} onChange={event => { folderEdited.current = true; setFolder(event.target.value); }} placeholder="Group_PluginName" className="mt-2 !font-normal" />{suggestedFolder && folder !== suggestedFolder && <button type="button" onClick={() => { folderEdited.current = false; setFolder(suggestedFolder); setOverride(false); }} className={`mt-2 text-xs ${theme.colors.accent} hover:underline`}>Use detected folder</button>}</label>}
+                    </div>
                     <details><summary className={`cursor-pointer text-xs ${theme.colors.textMuted}`}>Installation paths</summary><div className="mt-2 space-y-1">{draft.length ? prepared.map(item => <p key={item.id} className={`text-xs font-mono break-all ${theme.colors.textSecondary}`}>Universe / mods / {folder}/{configFileName(item)}</p>) : <p className={`text-xs ${theme.colors.textMuted}`}>Add files to preview their paths.</p>}</div></details>
                     {(error || pathError) && <p role="alert" className={`text-xs ${theme.colors.dangerText}`}>{error || pathError}</p>}
                     <p className={`text-xs ${theme.colors.textMuted}`}>Applied when the pack is enabled in a universe. Existing settings are kept.</p>
                 </div>
-                <div className={`${theme.components.modalFooter} !justify-end gap-3`}><button type="button" onClick={() => setOpen(false)} className={theme.components.buttonGhost}>Cancel</button><button type="button" disabled={!!pathError || disabled} onClick={() => { onChange(prepared); setOpen(false); }} className={theme.components.buttonPrimary}>Save configs</button></div>
+                <div className={`${theme.components.modalFooter} !justify-end gap-3`}><button type="button" onClick={() => setOpen(false)} className={theme.components.buttonGhost}>Cancel</button><button type="button" disabled={loading || !!pathError || disabled} onClick={() => { onChange(prepared); setOpen(false); }} className={theme.components.buttonPrimary}>Save configs</button></div>
             </div>
         </div></ModalPortal>}
     </>;
