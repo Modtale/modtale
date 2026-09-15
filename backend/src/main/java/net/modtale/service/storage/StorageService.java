@@ -138,6 +138,15 @@ public class StorageService {
         s3Client.putObject(putOb, RequestBody.fromBytes(data));
     }
 
+    public void deleteOwnedProjectMedia(String projectId, String location, java.util.Collection<String> remainingReferences) {
+        String key = ProjectMediaKeys.ownedKey(projectId, location, publicDomain);
+        // Legacy or foreign references are not proof of ownership and require reconciled cleanup.
+        if (key == null || remainingReferences == null) return;
+        for (String reference : remainingReferences)
+            if (key.equals(ProjectMediaKeys.ownedKey(projectId, reference, publicDomain))) return;
+        deleteFile(key);
+    }
+
     public void deleteFile(String fileName) {
         if (fileName == null || fileName.isEmpty()) return;
 

@@ -125,12 +125,6 @@ public class AuthenticationService {
             throw new UnauthorizedException("We couldn't sign you in with that username and password. Double-check both fields and try again.");
         }
 
-        if (user.isMfaEnabled() && (user.getMfaSecret() == null || user.getMfaSecret().isBlank())) {
-            logger.warn("User {} has MFA enabled but missing secret. Auto-disabling MFA to prevent lockout.", user.getId());
-            user.setMfaEnabled(false);
-            user = userRepository.save(user);
-        }
-
         return user;
     }
 

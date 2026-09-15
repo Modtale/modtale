@@ -68,13 +68,8 @@ public class ProjectMediaService {
             String currentUrl = isBanner ? project.getBannerUrl() : project.getImageUrl();
             String publicUrl = mediaUploadService.uploadPublicUrl(
                     file,
-                    "images",
-                    isBanner ? fileValidationService::validateBanner : fileValidationService::validateIcon,
-                    () -> {
-                        if (currentUrl != null && !currentUrl.contains("default.png") && !currentUrl.contains("placeholder") && !currentUrl.contains("favicon")) {
-                            projectDeletionService.deleteStoredFile(currentUrl);
-                        }
-                    }
+                    net.modtale.service.storage.ProjectMediaKeys.prefix(project.getId(), "images"),
+                    isBanner ? fileValidationService::validateBanner : fileValidationService::validateIcon
             );
 
             if (isBanner) {
@@ -83,8 +78,9 @@ public class ProjectMediaService {
                 project.setImageUrl(publicUrl);
             }
 
-            projectRepository.save(project);
-            projectService.evictProjectCache(project);
+            saveAndEvict(project);
+            if (currentUrl != null && !currentUrl.equals(publicUrl) && !currentUrl.contains("default.png")
+                    && !currentUrl.contains("placeholder") && !currentUrl.contains("favicon")) projectDeletionService.deleteProjectMediaFile(project, currentUrl);
         } catch (StorageUploadException ex) {
             throw new ProjectMediaOperationException(ex.getMessage(), ex);
         }
@@ -97,7 +93,7 @@ public class ProjectMediaService {
         ensureGalleryCapacity(project);
 
         try {
-            galleryItems(project).add(mediaUploadService.uploadPublicUrl(file, "gallery", fileValidationService::validateGalleryImage));
+            galleryItems(project).add(mediaUploadService.uploadPublicUrl(file, net.modtale.service.storage.ProjectMediaKeys.prefix(project.getId(), "gallery"), fileValidationService::validateGalleryImage));
             return saveAndEvict(project);
         } catch (StorageUploadException ex) {
             throw new ProjectMediaOperationException(ex.getMessage(), ex);
@@ -124,16 +120,15 @@ public class ProjectMediaService {
         Project project = projectAccessService.requireProjectPermission(id, user, "PROJECT_GALLERY_REMOVE",
                 "You do not have permission to remove gallery images from this project.");
         projectMutationGuard.ensureEditable(project);
-        galleryItems(project).remove(imageUrl);
+        if (!galleryItems(project).remove(imageUrl)) throw new InvalidProjectRequestException("That gallery image does not exist on this project.");
         if (project.getGalleryImageCaptions() != null && project.getGalleryImageCaptions().containsKey(imageUrl)) {
             Map<String, String> captions = new HashMap<>(project.getGalleryImageCaptions());
             captions.remove(imageUrl);
             project.setGalleryImageCaptions(captions);
         }
-        if (!isYouTubeUrl(imageUrl)) {
-            projectDeletionService.deleteStoredFile(imageUrl);
-        }
-        return saveAndEvict(project);
+        var saved = saveAndEvict(project);
+        if (!isYouTubeUrl(imageUrl)) projectDeletionService.deleteProjectMediaFile(project, imageUrl);
+        return saved;
     }
 
     public Project updateGalleryImageCaption(String id, String imageUrl, String caption, User user) {

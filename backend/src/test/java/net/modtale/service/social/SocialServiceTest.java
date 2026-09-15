@@ -33,7 +33,7 @@ class SocialServiceTest {
                 mock(NotificationService.class),
                 mock(SanitizationService.class),
                 mock(MongoTemplate.class),
-                mock(ScoringService.class)
+                mock(ScoringService.class), mock(FavoritePersistence.class)
         );
     }
 

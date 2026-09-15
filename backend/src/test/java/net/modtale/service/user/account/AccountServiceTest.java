@@ -23,6 +23,7 @@ import static org.mockito.Mockito.when;
 class AccountServiceTest {
 
     private UserRepository userRepository;
+    private AccountPreferencesPersistence preferencesPersistence;
     private OAuthAvatarHealingService oauthAvatarHealingService;
     private AccountService accountService;
 
@@ -30,6 +31,11 @@ class AccountServiceTest {
     void setUp() {
         userRepository = mock(UserRepository.class);
         oauthAvatarHealingService = mock(OAuthAvatarHealingService.class);
+        preferencesPersistence = mock(AccountPreferencesPersistence.class);
+        when(preferencesPersistence.capture(any())).thenAnswer(invocation ->
+                userRepository.findById(invocation.getArgument(0)).map(user ->
+                        new AccountPreferencesPersistence.Snapshot(new org.bson.Document(), user)).orElse(null));
+        when(preferencesPersistence.update(any(), any())).thenReturn(true);
         accountService = new AccountService(
                 userRepository,
                 mock(org.springframework.data.mongodb.core.MongoTemplate.class),
@@ -37,7 +43,8 @@ class AccountServiceTest {
                 mock(CurrentUserResolutionService.class),
                 oauthAvatarHealingService,
                 mock(AccountLifecycleService.class),
-                mock(ConnectedAccountMutationService.class)
+                mock(ConnectedAccountMutationService.class),
+                preferencesPersistence
         );
     }
 
@@ -151,7 +158,8 @@ class AccountServiceTest {
         assertEquals("external-one",
                 saved.getInstalledProjects().getFirst().getBundledProjects().getFirst().getExternalId());
         assertNotNull(saved.getUpdatedAt());
-        verify(userRepository).save(argThat(savedUser -> savedUser.getLauncherSettings() == saved));
+        verify(preferencesPersistence).update(argThat(state -> state.user().getLauncherSettings() == saved),
+                org.mockito.ArgumentMatchers.eq(AccountPreferencesPersistence.Field.LAUNCHER));
     }
 
     @Test
@@ -180,7 +188,8 @@ class AccountServiceTest {
         assertEquals("project-1", saved.getInstalledProjects().getFirst().getProjectId());
         assertEquals("2.0", saved.getInstalledProjects().getFirst().getInstalledVersion());
         assertNotNull(saved.getUpdatedAt());
-        verify(userRepository).save(argThat(savedUser -> savedUser.getLauncherSettings() == saved));
+        verify(preferencesPersistence).update(argThat(state -> state.user().getLauncherSettings() == saved),
+                org.mockito.ArgumentMatchers.eq(AccountPreferencesPersistence.Field.LAUNCHER));
     }
 
     @Test

@@ -44,6 +44,13 @@ describe('userClient', () => {
         expect(config).toEqual({ headers: { 'Content-Type': 'multipart/form-data' } });
     });
 
+    it('starts MFA enrollment with a mutation request', async () => {
+        mockedApi.post.mockResolvedValue({ data: { secret: 'fixture' } } as any);
+        expect(await userClient.startMfaSetup()).toEqual({ secret: 'fixture' });
+        expect(mockedApi.post).toHaveBeenCalledWith('/auth/mfa/setup');
+        expect(mockedApi.get).not.toHaveBeenCalled();
+    });
+
     it('posts MFA verification codes in the expected payload shape', async () => {
         mockedApi.post.mockResolvedValue({ data: { verified: true } } as any);
 

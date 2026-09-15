@@ -157,12 +157,12 @@ public class OrganizationService {
         organizationInviteService.inviteOrganizationMember(orgId, targetUserId, roleId, requester);
     }
 
-    public void resolveOrgInvite(String orgId, boolean accept, User responder) {
-        organizationInviteService.resolveOrgInvite(orgId, accept, responder);
+    public void resolveOrgInvite(String orgId, boolean accept, String requestId, User responder) {
+        organizationInviteService.resolveOrgInvite(orgId, accept, requestId, responder);
     }
 
-    public void voidOrgInvite(String orgId, String userId, User requester) {
-        organizationInviteService.voidOrgInvite(orgId, userId, requester);
+    public void voidOrgInvite(String orgId, String userId, String requestId, User requester) {
+        organizationInviteService.voidOrgInvite(orgId, userId, requestId, requester);
     }
 
     public void updateOrganizationMemberRole(String orgId, String targetUserId, String newRoleId, User requester) {
