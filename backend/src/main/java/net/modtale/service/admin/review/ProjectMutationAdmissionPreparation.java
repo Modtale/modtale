@@ -85,8 +85,11 @@ public final class ProjectMutationAdmissionPreparation {
     public Prepared recover(String id,String actor,BooleanSupplier permitted) {return budget.call(allowed->recoverWithinBudget(id,actor,allowed),permitted);}
     Prepared recoverWithinBudget(String id,String actor,BooleanSupplier allowed) {
         permission(allowed);var stored=archive.load(id);
-        if(stored.action()!=ReviewSnapshotArchive.Action.PROJECT_MUTATION_ADMISSION || !stored.actorId().equals(actor)
-                || stored.expiresAt()-stored.createdAt()>120000)throw invalid();
+        if(!stored.actorId().equals(actor))throw invalid();
+        var result=decodeStored(mongo,stored);permission(allowed);return result;
+    }
+    static Prepared decodeStored(MongoTemplate mongo,ReviewSnapshotArchive.Snapshot stored) {
+        if(stored.action()!=ReviewSnapshotArchive.Action.PROJECT_MUTATION_ADMISSION || stored.expiresAt()-stored.createdAt()>120000)throw invalid();
         var payload=decode(stored.versionBytes());
         if(payload.size()!=11 || !Integer.valueOf(1).equals(payload.get("schema")) || !uuid(payload.getString("mutationId"))
                 || !(payload.get("heldVersion") instanceof Binary original) || !digest(original.getData()).equals(payload.get("heldSha256"))
@@ -100,7 +103,7 @@ public final class ProjectMutationAdmissionPreparation {
                 || !binding.requestId().equals(scan.get("scanRequestId")) || binding.attempt()!=((Number)scan.get("scanAttempt")).longValue()
                 || !binding.filePath().equals(held.get("fileUrl")) || !binding.artifactSha256().equals(held.get("hash"))
                 || !binding.contextSha256().equals(ArtifactReviewContext.automaticallyReviewableFingerprint(mongo.getConverter().read(ProjectVersion.class,held))))throw invalid();
-        permission(allowed);return new Prepared(id,digest(stored.versionBytes()),payload.getString("mutationId"),payload.getString("versionId"),payload.getString("heldSha256"),binding,payload.getString("rule"),stored.createdAt(),stored.expiresAt());
+        return new Prepared(stored.id(),digest(stored.versionBytes()),payload.getString("mutationId"),payload.getString("versionId"),payload.getString("heldSha256"),binding,payload.getString("rule"),stored.createdAt(),stored.expiresAt());
     }
     Prepared verifyCurrent(Prepared expected,String actor,BooleanSupplier allowed) {
         if(!expected.equals(recoverWithinBudget(expected.id(),actor,allowed)))throw invalid();

@@ -88,7 +88,7 @@ public final class ProjectMutationActivator {
         var payload=decode(source.versionBytes());var held=decode(payload.get("heldVersion",Binary.class).getData());var scan=held.get("scanResult",Document.class);
         scan.put("scanState","REMOTE_REVIEW");scan.put("scanTimestamp",source.createdAt());scan.put("remoteReview",payload.get("binding",Document.class));return held;
     }
-    private static Document admission(ReviewSnapshotArchive.Snapshot source,ProjectMutationAdmissionPreparation.Prepared prepared,String afterSha) {
+    static Document admission(ReviewSnapshotArchive.Snapshot source,ProjectMutationAdmissionPreparation.Prepared prepared,String afterSha) {
         return new Document("_id",prepared.binding().requestId()).append("decisionId",prepared.id()).append("decisionSha256",prepared.decisionSha256())
                 .append("projectId",source.projectId()).append("versionId",prepared.versionId()).append("mutationId",prepared.mutationId())
                 .append("actor",source.actorId()).append("heldSha256",prepared.heldSha256()).append("afterSha256",afterSha).append("state","ACTIVE");

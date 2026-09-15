@@ -18,15 +18,18 @@ public final class ProjectMutationReferenceReader {
     private static final Collation BINARY=Collation.builder().locale("simple").build();
     public record Page(List<String> operationIds,String nextCursor) {public Page{operationIds=List.copyOf(operationIds);}}
     public record History(ProjectMutationPreparation.Recovered evidence,ProjectMutationExecutor.Result receipt,ReviewSnapshotArchive.Snapshot applied) {}
+    private final ProjectMutationAdmissionReader admissions;
     private final MongoCollection<Document> references;
     private final ReviewSnapshotArchive archive;
     private final ProjectMutationPreparation preparation;
     private final ProjectMutationExecutor executor;
     public ProjectMutationReferenceReader(MongoTemplate mongo,ReviewSnapshotArchive archive,ProjectMutationPreparation preparation,ProjectMutationExecutor executor) {
+        admissions=new ProjectMutationAdmissionReader(mongo,archive);
         this.archive=Objects.requireNonNull(archive);this.preparation=Objects.requireNonNull(preparation);this.executor=Objects.requireNonNull(executor);
         references=mongo.getCollection(ProjectMutationExecutor.REFERENCES).withReadPreference(ReadPreference.primary()).withReadConcern(ReadConcern.MAJORITY)
                 .withTimeout(5000,TimeUnit.MILLISECONDS);
     }
+    ReviewSnapshotArchive archive(){return archive;}
     public void initialize() {
         references.withWriteConcern(WriteConcern.MAJORITY.withJournal(true)).createIndex(new Document("projectId",1).append("_id",1),
                 new IndexOptions().name(INDEX).collation(BINARY));
@@ -73,7 +76,7 @@ public final class ProjectMutationReferenceReader {
         if(!Arrays.equals(bytes(expected),bytes(reference)))throw unavailable();
         permission(permitted);return new History(recovered,receipt,applied);
     }
-    /** Verifies the current held projection only; later admitted states require their own authenticated transition. */
+    /** Verifies held projections or authenticated admission provenance; never grants clearance. */
     public void requireHeldHeads(Object projectId,byte[] projectBytes,BooleanSupplier permitted) {
         permission(permitted);project(projectId);
         if(projectBytes==null || projectBytes.length>ReviewSnapshotArchive.MAX_BYTES)throw unavailable();
@@ -85,13 +88,13 @@ public final class ProjectMutationReferenceReader {
             permission(permitted);Object pointer=version.get("versionMutation");
             var scan=version.get("scanResult") instanceof Document doc?doc:null;
             if(pointer==null) {
+                admissions.requireNoAdmission(version,permitted);
                 if(scan!=null && "MUTATION_HELD".equals(scan.get("scanState")))throw unavailable();
                 continue;
             }
             if(!(pointer instanceof Document ref) || ref.size()!=3 || !(ref.get("operationId") instanceof String id)
                     || !id.matches(UUID) || !(ref.get("beforeSha256") instanceof String sha) || !sha.matches("[0-9a-f]{64}")
-                    || !(ref.get("requestId") instanceof String request) || !request.matches(UUID)
-                    || scan==null || !"MUTATION_HELD".equals(scan.get("scanState")))throw unavailable();
+                    || !(ref.get("requestId") instanceof String request) || !request.matches(UUID))throw unavailable();
             var archived=groups.get(id);
             if(archived==null) {
                 var verified=read(projectId,id,permitted);var root=new RawBsonDocument(verified.applied().versionBytes()).decode(new DocumentCodec());
@@ -99,6 +102,10 @@ public final class ProjectMutationReferenceReader {
                 groups.put(id,archived);
             }
             var original=archived.get(version.getString("_id"));if(original==null)throw unavailable();
+            if(scan==null || !"MUTATION_HELD".equals(scan.get("scanState"))) {
+                admissions.requireHead(projectId,version,permitted);continue;
+            }
+            admissions.requireUnadmitted(request,permitted);
             var difference=VersionReviewTransition.classify(List.of(original),List.of(version)).getFirst();
             if(difference.changes().stream().anyMatch(change->change!=VersionReviewTransition.Change.METADATA))throw unavailable();
         }

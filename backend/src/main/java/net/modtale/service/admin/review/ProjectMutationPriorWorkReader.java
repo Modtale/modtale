@@ -16,10 +16,12 @@ public final class ProjectMutationPriorWorkReader {
     }
     private static final int MAX_GROUPS=8,MAX_WORK=256;
     private static final long MAX_BYTES=64L*1024*1024;
+    private final ProjectMutationAdmissionReader admissions;
     private final ReviewRepairWorkflow budget;
     private final ProjectMutationReferenceReader history;
     private final ReviewRemoteTargetReader targets;
     public ProjectMutationPriorWorkReader(MongoTemplate mongo,ReviewRepairWorkflow budget,ProjectMutationReferenceReader history) {
+        admissions=new ProjectMutationAdmissionReader(mongo,history.archive());
         this.budget=Objects.requireNonNull(budget);this.history=Objects.requireNonNull(history);targets=new ReviewRemoteTargetReader(mongo);
     }
     public Inventory read(Object projectId,String mutationId,BooleanSupplier permitted) {
@@ -54,17 +56,20 @@ public final class ProjectMutationPriorWorkReader {
                 var scan=original.get("scanResult") instanceof Document doc?doc:null;
                 if(pointer!=null && scan!=null && "MUTATION_HELD".equals(scan.get("scanState"))) {
                     if(!(pointer instanceof Document ref) || ref.size()!=3 || !(ref.get("operationId") instanceof String previous))throw unavailable();
+                    admissions.requireUnadmitted(ref.getString("requestId"),allowed);
                     var prior=load(previous);var matching=versions(prior.applied()).stream().filter(v->change.versionId().equals(v.get("_id"))).toList();
                     if(matching.size()!=1 || VersionReviewTransition.classify(matching,List.of(original)).getFirst().changes().stream()
                             .anyMatch(c->c!=VersionReviewTransition.Change.METADATA))throw unavailable();
                     visit(previous);continue;
                 }
                 if(scan!=null && "MUTATION_HELD".equals(scan.get("scanState")))throw unavailable();
+                if(pointer!=null)admissions.requireHead(projectId,original,allowed);
+                else admissions.requireNoAdmission(original,allowed);
                 RemoteReviewBinding binding=null;
                 try{binding=targets.validate(projectId,original);}catch(IllegalStateException missing){ /* Explicit uncertainty below. */ }
                 add(new Work(id,change.versionId(),change.beforeSha256(),binding==null?Kind.UNRESOLVED:Kind.REMOTE_JOB,binding,
                         binding==null?"ORIGINAL_JOB_IDENTITY_UNAVAILABLE":null));
-                if(pointer!=null || original.get("reviewReplacement")!=null || original.get("reviewIsolation")!=null)
+                if(original.get("reviewReplacement")!=null || original.get("reviewIsolation")!=null)
                     add(new Work(id,change.versionId(),change.beforeSha256(),Kind.UNRESOLVED,null,"PRIOR_TRANSITION_REQUIRES_ACCOUNTING"));
             }
             active.remove(id);finished.add(id);permission();

@@ -54,7 +54,13 @@ class ProjectMutationActivatorTest {
     }
     @Test void collisionCannotLeaveVersionActivatedWithoutItsOwnAdmission(){
         f().mongo.getCollection(ProjectMutationActivator.ADMISSIONS).insertOne(new Document("_id",decision.binding().requestId()).append("decisionId","other"));var before=version();
-        assertEquals("UNKNOWN",activate().state());assertEquals(before,version());assertEquals("UNKNOWN",activate().state());
+        assertThrows(IllegalStateException.class,this::activate);assertEquals(before,version());assertThrows(IllegalStateException.class,this::activate);
+    }
+    @Test void admissionCollisionAfterClaimRollsBackTheVersion() {
+        var raced=spy(journal);doAnswer(call->{var claim=call.callRealMethod();f().mongo.getCollection(ProjectMutationActivator.ADMISSIONS).insertOne(new Document("_id",decision.binding().requestId()).append("decisionId","competing"));return claim;})
+                .when(raced).claim(any(),anyString(),any(),any());
+        var before=version();var activation=new ProjectMutationActivator(f().mongo,base.base.budget,base.service,base.base.base.base.base.archive,raced);
+        assertEquals("UNKNOWN",activation.activate(decision,"moderator",()->true).state());assertEquals(before,version());
     }
     @Test void competingDecisionsCannotActivateTheSameHeldRequestTwice(){
         var request=base.request(false);var other=base.service.prepare(new ProjectMutationAdmissionPreparation.Request(UUID.randomUUID().toString(),request.projectId(),request.versionIndex(),request.versionId(),request.heldSha256(),request.mutationId(),request.actor(),request.observations(),false),()->true);
