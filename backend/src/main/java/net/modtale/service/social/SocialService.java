@@ -2,8 +2,9 @@ package net.modtale.service.social;
 
 import java.util.List;
 import net.modtale.model.user.User;
+import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
-import net.modtale.service.admin.review.ProjectReviewPersistence;
+import net.modtale.service.analytics.ScoringService;
 import net.modtale.service.communication.NotificationService;
 import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.security.validation.SanitizationService;
@@ -17,21 +18,21 @@ public class SocialService {
     private final UserFollowService userFollowService;
 
     public SocialService(
-            FavoritePersistence favorites,
+            ProjectRepository projectRepository,
             UserRepository userRepository,
             ProjectService projectService,
             NotificationService notificationService,
             SanitizationService sanitizer,
             MongoTemplate mongoTemplate,
-            ProjectReviewPersistence reviewPersistence
+            ScoringService scoringService
     ) {
         this.projectSocialService = new ProjectSocialService(
-                favorites,
+                projectRepository,
                 userRepository,
                 projectService,
                 notificationService,
                 sanitizer,
-                reviewPersistence
+                scoringService
         );
         this.userFollowService = new UserFollowService(userRepository, notificationService, mongoTemplate);
     }

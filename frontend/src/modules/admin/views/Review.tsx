@@ -1,11 +1,8 @@
-import { PriorFindingReasoning } from './PriorFindingReasoning';
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Shield, List, FileText, Box, User as UserIcon, Check, ArrowLeft, Copy, ExternalLink, Terminal, Download, ArrowRight, X, ImageIcon, ChevronDown, ChevronUp, ShieldAlert, Eye, RefreshCw, PlayCircle } from 'lucide-react';
 import { API_BASE_URL, BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
 import { adminClient } from '../api/adminClient';
 import { SourceInspector } from './SourceInspector';
-import { ArtifactChanges } from './ArtifactChanges';
-import { FindingDecisions } from './FindingDecisions';
 import { SiteRoutes } from '@/utils/routes';
 import type { ScanIssue, ProjectVersion, ScanReviewTarget } from '@/types';
 import { ModalPortal } from '@/components/ui/ModalPortal';
@@ -70,48 +67,17 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     const [showScanDetails, setShowScanDetails] = useState(false);
     const [rescanning, setRescanning] = useState(false);
 
-    const [inspectorData, setInspectorData] = useState<{ version: string, reviewToken: string, structure: string[], issues: ScanIssue[], initialFile?: string, initialLine?: number, initialLineEnd?: number } | null>(null);
+    const [inspectorData, setInspectorData] = useState<{ version: string, structure: string[], issues: ScanIssue[], initialFile?: string, initialLine?: number, initialLineEnd?: number } | null>(null);
     const [loadingInspector, setLoadingInspector] = useState(false);
 
-    const [decisionWritten, setDecisionWritten] = useState(false);
-    const [refreshedReview, setRefreshedReview] = useState<{ source: any; data: any; versionId: string } | null>(null);
-    const [refreshing, setRefreshing] = useState(false);
-    const [refreshError, setRefreshError] = useState('');
-    const refreshGeneration = useRef(0);
-    const inspectionGeneration = useRef(0);
-    useEffect(() => {
-        refreshGeneration.current++;
-        setRefreshing(false); setRefreshError('');
-        setChecklist({}); setCurrentStep(0); setInspectorData(null); setLoadingInspector(false);
-        return () => { refreshGeneration.current++; };
-    }, [reviewingProject]);
-    const review = refreshedReview !== null && refreshedReview.source === reviewingProject ? refreshedReview.data : reviewingProject;
-    const mod = review.mod;
+    const mod = reviewingProject.mod;
     const isNewProject = mod.status === 'PENDING';
     const projectLink = SiteRoutes.project(mod);
 
-    const pendingVersion = refreshedReview !== null && refreshedReview.source === reviewingProject
-        ? mod.versions.find((v: ProjectVersion) => v.id === refreshedReview.versionId)
-        : reviewingProject.selectedVersionId
-            ? mod.versions.find((v: ProjectVersion) => v.id === reviewingProject.selectedVersionId)
-            : mod.versions.find((v: ProjectVersion) => v.reviewStatus === 'PENDING') || mod.versions[0];
-    useEffect(() => setDecisionWritten(false), [pendingVersion?.id, pendingVersion?.reviewToken]);
-    const [reasoningIssue, setReasoningIssue] = useState<number | null>(null);
-    useEffect(() => setReasoningIssue(null), [pendingVersion?.id, mod.reviewToken]);
-    const priorSources = mod.versions.filter((v: ProjectVersion) => v.id !== pendingVersion?.id && v.reviewStatus === 'APPROVED');
+    const pendingVersion = mod.versions.find((v: ProjectVersion) => v.reviewStatus === 'PENDING') || mod.versions[0];
     const scanResult = pendingVersion?.scanResult;
-    const scanIssues: ScanIssue[] = scanResult?.issues || [];
-    const currentEvidence = /^warden-3\.0\.0:[0-9a-f]{64}$/.test(scanResult?.securityEvidence?.policyVersion || '')
-        && /^[0-9a-f]{64}$/.test(scanResult?.securityEvidence?.artifactSha256 || '')
-        && /^[0-9a-f]{64}$/.test(scanResult?.securityEvidence?.contentSha256 || '');
-    const reviewReused = currentEvidence && Boolean(scanResult?.reusedReviewVersion) && scanResult?.scanState === 'COMPLETED'
-        && scanResult?.securityEvidence?.complete === true && scanResult?.status !== 'INFECTED'
-        && scanResult?.verdict !== 'BLOCK' && scanResult?.securityEvidence?.reviewState !== 'NEW_SECURITY_EVIDENCE';
-    const securityCleared = reviewReused || currentEvidence && scanResult?.status === 'CLEAN' && scanResult?.verdict === 'AUTO_APPROVE'
-        && scanResult?.scanState === 'COMPLETED' && scanResult?.securityEvidence?.complete === true
-        && scanResult?.securityEvidence?.clearanceGranted === true
-        && scanResult?.securityEvidence?.reviewState !== 'NEW_SECURITY_EVIDENCE';
-    const hasScanIssues = !!scanResult && scanResult.status !== 'SCANNING' && !securityCleared;
+    const scanIssues = scanResult?.issues || [];
+    const hasScanIssues = !!scanResult && scanResult.status !== 'CLEAN' && scanResult.status !== 'SCANNING' && scanIssues.length > 0;
     const isScanning = scanResult?.status === 'SCANNING';
 
     const orderedIssues = useMemo(() => {
@@ -122,7 +88,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             return 1;
         };
 
-        return scanIssues.map((issue: ScanIssue, originalIndex: number) => ({ issue, originalIndex })).sort(({ issue: a }, { issue: b }) => {
+        return [...scanIssues].sort((a, b) => {
             const cadenceDiff = Number((b.reviewCadence || '').toUpperCase() === 'ALWAYS')
                 - Number((a.reviewCadence || '').toUpperCase() === 'ALWAYS');
             if (cadenceDiff !== 0) return cadenceDiff;
@@ -141,7 +107,6 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     useEffect(() => {
         if (!pendingVersion?.dependencies) return;
 
-        let cancelled = false;
         const deps = pendingVersion.dependencies;
         const fetchMeta = async () => {
             const newMeta = { ...depMeta };
@@ -159,51 +124,17 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                     newMeta[d.projectId] = { icon: '', title: d.projectTitle || d.projectId };
                 }
             }));
-            if (!cancelled) setDepMeta(newMeta);
+            setDepMeta(newMeta);
         };
         fetchMeta();
-        return () => { cancelled = true; };
-    }, [review]);
+    }, [reviewingProject]);
 
-    const refreshEvidence = async () => {
-        if (refreshing || !pendingVersion) return;
-        const generation = ++refreshGeneration.current;
-        const versionId = pendingVersion.id;
-        setRefreshing(true); setRefreshError(''); setDecisionWritten(true);
-        setInspectorData(null); setLoadingInspector(false);
-        try {
-            const data = await adminClient.getReviewDetails(mod.id);
-            if (generation !== refreshGeneration.current) return;
-            const versions = data?.mod?.versions?.filter((version: ProjectVersion) => version.id === versionId);
-            if (data?.mod?.id !== mod.id || data.mod.status !== mod.status || versions?.length !== 1
-                || !versions[0].reviewToken || versions[0].reviewToken === pendingVersion.reviewToken
-                || (isNewProject && (!data.mod.reviewToken || data.mod.reviewToken === mod.reviewToken))
-                || !['PENDING', 'SCHEDULED'].includes(versions[0].reviewStatus)) {
-                throw new Error('The selected review is no longer available or lacks a current snapshot. Return to the queue to inspect its state.');
-            }
-            setRefreshedReview({ source: reviewingProject, data, versionId });
-            setChecklist({}); setCurrentStep(0); setShowScanDetails(false); setDepMeta({});
-            setDecisionWritten(false);
-        } catch (error) {
-            if (generation === refreshGeneration.current)
-                setRefreshError(extractApiErrorMessage(error, 'Could not refresh this review. Decisions remain disabled; retry to load current evidence.'));
-        } finally {
-            if (generation === refreshGeneration.current) setRefreshing(false);
-        }
-    };
-
-    const openInspector = async (version: string, issues: ScanIssue[] = [], file?: string, lineStart?: number, lineEnd?: number, reviewToken = mod.reviewToken) => {
-        const generation = refreshGeneration.current;
-        const inspection = ++inspectionGeneration.current;
-        setInspectorData(null);
+    const openInspector = async (version: string, issues: ScanIssue[] = [], file?: string, lineStart?: number, lineEnd?: number) => {
         setLoadingInspector(true);
         try {
-            if (!reviewToken) throw new Error('Refresh this review before inspecting its files.');
-            const structure = await adminClient.getStructure(mod.id, version, reviewToken);
-            if (generation !== refreshGeneration.current || inspection !== inspectionGeneration.current) return;
+            const structure = await adminClient.getStructure(mod.id, version);
             setInspectorData({
                 version,
-                reviewToken,
                 structure,
                 issues,
                 initialFile: file,
@@ -211,10 +142,9 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                 initialLineEnd: lineEnd
             });
         } catch (e) {
-            if (generation !== refreshGeneration.current || inspection !== inspectionGeneration.current) return;
             setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, "We could not inspect this version's file structure.") });
         } finally {
-            if (generation === refreshGeneration.current && inspection === inspectionGeneration.current) setLoadingInspector(false);
+            setLoadingInspector(false);
         }
     };
 
@@ -242,15 +172,11 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             setStatus({ type: 'error', title: 'Permission Required', msg: 'You do not have permission to approve projects or versions.' });
             return;
         }
-        if (decisionWritten || (isNewProject ? !mod.reviewToken : !pendingVersion?.reviewToken)) {
-            setStatus({ type: 'error', title: 'Refresh Required', msg: 'Refresh this review to load its current evidence before deciding.' });
-            return;
-        }
         try {
             if (isNewProject) {
-                await adminClient.publishProject(mod.id, mod.reviewToken, pendingVersion?.id);
+                await adminClient.publishProject(mod.id);
             } else {
-                await adminClient.approveVersion(mod.id, pendingVersion.id, pendingVersion.reviewToken);
+                await adminClient.approveVersion(mod.id, pendingVersion.id);
             }
             onApprove();
         } catch (e: any) {
@@ -267,15 +193,11 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             setStatus({ type: 'error', title: 'Permission Required', msg: 'You do not have permission to reject projects or versions.' });
             return;
         }
-        if (decisionWritten || (isNewProject ? !mod.reviewToken : !pendingVersion?.reviewToken)) {
-            setStatus({ type: 'error', title: 'Refresh Required', msg: 'Refresh this review to load its current evidence before deciding.' });
-            return;
-        }
         try {
             if (isNewProject) {
-                await adminClient.rejectProject(mod.id, reason, mod.reviewToken);
+                await adminClient.rejectProject(mod.id, reason);
             } else {
-                await adminClient.rejectVersion(mod.id, pendingVersion.id, reason, pendingVersion.reviewToken);
+                await adminClient.rejectVersion(mod.id, pendingVersion.id, reason);
             }
             onReject(reason);
         } catch (e: any) {
@@ -312,17 +234,14 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             {inspectorData && (
                 <SourceInspector
                     modId={mod.id}
-                    versionId={mod.versions.find((candidate: ProjectVersion) => candidate.versionNumber === inspectorData.version)?.id || ''}
-                    canRescan={canRescan}
-                    key={`${mod.id}:${inspectorData.version}:${inspectorData.reviewToken}`}
+                    versionId={pendingVersion.id}
                     version={inspectorData.version}
-                    reviewToken={inspectorData.reviewToken}
                     structure={inspectorData.structure}
                     issues={inspectorData.issues}
                     initialFile={inspectorData.initialFile}
                     initialLine={inspectorData.initialLine}
                     initialLineEnd={inspectorData.initialLineEnd}
-                    onClose={() => { inspectionGeneration.current++; setInspectorData(null); }}
+                    onClose={() => setInspectorData(null)}
                 />
             )}
 
@@ -619,51 +538,14 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                             <div>
                                                 <h4 className="font-bold text-blue-600 dark:text-blue-400">Scanner Is Running</h4>
                                                 <p className="text-sm text-blue-700/80 dark:text-blue-300/70 font-medium">
-                                                    Warden is inspecting this artifact. The result will remain pending until inspection and review finish.
+                                                    Warden is still processing this artifact. Refresh or run a manual rescan shortly.
                                                 </p>
                                             </div>
                                         </div>
                                     </div>
                                 )}
 
-                                {!scanResult && (
-                                    <div className="p-5 rounded-2xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20">
-                                        <h4 className="font-bold text-amber-800 dark:text-amber-200">Security evidence unavailable</h4>
-                                        <p className="text-sm text-amber-700 dark:text-amber-300">This version has no completed artifact review. Inspect it before approving publication.</p>
-                                    </div>
-                                )}
-
-                                {pendingVersion && <ArtifactChanges projectId={mod.id} version={pendingVersion.versionNumber} reviewToken={mod.reviewToken || ''}
-                                    onInspect={(version, path, token) => openInspector(version, version === pendingVersion.versionNumber ? scanIssues : [], path, undefined, undefined, token)} />}
-                                {pendingVersion && <FindingDecisions key={`${pendingVersion.id}:${pendingVersion.reviewToken}`}
-                                    projectId={mod.id} versionId={pendingVersion.id} token={pendingVersion.reviewToken}
-                                    issues={scanIssues} canDecide={canDecide} onSaved={() => setDecisionWritten(true)} />}
-                                {decisionWritten && <p role="status" className="text-sm text-amber-700">A finding decision was saved. Refresh the evidence to inspect the updated history before publishing.</p>}
-                                {decisionWritten && <button type="button" disabled={refreshing} onClick={() => void refreshEvidence()} className="text-sm font-bold text-modtale-accent">{refreshing ? 'Refreshing evidence…' : 'Refresh evidence and restart checklist'}</button>}
-                                {refreshError && <p role="alert" className="text-sm text-red-600">{refreshError}</p>}
-                                {scanResult?.status === 'FAILED' && <div role="status" className="rounded-2xl border border-amber-300 p-5 text-sm text-amber-800 dark:text-amber-200">
-                                    <h4 className="font-bold">Review service attention</h4>
-                                    <p>Security review did not complete. Clearance is withheld. Check the failure before requesting another scan; existing findings remain unresolved.</p>
-                                    <p>{scanResult.scanState === 'REMOTE_ORIGIN_UNVERIFIED' ? 'The original review service identity was not recorded. Reconcile the original job before requesting another scan.' : scanResult.scanState === 'REMOTE_CONTEXT_CONFLICT' ? 'The review service rejected the stored request context or service identity. Reconcile the original job before requesting another scan.' : scanResult.scanState === 'REMOTE_ISOLATED' ? 'The local review was isolated. Findings and blocking decisions remain in place. Resolve the original review operation before starting another scan.' : ['REMOTE_BINDING_MISSING', 'REMOTE_BINDING_MISMATCH'].includes(scanResult.scanState || '') ? 'The stored review job is missing or no longer matches this version. Repair review state before retrying.' : scanResult.scanState === 'REMOTE_UNSUPPORTED_CONTEXT' ? 'The current dependencies, runtime metadata or supplemental content cannot be fully reviewed. Resolve the review context before requesting another scan.' : scanResult.scanState === 'REMOTE_EXPIRED' ? 'The review expired.' : scanResult.scanState === 'REMOTE_CANCELLED' ? 'The review was cancelled.' : scanResult.scanState === 'REMOTE_HELD' ? 'The review was held.' : 'The review is unavailable.'}</p>
-                                </div>}
-                                {scanResult?.securityEvidence && (
-                                    <div className="rounded-2xl border border-slate-200 dark:border-white/10 p-5 space-y-3">
-                                        <div className="flex items-center justify-between gap-3">
-                                            <h4 className="font-bold dark:text-white">Artifact evidence</h4>
-                                            <span className="text-xs font-medium text-slate-500 break-all">{scanResult.securityEvidence.policyVersion}</span>
-                                        </div>
-                                        <p className="text-sm text-slate-600 dark:text-slate-300">
-                                            {scanResult.securityEvidence.complete ? 'Archive inspection completed.' : 'Inspection has gaps; clearance is withheld.'}
-                                            {scanResult.reusedReviewVersion ? ` Contents match the review of version ${scanResult.reusedReviewVersion}.` : ''}
-                                        </p>
-                                        <dl className="text-xs space-y-2">
-                                            <div><dt className="text-slate-500">Uploaded artifact SHA-256</dt><dd className="font-mono break-all dark:text-slate-300">{scanResult.securityEvidence.artifactSha256 || 'Unavailable'}</dd></div>
-                                            <div><dt className="text-slate-500">Security review</dt><dd className="dark:text-slate-300">{reviewReused ? `Approved review reused from ${scanResult.reusedReviewVersion}` : scanResult.securityEvidence.clearanceGranted ? 'Clearance granted' : isScanning ? 'Automatic review pending' : 'Manual review required'}</dd></div>
-                                        </dl>
-                                    </div>
-                                )}
-
-                                {hasScanIssues && scanResult && (
+                                {hasScanIssues && (
                                     <div className="rounded-2xl border border-red-200 dark:border-red-900/50 overflow-hidden">
                                         <div className="flex items-center justify-between p-5 bg-red-50 dark:bg-red-900/10">
                                             <div className="flex items-center gap-3 text-red-700 dark:text-red-400">
@@ -683,7 +565,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                         New: {scanResult.newIssueCount || 0} • Known: {scanResult.knownIssueCount || 0} • Escalated: {scanResult.escalatedIssueCount || 0}
                                                     </p>
                                                     <p className="text-xs opacity-80 font-medium">
-                                                        {scanResult.scanState ? `State: ${scanResult.scanState}` : 'State: unavailable'}
+                                                        {scanResult.scanState ? `State: ${scanResult.scanState}` : 'State: COMPLETED'}
                                                         {scanResult.scanAttempt ? ` • Attempt ${scanResult.scanAttempt}` : ''}
                                                         {scanResult.summary?.recoverableErrors ? ` • Recoverable Errors ${scanResult.summary.recoverableErrors}` : ''}
                                                     </p>
@@ -711,8 +593,6 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                     </button>
                                                 )}
                                                 <button
-                                                    aria-label={showScanDetails ? "Hide findings" : "Show findings"}
-                                                    aria-expanded={showScanDetails}
                                                     onClick={() => setShowScanDetails(!showScanDetails)}
                                                     className="p-2 hover:bg-white/20 rounded-lg transition-colors text-red-600 dark:text-red-400"
                                                 >
@@ -733,10 +613,8 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
 
                                         {showScanDetails && (
                                             <div className="p-4 bg-white dark:bg-black/20 space-y-2 border-t border-red-200 dark:border-red-900/50">
-                                                {orderedIssues.length === 0 && <p className="text-sm text-slate-600 dark:text-slate-300">No heuristic findings were emitted. Review the evidence and reviewer notes before deciding.</p>}
-                                                {orderedIssues.map(({ issue, originalIndex }) => (
-                                                    <div key={originalIndex} className="text-sm bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-slate-200 dark:border-white/5">
-                                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                                {orderedIssues.map((issue: ScanIssue, idx: number) => (
+                                                    <div key={idx} className="flex items-center justify-between text-sm bg-slate-50 dark:bg-white/5 p-3 rounded-xl border border-slate-200 dark:border-white/5">
                                                         <div className="flex-1 min-w-0 pr-4">
                                                             <div className="flex items-center gap-2 mb-1">
                                                                 <span className={`font-black text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wide
@@ -758,7 +636,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                                     <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 uppercase">Suppressed</span>
                                                                 )}
                                                                 {issue.knownIssue && !issue.escalated && (
-                                                                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 uppercase">Previously seen</span>
+                                                                    <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 uppercase">Known</span>
                                                                 )}
                                                                 {!issue.knownIssue && (
                                                                     <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-200 uppercase">New</span>
@@ -772,28 +650,13 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                                 {typeof issue.scoreImpact === 'number' && <span className="bg-slate-200 dark:bg-slate-700 px-1.5 rounded">Impact {issue.scoreImpact}</span>}
                                                             </div>
                                                             <p className="text-xs text-slate-600 dark:text-slate-400 leading-snug">{issue.description}</p>
-                                                            {issue.historicalFileEvidenceIdentical && <p className="text-xs text-slate-500 mt-1">Same finding and file as approved version {issue.baselineVersion}. Changes elsewhere still require review.</p>}
                                                         </div>
-                                                        {priorSources.length > 0 && <button type="button"
-                                                            aria-label={`Earlier reasoning for finding ${originalIndex + 1}`}
-                                                            aria-expanded={reasoningIssue === originalIndex}
-                                                            onClick={() => setReasoningIssue(value => value === originalIndex ? null : originalIndex)}
-                                                            className="shrink-0 text-xs font-bold text-indigo-600 dark:text-indigo-300 px-3 py-2">
-                                                            {reasoningIssue === originalIndex ? 'Hide earlier reasoning' : 'Earlier reasoning'}
-                                                        </button>}
                                                         <button
                                                             onClick={() => openInspector(pendingVersion.versionNumber, scanResult.issues, issue.filePath, issue.lineStart, issue.lineEnd)}
                                                             className="shrink-0 flex items-center gap-1.5 text-xs font-bold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 px-3 py-2 rounded-lg transition-colors"
                                                         >
                                                             <Eye className="w-3.5 h-3.5" /> Inspect
                                                         </button>
-                                                        </div>
-                                                        {reasoningIssue === originalIndex && <PriorFindingReasoning
-                                                            key={`${pendingVersion.id}:${mod.reviewToken}:${originalIndex}`}
-                                                            projectId={mod.id} versionId={pendingVersion.id} token={mod.reviewToken || ''}
-                                                            issues={scanIssues} issueIndex={originalIndex} sources={priorSources} autoLoad
-                                                            sourceVersionId={priorSources.filter((v: ProjectVersion) => v.versionNumber === issue.baselineVersion).length === 1
-                                                                ? priorSources.find((v: ProjectVersion) => v.versionNumber === issue.baselineVersion)?.id : undefined} />}
                                                     </div>
                                                 ))}
                                             </div>
@@ -801,17 +664,17 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                     </div>
                                 )}
 
-                                {securityCleared && !isScanning && (
+                                {!hasScanIssues && !isScanning && (
                                     <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between">
                                         <div className="flex items-center gap-4">
                                             <Check className="w-6 h-6 text-emerald-500" />
                                             <div>
-                                                <h4 className="font-bold text-emerald-500">Artifact Review Completed</h4>
+                                                <h4 className="font-bold text-emerald-500">Automated Checks Passed</h4>
                                                 <p className="text-sm text-emerald-600/80 dark:text-emerald-500/70 font-medium">
-                                                    {reviewReused ? `Previously approved contents and context match version ${scanResult?.reusedReviewVersion}.` : 'Inspection and security review completed with no unresolved concerns.'}
+                                                    Warden did not surface actionable security findings for this scan.
                                                 </p>
                                                 <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80 font-medium">
-                                                    {scanResult?.scanState ? `State: ${scanResult.scanState}` : 'State: unavailable'}
+                                                    {scanResult?.scanState ? `State: ${scanResult.scanState}` : 'State: COMPLETED'}
                                                     {scanResult?.scanAttempt ? ` • Attempt ${scanResult.scanAttempt}` : ''}
                                                 </p>
                                             </div>
@@ -970,8 +833,8 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                             <div className="max-w-3xl mx-auto space-y-8 animate-in slide-in-from-right-4 duration-300">
                                 <div className="p-8 bg-white dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 flex items-center gap-8">
                                     <div className="w-24 h-24 bg-slate-100 dark:bg-white/10 rounded-2xl flex items-center justify-center overflow-hidden shrink-0">
-                                        {review.authorStats?.avatarUrl ? (
-                                            <img src={review.authorStats.avatarUrl} className="w-full h-full object-cover" />
+                                        {reviewingProject.authorStats?.avatarUrl ? (
+                                            <img src={reviewingProject.authorStats.avatarUrl} className="w-full h-full object-cover" />
                                         ) : (
                                             <UserIcon className="w-10 h-10 text-slate-400" />
                                         )}
@@ -986,11 +849,11 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                         </div>
                                         <div>
                                             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Joined</label>
-                                            <p className="font-mono text-sm dark:text-slate-300 mt-2">{review.authorStats?.accountAge}</p>
+                                            <p className="font-mono text-sm dark:text-slate-300 mt-2">{reviewingProject.authorStats?.accountAge}</p>
                                         </div>
                                         <div className="col-span-2">
                                             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Projects</label>
-                                            <p className="font-black text-2xl text-modtale-accent mt-1">{review.authorStats?.totalProjects}</p>
+                                            <p className="font-black text-2xl text-modtale-accent mt-1">{reviewingProject.authorStats?.totalProjects}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1017,13 +880,13 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                 </h2>
                                 <p className="text-slate-500 dark:text-slate-400 font-medium mb-10 text-lg leading-relaxed">
                                     You are about to approve <strong>v{pendingVersion.versionNumber}</strong>.
-                                    {isNewProject ? (pendingVersion ? ` This will publish the project and version ${pendingVersion.versionNumber}.` : " This will make the project publicly visible.") : " This update will be pushed to users immediately."}
+                                    {isNewProject ? " This will make the project publicly visible." : " This update will be pushed to users immediately."}
                                 </p>
 
                                 <div className="flex flex-col gap-4">
                                     <button
                                         onClick={handleVersionApprove}
-                                        disabled={!canDecide || decisionWritten}
+                                        disabled={!canDecide}
                                         className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-emerald-500/20 transition-all transform hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                                     >
                                         Approve & Publish
@@ -1045,7 +908,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                         <div className="flex gap-4">
                             <button
                                 onClick={() => setShowRejectPanel(true)}
-                                disabled={!canDecide || decisionWritten}
+                                disabled={!canDecide}
                                 className="px-6 py-3 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-red-500/10 disabled:hover:text-red-500"
                             >
                                 Reject...

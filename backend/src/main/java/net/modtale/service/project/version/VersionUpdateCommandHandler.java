@@ -8,8 +8,7 @@ import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
-import net.modtale.service.admin.review.ProjectReviewPersistence;
-import net.modtale.service.admin.review.ProjectReviewSnapshot;
+import net.modtale.repository.project.ProjectRepository;
 import net.modtale.service.project.access.ProjectAccessService;
 import net.modtale.service.project.access.ProjectMutationGuard;
 import net.modtale.service.project.access.ProjectVersionAccessService;
@@ -19,7 +18,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class VersionUpdateCommandHandler {
 
-    private final ProjectReviewPersistence reviewPersistence;
+    private final ProjectRepository projectRepository;
     private final ProjectService projectService;
     private final ProjectAccessService projectAccessService;
     private final ProjectMutationGuard projectMutationGuard;
@@ -27,14 +26,14 @@ public class VersionUpdateCommandHandler {
     private final VersionMutationOrchestrationService versionMutationOrchestrationService;
 
     public VersionUpdateCommandHandler(
-            ProjectReviewPersistence reviewPersistence,
+            ProjectRepository projectRepository,
             ProjectService projectService,
             ProjectAccessService projectAccessService,
             ProjectMutationGuard projectMutationGuard,
             ProjectVersionAccessService projectVersionAccessService,
             VersionMutationOrchestrationService versionMutationOrchestrationService
     ) {
-        this.reviewPersistence = reviewPersistence;
+        this.projectRepository = projectRepository;
         this.projectService = projectService;
         this.projectAccessService = projectAccessService;
         this.projectMutationGuard = projectMutationGuard;
@@ -55,18 +54,10 @@ public class VersionUpdateCommandHandler {
         Project project = projectAccessService.requireVersionPermission(projectId, user, "VERSION_EDIT",
                 "You do not have permission to update this version.");
         projectMutationGuard.ensureEditable(project);
-        var snapshot = reviewPersistence.capture(projectId, ProjectReviewSnapshot.token(project));
-        project = snapshot.project();
 
         ProjectVersion version = projectVersionAccessService.requireById(project, versionId,
                 () -> new VersionNotFoundException("We couldn't find that project version."));
 
-        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-        var originalContext = mapper.valueToTree(java.util.Arrays.asList(version.getGameVersions(), version.getDependencies()));
-        String originalFingerprint = net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(version);
-        var previousScan = version.getScanResult();
-        String oldCachedArchive = null;
-        boolean childIdsChanged = false;
         if (gameVersions != null) {
             versionMutationOrchestrationService.validateGameVersions(gameVersions);
             version.setGameVersions(gameVersions);
@@ -88,16 +79,11 @@ public class VersionUpdateCommandHandler {
                 catch (java.io.IOException ex) { throw new net.modtale.exception.InvalidVersionRequestException("This mod has attached configs. Upload a new version to change its config ownership."); }
             }
             if (modpack) {
-                if (!java.util.Objects.equals(mapper.valueToTree(version.getDependencies()), mapper.valueToTree(resolvedProjectDependencies))
-                        && version.getFileUrl() != null && version.getFileUrl().endsWith(".zip")) {
-                    oldCachedArchive = version.getFileUrl();
-                    version.setFileUrl(null);
-                }
+                versionMutationOrchestrationService.invalidateCachedModpackArtifact(version, resolvedProjectDependencies);
             }
             version.setDependencies(resolvedProjectDependencies);
             if (modpack && project.getVersions().get(0).getId().equals(versionId)) {
                 project.setChildProjectIds(resolvedDependencies.simpleProjectIds());
-                childIdsChanged = true;
             }
         }
         if (incompatibleProjectIds != null) {
@@ -106,18 +92,7 @@ public class VersionUpdateCommandHandler {
             ));
         }
 
-        String updatedFingerprint = net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(version);
-        boolean contextChanged = originalFingerprint != null && updatedFingerprint != null
-                ? !originalFingerprint.equals(updatedFingerprint) : !originalContext.equals(mapper.valueToTree(java.util.Arrays.asList(version.getGameVersions(), version.getDependencies())));
-        if (contextChanged) {
-            version.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
-            version.setScheduledPublishDate(null);
-            version.setScanResult(null);
-        }
-        boolean queued = contextChanged && versionMutationOrchestrationService.prepareContextChangeScan(project, version, previousScan);
-        if (!reviewPersistence.applyVersionEdit(snapshot, versionId, contextChanged, childIdsChanged)) throw ProjectReviewSnapshot.conflict();
+        projectRepository.save(project);
         projectService.evictProjectCache(project);
-        if (queued) versionMutationOrchestrationService.enqueueContextChangeScan(project, version);
-        if (oldCachedArchive != null) versionMutationOrchestrationService.deleteCachedArtifact(oldCachedArchive);
     }
 }

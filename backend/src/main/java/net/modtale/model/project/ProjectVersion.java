@@ -3,22 +3,6 @@ package net.modtale.model.project;
 import java.util.List;
 
 public class ProjectVersion {
-    private ReviewIsolation reviewIsolation;
-    @com.fasterxml.jackson.annotation.JsonIgnore
-    public ReviewIsolation getReviewIsolation() { return reviewIsolation; }
-    @com.fasterxml.jackson.annotation.JsonIgnore
-    public void setReviewIsolation(ReviewIsolation value) { reviewIsolation = value; }
-    public record ReviewIsolation(String operationId, String actorId, String beforeSha256, java.util.Date isolatedAt) {
-        public ReviewIsolation {
-            if (operationId == null || !operationId.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
-                    || actorId == null || actorId.isBlank() || actorId.length() > 256
-                    || beforeSha256 == null || !beforeSha256.matches("[0-9a-f]{64}") || isolatedAt == null)
-                throw new IllegalArgumentException("Invalid review isolation provenance");
-            isolatedAt = new java.util.Date(isolatedAt.getTime());
-        }
-        @Override public java.util.Date isolatedAt() { return new java.util.Date(isolatedAt.getTime()); }
-    }
-
     private List<net.modtale.model.project.ModpackConfigReference> modpackConfigs;
     public List<net.modtale.model.project.ModpackConfigReference> getModpackConfigs() { return modpackConfigs; }
     public void setModpackConfigs(List<net.modtale.model.project.ModpackConfigReference> value) { modpackConfigs = value; }
@@ -38,29 +22,8 @@ public class ProjectVersion {
     private List<String> incompatibleProjectIds;
     private Channel channel;
 
-    private ScanResult.SecurityEvidence approvedSecurityEvidence;
-    private long securityApprovedAt;
-    private String approvedSecurityContextSha256;
-    public String getApprovedSecurityContextSha256() { return approvedSecurityContextSha256; }
-    public void setApprovedSecurityContextSha256(String value) { approvedSecurityContextSha256 = value; }
-    public ScanResult.SecurityEvidence getApprovedSecurityEvidence() { return approvedSecurityEvidence; }
-    public void setApprovedSecurityEvidence(ScanResult.SecurityEvidence value) { approvedSecurityEvidence = value; }
-    public long getSecurityApprovedAt() { return securityApprovedAt; }
-    public void setSecurityApprovedAt(long value) { securityApprovedAt = value; }
     private ScanResult scanResult;
     private List<ApprovedIssueBaseline> approvedIssueBaselines;
-    private String securityApprovalProjectId;
-    public String getSecurityApprovalProjectId() { return securityApprovalProjectId; }
-    public void setSecurityApprovalProjectId(String value) { securityApprovalProjectId = value; }
-    private java.util.Map<String, String> approvedReviewOrigins;
-    public java.util.Map<String, String> getApprovedReviewOrigins() { return approvedReviewOrigins; }
-    public void setApprovedReviewOrigins(java.util.Map<String, String> value) { approvedReviewOrigins = value; }
-    private String approvedFindingReviewHead;
-    public String getApprovedFindingReviewHead() { return approvedFindingReviewHead; }
-    public void setApprovedFindingReviewHead(String value) { approvedFindingReviewHead = value; }
-    private String findingReviewHead;
-    public String getFindingReviewHead() { return findingReviewHead; }
-    public void setFindingReviewHead(String value) { findingReviewHead = value; }
 
     private ReviewStatus reviewStatus = ReviewStatus.PENDING;
     private String rejectionReason;
@@ -73,7 +36,6 @@ public class ProjectVersion {
     public static class ApprovedIssueBaseline {
         private String fingerprint;
         private String looseFingerprint;
-        private String evidenceIdentity;
         private String severity;
         private int scoreImpact;
         private int confidence;
@@ -96,9 +58,6 @@ public class ProjectVersion {
             this.confidence = confidence;
             this.approvedAt = approvedAt;
         }
-
-        public String getEvidenceIdentity() { return evidenceIdentity; }
-        public void setEvidenceIdentity(String value) { evidenceIdentity = value; }
 
         public String getFingerprint() { return fingerprint; }
         public void setFingerprint(String fingerprint) { this.fingerprint = fingerprint; }

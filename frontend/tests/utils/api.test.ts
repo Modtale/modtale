@@ -138,12 +138,3 @@ describe('api utils', () => {
             .toBe('Could not save profile. We could not reach the server. Check your internet connection and try again.');
     });
 });
-
-it('does not refresh or replay an explicitly non-retriable mutation after 403', async () => {
-    const handler = (api.interceptors.response as any).handlers[0].rejected;
-    const request = vi.spyOn(api, 'request');
-    const failure = { config: { method: 'post', skipCsrfRetry: true }, response: { status: 403 } };
-    await expect(handler(failure)).rejects.toBe(failure);
-    expect(request).not.toHaveBeenCalled();
-    request.mockRestore();
-});

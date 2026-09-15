@@ -38,8 +38,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.anyString;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -48,7 +46,6 @@ import static org.mockito.Mockito.when;
 class LifecycleServiceTest {
 
     private LifecycleService lifecycleService;
-    private net.modtale.service.admin.review.ProjectReviewPersistence reviewPersistence;
     private ProjectRepository projectRepository;
     private ProjectService projectService;
     private ValidationService validationService;
@@ -87,12 +84,6 @@ class LifecycleServiceTest {
                 mock(VersionDependencyService.class),
                 mock(ProjectDeletionService.class)
         );
-        reviewPersistence = mock(net.modtale.service.admin.review.ProjectReviewPersistence.class);
-        when(reviewPersistence.capture(anyString(), anyString())).thenAnswer(invocation ->
-                new net.modtale.service.admin.review.ProjectReviewPersistence.Snapshot(new org.bson.Document(),
-                        projectService.getRawProjectById(invocation.getArgument(0))));
-        when(reviewPersistence.apply(any(), any())).thenReturn(true);
-        when(reviewPersistence.submitDraft(any())).thenReturn(true);
         ProjectDraftWorkflowService projectDraftWorkflowService = new ProjectDraftWorkflowService(
                 projectRepository,
                 projectService,
@@ -103,10 +94,10 @@ class LifecycleServiceTest {
                 projectAccessService,
                 projectMutationGuard,
                 versionMutationOrchestrationService,
-                new AppLimitProperties(10, 5, 10, 5, 5, 5, 20, 10),
-                reviewPersistence
+                new AppLimitProperties(10, 5, 10, 5, 5, 5, 20, 10)
         );
         ProjectPublicationService projectPublicationService = new ProjectPublicationService(
+                projectRepository,
                 projectService,
                 projectNotificationService,
                 webhookService,
@@ -114,8 +105,7 @@ class LifecycleServiceTest {
                 mock(ScoringService.class),
                 accessControlService,
                 projectAccessService,
-                securityIssueAnalysisService,
-                reviewPersistence
+                securityIssueAnalysisService
         );
         lifecycleService = new LifecycleService(
                 projectDraftWorkflowService,
@@ -135,7 +125,7 @@ class LifecycleServiceTest {
         when(userRepository.findById("org-1")).thenReturn(java.util.Optional.of(organization));
         when(sanitizationService.sanitizePlainText("Raw Title")).thenReturn("Clean Title");
         when(sanitizationService.sanitizePlainText("Raw Description")).thenReturn("Clean Description");
-        when(projectRepository.insert(any(Project.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(projectRepository.save(any(Project.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         Project draft = lifecycleService.createDraft(
                 "Raw Title",
@@ -164,7 +154,7 @@ class LifecycleServiceTest {
     @Test
     void importedDetailsAreSavedTogetherInAnUnpublishedDraft() {
         User creator = user("user-1", "Creator", User.AccountType.USER, true);
-        when(projectRepository.insert(any(Project.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(projectRepository.save(any(Project.class))).thenAnswer(invocation -> invocation.getArgument(0));
         String source = "https://www.curseforge.com/hytale/mods/my-mod";
         String icon = "https://media.forgecdn.net/avatars/1/icon.png";
 
@@ -177,7 +167,7 @@ class LifecycleServiceTest {
         assertEquals(source, draft.getLinks().get("CurseForge"));
         assertEquals(icon, draft.getImageUrl());
         assertTrue(draft.getVersions().isEmpty());
-        verify(projectRepository).insert(draft);
+        verify(projectRepository).save(draft);
     }
 
     @Test
@@ -211,7 +201,7 @@ class LifecycleServiceTest {
 
         verify(validationService).validateSlug("sky-tools");
         verify(validationService).validateRepositoryUrl("https://github.com/modtale/sky-tools");
-        verify(reviewPersistence).submitDraft(any());
+        verify(projectRepository).save(project);
         verify(projectService).evictProjectCache(project);
         verify(webhookService).triggerAdminNewProjectWebhook(project);
     }
@@ -231,25 +221,16 @@ class LifecycleServiceTest {
         project.setVersions(new ArrayList<>(List.of(uploadedDraftVersion)));
 
         ScanResult queuedScan = new ScanResult(ScanStatus.SCANNING, 0, List.of());
-        queuedScan.setScanRequestId("submission-request");
 
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
         when(accessControlService.hasProjectPermission(project, user, "PROJECT_STATUS_SUBMIT")).thenReturn(true);
         when(scanService.createQueuedScanResult(1, "Initial scan queued.")).thenReturn(queuedScan);
 
-        when(reviewPersistence.submitDraft(any())).thenReturn(false);
-        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> lifecycleService.submitProject("project-1", user));
-        verify(scanService, never()).enqueueBackgroundScan(anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyInt(), any());
-        verify(webhookService, never()).triggerAdminNewProjectWebhook(any());
-        project.setStatus(ProjectStatus.DRAFT); uploadedDraftVersion.setScanResult(null);
-        when(reviewPersistence.submitDraft(any())).thenReturn(true);
-        org.mockito.Mockito.clearInvocations(reviewPersistence, scanService);
-
         lifecycleService.submitProject("project-1", user);
 
         assertEquals(ProjectStatus.PENDING, project.getStatus());
         assertEquals(queuedScan, uploadedDraftVersion.getScanResult());
-        verify(reviewPersistence).submitDraft(any());
+        verify(projectRepository).save(project);
         verify(projectService).evictProjectCache(project);
         verify(scanService).enqueueBackgroundScan(
                 "project-1",
@@ -257,7 +238,7 @@ class LifecycleServiceTest {
                 "/files/data/bundle.zip",
                 "/files/data/bundle.zip",
                 false,
-                1, queuedScan.getScanRequestId()
+                1
         );
         verify(webhookService, never()).triggerAdminNewProjectWebhook(project);
     }
@@ -280,12 +261,12 @@ class LifecycleServiceTest {
 
         lifecycleService.submitProject("project-1", user);
 
-        verify(reviewPersistence).submitDraft(any());
+        verify(projectRepository).save(project);
         verify(webhookService, never()).triggerAdminNewProjectWebhook(project);
     }
 
     @Test
-    void publishProjectApprovesOnlySelectedVersionAndBroadcastsFirstPublication() {
+    void publishProjectApprovesVersionsAndBroadcastsFirstPublication() {
         User admin = user("user-1", "ItsNeil17", User.AccountType.USER, true);
         Project project = editableProject("project-1", ProjectClassification.DATA, ProjectStatus.PENDING);
         project.setCreatedAt(null);
@@ -296,18 +277,13 @@ class LifecycleServiceTest {
         scheduled.setScheduledPublishDate("2026-06-09T12:00:00");
         ProjectVersion approved = version("1.1.0");
         approved.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
-        ProjectVersion uninspected = version("1.2.0");
-        uninspected.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
-        project.setVersions(new ArrayList<>(List.of(scheduled, approved, uninspected)));
+        project.setVersions(new ArrayList<>(List.of(scheduled, approved)));
 
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
         when(accessControlService.canApproveProjectReviews(admin)).thenReturn(true);
         when(projectRepository.save(project)).thenReturn(project);
 
-        var snapshot = new net.modtale.service.admin.review.ProjectReviewPersistence.Snapshot(new org.bson.Document(), project);
-        when(reviewPersistence.capture("project-1", "review-token")).thenReturn(snapshot);
-        when(reviewPersistence.apply(snapshot, scheduled.getId())).thenReturn(true);
-        lifecycleService.publishProject("project-1", admin, "review-token", scheduled.getId());
+        lifecycleService.publishProject("project-1", admin);
 
         assertEquals(ProjectStatus.PUBLISHED, project.getStatus());
         assertNotNull(project.getCreatedAt());
@@ -318,33 +294,12 @@ class LifecycleServiceTest {
         assertNull(scheduled.getScheduledPublishDate());
         assertEquals(ProjectVersion.ReviewStatus.APPROVED, approved.getReviewStatus());
 
-        assertEquals(ProjectVersion.ReviewStatus.PENDING, uninspected.getReviewStatus());
-        verify(securityIssueAnalysisService).markIssuesAcceptedForApprovedVersion(scheduled);
-        verify(projectRepository, never()).save(project);
+        verify(securityIssueAnalysisService).pruneApprovedScanResults(project);
         verify(projectService).evictProjectCache(project);
         verify(projectNotificationService).notifyNewProject(project);
         verify(webhookService).triggerWebhook(project);
         verify(webhookService).triggerDiscordWebhook(project);
         verify(trackingService).logNewProject("project-1");
-    }
-
-    @Test
-    void unboundOrConcurrentPublicationDoesNotBroadcastOrSave() {
-        User admin = user("admin", "Moderator", User.AccountType.USER, true);
-        Project project = editableProject("project-1", ProjectClassification.DATA, ProjectStatus.PENDING);
-        ProjectVersion selected = version("1.0"); project.setVersions(List.of(selected));
-        when(projectService.getRawProjectById("project-1")).thenReturn(project);
-        when(accessControlService.canApproveProjectReviews(admin)).thenReturn(true);
-        assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                () -> lifecycleService.publishProject("project-1", admin));
-        var snapshot = new net.modtale.service.admin.review.ProjectReviewPersistence.Snapshot(new org.bson.Document(), project);
-        when(reviewPersistence.capture("project-1", "token")).thenReturn(snapshot);
-        when(reviewPersistence.apply(snapshot, selected.getId())).thenReturn(false);
-        assertThrows(org.springframework.web.server.ResponseStatusException.class,
-                () -> lifecycleService.publishProject("project-1", admin, "token", selected.getId()));
-        verify(projectRepository, never()).save(any());
-        verify(projectNotificationService, never()).notifyNewProject(any());
-        verify(webhookService, never()).triggerWebhook(any());
     }
 
     @Test

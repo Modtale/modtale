@@ -55,44 +55,6 @@ class SecurityIssueApprovalServiceTest {
     }
 
     @Test
-    void approvalRetainsDigestAndContextWithoutDuplicatingArchiveManifest() {
-        ProjectVersion version = approvedVersion("version", "1.0");
-        ScanResult scan = net.modtale.service.security.scan.ScanEvidenceFixtures.complete(false);
-        scan.setIssues(new ArrayList<>());
-        version.setHash(scan.getSecurityEvidence().artifactSha256());
-        scan.setReviewedContextSha256(net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(version));
-        String contentHash = scan.getSecurityEvidence().contentSha256();
-        version.setScanResult(scan);
-        approvalService.markIssuesAcceptedForApprovedVersion(version);
-        assertEquals(contentHash, version.getApprovedSecurityEvidence().contentSha256());
-        assertTrue(version.getApprovedSecurityEvidence().entryHashes().isEmpty());
-        assertEquals(64, version.getApprovedSecurityContextSha256().length());
-    }
-
-    @Test
-    void missingOrUnverifiedEvidenceCannotBecomeReusableApproval() {
-        for (String scenario : List.of("missing", "unverified", "wrong-artifact", "wrong-context")) {
-            ProjectVersion version = approvedVersion("version", "1.0");
-            ScanResult scan = net.modtale.service.security.scan.ScanEvidenceFixtures.complete(false);
-            version.setHash(scan.getSecurityEvidence().artifactSha256());
-            scan.setReviewedContextSha256(net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(version));
-            version.setApprovedSecurityEvidence(scan.getSecurityEvidence());
-            version.setApprovedSecurityContextSha256("old");
-            version.setSecurityApprovedAt(123);
-            switch (scenario) {
-                case "unverified" -> scan.setArtifactVerified(false);
-                case "wrong-artifact" -> version.setHash("c".repeat(64));
-                case "wrong-context" -> scan.setReviewedContextSha256("d".repeat(64));
-            }
-            version.setScanResult(scenario.equals("missing") ? null : scan);
-            approvalService.markIssuesAcceptedForApprovedVersion(version);
-            assertNull(version.getApprovedSecurityEvidence(), scenario);
-            assertNull(version.getApprovedSecurityContextSha256(), scenario);
-            assertEquals(0, version.getSecurityApprovedAt(), scenario);
-        }
-    }
-
-    @Test
     void storedBaselinesAreUsedAfterScanResultIsRemoved() {
         ProjectVersion version = approvedVersion("version-1", "1.0.0");
         version.setApprovedIssueBaselines(List.of(new ProjectVersion.ApprovedIssueBaseline(

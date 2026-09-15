@@ -47,9 +47,6 @@ final class SecurityIssueBaselineService {
                 continue;
             }
 
-            var identities = IssueEvidenceIdentity.from(java.util.Objects.equals(version.getHash(),
-                    scanResult.getSecurityEvidence() == null ? null : scanResult.getSecurityEvidence().artifactSha256())
-                    ? scanResult : null);
             for (ScanResult.ScanIssue issue : scanResult.getIssues()) {
                 if (issue == null) {
                     continue;
@@ -67,8 +64,7 @@ final class SecurityIssueBaselineService {
                         version.getId(),
                         version.getVersionNumber(),
                         approvedAt,
-                        1,
-                        identities.identify(issue)
+                        1
                 );
 
                 exactBaselines.merge(fingerprint, candidate, SecurityIssueAnalysisService.IssueBaseline::mergeWith);
@@ -107,8 +103,7 @@ final class SecurityIssueBaselineService {
                     version.getId(),
                     version.getVersionNumber(),
                     storedBaseline.getApprovedAt() > 0 ? storedBaseline.getApprovedAt() : approvedAt,
-                    1,
-                    storedBaseline.getEvidenceIdentity()
+                    1
             );
 
             exactBaselines.merge(candidate.fingerprint(), candidate, SecurityIssueAnalysisService.IssueBaseline::mergeWith);

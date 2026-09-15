@@ -15,8 +15,6 @@ import net.modtale.model.project.ScanStatus;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
 import net.modtale.repository.project.ProjectRepository;
-import net.modtale.service.admin.review.ProjectReviewPersistence;
-import net.modtale.service.admin.review.ProjectReviewSnapshot;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.communication.WebhookService;
 import net.modtale.service.project.access.ProjectAccessService;
@@ -30,7 +28,6 @@ import org.springframework.stereotype.Service;
 @Service
 public class ProjectDraftWorkflowService {
 
-    private final ProjectReviewPersistence reviewPersistence;
     private final ProjectRepository projectRepository;
     private final ProjectService projectService;
     private final ValidationService validationService;
@@ -52,11 +49,9 @@ public class ProjectDraftWorkflowService {
             ProjectAccessService projectAccessService,
             ProjectMutationGuard projectMutationGuard,
             VersionMutationOrchestrationService versionMutationOrchestrationService,
-            AppLimitProperties limitProperties,
-            ProjectReviewPersistence reviewPersistence
+            AppLimitProperties limitProperties
     ) {
         this.projectRepository = projectRepository;
-        this.reviewPersistence = reviewPersistence;
         this.projectService = projectService;
         this.validationService = validationService;
         this.webhookService = webhookService;
@@ -153,7 +148,7 @@ public class ProjectDraftWorkflowService {
         project.setTeamMembers(new ArrayList<>());
         project.setTeamInvites(new ArrayList<>());
 
-        return projectRepository.insert(project);
+        return projectRepository.save(project);
     }
 
     public void submitProject(String id, User user) {
@@ -161,10 +156,6 @@ public class ProjectDraftWorkflowService {
                 "You do not have permission to submit this project.");
         requireVerifiedEmail(user, "submit a project for review");
         projectMutationGuard.ensureEditable(project);
-        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
-        project = snapshot.project();
-        if (project.getStatus() != ProjectStatus.DRAFT)
-            throw new InvalidProjectRequestException("Only draft projects can be submitted for review.");
 
         if (project.getVersions().isEmpty() && project.getClassification() != ProjectClassification.MODPACK) {
             throw new InvalidProjectRequestException("Add at least one version before submitting this project.");
@@ -189,7 +180,7 @@ public class ProjectDraftWorkflowService {
         project.setExpiresAt(null);
         List<ProjectVersion> scansQueuedForSubmission = new ArrayList<>();
         if (project.getVersions() != null) {
-            for (var version : project.getVersions()) {
+            project.getVersions().forEach(version -> {
                 if (version.getReviewStatus() == null
                         || version.getReviewStatus() == ProjectVersion.ReviewStatus.REJECTED) {
                     version.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
@@ -197,12 +188,12 @@ public class ProjectDraftWorkflowService {
                 if (versionMutationOrchestrationService.queueSubmissionScanIfNeeded(project, version)) {
                     scansQueuedForSubmission.add(version);
                 }
-            }
+            });
         }
 
-        if (!reviewPersistence.submitDraft(snapshot)) throw ProjectReviewSnapshot.conflict();
+        projectRepository.save(project);
         projectService.evictProjectCache(project);
-        for (var version : scansQueuedForSubmission) versionMutationOrchestrationService.enqueueSubmissionScan(project, version);
+        scansQueuedForSubmission.forEach(version -> versionMutationOrchestrationService.enqueueSubmissionScan(project, version));
         if (project.getVersions() == null
                 || project.getVersions().stream().noneMatch(version -> version.getScanResult() != null
                 && version.getScanResult().getStatus() == ScanStatus.SCANNING)) {

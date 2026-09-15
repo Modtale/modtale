@@ -54,7 +54,6 @@ public class AuthController {
     private final AuthenticationMutationService authenticationMutationService;
     private final AccountService accountService;
     private final TwoFactorService twoFactorService;
-    private final net.modtale.service.auth.MfaEnrollmentService mfaEnrollmentService;
     private final LauncherAuthService launcherAuthService;
     private final SecurityContextRepository securityContextRepository;
 
@@ -64,11 +63,9 @@ public class AuthController {
             AccountService accountService,
             TwoFactorService twoFactorService,
             LauncherAuthService launcherAuthService,
-            SecurityContextRepository securityContextRepository,
-            net.modtale.service.auth.MfaEnrollmentService mfaEnrollmentService
+            SecurityContextRepository securityContextRepository
     ) {
         this.authenticationService = authenticationService;
-        this.mfaEnrollmentService = mfaEnrollmentService;
         this.authenticationMutationService = authenticationMutationService;
         this.accountService = accountService;
         this.twoFactorService = twoFactorService;
@@ -153,25 +150,29 @@ public class AuthController {
         return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/mfa/setup")
-    @PreAuthorize("!@apiSecurity.isApiKey(authentication) && @apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
+    @GetMapping("/mfa/setup")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<MfaSetupResponse> setupMfa() {
         User user = accountService.requireCurrentUser("setting up two-factor authentication");
         if (user.isMfaEnabled()) {
             throw new InvalidAuthenticationRequestException("Two-factor authentication is already enabled for this account.");
         }
 
-        String secret = mfaEnrollmentService.begin(user.getId());
+        String secret = twoFactorService.generateNewSecret();
+        authenticationMutationService.setTempMfaSecret(user.getId(), secret);
 
         String qrCode = twoFactorService.generateQrCodeImageUri(secret, user.getUsername());
         return ResponseEntity.ok(new MfaSetupResponse(secret, qrCode));
     }
 
     @PostMapping("/mfa/verify")
-    @PreAuthorize("!@apiSecurity.isApiKey(authentication) && @apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
+    @PreAuthorize("@apiSecurity.hasPersonalPerm('PROFILE_READ', authentication)")
     public ResponseEntity<MessageResponse> verifyMfaSetup(@Valid @RequestBody VerifyMfaRequest requestPayload) {
         User user = accountService.requireCurrentUser("verifying two-factor authentication setup");
-        mfaEnrollmentService.verify(user.getId(), requestPayload.getCode());
+        if (!twoFactorService.isOtpValid(user.getMfaSecret(), requestPayload.getCode())) {
+            throw new InvalidAuthenticationRequestException("That verification code was not accepted, so two-factor authentication was not enabled.");
+        }
+        authenticationMutationService.enableMfa(user.getId());
         return ResponseEntity.ok(new MessageResponse("MFA enabled successfully"));
     }
 

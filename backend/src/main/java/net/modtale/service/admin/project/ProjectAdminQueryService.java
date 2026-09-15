@@ -8,8 +8,7 @@ import net.modtale.model.dto.project.ProjectSummaryDTO;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectSort;
 import net.modtale.model.project.ProjectViewCategory;
-import net.modtale.service.admin.review.ProjectReviewPersistence;
-import net.modtale.service.admin.review.ProjectReviewSnapshot;
+import net.modtale.repository.project.ProjectRepository;
 import net.modtale.service.admin.audit.AdminAuditLogger;
 import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.project.query.SearchService;
@@ -19,18 +18,18 @@ import org.springframework.stereotype.Service;
 @Service
 public class ProjectAdminQueryService {
 
-    private final ProjectReviewPersistence reviewPersistence;
+    private final ProjectRepository projectRepository;
     private final ProjectService projectService;
     private final SearchService searchService;
     private final AdminAuditLogger adminAuditLogger;
 
     public ProjectAdminQueryService(
-            ProjectReviewPersistence reviewPersistence,
+            ProjectRepository projectRepository,
             ProjectService projectService,
             SearchService searchService,
             AdminAuditLogger adminAuditLogger
     ) {
-        this.reviewPersistence = reviewPersistence;
+        this.projectRepository = projectRepository;
         this.projectService = projectService;
         this.searchService = searchService;
         this.adminAuditLogger = adminAuditLogger;
@@ -44,13 +43,13 @@ public class ProjectAdminQueryService {
         return ProjectMapper.toAdminDTO(project);
     }
 
-    public void updateRawProject(String adminId, String id, java.util.Map<String, Object> metadata, String token) {
-        ProjectMetadataRepair.validate(metadata);
-        var snapshot = reviewPersistence.capture(id, token);
-        if (!reviewPersistence.applyMetadataRepair(snapshot, metadata)) throw ProjectReviewSnapshot.conflict();
-        projectService.evictProjectCache(snapshot.project());
-        adminAuditLogger.logAction(adminId, "RAW_UPDATE_PROJECT", id, "PROJECT",
-                "Repaired metadata fields: " + String.join(", ", new java.util.TreeSet<>(metadata.keySet())));
+    public void updateRawProject(String adminId, String id, Project updatedProject) {
+        Project existing = requireProject(id);
+        projectService.evictProjectCache(existing);
+        updatedProject.setId(existing.getId());
+        projectRepository.save(updatedProject);
+        projectService.evictProjectCache(updatedProject);
+        adminAuditLogger.logAction(adminId, "RAW_UPDATE_PROJECT", existing.getId(), "PROJECT", "Updated via Raw JSON");
     }
 
     public List<ProjectSummaryDTO> searchProjects(String query, boolean deleted) {

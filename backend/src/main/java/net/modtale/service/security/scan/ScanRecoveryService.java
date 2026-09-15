@@ -63,13 +63,10 @@ public class ScanRecoveryService {
                     int nextAttempt = currentAttempt + 1;
                     ScanResult queued = scanRoutingService.createQueuedScanResult(
                             nextAttempt,
-                            "WAITING_RETRY".equals(scanResult.getScanState())
-                                    ? "Inspection capacity was temporarily unavailable; review was re-queued automatically."
-                                    : "Previous scan attempt timed out and was re-queued automatically."
+                            "Previous scan attempt timed out and was re-queued automatically."
                     );
 
-                    queued.setManualRescan(scanResult.isManualRescan());
-                    if (scanPersistenceService.queueRetryAttempt(project.getId(), version.getId(), currentAttempt, queued, scanResult, timeoutMs)) {
+                    if (scanPersistenceService.queueRetryAttempt(project.getId(), version.getId(), currentAttempt, queued)) {
                         logger.warn(
                                 "Recovered stale scan by retrying project={} version={} previousAttempt={} nextAttempt={}",
                                 project.getId(),
@@ -83,8 +80,8 @@ public class ScanRecoveryService {
                                 version.getId(),
                                 version.getFileUrl(),
                                 extractOriginalFilename(version.getFileUrl()),
-                                queued.isManualRescan(),
-                                nextAttempt, queued.getScanRequestId()
+                                false,
+                                nextAttempt
                         );
                     }
                 } else {
@@ -92,7 +89,7 @@ public class ScanRecoveryService {
                             project.getId(),
                             version.getId(),
                             extractOriginalFilename(version.getFileUrl()),
-                            currentAttempt, scanResult, timeoutMs
+                            currentAttempt
                     );
                 }
             }
@@ -120,7 +117,7 @@ public class ScanRecoveryService {
                 String filePath,
                 String originalFilename,
                 boolean isManualRescan,
-                int expectedAttempt, String requestId
+                int expectedAttempt
         );
     }
 }

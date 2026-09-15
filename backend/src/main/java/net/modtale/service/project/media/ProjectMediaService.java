@@ -14,8 +14,7 @@ import net.modtale.exception.ProjectMediaOperationException;
 import net.modtale.exception.StorageUploadException;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.User;
-import net.modtale.service.admin.review.ProjectReviewPersistence;
-import net.modtale.service.admin.review.ProjectReviewSnapshot;
+import net.modtale.repository.project.ProjectRepository;
 import net.modtale.service.media.MediaUploadService;
 import net.modtale.service.project.access.ProjectAccessService;
 import net.modtale.service.project.access.ProjectMutationGuard;
@@ -28,7 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class ProjectMediaService {
 
-    private final ProjectReviewPersistence reviewPersistence;
+    private final ProjectRepository projectRepository;
     private final ProjectService projectService;
     private final ProjectAccessService projectAccessService;
     private final ProjectMutationGuard projectMutationGuard;
@@ -40,7 +39,7 @@ public class ProjectMediaService {
     private static final Pattern YOUTUBE_VIDEO_ID_PATTERN = Pattern.compile("^[A-Za-z0-9_-]{11}$");
 
     public ProjectMediaService(
-            ProjectReviewPersistence reviewPersistence,
+            ProjectRepository projectRepository,
             ProjectService projectService,
             ProjectAccessService projectAccessService,
             ProjectMutationGuard projectMutationGuard,
@@ -49,7 +48,7 @@ public class ProjectMediaService {
             FileValidationService fileValidationService,
             AppLimitProperties limitProperties
     ) {
-        this.reviewPersistence = reviewPersistence;
+        this.projectRepository = projectRepository;
         this.projectService = projectService;
         this.projectAccessService = projectAccessService;
         this.projectMutationGuard = projectMutationGuard;
@@ -64,15 +63,18 @@ public class ProjectMediaService {
         Project project = projectAccessService.requireProjectPermission(id, user, permission,
                 "You do not have permission to update this project's image.");
         projectMutationGuard.ensureEditable(project);
-        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
-        project = snapshot.project();
 
         try {
             String currentUrl = isBanner ? project.getBannerUrl() : project.getImageUrl();
             String publicUrl = mediaUploadService.uploadPublicUrl(
                     file,
-                    net.modtale.service.storage.ProjectMediaKeys.prefix(project.getId(), "images"),
-                    isBanner ? fileValidationService::validateBanner : fileValidationService::validateIcon
+                    "images",
+                    isBanner ? fileValidationService::validateBanner : fileValidationService::validateIcon,
+                    () -> {
+                        if (currentUrl != null && !currentUrl.contains("default.png") && !currentUrl.contains("placeholder") && !currentUrl.contains("favicon")) {
+                            projectDeletionService.deleteStoredFile(currentUrl);
+                        }
+                    }
             );
 
             if (isBanner) {
@@ -81,9 +83,8 @@ public class ProjectMediaService {
                 project.setImageUrl(publicUrl);
             }
 
-            saveAndEvict(snapshot);
-            if (currentUrl != null && !currentUrl.equals(publicUrl) && !currentUrl.contains("default.png")
-                    && !currentUrl.contains("placeholder") && !currentUrl.contains("favicon")) projectDeletionService.deleteProjectMediaFile(project, currentUrl);
+            projectRepository.save(project);
+            projectService.evictProjectCache(project);
         } catch (StorageUploadException ex) {
             throw new ProjectMediaOperationException(ex.getMessage(), ex);
         }
@@ -93,13 +94,11 @@ public class ProjectMediaService {
         Project project = projectAccessService.requireProjectPermission(id, user, "PROJECT_GALLERY_ADD",
                 "You do not have permission to upload gallery images for this project.");
         projectMutationGuard.ensureEditable(project);
-        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
-        project = snapshot.project();
         ensureGalleryCapacity(project);
 
         try {
-            galleryItems(project).add(mediaUploadService.uploadPublicUrl(file, net.modtale.service.storage.ProjectMediaKeys.prefix(project.getId(), "gallery"), fileValidationService::validateGalleryImage));
-            return saveAndEvict(snapshot);
+            galleryItems(project).add(mediaUploadService.uploadPublicUrl(file, "gallery", fileValidationService::validateGalleryImage));
+            return saveAndEvict(project);
         } catch (StorageUploadException ex) {
             throw new ProjectMediaOperationException(ex.getMessage(), ex);
         }
@@ -109,8 +108,6 @@ public class ProjectMediaService {
         Project project = projectAccessService.requireProjectPermission(id, user, "PROJECT_GALLERY_ADD",
                 "You do not have permission to add gallery videos for this project.");
         projectMutationGuard.ensureEditable(project);
-        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
-        project = snapshot.project();
         ensureGalleryCapacity(project);
 
         String normalizedVideoUrl = normalizeYouTubeUrl(videoUrl);
@@ -120,33 +117,29 @@ public class ProjectMediaService {
         }
 
         galleryItems.add(normalizedVideoUrl);
-        return saveAndEvict(snapshot);
+        return saveAndEvict(project);
     }
 
     public Project removeGalleryImage(String id, String imageUrl, User user) {
         Project project = projectAccessService.requireProjectPermission(id, user, "PROJECT_GALLERY_REMOVE",
                 "You do not have permission to remove gallery images from this project.");
         projectMutationGuard.ensureEditable(project);
-        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
-        project = snapshot.project();
-        if (!galleryItems(project).remove(imageUrl))
-            throw new InvalidProjectRequestException("That gallery image does not exist on this project.");
+        galleryItems(project).remove(imageUrl);
         if (project.getGalleryImageCaptions() != null && project.getGalleryImageCaptions().containsKey(imageUrl)) {
             Map<String, String> captions = new HashMap<>(project.getGalleryImageCaptions());
             captions.remove(imageUrl);
             project.setGalleryImageCaptions(captions);
         }
-        var saved = saveAndEvict(snapshot);
-        if (!isYouTubeUrl(imageUrl)) projectDeletionService.deleteProjectMediaFile(project, imageUrl);
-        return saved;
+        if (!isYouTubeUrl(imageUrl)) {
+            projectDeletionService.deleteStoredFile(imageUrl);
+        }
+        return saveAndEvict(project);
     }
 
     public Project updateGalleryImageCaption(String id, String imageUrl, String caption, User user) {
         Project project = projectAccessService.requireProjectPermission(id, user, "PROJECT_GALLERY_ADD",
                 "You do not have permission to edit gallery image captions for this project.");
         projectMutationGuard.ensureEditable(project);
-        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
-        project = snapshot.project();
 
         if (project.getGalleryImages() == null || !project.getGalleryImages().contains(imageUrl)) {
             throw new InvalidProjectRequestException("That gallery image does not exist on this project.");
@@ -168,15 +161,16 @@ public class ProjectMediaService {
         }
         project.setGalleryImageCaptions(captions);
 
-        return saveAndEvict(snapshot);
+        Project saved = projectRepository.save(project);
+        Project cacheTarget = saved != null ? saved : project;
+        projectService.evictProjectCache(cacheTarget);
+        return cacheTarget;
     }
 
     public Project reorderGallery(String id, List<String> imageUrls, User user) {
         Project project = projectAccessService.requireProjectPermission(id, user, "PROJECT_GALLERY_ADD",
                 "You do not have permission to reorder this project gallery.");
         projectMutationGuard.ensureEditable(project);
-        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
-        project = snapshot.project();
 
         List<String> currentItems = new ArrayList<>(galleryItems(project));
         List<String> requestedItems = imageUrls == null ? List.of() : new ArrayList<>(imageUrls);
@@ -187,13 +181,14 @@ public class ProjectMediaService {
         }
 
         project.setGalleryImages(requestedItems);
-        return saveAndEvict(snapshot);
+        return saveAndEvict(project);
     }
 
-    private Project saveAndEvict(ProjectReviewPersistence.Snapshot snapshot) {
-        if (!reviewPersistence.applyPresentation(snapshot, true)) throw ProjectReviewSnapshot.conflict();
-        projectService.evictProjectCache(snapshot.project());
-        return snapshot.project();
+    private Project saveAndEvict(Project project) {
+        Project saved = projectRepository.save(project);
+        Project cacheTarget = saved != null ? saved : project;
+        projectService.evictProjectCache(cacheTarget);
+        return cacheTarget;
     }
 
     private void ensureGalleryCapacity(Project project) {

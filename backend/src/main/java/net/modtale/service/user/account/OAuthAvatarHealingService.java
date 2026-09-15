@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import net.modtale.model.user.OAuthProvider;
 import net.modtale.model.user.User;
+import net.modtale.repository.user.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -18,17 +19,16 @@ public class OAuthAvatarHealingService {
 
     private static final Logger logger = LoggerFactory.getLogger(OAuthAvatarHealingService.class);
 
-    private final UserAvatarPersistence persistence;
+    private final UserRepository userRepository;
     private final RestClient restClient;
     private final Map<String, LocalDateTime> avatarHealCooldown = new ConcurrentHashMap<>();
 
-    public OAuthAvatarHealingService(UserAvatarPersistence persistence) {
-        this.persistence = persistence;
+    public OAuthAvatarHealingService(UserRepository userRepository) {
+        this.userRepository = userRepository;
         this.restClient = RestClient.create();
     }
 
     public void maybeHealOAuthAvatar(User user) {
-        if (user == null || user.isDeleted()) return;
         if (user.getAvatarUrl() == null || user.getAvatarUrl().isBlank()) {
             return;
         }
@@ -39,33 +39,26 @@ public class OAuthAvatarHealingService {
             return;
         }
 
-        var snapshot = persistence.capture(user.getId());
-        if (snapshot == null) return;
-        User current = snapshot.user();
-        if (current.getAvatarUrl() == null || current.getConnectedAccounts() == null
-                || current.getConnectedAccounts().isEmpty() || !isOAuthManagedAvatar(current)) return;
-
         LocalDateTime lastAttempt = avatarHealCooldown.get(user.getId());
         if (lastAttempt != null && lastAttempt.isAfter(LocalDateTime.now().minusMinutes(30))) {
             return;
         }
         avatarHealCooldown.put(user.getId(), LocalDateTime.now());
 
-        if (isImageUrlReachable(current.getAvatarUrl())) {
+        if (isImageUrlReachable(user.getAvatarUrl())) {
             return;
         }
 
-        String refreshed = refreshAvatarFromLinkedProvider(current);
+        String refreshed = refreshAvatarFromLinkedProvider(user);
         if (refreshed != null && !refreshed.isBlank() && isImageUrlReachable(refreshed)) {
-            if (!persistence.update(snapshot, refreshed)) return;
             user.setAvatarUrl(refreshed);
+            userRepository.save(user);
             logger.info("Healed broken provider avatar for user {} using linked provider.", user.getId());
             return;
         }
 
-        String fallback = "https://ui-avatars.com/api/?name=" + java.net.URLEncoder.encode(current.getUsername() == null ? "User" : current.getUsername(), java.nio.charset.StandardCharsets.UTF_8) + "&background=random";
-        if (!persistence.update(snapshot, fallback)) return;
-        user.setAvatarUrl(fallback);
+        user.setAvatarUrl("https://ui-avatars.com/api/?name=" + user.getUsername() + "&background=random");
+        userRepository.save(user);
         logger.warn("Reset broken provider avatar to default for user {}", user.getId());
     }
 
@@ -90,7 +83,7 @@ public class OAuthAvatarHealingService {
                 || (hasBluesky && avatarUrl.contains("bsky"));
     }
 
-    boolean isImageUrlReachable(String rawUrl) {
+    private boolean isImageUrlReachable(String rawUrl) {
         try {
             HttpURLConnection connection = (HttpURLConnection) new URL(rawUrl).openConnection();
             connection.setInstanceFollowRedirects(true);
@@ -106,7 +99,7 @@ public class OAuthAvatarHealingService {
         }
     }
 
-    String refreshAvatarFromLinkedProvider(User user) {
+    private String refreshAvatarFromLinkedProvider(User user) {
         for (User.ConnectedAccount account : user.getConnectedAccounts()) {
             if (account == null || account.getProvider() == null) {
                 continue;

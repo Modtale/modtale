@@ -1,14 +1,13 @@
 package net.modtale.service.project.lifecycle;
 
 import java.time.LocalDateTime;
-import net.modtale.service.admin.review.ProjectReviewPersistence;
-import net.modtale.service.admin.review.ProjectReviewSnapshot;
 import net.modtale.exception.InvalidProjectRequestException;
 import net.modtale.exception.ProjectOperationForbiddenException;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.user.User;
+import net.modtale.repository.project.ProjectRepository;
 import net.modtale.service.analytics.ScoringService;
 import net.modtale.service.analytics.TrackingService;
 import net.modtale.service.communication.ProjectNotificationService;
@@ -22,7 +21,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class ProjectPublicationService {
 
-    private final ProjectReviewPersistence reviewPersistence;
+    private final ProjectRepository projectRepository;
     private final ProjectService projectService;
     private final ProjectNotificationService projectNotificationService;
     private final WebhookService webhookService;
@@ -33,6 +32,7 @@ public class ProjectPublicationService {
     private final SecurityIssueAnalysisService securityIssueAnalysisService;
 
     public ProjectPublicationService(
+            ProjectRepository projectRepository,
             ProjectService projectService,
             ProjectNotificationService projectNotificationService,
             WebhookService webhookService,
@@ -40,10 +40,9 @@ public class ProjectPublicationService {
             ScoringService scoringService,
             AccessControlService accessControlService,
             ProjectAccessService projectAccessService,
-            SecurityIssueAnalysisService securityIssueAnalysisService,
-            ProjectReviewPersistence reviewPersistence
+            SecurityIssueAnalysisService securityIssueAnalysisService
     ) {
-        this.reviewPersistence = reviewPersistence;
+        this.projectRepository = projectRepository;
         this.projectService = projectService;
         this.projectNotificationService = projectNotificationService;
         this.webhookService = webhookService;
@@ -57,24 +56,19 @@ public class ProjectPublicationService {
     public void revertProjectToDraft(String id, User user) {
         Project project = projectAccessService.requireProjectPermission(id, user, "PROJECT_STATUS_REVERT",
                 "You do not have permission to revert this project.");
-        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
-        project = snapshot.project();
         if (project.getStatus() != ProjectStatus.PENDING) {
             throw new InvalidProjectRequestException(
                     "Only projects that are pending review can be reverted to draft.");
         }
         project.setStatus(ProjectStatus.DRAFT);
         scoringService.markProjectRankingDirty(project);
-        project.setUpdatedAt(LocalDateTime.now().toString());
-        if (!reviewPersistence.apply(snapshot, null)) throw ProjectReviewSnapshot.conflict();
+        projectRepository.save(project);
         projectService.evictProjectCache(project);
     }
 
     public void archiveProject(String id, User user) {
         Project project = projectAccessService.requireProjectPermission(id, user, "PROJECT_STATUS_ARCHIVE",
                 "You do not have permission to archive this project.");
-        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
-        project = snapshot.project();
         if (project.getStatus() != ProjectStatus.PUBLISHED
                 && project.getStatus() != ProjectStatus.UNLISTED
                 && project.getStatus() != ProjectStatus.PRIVATE) {
@@ -83,55 +77,38 @@ public class ProjectPublicationService {
         project.setStatus(ProjectStatus.ARCHIVED);
         project.setExpiresAt(null);
         scoringService.markProjectRankingDirty(project);
-        project.setUpdatedAt(LocalDateTime.now().toString());
-        if (!reviewPersistence.apply(snapshot, null)) throw ProjectReviewSnapshot.conflict();
+        projectRepository.save(project);
         projectService.evictProjectCache(project);
     }
 
     public void unlistProject(String id, User user) {
         Project project = projectAccessService.requireProjectPermission(id, user, "PROJECT_STATUS_UNLIST",
                 "You do not have permission to unlist this project.");
-        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
-        project = snapshot.project();
         if (project.getStatus() != ProjectStatus.PUBLISHED && project.getStatus() != ProjectStatus.ARCHIVED) {
             throw new InvalidProjectRequestException("Only published or archived projects can be unlisted.");
         }
         project.setStatus(ProjectStatus.UNLISTED);
         project.setExpiresAt(null);
         scoringService.markProjectRankingDirty(project);
-        project.setUpdatedAt(LocalDateTime.now().toString());
-        if (!reviewPersistence.apply(snapshot, null)) throw ProjectReviewSnapshot.conflict();
+        projectRepository.save(project);
         projectService.evictProjectCache(project);
     }
 
     public void privateProject(String id, User user) {
         Project project = projectAccessService.requireProjectPermission(id, user, "PROJECT_STATUS_UNLIST",
                 "You do not have permission to make this project private.");
-        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
-        project = snapshot.project();
         if (project.getStatus() == ProjectStatus.PENDING || project.getStatus() == ProjectStatus.DELETED) {
             throw new InvalidProjectRequestException("Pending or deleted projects cannot be made private.");
         }
         project.setStatus(ProjectStatus.PRIVATE);
         project.setExpiresAt(null);
         scoringService.markProjectRankingDirty(project);
-        project.setUpdatedAt(LocalDateTime.now().toString());
-        if (!reviewPersistence.apply(snapshot, null)) throw ProjectReviewSnapshot.conflict();
+        projectRepository.save(project);
         projectService.evictProjectCache(project);
     }
 
     public void publishProject(String id, User user) {
-        publishProject(id, user, null, null);
-    }
-
-    public void publishProject(String id, User user, String reviewToken, String reviewedVersionId) {
-        var snapshot = reviewToken == null ? null : reviewPersistence.capture(id, reviewToken);
-        boolean reviewed = snapshot != null;
-        if (snapshot == null) {
-            Project current = projectAccessService.requireProject(id);
-            snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(current));
-        }
-        Project project = snapshot.project();
+        Project project = projectAccessService.requireProject(id);
         boolean canApproveReviews = accessControlService.canApproveProjectReviews(user);
         boolean isRestoration = project.getStatus() == ProjectStatus.ARCHIVED
                 || project.getStatus() == ProjectStatus.UNLISTED
@@ -145,37 +122,20 @@ public class ProjectPublicationService {
         } else if (!canApproveReviews) {
             throw new ProjectOperationForbiddenException("Only administrators with review approval permission can publish a new project.");
         }
-        if (!isRestoration && !reviewed) {
-            throw ProjectReviewSnapshot.conflict();
-        }
-        if (reviewed && project.getStatus() != ProjectStatus.PENDING) {
-            throw new InvalidProjectRequestException("Only pending projects can be approved through review.");
-        }
-        ProjectVersion selected = null;
-        if (reviewed && reviewedVersionId != null && project.getVersions() != null) {
-            var matches = project.getVersions().stream().filter(version -> reviewedVersionId.equals(version.getId())).toList();
-            if (matches.size() != 1) throw ProjectReviewSnapshot.conflict();
-            selected = matches.getFirst();
-            if (selected.getReviewStatus() != ProjectVersion.ReviewStatus.PENDING
-                    && selected.getReviewStatus() != ProjectVersion.ReviewStatus.SCHEDULED
-                    && selected.getReviewStatus() != ProjectVersion.ReviewStatus.APPROVED) {
-                throw new InvalidProjectRequestException("This version is not available for approval.");
-            }
-        }
-        if (reviewed && selected == null && project.getVersions() != null && !project.getVersions().isEmpty()) {
-            throw new InvalidProjectRequestException("Select the inspected version before publishing this project.");
-        }
         project.setStatus(ProjectStatus.PUBLISHED);
         project.setExpiresAt(null);
         project.setUpdatedAt(LocalDateTime.now().toString());
         scoringService.markProjectRankingDirty(project);
 
-        if (selected != null && selected.getReviewStatus() != ProjectVersion.ReviewStatus.APPROVED) {
-            selected.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
-            selected.setScheduledPublishDate(null);
-            selected.setRejectionReason(null);
-            selected.setSecurityApprovalProjectId(project.getId());
-            securityIssueAnalysisService.markIssuesAcceptedForApprovedVersion(selected);
+        if (project.getVersions() != null) {
+            project.getVersions().forEach(version -> {
+                if (version.getReviewStatus() == ProjectVersion.ReviewStatus.PENDING
+                        || version.getReviewStatus() == ProjectVersion.ReviewStatus.SCHEDULED) {
+                    version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+                    version.setScheduledPublishDate(null);
+                }
+            });
+            securityIssueAnalysisService.pruneApprovedScanResults(project);
         }
 
         if (isNew) {
@@ -188,8 +148,7 @@ public class ProjectPublicationService {
             project.setImageUrl("https://modtale.net/assets/favicon.svg");
         }
 
-        if (!reviewPersistence.apply(snapshot, reviewedVersionId)) throw ProjectReviewSnapshot.conflict();
-        Project saved = project;
+        Project saved = projectRepository.save(project);
         projectService.evictProjectCache(saved);
 
         if (isNew) {
@@ -203,13 +162,10 @@ public class ProjectPublicationService {
     public void updateProjectStatus(String id, ProjectStatus status, User user, String permissionRequired) {
         Project project = projectAccessService.requireProjectPermission(id, user, permissionRequired,
                 "You do not have permission to update this project.");
-        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
-        project = snapshot.project();
         project.setStatus(status);
         project.setExpiresAt(null);
         scoringService.markProjectRankingDirty(project);
-        project.setUpdatedAt(LocalDateTime.now().toString());
-        if (!reviewPersistence.apply(snapshot, null)) throw ProjectReviewSnapshot.conflict();
+        projectRepository.save(project);
         projectService.evictProjectCache(project);
     }
 }

@@ -9,8 +9,7 @@ import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
-import net.modtale.service.admin.review.ProjectReviewPersistence;
-import net.modtale.service.admin.review.ProjectReviewSnapshot;
+import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.auth.ApiKeyService;
 import net.modtale.service.project.access.ProjectAccessService;
@@ -22,7 +21,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class TeamTransferService {
 
-    private final ProjectReviewPersistence reviewPersistence;
+    private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final ProjectService projectService;
     private final ProjectAccessService projectAccessService;
@@ -32,7 +31,7 @@ public class TeamTransferService {
     private final AccessControlService accessControlService;
 
     public TeamTransferService(
-            ProjectReviewPersistence reviewPersistence,
+            ProjectRepository projectRepository,
             UserRepository userRepository,
             ProjectService projectService,
             ProjectAccessService projectAccessService,
@@ -41,7 +40,7 @@ public class TeamTransferService {
             ApiKeyService apiKeyService,
             AccessControlService accessControlService
     ) {
-        this.reviewPersistence = reviewPersistence;
+        this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.projectService = projectService;
         this.projectAccessService = projectAccessService;
@@ -55,8 +54,6 @@ public class TeamTransferService {
         Project project = projectAccessService.requireProjectPermission(id, requester, "PROJECT_TRANSFER_REQUEST",
                 "You do not have permission to transfer this project.");
         projectMutationGuard.ensureEditable(project);
-        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
-        project = snapshot.project();
 
         User target = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("We couldn't find the transfer target."));
@@ -65,30 +62,19 @@ public class TeamTransferService {
         }
 
         project.setPendingTransferTo(target.getId());
-        project.setPendingTransferRequestId(java.util.UUID.randomUUID().toString());
-        project.setPendingTransferOwnerId(project.getAuthorId());
-        project.setPendingTransferExpiresAt(System.currentTimeMillis() + java.time.Duration.ofDays(7).toMillis());
-        if (!reviewPersistence.applyTeam(snapshot)) throw ProjectReviewSnapshot.conflict();
+        projectRepository.save(project);
         projectService.evictProjectCache(project);
 
         User author = userRepository.findById(project.getAuthorId()).orElse(null);
         teamNotificationService.sendTransferRequest(project, target, author);
     }
 
-    public void resolveTransfer(String id, boolean accept, String requestId, User responder) {
+    public void resolveTransfer(String id, boolean accept, User responder) {
         Project project = projectService.getRawProjectById(id);
         if (project == null || project.getPendingTransferTo() == null) {
             throw new InvalidProjectRequestException("We couldn't find a pending transfer request for that project.");
         }
         projectMutationGuard.ensureEditable(project);
-        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
-        project = snapshot.project();
-
-        if (requestId == null || requestId.isBlank() || !requestId.equals(project.getPendingTransferRequestId())
-                || project.getPendingTransferExpiresAt() <= System.currentTimeMillis()
-                || project.getPendingTransferOwnerId() == null
-                || !project.getPendingTransferOwnerId().equals(project.getAuthorId()))
-            throw new InvalidProjectRequestException("This transfer request is no longer current. Ask the owner to send a new request.");
 
         if (!responder.getId().equals(project.getPendingTransferTo())) {
             User targetUser = userRepository.findById(project.getPendingTransferTo()).orElse(null);
@@ -105,6 +91,16 @@ public class TeamTransferService {
             User newOwner = userRepository.findById(project.getPendingTransferTo())
                     .orElseThrow(() -> new ResourceNotFoundException("We couldn't find the transfer target."));
 
+            if (oldOwner != null) {
+                if (oldOwner.getAccountType() == User.AccountType.ORGANIZATION && oldOwner.getOrganizationMembers() != null) {
+                    oldOwner.getOrganizationMembers().forEach(member ->
+                            apiKeyService.syncUserProjectPermissions(member.getUserId(), project.getId(), EnumSet.noneOf(ApiKey.ApiPermission.class))
+                    );
+                } else {
+                    apiKeyService.syncUserProjectPermissions(oldOwner.getId(), project.getId(), EnumSet.noneOf(ApiKey.ApiPermission.class));
+                }
+            }
+
             project.setAuthorId(newOwner.getId());
             project.setAuthor(null);
             project.setPendingTransferTo(null);
@@ -112,23 +108,14 @@ public class TeamTransferService {
                 project.getTeamMembers().removeIf(member -> member.getUserId().equals(newOwner.getId()));
             }
 
-            if (!reviewPersistence.resolveTransfer(snapshot, requestId)) throw ProjectReviewSnapshot.conflict();
+            projectRepository.save(project);
             projectService.evictProjectCache(project);
-            if (oldOwner != null) {
-                if (oldOwner.getAccountType() == User.AccountType.ORGANIZATION && oldOwner.getOrganizationMembers() != null) {
-                    oldOwner.getOrganizationMembers().forEach(member ->
-                            apiKeyService.syncUserProjectPermissions(member.getUserId(), id, EnumSet.noneOf(ApiKey.ApiPermission.class))
-                    );
-                } else {
-                    apiKeyService.syncUserProjectPermissions(oldOwner.getId(), id, EnumSet.noneOf(ApiKey.ApiPermission.class));
-                }
-            }
             teamNotificationService.sendTransferAccepted(project, oldOwner, newOwner);
             return;
         }
 
         project.setPendingTransferTo(null);
-        if (!reviewPersistence.resolveTransfer(snapshot, requestId)) throw ProjectReviewSnapshot.conflict();
+        projectRepository.save(project);
         projectService.evictProjectCache(project);
         User oldOwner = userRepository.findById(project.getAuthorId()).orElse(null);
         teamNotificationService.sendTransferDeclined(project, oldOwner);

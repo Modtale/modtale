@@ -54,16 +54,13 @@ class ProjectReviewDecisionServiceTest {
         projectVersionAccessService = mock(ProjectVersionAccessService.class);
         adminAuditLogger = mock(AdminAuditLogger.class);
 
-        var persistence=mock(VersionReviewPersistence.class);
-        when(persistence.apply(any(),any())).thenReturn(true);
         ProjectReviewTransitionService transitionService = new ProjectReviewTransitionService(
+                projectRepository,
                 projectService,
                 lifecycleService,
                 mock(ScoringService.class),
                 securityIssueAnalysisService,
-                projectVersionAccessService,
-                persistence,
-                mock(ProjectReviewPersistence.class)
+                projectVersionAccessService
         );
         ProjectReviewEffectService effectService = new ProjectReviewEffectService(
                 userRepository,
@@ -86,14 +83,15 @@ class ProjectReviewDecisionServiceTest {
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
         when(projectVersionAccessService.requireById(eq(project), eq("version-1"), any())).thenReturn(version);
 
-        service.approveVersion(admin, "project-1", "version-1", VersionReviewSnapshot.token(version));
+        service.approveVersion(admin, "project-1", "version-1");
 
         assertEquals(ProjectVersion.ReviewStatus.APPROVED, version.getReviewStatus());
         assertNull(version.getRejectionReason());
         assertNull(version.getScheduledPublishDate());
         assertNotNull(project.getUpdatedAt());
 
-        verify(securityIssueAnalysisService).markIssuesAcceptedForApprovedVersion(version);
+        verify(securityIssueAnalysisService).pruneApprovedScanResults(project);
+        verify(projectRepository).save(project);
         verify(projectService).evictProjectCache(project);
         verify(projectNotificationService).notifyUpdates(project, "1.0.0");
         verify(projectNotificationService).notifyDependents(project, "1.0.0");
@@ -113,13 +111,13 @@ class ProjectReviewDecisionServiceTest {
         when(projectVersionAccessService.requireById(eq(project), eq("version-1"), any())).thenReturn(version);
         when(userRepository.findById("author-1")).thenReturn(Optional.of(author));
 
-        service.rejectVersion(admin, "project-1", "version-1", "Missing metadata", VersionReviewSnapshot.token(version));
+        service.rejectVersion(admin, "project-1", "version-1", "Missing metadata");
 
         assertEquals(ProjectVersion.ReviewStatus.REJECTED, version.getReviewStatus());
         assertEquals("Missing metadata", version.getRejectionReason());
         assertNull(version.getScheduledPublishDate());
 
-        verify(projectService).evictProjectCache(project);
+        verify(projectRepository).save(project);
         verify(projectService).evictProjectCache(project);
         verify(notificationService).sendNotifcation(
                 java.util.List.of("author-1"),

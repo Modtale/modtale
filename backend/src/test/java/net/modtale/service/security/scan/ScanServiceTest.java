@@ -5,8 +5,7 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.project.ScanResult;
 import net.modtale.model.user.User;
-import net.modtale.service.admin.review.VersionReviewPersistence;
-import static org.mockito.ArgumentMatchers.any;
+import net.modtale.repository.project.ProjectRepository;
 import net.modtale.service.project.access.ProjectVersionAccessService;
 import net.modtale.service.project.query.ProjectService;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,7 +24,7 @@ class ScanServiceTest {
     private ScanService service;
     private ScanRequestService scanRequestService;
     private ScanExecutionService scanExecutionService;
-    private VersionReviewPersistence reviewPersistence;
+    private ProjectRepository projectRepository;
     private ProjectService projectService;
     private ProjectVersionAccessService projectVersionAccessService;
     private ScanThrottleService scanThrottleService;
@@ -33,15 +32,14 @@ class ScanServiceTest {
 
     @BeforeEach
     void setUp() {
-        reviewPersistence = mock(VersionReviewPersistence.class);
-        when(reviewPersistence.queueRescan(any(), any())).thenReturn(true);
+        projectRepository = mock(ProjectRepository.class);
         projectService = mock(ProjectService.class);
         projectVersionAccessService = mock(ProjectVersionAccessService.class);
         scanThrottleService = mock(ScanThrottleService.class);
         scanRoutingService = mock(ScanRoutingService.class);
         scanExecutionService = mock(ScanExecutionService.class);
         scanRequestService = new ScanRequestService(
-                reviewPersistence,
+                projectRepository,
                 projectService,
                 scanThrottleService,
                 scanRoutingService,
@@ -66,7 +64,6 @@ class ScanServiceTest {
         project.setVersions(List.of(version));
 
         ScanResult pendingScan = new ScanResult();
-        pendingScan.setScanRequestId("queued-request");
 
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
         when(projectVersionAccessService.findById(project, "version-1")).thenReturn(version);
@@ -79,7 +76,7 @@ class ScanServiceTest {
         assertEquals(pendingScan, version.getScanResult());
         assertEquals(ProjectVersion.ReviewStatus.PENDING, version.getReviewStatus());
         verify(scanThrottleService).enforceRescanLimit(user);
-        verify(reviewPersistence).queueRescan(any(), any());
+        verify(projectRepository).save(project);
         verify(projectService).evictProjectCache(project);
         ArgumentCaptor<String> originalFilename = ArgumentCaptor.forClass(String.class);
         verify(scanExecutionService).enqueueBackgroundScan(
@@ -88,7 +85,7 @@ class ScanServiceTest {
                 eq("https://cdn.modtale.net/files/generated-mod.jar"),
                 originalFilename.capture(),
                 eq(true),
-                eq(2), eq(pendingScan.getScanRequestId())
+                eq(2)
         );
         assertTrue(originalFilename.getValue().endsWith("generated-mod.jar"));
     }

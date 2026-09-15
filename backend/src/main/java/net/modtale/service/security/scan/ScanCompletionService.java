@@ -20,7 +20,6 @@ public class ScanCompletionService {
 
     private static final Logger logger = LoggerFactory.getLogger(ScanCompletionService.class);
 
-    private final WardenClientService warden;
     private final ProjectRepository projectRepository;
     private final ProjectService projectService;
     private final ProjectNotificationService projectNotificationService;
@@ -38,10 +37,8 @@ public class ScanCompletionService {
             SecurityIssueAnalysisService securityIssueAnalysisService,
             ScanRoutingService scanRoutingService,
             ScanPersistenceService scanPersistenceService,
-            ProjectVersionAccessService projectVersionAccessService,
-            WardenClientService warden
+            ProjectVersionAccessService projectVersionAccessService
     ) {
-        this.warden = warden;
         this.projectRepository = projectRepository;
         this.projectService = projectService;
         this.projectNotificationService = projectNotificationService;
@@ -59,110 +56,34 @@ public class ScanCompletionService {
             boolean isManualRescan,
             ScanResult scanResult
     ) {
-        handleCompletedScan(projectId, versionId, expectedAttempt, isManualRescan, scanResult, null);
-    }
-    public void handleCompletedScan(String projectId, String versionId, int expectedAttempt, boolean isManualRescan,
-            ScanResult scanResult, String requestId) {
-        complete(projectId,versionId,expectedAttempt,isManualRescan,scanResult,requestId,null);
-    }
-    public boolean handleRemoteCompletedScan(RemoteReviewPollStore.Claim claim,ScanResult result) {
-        var binding=claim.binding();
-        if(binding.origin()==null)return false;
-        if(result==null || !binding.requestId().equals(result.getScanRequestId()))return false;
-        return complete(binding.projectId(),binding.versionId(),binding.attempt(),binding.manualRescan(),result,binding.requestId(),claim);
-    }
-    private boolean complete(String projectId,String versionId,int expectedAttempt,boolean isManualRescan,
-            ScanResult scanResult,String requestId,RemoteReviewPollStore.Claim remote) {
-        scanResult.setScanRequestId(requestId);
         securityIssueAnalysisService.normalizeScanResult(scanResult);
         scanResult.setScanAttempt(expectedAttempt);
 
         Project project = projectRepository.findById(projectId).orElse(null);
         if (project == null) {
             logger.warn("Scan completed but project no longer exists project={} version={} attempt={}", projectId, versionId, expectedAttempt);
-            return false;
+            return;
         }
 
         ProjectVersion targetVersion = projectVersionAccessService.findById(project, versionId);
         if (targetVersion == null) {
             logger.warn("Scan completed but version no longer exists project={} version={} attempt={}", projectId, versionId, expectedAttempt);
-            return false;
+            return;
         }
 
-        ScanResult.RemoteReviewPoll remotePoll=null;
-        if(remote!=null) {
-            var current=targetVersion.getScanResult();
-            if(current==null || !remote.binding().equals(current.getRemoteReview()) || !"REMOTE_REVIEW".equals(current.getScanState()))return false;
-            remotePoll=current.getRemotePoll();
-            if(!ScanPersistenceService.remoteResultMatches(remote,remotePoll,scanResult,targetVersion))return false;
-        }
-
-        if (scanResult.getSecurityEvidence() == null || !java.util.Objects.equals(targetVersion.getHash(),
-                scanResult.getSecurityEvidence().artifactSha256())) {
-            scanResult.setArtifactVerified(false);
-        }
         SecurityIssueAnalysisService.BaselineIndex baselines =
                 securityIssueAnalysisService.collectApprovedIssueBaselines(project, versionId);
         SecurityIssueAnalysisService.ClassificationStats classification =
                 securityIssueAnalysisService.annotateAgainstBaselines(scanResult, baselines);
-        new ArtifactReviewReuseService().annotate(project, versionId, scanResult);
         ScanRoutingService.RoutingDecision routingDecision =
                 scanRoutingService.decideRouting(scanResult, classification, isManualRescan);
 
-        if(remote==null)scanResult.setReviewedContextSha256(ArtifactReviewContext.automaticallyReviewableFingerprint(targetVersion));
-        if(remote!=null && routingDecision.action()==ScanRoutingService.RoutingAction.DEFER)
-            routingDecision=new ScanRoutingService.RoutingDecision(ScanRoutingService.RoutingAction.REQUIRE_REVIEW,0);
-        if (scanResult.getReviewedContextSha256() == null) {
-            scanResult.setReusedReviewVersion(null);
-            scanResult.setReusedReviewApprovedAt(0);
-            if (!"BLOCK".equals(scanResult.getVerdict()) && scanResult.getStatus() != ScanStatus.INFECTED) {
-                scanResult.setVerdict("REVIEW");
-                scanResult.setStatus(ScanStatus.SUSPICIOUS);
-            }
-            routingDecision = new ScanRoutingService.RoutingDecision(ScanRoutingService.RoutingAction.REQUIRE_REVIEW, 0);
-            var notes = new java.util.ArrayList<>(scanResult.getReviewerNotes() == null
-                    ? java.util.List.<String>of() : scanResult.getReviewerNotes());
-            notes.add("Separate files or unresolved dependency context require additional review before publishing.");
-            scanResult.setReviewerNotes(notes);
-        }
-
-        if ((routingDecision.action() == ScanRoutingService.RoutingAction.SCHEDULE
-                || routingDecision.action() == ScanRoutingService.RoutingAction.APPROVE_NOW)
-                && !java.util.Objects.equals(scanResult.getSecurityEvidence().policyVersion(), warden.currentPolicyVersion())) {
-            routingDecision = new ScanRoutingService.RoutingDecision(ScanRoutingService.RoutingAction.REQUIRE_REVIEW, 0);
-            scanResult.setVerdict("REVIEW");
-            scanResult.setStatus(ScanStatus.SUSPICIOUS);
-            scanResult.setReusedReviewVersion(null);
-            var notes = new java.util.ArrayList<>(scanResult.getReviewerNotes() == null
-                    ? java.util.List.<String>of() : scanResult.getReviewerNotes());
-            notes.add("The current inspection policy could not validate this result. A fresh review is required.");
-            scanResult.setReviewerNotes(notes);
-        }
-        if (targetVersion.getFindingReviewHead() != null) {
-            scanResult.setReusedReviewVersion(null);
-            scanResult.setReusedReviewApprovedAt(0);
-            if (!"BLOCK".equals(scanResult.getVerdict()) && scanResult.getStatus() != ScanStatus.INFECTED) {
-                scanResult.setVerdict("REVIEW");
-                scanResult.setStatus(ScanStatus.SUSPICIOUS);
-            }
-            routingDecision = new ScanRoutingService.RoutingDecision(ScanRoutingService.RoutingAction.REQUIRE_REVIEW, 0);
-            var notes = new java.util.ArrayList<>(scanResult.getReviewerNotes());
-            notes.add("Recorded finding decisions require a current moderator review before publication.");
-            scanResult.setReviewerNotes(notes);
-        }
         boolean approvedImmediately = routingDecision.action() == ScanRoutingService.RoutingAction.APPROVE_NOW;
         boolean notifyFlagged = routingDecision.action() == ScanRoutingService.RoutingAction.REQUIRE_REVIEW;
 
-        if (approvedImmediately) {
-            targetVersion.setScanResult(scanResult);
-            targetVersion.setSecurityApprovalProjectId(project.getId());
-            securityIssueAnalysisService.markIssuesAcceptedForApprovedVersion(targetVersion);
-        }
-        if (!(remote!=null ? scanPersistenceService.applyRemoteScanOutcome(remote,remotePoll,scanResult,routingDecision,targetVersion)
-                : requestId == null ? scanPersistenceService.applyScanOutcome(projectId, versionId, expectedAttempt, scanResult, routingDecision, targetVersion)
-                : scanPersistenceService.applyScanOutcome(projectId, versionId, expectedAttempt, scanResult, routingDecision, targetVersion, requestId))) {
+        if (!scanPersistenceService.applyScanOutcome(projectId, versionId, expectedAttempt, scanResult, routingDecision)) {
             logger.info("Scan result ignored because a newer attempt already exists project={} version={} attempt={}", projectId, versionId, expectedAttempt);
-            return false;
+            return;
         }
 
         Project refreshed = projectRepository.findById(projectId).orElse(null);
@@ -186,18 +107,22 @@ public class ScanCompletionService {
             webhookService.triggerAdminFlaggedVersionWebhook(refreshed, refreshedVersion, scanResult);
         }
 
-        if (routingDecision.action() != ScanRoutingService.RoutingAction.DEFER) notifyProjectSubmissionIfReady(projectId, versionId);
+        notifyProjectSubmissionIfReady(projectId, versionId);
 
         if (approvedImmediately && refreshed != null) {
             ProjectVersion approvedVersion = projectVersionAccessService.findById(refreshed, versionId);
             if (approvedVersion != null) {
+                int pruned = securityIssueAnalysisService.pruneApprovedScanResults(refreshed);
+                if (pruned > 0) {
+                    projectRepository.save(refreshed);
+                    projectService.evictProjectCache(refreshed);
+                }
                 if (refreshed.getStatus() == ProjectStatus.PUBLISHED) {
                     projectNotificationService.notifyUpdates(refreshed, approvedVersion.getVersionNumber());
                     projectNotificationService.notifyDependents(refreshed, approvedVersion.getVersionNumber());
                 }
             }
         }
-        return true;
     }
 
     public void handleScanFailure(
@@ -207,13 +132,8 @@ public class ScanCompletionService {
             int expectedAttempt,
             RuntimeException exception
     ) {
-        handleScanFailure(projectId, versionId, originalFilename, expectedAttempt, exception, null);
-    }
-    public void handleScanFailure(String projectId, String versionId, String originalFilename, int expectedAttempt,
-            RuntimeException exception, String requestId) {
         ScanResult degraded = scanRoutingService.buildPipelineErrorResult(exception, originalFilename, expectedAttempt);
-        boolean applied = requestId == null ? scanPersistenceService.updateFailedScan(projectId, versionId, degraded, expectedAttempt)
-                : scanPersistenceService.updateFailedScan(projectId, versionId, degraded, expectedAttempt, requestId);
+        boolean applied = scanPersistenceService.updateFailedScan(projectId, versionId, degraded, expectedAttempt);
 
         if (applied) {
             Project project = projectRepository.findById(projectId).orElse(null);
@@ -231,10 +151,10 @@ public class ScanCompletionService {
             String projectId,
             String versionId,
             String originalFilename,
-            int expectedAttempt, ScanResult observed, long timeoutMillis
+            int expectedAttempt
     ) {
         ScanResult timedOut = scanRoutingService.buildScanTimeoutResult(originalFilename, expectedAttempt);
-        boolean applied = scanPersistenceService.updateTimedOutScan(projectId, versionId, timedOut, expectedAttempt, observed, timeoutMillis);
+        boolean applied = scanPersistenceService.updateFailedScan(projectId, versionId, timedOut, expectedAttempt);
         if (!applied) {
             return;
         }

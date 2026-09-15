@@ -3,7 +3,9 @@ package net.modtale.service.social;
 import java.util.Optional;
 import net.modtale.exception.ForbiddenOperationException;
 import net.modtale.exception.ResourceNotFoundException;
+import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
+import net.modtale.service.analytics.ScoringService;
 import net.modtale.service.communication.NotificationService;
 import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.security.validation.SanitizationService;
@@ -25,13 +27,13 @@ class SocialServiceTest {
     void setUp() {
         userRepository = mock(UserRepository.class);
         socialService = new SocialService(
-                mock(FavoritePersistence.class),
+                mock(ProjectRepository.class),
                 userRepository,
                 mock(ProjectService.class),
                 mock(NotificationService.class),
                 mock(SanitizationService.class),
                 mock(MongoTemplate.class),
-                mock(net.modtale.service.admin.review.ProjectReviewPersistence.class)
+                mock(ScoringService.class)
         );
     }
 

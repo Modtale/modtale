@@ -119,8 +119,7 @@ export function Members({ org, currentUser, showStatus, onMemberRemoved }: Membe
 
     const handleCancelInvite = async (userId: string) => {
         try {
-            const requestId = org.pendingOrgInvites?.find(invite => invite.userId === userId)?.requestId ?? 'legacy';
-            await organizationClient.cancelInvite(org.id, userId, requestId);
+            await organizationClient.cancelInvite(org.id, userId);
             setInvites(await organizationClient.getInvites(org.id));
         } catch (err: unknown) {
             showStatus('error', 'Invite Cancel Failed', extractApiErrorMessage(err, 'We could not cancel that pending invite.'));

@@ -196,8 +196,7 @@ public class ProjectMapper {
                 project.getProjectRoles(),
                 project.getTeamMembers(),
                 project.getTeamInvites(),
-                toAdminVersionSummaryDTOs(project.getVersions()),
-                net.modtale.service.admin.review.ProjectReviewSnapshot.token(project)
+                toAdminVersionSummaryDTOs(project.getVersions())
         );
     }
 
@@ -368,8 +367,7 @@ public class ProjectMapper {
                 version.getChannel(),
                 version.getReviewStatus(),
                 version.getRejectionReason(),
-                version.getScanResult(),
-                net.modtale.service.admin.review.VersionReviewSnapshot.token(version)
+                version.getScanResult()
         );
     }
 
@@ -390,11 +388,6 @@ public class ProjectMapper {
                         .findFirst()
                         .orElseGet(() -> project.getVersions().stream().filter(java.util.Objects::nonNull).findFirst().orElse(null));
 
-        return toVerificationQueueItemDTO(project, pendingVersion);
-    }
-
-    public static AdminVerificationQueueItemDTO toVerificationQueueItemDTO(Project project, ProjectVersion pendingVersion) {
-        if (project == null) return null;
         return new AdminVerificationQueueItemDTO(
                 project.getId(),
                 project.getTitle(),
@@ -424,7 +417,6 @@ public class ProjectMapper {
         return new AdminVerificationQueueScanDTO(
                 scanResult.getStatus(),
                 scanResult.getVerdict(),
-                scanResult.getScanState(),
                 scanResult.getRiskScore(),
                 scanResult.getKnownIssueCount(),
                 scanResult.getNewIssueCount(),

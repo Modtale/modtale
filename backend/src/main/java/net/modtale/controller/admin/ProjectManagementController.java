@@ -4,9 +4,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import net.modtale.model.dto.admin.AdminProjectDTO;
 import net.modtale.model.dto.admin.AdminProjectReviewDTO;
-import org.springframework.http.ProblemDetail;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.CacheControl;
+import net.modtale.model.dto.admin.AdminVerificationQueueItemDTO;
 import net.modtale.model.dto.project.ProjectSummaryDTO;
 import net.modtale.model.dto.request.admin.RejectReasonRequest;
 import net.modtale.model.project.Project;
@@ -23,7 +21,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -48,10 +45,8 @@ public class ProjectManagementController {
 
     @GetMapping("/verification/queue")
     @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_REVIEW_READ', authentication)")
-    public ResponseEntity<ProblemDetail> getVerificationQueue() {
-        return ResponseEntity.status(HttpStatus.GONE).cacheControl(CacheControl.noStore())
-                .header("Link", "</api/v1/admin/verification/queue/page>; rel=\"successor-version\"")
-                .body(ProblemDetail.forStatusAndDetail(HttpStatus.GONE, "Use the paginated moderation queue endpoint. Refresh the application to load the current review interface."));
+    public ResponseEntity<List<AdminVerificationQueueItemDTO>> getVerificationQueue() {
+        return ResponseEntity.ok(projectReviewAdminService.getVerificationQueue());
     }
 
     @GetMapping("/projects/{id}/review-details")
@@ -68,41 +63,41 @@ public class ProjectManagementController {
 
     @PutMapping("/projects/{id}/raw")
     @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_RAW_EDIT', authentication)")
-    public ResponseEntity<Void> updateRawProject(@PathVariable String id, @RequestBody java.util.Map<String, Object> metadata, @RequestHeader("If-Match") String token) {
+    public ResponseEntity<Void> updateRawProject(@PathVariable String id, @RequestBody Project updatedProject) {
         User currentUser = accountService.requireCurrentUser("editing raw project data");
-        projectAdminOperationsService.updateRawProject(currentUser.getId(), id, metadata, token);
+        projectAdminOperationsService.updateRawProject(currentUser.getId(), id, updatedProject);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/projects/{id}/publish")
     @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_REVIEW_DECIDE', authentication)")
-    public ResponseEntity<Void> publishProject(@PathVariable String id, @RequestHeader("If-Match") String reviewToken, @RequestParam(required = false) String versionId) {
+    public ResponseEntity<Void> publishProject(@PathVariable String id) {
         User currentUser = accountService.requireCurrentUser("publishing projects");
-        projectReviewAdminService.publishProject(currentUser, id, reviewToken, versionId);
+        projectReviewAdminService.publishProject(currentUser, id);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/projects/{id}/versions/{versionId}/approve")
     @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_REVIEW_DECIDE', authentication)")
-    public ResponseEntity<Void> approveVersion(@PathVariable String id, @PathVariable String versionId, @RequestHeader("If-Match") String reviewToken) {
+    public ResponseEntity<Void> approveVersion(@PathVariable String id, @PathVariable String versionId) {
         User currentUser = accountService.requireCurrentUser("approving project versions");
-        projectReviewAdminService.approveVersion(currentUser, id, versionId, reviewToken);
+        projectReviewAdminService.approveVersion(currentUser, id, versionId);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/projects/{id}/versions/{versionId}/reject")
     @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_REVIEW_DECIDE', authentication)")
-    public ResponseEntity<Void> rejectVersion(@PathVariable String id, @PathVariable String versionId, @Valid @RequestBody RejectReasonRequest requestPayload, @RequestHeader("If-Match") String reviewToken) {
+    public ResponseEntity<Void> rejectVersion(@PathVariable String id, @PathVariable String versionId, @Valid @RequestBody RejectReasonRequest requestPayload) {
         User currentUser = accountService.requireCurrentUser("rejecting project versions");
-        projectReviewAdminService.rejectVersion(currentUser, id, versionId, requestPayload.getReason(), reviewToken);
+        projectReviewAdminService.rejectVersion(currentUser, id, versionId, requestPayload.getReason());
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("/projects/{id}/reject")
     @PreAuthorize("@apiSecurity.hasAdminPermission('PROJECT_REVIEW_DECIDE', authentication)")
-    public ResponseEntity<Void> rejectProject(@PathVariable String id, @Valid @RequestBody RejectReasonRequest requestPayload, @RequestHeader("If-Match") String reviewToken) {
+    public ResponseEntity<Void> rejectProject(@PathVariable String id, @Valid @RequestBody RejectReasonRequest requestPayload) {
         User currentUser = accountService.requireCurrentUser("rejecting projects");
-        projectReviewAdminService.rejectProject(currentUser, id, requestPayload.getReason(), reviewToken);
+        projectReviewAdminService.rejectProject(currentUser, id, requestPayload.getReason());
         return ResponseEntity.ok().build();
     }
 

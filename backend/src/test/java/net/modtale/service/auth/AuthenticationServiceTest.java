@@ -148,7 +148,7 @@ class AuthenticationServiceTest {
     }
 
     @Test
-    void authenticatePreservesMfaWhenSecretIsMissing() {
+    void authenticateAutoDisablesMfaWhenSecretIsMissing() {
         User user = user("user-1", "Ada", "ada@example.com");
         user.setPassword("encoded");
         user.setMfaEnabled(true);
@@ -157,11 +157,12 @@ class AuthenticationServiceTest {
         when(userRepository.findByUsernameIgnoreCase("Ada")).thenReturn(Optional.of(user));
         when(bannedEmailRepository.existsByEmailIgnoreCase("ada@example.com")).thenReturn(false);
         when(passwordEncoder.matches("secret123", "encoded")).thenReturn(true);
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         User authenticated = authenticationService.authenticate("Ada", "secret123");
 
-        assertTrue(authenticated.isMfaEnabled());
-        verify(userRepository, never()).save(any(User.class));
+        assertFalse(authenticated.isMfaEnabled());
+        verify(userRepository).save(user);
     }
 
     @Test

@@ -25,9 +25,7 @@ import net.modtale.exception.StorageUploadException;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectDependency;
 import net.modtale.model.project.ProjectVersion;
-import net.modtale.service.admin.review.ProjectReviewPersistence;
-import net.modtale.service.admin.review.ProjectReviewSnapshot;
-import net.modtale.service.admin.review.VersionReviewSnapshot;
+import net.modtale.repository.project.ProjectRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,24 +39,22 @@ final class ModpackArchiveService {
     private static final String MANIFEST = "manifest.json";
     private static final String LOCKFILE = "modtale.lock.json";
 
-    private final ProjectReviewPersistence reviewPersistence;
+    private final ProjectRepository projectRepository;
     private final DownloadArchiveSupport archiveSupport;
 
-    ModpackArchiveService(ProjectReviewPersistence reviewPersistence, DownloadArchiveSupport archiveSupport) {
-        this.reviewPersistence = reviewPersistence;
+    ModpackArchiveService(ProjectRepository projectRepository, DownloadArchiveSupport archiveSupport) {
+        this.projectRepository = projectRepository;
         this.archiveSupport = archiveSupport;
     }
 
     byte[] generateModpackZip(Project pack, ProjectVersion version) throws IOException {
-        String projectToken = ProjectReviewSnapshot.token(pack);
-        String versionToken = VersionReviewSnapshot.token(version);
         byte[] cachedArchive = downloadCachedArchive(pack, version);
         if (cachedArchive != null) {
             return cachedArchive;
         }
 
         byte[] zipBytes = buildArchive(pack, version);
-        cacheArchive(pack, version, zipBytes, projectToken, versionToken);
+        cacheArchive(pack, version, zipBytes);
         return zipBytes;
     }
 
@@ -442,7 +438,7 @@ final class ModpackArchiveService {
         }
     }
 
-    private void cacheArchive(Project pack, ProjectVersion version, byte[] zipBytes, String projectToken, String versionToken) {
+    private void cacheArchive(Project pack, ProjectVersion version, byte[] zipBytes) {
         try {
             String fileName = (pack.getSlug() != null && !pack.getSlug().isEmpty() ? pack.getSlug() : pack.getId())
                     + "-"
@@ -453,9 +449,8 @@ final class ModpackArchiveService {
                     "modpacks"
             );
 
-            if (!reviewPersistence.cacheModpackArchive(pack.getId(), projectToken, version.getId(), versionToken, uploadPath))
-                throw ProjectReviewSnapshot.conflict();
             version.setFileUrl(uploadPath);
+            projectRepository.save(pack);
         } catch (StorageUploadException ex) {
             logger.warn("Generated modpack archive could not be cached for project={} version={}",
                     pack.getId(), version.getVersionNumber(), ex);

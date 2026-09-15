@@ -20,7 +20,6 @@ const WRITE_METHODS = new Set(['post', 'put', 'delete', 'patch']);
 const CSRF_COOKIE_NAME = 'XSRF-TOKEN';
 
 type RetriableAxiosConfig = InternalAxiosRequestConfig & {
-    skipCsrfRetry?: boolean;
     _csrfRetryAttempted?: boolean;
     _csrfRefreshAttempted?: boolean;
 };
@@ -119,7 +118,7 @@ api.interceptors.response.use(
     response => response,
     async (error) => {
         const config = error.config as RetriableAxiosConfig | undefined;
-        if (!config || config.skipCsrfRetry || !shouldAttachCsrfToken(config.method) || config._csrfRetryAttempted || error.response?.status !== 403) {
+        if (!config || !shouldAttachCsrfToken(config.method) || config._csrfRetryAttempted || error.response?.status !== 403) {
             return Promise.reject(error);
         }
 
