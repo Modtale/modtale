@@ -55,7 +55,7 @@ export function LauncherStory() {
                 </p>
                 <FeatureDemo
                     clip="world-library"
-                    alt="Search for LevelingCore in the library, enable and disable it in Tidewater, then return to the full mod list."
+                    alt="Search for a mod, enable it, clear the search, and enable another mod from the Disabled section."
                 />
                 <p>
                     The launcher uses your linked Hytale account for the game’s
@@ -92,11 +92,10 @@ export function LauncherStory() {
             <section id="everyday">
                 <h2>A home for the everyday details</h2>
                 <p>
-                    The Play screen puts your game installation, launch options,
-                    and Modtale discoveries together. The library gives
-                    installed projects their own version controls, so checking
-                    for updates and looking through available releases happen
-                    where you already manage your worlds.
+                    Keep your installed mods up to date from the library.
+                    When a new release is available, open its update, review
+                    the version, and install it where you already manage
+                    your worlds.
                 </p>
                 <FeatureDemo
                     clip="mod-updates"
@@ -166,7 +165,7 @@ export function LauncherStory() {
                 </p>
                 <FeatureDemo
                     clip="wardrobe"
-                    alt="Start with a popular skin, customize its hairstyle, color, and clothing, then save and reopen your own version."
+                    alt="Start with a popular skin, customize its hair and eye colors, then save it alongside your other looks."
                 />
             </section>
             <section id="next">

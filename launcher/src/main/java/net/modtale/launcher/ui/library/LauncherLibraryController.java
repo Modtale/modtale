@@ -77,6 +77,7 @@ public final class LauncherLibraryController {
     private final LauncherAccountController accountController;
     private final LauncherFeedback feedback;
     private final Executor executor;
+    private final CachedImageLoader imageLoader;
     private final Supplier<StackPane> overlayHost;
     private final HytaleWorldManager worldManager = new HytaleWorldManager();
     private final VBox projectList = new VBox(10);
@@ -127,6 +128,7 @@ public final class LauncherLibraryController {
         this.accountController = accountController;
         this.feedback = feedback;
         this.executor = executor;
+        this.imageLoader = imageLoader;
         this.overlayHost = overlayHost == null ? () -> null : overlayHost;
         this.listRenderer = new LibraryProjectListRenderer(ignored -> {
         }, this::updateSelected);
@@ -1038,12 +1040,16 @@ public final class LauncherLibraryController {
             StackPane host = overlayHost.get();
             if (host == null) return;
             Map<String, String> configTitles = new LinkedHashMap<>();
+            Map<String, String> configIcons = new LinkedHashMap<>();
             for (InstalledProject project : installedProjects) {
                 if (!project.isModpack()) {
                     for (String id : worldModIds(project)) configTitles.putIfAbsent(id, project.title());
+                    ProjectMeta meta = projectMetadata.get(project.projectId());
+                    String icon = meta == null ? "" : first(meta.icon(), "");
+                    if (!icon.isBlank()) configIcons.putIfAbsent(project.title(), icon);
                 }
             }
-            ShareConfigSelectionModal.show(host, candidates, configTitles, selected ->
+            ShareConfigSelectionModal.show(host, candidates, configTitles, configIcons, imageLoader, selected ->
                     feedback.runAsync("Creating " + world.name() + " share link...", () -> {
                         accountController.ensureSignedIn();
                         CreateWorldModListRequest request = snapshotRequest(world);

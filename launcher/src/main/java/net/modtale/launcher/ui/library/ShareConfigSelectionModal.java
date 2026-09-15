@@ -12,6 +12,9 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tooltip;
+import javafx.scene.image.ImageView;
+import javafx.scene.shape.Rectangle;
+import net.modtale.launcher.ui.common.CachedImageLoader;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -29,6 +32,10 @@ final class ShareConfigSelectionModal {
     }
 
     static void show(StackPane host, List<ConfigFile> files, Map<String, String> modTitles, Consumer<List<ConfigFile>> share) {
+        show(host, files, modTitles, Map.of(), null, share);
+    }
+
+    static void show(StackPane host, List<ConfigFile> files, Map<String, String> modTitles, Map<String, String> modIcons, CachedImageLoader imageLoader, Consumer<List<ConfigFile>> share) {
         // A keyboard activation must not stack dialogs while focus is moving into the overlay.
         if (host.lookup(".share-config-overlay") != null) return;
         StackPane overlay = new StackPane();
@@ -71,6 +78,21 @@ final class ShareConfigSelectionModal {
             title.setMaxWidth(Double.MAX_VALUE);
             StackPane icon = new StackPane(LauncherIcons.icon(LauncherIcons.Glyph.SLIDERS, 20));
             icon.getStyleClass().add("share-config-file-icon");
+            String iconUrl = modIcons.get(group.getKey());
+            if (imageLoader != null && iconUrl != null && !iconUrl.isBlank()) {
+                var fallback = icon.getChildren().getFirst();
+                ImageView image = new ImageView();
+                image.setFitWidth(36);
+                image.setFitHeight(36);
+                Rectangle clip = new Rectangle(36, 36);
+                clip.setArcWidth(14);
+                clip.setArcHeight(14);
+                image.setClip(clip);
+                image.setSmooth(true);
+                icon.getChildren().add(image);
+                imageLoader.loadInto(image, iconUrl, 108, 108, true);
+                CachedImageLoader.showFallbackUntilLoaded(fallback, image);
+            }
             StackPane arrow = new StackPane(LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_RIGHT, 16));
             HBox heading = new HBox(14, icon, title, count, arrow);
             heading.setAlignment(Pos.CENTER_LEFT);

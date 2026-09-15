@@ -18,6 +18,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
@@ -164,12 +165,7 @@ final class PostDownloadWorldModal {
         VBox body = new VBox(16);
         body.getStyleClass().add("post-download-modal-body");
         body.getChildren().add(summaryRow());
-        if (!configs.isEmpty()) {
-            Label note = new Label(configs.size() + (configs.size() == 1 ? " config file" : " config files")
-                    + " will be added to the selected worlds. Existing settings are kept.");
-            note.setWrapText(true);
-            body.getChildren().add(note);
-        }
+
 
         VBox list = new VBox(8);
         list.getStyleClass().add("post-download-modal-world-list");
@@ -190,6 +186,15 @@ final class PostDownloadWorldModal {
         toggleAllButton.setMinWidth(Region.USE_PREF_SIZE);
         toggleAllButton.setMaxWidth(Region.USE_PREF_SIZE);
         toggleAllButton.setOnAction(event -> toggleAll());
+        if (!configs.isEmpty()) {
+            Label included = new Label("Configs included", LauncherIcons.icon(LauncherIcons.Glyph.SLIDERS, 14));
+            included.getStyleClass().add("share-config-path");
+            included.setAccessibleText("Configs included. Existing settings are kept.");
+            Tooltip.install(included, new Tooltip("Adds bundled configs to the selected worlds without replacing existing settings."));
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            row.getChildren().addAll(included, spacer);
+        }
         row.getChildren().add(toggleAllButton);
         return row;
     }
