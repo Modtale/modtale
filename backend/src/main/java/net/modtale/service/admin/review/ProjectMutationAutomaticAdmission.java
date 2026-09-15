@@ -42,10 +42,11 @@ public final class ProjectMutationAutomaticAdmission {
         var inventory=prior.readWithinBudget(candidate.projectId(),candidate.mutationId(),allowed);
         if(inventory.work().stream().anyMatch(work->work.kind()==ProjectMutationPriorWorkReader.Kind.UNRESOLVED))return finish(claim,ProjectMutationAdmissionAttempts.Outcome.ATTENTION,allowed);
         var observations=new LinkedHashMap<String,String>();boolean waiting=false,attention=false,yielded=false,madeProgress=false;int reads=0;
+        try(var receipts=accounting.readBatch(candidate.projectId(),allowed)){
         for(var work:inventory.work()) {
             if(work.kind()!=ProjectMutationPriorWorkReader.Kind.REMOTE_JOB)continue;
             String key=work.mutationId()+"/"+work.versionId();String id=UUID.nameUUIDFromBytes(("automatic-status-1:"+claim.decisionId()+":"+key).getBytes(StandardCharsets.UTF_8)).toString();
-            var receipt=progress.completed(scope,work,allowed);
+            var receipt=progress.completed(scope,work,allowed,receipts);
             if(receipt==null) {
                 // Leave time to retain the result and finish bookkeeping before yielding this generation.
                 if(reads>=1 || ReviewRepairIo.currentRemainingNanos()<TimeUnit.SECONDS.toNanos(10)){yielded=true;break;}
@@ -63,6 +64,7 @@ public final class ProjectMutationAutomaticAdmission {
                 // A later generation may perform a new read-only observation; never replay this observation ID.
                 waiting=true;
             } else attention=true;
+        }
         }
         if(attention)return finish(claim,ProjectMutationAdmissionAttempts.Outcome.ATTENTION,allowed);
         if(waiting)return finish(claim,ProjectMutationAdmissionAttempts.Outcome.WAITING,allowed);

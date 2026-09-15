@@ -45,12 +45,13 @@ public final class ProjectMutationAdmissionPreparation {
         history.requireHeldHeads(request.projectId(),bytes(new Document("_id",request.projectId()).append("versions",List.of(held))),allowed);
         var inventory=prior.readWithinBudget(request.projectId(),request.mutationId(),allowed);var evidence=new ArrayList<Document>();
         var used=new HashSet<String>();boolean uncertain=false;
+        try(var receipts=accounting.readBatch(request.projectId(),allowed)){
         for(var work:inventory.work()) {
             permission(allowed);var item=new Document("mutationId",work.mutationId()).append("versionId",work.versionId()).append("beforeSha256",work.beforeSha256())
                     .append("kind",work.kind().name()).append("reason",work.reason());
             if(work.kind()==ProjectMutationPriorWorkReader.Kind.REMOTE_JOB) {
                 String key=work.mutationId()+"/"+work.versionId(),id=request.observations().get(key);if(!uuid(id))throw invalid();used.add(key);
-                var observation=accounting.receiptWithinBudget(id,request.projectId(),work.mutationId(),work.versionId(),allowed);
+                var observation=receipts.receipt(id,request.projectId(),work.mutationId(),work.versionId());
                 if(!Set.of("OBSERVED","UNKNOWN").contains(observation.state()))throw invalid();
                 ReviewOrphanCancellationJournal.validateObservation(observation.observation(),work.binding());
                 var status=observation.observation().status();boolean completed="OBSERVED".equals(observation.state())
@@ -60,6 +61,7 @@ public final class ProjectMutationAdmissionPreparation {
                         .append("receivedAt",observation.receivedAt()).append("body",ReviewOrphanCancellationJournal.observationDocument(observation.observation())));
             } else if(work.kind()==ProjectMutationPriorWorkReader.Kind.UNRESOLVED)uncertain=true;
             evidence.add(item);
+        }
         }
         if(!used.equals(request.observations().keySet()) || uncertain && !request.acknowledgeUncertainty())throw invalid();
         var configuration=client.configuration(allowed,ReviewRepairIo::currentRemainingNanos);permission(allowed);

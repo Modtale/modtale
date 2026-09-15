@@ -21,11 +21,11 @@ final class ProjectMutationObservationProgress {
         records=mongo.getCollection(COLLECTION).withReadPreference(ReadPreference.primary()).withReadConcern(ReadConcern.MAJORITY)
                 .withWriteConcern(WriteConcern.MAJORITY.withJournal(true).withWTimeout(5,TimeUnit.SECONDS)).withTimeout(5000,TimeUnit.MILLISECONDS);
     }
-    ProjectMutationJobAccounting.Receipt completed(ProjectMutationAdmissionAttempts.Scope scope,ProjectMutationPriorWorkReader.Work work,BooleanSupplier allowed){
+    ProjectMutationJobAccounting.Receipt completed(ProjectMutationAdmissionAttempts.Scope scope,ProjectMutationPriorWorkReader.Work work,BooleanSupplier allowed,ProjectMutationJobAccounting.ReadBatch batch){
         permission(allowed);var identity=identity(scope,work);var stored=read(identity.getString("_id"));if(stored==null)return null;
         var id=stored.get("observationId");if(!(id instanceof String value) || !value.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"))throw invalid();
         identity.append("observationId",value);if(!Arrays.equals(bytes(identity),bytes(stored)))throw invalid();
-        var receipt=accounting.receiptWithinBudget(value,scope.projectId(),work.mutationId(),work.versionId(),allowed);
+        var receipt=batch.receipt(value,scope.projectId(),work.mutationId(),work.versionId());
         requireCompleted(receipt,work);permission(allowed);return receipt;
     }
     void retain(ProjectMutationAdmissionAttempts.Scope scope,ProjectMutationPriorWorkReader.Work work,ProjectMutationJobAccounting.Receipt receipt,BooleanSupplier allowed){

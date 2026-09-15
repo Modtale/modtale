@@ -18,19 +18,23 @@ class ProjectMutationObservationProgressTest {
     static final String PROGRESS="project_mutation_observation_progress";
     ProjectMutationAutomaticAdmissionTest base=new ProjectMutationAutomaticAdmissionTest();
     AtomicInteger reads=new AtomicInteger();String secondState="COMPLETED";
-    @BeforeEach void setup()throws Exception{
+    @BeforeEach void setup()throws Exception{setup(2);}
+    void setup(int jobs)throws Exception{
+        if(jobs<2 || jobs>256)throw new IllegalArgumentException();
         base.setup();var f=base.f();var preparation=base.base.base.base.base;
         var old=new RawBsonDocument(preparation.base.archive.load(base.base.base.prepared.beforeArchiveId()).versionBytes()).decode(new DocumentCodec());
         var versions=new ArrayList<>(old.getList("versions",Document.class));var first=versions.getFirst();
-        var second=new RawBsonDocument(VersionMutationPreparationTest.bytes(first)).decode(new DocumentCodec());second.put("_id","v2");
-        var scan=second.get("scanResult",Document.class);String request=UUID.randomUUID().toString();scan.put("scanRequestId",request);
-        var remote=scan.get("remoteReview",Document.class);remote.put("versionId","v2");remote.put("requestId",request);remote.put("jobId",UUID.randomUUID().toString());
-        versions.add(second);old.put("versions",versions);f.mongo.getCollection("projects").replaceOne(new Document("_id",old.get("_id")),old);
+        for(int i=2;i<=jobs;i++){
+            var added=new RawBsonDocument(VersionMutationPreparationTest.bytes(first)).decode(new DocumentCodec());added.put("_id","v"+i);
+            var scan=added.get("scanResult",Document.class);String request=UUID.randomUUID().toString();scan.put("scanRequestId",request);
+            var remote=scan.get("remoteReview",Document.class);remote.put("versionId","v"+i);remote.put("requestId",request);remote.put("jobId",UUID.randomUUID().toString());versions.add(added);
+        }
+        old.put("versions",versions);f.mongo.getCollection("projects").replaceOne(new Document("_id",old.get("_id")),old);
         var proposal=preparation.request();var next=new RawBsonDocument(proposal.proposedProject()).decode(new DocumentCodec());next.getList("versions",Document.class).get(1).putAll(new Document("fileUrl",f.binding.filePath()).append("hash",f.binding.artifactSha256()));
         var prepared=preparation.service.prepare(new ProjectMutationPreparation.Request(proposal.id(),proposal.projectId(),proposal.expectedSha256(),proposal.actor(),proposal.mutation(),VersionMutationPreparationTest.bytes(next)),()->true);
         assertEquals("APPLIED",base.base.base.base.executor().apply(prepared,"owner",()->true).state());
         var bindings=new HashMap<String,RemoteReviewBinding>();
-        for(var version:List.of(first,second)){var binding=f.mongo.getConverter().read(RemoteReviewBinding.class,version.get("scanResult",Document.class).get("remoteReview",Document.class));bindings.put(binding.jobId(),binding);}
+        for(var version:versions){if("w".equals(version.get("_id")))continue;var binding=f.mongo.getConverter().read(RemoteReviewBinding.class,version.get("scanResult",Document.class).get("remoteReview",Document.class));bindings.put(binding.jobId(),binding);}
         f.server.removeContext("/api/v1/review-jobs");f.route(e->{
             if(e.getRequestURI().getPath().endsWith("/configuration")){var bytes=f.mapper.writeValueAsBytes(Map.of("policyVersion",f.binding.policyVersion(),"reviewConfigSha256",base.base.config));e.sendResponseHeaders(200,bytes.length);e.getResponseBody().write(bytes);return;}
             var path=e.getRequestURI().getPath();var binding=bindings.get(path.substring(path.lastIndexOf('/')+1));assertNotNull(binding);reads.incrementAndGet();
