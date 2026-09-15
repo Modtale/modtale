@@ -96,14 +96,17 @@ public final class VersionMutationExecutor {
         return new Result("UNKNOWN",null);
     }
     private static Document projected(VersionMutationPreparation.Prepared prepared,Document before,Document proposed) {
+        return projectVersion(prepared.id(),prepared.beforeSha256(),prepared.id(),before,proposed);
+    }
+    static Document projectVersion(String operationId,String beforeSha256,String requestSeed,Document before,Document proposed) {
         var fields=new HashSet<>(before.keySet());fields.addAll(proposed.keySet());
         for(var field:fields)if(!EDITABLE.contains(field) && !RESET.contains(field)
                 && (before.containsKey(field)!=proposed.containsKey(field) || !Arrays.equals(bytes(new Document("v",before.get(field))),bytes(new Document("v",proposed.get(field))))))throw invalid();
         var next=new Document(before);for(var field:EDITABLE){if(proposed.containsKey(field))next.put(field,proposed.get(field));else next.remove(field);}
         var old=before.get("scanResult",Document.class);Object hold=before.get("replacementSecurityHold");
         if(hold!=null && (!(hold instanceof String id) || !id.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")))throw invalid();
-        if(hold==null && old!=null && ("BLOCK".equals(old.get("verdict")) || "INFECTED".equals(old.get("status"))))hold=prepared.id();
-        String request=UUID.nameUUIDFromBytes(("version-mutation-request-1:"+prepared.id()).getBytes(StandardCharsets.UTF_8)).toString();
+        if(hold==null && old!=null && ("BLOCK".equals(old.get("verdict")) || "INFECTED".equals(old.get("status"))))hold=operationId;
+        String request=UUID.nameUUIDFromBytes(("version-mutation-request-1:"+requestSeed).getBytes(StandardCharsets.UTF_8)).toString();
         if(before.get("retainedRemoteReview")!=null && !(before.get("retainedRemoteReview") instanceof Document))throw invalid();
         if(old!=null && old.get("scanAttempt")==null)throw invalid();
         Object priorAttempt=old==null?before.get("retainedRemoteReview") instanceof Document retained?retained.get("attempt"):null:old.get("scanAttempt");
@@ -113,7 +116,7 @@ public final class VersionMutationExecutor {
                 .append("scanAttempt",attempt).append("scanTimestamp",System.currentTimeMillis()).append("manualRescan",false).append("verdict",hold==null?"REVIEW":"BLOCK");
         next.put("scanResult",scan);for(var field:RESET)if(!field.equals("scanResult"))next.put(field,null);
         next.put("reviewStatus","PENDING");next.put("securityApprovedAt",0L);next.put("replacementSecurityHold",hold);
-        next.put("versionMutation",new Document("operationId",prepared.id()).append("beforeSha256",prepared.beforeSha256()).append("requestId",request));
+        next.put("versionMutation",new Document("operationId",operationId).append("beforeSha256",beforeSha256).append("requestId",request));
         return next;
     }
     private static Document decode(byte[] value){return new RawBsonDocument(value).decode(new DocumentCodec());}
