@@ -19,22 +19,8 @@ class ProjectMutationHistoryBudgetTest {
     @AfterEach void cleanup(){base.cleanup();}
     @ParameterizedTest @CsvSource({"2790000,8,false","2800000,8,true","0,9,true"})
     void historyBoundsNeverPermitPartialAdmission(int padding,int groupCount,boolean exceedsLimit){
-        var f=base.f();var archive=base.base.base.base.base.base.archive;var project=base.candidate().projectId();
-        var source=new RawBsonDocument(archive.load(base.base.base.prepared.beforeArchiveId()).versionBytes()).decode(new DocumentCodec());
-        source.put("fixturePadding","x".repeat(padding));f.mongo.getCollection("projects").replaceOne(new Document("_id",project),source);
-        var preparation=new ProjectMutationPreparation(f.mongo,archive,Clock.systemUTC(),60000);
-        var executor=new ProjectMutationExecutor(f.mongo,preparation,archive,new ReviewRepairJournal(f.mongo,archive));
-        var groups=new ArrayList<ProjectMutationPreparation.Prepared>();long sourceBytes=0;
-        for(int i=0;i<groupCount;i++){
-            var captured=preparation.capture(project,()->true);var next=new RawBsonDocument(captured.bytes()).decode(new DocumentCodec());
-            if(i==0)next.put("versions",List.of(next.getList("versions",Document.class).get(1),new Document("_id","new-upload").append("reviewStatus","PENDING").append("fileUrl",f.binding.filePath()).append("hash",f.binding.artifactSha256())));
-            else next.getList("versions",Document.class).get(1).put("gameVersions",List.of("runtime-"+i));
-            var prepared=preparation.prepare(new ProjectMutationPreparation.Request(UUID.randomUUID().toString(),project,captured.sha256(),"owner",ProjectMutationPreparation.Mutation.VERSION_LIST,VersionMutationPreparationTest.bytes(next)),()->true);
-            assertEquals("APPLIED",executor.apply(prepared,"owner",()->true).state());groups.add(prepared);
-            sourceBytes+=archive.load(prepared.beforeArchiveId()).versionBytes().length+archive.load(prepared.afterArchiveId()).versionBytes().length;
-            String applied=UUID.nameUUIDFromBytes(("project-mutation-applied-1:"+prepared.id()).getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();sourceBytes+=archive.load(applied).versionBytes().length;
-        }
-        var candidate=base.candidate();assertEquals(groups.getLast().id(),candidate.mutationId());long started=System.nanoTime();
+        long sourceBytes=stage(padding,groupCount);var f=base.f();var archive=base.base.base.base.base.base.archive;var project=base.candidate().projectId();
+        var candidate=base.candidate();long started=System.nanoTime();
         assertEquals(exceedsLimit,sourceBytes>64L*1024*1024 || groupCount>8);
         if(exceedsLimit){
             assertThrows(ProjectMutationPriorWorkReader.LimitExceeded.class,()->base.base.prior.read(project,candidate.mutationId(),()->true));
@@ -51,5 +37,23 @@ class ProjectMutationHistoryBudgetTest {
             var decision=new RawBsonDocument(archive.load(result.decisionId()).versionBytes()).decode(new DocumentCodec());assertEquals(8,decision.getList("groups",String.class).size());assertEquals("PRIOR_WORK_ACCOUNTED",decision.getString("rule"));
         }
         assertEquals(0,f.posts.get());System.out.println("historyGroups="+groupCount+" sourceBytes="+sourceBytes+" validationMillis="+TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started));
+    }
+    long stage(int padding,int groupCount){
+        var f=base.f();var archive=base.base.base.base.base.base.archive;var project=base.candidate().projectId();
+        var source=new RawBsonDocument(base.base.base.history.read(project,base.candidate().mutationId(),()->true).evidence().before().versionBytes()).decode(new DocumentCodec());
+        source.put("fixturePadding","x".repeat(padding));f.mongo.getCollection("projects").replaceOne(new Document("_id",project),source);
+        var preparation=new ProjectMutationPreparation(f.mongo,archive,Clock.systemUTC(),60000);
+        var executor=new ProjectMutationExecutor(f.mongo,preparation,archive,new ReviewRepairJournal(f.mongo,archive));
+        var groups=new ArrayList<ProjectMutationPreparation.Prepared>();long sourceBytes=0;
+        for(int i=0;i<groupCount;i++){
+            var captured=preparation.capture(project,()->true);var next=new RawBsonDocument(captured.bytes()).decode(new DocumentCodec());
+            if(i==0)next.put("versions",List.of(next.getList("versions",Document.class).get(1),new Document("_id","new-upload").append("reviewStatus","PENDING").append("fileUrl",f.binding.filePath()).append("hash",f.binding.artifactSha256())));
+            else next.getList("versions",Document.class).get(1).put("gameVersions",List.of("runtime-"+i));
+            var prepared=preparation.prepare(new ProjectMutationPreparation.Request(UUID.randomUUID().toString(),project,captured.sha256(),"owner",ProjectMutationPreparation.Mutation.VERSION_LIST,VersionMutationPreparationTest.bytes(next)),()->true);
+            assertEquals("APPLIED",executor.apply(prepared,"owner",()->true).state());groups.add(prepared);
+            sourceBytes+=archive.load(prepared.beforeArchiveId()).versionBytes().length+archive.load(prepared.afterArchiveId()).versionBytes().length;
+            String applied=UUID.nameUUIDFromBytes(("project-mutation-applied-1:"+prepared.id()).getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();sourceBytes+=archive.load(applied).versionBytes().length;
+        }
+        assertEquals(groups.getLast().id(),base.candidate().mutationId());return sourceBytes;
     }
 }
