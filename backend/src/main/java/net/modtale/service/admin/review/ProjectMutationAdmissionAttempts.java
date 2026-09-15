@@ -53,7 +53,8 @@ public final class ProjectMutationAdmissionAttempts {
             if(result==null)return null;var found=decode(scope,result);permission(allowed);return token.equals(found.current().token())?found.current():null;
         }catch(MongoException uncertain){var found=decode(scope,read(scope.requestId()));permission(allowed);return found.current()!=null && token.equals(found.current().token())?found.current():null;}
     }
-    public Status status(Scope scope,BooleanSupplier permitted){return budget.call(allowed->{permission(allowed);var value=read(scope.requestId());var result=value==null?new Status("ABSENT",0,null,null,null):decode(scope,value);permission(allowed);return result;},permitted);}
+    public Status status(Scope scope,BooleanSupplier permitted){return budget.call(allowed->statusWithinBudget(scope,allowed),permitted);}
+    Status statusWithinBudget(Scope scope,BooleanSupplier allowed){permission(allowed);var value=read(scope.requestId());var result=value==null?new Status("ABSENT",0,null,null,null):decode(scope,value);permission(allowed);return result;}
     public Status finish(Claim claim,Outcome outcome,BooleanSupplier permitted){return budget.call(allowed->finishWithinBudget(claim,outcome,allowed),permitted);}
     Status finishWithinBudget(Claim claim,Outcome outcome,BooleanSupplier allowed) {
         permission(allowed);Objects.requireNonNull(outcome);var stored=read(claim.scope().requestId());var current=decode(claim.scope(),stored);

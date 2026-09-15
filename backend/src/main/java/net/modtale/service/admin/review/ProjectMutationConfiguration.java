@@ -51,6 +51,12 @@ public class ProjectMutationConfiguration {
         return new ProjectMutationActivator(mongo,budget,preparation,archive,journal);
     }
 
+    @Bean
+    @ConditionalOnProperty(name="app.warden.jobs.enabled",havingValue="true")
+    ProjectMutationAutomaticAdmission projectMutationAutomaticAdmission(MongoTemplate mongo,ReviewRepairWorkflow budget,ProjectMutationReferenceReader history,ProjectMutationPriorWorkReader prior,ProjectMutationAdmissionAttempts attempts,ProjectMutationJobAccounting accounting,ProjectMutationAdmissionPreparation preparation,ProjectMutationActivator activator,ReviewSnapshotArchive archive) {
+        return new ProjectMutationAutomaticAdmission(mongo,budget,history,prior,attempts,accounting,preparation,activator,archive);
+    }
+
     @Bean(destroyMethod="close")
     @ConditionalOnProperty(name="app.warden.jobs.enabled",havingValue="true")
     ProjectMutationJobAccounting projectMutationJobAccounting(MongoTemplate mongo,ReviewRepairWorkflow budget,ProjectMutationReferenceReader history,

@@ -20,7 +20,10 @@ public final class ProjectMutationJobAccounting implements AutoCloseable {
         observer=new ReviewRemoteStatusObserver(mongo,COLLECTION,client,concurrency,Duration.ofSeconds(30));
     }
     public Receipt check(String id,Object projectId,String mutationId,String versionId,BooleanSupplier permitted) {
-        return budget.call(allowed->view(mutationId,versionId,observer.check(id,access->target(projectId,mutationId,versionId,access),allowed)),permitted);
+        return budget.call(allowed->checkWithinBudget(id,projectId,mutationId,versionId,allowed),permitted);
+    }
+    Receipt checkWithinBudget(String id,Object projectId,String mutationId,String versionId,BooleanSupplier permitted) {
+        return view(mutationId,versionId,observer.check(id,access->target(projectId,mutationId,versionId,access),permitted));
     }
     public Receipt receipt(String id,Object projectId,String mutationId,String versionId,BooleanSupplier permitted) {
         return budget.call(allowed->receiptWithinBudget(id,projectId,mutationId,versionId,allowed),permitted);

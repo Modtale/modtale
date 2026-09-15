@@ -26,7 +26,7 @@ public final class ProjectMutationActivator {
     public Result activate(ProjectMutationAdmissionPreparation.Prepared prepared,String actor,BooleanSupplier permitted) {
         return budget.call(allowed->activateWithinBudget(prepared,actor,allowed),permitted);
     }
-    private Result activateWithinBudget(ProjectMutationAdmissionPreparation.Prepared prepared,String actor,BooleanSupplier allowed) {
+    Result activateWithinBudget(ProjectMutationAdmissionPreparation.Prepared prepared,String actor,BooleanSupplier allowed) {
         var previous=receiptWithinBudget(prepared,actor,allowed);if(!"UNKNOWN".equals(previous.state()))return previous;
         preparation.verifyCurrent(prepared,actor,allowed);var source=archive.load(prepared.id());var projected=projected(source);String afterSha=digest(bytes(projected));
         var hello=ReviewRepairIo.database(mongo.getDb()).runCommand(new Document("hello",1),ReadPreference.primary());
