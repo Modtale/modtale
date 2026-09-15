@@ -85,4 +85,47 @@ class ProjectMutationOwnerAccessTest {
         assertEquals(before,base.root());verifyNoInteractions(files,projects);
     }
 
+    net.modtale.service.project.version.VersionUpdateCommandHandler editHandler(boolean retained,
+            net.modtale.service.project.version.VersionMutationOrchestrationService orchestration){
+        var mongo=base.base.base.fixture.mongo;var access=mock(net.modtale.service.project.access.ProjectAccessService.class);
+        when(access.requireVersionPermission(anyString(),any(),eq("VERSION_EDIT"),anyString())).thenAnswer(call->mongo.findById(call.getArgument(0),net.modtale.model.project.Project.class));
+        var versions=mock(net.modtale.service.project.access.ProjectVersionAccessService.class);
+        when(versions.requireById(any(),anyString(),any())).thenAnswer(call->{var project=(net.modtale.model.project.Project)call.getArgument(0);return project.getVersions().stream().filter(v->v.getId().equals(call.getArgument(1))).findFirst().orElseThrow();});
+        when(orchestration.sanitizeChangelog(anyString())).thenAnswer(call->call.getArgument(0));
+        var handler=new net.modtale.service.project.version.VersionUpdateCommandHandler(new ProjectReviewPersistence(mongo),mock(net.modtale.service.project.query.ProjectService.class),access,
+                new net.modtale.service.project.access.ProjectMutationGuard(),versions,orchestration);
+        if(retained)org.springframework.test.util.ReflectionTestUtils.setField(handler,"retainedMutations",owner);return handler;
+    }
+    @Test void productionContextEditRetainsOldJobAndPreservesBlock(){
+        base.base.base.fixture.change("scanResult.verdict","BLOCK");var before=VersionMutationPreparationTest.bytes(base.root());
+        var orchestration=mock(net.modtale.service.project.version.VersionMutationOrchestrationService.class);
+        editHandler(true,orchestration).updateVersion(base.root().get("_id").toString(),"v",null,null,List.of("changed-runtime"),null,null,user);
+        var version=base.root().getList("versions",Document.class).getFirst();var scan=version.get("scanResult",Document.class);
+        assertEquals("MUTATION_HELD",scan.get("scanState"));assertEquals(2,scan.get("scanAttempt"));assertEquals("BLOCK",scan.get("verdict"));assertNotNull(version.get("replacementSecurityHold"));
+        var ref=base.base.base.fixture.mongo.getCollection(ProjectMutationExecutor.REFERENCES).find().first();
+        assertArrayEquals(before,base.base.base.archive.load(ref.getString("beforeArchiveId")).versionBytes());
+        verify(orchestration,never()).enqueueContextChangeScan(any(),any());assertEquals(0,base.base.base.fixture.posts.get());
+    }
+    @Test void metadataOnlyEditKeepsExistingReviewWithoutRetainedMutation(){
+        var scan=base.root().getList("versions",Document.class).getFirst().get("scanResult");var orchestration=mock(net.modtale.service.project.version.VersionMutationOrchestrationService.class);
+        editHandler(true,orchestration).updateVersion(base.root().get("_id").toString(),"v",null,null,null,"New changelog",null,user);
+        var version=base.root().getList("versions",Document.class).getFirst();assertEquals(scan,version.get("scanResult"));assertEquals("New changelog",version.get("changelog"));
+        assertEquals(0,base.base.base.fixture.mongo.getCollection(ProjectMutationExecutor.REFERENCES).countDocuments());verify(orchestration,never()).enqueueContextChangeScan(any(),any());
+    }
+    @Test void disabledRuntimeCannotOverwriteTrackedContext(){
+        var before=base.root();var orchestration=mock(net.modtale.service.project.version.VersionMutationOrchestrationService.class);
+        assertThrows(net.modtale.exception.InvalidVersionRequestException.class,()->editHandler(false,orchestration).updateVersion(before.get("_id").toString(),"v",null,null,List.of("changed"),null,null,user));
+        assertEquals(before,base.root());verify(orchestration,never()).enqueueContextChangeScan(any(),any());
+    }
+    @Test void modpackContextEditInvalidatesCacheWithoutDeletingHistoricalArchive(){
+        var mongo=base.base.base.fixture.mongo;mongo.getCollection("projects").updateOne(new Document("_id",base.root().get("_id")),new Document("$set",new Document("classification","MODPACK")));
+        var dependency=new net.modtale.model.project.ProjectDependency("dependency","Original dependency","1.0");
+        base.base.base.fixture.change("dependencies",List.of(mongo.getConverter().convertToMongoType(dependency)));
+        var orchestration=mock(net.modtale.service.project.version.VersionMutationOrchestrationService.class);
+        when(orchestration.resolveRequestedDependencies(any(),eq(true),eq(true))).thenReturn(new net.modtale.service.project.version.VersionDependencyService.ResolvedDependencies(List.of(),List.of()));
+        editHandler(true,orchestration).updateVersion(base.root().get("_id").toString(),"v",List.of(),null,null,null,null,user);
+        var version=base.root().getList("versions",Document.class).getFirst();assertNull(version.get("fileUrl"));assertEquals("MUTATION_HELD",version.get("scanResult",Document.class).get("scanState"));
+        verify(orchestration,never()).deleteCachedArtifact(anyString());
+    }
+
 }

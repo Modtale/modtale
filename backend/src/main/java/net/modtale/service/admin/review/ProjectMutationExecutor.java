@@ -112,6 +112,11 @@ public final class ProjectMutationExecutor {
             } else original=old.get(transition.beforeIndex());
             boolean held=transition.beforeIndex()<0 || transition.changes().stream().anyMatch(change->change!=VersionReviewTransition.Change.METADATA)
                     || prepared.mutation()==ProjectMutationPreparation.Mutation.SUBMISSION && original.get("scanResult")==null;
+            if(held && "MODPACK".equals(before.get("classification")) && next.get("fileUrl")==null
+                    && original.get("fileUrl") instanceof String cached && cached.endsWith(".zip")
+                    && transition.changes().contains(VersionReviewTransition.Change.CONTEXT)) {
+                original=new Document(original);if(next.containsKey("fileUrl"))original.put("fileUrl",null);else original.remove("fileUrl");
+            }
             if(held)next=VersionMutationExecutor.projectVersion(prepared.id(),transition.beforeSha256()==null?prepared.beforeSha256():transition.beforeSha256(),
                     prepared.id()+":"+transition.versionId(),original,next,prepared.createdAt());
             else {

@@ -20,6 +20,8 @@ import org.springframework.stereotype.Service;
 public class VersionUpdateCommandHandler {
 
     private final ProjectReviewPersistence reviewPersistence;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private net.modtale.service.admin.review.ProjectMutationOwnerAccess retainedMutations;
     private final ProjectService projectService;
     private final ProjectAccessService projectAccessService;
     private final ProjectMutationGuard projectMutationGuard;
@@ -109,6 +111,15 @@ public class VersionUpdateCommandHandler {
         String updatedFingerprint = net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(version);
         boolean contextChanged = originalFingerprint != null && updatedFingerprint != null
                 ? !originalFingerprint.equals(updatedFingerprint) : !originalContext.equals(mapper.valueToTree(java.util.Arrays.asList(version.getGameVersions(), version.getDependencies())));
+        if (contextChanged && retainedMutations!=null) {
+            var outcome=retainedMutations.editVersion(snapshot.raw(),reviewPersistence.versionEditProposal(snapshot,versionId,childIdsChanged));
+            if(!"APPLIED".equals(outcome.state()))throw ProjectReviewSnapshot.conflict();
+            projectService.evictProjectCache(project);
+            return;
+        }
+        if(contextChanged && (version.getRetainedRemoteReview()!=null || version.getVersionMutation()!=null || version.getReviewReplacement()!=null
+                || version.getReviewIsolation()!=null || version.getReplacementSecurityHold()!=null || previousScan!=null && previousScan.getRemoteReview()!=null))
+            throw new net.modtale.exception.InvalidVersionRequestException("Retained review history must be available before changing this version's runtime or dependencies.");
         if (contextChanged) {
             version.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
             version.setScheduledPublishDate(null);

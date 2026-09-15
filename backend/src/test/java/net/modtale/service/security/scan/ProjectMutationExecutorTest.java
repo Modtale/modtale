@@ -120,4 +120,14 @@ class ProjectMutationExecutorTest {
         assertEquals("APPLIED",executor().apply(prepared,"owner",()->true).state());
     }
 
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void cacheInvalidationExceptionCannotRemoveOrdinaryArtifactsOrUnchangedPackCache(boolean modpack){
+        if(modpack)base.base.fixture.mongo.getCollection("projects").updateOne(new Document("_id",root().get("_id")),new Document("$set",new Document("classification","MODPACK")));
+        var captured=base.service.capture(root().get("_id"),()->true);var proposed=new RawBsonDocument(captured.bytes()).decode(new DocumentCodec());var version=proposed.getList("versions",Document.class).getFirst();
+        version.put("fileUrl",null);if(!modpack)version.put("gameVersions",List.of("changed"));
+        var request=new ProjectMutationPreparation.Request(UUID.randomUUID().toString(),captured.projectId(),captured.sha256(),"owner",ProjectMutationPreparation.Mutation.VERSION_LIST,VersionMutationPreparationTest.bytes(proposed));
+        var prepared=base.service.prepare(request,()->true);assertThrows(IllegalStateException.class,()->executor().apply(prepared,"owner",()->true));
+        assertArrayEquals(captured.bytes(),VersionMutationPreparationTest.bytes(root()));
+    }
+
 }

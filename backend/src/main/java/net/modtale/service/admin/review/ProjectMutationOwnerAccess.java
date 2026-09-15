@@ -25,6 +25,12 @@ public final class ProjectMutationOwnerAccess {
             return preparation.prepare(new ProjectMutationPreparation.Request(id,projectId,expectedSha256,actor,mutation,proposal),permitted);
         },()->true);
     }
+    public ProjectMutationExecutor.Result editVersion(org.bson.Document original,org.bson.Document proposed) {
+        byte[] before=bytes(Objects.requireNonNull(original));String sha;
+        try{sha=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(before));}
+        catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
+        return apply(prepare(java.util.UUID.randomUUID().toString(),original.get("_id"),sha,ProjectMutationPreparation.Mutation.VERSION_LIST,bytes(proposed)));
+    }
     public ProjectMutationExecutor.Result removeVersion(org.bson.Document original,String versionId) {
         byte[] before=bytes(Objects.requireNonNull(original));
         var proposed=new org.bson.RawBsonDocument(before).decode(new org.bson.codecs.DocumentCodec());

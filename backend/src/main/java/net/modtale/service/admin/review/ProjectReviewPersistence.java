@@ -24,6 +24,18 @@ public class ProjectReviewPersistence {
         ProjectReviewSnapshot.requireCurrent(project, token);
         return new Snapshot(raw, project);
     }
+    public Document versionEditProposal(Snapshot snapshot,String versionId,boolean childIdsChanged) {
+        var codec=new org.bson.codecs.DocumentCodec();
+        var proposed=new org.bson.RawBsonDocument(snapshot.raw(),codec).decode(codec);
+        var targets=snapshot.project().getVersions().stream().filter(version->versionId.equals(version.getId())).toList();
+        var originals=proposed.getList("versions",Document.class).stream().filter(version->versionId.equals(version.get("_id"))).toList();
+        if(targets.size()!=1 || originals.size()!=1)throw ProjectReviewSnapshot.conflict();
+        var mapped=new Document();mongo.getConverter().write(targets.getFirst(),mapped);var target=originals.getFirst();
+        for(var field:List.of("gameVersions","dependencies","incompatibleProjectIds","changelog","channel","fileUrl")) {
+            if(mapped.containsKey(field))target.put(field,mapped.get(field));else target.remove(field);
+        }
+        if(childIdsChanged)proposed.put("childProjectIds",snapshot.project().getChildProjectIds());return proposed;
+    }
     public boolean apply(Snapshot snapshot, String approvedVersionId) {
         Project project = snapshot.project();
         var originGuard = new org.springframework.data.mongodb.core.query.Query();
