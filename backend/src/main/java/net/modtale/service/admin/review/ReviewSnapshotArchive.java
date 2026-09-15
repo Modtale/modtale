@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit;
 public final class ReviewSnapshotArchive {
     public static final String METADATA="review_snapshot_archives", CHUNKS="review_snapshot_chunks";
     public static final int MAX_BYTES=16*1024*1024, CHUNK_BYTES=256*1024;
-    public enum Action { ISOLATE_REVIEW, REPLACE_REVIEW }
+    public enum Action { ISOLATE_REVIEW, REPLACE_REVIEW, CANCEL_REMOTE_REVIEW }
     public record Snapshot(String id,Object projectId,int versionIndex,String actorId,Action action,long createdAt,long expiresAt,byte[] versionBytes) {
         public Snapshot {
             if(!uuid(id) || !(projectId instanceof ObjectId || projectId instanceof String s && !s.isEmpty() && s.length()<=128
