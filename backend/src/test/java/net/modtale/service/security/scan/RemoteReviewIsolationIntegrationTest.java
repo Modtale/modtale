@@ -64,4 +64,16 @@ class RemoteReviewIsolationIntegrationTest {
         assertFalse(fixture.completion.handleRemoteCompletedScan(claim,fixture.cleanResult()));assertTrue(reached.get());assertIsolated();
         assertEquals("APPLIED",isolation.recover(prepared.id(),"actor").receipt().outcome().state());
     }
+    @Test void manualRescanCannotEraseAnUnaccountedRemoteJobOrItsIsolatedReference() {
+        fixture.attached(30000);fixture.change("scanResult.verdict","BLOCK");
+        for(boolean isolated:List.of(false,true)) {
+            if(isolated)isolateExpiredBrokenPoll();
+            var before=raw();var version=fixture.mongo.findById(fixture.project,Project.class).getVersions().getFirst();
+            var writes=new VersionReviewPersistence(fixture.mongo);var snapshot=writes.captureForRescan(fixture.project,"v",VersionReviewSnapshot.rescanToken(version));
+            var queued=new ScanResult();queued.setStatus(ScanStatus.SCANNING);queued.setScanState("QUEUED");queued.setScanAttempt(2);
+            var error=assertThrows(org.springframework.web.server.ResponseStatusException.class,()->writes.queueRescan(snapshot,queued));
+            assertEquals(409,error.getStatusCode().value());assertEquals(before,raw());assertEquals("BLOCK",fixture.saved().getVerdict());
+        }
+        assertEquals(0,fixture.posts.get());assertEquals(0,fixture.gets.get());
+    }
 }

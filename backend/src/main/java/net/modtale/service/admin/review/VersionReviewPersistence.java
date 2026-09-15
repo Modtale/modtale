@@ -68,6 +68,9 @@ public class VersionReviewPersistence {
         return applyUpdate(snapshot, update, originGuard.getQueryObject());
     }
     public boolean queueRescan(Snapshot snapshot, net.modtale.model.project.ScanResult queued) {
+        if (snapshot.version().get("scanResult") instanceof Document scan && scan.get("remoteReview") != null)
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "This version has a retained remote review. A replacement scan must preserve its review history first.");
         return applyUpdate(snapshot, new Update()
                 .set("versions.$.scanResult", queued)
                 .set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.PENDING)

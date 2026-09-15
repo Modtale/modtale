@@ -493,4 +493,12 @@ class VersionReviewPersistenceIntegrationTest {
         mongo.updateFirst(Query.query(Criteria.where("_id").is(id)),new Update().set("versions.0.scanResult.scanTimestamp",1234L),Project.class);
         assertEquals(409,assertThrows(ResponseStatusException.class,()->persistence.capture(id,version.getId(),token)).getStatusCode().value());
     }
+    @Test void malformedRemoteReferenceCannotBeSilentlyDiscardedByManualRescan() {
+        var collection=mongo.getCollection("projects");var raw=collection.find().first();
+        collection.updateOne(new Document("_id",raw.get("_id")),new Document("$set",new Document("versions.0.scanResult.remoteReview","malformed retained reference")));
+        var before=collection.find().first();var stored=before.getList("versions",Document.class).getFirst();
+        var snapshot=new VersionReviewPersistence.Snapshot(before.get("_id"),stored);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,()->persistence.queueRescan(snapshot,queued()));
+        assertEquals(before,collection.find().first());
+    }
 }
