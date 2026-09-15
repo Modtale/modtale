@@ -1,10 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useId } from 'react';
 import Cropper from 'react-easy-crop';
-import { X, Check } from 'lucide-react';
+import { X, Check, Crop, Minus, Plus } from 'lucide-react';
 import { Spinner } from '@/components/ui/Spinner';
 import { isGifImage } from '@/utils/images';
 import { ModalPortal } from '@/components/ui/ModalPortal';
-import { IMAGE_DIMENSION_LABEL, IMAGE_FORMAT_LABEL } from '@/utils/siteLimits';
 
 interface ImageCropperModalProps {
     imageSrc: string;
@@ -36,6 +35,8 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                                                                         onCancel,
                                                                         onCropComplete
                                                                     }) => {
+    const titleId = useId();
+    const zoomId = useId();
     const isGif = isGifImage(imageSrc, sourceFile);
     const [error, setError] = useState<string | null>(null);
     const [crop, setCrop] = useState({ x: 0, y: 0 });
@@ -196,68 +197,61 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
     return (
         <ModalPortal>
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={(e) => e.stopPropagation()}>
-            <div className="bg-white dark:bg-slate-900 w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 flex flex-col h-[80vh] md:h-[600px] animate-in zoom-in-95 duration-200">
-
-                <div className="p-4 border-b border-slate-200 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-white/5">
-                    <h2 className="text-lg font-black text-slate-900 dark:text-white">{isGif ? 'Preview GIF' : 'Crop Image'}</h2>
-                    <button
-                        onClick={onCancel}
-                        disabled={isProcessing}
-                        className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors disabled:opacity-50"
-                    >
-                        <X className="w-6 h-6" />
+            <div role="dialog" aria-modal="true" aria-labelledby={titleId} className="bg-white dark:bg-modtale-card w-full max-w-2xl max-h-[calc(100dvh-2rem)] rounded-2xl shadow-2xl overflow-y-auto border border-slate-200 dark:border-white/10 flex flex-col animate-in zoom-in-95 duration-200">
+                <div className="px-6 py-4 border-b border-slate-200 dark:border-white/10 flex justify-between items-center gap-4 shrink-0">
+                    <div className="flex items-center gap-3">
+                        <Crop className="w-5 h-5 text-modtale-accent shrink-0" />
+                        <h2 id={titleId} className="!m-0 text-xl font-black leading-none text-slate-900 dark:text-white">{isGif ? 'Preview GIF' : 'Crop Image'}</h2>
+                    </div>
+                    <button onClick={onCancel} disabled={isProcessing} aria-label="Close image editor"
+                        className="w-10 h-10 shrink-0 inline-flex items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-50">
+                        <X className="w-5 h-5" />
                     </button>
                 </div>
 
-                <div className="relative flex-1 bg-slate-950">
-                    {isGif ? (
-                        <div className="absolute inset-6 flex items-center justify-center" style={{ containerType: 'size' }}>
-                            <img src={imageSrc} alt="Animated image preview" className="max-h-full max-w-full object-cover rounded-xl" style={{ width: `min(100cqw, ${aspect * 100}cqh)`, height: `min(${100 / aspect}cqw, 100cqh)` }} />
-                        </div>
-                    ) : <Cropper
-                        image={imageSrc}
-                        crop={crop}
-                        zoom={zoom}
-                        aspect={aspect}
-                        onCropChange={setCrop}
-                        onCropComplete={onCropCompleteChange}
-                        onZoomChange={setZoom}
-                    />}
-                </div>
-
-                <div className="p-4 border-t border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-white/5 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    {isGif ? <p className="text-sm text-slate-500 dark:text-slate-400 sm:max-w-sm">Your GIF stays animated and is centered to fit. Accepted: {IMAGE_FORMAT_LABEL} · max 10 MB · {IMAGE_DIMENSION_LABEL}.</p> : <div className="w-full sm:w-1/2 flex items-center gap-3">
-                        <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Zoom</span>
-                        <input
-                            type="range"
-                            value={zoom}
-                            min={1}
-                            max={3}
-                            step={0.1}
-                            aria-labelledby="Zoom"
-                            onChange={(e) => setZoom(Number(e.target.value))}
-                            className="themed-range h-4 w-full cursor-pointer"
-                        />
-                    </div>}
-                    {!isGif && <p className="text-[11px] text-slate-500 dark:text-slate-400">Accepted: {IMAGE_FORMAT_LABEL} · max 10 MB · {IMAGE_DIMENSION_LABEL}.</p>}
-                    {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
-                    <div className="flex items-center gap-3 w-full sm:w-auto">
-                        <button
-                            onClick={onCancel}
-                            disabled={isProcessing}
-                            className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl font-bold text-sm bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-white/20 transition-all disabled:opacity-50"
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleSave}
-                            disabled={isProcessing}
-                            className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl font-bold text-sm bg-modtale-accent text-white hover:bg-modtale-accentHover shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                        >
-                            {isProcessing ? <Spinner className="w-4 h-4 text-white" /> : <Check className="w-4 h-4" />}
-                            {isGif ? 'Use GIF' : 'Apply Crop'}
-                        </button>
+                <div className="p-4 sm:p-6 space-y-5">
+                    <div className="relative h-[clamp(180px,45dvh,400px)] overflow-hidden rounded-xl border border-slate-200 dark:border-white/10 bg-slate-100 dark:bg-slate-950">
+                        {isGif ? (
+                            <div className="absolute inset-4 flex items-center justify-center" style={{ containerType: 'size' }}>
+                                <img src={imageSrc} alt="Animated image preview" className="max-h-full max-w-full object-cover rounded-lg" style={{ width: `min(100cqw, ${aspect * 100}cqh)`, height: `min(${100 / aspect}cqw, 100cqh)` }} />
+                            </div>
+                        ) : <Cropper
+                            image={imageSrc}
+                            crop={crop}
+                            zoom={zoom}
+                            aspect={aspect}
+                            showGrid={false}
+                            onCropChange={setCrop}
+                            onCropComplete={onCropCompleteChange}
+                            onZoomChange={setZoom}
+                        />}
                     </div>
+                    {isGif ? <p className="!m-0 text-sm text-slate-500 dark:text-slate-400">Your GIF stays animated and is centered to fit.</p> : (
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between text-sm">
+                                <label htmlFor={zoomId} className="font-bold text-slate-700 dark:text-slate-200">Zoom</label>
+                                <output htmlFor={zoomId} className="tabular-nums text-slate-500 dark:text-slate-400">{Math.round(zoom * 100)}%</output>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <button aria-label="Zoom out" onClick={() => setZoom(value => Math.max(1, value - 0.1))} disabled={zoom <= 1 || isProcessing}
+                                    className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 disabled:opacity-40 transition-colors"><Minus className="w-4 h-4" /></button>
+                                <input id={zoomId} type="range" value={zoom} min={1} max={3} step={0.01} disabled={isProcessing}
+                                    onChange={(e) => setZoom(Number(e.target.value))} className="themed-range h-4 w-full min-w-0 cursor-pointer" />
+                                <button aria-label="Zoom in" onClick={() => setZoom(value => Math.min(3, value + 0.1))} disabled={zoom >= 3 || isProcessing}
+                                    className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 disabled:opacity-40 transition-colors"><Plus className="w-4 h-4" /></button>
+                            </div>
+                        </div>
+                    )}
+                    {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
+                </div>
+                <div className="px-4 sm:px-6 py-4 border-t border-slate-200 dark:border-white/10 flex items-center justify-end gap-3 shrink-0">
+                    <button onClick={onCancel} disabled={isProcessing}
+                        className="flex-1 sm:flex-none px-5 h-11 rounded-xl border border-slate-200 dark:border-white/10 font-bold text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors disabled:opacity-50">Cancel</button>
+                    <button onClick={handleSave} disabled={isProcessing || (!isGif && !croppedAreaPixels)}
+                        className="flex-1 sm:flex-none px-5 h-11 rounded-xl font-bold text-sm whitespace-nowrap bg-modtale-accent text-white hover:bg-modtale-accentHover transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
+                        {isProcessing ? <Spinner className="w-4 h-4 text-white" /> : <Check className="w-4 h-4" />}
+                        {isGif ? 'Use GIF' : 'Apply Crop'}
+                    </button>
                 </div>
             </div>
         </div>
