@@ -9,6 +9,9 @@ import java.util.function.BooleanSupplier;
 
 /** Authenticated prior-work inventory; absence of a usable job identity is never proof of no work. */
 public final class ProjectMutationPriorWorkReader {
+    public static final class LimitExceeded extends IllegalStateException {
+        private LimitExceeded(){super("Prior mutation work exceeds the inspection budget");}
+    }
     public enum Kind { NEW_VERSION, REMOTE_JOB, UNRESOLVED }
     public record Work(String mutationId,String versionId,String beforeSha256,Kind kind,RemoteReviewBinding binding,String reason) {}
     public record Inventory(String mutationId,List<String> groups,List<Work> work) {
@@ -37,12 +40,12 @@ public final class ProjectMutationPriorWorkReader {
         Walk(Object projectId,BooleanSupplier allowed){this.projectId=projectId;this.allowed=allowed;}
         ProjectMutationReferenceReader.History load(String id) {
             permission();var found=groups.get(id);if(found!=null)return found;
-            if(groups.size()>=MAX_GROUPS)throw unavailable();
+            if(groups.size()>=MAX_GROUPS)throw new LimitExceeded();
             found=history.read(projectId,id,allowed);
             retainedBytes+=found.evidence().before().versionBytes().length;
             retainedBytes+=found.evidence().after().versionBytes().length;
             retainedBytes+=found.applied().versionBytes().length;
-            if(retainedBytes>MAX_BYTES)throw unavailable();groups.put(id,found);return found;
+            if(retainedBytes>MAX_BYTES)throw new LimitExceeded();groups.put(id,found);return found;
         }
         void visit(String id) {
             permission();if(active.contains(id))throw unavailable();if(finished.contains(id))return;
@@ -74,7 +77,7 @@ public final class ProjectMutationPriorWorkReader {
             }
             active.remove(id);finished.add(id);permission();
         }
-        void add(Work item){if(work.size()>=MAX_WORK)throw unavailable();work.add(item);}
+        void add(Work item){if(work.size()>=MAX_WORK)throw new LimitExceeded();work.add(item);}
         void permission(){if(!allowed.getAsBoolean())throw new SecurityException("Prior work access is not permitted");}
     }
     private static List<Document> versions(ReviewSnapshotArchive.Snapshot snapshot) {

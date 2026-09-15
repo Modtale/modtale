@@ -39,7 +39,9 @@ public final class ProjectMutationAutomaticAdmission {
         history.requireHeldHeads(candidate.projectId(),bytes(new Document("_id",candidate.projectId()).append("versions",List.of(version))),allowed);
         var claim=attempts.beginWithinBudget(scope,captured.sha256(),allowed);
         if(claim==null){var state=attempts.statusWithinBudget(scope,allowed);return new Result(state.state(),state.current()==null?null:state.current().decisionId());}
-        var inventory=prior.readWithinBudget(candidate.projectId(),candidate.mutationId(),allowed);
+        ProjectMutationPriorWorkReader.Inventory inventory;
+        try{inventory=prior.readWithinBudget(candidate.projectId(),candidate.mutationId(),allowed);}
+        catch(ProjectMutationPriorWorkReader.LimitExceeded limit){return finish(claim,ProjectMutationAdmissionAttempts.Outcome.ATTENTION,allowed);}
         if(inventory.work().stream().anyMatch(work->work.kind()==ProjectMutationPriorWorkReader.Kind.UNRESOLVED))return finish(claim,ProjectMutationAdmissionAttempts.Outcome.ATTENTION,allowed);
         var observations=new LinkedHashMap<String,String>();boolean waiting=false,attention=false,yielded=false,madeProgress=false;int reads=0;
         try(var receipts=accounting.readBatch(candidate.projectId(),allowed)){
