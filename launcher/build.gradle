@@ -235,6 +235,34 @@ tasks.register('prepareJpackageInput', Sync) {
         exclude 'jna-*.jar'
     }
     from(packagedJna)
+    inputs.property('jarCompressionLevel', 9)
+    doLast {
+        long before = 0
+        long after = 0
+        fileTree(destinationDir) { include '*.jar' }.files.each { archive ->
+            before += archive.length()
+            def optimized = new File(temporaryDir, archive.name)
+            optimized.parentFile.mkdirs()
+            new java.util.zip.ZipFile(archive).withCloseable { source ->
+                new java.util.zip.ZipOutputStream(new FileOutputStream(optimized)).withCloseable { output ->
+                    output.setLevel(9)
+                    source.entries().each { original ->
+                        def entry = new java.util.zip.ZipEntry(original)
+                        entry.setMethod(java.util.zip.ZipEntry.DEFLATED)
+                        entry.setCompressedSize(-1)
+                        output.putNextEntry(entry)
+                        source.getInputStream(original).withCloseable { it.transferTo(output) }
+                        output.closeEntry()
+                    }
+                }
+            }
+            if (optimized.length() < archive.length()) {
+                java.nio.file.Files.move(optimized.toPath(), archive.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            }
+            after += archive.length()
+        }
+        logger.lifecycle("Packaged JARs: ${before} -> ${after} bytes (lossless compression)")
+    }
 }
 
 def jpackageExecutable = packagingJavaLauncher.map {
@@ -329,6 +357,12 @@ tasks.named('check') { dependsOn tasks.named('testBootstrap') }
 
 // Keep jpackage's native bundle/installer metadata, then replace the VM-dependent entry point.
 def installBootstrap = { File image ->
+    def treeSize = { File root ->
+        long bytes = 0
+        root.eachFileRecurse(groovy.io.FileType.FILES) { bytes += it.length() }
+        bytes
+    }
+    long originalBytes = treeSize(image)
     def appDir = new File(image, currentOs.isWindows() ? 'app' : currentOs.isMacOsX() ? 'Contents/app' : 'lib/app')
     def entry = new File(image, currentOs.isWindows() ? "${appDisplayName}.exe"
             : currentOs.isMacOsX() ? "Contents/MacOS/${appDisplayName}" : "bin/${appDisplayName}")
@@ -344,6 +378,15 @@ def installBootstrap = { File image ->
         // Replacing the executable invalidates jpackage's ad-hoc signature.
         runExternalCommand(['codesign', '--force', '--deep', '--sign', '-', image.absolutePath])
     }
+    long finalBytes = treeSize(image)
+    def report = layout.buildDirectory.file('reports/package-size.json').get().asFile
+    report.parentFile.mkdirs()
+    report.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
+            os: System.getProperty('os.name'), arch: System.getProperty('os.arch'),
+            withRuntimeBytes: originalBytes, packageBytes: finalBytes,
+            bootstrapBytes: entry.length(), savedBytes: originalBytes - finalBytes
+    ]))
+    logger.lifecycle("Application image: ${originalBytes} -> ${finalBytes} bytes")
 }
 
 def configureJpackageTask = { TaskProvider<Exec> packageTask, String packageType, Closure<Boolean> hostPredicate, Closure<List<String>> platformArgs ->

@@ -8,7 +8,7 @@ use sha2::{Digest, Sha256};
 use std::{
     env,
     fs::{self, File, OpenOptions},
-    io::{self, Read, Write},
+    io::{Read, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
     thread,
@@ -67,6 +67,23 @@ fn diagnostic() -> bool {
         .nth(1)
         .is_some_and(|a| a == "--modtale-bootstrap-check")
 }
+fn http_agent(timeout: Duration) -> ureq::Agent {
+    let config = ureq::Agent::config_builder();
+    #[cfg(any(windows, target_os = "macos"))]
+    let config = config.tls_config(
+        ureq::tls::TlsConfig::builder()
+            .provider(ureq::tls::TlsProvider::NativeTls)
+            .root_certs(ureq::tls::RootCerts::PlatformVerifier)
+            .build(),
+    );
+    config
+        .https_only(true)
+        .timeout_global(Some(timeout))
+        .timeout_connect(Some(Duration::from_secs(20)))
+        .timeout_recv_body(Some(Duration::from_secs(30)))
+        .build()
+        .into()
+}
 fn java_name() -> &'static str {
     if cfg!(windows) { "java.exe" } else { "java" }
 }
@@ -116,8 +133,14 @@ fn java_candidates(home: &Path, cache: &Path) -> Vec<PathBuf> {
             }
         }
         roots.push(home.join("AppData/Roaming/Hytale"));
+        if let Some(root) = env::var_os("ProgramFiles") {
+            roots.push(PathBuf::from(root).join("Hypixel Studios/Hytale Launcher"));
+        }
     } else if cfg!(target_os = "macos") {
         roots.push(home.join("Library/Application Support/Hytale"));
+        roots.push(PathBuf::from(
+            "/Applications/Hytale Launcher.app/Contents/MacOS",
+        ));
     } else {
         if let Some(root) = env::var_os("XDG_DATA_HOME") {
             roots.push(PathBuf::from(root).join("Hytale"));
@@ -148,6 +171,7 @@ fn java_candidates(home: &Path, cache: &Path) -> Vec<PathBuf> {
             )));
         }
         paths.push(root.join("jre/latest/bin").join(java_name()));
+        paths.push(root.join("jre/latest/Contents/Home/bin").join(java_name()));
     }
     if let Some(java) = find_java(cache, 4) {
         paths.push(java);
@@ -314,13 +338,7 @@ fn install_runtime(state: &Path, cache: &Path, app: &Path, log: &File) -> Result
             false,
         );
     }
-    let agent: ureq::Agent = ureq::Agent::config_builder()
-        .https_only(true)
-        .timeout_global(Some(Duration::from_secs(600)))
-        .timeout_connect(Some(Duration::from_secs(20)))
-        .timeout_recv_body(Some(Duration::from_secs(30)))
-        .build()
-        .into();
+    let agent = http_agent(Duration::from_secs(600));
     let os = if cfg!(windows) {
         "windows"
     } else if cfg!(target_os = "macos") {
@@ -352,7 +370,7 @@ fn install_runtime(state: &Path, cache: &Path, app: &Path, log: &File) -> Result
     download(response.body_mut().as_reader(), &archive, package)?;
     let extracted = staging.path().join("extracted");
     fs::create_dir(&extracted)?;
-    extract(&archive, &extracted, cfg!(windows))?;
+    extract(&archive, &extracted)?;
     let java = find_java(&extracted, 4).ok_or("Downloaded runtime has no Java executable")?;
     if !probe(&java, app, log) {
         return Err("Downloaded Java failed the compatibility check".into());
@@ -473,40 +491,54 @@ fn download(mut source: impl Read, destination: &Path, package: &Package) -> Res
     out.sync_all()?;
     Ok(())
 }
-fn extract(archive: &Path, destination: &Path, windows: bool) -> Result<()> {
+fn extract(archive: &Path, destination: &Path) -> Result<()> {
+    #[cfg(windows)]
+    {
+        extract_zip(archive, destination)
+    }
+    #[cfg(unix)]
+    {
+        extract_tar(archive, destination)
+    }
+}
+#[cfg(any(windows, test))]
+fn extract_zip(archive: &Path, destination: &Path) -> Result<()> {
     let file = File::open(archive)?;
     let mut total = 0_u64;
-    if windows {
-        let mut zip = zip::ZipArchive::new(file)?;
-        for index in 0..zip.len() {
-            let mut entry = zip.by_index(index)?;
-            total = total.checked_add(entry.size()).ok_or("Archive too large")?;
-            if total > MAX_EXTRACTED {
-                return Err("Archive too large".into());
-            }
-            let path = destination.join(entry.enclosed_name().ok_or("Unsafe archive path")?);
-            if entry.is_symlink() {
-                return Err("Unexpected link in Java ZIP".into());
-            }
-            if entry.is_dir() {
-                fs::create_dir_all(path)?;
-            } else {
-                fs::create_dir_all(path.parent().ok_or("Invalid archive path")?)?;
-                io::copy(&mut entry, &mut File::create(path)?)?;
-            }
+    let mut zip = zip::ZipArchive::new(file)?;
+    for index in 0..zip.len() {
+        let mut entry = zip.by_index(index)?;
+        total = total.checked_add(entry.size()).ok_or("Archive too large")?;
+        if total > MAX_EXTRACTED {
+            return Err("Archive too large".into());
         }
-    } else {
-        let mut tar = tar::Archive::new(flate2::read::GzDecoder::new(file));
-        for entry in tar.entries()? {
-            let mut entry = entry?;
-            total = total.checked_add(entry.size()).ok_or("Archive too large")?;
-            if total > MAX_EXTRACTED {
-                return Err("Archive too large".into());
-            }
-            // tar's unpack_in confines paths and link targets to the staging directory.
-            if !entry.unpack_in(destination)? {
-                return Err("Unsafe archive path".into());
-            }
+        let path = destination.join(entry.enclosed_name().ok_or("Unsafe archive path")?);
+        if entry.is_symlink() {
+            return Err("Unexpected link in Java ZIP".into());
+        }
+        if entry.is_dir() {
+            fs::create_dir_all(path)?;
+        } else {
+            fs::create_dir_all(path.parent().ok_or("Invalid archive path")?)?;
+            std::io::copy(&mut entry, &mut File::create(path)?)?;
+        }
+    }
+    Ok(())
+}
+#[cfg(any(unix, test))]
+fn extract_tar(archive: &Path, destination: &Path) -> Result<()> {
+    let file = File::open(archive)?;
+    let mut total = 0_u64;
+    let mut tar = tar::Archive::new(flate2::read::GzDecoder::new(file));
+    for entry in tar.entries()? {
+        let mut entry = entry?;
+        total = total.checked_add(entry.size()).ok_or("Archive too large")?;
+        if total > MAX_EXTRACTED {
+            return Err("Archive too large".into());
+        }
+        // tar's unpack_in confines paths and link targets to the staging directory.
+        if !entry.unpack_in(destination)? {
+            return Err("Unsafe archive path".into());
         }
     }
     Ok(())
@@ -627,7 +659,7 @@ mod tests {
         zip.finish().unwrap();
         let staging = dir.path().join("staging");
         fs::create_dir(&staging).unwrap();
-        assert!(extract(&path, &staging, true).is_err());
+        assert!(extract_zip(&path, &staging).is_err());
         assert!(!dir.path().join("escaped").exists());
     }
     #[test]
@@ -651,7 +683,7 @@ mod tests {
         tar.into_inner().unwrap().finish().unwrap();
         let staging = dir.path().join("staging");
         fs::create_dir(&staging).unwrap();
-        extract(&archive, &staging, false).unwrap();
+        extract_tar(&archive, &staging).unwrap();
         assert_eq!(fs::read(find_java(&staging, 4).unwrap()).unwrap(), b"java");
     }
     #[cfg(unix)]
@@ -681,11 +713,7 @@ mod tests {
     fn real_download_works_without_hytale() {
         let app = PathBuf::from(env::var_os("MODTALE_TEST_APP").expect("MODTALE_TEST_APP"));
         let dir = tempfile::tempdir().unwrap();
-        let agent: ureq::Agent = ureq::Agent::config_builder()
-            .https_only(true)
-            .timeout_global(Some(Duration::from_secs(180)))
-            .build()
-            .into();
+        let agent = http_agent(Duration::from_secs(180));
         let os = if cfg!(windows) {
             "windows"
         } else if cfg!(target_os = "macos") {
@@ -727,7 +755,7 @@ mod tests {
         .unwrap();
         let runtime = dir.path().join("runtime");
         fs::create_dir(&runtime).unwrap();
-        extract(&archive, &runtime, cfg!(windows)).unwrap();
+        extract(&archive, &runtime).unwrap();
         let java = find_java(&runtime, 4).unwrap();
         let log = File::create(dir.path().join("probe.log")).unwrap();
         assert!(

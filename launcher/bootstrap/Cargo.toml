@@ -4,13 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ureq = { version = "3.4", default-features = false, features = ["rustls"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
-flate2 = "1"
-tar = "0.4"
-zip = { version = "8", default-features = false, features = ["deflate"] }
 fs2 = "0.4"
 tempfile = "3"
 tinyfiledialogs = "3.9"
@@ -19,10 +15,33 @@ tinyfiledialogs = "3.9"
 winresource = "0.1"
 
 [profile.release]
-opt-level = "s"
+opt-level = "z"
+panic = "abort"
 lto = true
 codegen-units = 1
 strip = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libloading = "0.9"
+
+[target.'cfg(target_os = "linux")'.dependencies.ureq]
+version = "3.4"
+default-features = false
+features = ["rustls"]
+
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies.ureq]
+version = "3.4"
+default-features = false
+features = ["native-tls"]
+
+[target.'cfg(windows)'.dependencies]
+zip = { version = "8", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+
+[target.'cfg(unix)'.dependencies]
+flate2 = "1"
+tar = "0.4"
+
+[dev-dependencies]
+zip = { version = "8", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+flate2 = "1"
+tar = "0.4"

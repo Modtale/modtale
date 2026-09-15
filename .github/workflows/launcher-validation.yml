@@ -81,6 +81,8 @@ jobs:
             Linux) launcher="build/jpackage/app-image/Modtale Launcher/bin/Modtale Launcher" ;;
           esac
           python bootstrap/smoke.py "$launcher" "$JAVA_HOME"
+          python bootstrap/smoke.py "$launcher" "$JAVA_HOME" --hytale
+          python bootstrap/smoke.py "$launcher"
       - name: Upload validation reports
         if: always()
         uses: actions/upload-artifact@v7.0.1
@@ -89,3 +91,4 @@ jobs:
           path: |
             launcher/build/reports/tests
             launcher/build/test-results
+            launcher/build/reports/package-size.json
