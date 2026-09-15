@@ -44,3 +44,38 @@ it('explains unmatched evidence without claiming newness or safety', async () =>
     await act(async () => root.render(<PriorFindingReasoning {...props} />));await load();
     expect(container.textContent).toContain('does not mean the finding is new or safe');
 });
+it('uses a newly selected baseline and ignores the pending older baseline response', async () => {
+    let resolve!: (value: typeof result) => void;
+    vi.mocked(loadPriorFindingReasoning).mockReturnValueOnce(new Promise(done => { resolve = done; }))
+        .mockResolvedValueOnce({ ...result, sourceVersionId: 'second', sourceVersion: '2', decisions: [] });
+    const sources = [...props.sources, { id: 'second', versionNumber: '2' }];
+    await act(async () => root.render(<PriorFindingReasoning {...props} sources={sources} sourceVersionId="source" autoLoad />));
+    await act(async () => root.render(<PriorFindingReasoning {...props} sources={sources} sourceVersionId="second" autoLoad />));
+    expect(loadPriorFindingReasoning).toHaveBeenLastCalledWith('project', 'target', 'second', 0, 'snapshot');
+    expect(container.querySelector<HTMLSelectElement>('select')!.value).toBe('second');
+    await act(async () => resolve(result));
+    expect(container.textContent).not.toContain('untrusted rationale');
+    expect(container.textContent).toContain('does not mean the finding is new or safe');
+});
+it('falls back to an available approved source after the selected source disappears', async () => {
+    vi.mocked(loadPriorFindingReasoning).mockResolvedValue(result);
+    await act(async () => root.render(<PriorFindingReasoning {...props} sourceVersionId="source" autoLoad />));
+    vi.mocked(loadPriorFindingReasoning).mockResolvedValue({ ...result, sourceVersionId: 'replacement', decisions: [] });
+    await act(async () => root.render(<PriorFindingReasoning {...props} sources={[{ id: 'replacement', versionNumber: '3' }]} sourceVersionId="source" autoLoad />));
+    expect(loadPriorFindingReasoning).toHaveBeenLastCalledWith('project', 'target', 'replacement', 0, 'snapshot');
+    expect(container.querySelector<HTMLSelectElement>('select')!.value).toBe('replacement');
+    expect(container.textContent).not.toContain('untrusted rationale');
+});
+it('prevents duplicate loads before the disabled button renders', async () => {
+    vi.mocked(loadPriorFindingReasoning).mockReturnValue(new Promise(() => {}));
+    await act(async () => root.render(<PriorFindingReasoning {...props} />));
+    await act(async () => {
+        container.querySelector<HTMLButtonElement>('button')!.click();
+        container.querySelector<HTMLButtonElement>('button')!.click();
+    });
+    expect(loadPriorFindingReasoning).toHaveBeenCalledTimes(1);
+});
+it('does not request an out-of-range occurrence even when manually triggered', async () => {
+    await act(async () => root.render(<PriorFindingReasoning {...props} issueIndex={2} />));
+    await load(); expect(loadPriorFindingReasoning).not.toHaveBeenCalled();
+});
