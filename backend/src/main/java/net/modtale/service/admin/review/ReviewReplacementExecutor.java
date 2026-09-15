@@ -61,7 +61,7 @@ public final class ReviewReplacementExecutor {
                     for(String field:List.of("securityEvidence","reviewedContextSha256","reusedReviewVersion","reusedReviewOrigins"))scan.put(field,null);
                     scan.put("reusedReviewApprovedAt",0L);
                     var fields=new Document("scanResult",scan).append("reviewStatus","PENDING").append("scheduledPublishDate",null)
-                            .append("securityApprovedAt",0L).append("reviewIsolation",null)
+                            .append("securityApprovedAt",0L)
                             .append("reviewReplacement",new Document("operationId",prepared.id()).append("beforeSha256",prepared.beforeSha256()).append("requestId",prepared.replacement().requestId()));
                     for(String field:List.of("securityApprovalProjectId","approvedSecurityEvidence","approvedSecurityContextSha256","approvedReviewOrigins","approvedFindingReviewHead"))fields.put(field,null);
                     String prefix="versions."+source.versionIndex()+".";var set=new Document();fields.forEach((key,value)->set.put(prefix+key,value));
@@ -69,7 +69,8 @@ public final class ReviewReplacementExecutor {
                             new Document("$gte",List.of("$$NOW",new Date(prepared.createdAt()))),
                             new Document("$lt",List.of("$$NOW",new Date(prepared.expiresAt()))))));
                     permission(permitted);
-                    if(ReviewRepairIo.collection(projects,session).updateOne(session,query,new Document("$set",set),new UpdateOptions().collation(BINARY)).getModifiedCount()==1) {
+                    if(ReviewRepairIo.collection(projects,session).updateOne(session,query,new Document("$set",set)
+                            .append("$unset",new Document(prefix+"reviewIsolation","")),new UpdateOptions().collation(BINARY)).getModifiedCount()==1) {
                         after=reader.capture(session,source.projectId(),source.versionIndex(),original.getString("_id")).sha256();
                         var admission=new Document("_id",prepared.id()).append("beforeArchiveId",source.id()).append("beforeSha256",prepared.beforeSha256())
                                 .append("afterSha256",after).append("actor",actor).append("projectId",source.projectId()).append("versionIndex",source.versionIndex())

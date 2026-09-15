@@ -20,7 +20,7 @@ class ReviewReplacementEvidenceReaderTest {
     @BeforeEach void setup()throws Exception {
         fixture.setup();current=new ReviewRemoteTargetReader(fixture.fixture.mongo);
         resolver=spy(new ReviewOrphanTargetResolver(fixture.fixture.mongo,fixture.archive,fixture.isolation));
-        reader=new ReviewReplacementEvidenceReader(current,resolver);
+        reader=new ReviewReplacementEvidenceReader(current,resolver,new ReviewReplacementHistoryReader(fixture.fixture.mongo,fixture.archive,current));
     }
     @AfterEach void cleanup(){fixture.cleanup();}
     ReviewReplacementEvidenceReader.Evidence capture(){return reader.capture(fixture.raw().get("_id"),0,"v",()->true);}
@@ -64,7 +64,7 @@ class ReviewReplacementEvidenceReaderTest {
 
     @Test void permissionIsRequiredBeforeReadsAndRecheckedAfterHistoricalRecovery() {
         fixture.fixture.attached(30000);fixture.isolateExpiredBrokenPoll();
-        var observed=spy(current);var guarded=new ReviewReplacementEvidenceReader(observed,resolver);
+        var observed=spy(current);var guarded=new ReviewReplacementEvidenceReader(observed,resolver,new ReviewReplacementHistoryReader(fixture.fixture.mongo,fixture.archive,current));
         Object id=fixture.raw().get("_id");
         assertThrows(SecurityException.class,()->guarded.capture(id,0,"v",()->false));
         verifyNoInteractions(observed,resolver);

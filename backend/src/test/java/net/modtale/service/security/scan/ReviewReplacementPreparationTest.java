@@ -23,7 +23,7 @@ class ReviewReplacementPreparationTest {
             "d".repeat(64),new RemoteReviewOrigin("22222222-2222-2222-2222-222222222222","f".repeat(64)));
     @BeforeEach void setup()throws Exception {
         fixture.setup();fixture.fixture.attached(30000);targets=new ReviewRemoteTargetReader(fixture.fixture.mongo);
-        evidence=new ReviewReplacementEvidenceReader(targets,new ReviewOrphanTargetResolver(fixture.fixture.mongo,fixture.archive,fixture.isolation));
+        evidence=new ReviewReplacementEvidenceReader(targets,new ReviewOrphanTargetResolver(fixture.fixture.mongo,fixture.archive,fixture.isolation),new ReviewReplacementHistoryReader(fixture.fixture.mongo,fixture.archive,targets));
         preparation=create(fixture.archive,clock);
     }
     ReviewReplacementPreparation create(ReviewSnapshotArchive archive,Clock clock) {

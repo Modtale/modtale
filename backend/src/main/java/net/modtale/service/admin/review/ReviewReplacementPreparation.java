@@ -83,6 +83,9 @@ public final class ReviewReplacementPreparation {
         return recoverEvidence(id,actor,permitted).prepared();
     }
     public Recovered recoverEvidence(String id,String actor,BooleanSupplier permitted) {
+        return recoverEvidence(archive,targets,id,actor,permitted);
+    }
+    static Recovered recoverEvidence(ReviewSnapshotArchive archive,ReviewRemoteTargetReader targets,String id,String actor,BooleanSupplier permitted) {
         permission(permitted);
         var intent=archive.load(id);permission(permitted);
         if(intent.action()!=ReviewSnapshotArchive.Action.REPLACEMENT_INTENT || !intent.actorId().equals(actor)

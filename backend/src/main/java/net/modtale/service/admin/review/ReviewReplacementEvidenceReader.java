@@ -9,12 +9,14 @@ import java.util.function.BooleanSupplier;
 
 /** Current evidence and authenticated isolation history; no replacement or remote-work authority. */
 public final class ReviewReplacementEvidenceReader {
-    public record Evidence(ReviewRemoteTargetReader.Captured current,ReviewOrphanTargetResolver.Target isolation) {}
+    public record Evidence(ReviewRemoteTargetReader.Captured current,ReviewOrphanTargetResolver.Target isolation,ReviewReplacementHistoryReader.Link previousReplacement) {}
     private final ReviewRemoteTargetReader current;
     private final ReviewOrphanTargetResolver orphans;
+    private final ReviewReplacementHistoryReader history;
 
-    public ReviewReplacementEvidenceReader(ReviewRemoteTargetReader current,ReviewOrphanTargetResolver orphans) {
+    public ReviewReplacementEvidenceReader(ReviewRemoteTargetReader current,ReviewOrphanTargetResolver orphans,ReviewReplacementHistoryReader history) {
         this.current=Objects.requireNonNull(current);this.orphans=Objects.requireNonNull(orphans);
+        this.history=Objects.requireNonNull(history);
     }
 
     public Evidence capture(Object projectId,int versionIndex,String versionId,BooleanSupplier permitted) {
@@ -23,10 +25,12 @@ public final class ReviewReplacementEvidenceReader {
         permission(permitted);
         var version=new RawBsonDocument(captured.snapshot().versionBytes()).decode(new DocumentCodec());
         var scan=version.get("scanResult",Document.class);
+        Object prior=version.get("reviewReplacement");
+        var previous=prior==null?null:history.verifyHead(projectId,versionIndex,captured.binding(),prior,permitted);
         Object reference=version.get("reviewIsolation");
         if(reference==null) {
             if("REMOTE_ISOLATED".equals(scan.get("scanState")))throw inconsistent();
-            permission(permitted);return new Evidence(captured,null);
+            permission(permitted);return new Evidence(captured,null,previous);
         }
         ProjectVersion.ReviewIsolation isolation;
         try {
@@ -42,7 +46,7 @@ public final class ReviewReplacementEvidenceReader {
                 || original.versionIndex()!=captured.snapshot().versionIndex()
                 || !original.beforeSha256().equals(isolation.beforeSha256())
                 || !original.binding().equals(captured.binding()))throw inconsistent();
-        permission(permitted);return new Evidence(captured,original);
+        permission(permitted);return new Evidence(captured,original,previous);
     }
 
     private static void permission(BooleanSupplier permitted) {
