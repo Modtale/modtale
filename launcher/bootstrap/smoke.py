@@ -10,7 +10,7 @@ executable = Path(sys.argv[1]).resolve()
 with tempfile.TemporaryDirectory(prefix="modtale bootstrap ü ") as directory:
     home = Path(directory)
     environment = os.environ.copy()
-    for key in ("MODTALE_JAVA", "MODTALE_HYTALE_HOME", "JAVA_HOME", "PATH", "APPDATA", "LOCALAPPDATA", "XDG_DATA_HOME", "ProgramFiles"):
+    for key in ("MODTALE_JAVA", "MODTALE_HYTALE_HOME", "JAVA_HOME", "PATH", "APPDATA", "LOCALAPPDATA", "XDG_DATA_HOME", "HOST_XDG_DATA_HOME", "ProgramFiles"):
         environment.pop(key, None)
     environment.update(HOME=str(home), USERPROFILE=str(home), PATH="", XDG_DATA_HOME=str(home))
     offline = dict(HTTPS_PROXY="http://127.0.0.1:1", HTTP_PROXY="http://127.0.0.1:1", ALL_PROXY="http://127.0.0.1:1", NO_PROXY="")

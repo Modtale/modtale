@@ -887,6 +887,7 @@ exec "\$APPDIR/bin/${appDisplayName}" "\$@"
                 '--socket=wayland',
                 '--device=dri',
                 '--filesystem=home',
+                '--filesystem=~/.var/app/com.hypixel.HytaleLauncher/data/Hytale/install:ro',
                 '--talk-name=org.freedesktop.portal.Desktop',
                 buildDir.absolutePath
         ])

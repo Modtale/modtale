@@ -142,8 +142,10 @@ fn java_candidates(home: &Path, cache: &Path) -> Vec<PathBuf> {
             "/Applications/Hytale Launcher.app/Contents/MacOS",
         ));
     } else {
-        if let Some(root) = env::var_os("XDG_DATA_HOME") {
-            roots.push(PathBuf::from(root).join("Hytale"));
+        for key in ["XDG_DATA_HOME", "HOST_XDG_DATA_HOME"] {
+            if let Some(root) = env::var_os(key) {
+                roots.push(PathBuf::from(root).join("Hytale"));
+            }
         }
         for root in [
             ".var/app/com.hypixel.HytaleLauncher/data/Hytale",
@@ -263,24 +265,54 @@ fn run() -> Result<i32> {
         return Ok(0);
     }
     writeln!(log, "Starting Modtale with {}", java.display())?;
-    // Keep arguments as OS strings so deep links, spaces and non-ASCII paths survive unchanged.
-    let mut child = command(&java)
-        .args(&config.jvm_args)
-        .arg("-cp")
-        .arg(app.join("*"))
-        .arg("net.modtale.launcher.LauncherMain")
+    // Replace the Unix bootstrap process so the Dock/taskbar does not retain a second launcher.
+    let mut launch = application_command(&java, &app, &config);
+    launch
         .args(env::args_os().skip(1))
         .stdout(log.try_clone()?)
-        .stderr(log.try_clone()?)
-        .spawn()?;
-    let status = child.wait()?;
-    if !status.success() {
-        return Err(
-            format!("The launcher exited with {status}. See bootstrap.log for details.").into(),
-        );
+        .stderr(log.try_clone()?);
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        Err(launch.exec().into())
     }
-    Ok(0)
+    #[cfg(windows)]
+    {
+        let status = launch.spawn()?.wait()?;
+        if !status.success() {
+            return Err(format!(
+                "The launcher exited with {status}. See bootstrap.log for details."
+            )
+            .into());
+        }
+        Ok(0)
+    }
 }
+fn application_command(java: &Path, app: &Path, config: &Config) -> Command {
+    let mut launch = command(java);
+    launch.args(&config.jvm_args);
+    #[cfg(target_os = "macos")]
+    {
+        launch.arg("-Xdock:name=Modtale Launcher");
+        if let Ok(icons) = fs::read_dir(app.join("../Resources")) {
+            if let Some(icon) = icons
+                .filter_map(|entry| entry.ok())
+                .map(|entry| entry.path())
+                .find(|path| path.extension().is_some_and(|ext| ext == "icns"))
+            {
+                let mut argument = std::ffi::OsString::from("-Xdock:icon=");
+                argument.push(icon);
+                launch.arg(argument);
+            }
+        }
+    }
+    launch
+        .arg("-cp")
+        .arg(app.join("*"))
+        .arg("net.modtale.launcher.LauncherMain");
+    launch
+}
+
 fn acquire_setup_lock(state: &Path, timeout: Duration) -> Result<File> {
     let lock = OpenOptions::new()
         .create(true)
@@ -555,6 +587,28 @@ mod tests {
             checksum: format!("{:x}", Sha256::digest(bytes)),
             size: bytes.len() as u64,
         }
+    }
+    #[test]
+    fn preserves_argument_boundaries_for_native_launch() {
+        let config = Config {
+            jvm_args: vec!["-Dmodtale.launcherVersion=1.0".into()],
+        };
+        let mut launch =
+            application_command(Path::new("java"), Path::new("app with spaces ü"), &config);
+        launch.arg("modtale://install/project?name=space and ü");
+        let args: Vec<_> = launch.get_args().collect();
+        assert_eq!(args[0], "-Dmodtale.launcherVersion=1.0");
+        assert_eq!(
+            args[args.len() - 3],
+            Path::new("app with spaces ü").join("*").as_os_str()
+        );
+        assert_eq!(args[args.len() - 2], "net.modtale.launcher.LauncherMain");
+        assert_eq!(
+            args[args.len() - 1],
+            "modtale://install/project?name=space and ü"
+        );
+        #[cfg(target_os = "macos")]
+        assert!(args.contains(&std::ffi::OsStr::new("-Xdock:name=Modtale Launcher")));
     }
     #[test]
     fn verifies_download_before_use() {
