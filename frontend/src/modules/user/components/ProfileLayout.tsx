@@ -283,7 +283,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                             <>
                                 <ImageIcon className="w-8 h-8 text-white mb-2" aria-hidden="true" />
                                 <span className="text-xs font-bold text-white">Change Avatar</span>
-                                <span className="text-[10px] font-medium text-white/70">Rec: 512x512 · Max 10 MB · {IMAGE_DIMENSION_LABEL}</span>
+                                <span className="text-[10px] font-medium text-white/70">Rec: 512x512</span>
                             </>
                         )}
                     </label>
