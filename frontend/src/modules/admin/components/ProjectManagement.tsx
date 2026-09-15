@@ -2,6 +2,7 @@ import { SkeletonSurface } from '@/components/ui/Skeleton';
 import React, { useState, useEffect, useRef } from 'react';
 import { Package, Search, Trash2, EyeOff, Clock, AlertTriangle, ArrowRight, Hash, Terminal, Download, RotateCcw, Code, X, FileJson, Lock } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
+import { projectMetadataForRepair } from '../utils/projectMetadataRepair';
 import { API_BASE_URL, extractApiErrorMessage } from '@/utils/api';
 import { AdminPermission, hasAdminPermission } from '../utils/access';
 import type { Project, ScanIssue } from '@/types';
@@ -31,6 +32,7 @@ export function ProjectManagement({ setStatus, currentAdmin: initialAdmin }: { s
 
     const [showRawModal, setShowRawModal] = useState(false);
     const [rawJsonStr, setRawJsonStr] = useState('');
+    const [rawReviewToken, setRawReviewToken] = useState<string | null>(null);
     const [jsonError, setJsonError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -138,7 +140,12 @@ export function ProjectManagement({ setStatus, currentAdmin: initialAdmin }: { s
 
     const openRawEdit = () => {
         if (!canEditRaw) return;
-        setRawJsonStr(JSON.stringify(foundProject, null, 2));
+        if (!foundProject?.reviewToken) {
+            setStatus({ type: 'error', title: 'Refresh required', msg: 'Reload this project before editing its metadata.' });
+            return;
+        }
+        setRawReviewToken(foundProject.reviewToken);
+        setRawJsonStr(JSON.stringify(projectMetadataForRepair(foundProject), null, 2));
         setJsonError(null);
         setShowRawModal(true);
     };
@@ -178,14 +185,15 @@ export function ProjectManagement({ setStatus, currentAdmin: initialAdmin }: { s
 
     const saveRawEdit = async () => {
         if (!foundProject) return;
-        if (!canEditRaw) return;
+        if (!canEditRaw || !rawReviewToken) return;
         setLoading(true);
         try {
             const parsed = JSON.parse(rawJsonStr);
-            await adminClient.updateProjectRaw(foundProject.id, parsed);
+            await adminClient.updateProjectRaw(foundProject.id, parsed, rawReviewToken);
             setStatus({ type: 'success', title: 'Saved', msg: 'Raw project metadata updated successfully.' });
             setShowRawModal(false);
-            setFoundProject(parsed);
+            setFoundProject(null);
+            setRawReviewToken(null);
         } catch (e: any) {
             setStatus({
                 type: 'error',
@@ -275,7 +283,7 @@ export function ProjectManagement({ setStatus, currentAdmin: initialAdmin }: { s
 
                         <div className="flex flex-wrap gap-4">
                             <button onClick={openRawEdit} disabled={!canEditRaw} className={`flex-1 py-3 border-2 rounded-xl font-bold flex items-center justify-center gap-2 transition-all min-w-[200px] ${!canEditRaw ? 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-slate-400 opacity-50 cursor-not-allowed' : 'border-indigo-500/20 hover:border-indigo-500 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-500'}`}>
-                                <Code className="w-4 h-4" /> Edit Raw JSON {!canEditRaw && <Lock className="w-4 h-4" />}
+                                <Code className="w-4 h-4" /> Repair Metadata {!canEditRaw && <Lock className="w-4 h-4" />}
                             </button>
 
                             {foundProject.status === 'DELETED' ? (
@@ -334,7 +342,7 @@ export function ProjectManagement({ setStatus, currentAdmin: initialAdmin }: { s
                         <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
                             <div className="bg-slate-900 w-full max-w-5xl rounded-3xl shadow-2xl border border-white/10 flex flex-col overflow-hidden h-[85vh]">
                                 <div className="px-6 py-4 border-b border-white/10 flex justify-between items-center bg-black/40">
-                                    <div><h3 className="font-bold text-white flex items-center gap-2 text-lg"><FileJson className="w-5 h-5 text-indigo-400" /> JSON Editor</h3><p className="text-xs text-slate-400 mt-1 font-mono">Editing project: {foundProject.id}</p></div>
+                                    <div><h3 className="font-bold text-white flex items-center gap-2 text-lg"><FileJson className="w-5 h-5 text-indigo-400" /> Metadata Editor</h3><p className="text-xs text-slate-400 mt-1 font-mono">Review and release changes use their dedicated actions. Project: {foundProject.id}</p></div>
                                     <button onClick={() => setShowRawModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
                                 </div>
                                 <div className="flex-1 p-6 overflow-hidden flex flex-col bg-[#0d1117]">

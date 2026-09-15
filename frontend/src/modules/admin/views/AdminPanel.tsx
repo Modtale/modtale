@@ -1,3 +1,5 @@
+import { ReviewOrigins } from '../components/ReviewOrigins';
+import { ReviewStateDiagnostics } from '../components/ReviewStateDiagnostics';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText, CalendarClock } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
@@ -12,7 +14,8 @@ import { PlatformAnalytics } from '../components/PlatformAnalytics';
 import { AuditLogs } from '../components/AuditLogs';
 import { StatusIncidents } from '../components/StatusIncidents';
 import { AdminPermission, hasAdminPermission, hasAnyAdminPermission, isAdminUser } from '../utils/access';
-import type { AdminVerificationQueueItem } from '@/types';
+import { useModerationQueue } from '../hooks/useModerationQueue';
+import type { QueueFilter } from '../api/moderationQueue';
 
 interface AdminPanelProps {
     currentUser: any;
@@ -21,13 +24,9 @@ interface AdminPanelProps {
 type AdminTab = 'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'logs' | 'status';
 
 export function AdminPanel({ currentUser }: AdminPanelProps) {
+    const [queueFilter, setQueueFilter] = useState<QueueFilter>('ALL');
     const [activeTab, setActiveTab] = useState<AdminTab>('verification');
     const [status, setStatus] = useState<any>(null);
-
-    const [pendingProjects, setPendingProjects] = useState<AdminVerificationQueueItem[]>([]);
-    const [loadingQueue, setLoadingQueue] = useState(false);
-    const [queueError, setQueueError] = useState<string | null>(null);
-    const queueRequestInFlight = useRef(false);
 
     const [reviewingProject, setReviewingProject] = useState<any>(null);
     const [loadingReview, setLoadingReview] = useState(false);
@@ -83,16 +82,20 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         canUseProjectManagement,
         canUseUserManagement
     ]);
+    const queue = useModerationQueue(canReadReviewQueue, currentUser?.id || currentUser?.username || '', queueFilter);
+    const pendingProjects = queue.page.items;
+    const loadingQueue = queue.loading;
+    const queueError = queue.error;
+    const fetchQueue = queue.refresh;
+    const queueHeading = useRef<HTMLHeadingElement>(null);
+    const queueFailure = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (queue.navigation.revision === 0 || !canReadReviewQueue || activeTab !== 'verification' || reviewingProject) return;
+        (queue.navigation.target === 'error' ? queueFailure.current : queueHeading.current)?.focus();
+    }, [queue.navigation, canReadReviewQueue, activeTab, reviewingProject]);
     const firstAllowedTab = (Object.keys(tabAccess) as AdminTab[]).find(tab => tabAccess[tab]);
 
     useEffect(() => {
-        if (canReadReviewQueue) {
-            fetchQueue();
-        } else {
-            setPendingProjects([]);
-            setQueueError(null);
-        }
-
         if (canReadReports) {
             fetchReports();
         } else {
@@ -120,23 +123,6 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         }
     }, [activeTab, firstAllowedTab, isAdmin, tabAccess]);
 
-    const fetchQueue = async (background = false) => {
-        if (!canReadReviewQueue || queueRequestInFlight.current) return;
-        queueRequestInFlight.current = true;
-        if (!background) setLoadingQueue(true);
-        try {
-            const data = await adminClient.getVerificationQueue();
-            if (!Array.isArray(data)) throw new Error('The verification queue returned an invalid response.');
-            setPendingProjects(data);
-            setQueueError(null);
-        } catch (e) {
-            setQueueError(extractApiErrorMessage(e, 'We could not load the verification queue.'));
-        } finally {
-            queueRequestInFlight.current = false;
-            if (!background) setLoadingQueue(false);
-        }
-    };
-
     const fetchReports = async () => {
         if (!canReadReports) return;
         setLoadingReports(true);
@@ -151,13 +137,19 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         }
     };
 
-    const fetchProjectDetails = async (id: string) => {
+    const fetchProjectDetails = async (id: string, versionId?: string) => {
         if (loadingReview) return;
         setLoadingReview(true);
         setLoadingReviewId(id);
         try {
             const data = await adminClient.getReviewDetails(id);
-            setReviewingProject(data);
+            if (versionId) {
+                const selected = data.mod.versions.filter((version: any) => version.id === versionId);
+                if (selected.length !== 1 || selected[0].reviewStatus !== 'PENDING' || selected[0].scanResult?.status === 'SCANNING') {
+                    throw new Error('This version is no longer ready for review. Refresh the queue.');
+                }
+            }
+            setReviewingProject({ ...data, selectedVersionId: versionId });
         } catch (e) {
             setStatus({ type: 'error', title: 'Error', msg: extractApiErrorMessage(e, "We could not load this project's review details.") });
         } finally {
@@ -300,25 +292,42 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                             {activeTab === 'verification' && canReadReviewQueue && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="mb-8">
-                                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-normal">Verification Queue</h1>
-                                        <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Review pending projects and updates.</p>
+                                        <h1 ref={queueHeading} tabIndex={-1} className="text-3xl font-black text-slate-900 dark:text-white tracking-normal">Verification Queue</h1>
+                                        <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Review pending projects and updates. Pages are ordered by project and version, not risk.</p>
                                     </div>
                                     {queueError && (
-                                        <div className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
+                                        <div ref={queueFailure} tabIndex={-1} role="alert" className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
                                             <span>{queueError}</span>
-                                            <button type="button" onClick={() => fetchQueue()} className="shrink-0 rounded-lg border border-current px-3 py-1.5 font-bold hover:bg-red-100 dark:hover:bg-red-500/10">
+                                            <button type="button" onClick={() => void queue.retry()} className="shrink-0 rounded-lg border border-current px-3 py-1.5 font-bold hover:bg-red-100 dark:hover:bg-red-500/10">
                                                 Retry
                                             </button>
                                         </div>
                                     )}
+                                    <div className="mb-4 flex flex-wrap items-center gap-3">
+                                        <label htmlFor="moderation-queue-filter" className="text-sm font-bold">Queue view</label>
+                                        <select id="moderation-queue-filter" value={queueFilter} onChange={event => setQueueFilter(event.target.value as QueueFilter)} className="rounded-lg border px-3 py-2 text-sm dark:bg-slate-900">
+                                            <option value="ALL">All pending reviews</option>
+                                            <option value="SECURITY">Security findings</option>
+                                            <option value="OPERATIONS">Review service failures</option>
+                                        </select>
+                                        <button type="button" onClick={() => void queue.restart()} className="rounded-lg border px-3 py-2 text-sm font-bold">Refresh from start</button>
+                                        <button type="button" disabled={loadingQueue || !queue.page.nextCursor} onClick={queue.next} className="rounded-lg border px-3 py-2 text-sm font-bold disabled:opacity-50">Next page</button>
+                                        <span role="status" aria-live="polite" className="text-sm text-slate-500">{pendingProjects.length} entries on this page{loadingQueue ? ' · Loading…' : ''}</span>
+                                    </div>
+                                    {queue.page.unavailableItems > 0 && <p role="status" className="mb-4 text-sm text-amber-700">{queue.page.unavailableItems} entries on this page cannot be opened safely and need data repair. Continue to inspect other entries.</p>}
                                     <VerificationQueue
                                         pendingProjects={pendingProjects}
                                         loadingQueue={loadingQueue}
                                         loadFailed={queueError !== null}
+                                        hasMore={queue.page.nextCursor !== null}
+                                        unavailableItems={queue.page.unavailableItems}
+                                        loaded={queue.loaded}
                                         loadingReview={loadingReview}
                                         reviewingId={loadingReviewId}
                                         onReview={fetchProjectDetails}
                                     />
+                                    <ReviewStateDiagnostics subject={currentUser?.id || currentUser?.username || ''} canRepair={canRescanVersions} />
+                                    <ReviewOrigins subject={currentUser?.id || currentUser?.username || ''} />
                                 </div>
                             )}
 

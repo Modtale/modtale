@@ -165,6 +165,7 @@ class ProjectMapperTest {
         pendingVersion.setChangelog("Needs review");
         pendingVersion.getScanResult().setStatus(ScanStatus.SUSPICIOUS);
         pendingVersion.getScanResult().setVerdict("REVIEW");
+        pendingVersion.getScanResult().setScanState("REMOTE_HELD");
         pendingVersion.getScanResult().setRiskScore(73);
         pendingVersion.getScanResult().setKnownIssueCount(2);
         pendingVersion.getScanResult().setNewIssueCount(3);
@@ -177,6 +178,7 @@ class ProjectMapperTest {
         assertEquals("Needs review", item.pendingVersion().changelog());
         assertEquals(ScanStatus.SUSPICIOUS, item.pendingVersion().scan().status());
         assertEquals("REVIEW", item.pendingVersion().scan().verdict());
+        assertEquals("REMOTE_HELD", item.pendingVersion().scan().scanState());
         assertEquals(73, item.pendingVersion().scan().riskScore());
         assertEquals(3, item.pendingVersion().scan().newIssueCount());
         assertEquals(1, item.pendingVersion().scan().escalatedIssueCount());

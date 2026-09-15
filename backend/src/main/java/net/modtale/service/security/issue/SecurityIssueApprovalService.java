@@ -21,13 +21,27 @@ public class SecurityIssueApprovalService {
     }
 
     public void markIssuesAcceptedForApprovedVersion(ProjectVersion version) {
-        if (version == null || version.getScanResult() == null) return;
+        if (version == null) return;
+        // Only the conditional manual approval writer may attest a reviewed finding-history head.
+        version.setApprovedFindingReviewHead(null);
+        if (version.getScanResult() == null) {
+            version.setSecurityApprovalProjectId(null);
+            version.setApprovedReviewOrigins(null);
+            version.setApprovedSecurityEvidence(null);
+            version.setApprovedSecurityContextSha256(null);
+            version.setSecurityApprovedAt(0);
+            version.setApprovedIssueBaselines(null);
+            return;
+        }
         ScanResult scanResult = version.getScanResult();
         securityIssueClassificationService.normalizeScanResult(scanResult);
 
         List<ScanResult.ScanIssue> issues = scanResult.getIssues();
         List<ProjectVersion.ApprovedIssueBaseline> approvedIssueBaselines = new ArrayList<>();
         long approvedAt = approvedAt(version);
+        var identities = IssueEvidenceIdentity.from(java.util.Objects.equals(version.getHash(),
+                scanResult.getSecurityEvidence() == null ? null : scanResult.getSecurityEvidence().artifactSha256())
+                ? scanResult : null);
 
         for (ScanResult.ScanIssue issue : issues) {
             if (issue == null) continue;
@@ -49,19 +63,38 @@ public class SecurityIssueApprovalService {
                 issue.setBaselineScoreImpact(Math.max(0, issue.getScoreImpact()));
             }
 
-            approvedIssueBaselines.add(new ProjectVersion.ApprovedIssueBaseline(
+            var stored = new ProjectVersion.ApprovedIssueBaseline(
                     fingerprint,
                     looseFingerprint,
                     severity,
                     Math.max(0, issue.getScoreImpact()),
                     Math.max(0, issue.getConfidence()),
                     approvedAt
-            ));
+            );
+            stored.setEvidenceIdentity(identities.identify(issue));
+            approvedIssueBaselines.add(stored);
         }
 
         scanResult.setKnownIssueCount(issues.size());
         scanResult.setNewIssueCount(0);
         scanResult.setEscalatedIssueCount(0);
+        var evidence = scanResult.getSecurityEvidence();
+        boolean reusableEvidence = net.modtale.service.security.scan.ArtifactClearancePolicy.complete(scanResult)
+                && java.util.Objects.equals(version.getHash(), evidence.artifactSha256())
+                && java.util.Objects.equals(net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(version),
+                        scanResult.getReviewedContextSha256());
+        reusableEvidence = reusableEvidence && (scanResult.getReusedReviewVersion() == null
+                || net.modtale.service.security.scan.ArtifactReviewLineage.wellFormed(scanResult.getReusedReviewOrigins())
+                && !scanResult.getReusedReviewOrigins().isEmpty());
+        if (!reusableEvidence) version.setSecurityApprovalProjectId(null);
+        version.setApprovedReviewOrigins(!reusableEvidence ? null : scanResult.getReusedReviewVersion() == null
+                ? java.util.Map.of() : java.util.Map.copyOf(scanResult.getReusedReviewOrigins()));
+        version.setApprovedSecurityEvidence(!reusableEvidence ? null : new ScanResult.SecurityEvidence(
+                evidence.policyVersion(), evidence.artifactSha256(), evidence.contentSha256(), evidence.complete(),
+                evidence.clearanceGranted(), evidence.reviewState(), java.util.Map.of()));
+        version.setApprovedSecurityContextSha256(reusableEvidence ? scanResult.getReviewedContextSha256() : null);
+        version.setSecurityApprovedAt(!reusableEvidence ? 0 : scanResult.getReusedReviewApprovedAt() > 0
+                ? scanResult.getReusedReviewApprovedAt() : Instant.now().toEpochMilli());
         version.setApprovedIssueBaselines(approvedIssueBaselines);
         version.setScanResult(null);
     }
@@ -78,6 +111,7 @@ public class SecurityIssueApprovalService {
                     || version.getScanResult() == null) {
                 continue;
             }
+            version.setSecurityApprovalProjectId(project.getId());
             markIssuesAcceptedForApprovedVersion(version);
             pruned++;
         }

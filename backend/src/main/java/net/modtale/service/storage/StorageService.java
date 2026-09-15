@@ -138,6 +138,15 @@ public class StorageService {
         s3Client.putObject(putOb, RequestBody.fromBytes(data));
     }
 
+    public void deleteOwnedProjectMedia(String projectId, String location, java.util.Collection<String> remainingReferences) {
+        String key = ProjectMediaKeys.ownedKey(projectId, location, publicDomain);
+        // Legacy or foreign references are not proof of ownership and require reconciled cleanup.
+        if (key == null || remainingReferences == null) return;
+        for (String reference : remainingReferences)
+            if (key.equals(ProjectMediaKeys.ownedKey(projectId, reference, publicDomain))) return;
+        deleteFile(key);
+    }
+
     public void deleteFile(String fileName) {
         if (fileName == null || fileName.isEmpty()) return;
 
@@ -197,6 +206,17 @@ public class StorageService {
         } catch (IOException | SdkException e) {
             throw StorageDownloadException.from(e, "Failed to download the requested file.");
         }
+    }
+
+    public byte[] downloadBounded(String fileName,int maxBytes) {
+        if(maxBytes<1 || maxBytes>100*1024*1024)throw new IllegalArgumentException("Invalid download limit");
+        try (ResponseInputStream<GetObjectResponse> response=s3Client.getObject(GetObjectRequest.builder().bucket(bucketName).key(fileName).build())) {
+            Long size=response.response().contentLength();
+            if(size!=null && (size<0 || size>maxBytes)){response.abort();throw new IOException("Stored artifact exceeds download limit");}
+            byte[] bytes=response.readNBytes(maxBytes+1);
+            if(bytes.length>maxBytes || size!=null && size!=bytes.length){response.abort();throw new IOException("Stored artifact length is invalid");}
+            return bytes;
+        } catch(IOException | SdkException failure) {throw StorageDownloadException.from(failure,"Failed to download the requested artifact.");}
     }
 
     public java.util.Set<String> findExistingKeys(java.util.Set<String> requiredKeys) {

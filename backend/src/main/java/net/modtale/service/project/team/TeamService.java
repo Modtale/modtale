@@ -27,8 +27,8 @@ public class TeamService {
         teamTransferService.requestTransfer(id, targetUserId, requester);
     }
 
-    public void resolveTransfer(String id, boolean accept, User responder) {
-        teamTransferService.resolveTransfer(id, accept, responder);
+    public void resolveTransfer(String id, boolean accept, String requestId, User responder) {
+        teamTransferService.resolveTransfer(id, accept, requestId, responder);
     }
 
     public Project createProjectRole(String id, String name, String color, Set<ApiKey.ApiPermission> perms, User requester) {
@@ -47,8 +47,8 @@ public class TeamService {
         teamMembershipService.inviteContributor(id, targetUserId, roleId, requester);
     }
 
-    public void cancelInvite(String id, String targetUserId, User requester) {
-        teamMembershipService.cancelInvite(id, targetUserId, requester);
+    public void cancelInvite(String id, String targetUserId, String requestId, User requester) {
+        teamMembershipService.cancelInvite(id, targetUserId, requestId, requester);
     }
 
     public void updateContributorRole(String id, String targetUserId, String roleId, User requester) {
@@ -59,11 +59,11 @@ public class TeamService {
         teamMembershipService.removeContributor(id, targetUserId, requester);
     }
 
-    public void acceptInvite(String id, String userId) {
-        teamMembershipService.acceptInvite(id, userId);
+    public void acceptInvite(String id, String userId, String requestId) {
+        teamMembershipService.acceptInvite(id, userId, requestId);
     }
 
-    public void declineInvite(String id, String userId) {
-        teamMembershipService.declineInvite(id, userId);
+    public void declineInvite(String id, String userId, String requestId) {
+        teamMembershipService.declineInvite(id, userId, requestId);
     }
 }
