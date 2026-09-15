@@ -42,17 +42,24 @@ public class PriorFindingReasoningService {
             if(event.supersedesDecisionId()!=null) removed.add(event.supersedesDecisionId());
         }
         if(events.stream().anyMatch(e->e.disposition()==FindingReviewService.Disposition.REQUIRE_REVIEW && !removed.contains(e.id()))) throw unavailable();
-        boolean approvedOccurrence=source.getApprovedIssueBaselines()!=null && source.getApprovedIssueBaselines().stream()
-                .filter(Objects::nonNull).anyMatch(value->identity.equals(value.getEvidenceIdentity()));
-        var matched=events.stream().filter(e->approvedOccurrence && e.disposition()==FindingReviewService.Disposition.ACCEPT
+        String reasoningIdentity = IssueEvidenceIdentity.from(scan).reasoningIdentity(issue);
+        var approvedIdentities = new HashSet<String>();
+        if (source.getApprovedIssueBaselines() != null) for (var baseline : source.getApprovedIssueBaselines()) {
+            if (baseline == null || baseline.getEvidenceIdentity() == null
+                    || !baseline.getEvidenceIdentity().matches("ie1:[0-9a-f]{64}")) continue;
+            if (identity.equals(baseline.getEvidenceIdentity()) || reasoningIdentity != null
+                    && reasoningIdentity.equals(baseline.getReasoningEvidenceIdentity())) approvedIdentities.add(baseline.getEvidenceIdentity());
+        }
+        var matched=events.stream().filter(e->approvedIdentities.contains(e.finding().identity()) && e.disposition()==FindingReviewService.Disposition.ACCEPT
                 && !removed.contains(e.id()) && "WHOLE_ARTIFACT".equals(e.scope())
-                && identity.equals(e.finding().identity()) && Objects.equals(issue.getFilePath(),e.finding().path())
+                && Objects.equals(issue.getFilePath(),e.finding().path())
                 && Objects.equals(issue.getType(),e.finding().type()) && Objects.equals(issue.getDescription(),e.finding().description())
                 && issue.getLineStart()==e.finding().lineStart() && issue.getLineEnd()==e.finding().lineEnd()
                 && approved.contentSha256().equals(e.contentSha256()) && approved.policyVersion().equals(e.policyVersion())
                 && source.getApprovedSecurityContextSha256().equals(e.contextSha256())
                 && e.createdAt()<=source.getSecurityApprovedAt()).toList();
         var reasons=new ArrayList<String>();
+        if (matched.stream().anyMatch(e -> !identity.equals(e.finding().identity()))) reasons.add("Risk scoring changed; this earlier explanation does not establish current acceptance.");
         if(!approved.contentSha256().equals(scan.getSecurityEvidence().contentSha256())) reasons.add("Artifact contents changed; callers and resources need current review.");
         if(!source.getApprovedSecurityContextSha256().equals(context)) reasons.add("Runtime, dependency or manifest context changed.");
         if("BLOCK".equals(scan.getVerdict()) || scan.getStatus()==ScanStatus.INFECTED

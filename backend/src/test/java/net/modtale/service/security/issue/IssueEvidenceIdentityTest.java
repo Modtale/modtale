@@ -121,6 +121,31 @@ class IssueEvidenceIdentityTest {
         assertEquals("second", b.mergeWith(a).evidenceIdentity());
     }
 
+    @Test void existingDecisionIdentityRemainsByteCompatible() {
+        var scan = scan(); var issue = scan.getIssues().getFirst();
+        issue.setScoreImpact(7); issue.setConfidence(81); issue.setEvidenceLevel("BEHAVIORAL");
+        issue.setReviewCadence("WHEN_CHANGED"); issue.setReviewPriority("MEDIUM"); issue.setTactics(List.of("NETWORK"));
+        assertEquals("ie1:950d94eaa1e0b2e30188bdc3973219e4d450ffbd72ecaa8880c899321adab9b2", IssueEvidenceIdentity.from(scan).identify(issue));
+    }
+    @Test void reasoningIdentityIgnoresOnlyScoringAndStillBindsSecurityEvidence() {
+        var scan = scan(); var issue = scan.getIssues().getFirst(); var identities = IssueEvidenceIdentity.from(scan);
+        String exact = identities.identify(issue), reasoning = identities.reasoningIdentity(issue);
+        issue.setScoreImpact(40); issue.setConfidence(90); issue.setReviewPriority("HIGH"); issue.setNoiseSuppressed(true);
+        assertNotEquals(exact, identities.identify(issue)); assertEquals(reasoning, identities.reasoningIdentity(issue));
+        issue.setSeverity("HIGH"); assertNotEquals(reasoning, identities.reasoningIdentity(issue));
+        var changed = scan(); replaceEntries(changed, Map.of("Mod.class", "c".repeat(64)));
+        assertNotEquals(reasoning, IssueEvidenceIdentity.from(changed).reasoningIdentity(changed.getIssues().getFirst()));
+    }
+    @Test void approvalRetainsReasoningIdentityAndOldSnapshotsOmitAbsentField() throws Exception {
+        var scan = scan(); String expected = IssueEvidenceIdentity.from(scan).reasoningIdentity(scan.getIssues().getFirst());
+        var prior = approved(scan);
+        assertEquals(expected, prior.getApprovedIssueBaselines().getFirst().getReasoningEvidenceIdentity());
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        assertFalse(mapper.valueToTree(new ProjectVersion.ApprovedIssueBaseline()).has("reasoningEvidenceIdentity"));
+        var restored = mapper.readValue(mapper.writeValueAsBytes(prior), ProjectVersion.class);
+        assertEquals(expected, restored.getApprovedIssueBaselines().getFirst().getReasoningEvidenceIdentity());
+    }
+
     private void annotate(ScanResult current, ProjectVersion prior) {
         var project = new Project(); project.setVersions(List.of(prior));
         evaluation.annotateAgainstBaselines(current,

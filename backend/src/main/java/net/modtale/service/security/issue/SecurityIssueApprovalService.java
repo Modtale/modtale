@@ -76,6 +76,7 @@ public class SecurityIssueApprovalService {
                     approvedAt
             );
             stored.setEvidenceIdentity(identities.identify(issue));
+            stored.setReasoningEvidenceIdentity(identities.reasoningIdentity(issue));
             approvedIssueBaselines.add(stored);
         }
 

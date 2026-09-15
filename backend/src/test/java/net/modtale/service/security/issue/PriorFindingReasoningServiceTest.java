@@ -89,4 +89,31 @@ class PriorFindingReasoningServiceTest {
     @Test void absentApprovedOccurrenceNeverManufacturesRecordedApproval() {
         var f=new Fixture();f.source.setApprovedIssueBaselines(List.of());assertTrue(f.read().decisions().isEmpty());
     }
+    @Test void scoringChangesCanRetrieveNewlyBoundReasoningWithoutAcceptance() {
+        var f = new Fixture(); var scan = f.target.getScanResult(); var issue = scan.getIssues().getFirst();
+        f.source.getApprovedIssueBaselines().getFirst().setReasoningEvidenceIdentity(IssueEvidenceIdentity.from(scan).reasoningIdentity(issue));
+        issue.setScoreImpact(40); issue.setConfidence(90); issue.setReviewPriority("HIGH"); issue.setNoiseSuppressed(true);
+        var result = f.read(); assertEquals(List.of(f.event), result.decisions());
+        assertTrue(result.reviewReasons().stream().anyMatch(r -> r.contains("Risk scoring changed")));
+        assertFalse(issue.isResolved()); assertFalse(ArtifactClearancePolicy.cleared(scan));
+        verify(f.mongo, never()).insert(any(), anyString());
+    }
+    @Test void legacyApprovalsCannotInventMissingReasoningBindings() {
+        var f = new Fixture(); f.target.getScanResult().getIssues().getFirst().setConfidence(90);
+        assertTrue(f.read().decisions().isEmpty());
+    }
+    @Test void newReasoningBindingCannotMatchChangedDescriptionsFilesOrSeverity() {
+        for (String change : List.of("description", "file", "severity")) {
+            var f = new Fixture(); var scan = f.target.getScanResult(); var issue = scan.getIssues().getFirst();
+            f.source.getApprovedIssueBaselines().getFirst().setReasoningEvidenceIdentity(IssueEvidenceIdentity.from(scan).reasoningIdentity(issue));
+            switch (change) {
+                case "description" -> issue.setDescription("Different destination");
+                case "severity" -> issue.setSeverity("HIGH");
+                case "file" -> { var e = scan.getSecurityEvidence(); var entries = Map.of("Mod.class", "c".repeat(64));
+                    scan.setSecurityEvidence(new ScanResult.SecurityEvidence(e.policyVersion(), e.artifactSha256(), SecurityManifest.identity(entries), true, false, e.reviewState(), entries)); }
+            }
+            assertTrue(f.read().decisions().isEmpty(), change);
+        }
+    }
+
 }

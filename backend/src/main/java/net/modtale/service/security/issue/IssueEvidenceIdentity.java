@@ -24,23 +24,32 @@ final class IssueEvidenceIdentity {
                 Map.copyOf(scan.getSecurityEvidence().entryHashes()));
     }
 
-    String identify(ScanResult.ScanIssue issue) {
+    String identify(ScanResult.ScanIssue issue) { return identify(issue, false); }
+    String reasoningIdentity(ScanResult.ScanIssue issue) { return identify(issue, true); }
+    private String identify(ScanResult.ScanIssue issue, boolean reasoningOnly) {
         if (policy == null || issue == null || issue.getFilePath() == null) return null;
         String fileHash = entries.get(issue.getFilePath());
         if (fileHash == null) return null;
         try {
             MessageDigest hash = MessageDigest.getInstance("SHA-256");
-            for (String value : new String[]{"finding-evidence-v1", policy, issue.getFilePath(), fileHash,
+            for (String value : new String[]{reasoningOnly ? "finding-reasoning-evidence-v1" : "finding-evidence-v1", policy, issue.getFilePath(), fileHash,
                     issue.getType(), issue.getCategory(), issue.getDescription(), issue.getSeverity(),
-                    Integer.toString(issue.getLineStart()), Integer.toString(issue.getLineEnd()),
-                    Integer.toString(issue.getScoreImpact()), Integer.toString(issue.getConfidence()),
-                    issue.getEvidenceLevel(), issue.getReviewCadence(), issue.getReviewPriority(),
-                    Boolean.toString(issue.isNoiseSuppressed())}) {
+                    Integer.toString(issue.getLineStart()), Integer.toString(issue.getLineEnd())}) {
                 append(hash, value);
+            }
+            if (!reasoningOnly) {
+                append(hash, Integer.toString(issue.getScoreImpact()));
+                append(hash, Integer.toString(issue.getConfidence()));
+            }
+            append(hash, issue.getEvidenceLevel());
+            append(hash, issue.getReviewCadence());
+            if (!reasoningOnly) {
+                append(hash, issue.getReviewPriority());
+                append(hash, Boolean.toString(issue.isNoiseSuppressed()));
             }
             hash.update(ByteBuffer.allocate(4).putInt(issue.getTactics().size()).array());
             for (String tactic : issue.getTactics()) append(hash, tactic);
-            return "ie1:" + HexFormat.of().formatHex(hash.digest());
+            return (reasoningOnly ? "re1:" : "ie1:") + HexFormat.of().formatHex(hash.digest());
         } catch (NoSuchAlgorithmException impossible) {
             throw new IllegalStateException(impossible);
         }

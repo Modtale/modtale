@@ -79,6 +79,24 @@ class ArtifactReviewLineageIntegrationTest {
                 new ScanRoutingService.RoutingDecision(ScanRoutingService.RoutingAction.APPROVE_NOW,0),target));
         assertEquals("REMOTE_REVIEW",mongo.findById(id,Project.class).getVersions().get(1).getScanResult().getScanState());
     }
+    @Test void approvalPersistsReasoningBindingAndSnapshotDetectsItsReplacement() {
+        var issue = new ScanResult.ScanIssue(); issue.setType("Network"); issue.setCategory("NETWORK");
+        issue.setDescription("Documented connection"); issue.setFilePath("Mod.class"); issue.setSeverity("LOW");
+        issue.setLineStart(9); issue.setLineEnd(11); result.setIssues(new ArrayList<>(List.of(issue)));
+        target.setScanResult(result);
+        new SecurityIssueApprovalService(new SecurityIssueClassificationService(new AppSecurityProperties("test",60,120,2,12,15,120,25,2)))
+                .markIssuesAcceptedForApprovedVersion(target);
+        String expected = target.getApprovedIssueBaselines().getFirst().getReasoningEvidenceIdentity();
+        assertTrue(expected.matches("re1:[0-9a-f]{64}"));
+        assertTrue(apply());
+        var stored = mongo.findById(id, Project.class).getVersions().get(1);
+        assertEquals(expected, stored.getApprovedIssueBaselines().getFirst().getReasoningEvidenceIdentity());
+        String token = VersionReviewSnapshot.token(stored);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(id)), new Update()
+                .set("versions.1.approvedIssueBaselines.0.reasoningEvidenceIdentity", "re1:" + "f".repeat(64)), Project.class);
+        var changed = mongo.findById(id, Project.class).getVersions().get(1);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class, () -> VersionReviewSnapshot.requireCurrent(changed, token));
+    }
     @Test void sourceGuardPublishesOnlyTargetAndRetainsOriginProof() {
         assertTrue(apply());var stored=mongo.findById(id,Project.class);
         assertEquals(ProjectVersion.ReviewStatus.APPROVED,stored.getVersions().get(1).getReviewStatus());

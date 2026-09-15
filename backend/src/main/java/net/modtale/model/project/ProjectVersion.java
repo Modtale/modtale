@@ -101,6 +101,7 @@ public class ProjectVersion {
         private String fingerprint;
         private String looseFingerprint;
         private String evidenceIdentity;
+        private String reasoningEvidenceIdentity;
         private String severity;
         private int scoreImpact;
         private int confidence;
@@ -123,6 +124,10 @@ public class ProjectVersion {
             this.confidence = confidence;
             this.approvedAt = approvedAt;
         }
+
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        public String getReasoningEvidenceIdentity() { return reasoningEvidenceIdentity; }
+        public void setReasoningEvidenceIdentity(String value) { reasoningEvidenceIdentity = value; }
 
         public String getEvidenceIdentity() { return evidenceIdentity; }
         public void setEvidenceIdentity(String value) { evidenceIdentity = value; }
