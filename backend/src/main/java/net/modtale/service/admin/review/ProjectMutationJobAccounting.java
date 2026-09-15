@@ -25,6 +25,9 @@ public final class ProjectMutationJobAccounting implements AutoCloseable {
     Receipt checkWithinBudget(String id,Object projectId,String mutationId,String versionId,BooleanSupplier permitted) {
         return view(mutationId,versionId,observer.check(id,access->target(projectId,mutationId,versionId,access),permitted));
     }
+    Receipt checkWithinBudget(String id,Object projectId,String mutationId,String versionId,BooleanSupplier permitted,Duration maximum) {
+        return view(mutationId,versionId,observer.check(id,access->target(projectId,mutationId,versionId,access),permitted,maximum));
+    }
     public Receipt receipt(String id,Object projectId,String mutationId,String versionId,BooleanSupplier permitted) {
         return budget.call(allowed->receiptWithinBudget(id,projectId,mutationId,versionId,allowed),permitted);
     }

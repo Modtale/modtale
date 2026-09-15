@@ -35,9 +35,13 @@ final class ReviewRemoteStatusObserver implements AutoCloseable {
                 .withWriteConcern(WriteConcern.MAJORITY.withJournal(true).withWTimeout(5,TimeUnit.SECONDS)).withTimeout(5000,TimeUnit.MILLISECONDS);
     }
     Receipt check(String id,Function<BooleanSupplier,Target> resolve,BooleanSupplier permitted) {
+        return check(id,resolve,permitted,Duration.ofNanos(budgetNanos));
+    }
+    Receipt check(String id,Function<BooleanSupplier,Target> resolve,BooleanSupplier permitted,Duration maximum) {
+        if(maximum==null || maximum.compareTo(Duration.ofSeconds(1))<0 || maximum.compareTo(Duration.ofSeconds(30))>0)throw new IllegalArgumentException("Invalid observation deadline");
         permission(permitted);if(!uuid(id))throw new IllegalArgumentException("Invalid observation identity");
         if(closed.get() || !slots.tryAcquire())throw new IllegalStateException("Reconciliation unavailable");
-        long started=System.nanoTime();LongSupplier remaining=()->budgetNanos-(System.nanoTime()-started);
+        long started=System.nanoTime();LongSupplier remaining=()->Math.min(budgetNanos,maximum.toNanos())-(System.nanoTime()-started);
         BooleanSupplier allowed=()->{if(closed.get() || Thread.currentThread().isInterrupted() || remaining.getAsLong()<=0)throw new IllegalStateException("Reconciliation stopped");return permitted.getAsBoolean();};
         try(var io=ReviewRepairIo.open(remaining)) {
             var target=resolve.apply(allowed);var expected=target.intent();var existing=read(id);
