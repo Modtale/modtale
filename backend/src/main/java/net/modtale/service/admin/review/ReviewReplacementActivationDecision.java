@@ -16,6 +16,8 @@ import java.util.function.BooleanSupplier;
 public final class ReviewReplacementActivationDecision {
     public record Prepared(String id,String replacementId,String observationId,String observationSha256,String heldSha256,
                            String rule,boolean acknowledgedUncertainty,long createdAt,long expiresAt) {}
+    record Context(ReviewSnapshotArchive.Snapshot decision,Document admission,net.modtale.model.project.RemoteReviewBinding replacement) {}
+    private record Recovered(Prepared prepared,ReviewSnapshotArchive.Snapshot snapshot) {}
     private final ReviewSnapshotArchive archive;
     private final ReviewReplacementPreparation preparation;
     private final ReviewReplacementExecutor executor;
@@ -51,6 +53,7 @@ public final class ReviewReplacementActivationDecision {
                 .append("versionIndex",source.versionIndex()).append("requestId",replacement.replacement().requestId()).append("state","HELD");
         if(admission==null || !Arrays.equals(bytes(expected),bytes(admission)))throw conflict();
         var observation=accounting.receipt(observationId,replacement,original.actorId(),permitted);
+        if(!Set.of("OBSERVED","UNKNOWN").contains(observation.state()))throw new IllegalStateException("A completed status observation is required before activation");
         var observationBody=observation(observation);
         boolean completed=completed(observation);
         if(!completed && !acknowledgeUncertainty)throw new IllegalStateException("The original job remains uncertain; acknowledge possible duplicate work before activation");
@@ -69,6 +72,9 @@ public final class ReviewReplacementActivationDecision {
 
     /** Historical read-back only; expiry never extends and recovery does not activate the admission. */
     public Prepared recover(String id,String actor,BooleanSupplier permitted) {
+        return recoverEvidence(id,actor,permitted).prepared();
+    }
+    private Recovered recoverEvidence(String id,String actor,BooleanSupplier permitted) {
         permission(permitted);var stored=archive.load(id);permission(permitted);
         if(stored.action()!=ReviewSnapshotArchive.Action.REPLACEMENT_ACTIVATION || !stored.actorId().equals(actor)
                 || stored.expiresAt()-stored.createdAt()>120000)throw conflict();
@@ -84,10 +90,21 @@ public final class ReviewReplacementActivationDecision {
         if(admission==null || !replacement.equals(admission.get("_id")) || !stored.projectId().equals(admission.get("projectId"))
                 || !Integer.valueOf(stored.versionIndex()).equals(admission.get("versionIndex")) || !held.equals(admission.get("afterSha256"))
                 || !"HELD".equals(admission.get("state")))throw conflict();
-        permission(permitted);return new Prepared(id,replacement,observation.getString("id"),digest(bytes(observation)),held,rule,ack,stored.createdAt(),stored.expiresAt());
+        permission(permitted);return new Recovered(new Prepared(id,replacement,observation.getString("id"),digest(bytes(observation)),held,rule,ack,stored.createdAt(),stored.expiresAt()),stored);
     }
     private Document readAdmission(String id) {
         return ReviewRepairIo.collection(admissions).find(new Document("_id",id)).collation(Collation.builder().locale("simple").build()).maxTime(5,TimeUnit.SECONDS).first();
+    }
+    Context verifyCurrent(Prepared expected,String actor,BooleanSupplier permitted) {
+        if(!expected.equals(recover(expected.id(),actor,permitted)))throw conflict();
+        var original=archive.load(expected.replacementId());
+        var replacement=preparation.recover(original.id(),original.actorId(),permitted);
+        if(!expected.equals(prepare(expected.id(),replacement,expected.observationId(),actor,expected.acknowledgedUncertainty(),permitted)))throw conflict();
+        var verified=recoverEvidence(expected.id(),actor,permitted);
+        if(!expected.equals(verified.prepared()))throw conflict();
+        var source=verified.snapshot();
+        var payload=new RawBsonDocument(source.versionBytes()).decode(new DocumentCodec());
+        return new Context(source,payload.get("admission",Document.class),replacement.replacement());
     }
     private static boolean completed(ReviewReplacementJobAccounting.Receipt receipt) {
         var observation=receipt.observation();return "OBSERVED".equals(receipt.state()) && observation!=null && "REMOTE_STATUS".equals(observation.kind())

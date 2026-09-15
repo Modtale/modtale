@@ -101,4 +101,10 @@ class ReviewReplacementActivationDecisionTest {
         assertThrows(IllegalStateException.class,()->prepare(false));assertThrows(IllegalStateException.class,()->prepare(true));
         assertEquals(prepared,decisions.recover(id,"next-moderator",()->true));
     }
+    @Test void unfinishedObservationCannotBeUsedForActivationEvenWithAcknowledgement() {
+        observe(200,"COMPLETED","COMPLETED");
+        base.fixture.fixture.fixture.mongo.getCollection(ReviewReplacementJobAccounting.COLLECTION).updateOne(new Document("_id",base.id),
+                new Document("$set",new Document("state","READING")).append("$unset",new Document("observation","").append("receivedAt","")));
+        assertThrows(IllegalStateException.class,()->prepare(true));assertNull(base.fixture.fixture.archive.find(id));
+    }
 }
