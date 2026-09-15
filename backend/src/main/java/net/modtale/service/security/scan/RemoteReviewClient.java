@@ -104,8 +104,9 @@ public final class RemoteReviewClient implements AutoCloseable {
     public Status status(RemoteReviewBinding binding) {
         requireJob(binding);return statusBody(exchange(scoped(client.get().uri(uri(binding,"/"+binding.jobId(),true)),binding.origin()),200,65536),binding);
     }
-    public Status cancel(RemoteReviewBinding binding) {
-        requireJob(binding);return statusBody(exchange(scoped(client.delete().uri(uri(binding,"/"+binding.jobId(),true)),binding.origin()),200,65536),binding);
+    public Status cancel(RemoteReviewBinding binding) {return cancel(binding,()->true,timeout::toNanos);}
+    public Status cancel(RemoteReviewBinding binding,java.util.function.BooleanSupplier current,java.util.function.LongSupplier remainingNanos) {
+        requireJob(binding);return statusBody(exchange(scoped(client.delete().uri(uri(binding,"/"+binding.jobId(),true)),binding.origin()),200,65536,current,remainingNanos),binding);
     }
     public ScanResult result(RemoteReviewBinding binding) {
         requireJob(binding);var body=exchange(scoped(client.get().uri(uri(binding,"/"+binding.jobId()+"/result",true)),binding.origin()),200,16*1024*1024);
@@ -138,14 +139,18 @@ public final class RemoteReviewClient implements AutoCloseable {
     }
     private JsonNode exchange(WebClient.RequestHeadersSpec<?> request,int expected,int max) {return exchange(request,expected,max,()->true);}
     private JsonNode exchange(WebClient.RequestHeadersSpec<?> request,int expected,int max,java.util.function.BooleanSupplier current) {
+        return exchange(request,expected,max,current,timeout::toNanos);
+    }
+    private JsonNode exchange(WebClient.RequestHeadersSpec<?> request,int expected,int max,java.util.function.BooleanSupplier current,java.util.function.LongSupplier remainingNanos) {
         if(closed.get() || !slots.tryAcquire())throw new Unavailable(503);
         try {
             if(closed.get())throw new Unavailable(503);
             if(!current.getAsBoolean())throw new Superseded();
+            long remaining=Math.min(timeout.toNanos(),remainingNanos.getAsLong());if(remaining<=0)throw new Superseded();
             byte[] bytes=request.exchangeToMono(response->{
                 if(response.statusCode().value()!=expected)return response.releaseBody().then(reactor.core.publisher.Mono.error(new Unavailable(response.statusCode().value())));
                 return response.bodyToMono(byte[].class);
-            }).takeUntilOther(stop.asMono()).timeout(timeout).block();
+            }).takeUntilOther(stop.asMono()).timeout(Duration.ofNanos(remaining)).block();
             if(closed.get() || bytes==null || bytes.length==0 || bytes.length>max)throw new Unavailable(502);
             var parsed=mapper.readTree(bytes);if(parsed==null || !parsed.isObject())throw new Unavailable(502);return parsed;
         }catch(Unavailable | Superseded failure){throw failure;}catch(Exception failure){throw new Unavailable(503);}finally{slots.release();}
