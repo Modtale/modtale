@@ -343,7 +343,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                     {uploadingBanner ? <Spinner className="w-4 h-4" /> : <ImageIcon className="w-4 h-4" />}
                                     {uploadingBanner ? 'Uploading...' : 'Change Banner'}
                                 </div>
-                                <span className="text-[10px] font-bold opacity-70 drop-shadow-sm mt-0.5">Rec: 1920x640 · Max 10 MB · {IMAGE_DIMENSION_LABEL}</span>
+                                <span className="text-[10px] font-bold opacity-70 drop-shadow-sm mt-0.5">Rec: 1920x640</span>
                             </div>
                         ) : (
                             <div className="flex flex-col items-center">
