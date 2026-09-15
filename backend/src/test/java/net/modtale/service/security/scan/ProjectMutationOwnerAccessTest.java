@@ -128,4 +128,59 @@ class ProjectMutationOwnerAccessTest {
         verify(orchestration,never()).deleteCachedArtifact(anyString());
     }
 
+    net.modtale.service.project.lifecycle.ProjectDraftWorkflowService submissionService(boolean retained,
+            net.modtale.service.project.version.VersionMutationOrchestrationService orchestration,net.modtale.service.communication.WebhookService webhooks){
+        var mongo=base.base.base.fixture.mongo;var projects=mock(net.modtale.repository.project.ProjectRepository.class);
+        when(projects.findById(anyString())).thenAnswer(call->Optional.ofNullable(mongo.findById(call.getArgument(0),net.modtale.model.project.Project.class)));
+        var access=mock(net.modtale.service.project.access.ProjectAccessService.class);
+        when(access.requireProjectPermission(anyString(),any(),eq("PROJECT_STATUS_SUBMIT"),anyString())).thenAnswer(call->mongo.findById(call.getArgument(0),net.modtale.model.project.Project.class));
+        var service=new net.modtale.service.project.lifecycle.ProjectDraftWorkflowService(projects,mock(net.modtale.service.project.query.ProjectService.class),
+                mock(net.modtale.service.project.validation.ValidationService.class),webhooks,mock(net.modtale.service.security.validation.SanitizationService.class),mock(UserRepository.class),access,
+                new net.modtale.service.project.access.ProjectMutationGuard(),orchestration,new net.modtale.config.properties.AppLimitProperties(10,5,10,5,5,5,20,10),new ProjectReviewPersistence(mongo));
+        if(retained)org.springframework.test.util.ReflectionTestUtils.setField(service,"retainedMutations",owner);return service;
+    }
+    void draft(){
+        user.setEmailVerified(true);base.base.base.fixture.mongo.getCollection("projects").updateOne(new Document("_id",base.root().get("_id")),
+                new Document("$set",new Document("status","DRAFT").append("description","A complete project description").append("tags",List.of("utility")).append("license","MIT")));
+    }
+    @Test void productionSubmissionPreservesPrunedHistoryAndAttemptWithOnlySubmissionScope(){
+        draft();api(Set.of(ApiKey.ApiPermission.PROJECT_STATUS_SUBMIT));var fixture=base.base.base.fixture;
+        fixture.change("retainedRemoteReview",fixture.mongo.getConverter().convertToMongoType(fixture.saved().getRemoteReview()));fixture.change("scanResult",null);
+        var before=VersionMutationPreparationTest.bytes(base.root());var orchestration=mock(net.modtale.service.project.version.VersionMutationOrchestrationService.class);var webhooks=mock(net.modtale.service.communication.WebhookService.class);
+        submissionService(true,orchestration,webhooks).submitProject(base.root().get("_id").toString(),user);
+        assertEquals("PENDING",base.root().get("status"));var version=base.root().getList("versions",Document.class).getFirst();
+        assertEquals(2,version.get("scanResult",Document.class).get("scanAttempt"));assertEquals("MUTATION_HELD",version.get("scanResult",Document.class).get("scanState"));
+        var ref=fixture.mongo.getCollection(ProjectMutationExecutor.REFERENCES).find().first();assertArrayEquals(before,base.base.base.archive.load(ref.getString("beforeArchiveId")).versionBytes());
+        verifyNoInteractions(orchestration,webhooks);
+    }
+    @Test void disabledRuntimeCannotSubmitTrackedVersions(){
+        draft();var before=base.root();var orchestration=mock(net.modtale.service.project.version.VersionMutationOrchestrationService.class);var webhooks=mock(net.modtale.service.communication.WebhookService.class);
+        assertThrows(net.modtale.exception.InvalidProjectRequestException.class,()->submissionService(false,orchestration,webhooks).submitProject(before.get("_id").toString(),user));
+        assertEquals(before,base.root());verifyNoInteractions(orchestration,webhooks);
+    }
+    @Test void emailVerificationLossPreventsPreparedSubmission(){
+        draft();var captured=base.base.service.capture(base.root().get("_id"),()->true);var proposed=base.root();proposed.put("status","PENDING");
+        var prepared=owner.prepare(UUID.randomUUID().toString(),captured.projectId(),captured.sha256(),ProjectMutationPreparation.Mutation.SUBMISSION,VersionMutationPreparationTest.bytes(proposed));
+        user.setEmailVerified(false);assertThrows(SecurityException.class,()->owner.apply(prepared));assertEquals("DRAFT",base.root().get("status"));
+    }
+    @Test void emptyModpackSubmissionStillNotifiesManualReview(){
+        draft();base.base.base.fixture.mongo.getCollection("projects").updateOne(new Document("_id",base.root().get("_id")),new Document("$set",new Document("classification","MODPACK").append("versions",List.of())));
+        var orchestration=mock(net.modtale.service.project.version.VersionMutationOrchestrationService.class);var webhooks=mock(net.modtale.service.communication.WebhookService.class);
+        submissionService(true,orchestration,webhooks).submitProject(base.root().get("_id").toString(),user);
+        assertEquals("PENDING",base.root().get("status"));verify(webhooks).triggerAdminNewProjectWebhook(any());verifyNoInteractions(orchestration);
+    }
+
+    @Test void legacyUnboundQueuedSubmissionGetsRetainedRequest(){
+        draft();String old=UUID.randomUUID().toString();base.base.base.fixture.change("reviewStatus","PENDING");
+        base.base.base.fixture.change("scanResult",new Document("status","SCANNING").append("scanState","QUEUED").append("scanAttempt",1).append("scanRequestId",old));
+        owner.submitDraft(base.root());var scan=base.root().getList("versions",Document.class).getFirst().get("scanResult",Document.class);
+        assertEquals("MUTATION_HELD",scan.get("scanState"));assertEquals(2,scan.get("scanAttempt"));assertNotEquals(old,scan.get("scanRequestId"));
+    }
+    @Test void submissionDoesNotReplaceAnAlreadyRetainedHeldRequest(){
+        draft();var orchestration=mock(net.modtale.service.project.version.VersionMutationOrchestrationService.class);
+        editHandler(true,orchestration).updateVersion(base.root().get("_id").toString(),"v",null,null,List.of("changed"),null,null,user);
+        var scan=base.root().getList("versions",Document.class).getFirst().get("scanResult");owner.submitDraft(base.root());
+        assertEquals(scan,base.root().getList("versions",Document.class).getFirst().get("scanResult"));
+    }
+
 }

@@ -111,7 +111,9 @@ public final class ProjectMutationExecutor {
                 original=new Document(next);original.put("scanResult",null);original.put("securityApprovedAt",0L);
             } else original=old.get(transition.beforeIndex());
             boolean held=transition.beforeIndex()<0 || transition.changes().stream().anyMatch(change->change!=VersionReviewTransition.Change.METADATA)
-                    || prepared.mutation()==ProjectMutationPreparation.Mutation.SUBMISSION && original.get("scanResult")==null;
+                    || prepared.mutation()==ProjectMutationPreparation.Mutation.SUBMISSION && (original.get("scanResult")==null
+                    || original.get("versionMutation")==null && original.get("scanResult") instanceof Document queued
+                    && "SCANNING".equals(queued.get("status")) && queued.get("remoteReview")==null);
             if(held && "MODPACK".equals(before.get("classification")) && next.get("fileUrl")==null
                     && original.get("fileUrl") instanceof String cached && cached.endsWith(".zip")
                     && transition.changes().contains(VersionReviewTransition.Change.CONTEXT)) {

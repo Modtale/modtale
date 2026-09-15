@@ -25,6 +25,17 @@ public final class ProjectMutationOwnerAccess {
             return preparation.prepare(new ProjectMutationPreparation.Request(id,projectId,expectedSha256,actor,mutation,proposal),permitted);
         },()->true);
     }
+    public ProjectMutationExecutor.Result submitDraft(org.bson.Document original) {
+        byte[] before=bytes(Objects.requireNonNull(original));
+        var proposed=new org.bson.RawBsonDocument(before).decode(new org.bson.codecs.DocumentCodec());
+        proposed.put("status","PENDING");proposed.put("expiresAt",null);
+        for(var version:proposed.getList("versions",org.bson.Document.class))
+            if(version.get("reviewStatus")==null || "REJECTED".equals(version.get("reviewStatus")))version.put("reviewStatus","PENDING");
+        String sha;
+        try{sha=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(before));}
+        catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
+        return apply(prepare(java.util.UUID.randomUUID().toString(),original.get("_id"),sha,ProjectMutationPreparation.Mutation.SUBMISSION,bytes(proposed)));
+    }
     public ProjectMutationExecutor.Result editVersion(org.bson.Document original,org.bson.Document proposed) {
         byte[] before=bytes(Objects.requireNonNull(original));String sha;
         try{sha=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(before));}

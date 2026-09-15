@@ -40,6 +40,7 @@ public final class ProjectMutationOwnerAuthority {
         BooleanSupplier allowed=()->{
             if(SecurityContextHolder.getContext().getAuthentication()!=authentication)return false;
             var refreshed=current(authentication);if(refreshed==null || !actor.equals(refreshed.getId()))return false;
+            if(permissions.contains(ApiKey.ApiPermission.PROJECT_STATUS_SUBMIT) && !refreshed.isEmailVerified())return false;
             var raw=ReviewRepairIo.collection(mongo.getCollection("projects").withReadPreference(ReadPreference.primary()).withReadConcern(ReadConcern.MAJORITY))
                     .find(new Document("_id",projectId)).collation(Collation.builder().locale("simple").build()).maxTime(5,TimeUnit.SECONDS).first();
             if(raw==null || !projectId.equals(raw.get("_id")))return false;

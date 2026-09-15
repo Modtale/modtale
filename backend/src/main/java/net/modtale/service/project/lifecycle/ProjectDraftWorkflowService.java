@@ -31,6 +31,8 @@ import org.springframework.stereotype.Service;
 public class ProjectDraftWorkflowService {
 
     private final ProjectReviewPersistence reviewPersistence;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private net.modtale.service.admin.review.ProjectMutationOwnerAccess retainedMutations;
     private final ProjectRepository projectRepository;
     private final ProjectService projectService;
     private final ValidationService validationService;
@@ -185,6 +187,19 @@ public class ProjectDraftWorkflowService {
             throw new InvalidProjectRequestException("Select a license before submitting this project.");
         }
 
+        if(retainedMutations!=null) {
+            var outcome=retainedMutations.submitDraft(snapshot.raw());
+            if(!"APPLIED".equals(outcome.state()))throw ProjectReviewSnapshot.conflict();
+            projectService.evictProjectCache(project);
+            var committed=projectRepository.findById(id).orElseThrow(ProjectReviewSnapshot::conflict);
+            if(committed.getVersions()==null || committed.getVersions().stream().noneMatch(version->version.getScanResult()!=null
+                    && version.getScanResult().getStatus()==ScanStatus.SCANNING))webhookService.triggerAdminNewProjectWebhook(committed);
+            return;
+        }
+        if(project.getVersions()!=null && project.getVersions().stream().anyMatch(version->version.getRetainedRemoteReview()!=null
+                || version.getVersionMutation()!=null || version.getReviewReplacement()!=null || version.getReviewIsolation()!=null
+                || version.getReplacementSecurityHold()!=null || version.getScanResult()!=null && version.getScanResult().getRemoteReview()!=null))
+            throw new InvalidProjectRequestException("Retained review history must be available before submitting this project.");
         project.setStatus(ProjectStatus.PENDING);
         project.setExpiresAt(null);
         List<ProjectVersion> scansQueuedForSubmission = new ArrayList<>();
