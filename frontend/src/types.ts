@@ -176,6 +176,7 @@ export interface ScanIssue {
     baselineVersion?: string;
     baselineScoreImpact?: number;
     baselineSeverity?: string;
+    historicalFileEvidenceIdentical?: boolean;
 }
 
 export interface ScanSummary {
@@ -211,7 +212,19 @@ export interface ScanReviewTarget {
     relatedChecks?: string[];
 }
 
+export interface ArtifactSecurityEvidence {
+    policyVersion: string;
+    artifactSha256: string;
+    contentSha256: string;
+    complete: boolean;
+    clearanceGranted: boolean;
+    reviewState: string;
+    entryHashes: Record<string, string>;
+}
+
 export interface ScanResult {
+    securityEvidence?: ArtifactSecurityEvidence;
+    reusedReviewVersion?: string;
     status: 'SCANNING' | 'CLEAN' | 'SUSPICIOUS' | 'INFECTED' | 'FAILED' | 'FLAGGED' | string;
     verdict?: 'AUTO_APPROVE' | 'REVIEW' | 'BLOCK' | string;
     riskLevel?: 'LOW' | 'ELEVATED' | 'HIGH' | 'CRITICAL' | string;
@@ -231,6 +244,7 @@ export interface ScanResult {
 }
 
 export interface ProjectVersion {
+    reviewToken?: string;
     manifestId?: string;
     modpackConfigs?: { projectId: string; source: string; path: string; sha256: string }[];
     id: string;
@@ -303,6 +317,7 @@ export interface GalleryImage {
 }
 
 export interface Project {
+    reviewToken?: string;
     id: string;
     slug?: string;
     title: string;
@@ -347,6 +362,7 @@ export interface Project {
 }
 
 export interface AdminVerificationQueueScan {
+    scanState?: string;
     status?: ScanResult['status'];
     verdict?: ScanResult['verdict'];
     riskScore: number;

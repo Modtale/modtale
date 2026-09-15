@@ -36,3 +36,10 @@ for (const name of ['localStorage', 'sessionStorage'] as const) {
 }
 
 setI18n(createAppI18n());
+
+// jsdom lacks native modal methods. This facade supports component state tests;
+// focus containment, inert background and keyboard behavior require browser tests.
+if (typeof HTMLDialogElement !== 'undefined' && !HTMLDialogElement.prototype.showModal) {
+    HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+    HTMLDialogElement.prototype.close = function () { this.open = false; };
+}

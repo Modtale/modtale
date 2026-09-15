@@ -65,7 +65,8 @@ public class ScanExecutionService {
                 securityIssueAnalysisService,
                 scanRoutingService,
                 scanPersistenceService,
-                projectVersionAccessService
+                projectVersionAccessService,
+                wardenService
         );
         this.wardenService = wardenService;
         this.storageService = storageService;
@@ -88,18 +89,25 @@ public class ScanExecutionService {
             boolean isManualRescan,
             int expectedAttempt
     ) {
+        enqueueBackgroundScan(projectId, versionId, filePath, originalFilename, isManualRescan, expectedAttempt, null);
+    }
+    public void enqueueBackgroundScan(String projectId, String versionId, String filePath, String originalFilename,
+            boolean isManualRescan, int expectedAttempt, String requestId) {
+        // The persisted request is the durable handoff; polling owns remote dispatch.
+        if (wardenService.remoteJobsEnabled()) return;
         taskExecutor.execute(() -> processBackgroundScan(
                 projectId,
                 versionId,
                 filePath,
                 originalFilename,
                 isManualRescan,
-                expectedAttempt
+                expectedAttempt, requestId
         ));
     }
 
     @Scheduled(fixedDelayString = "${app.security.scan-recovery-check-ms:120000}")
     public void recoverStaleScanningVersions() {
+        if (wardenService.remoteJobsEnabled()) return;
         scanRecoveryService.recoverStaleScanningVersions(this::enqueueBackgroundScan);
     }
 
@@ -118,9 +126,11 @@ public class ScanExecutionService {
             String filePath,
             String originalFilename,
             boolean isManualRescan,
-            int expectedAttempt
+            int expectedAttempt, String requestId
     ) {
-        if (!scanPersistenceService.markAttemptRunning(projectId, versionId, expectedAttempt)) {
+        if (wardenService.remoteJobsEnabled()) return;
+        if (!(requestId == null ? scanPersistenceService.markAttemptRunning(projectId, versionId, expectedAttempt)
+                : scanPersistenceService.markAttemptRunning(projectId, versionId, expectedAttempt, requestId))) {
             logger.info("Scan attempt skipped because state moved ahead project={} version={} attempt={}", projectId, versionId, expectedAttempt);
             return;
         }
@@ -129,15 +139,12 @@ public class ScanExecutionService {
 
         try {
             byte[] fileBytes = storageService.download(filePath);
-            scanCompletionService.handleCompletedScan(
-                    projectId,
-                    versionId,
-                    expectedAttempt,
-                    isManualRescan,
-                    wardenService.scanFile(fileBytes, originalFilename)
-            );
+            var result = wardenService.scanFile(fileBytes, originalFilename);
+            if (requestId == null) scanCompletionService.handleCompletedScan(projectId, versionId, expectedAttempt, isManualRescan, result);
+            else scanCompletionService.handleCompletedScan(projectId, versionId, expectedAttempt, isManualRescan, result, requestId);
         } catch (RuntimeException e) {
-            scanCompletionService.handleScanFailure(projectId, versionId, originalFilename, expectedAttempt, e);
+            if (requestId == null) scanCompletionService.handleScanFailure(projectId, versionId, originalFilename, expectedAttempt, e);
+            else scanCompletionService.handleScanFailure(projectId, versionId, originalFilename, expectedAttempt, e, requestId);
         }
     }
 }

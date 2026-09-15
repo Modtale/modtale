@@ -8,14 +8,17 @@ interface VerificationQueueProps {
     loadingQueue: boolean;
     loadFailed?: boolean;
     loadingReview: boolean;
+    hasMore?: boolean;
+    unavailableItems?: number;
+    loaded?: boolean;
     reviewingId?: string;
-    onReview: (id: string) => void;
+    onReview: (id: string, versionId?: string) => void;
 }
 
 export const VerificationQueue: React.FC<VerificationQueueProps> = ({
-                                                                        pendingProjects, loadingQueue, loadFailed, loadingReview, reviewingId, onReview
+                                                                        pendingProjects, loadingQueue, loadFailed, loadingReview, reviewingId, onReview, hasMore = false, unavailableItems = 0, loaded = true
                                                                     }) => {
-    const Surface = loadingQueue ? SkeletonSurface : React.Fragment;
+    const Surface = loadingQueue && pendingProjects.length === 0 ? SkeletonSurface : React.Fragment;
     if (loadingQueue && pendingProjects.length === 0) {
         pendingProjects = Array.from({ length: 3 }, (_, index) => ({
             id: `pending-${index}`, title: 'Project review title', author: 'Creator name',
@@ -28,14 +31,17 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
         return null;
     }
 
+    if (pendingProjects.length === 0 && (hasMore || unavailableItems > 0 || !loaded)) {
+        return <p className="py-8 text-center text-slate-500">{hasMore ? 'No openable entries on this page. Continue to the next page.' : unavailableItems > 0 ? 'Some entries require data repair before they can be reviewed.' : 'Queue has not loaded yet.'}</p>;
+    }
     if (pendingProjects.length === 0) {
         return (
             <div className="text-center py-32 bg-white/40 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-md">
                 <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                     <CheckCircle className="w-10 h-10 text-emerald-500" />
                 </div>
-                <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">All Caught Up!</h3>
-                <p className="text-slate-500 font-medium">No projects or versions pending verification.</p>
+                <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">No entries on this page</h3>
+                <p className="text-slate-500 font-medium">Refresh from the start to check for new or changed reviews.</p>
             </div>
         );
     }
@@ -44,7 +50,8 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
         const isProjectPending = mod.status === 'PENDING';
         const targetVersion = mod.pendingVersion;
         const scan = targetVersion?.scan;
-        const hasIssues = scan && scan.status !== 'CLEAN';
+        const needsService = scan?.status === 'FAILED';
+        const hasIssues = scan && scan.status !== 'CLEAN' && !needsService;
         const newIssues = scan?.newIssueCount || 0;
         const knownIssues = scan?.knownIssueCount || 0;
         const escalatedIssues = scan?.escalatedIssueCount || 0;
@@ -52,7 +59,7 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
         const risk = scan?.riskScore || 0;
 
         return (
-            <div key={mod.id} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl backdrop-blur-md p-6 flex flex-col md:flex-row gap-8 hover:shadow-xl transition-all duration-300 group hover:border-modtale-accent/20">
+            <div key={JSON.stringify([mod.id, targetVersion?.id])} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl backdrop-blur-md p-6 flex flex-col md:flex-row gap-8 hover:shadow-xl transition-all duration-300 group hover:border-modtale-accent/20">
                 <div className="w-full md:w-32 h-32 rounded-2xl overflow-hidden bg-slate-100 dark:bg-white/5 relative shrink-0 shadow-inner">
                     <img src={mod.imageUrl} className="w-full h-full object-cover" alt="" onError={(e) => e.currentTarget.src = '/assets/favicon.svg'} />
                     {isProjectPending && (
@@ -77,6 +84,7 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
                         </div>
                     </div>
 
+                    {isProjectPending && targetVersion && <p className="text-sm text-slate-500">Version {targetVersion.versionNumber}</p>}
                     {isProjectPending ? (
                         <p className="text-slate-600 dark:text-slate-400 text-sm mb-6 line-clamp-2 leading-relaxed font-medium">{mod.description}</p>
                     ) : (
@@ -91,13 +99,17 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
                             <button
-                                onClick={() => onReview(mod.id)}
+                                onClick={() => onReview(mod.id, targetVersion?.id)}
                                 className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-black rounded-xl font-black text-sm flex items-center gap-2 hover:bg-slate-800 dark:hover:bg-slate-200 transition-all shadow-lg shadow-black/10 dark:shadow-white/5 hover:scale-105 active:scale-95"
                             >
-                                {loadingReview && reviewingId === mod.id ? 'Loading...' : <><Shield className="w-4 h-4" /> Verify {isProjectPending ? 'Project' : 'Update'}</>}
+                                {loadingReview && reviewingId === mod.id ? 'Loading...' : needsService ? 'Open diagnostics' : <><Shield className="w-4 h-4" /> Verify {isProjectPending ? 'Project' : 'Update'}</>}
                             </button>
                         </div>
                         <div className="flex items-center gap-2">
+                            {needsService && <div className="text-sm text-amber-700 dark:text-amber-300">
+                                {scan?.scanState === 'REMOTE_ORIGIN_UNVERIFIED' ? 'Original review service unverified' : scan?.scanState === 'REMOTE_CONTEXT_CONFLICT' ? 'Review service context conflict' : scan?.scanState === 'REMOTE_ISOLATED' ? 'Local review isolated' : ['REMOTE_BINDING_MISSING', 'REMOTE_BINDING_MISMATCH'].includes(scan?.scanState || '') ? 'Review state needs repair' : scan?.scanState === 'REMOTE_UNSUPPORTED_CONTEXT' ? 'Review context unsupported' : scan?.scanState === 'REMOTE_EXPIRED' ? 'Review expired' : scan?.scanState === 'REMOTE_CANCELLED' ? 'Review cancelled' : scan?.scanState === 'REMOTE_HELD' ? 'Review held' : 'Review unavailable'}
+                                <span className="block text-xs">Security clearance withheld</span>
+                            </div>}
                             {scan?.status === 'SCANNING' && (
                                 <div className="flex items-center gap-2 text-blue-500 bg-blue-500/10 px-3 py-1.5 rounded-lg">
                                     <Clock className="w-4 h-4" />
@@ -126,7 +138,15 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
 
     return (
         <Surface><div className="grid gap-4">
-            {pendingProjects.map(renderQueueItem)}
+            {pendingProjects.some(mod => mod.pendingVersion?.scan?.status !== 'FAILED') && <section aria-label="Content and security review" className="grid gap-4">
+                <h2 className="text-lg font-bold dark:text-white">Content and security review</h2>
+                {pendingProjects.filter(mod => mod.pendingVersion?.scan?.status !== 'FAILED').map(renderQueueItem)}
+            </section>}
+            {pendingProjects.some(mod => mod.pendingVersion?.scan?.status === 'FAILED') && <section aria-label="Review service attention" className="grid gap-4">
+                <div><h2 className="text-lg font-bold dark:text-white">Review service attention</h2>
+                    <p className="text-sm text-slate-600 dark:text-slate-300">These security reviews did not complete. Inspect the failure before requesting another scan. Existing findings still require review.</p></div>
+                {pendingProjects.filter(mod => mod.pendingVersion?.scan?.status === 'FAILED').map(renderQueueItem)}
+            </section>}
         </div></Surface>
     );
 };

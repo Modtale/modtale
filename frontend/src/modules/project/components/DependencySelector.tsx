@@ -635,7 +635,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                         </div>
 
                         <div className="px-6 pt-6 space-y-3">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
                                 <span className={`text-xs ${theme.colors.textMuted}`}>Show Alpha/Beta</span>
                                 <button type="button" onClick={() => setShowAlphaBeta(!showAlphaBeta)} className={`transition-colors ${showAlphaBeta ? theme.colors.accent : theme.colors.textMuted}`}>
                                     {showAlphaBeta ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}

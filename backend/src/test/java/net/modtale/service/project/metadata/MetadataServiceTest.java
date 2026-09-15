@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -28,6 +29,7 @@ import static org.mockito.Mockito.when;
 class MetadataServiceTest {
 
     private MetadataService service;
+    private net.modtale.service.admin.review.ProjectReviewPersistence reviewPersistence;
     private ProjectRepository projectRepository;
     private ProjectService projectService;
     private ValidationService validationService;
@@ -38,6 +40,11 @@ class MetadataServiceTest {
     @BeforeEach
     void setUp() {
         projectRepository = mock(ProjectRepository.class);
+        reviewPersistence = mock(net.modtale.service.admin.review.ProjectReviewPersistence.class);
+        when(reviewPersistence.capture(anyString(), anyString())).thenAnswer(invocation ->
+                new net.modtale.service.admin.review.ProjectReviewPersistence.Snapshot(new org.bson.Document(),
+                        projectService.getRawProjectById(invocation.getArgument(0))));
+        when(reviewPersistence.applyPresentation(any(), anyBoolean())).thenReturn(true);
         projectService = mock(ProjectService.class);
         validationService = mock(ValidationService.class);
         accessControlService = mock(AccessControlService.class);
@@ -46,6 +53,7 @@ class MetadataServiceTest {
 
         service = new MetadataService(
                 projectRepository,
+                reviewPersistence,
                 projectService,
                 validationService,
                 projectAccessService,
@@ -91,7 +99,7 @@ class MetadataServiceTest {
         assertEquals("MIT", existing.getLicense());
         assertFalse(existing.isCustomLicenseOpenSource());
         verify(validationService).validateSlug("new-slug");
-        verify(projectRepository).save(existing);
+        verify(reviewPersistence).applyPresentation(any(), eq(false));
         verify(projectService).evictProjectCache(existing);
     }
 
@@ -119,7 +127,7 @@ class MetadataServiceTest {
 
         assertEquals("Sky Public License", existing.getLicense());
         assertTrue(existing.isCustomLicenseOpenSource());
-        verify(projectRepository).save(existing);
+        verify(reviewPersistence).applyPresentation(any(), eq(false));
     }
 
     @Test
@@ -164,7 +172,7 @@ class MetadataServiceTest {
 
         assertThrows(InvalidProjectRequestException.class, () -> service.updateMetadata("project-1", updated, user));
 
-        verify(projectRepository, never()).save(existing);
+        verify(reviewPersistence, never()).applyPresentation(any(), anyBoolean());
         verify(projectService, never()).evictProjectCache(existing);
         assertEquals("owned-image.png", existing.getImageUrl());
     }
@@ -184,7 +192,7 @@ class MetadataServiceTest {
 
         service.updateMetadata("project-1", updated, user);
 
-        verify(projectRepository).save(existing);
+        verify(reviewPersistence).applyPresentation(any(), eq(false));
         assertEquals("owned-image.png", existing.getImageUrl());
     }
 

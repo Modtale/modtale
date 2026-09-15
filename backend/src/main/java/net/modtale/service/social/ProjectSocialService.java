@@ -9,38 +9,36 @@ import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.model.project.Comment;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.User;
-import net.modtale.repository.project.ProjectRepository;
 import net.modtale.repository.user.UserRepository;
-import net.modtale.service.analytics.ScoringService;
+import net.modtale.service.admin.review.ProjectReviewPersistence;
+import net.modtale.service.admin.review.ProjectReviewSnapshot;
 import net.modtale.service.communication.NotificationService;
 import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.security.validation.SanitizationService;
 
 final class ProjectSocialService {
 
+    private final ProjectReviewPersistence reviewPersistence;
     private final FavoritePersistence favorites;
-    private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final ProjectService projectService;
     private final NotificationService notificationService;
     private final SanitizationService sanitizer;
-    private final ScoringService scoringService;
 
     ProjectSocialService(
-            ProjectRepository projectRepository,
+            FavoritePersistence favorites,
             UserRepository userRepository,
             ProjectService projectService,
             NotificationService notificationService,
             SanitizationService sanitizer,
-            ScoringService scoringService, FavoritePersistence favorites
+            ProjectReviewPersistence reviewPersistence
     ) {
+        this.reviewPersistence = reviewPersistence;
         this.favorites = favorites;
-        this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.projectService = projectService;
         this.notificationService = notificationService;
         this.sanitizer = sanitizer;
-        this.scoringService = scoringService;
     }
 
     void toggleFavorite(String projectId, String userId) {
@@ -50,7 +48,9 @@ final class ProjectSocialService {
     }
 
     void addComment(String projectId, String userId, String content) {
-        Project project = getProject(projectId);
+        Project original = getProject(projectId);
+        var snapshot = reviewPersistence.capture(original.getId(), ProjectReviewSnapshot.token(original));
+        Project project = snapshot.project();
         if (!project.isAllowComments()) {
             throw new ForbiddenOperationException("Comments are disabled for this project.");
         }
@@ -60,7 +60,7 @@ final class ProjectSocialService {
             project.setComments(new ArrayList<>());
         }
         project.getComments().add(0, new Comment(user.getId(), sanitizer.sanitizePlainText(content)));
-        projectRepository.save(project);
+        if (!reviewPersistence.applyComments(snapshot)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(project);
 
         if (project.getAuthorId() != null && !project.getAuthorId().equals(userId)) {
@@ -78,7 +78,9 @@ final class ProjectSocialService {
     }
 
     void editComment(String projectId, String commentId, String userId, String newContent) {
-        Project project = getProject(projectId);
+        Project original = getProject(projectId);
+        var snapshot = reviewPersistence.capture(original.getId(), ProjectReviewSnapshot.token(original));
+        Project project = snapshot.project();
 
         Comment comment = project.getComments().stream()
                 .filter(candidate -> candidate.getId().equals(commentId))
@@ -90,12 +92,14 @@ final class ProjectSocialService {
 
         comment.setContent(sanitizer.sanitizePlainText(newContent));
         comment.setUpdatedAt(LocalDateTime.now().toString());
-        projectRepository.save(project);
+        if (!reviewPersistence.applyComments(snapshot)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(project);
     }
 
     void voteComment(String projectId, String commentId, String userId, boolean upvote) {
-        Project project = getProject(projectId);
+        Project original = getProject(projectId);
+        var snapshot = reviewPersistence.capture(original.getId(), ProjectReviewSnapshot.token(original));
+        Project project = snapshot.project();
         if (project.getComments() == null) {
             throw new ResourceNotFoundException("Project not found.");
         }
@@ -119,12 +123,14 @@ final class ProjectSocialService {
             comment.getUpvotes().remove(userId);
         }
 
-        projectRepository.save(project);
+        if (!reviewPersistence.applyComments(snapshot)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(project);
     }
 
     void setCommentPinned(String projectId, String commentId, boolean pinned) {
-        Project project = getProject(projectId);
+        Project original = getProject(projectId);
+        var snapshot = reviewPersistence.capture(original.getId(), ProjectReviewSnapshot.token(original));
+        Project project = snapshot.project();
         if (project.getComments() == null) {
             throw new ResourceNotFoundException("Comment not found.");
         }
@@ -133,7 +139,7 @@ final class ProjectSocialService {
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found."));
         comment.setPinned(pinned);
-        projectRepository.save(project);
+        if (!reviewPersistence.applyComments(snapshot)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(project);
     }
 

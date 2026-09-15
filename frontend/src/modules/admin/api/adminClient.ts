@@ -1,22 +1,30 @@
 import { api } from '@/utils/api';
-import type { AdminVerificationQueueItem } from '@/types';
+
+export interface InspectionWindow {
+    identity: string; content: string; format: string; start: number; end: number; totalCharacters: number;
+    firstLine: number; lineMatched: boolean; representationComplete: boolean; gaps: string[];
+}
 
 export const adminClient = {
     getProjectMeta: async (projectId: string) => (await api.get(`/projects/${projectId}/meta`)).data,
-    getStructure: async (projectId: string, version: string) => (await api.get(`/admin/projects/${projectId}/versions/${version}/structure`)).data,
-    getFileContent: async (projectId: string, version: string, path: string) => (await api.get(`/admin/projects/${projectId}/versions/${version}/file`, { params: { path } })).data,
+    getArtifactChanges: async (projectId: string, version: string, reviewToken: string): Promise<import('../views/ArtifactChanges').ArtifactChangeSummary> => (await api.get(`/admin/projects/${encodeURIComponent(projectId)}/versions/${encodeURIComponent(version)}/changes`, { headers: { 'If-Match': reviewToken } })).data,
+    getStructure: async (projectId: string, version: string, reviewToken: string) => (await api.get(`/admin/projects/${encodeURIComponent(projectId)}/versions/${encodeURIComponent(version)}/structure`, { headers: { 'If-Match': reviewToken } })).data,
+    getFileContent: async (projectId: string, version: string, path: string, reviewToken: string) => (await api.get(`/admin/projects/${encodeURIComponent(projectId)}/versions/${encodeURIComponent(version)}/file`, { params: { path }, headers: { 'If-Match': reviewToken } })).data,
+    getFileWindow: async (projectId: string, version: string, path: string, reviewToken: string, offset = 0, identity?: string, sourceLine = 0): Promise<InspectionWindow> =>
+        (await api.get(`/admin/projects/${encodeURIComponent(projectId)}/versions/${encodeURIComponent(version)}/file-window`,
+            { params: { path, offset, characters: 32000, sourceLine, identity }, headers: { 'If-Match': reviewToken } })).data,
     scanVersion: async (projectId: string, versionId: string) => (await api.post(`/admin/projects/${projectId}/versions/${versionId}/scan`)).data,
-    publishProject: async (projectId: string) => (await api.post(`/admin/projects/${projectId}/publish`)).data,
-    rejectProject: async (projectId: string, reason: string) => (await api.post(`/admin/projects/${projectId}/reject`, { reason })).data,
-    approveVersion: async (projectId: string, versionId: string) => (await api.post(`/admin/projects/${projectId}/versions/${versionId}/approve`)).data,
-    rejectVersion: async (projectId: string, versionId: string, reason: string) => (await api.post(`/admin/projects/${projectId}/versions/${versionId}/reject`, { reason })).data,
+    publishProject: async (projectId: string, reviewToken?: string, versionId?: string) => (await api.post(`/admin/projects/${projectId}/publish`, null, { headers: { 'If-Match': reviewToken }, params: { versionId } })).data,
+    rejectProject: async (projectId: string, reason: string, reviewToken?: string) => (await api.post(`/admin/projects/${projectId}/reject`, { reason }, { headers: { 'If-Match': reviewToken } })).data,
+    approveVersion: async (projectId: string, versionId: string, reviewToken?: string) => (await api.post(`/admin/projects/${projectId}/versions/${versionId}/approve`, null, { headers: { 'If-Match': reviewToken } })).data,
+    rejectVersion: async (projectId: string, versionId: string, reason: string, reviewToken?: string) => (await api.post(`/admin/projects/${projectId}/versions/${versionId}/reject`, { reason }, { headers: { 'If-Match': reviewToken } })).data,
 
     getLogs: async (params: any) => (await api.get('/admin/logs', { params })).data,
     getPlatformAnalytics: async (range: string) => (await api.get(`/analytics/platform/full?range=${range}`)).data,
 
     searchProjects: async (params: any) => (await api.get('/admin/projects/search', { params })).data,
     getProjectById: async (id: string) => (await api.get(`/admin/projects/${id}`)).data,
-    updateProjectRaw: async (id: string, data: any) => (await api.put(`/admin/projects/${id}/raw`, data)).data,
+    updateProjectRaw: async (id: string, data: Record<string, unknown>, token: string) => (await api.put(`/admin/projects/${id}/raw`, data, { headers: { 'If-Match': token } })).data,
     deleteProject: async (id: string, reason: string) => (await api.delete(`/admin/projects/${id}`, { params: { reason } })).data,
     hardDeleteProject: async (id: string, reason: string) => (await api.delete(`/admin/projects/${id}/hard`, { params: { reason } })).data,
     restoreProject: async (id: string, status: string) => (await api.post(`/admin/projects/${id}/restore`, null, { params: { status } })).data,
@@ -41,7 +49,6 @@ export const adminClient = {
     getUserRaw: async (userId: string) => (await api.get(`/admin/users/${userId}/raw`)).data,
     updateUserRaw: async (userId: string, data: any) => (await api.put(`/admin/users/${userId}/raw`, data)).data,
 
-    getVerificationQueue: async (): Promise<AdminVerificationQueueItem[]> => (await api.get('/admin/verification/queue')).data,
     getReviewDetails: async (id: string) => (await api.get(`/admin/projects/${id}/review-details`)).data,
     getCurrentAdmin: async () => (await api.get('/user/me')).data,
 

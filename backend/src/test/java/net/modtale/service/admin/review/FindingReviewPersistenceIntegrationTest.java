@@ -1,0 +1,654 @@
+package net.modtale.service.admin.review;
+
+import com.mongodb.client.*;
+import java.util.*;
+import net.modtale.config.db.*;
+import net.modtale.model.project.*;
+import net.modtale.service.project.query.ProjectService;
+import net.modtale.service.security.issue.FindingReviewService;
+import net.modtale.service.security.scan.*;
+import org.bson.Document;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.springframework.data.mongodb.core.*;
+import org.springframework.data.mongodb.core.convert.*;
+import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
+import org.springframework.data.mongodb.core.query.*;
+import org.springframework.web.server.ResponseStatusException;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+@EnabledIfEnvironmentVariable(named="WARDEN_REVIEW_DB_TEST", matches="true")
+class FindingReviewPersistenceIntegrationTest {
+    private MongoClient client;
+    private MongoTemplate mongo;
+    private VersionReviewPersistence persistence;
+    private FindingReviewService service;
+    private ProjectService projects;
+    private WardenClientService warden;
+    private String database;
+    private final String projectId = "abcdefabcdefabcdefabcdef";
+
+    @BeforeEach void setup() throws Exception {
+        String port = System.getenv().getOrDefault("WARDEN_REVIEW_DB_PORT", "27029");
+        if (!Set.of("27029", "27030").contains(port)) throw new IllegalArgumentException("Unexpected test database port");
+        database = "warden_finding_test_" + UUID.randomUUID().toString().replace("-", "");
+        client = MongoClients.create("mongodb://127.0.0.1:" + port + "/?serverSelectionTimeoutMS=3000");
+        var factory = new SimpleMongoClientDatabaseFactory(client, database);
+        var conversions = new MongoConfig().mongoCustomConversions(new MongoArtifactManifestStore(factory));
+        var context = new MongoMappingContext(); context.setSimpleTypeHolder(conversions.getSimpleTypeHolder()); context.afterPropertiesSet();
+        var converter = new MappingMongoConverter(new DefaultDbRefResolver(factory), context);
+        converter.setCustomConversions(conversions); converter.afterPropertiesSet();
+        mongo = new MongoTemplate(factory, converter); persistence = spy(new VersionReviewPersistence(mongo));
+        projects = mock(ProjectService.class); warden = mock(WardenClientService.class);
+        when(warden.currentPolicyVersion()).thenReturn(ScanEvidenceFixtures.complete(false).getSecurityEvidence().policyVersion());
+        service = new FindingReviewService(mongo, persistence, projects, warden);
+        var project = new Project(); project.setId(projectId);
+        var version = new ProjectVersion(); version.setId("v1"); version.setVersionNumber("1.0");
+        var scan = ScanEvidenceFixtures.complete(false);
+        version.setHash(scan.getSecurityEvidence().artifactSha256());
+        scan.setReviewedContextSha256(ArtifactReviewContext.fingerprint(version));
+        var issue = new ScanResult.ScanIssue(); issue.setFilePath("Mod.class"); issue.setType("Network");
+        issue.setDescription("Connects to a service"); issue.setSeverity("LOW");
+        scan.setIssues(new ArrayList<>(List.of(issue))); version.setScanResult(scan);
+        project.setVersions(List.of(version)); mongo.insert(project);
+        when(projects.getRawProjectById(projectId)).thenReturn(project);
+    }
+    @AfterEach void cleanup() { if (client != null) { client.getDatabase(database).drop(); client.close(); } }
+    private ProjectVersion version() { return mongo.findById(projectId, Project.class).getVersions().getFirst(); }
+    private String token() { return VersionReviewSnapshot.token(version()); }
+    private FindingReviewService.Event record(String token) {
+        return service.record(projectId, "v1", token, "moderator", new FindingReviewService.Request(0,
+                FindingReviewService.Disposition.ACCEPT, "Verified documented service integration"));
+    }
+
+    @Test void persistsActorRationaleWholeArtifactScopeAndInvalidatesBrowserSnapshot() {
+        String before = token(); var event = record(before);
+        assertEquals("moderator", event.actorId()); assertEquals("WHOLE_ARTIFACT", event.scope());
+        assertEquals(30L * 86400000, event.expiresAt() - event.createdAt());
+        assertEquals(version().getHash(), event.artifactSha256());
+        assertEquals(ArtifactReviewContext.fingerprint(version()), event.contextSha256());
+        assertTrue(event.finding().identity().matches("ie1:[0-9a-f]{64}"));
+        assertNotEquals(before, token()); assertEquals(event.id(), version().getFindingReviewHead());
+        assertEquals(event, service.history(projectId, "v1", token(), 0).events().getFirst());
+        assertFalse(version().getScanResult().getIssues().getFirst().isResolved());
+        assertFalse(ArtifactClearancePolicy.cleared(version().getScanResult()));
+        verify(projects).evictProjectCache(any(Project.class));
+    }
+    @Test void decisionCancelsSchedulingAndCannotBeBypassedByAStaleScanOutcome() {
+        var previous = version();
+        var scan = ScanEvidenceFixtures.complete(true);
+        scan.setReviewedContextSha256(ArtifactReviewContext.fingerprint(previous));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update()
+                .set("versions.0.reviewStatus", ProjectVersion.ReviewStatus.SCHEDULED)
+                .set("versions.0.scheduledPublishDate", "2020-01-01T00:00:00"), Project.class);
+        record(token());
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+        assertNull(version().getScheduledPublishDate());
+        var current = version(); current.setScanResult(scan);
+        assertFalse(ArtifactClearancePolicy.boundToVersion(current));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update()
+                .set("versions.0.scanResult.status", ScanStatus.SCANNING)
+                .set("versions.0.scanResult.scanState", "SCANNING"), Project.class);
+        var scans = new ScanPersistenceService(mongo, mock(net.modtale.repository.project.ProjectRepository.class), projects);
+        var approve = new ScanRoutingService.RoutingDecision(ScanRoutingService.RoutingAction.APPROVE_NOW, 0);
+        assertFalse(scans.applyScanOutcome(projectId, "v1", 1, scan, approve, previous));
+        assertFalse(scans.applyScanOutcome(projectId, "v1", 1, scan, approve, current));
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+    }
+    @Test void subsequentConclusionSupersedesOnlyTheSameReviewedScope() {
+        var first = record(token());
+        var second = service.record(projectId, "v1", token(), "other-reviewer", new FindingReviewService.Request(0,
+                FindingReviewService.Disposition.REQUIRE_REVIEW, "The caller needs further investigation"));
+        assertEquals(first.id(), second.supersedesDecisionId());
+        assertEquals(0, second.expiresAt());
+        assertEquals(first, mongo.findById(first.id(), FindingReviewService.Event.class, FindingReviewService.COLLECTION));
+        assertEquals(2, service.history(projectId, "v1", token(), 0).events().size());
+    }
+    @Test void historyExplainsScopeChangesAndUnavailablePolicy() {
+        var event = record(token());
+        assertEquals("APPLICABLE", service.history(projectId, "v1", token(), 0).assessments().get(event.id()).state());
+        when(warden.currentPolicyVersion()).thenReturn(null);
+        assertEquals("POLICY_UNAVAILABLE", service.history(projectId, "v1", token(), 0).assessments().get(event.id()).state());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update()
+                .set("versions.0.gameVersions", List.of("different-runtime")), Project.class);
+        assertEquals("CONTEXT_CHANGED", service.history(projectId, "v1", token(), 0).assessments().get(event.id()).state());
+    }
+    @Test void historyRejectsVersionChangeDuringPolicyLookup() {
+        record(token());
+        when(warden.currentPolicyVersion()).thenAnswer(invocation -> {
+            mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update()
+                    .set("versions.0.hash", "f".repeat(64)), Project.class);
+            return ScanEvidenceFixtures.complete(false).getSecurityEvidence().policyVersion();
+        });
+        assertEquals(409, assertThrows(ResponseStatusException.class,
+                () -> service.history(projectId, "v1", token(), 0)).getStatusCode().value());
+    }
+    @Test void staleConcurrentRecordCannotOverwriteHead() {
+        String before = token(); var winner = record(before);
+        assertEquals(409, assertThrows(ResponseStatusException.class, () -> record(before)).getStatusCode().value());
+        assertEquals(winner.id(), version().getFindingReviewHead());
+        assertEquals(1, mongo.getCollection(FindingReviewService.COLLECTION).countDocuments());
+    }
+    @Test void artifactChangeBetweenInsertAndCasLeavesOnlyUnreachableEvent() {
+        doAnswer(invocation -> {
+            mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)),
+                    new Update().set("versions.0.hash", "f".repeat(64)), Project.class);
+            return invocation.callRealMethod();
+        }).when(persistence).appendFindingReview(any(), anyString());
+        assertEquals(409, assertThrows(ResponseStatusException.class, () -> record(token())).getStatusCode().value());
+        assertNull(version().getFindingReviewHead());
+        assertEquals(1, mongo.getCollection(FindingReviewService.COLLECTION).countDocuments());
+        assertTrue(service.history(projectId, "v1", token(), 0).events().isEmpty());
+        verifyNoInteractions(projects);
+    }
+    @Test void revocationSurvivesPrunedScanAndRetainsOriginalDecision() {
+        var original = record(token());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("versions.0.scanResult", null), Project.class);
+        var revoked = service.revoke(projectId, "v1", token(), "second-moderator", original.id(), "New information invalidates the earlier review");
+        assertEquals(original.id(), revoked.revokedDecisionId());
+        assertEquals("second-moderator", revoked.actorId());
+        assertEquals(original, mongo.findById(original.id(), FindingReviewService.Event.class, FindingReviewService.COLLECTION));
+        assertEquals(List.of(revoked, original), service.history(projectId, "v1", token(), 0).events());
+        assertThrows(ResponseStatusException.class, () -> service.revoke(projectId, "v1", token(), "reviewer", original.id(), "Duplicate revocation should fail"));
+    }
+    @Test void cannotRevokeAnOrphanOrReadCrossVersionHistory() {
+        var original = record(token());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("versions.0.findingReviewHead", null), Project.class);
+        assertThrows(ResponseStatusException.class, () -> service.revoke(projectId, "v1", token(), "reviewer", original.id(), "An orphan is not active history"));
+        var foreign = new FindingReviewService.Event("foreign", projectId, "another-version", null, 1, "actor", 0, 0,
+                FindingReviewService.Disposition.ACCEPT, "foreign decision", "WHOLE_ARTIFACT", null, null, null, null, null, null, null);
+        mongo.insert(foreign, FindingReviewService.COLLECTION);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("versions.0.findingReviewHead", "foreign"), Project.class);
+        assertThrows(ResponseStatusException.class, () -> service.history(projectId, "v1", token(), 0));
+    }
+    @Test void historyPagesAreStableAndMissingPredecessorsFailExplicitly() {
+        var first = record(token()); var previous = first;
+        for (int i = 2; i <= 51; i++) {
+            var next = new FindingReviewService.Event("event-" + i, projectId, "v1", previous.id(), i,
+                    first.actorId(), first.createdAt() + i, first.expiresAt(), first.disposition(), first.rationale(),
+                    first.scope(), first.artifactSha256(), first.contentSha256(), first.policyVersion(),
+                    first.contextSha256(), first.finding(), null, null);
+            mongo.insert(next, FindingReviewService.COLLECTION); previous = next;
+        }
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("versions.0.findingReviewHead", previous.id()), Project.class);
+        var page = service.history(projectId, "v1", token(), 0);
+        assertEquals(50, page.events().size()); assertEquals(50, page.nextOffset());
+        assertEquals("event-51", page.events().getFirst().id());
+        var older = service.history(projectId, "v1", token(), page.nextOffset());
+        assertEquals(List.of(first), older.events()); assertNull(older.nextOffset());
+        assertThrows(ResponseStatusException.class, () -> service.history(projectId, "v1", token(), -1));
+        mongo.getCollection(FindingReviewService.COLLECTION).deleteOne(new Document("_id", "event-10"));
+        assertThrows(ResponseStatusException.class, () -> service.history(projectId, "v1", token(), 0));
+        assertThrows(ResponseStatusException.class, () -> record(token()));
+    }
+    @Test void missingHistoryFailsExplicitlyInsteadOfAppearingEmpty() {
+        var event = record(token());
+        mongo.getCollection(FindingReviewService.COLLECTION).deleteOne(new Document("_id", event.id()));
+        assertThrows(ResponseStatusException.class, () -> service.history(projectId, "v1", token(), 0));
+        assertThrows(ResponseStatusException.class, () -> record(token()));
+    }
+    @Test void invalidRationaleOrUnboundEvidenceCannotCreateRecords() {
+        for (String rationale : Arrays.asList(null, "short", "x".repeat(4001)))
+            assertThrows(ResponseStatusException.class, () -> service.record(projectId, "v1", token(), "reviewer",
+                    new FindingReviewService.Request(0, FindingReviewService.Disposition.ACCEPT, rationale)));
+        assertThrows(ResponseStatusException.class, () -> service.record(projectId, "v1", token(), "reviewer",
+                new FindingReviewService.Request(null, FindingReviewService.Disposition.ACCEPT, "No finding was selected")));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("versions.0.gameVersions", List.of("changed-runtime")), Project.class);
+        assertThrows(ResponseStatusException.class, () -> record(token()));
+        assertEquals(0, mongo.getCollection(FindingReviewService.COLLECTION).countDocuments());
+    }
+    private FindingReviewService.Event requireFurtherReview() {
+        return service.record(projectId, "v1", token(), "moderator", new FindingReviewService.Request(0,
+                FindingReviewService.Disposition.REQUIRE_REVIEW, "Investigate the destination and its caller"));
+    }
+    private boolean approveVersion() {
+        var current = version(); var snapshot = persistence.capture(projectId, "v1", token());
+        current.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        return persistence.apply(snapshot, current);
+    }
+    private boolean approveProject() {
+        var current = mongo.findById(projectId, Project.class);
+        var projectPersistence = new ProjectReviewPersistence(mongo);
+        var snapshot = projectPersistence.capture(projectId, ProjectReviewSnapshot.token(current));
+        snapshot.project().setStatus(ProjectStatus.PUBLISHED);
+        snapshot.project().getVersions().getFirst().setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        return projectPersistence.apply(snapshot, "v1");
+    }
+    @Test void unresolvedRequirementBlocksBothManualApprovalPathsUntilExplicitResolution() {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("status", ProjectStatus.PENDING), Project.class);
+        var requirement = requireFurtherReview();
+        var failure = assertThrows(ResponseStatusException.class, this::approveVersion);
+        assertEquals(409, failure.getStatusCode().value());
+        assertTrue(failure.getReason().contains("outstanding finding-review"));
+        assertThrows(ResponseStatusException.class, this::approveProject);
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+        assertEquals(ProjectStatus.PENDING, mongo.findById(projectId, Project.class).getStatus());
+        var resolution = record(token());
+        assertEquals(requirement.id(), resolution.supersedesDecisionId());
+        assertTrue(approveProject());
+        assertEquals(resolution.id(), version().getApprovedFindingReviewHead());
+        assertEquals(ProjectVersion.ReviewStatus.APPROVED, version().getReviewStatus());
+    }
+    @Test void requirementsSurviveContextChangesAndPruningUntilExplicitRevocation() {
+        var requirement = requireFurtherReview();
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update()
+                .set("versions.0.scanResult", null).set("versions.0.gameVersions", List.of("new-runtime")), Project.class);
+        assertThrows(ResponseStatusException.class, this::approveVersion);
+        service.revoke(projectId, "v1", token(), "moderator", requirement.id(), "Independent inspection resolves this requirement");
+        assertTrue(approveVersion());
+    }
+    @Test void missingOrForgedHistoryCannotAuthorizeManualApproval() {
+        var event = record(token());
+        mongo.getCollection(FindingReviewService.COLLECTION).updateOne(new Document("_id", event.id()),
+                new Document("$set", new Document("supersedesDecisionId", "unreachable-event")));
+        assertThrows(ResponseStatusException.class, this::approveVersion);
+        assertThrows(ResponseStatusException.class, this::approveProject);
+        mongo.getCollection(FindingReviewService.COLLECTION).deleteOne(new Document("_id", event.id()));
+        assertThrows(ResponseStatusException.class, this::approveVersion);
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+    }
+    @Test void approvalSnapshotCannotSkipANewlyRecordedRequirement() {
+        record(token());
+        var current = version(); var snapshot = persistence.capture(projectId, "v1", token());
+        current.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        requireFurtherReview();
+        assertFalse(persistence.apply(snapshot, current));
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+    }
+    @Test void revokingReplacementDoesNotResurrectEarlierConclusionOrIgnoreNewRequirement() {
+        requireFurtherReview();
+        var resolution = record(token());
+        service.revoke(projectId, "v1", token(), "moderator", resolution.id(), "This acceptance needs to be reconsidered");
+        // Manual approval is a new decision; revoked acceptance never provides automatic clearance.
+        assertTrue(approveVersion());
+        requireFurtherReview();
+        assertThrows(ResponseStatusException.class, this::approveVersion);
+    }
+
+    @Test void contextEditsInvalidateApprovalButRetainHistoryAndUnknownStoredFields() {
+        var event = record(token()); assertTrue(approveVersion());
+        mongo.getCollection("projects").updateOne(new Document("_id", new org.bson.types.ObjectId(projectId)),
+                new Document("$set", new Document("versions.0.futureEvidence", new Document("marker", true))));
+        var edits = new ProjectReviewPersistence(mongo);
+        var project = mongo.findById(projectId, Project.class);
+        var snapshot = edits.capture(projectId, ProjectReviewSnapshot.token(project));
+        var edited = snapshot.project().getVersions().getFirst();
+        edited.setGameVersions(List.of("new-runtime"));
+        var queued = new ScanResult(); queued.setScanState("QUEUED"); queued.setScanAttempt(2); edited.setScanResult(queued);
+        assertTrue(edits.applyVersionEdit(snapshot, "v1", true, false));
+        var stored = version();
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, stored.getReviewStatus());
+        assertEquals(event.id(), stored.getFindingReviewHead());
+        assertNull(stored.getApprovedFindingReviewHead()); assertNull(stored.getApprovedSecurityEvidence());
+        assertNull(stored.getApprovedReviewOrigins()); assertEquals(0, stored.getSecurityApprovedAt());
+        assertEquals(2, stored.getScanResult().getScanAttempt());
+        assertEquals(new Document("marker", true), mongo.getCollection("projects").find().first()
+                .getList("versions", Document.class).getFirst().get("futureEvidence"));
+    }
+    @Test void metadataOnlyVersionEditPreservesReviewStateAndHistory() {
+        var event = record(token()); assertTrue(approveVersion());
+        var edits = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var snapshot = edits.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().getVersions().getFirst().setChangelog("Documentation corrected");
+        assertTrue(edits.applyVersionEdit(snapshot, "v1", false, false));
+        assertEquals(ProjectVersion.ReviewStatus.APPROVED, version().getReviewStatus());
+        assertEquals(event.id(), version().getApprovedFindingReviewHead());
+        assertEquals("Documentation corrected", version().getChangelog());
+    }
+    @Test void staleVersionEditCannotRestoreAnApprovalOrEraseNewFindingHistory() {
+        record(token()); assertTrue(approveVersion());
+        var edits = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var snapshot = edits.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().getVersions().getFirst().setChangelog("Unrelated correction");
+        var requirement = requireFurtherReview();
+        assertFalse(edits.applyVersionEdit(snapshot, "v1", false, false));
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+        assertEquals(requirement.id(), version().getFindingReviewHead());
+    }
+
+    @Test void addingAVersionPreservesUnknownSiblingEvidenceAndLinkedApproval() {
+        var event = record(token()); assertTrue(approveVersion());
+        mongo.getCollection("projects").updateOne(new Document(), new Document("$set", new Document("versions.0.futureEvidence", new Document("marker", true))));
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        var added = new ProjectVersion(); added.setId("new-version"); added.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
+        snapshot.project().getVersions().addFirst(added);
+        assertTrue(writes.applyVersionList(snapshot));
+        var stored = mongo.findById(projectId, Project.class).getVersions();
+        assertEquals("new-version", stored.getFirst().getId());
+        assertEquals(event.id(), stored.get(1).getApprovedFindingReviewHead());
+        assertEquals(ProjectVersion.ReviewStatus.APPROVED, stored.get(1).getReviewStatus());
+        assertEquals(new Document("marker", true), mongo.getCollection("projects").find().first().getList("versions", Document.class).get(1).get("futureEvidence"));
+    }
+    @Test void staleVersionDeletionCannotEraseANewerReviewRequirement() {
+        record(token()); assertTrue(approveVersion());
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().getVersions().clear();
+        var requirement = requireFurtherReview();
+        assertFalse(writes.applyVersionList(snapshot));
+        assertEquals(requirement.id(), version().getFindingReviewHead());
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+    }
+    @Test void replacingSomeGameTargetsInvalidatesRetainedApprovalWithoutDeletingHistory() {
+        var event = record(token()); assertTrue(approveVersion());
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        var retained = snapshot.project().getVersions().getFirst();
+        retained.setGameVersions(List.of("remaining-runtime"));
+        var queued = new ScanResult(); queued.setScanAttempt(3); queued.setScanState("QUEUED"); retained.setScanResult(queued);
+        assertTrue(writes.applyVersionList(snapshot));
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+        assertNull(version().getApprovedFindingReviewHead()); assertNull(version().getApprovedSecurityEvidence());
+        assertEquals(event.id(), version().getFindingReviewHead());
+        assertEquals(3, version().getScanResult().getScanAttempt());
+        assertNotNull(mongo.findById(event.id(), FindingReviewService.Event.class, FindingReviewService.COLLECTION));
+    }
+
+    @Test void presentationWritesCannotChangeVersionApprovalOrProjectStatus() {
+        var event = record(token()); assertTrue(approveVersion());
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var originalStatus = project.getStatus();
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().setTitle("Updated title"); snapshot.project().setStatus(ProjectStatus.DELETED);
+        snapshot.project().getVersions().getFirst().setFindingReviewHead("unrelated");
+        snapshot.project().getVersions().getFirst().setReviewStatus(ProjectVersion.ReviewStatus.REJECTED);
+        assertTrue(writes.applyPresentation(snapshot, false));
+        var stored = mongo.findById(projectId, Project.class);
+        assertEquals("Updated title", stored.getTitle()); assertEquals(originalStatus, stored.getStatus());
+        assertEquals(event.id(), stored.getVersions().getFirst().getApprovedFindingReviewHead());
+        assertEquals(event.id(), stored.getVersions().getFirst().getFindingReviewHead());
+        assertEquals(ProjectVersion.ReviewStatus.APPROVED, stored.getVersions().getFirst().getReviewStatus());
+    }
+    @Test void staleGalleryWriteCannotRestoreOlderApprovalOrDeleteNewHistory() {
+        record(token()); assertTrue(approveVersion());
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().setGalleryImages(List.of("new-gallery.png"));
+        var event = requireFurtherReview();
+        assertFalse(writes.applyPresentation(snapshot, true));
+        assertEquals(event.id(), version().getFindingReviewHead());
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+    }
+
+    @Test void softDeleteAndRestorePreserveVersionReviewHistory() {
+        var event = record(token());
+        var writes = new ProjectReviewPersistence(mongo);
+        for (var status : List.of(ProjectStatus.DELETED, ProjectStatus.PUBLISHED)) {
+            var project = mongo.findById(projectId, Project.class);
+            var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+            snapshot.project().setStatus(status);
+            snapshot.project().getVersions().clear();
+            assertTrue(writes.applyDeletionState(snapshot, false));
+            assertEquals(status, mongo.findById(projectId, Project.class).getStatus());
+            assertEquals(event.id(), version().getFindingReviewHead());
+            assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+        }
+    }
+    @Test void staleHardDeleteCannotEraseANewerDecisionButCurrentDeleteRemovesExactlyItsProject() {
+        record(token()); var writes = new ProjectReviewPersistence(mongo);
+        var project = mongo.findById(projectId, Project.class);
+        var stale = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        var event = requireFurtherReview();
+        assertFalse(writes.deleteProject(stale));
+        assertEquals(event.id(), version().getFindingReviewHead());
+        var current = mongo.findById(projectId, Project.class);
+        assertTrue(writes.deleteProject(writes.capture(projectId, ProjectReviewSnapshot.token(current))));
+        assertNull(mongo.findById(projectId, Project.class));
+        assertNotNull(mongo.findById(event.id(), FindingReviewService.Event.class, FindingReviewService.COLLECTION));
+    }
+    @Test void dependencyScrubDoesNotRewritePreservedVersionEvidence() {
+        var event = record(token()); assertTrue(approveVersion());
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().setTitle("Deleted Project"); snapshot.project().setImageUrl(null);
+        snapshot.project().getVersions().getFirst().setApprovedFindingReviewHead("forged");
+        assertTrue(writes.applyDeletionState(snapshot, true));
+        assertEquals(event.id(), version().getApprovedFindingReviewHead());
+        assertEquals(ProjectVersion.ReviewStatus.APPROVED, version().getReviewStatus());
+    }
+
+    @Test void teamUpdatesCannotChangeReviewAuthorityOrPublicationState() {
+        var event = record(token()); assertTrue(approveVersion());
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var originalStatus = project.getStatus();
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().setAuthorId("new-owner"); snapshot.project().setStatus(ProjectStatus.DELETED);
+        snapshot.project().setTeamMembers(List.of(new Project.ProjectMember("contributor", "role")));
+        snapshot.project().getVersions().clear();
+        assertTrue(writes.applyTeam(snapshot));
+        var stored = mongo.findById(projectId, Project.class);
+        assertEquals("new-owner", stored.getAuthorId()); assertEquals(originalStatus, stored.getStatus());
+        assertEquals(event.id(), version().getApprovedFindingReviewHead());
+        assertEquals(ProjectVersion.ReviewStatus.APPROVED, version().getReviewStatus());
+    }
+    @Test void staleTeamUpdateCannotEraseANewerRequirementOrConcurrentOwnershipChange() {
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().setPendingTransferTo("requested-owner");
+        var event = requireFurtherReview();
+        assertFalse(writes.applyTeam(snapshot)); assertEquals(event.id(), version().getFindingReviewHead());
+        project = mongo.findById(projectId, Project.class);
+        snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().setPendingTransferTo("requested-owner");
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("authorId", "different-owner"), Project.class);
+        assertFalse(writes.applyTeam(snapshot));
+        assertEquals("different-owner", mongo.findById(projectId, Project.class).getAuthorId());
+    }
+
+    @Test void draftSubmissionPreservesCurrentEvidenceAndUnknownFields() {
+        var event = record(token());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("status", ProjectStatus.DRAFT), Project.class);
+        mongo.getCollection("projects").updateOne(new Document(), new Document("$set", new Document("versions.0.futureEvidence", "preserved")));
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().setStatus(ProjectStatus.PENDING);
+        snapshot.project().getVersions().getFirst().setScanResult(null);
+        assertTrue(writes.submitDraft(snapshot));
+        assertNotNull(version().getScanResult()); assertEquals(event.id(), version().getFindingReviewHead());
+        assertEquals("preserved", mongo.getCollection("projects").find().first().getList("versions", Document.class).getFirst().get("futureEvidence"));
+        assertFalse(writes.submitDraft(snapshot));
+    }
+    @Test void draftSubmissionQueuesOnlyUnscannedVersionsAndLosesToConcurrentDecision() {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("status", ProjectStatus.DRAFT).set("versions.0.scanResult", null), Project.class);
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().setStatus(ProjectStatus.PENDING);
+        var queued = new ScanResult(); queued.setScanState("QUEUED"); queued.setScanAttempt(1);
+        snapshot.project().getVersions().getFirst().setScanResult(queued);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("versions.0.findingReviewHead", "new-decision"), Project.class);
+        assertFalse(writes.submitDraft(snapshot)); assertNull(version().getScanResult());
+        project = mongo.findById(projectId, Project.class);
+        snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(project));
+        snapshot.project().setStatus(ProjectStatus.PENDING); snapshot.project().getVersions().getFirst().setScanResult(queued);
+        assertTrue(writes.submitDraft(snapshot)); assertEquals(1, version().getScanResult().getScanAttempt());
+        assertEquals("new-decision", version().getFindingReviewHead());
+    }
+
+    @Test void unlistingPreservesEvidenceAndRejectsStaleState() {
+        var event = record(token());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("status", ProjectStatus.PUBLISHED), Project.class);
+        var writes = new ProjectReviewPersistence(mongo);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        snapshot.project().setVersions(List.of());
+        assertTrue(writes.unlist(snapshot));
+        assertEquals(ProjectStatus.UNLISTED, mongo.findById(projectId, Project.class).getStatus());
+        assertEquals(event.id(), version().getFindingReviewHead()); assertNotNull(version().getScanResult());
+        assertFalse(writes.unlist(snapshot));
+        snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("versions.0.findingReviewHead", "new-head"), Project.class);
+        assertFalse(writes.unlist(snapshot)); assertEquals("new-head", version().getFindingReviewHead());
+    }
+    @Test void unlistingCannotPublishAnUnreviewedOrDeletedProject() {
+        var writes = new ProjectReviewPersistence(mongo);
+        for (var status : List.of(ProjectStatus.DRAFT, ProjectStatus.PENDING, ProjectStatus.PRIVATE, ProjectStatus.ARCHIVED, ProjectStatus.DELETED)) {
+            mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("status", status), Project.class);
+            var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+            assertThrows(ResponseStatusException.class, () -> writes.unlist(snapshot));
+            assertEquals(status, mongo.findById(projectId, Project.class).getStatus());
+        }
+    }
+
+    @Test void commentUpdatesCannotChangeReviewStateOrOverwriteNewDecisions() {
+        var event = record(token()); var writes = new ProjectReviewPersistence(mongo);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        snapshot.project().setComments(List.of(new Comment("user", "hello")));
+        var originalStatus = snapshot.project().getStatus();
+        snapshot.project().setStatus(ProjectStatus.DELETED); snapshot.project().setVersions(List.of());
+        assertTrue(writes.applyComments(snapshot));
+        var stored = mongo.findById(projectId, Project.class);
+        assertEquals(originalStatus, stored.getStatus());
+        assertEquals("hello", stored.getComments().getFirst().getContent());
+        assertEquals(event.id(), version().getFindingReviewHead()); assertNotNull(version().getScanResult());
+        snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(stored));
+        snapshot.project().getComments().getFirst().setPinned(true);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("versions.0.findingReviewHead", "later"), Project.class);
+        assertFalse(writes.applyComments(snapshot));
+        assertFalse(mongo.findById(projectId, Project.class).getComments().getFirst().isPinned());
+        assertEquals("later", version().getFindingReviewHead());
+    }
+    @Test void commentUpdatesCannotUndoConcurrentCommentPolicyOrEdits() {
+        var writes = new ProjectReviewPersistence(mongo);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        snapshot.project().setComments(List.of(new Comment("user", "stale")));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)),
+                new Update().set("allowComments", false).set("comments", List.of(new Comment("other", "current"))), Project.class);
+        assertFalse(writes.applyComments(snapshot));
+        var stored = mongo.findById(projectId, Project.class);
+        assertFalse(stored.isAllowComments()); assertEquals("current", stored.getComments().getFirst().getContent());
+    }
+
+    @Test void archiveCacheChangesOnlyTheSelectedFileReferenceAndRejectsStaleGeneration() {
+        var event = record(token());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("classification", ProjectClassification.MODPACK), Project.class);
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        String projectToken = ProjectReviewSnapshot.token(project), versionToken = token();
+        assertTrue(writes.cacheModpackArchive(projectId, projectToken, "v1", versionToken, "modpacks/new.zip"));
+        assertEquals("modpacks/new.zip", version().getFileUrl());
+        assertEquals(event.id(), version().getFindingReviewHead()); assertNotNull(version().getScanResult());
+        assertThrows(ResponseStatusException.class, () -> writes.cacheModpackArchive(projectId, projectToken, "v1", versionToken, "modpacks/stale.zip"));
+        project = mongo.findById(projectId, Project.class);
+        String currentProjectToken = ProjectReviewSnapshot.token(project), currentVersionToken = token();
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("versions.0.findingReviewHead", "later"), Project.class);
+        assertThrows(ResponseStatusException.class, () -> writes.cacheModpackArchive(projectId, currentProjectToken, "v1", currentVersionToken, "modpacks/stale.zip"));
+        assertEquals("later", version().getFindingReviewHead()); assertEquals("modpacks/new.zip", version().getFileUrl());
+    }
+    @Test void archiveCacheRejectsForeignVersionsAndNonModpacks() {
+        var writes = new ProjectReviewPersistence(mongo); var project = mongo.findById(projectId, Project.class);
+        String original = ProjectReviewSnapshot.token(project);
+        assertThrows(ResponseStatusException.class, () -> writes.cacheModpackArchive(projectId, original, "v1", token(), "modpacks/new.zip"));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("classification", ProjectClassification.MODPACK), Project.class);
+        String current = ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class));
+        assertThrows(ResponseStatusException.class, () -> writes.cacheModpackArchive(projectId, current, "foreign", token(), "modpacks/new.zip"));
+        assertThrows(ResponseStatusException.class, () -> writes.cacheModpackArchive(projectId, current, "v1", "wrong", "modpacks/new.zip"));
+        assertFalse(writes.cacheModpackArchive(projectId, current, "v1", token(), null));
+        assertNull(version().getFileUrl());
+    }
+
+    @Test void staleTransferNotificationsCannotCancelReplacementRequests() {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("pendingTransferTo", "recipient")
+                .set("pendingTransferRequestId", "new-request").set("pendingTransferOwnerId", "owner")
+                .set("pendingTransferExpiresAt", System.currentTimeMillis() + 60000), Project.class);
+        var repository = mock(net.modtale.repository.user.NotificationRepository.class);
+        var notifications = new net.modtale.service.communication.NotificationService(repository,
+                mock(net.modtale.repository.user.UserRepository.class), mongo,
+                mock(net.modtale.service.communication.NotificationDeliveryService.class));
+        var otherRecipient = new net.modtale.model.user.Notification("other-recipient", "Request", "Request", java.net.URI.create("/dashboard"), null,
+                net.modtale.model.user.NotificationType.TRANSFER_REQUEST,
+                Map.of("projectId", projectId, "requestId", "new-request", "targetUserId", "recipient"));
+        otherRecipient.setId("other-notification"); when(repository.findById("other-notification")).thenReturn(Optional.of(otherRecipient));
+        notifications.deleteNotification("other-notification", "other-recipient");
+        assertEquals("recipient", mongo.findById(projectId, Project.class).getPendingTransferTo());
+        for (String requestId : List.of("", "old-request", "new-request")) {
+            var metadata = new HashMap<String,String>(); metadata.put("projectId", projectId);
+            metadata.put("targetUserId", "recipient"); if (!requestId.isEmpty()) metadata.put("requestId", requestId);
+            var notification = new net.modtale.model.user.Notification("recipient", "Request", "Request", java.net.URI.create("/dashboard"), null,
+                    net.modtale.model.user.NotificationType.TRANSFER_REQUEST, metadata); notification.setId("notification");
+            when(repository.findById("notification")).thenReturn(Optional.of(notification));
+            notifications.deleteNotification("notification", "recipient");
+            var current = mongo.findById(projectId, Project.class);
+            if (requestId.equals("new-request")) assertNull(current.getPendingTransferTo());
+            else assertEquals("recipient", current.getPendingTransferTo());
+        }
+        assertNotNull(version().getScanResult());
+    }
+    @Test void expiredTransferCleanupWorksWithoutAnyNotificationAndKeepsNewRequests() {
+        var notifications = new net.modtale.service.communication.NotificationService(mock(net.modtale.repository.user.NotificationRepository.class),
+                mock(net.modtale.repository.user.UserRepository.class), mongo, mock(net.modtale.service.communication.NotificationDeliveryService.class));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("pendingTransferTo", "recipient")
+                .set("pendingTransferRequestId", "expired").set("pendingTransferExpiresAt", 1L), Project.class);
+        notifications.cleanupExpiredTransfers(); assertNull(mongo.findById(projectId, Project.class).getPendingTransferTo());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("pendingTransferTo", "recipient")
+                .set("pendingTransferRequestId", "new").set("pendingTransferExpiresAt", System.currentTimeMillis()+60000), Project.class);
+        notifications.cleanupExpiredTransfers(); assertEquals("new", mongo.findById(projectId, Project.class).getPendingTransferRequestId());
+    }
+    @Test void finalTransferWriteChecksDatabaseExpiryAndOriginalOwner() {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("authorId", "owner")
+                .set("pendingTransferOwnerId", "owner").set("pendingTransferTo", "recipient")
+                .set("pendingTransferRequestId", "request").set("pendingTransferExpiresAt", 1L), Project.class);
+        var writes = new ProjectReviewPersistence(mongo);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        snapshot.project().setAuthorId("recipient"); snapshot.project().setPendingTransferTo(null);
+        assertFalse(writes.resolveTransfer(snapshot, "request")); assertEquals("owner", mongo.findById(projectId, Project.class).getAuthorId());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("pendingTransferExpiresAt", System.currentTimeMillis()+60000), Project.class);
+        snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        snapshot.project().setAuthorId("recipient"); snapshot.project().setPendingTransferTo(null);
+        assertTrue(writes.resolveTransfer(snapshot, "request"));
+        assertEquals("recipient", mongo.findById(projectId, Project.class).getAuthorId()); assertNotNull(version().getScanResult());
+    }
+
+    private void prepareContributorInvite(String requestId, long expiry) {
+        var invite = new Project.ProjectMember("recipient", "role"); invite.setRequestId(requestId);
+        invite.setRequestOwnerId("owner"); invite.setRequestExpiresAt(expiry);
+        invite.setRequestPermissions(Set.of(net.modtale.model.user.ApiKey.ApiPermission.PROJECT_EDIT_METADATA));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("authorId", "owner")
+                .set("teamInvites", List.of(invite)).set("projectRoles", List.of(new Project.ProjectRole("role", "Role", "#fff", invite.getRequestPermissions()))), Project.class);
+    }
+    @Test void contributorAcceptanceRetainsEvidenceAndBindsTheOfferedRole() {
+        var event = record(token()); prepareContributorInvite("invite", System.currentTimeMillis()+60000);
+        var writes = new ProjectReviewPersistence(mongo);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        snapshot.project().setTeamInvites(List.of()); snapshot.project().setTeamMembers(List.of(new Project.ProjectMember("recipient", "role")));
+        assertTrue(writes.resolveContributorInvite(snapshot, "recipient", "invite", true));
+        assertEquals(event.id(), version().getFindingReviewHead()); assertNotNull(version().getScanResult());
+        prepareContributorInvite("invite2", System.currentTimeMillis()+60000);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("projectRoles.0.permissions", List.of()), Project.class);
+        var changed = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        assertThrows(net.modtale.exception.InvalidProjectRequestException.class, () -> writes.resolveContributorInvite(changed, "recipient", "invite2", true));
+    }
+    @Test void staleContributorCancellationAndLegacyIdentityCannotRemoveReplacement() {
+        prepareContributorInvite("old", System.currentTimeMillis()+60000); var writes = new ProjectReviewPersistence(mongo);
+        var snapshot = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        snapshot.project().setTeamInvites(List.of()); prepareContributorInvite("new", System.currentTimeMillis()+60000);
+        assertFalse(writes.resolveContributorInvite(snapshot, "recipient", "old", false));
+        var current = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        assertThrows(net.modtale.exception.InvalidProjectRequestException.class, () -> writes.resolveContributorInvite(current, "recipient", "legacy", false));
+        prepareContributorInvite(null, 0);
+        var legacy = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        legacy.project().setTeamInvites(List.of()); assertTrue(writes.resolveContributorInvite(legacy, "recipient", "legacy", false));
+    }
+    @Test void contributorNotificationsAndIndependentExpiryKeepCurrentInvitations() {
+        prepareContributorInvite("new", System.currentTimeMillis()+60000);
+        var repository = mock(net.modtale.repository.user.NotificationRepository.class);
+        var notifications = new net.modtale.service.communication.NotificationService(repository,
+                mock(net.modtale.repository.user.UserRepository.class), mongo, mock(net.modtale.service.communication.NotificationDeliveryService.class));
+        var old = new net.modtale.model.user.Notification("recipient", "Invite", "Invite", java.net.URI.create("/dashboard"), null,
+                net.modtale.model.user.NotificationType.CONTRIBUTOR_INVITE, Map.of("projectId", projectId, "requestId", "old"));
+        old.setId("old"); when(repository.findById("old")).thenReturn(Optional.of(old)); notifications.deleteNotification("old", "recipient");
+        notifications.cleanupExpiredContributorInvites();
+        assertEquals("new", mongo.findById(projectId, Project.class).getTeamInvites().getFirst().getRequestId());
+        prepareContributorInvite("expired", 1); notifications.cleanupExpiredContributorInvites();
+        assertTrue(mongo.findById(projectId, Project.class).getTeamInvites().isEmpty());
+    }
+    @Test void expiredOrOwnerChangedContributorInvitesCannotGrantMembership() {
+        var writes = new ProjectReviewPersistence(mongo); prepareContributorInvite("invite", 1);
+        var expired = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        assertThrows(net.modtale.exception.InvalidProjectRequestException.class, () -> writes.resolveContributorInvite(expired, "recipient", "invite", true));
+        prepareContributorInvite("invite", System.currentTimeMillis()+60000);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update().set("authorId", "different"), Project.class);
+        var changed = writes.capture(projectId, ProjectReviewSnapshot.token(mongo.findById(projectId, Project.class)));
+        assertThrows(net.modtale.exception.InvalidProjectRequestException.class, () -> writes.resolveContributorInvite(changed, "recipient", "invite", true));
+    }
+
+}
