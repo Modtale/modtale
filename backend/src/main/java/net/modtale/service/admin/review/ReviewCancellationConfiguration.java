@@ -20,7 +20,7 @@ public class ReviewCancellationConfiguration {
     @Bean ReviewOrphanCancellationExecutor reviewOrphanCancellationExecutor(ReviewOrphanCancellationJournal journal,RemoteReviewClient client,AppReviewRepairProperties properties) {
         return new ReviewOrphanCancellationExecutor(journal,client,properties.concurrency(),Duration.ofSeconds(30));
     }
-    @Bean ReviewCancellationReconciler reviewCancellationReconciler(MongoTemplate mongo,ReviewOrphanCancellationJournal journal,RemoteReviewClient client,AppReviewRepairProperties properties) {
+    @Bean(initMethod="initializeDiscovery") ReviewCancellationReconciler reviewCancellationReconciler(MongoTemplate mongo,ReviewOrphanCancellationJournal journal,RemoteReviewClient client,AppReviewRepairProperties properties) {
         return new ReviewCancellationReconciler(mongo,journal,client,properties.concurrency(),Duration.ofSeconds(30));
     }
     @Bean ReviewCancellationAccess reviewCancellationAccess(AccountService accounts,ReviewRepairWorkflow workflow,ReviewOrphanCancellationJournal journal,

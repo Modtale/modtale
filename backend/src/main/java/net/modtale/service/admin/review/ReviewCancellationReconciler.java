@@ -21,6 +21,7 @@ public final class ReviewCancellationReconciler implements AutoCloseable {
                           ReviewOrphanCancellationJournal.Observation observation,Long receivedAt) {}
     private static final Collation BINARY=Collation.builder().locale("simple").build();
     private final MongoCollection<Document> observations;
+    private final ReviewObservationReader reader;
     private final ReviewOrphanCancellationJournal journal;
     private final RemoteReviewClient client;
     private final Semaphore slots;
@@ -28,9 +29,15 @@ public final class ReviewCancellationReconciler implements AutoCloseable {
     private final AtomicBoolean closed=new AtomicBoolean();
     public ReviewCancellationReconciler(MongoTemplate mongo,ReviewOrphanCancellationJournal journal,RemoteReviewClient client,int concurrency,Duration budget) {
         if(concurrency<1 || concurrency>2 || budget==null || budget.compareTo(Duration.ofSeconds(1))<0 || budget.compareTo(Duration.ofSeconds(30))>0)throw new IllegalArgumentException("Invalid reconciliation capacity");
+        reader=new ReviewObservationReader(mongo);
         this.journal=Objects.requireNonNull(journal);this.client=Objects.requireNonNull(client);slots=new Semaphore(concurrency);budgetNanos=budget.toNanos();
         observations=mongo.getCollection(COLLECTION).withReadPreference(ReadPreference.primary()).withReadConcern(ReadConcern.MAJORITY)
                 .withWriteConcern(WriteConcern.MAJORITY.withJournal(true).withWTimeout(5,TimeUnit.SECONDS)).withTimeout(5000,TimeUnit.MILLISECONDS);
+    }
+    public void initializeDiscovery(){reader.initialize();}
+    public ReviewObservationReader.Page history(ReviewOrphanCancellationJournal.Prepared original,String actor,String cursor,int limit,BooleanSupplier permitted) {
+        permission(permitted);journal.reconciliationTarget(original,actor,permitted);
+        var page=reader.page(original,actor,cursor,limit);permission(permitted);return page;
     }
     public Receipt check(String id,ReviewOrphanCancellationJournal.Prepared original,String actor,BooleanSupplier permitted) {
         permission(permitted);if(!uuid(id))throw new IllegalArgumentException("Invalid observation identity");
