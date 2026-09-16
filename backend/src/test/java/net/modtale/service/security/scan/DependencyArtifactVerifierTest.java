@@ -86,6 +86,37 @@ class DependencyArtifactVerifierTest {
         finally {release.countDown();}
         assertTrue(closed.await(2,TimeUnit.SECONDS));assertTrue(capacity.tryAcquire(2,TimeUnit.SECONDS));capacity.release();assertEquals(0,reads.get());
     }
+    @Test void realStorageSdkStreamsMatchThenRecoverAfterAStalledResponse() throws Exception {
+        byte[] bytes={1,2,3};var stall=new java.util.concurrent.atomic.AtomicBoolean();
+        var entered=new CountDownLatch(1);var release=new CountDownLatch(1);
+        var server=com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1",0),0);
+        server.setExecutor(java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor());
+        server.createContext("/",exchange->{
+            try {
+                exchange.sendResponseHeaders(200,bytes.length);
+                if(stall.get()) {exchange.getResponseBody().write(bytes[0]);exchange.getResponseBody().flush();entered.countDown();
+                    try {release.await(5,TimeUnit.SECONDS);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();}
+                    exchange.getResponseBody().write(bytes,1,2);
+                } else exchange.getResponseBody().write(bytes);
+            } finally {exchange.close();}
+        });server.start();
+        try(var s3=software.amazon.awssdk.services.s3.S3Client.builder()
+                .endpointOverride(java.net.URI.create("http://127.0.0.1:"+server.getAddress().getPort()))
+                .region(software.amazon.awssdk.regions.Region.US_EAST_1)
+                .serviceConfiguration(software.amazon.awssdk.services.s3.S3Configuration.builder().pathStyleAccessEnabled(true).build())
+                .credentialsProvider(software.amazon.awssdk.auth.credentials.StaticCredentialsProvider.create(
+                        software.amazon.awssdk.auth.credentials.AwsBasicCredentials.create("test-key","test-secret"))).build()) {
+            var storage=new net.modtale.service.storage.StorageService(s3,new net.modtale.config.properties.AppR2Properties("bucket","","","",""),null);
+            var capacity=new Semaphore(1);var verifier=new DependencyArtifactVerifier(storage::getStream,capacity);
+            var input=inventory(node("a","file",bytes));
+            assertTrue(verifier.verify(input,10,Duration.ofSeconds(5)).matched());
+            stall.set(true);
+            assertEquals(TIME_LIMIT,verifier.verify(input,10,Duration.ofMillis(500)).state());
+            assertTrue(entered.await(2,TimeUnit.SECONDS));release.countDown();
+            assertTrue(capacity.tryAcquire(3,TimeUnit.SECONDS));capacity.release();stall.set(false);
+            assertTrue(verifier.verify(input,10,Duration.ofSeconds(5)).matched());
+        } finally {release.countDown();server.stop(0);}
+    }
     @Test void largeInputIsReadInSmallChunksAndClosed()throws Exception {
         byte[] bytes=new byte[1024*1024];new Random(123).nextBytes(bytes);var max=new AtomicInteger();var closed=new AtomicInteger();
         var verifier=new DependencyArtifactVerifier(path->new ByteArrayInputStream(bytes){

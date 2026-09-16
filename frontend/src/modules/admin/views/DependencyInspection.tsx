@@ -14,6 +14,18 @@ export interface DependencyInspectionResult {
         gaps: { from: Key; reference: { projectId: string; versionNumber: string }; reason: string }[];
     };
 }
+export interface DependencyByteResult {
+    reviewToken: string;
+    inventoryIdentity: string;
+    verification: { inventoryIdentity: string; state: string; bytes: number; artifacts: { fileReference: string; expectedSha256: string; actualSha256: string | null; bytes: number; state: string }[] };
+}
+const byteStates: Record<string, string> = {
+    MATCHED: 'Stored files matched the recorded hashes during this check. Security approval is still separate.',
+    MISMATCH: 'Stored file bytes do not match the recorded inventory. Review the mismatch before deciding.',
+    UNAVAILABLE: 'Stored file verification was unavailable.', BYTE_LIMIT: 'Verification reached its total byte limit. Some files remain unverified.',
+    TIME_LIMIT: 'Verification reached its time limit. File verification is incomplete.', BUSY: 'Verification capacity is occupied. Try again later.',
+    UNRESOLVED: 'Resolve the dependency inventory before verifying stored files.',
+};
 const reasons: Record<string, string> = {
     MISSING: 'Pinned version not found', AMBIGUOUS: 'Version identity is ambiguous', UNAVAILABLE: 'Record unavailable',
     EXTERNAL: 'External dependency requires inspection', CYCLE: 'Dependency cycle', DEPTH_LIMIT: 'Dependency depth limit reached',
@@ -25,13 +37,14 @@ export function DependencyInspection({ projectId, versionId, reviewToken }: { pr
     const [result, setResult] = useState<DependencyInspectionResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [bytes, setBytes] = useState<DependencyByteResult | null>(null);
     const generation = useRef(0);
     useEffect(() => {
-        generation.current++; setResult(null); setLoading(false); setError('');
+        generation.current++; setResult(null); setBytes(null); setLoading(false); setError('');
         return () => { generation.current++; };
     }, [projectId, versionId, reviewToken]);
     const load = async () => {
-        const request = ++generation.current; setResult(null); setError(''); setLoading(true);
+        const request = ++generation.current; setResult(null); setBytes(null); setError(''); setLoading(true);
         try {
             const next = await adminClient.getDependencyInspection(projectId, versionId, reviewToken);
             if (next.reviewToken !== reviewToken || next.inventory.root.projectId !== projectId || next.inventory.root.versionId !== versionId)
@@ -39,6 +52,19 @@ export function DependencyInspection({ projectId, versionId, reviewToken }: { pr
             if (request === generation.current) setResult(next);
         } catch (failure) {
             if (request === generation.current) setError(extractApiErrorMessage(failure, 'Dependency inspection is unavailable.'));
+        } finally { if (request === generation.current) setLoading(false); }
+    };
+    const verify = async () => {
+        if (!result?.inventory.identity) return;
+        const identity = result.inventory.identity;
+        const request = ++generation.current; setBytes(null); setError(''); setLoading(true);
+        try {
+            const next = await adminClient.verifyDependencyBytes(projectId, versionId, reviewToken, identity);
+            if (next.reviewToken !== reviewToken || next.inventoryIdentity !== identity || next.verification.inventoryIdentity !== identity)
+                throw new Error('Byte verification no longer matches this inventory. Inspect dependencies again.');
+            if (request === generation.current) setBytes(next);
+        } catch (failure) {
+            if (request === generation.current) { setResult(null); setError(extractApiErrorMessage(failure, 'Stored file verification is unavailable.')); }
         } finally { if (request === generation.current) setLoading(false); }
     };
     return <section aria-label="Dependency inventory" className="rounded-2xl border border-slate-200 dark:border-slate-700 p-5 space-y-4">
@@ -52,6 +78,16 @@ export function DependencyInspection({ projectId, versionId, reviewToken }: { pr
         {error && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p>}
         {result && <>
             <p role="status" className="text-sm dark:text-slate-200">{result.inventory.nodes.length} versions recorded · {result.inventory.edges.length} declarations · {result.inventory.gaps.length} unresolved items</p>
+            {result.inventory.identity && result.inventory.gaps.length === 0 && <button type="button" onClick={verify} disabled={loading}
+                className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 disabled:opacity-50">{loading ? 'Checking stored files…' : 'Verify stored files'}</button>}
+            {bytes && <div className="space-y-2">
+                <p role="status" className="text-sm dark:text-slate-200">{byteStates[bytes.verification.state] || 'File verification is incomplete.'}</p>
+                {bytes.verification.artifacts.length > 0 && <details>
+                    <summary className="cursor-pointer text-sm dark:text-slate-200">File observations ({bytes.verification.artifacts.length})</summary>
+                    <ul className="max-h-60 overflow-auto text-xs space-y-2 mt-3 dark:text-slate-200">{bytes.verification.artifacts.map((artifact, index) =>
+                        <li key={index} className="break-all">{artifact.fileReference}: {artifact.state.toLowerCase()}<br />Recorded: {artifact.expectedSha256}<br />Observed: {artifact.actualSha256 || 'Unavailable'}</li>)}</ul>
+                </details>}
+            </div>}
             {result.inventory.gaps.length > 0 && <ul aria-label="Unresolved dependency evidence" className="max-h-60 overflow-auto space-y-2 text-sm text-amber-700 dark:text-amber-300">
                 {result.inventory.gaps.map((gap, index) => <li key={index} className="break-all">{gap.reference.projectId} / {gap.reference.versionNumber}: {reasons[gap.reason] || 'Unresolved dependency evidence'}</li>)}
             </ul>}

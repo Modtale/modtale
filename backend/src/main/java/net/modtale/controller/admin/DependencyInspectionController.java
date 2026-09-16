@@ -20,11 +20,30 @@ import java.util.function.Supplier;
 public class DependencyInspectionController {
     private final ProjectService projects;
     private final Supplier<DependencyReviewSource> sources;
-    @Autowired public DependencyInspectionController(ProjectService projects,MongoTemplate mongo) {
-        this(projects,()->new DependencyReviewSource(mongo));
+    private final DependencyArtifactVerifier verifier;
+    @Autowired public DependencyInspectionController(ProjectService projects,MongoTemplate mongo,net.modtale.service.storage.StorageService storage) {
+        this(projects,()->new DependencyReviewSource(mongo),new DependencyArtifactVerifier(storage));
     }
-    DependencyInspectionController(ProjectService projects,Supplier<DependencyReviewSource> sources) {
-        this.projects=projects;this.sources=sources;
+    DependencyInspectionController(ProjectService projects,Supplier<DependencyReviewSource> sources,DependencyArtifactVerifier verifier) {
+        this.projects=projects;this.sources=sources;this.verifier=verifier;
+    }
+    public record ByteInspection(String reviewToken,String inventoryIdentity,DependencyArtifactVerifier.Result verification) {}
+    @GetMapping("/dependency-bytes")
+    public ResponseEntity<ByteInspection> verifyBytes(@PathVariable String id,@PathVariable String versionId,
+            @RequestParam String inventoryIdentity,@RequestHeader(value="If-Match",required=false) String expected) {
+        if(inventoryIdentity==null||!inventoryIdentity.matches("[0-9a-f]{64}"))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid dependency inventory identity");
+        var before=inspect(id,versionId,expected).getBody();
+        if(!before.inventory().resolved()||!inventoryIdentity.equals(before.inventory().identity()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"Dependency inventory changed; inspect it again");
+        var verification=verifier.verify(before.inventory());
+        // Use a fresh database budget and observations after storage reads, never the pre-read cache.
+        var after=inspect(id,versionId,expected).getBody();
+        if(!after.inventory().resolved()||!inventoryIdentity.equals(after.inventory().identity())
+                ||verification==null||!inventoryIdentity.equals(verification.inventoryIdentity()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"Dependency inventory changed during byte verification");
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff")
+                .body(new ByteInspection(after.reviewToken(),inventoryIdentity,verification));
     }
     private static boolean sameDeclarations(ProjectVersion version,DependencyReviewGraph.Snapshot root) {
         try {

@@ -103,13 +103,32 @@ class DependencyReviewSourceTest {
         },1_000_000_000L);
         assertEquals(State.UNAVAILABLE,source.readRoot("root","first").state());
     }
+    @Test void byteEndpointRevalidatesRealDatabaseDependenciesAfterReadingStorage() throws Exception {
+        byte[] bytes={1,2,3};String hash=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        project("root",version("v","1").append("hash",hash).append("dependencies",List.of(new Document("projectId","child").append("versionNumber","1"))));
+        project("child",version("child-v","1").append("hash",hash));
+        mongo.save(mongo.findById("root",net.modtale.model.project.Project.class));
+        var projects=org.mockito.Mockito.mock(net.modtale.service.project.query.ProjectService.class);
+        org.mockito.Mockito.when(projects.getRawProjectById("root")).thenAnswer(i->mongo.findById("root",net.modtale.model.project.Project.class));
+        var storage=org.mockito.Mockito.mock(net.modtale.service.storage.StorageService.class);
+        org.mockito.Mockito.when(storage.getStream(org.mockito.ArgumentMatchers.anyString())).thenAnswer(i->new java.io.ByteArrayInputStream(bytes));
+        var controller=new net.modtale.controller.admin.DependencyInspectionController(projects,mongo,storage);
+        String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(projects.getRawProjectById("root"));
+        String identity=controller.inspect("root","v",token).getBody().inventory().identity();
+        var verified=controller.verifyBytes("root","v",identity,token).getBody();
+        assertTrue(verified.verification().matched());assertEquals(6,verified.verification().bytes());
+        org.mockito.Mockito.when(storage.getStream("files/child-v")).thenAnswer(i->new java.io.ByteArrayInputStream(bytes){
+            public void close(){mongo.getCollection("projects").updateOne(new Document("_id","child"),new Document("$set",new Document("versions.0.hash","d".repeat(64))));}
+        });
+        assertEquals(409,assertThrows(org.springframework.web.server.ResponseStatusException.class,()->controller.verifyBytes("root","v",identity,token)).getStatusCode().value());
+    }
     @Test void controllerComposesRealDatabaseGraphWithTheOpenedReviewSnapshot() {
         project("root",version("v","1").append("dependencies",List.of(new Document("projectId","child").append("versionNumber","1"))));
         project("child",version("child-v","1"));
         mongo.save(mongo.findById("root",net.modtale.model.project.Project.class));
         var projects=org.mockito.Mockito.mock(net.modtale.service.project.query.ProjectService.class);
         org.mockito.Mockito.when(projects.getRawProjectById("root")).thenAnswer(i->mongo.findById("root",net.modtale.model.project.Project.class));
-        var controller=new net.modtale.controller.admin.DependencyInspectionController(projects,mongo);
+        var controller=new net.modtale.controller.admin.DependencyInspectionController(projects,mongo,org.mockito.Mockito.mock(net.modtale.service.storage.StorageService.class));
         String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(projects.getRawProjectById("root"));
         var response=controller.inspect("root","v",token).getBody();
         assertFalse(response.artifactBytesVerified());assertEquals(2,response.inventory().nodes().size());assertTrue(response.inventory().resolved());

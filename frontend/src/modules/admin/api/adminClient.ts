@@ -7,6 +7,7 @@ export interface InspectionWindow {
 
 export const adminClient = {
     getProjectMeta: async (projectId: string) => (await api.get(`/projects/${projectId}/meta`)).data,
+    verifyDependencyBytes: async (projectId: string, versionId: string, reviewToken: string, inventoryIdentity: string): Promise<import('../views/DependencyInspection').DependencyByteResult> => (await api.get(`/admin/projects/${encodeURIComponent(projectId)}/version-ids/${encodeURIComponent(versionId)}/dependency-bytes`, { headers: { 'If-Match': reviewToken }, params: { inventoryIdentity } })).data,
     getDependencyInspection: async (projectId: string, versionId: string, reviewToken: string): Promise<import('../views/DependencyInspection').DependencyInspectionResult> => (await api.get(`/admin/projects/${encodeURIComponent(projectId)}/version-ids/${encodeURIComponent(versionId)}/dependencies`, { headers: { 'If-Match': reviewToken } })).data,
     getArtifactChanges: async (projectId: string, version: string, reviewToken: string): Promise<import('../views/ArtifactChanges').ArtifactChangeSummary> => (await api.get(`/admin/projects/${encodeURIComponent(projectId)}/versions/${encodeURIComponent(version)}/changes`, { headers: { 'If-Match': reviewToken } })).data,
     getStructure: async (projectId: string, version: string, reviewToken: string) => (await api.get(`/admin/projects/${encodeURIComponent(projectId)}/versions/${encodeURIComponent(version)}/structure`, { headers: { 'If-Match': reviewToken } })).data,
