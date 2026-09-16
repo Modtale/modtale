@@ -106,6 +106,7 @@ public class ScanCompletionService {
         SecurityIssueAnalysisService.ClassificationStats classification =
                 securityIssueAnalysisService.annotateAgainstBaselines(scanResult, baselines);
         new ArtifactReviewReuseService().annotate(project, versionId, scanResult);
+        boolean reuseAnnotated = scanResult.getReusedReviewVersion() != null;
         ScanRoutingService.RoutingDecision routingDecision =
                 scanRoutingService.decideRouting(scanResult, classification, isManualRescan);
 
@@ -151,6 +152,11 @@ public class ScanCompletionService {
                     ? "A retained security block from an earlier review must be resolved before publication."
                     : "Recorded finding decisions require a current moderator review before publication.");
             scanResult.setReviewerNotes(notes);
+        }
+        if (reuseAnnotated && scanResult.getReusedReviewVersion() == null) {
+            scanResult.setReusedReviewApprovedAt(0);
+            scanResult.setReusedReviewOrigins(null);
+            classification = securityIssueAnalysisService.annotateAgainstBaselines(scanResult, baselines);
         }
         boolean approvedImmediately = routingDecision.action() == ScanRoutingService.RoutingAction.APPROVE_NOW;
         boolean notifyFlagged = routingDecision.action() == ScanRoutingService.RoutingAction.REQUIRE_REVIEW;

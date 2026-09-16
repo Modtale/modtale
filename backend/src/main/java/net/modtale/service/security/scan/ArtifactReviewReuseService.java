@@ -11,6 +11,7 @@ public class ArtifactReviewReuseService {
     public void annotate(Project project, String currentVersionId, ScanResult result) {
         result.setReusedReviewVersion(null);
         result.setReusedReviewApprovedAt(0);
+        result.setReusedReviewOrigins(null);
         var current = result.getSecurityEvidence();
         if (!ArtifactClearancePolicy.complete(result) || ArtifactClearancePolicy.cleared(result) || current == null || !current.complete()
                 || "NEW_SECURITY_EVIDENCE".equals(current.reviewState())
@@ -18,7 +19,7 @@ public class ArtifactReviewReuseService {
                 || project == null || project.getVersions() == null) return;
         ProjectVersion target = project.getVersions().stream().filter(Objects::nonNull)
                 .filter(version -> Objects.equals(currentVersionId, version.getId())).findFirst().orElse(null);
-        String context = ArtifactReviewContext.fingerprint(target);
+        String context = ArtifactReviewContext.automaticallyReviewableFingerprint(target);
         if (context == null || target.getReplacementSecurityHold()!=null || target.getFindingReviewHead() != null) return;
         long now = System.currentTimeMillis();
         for (ProjectVersion version : project.getVersions()) {
