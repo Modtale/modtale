@@ -1139,7 +1139,8 @@ public final class LauncherLibraryController {
         feedback.runAsync("Enabling install in selected worlds...", () -> {
             for (HytaleWorld world : selection.worlds()) {
                 try {
-                    net.modtale.launcher.install.WorldListConfigInstaller.install(selection.configs(), "WORLD", world.directory().resolve("mods"), 32 * 1024 * 1024);
+                    net.modtale.launcher.install.WorldListConfigInstaller.install(selection.configs(), "WORLD", world.directory().resolve("mods"),
+                            32 * 1024 * 1024, conflicts -> confirmConfigReplacement(world, conflicts));
                 } catch (java.io.IOException ex) {
                     throw new ModtaleApiException("Could not apply shared configs to " + world.name(), ex);
                 }
@@ -1158,6 +1159,35 @@ public final class LauncherLibraryController {
             feedback.showToast("Worlds updated", "Enabled the install in selected worlds.");
             accountController.syncLocalSettings();
         });
+    }
+
+    private boolean confirmConfigReplacement(HytaleWorld world,
+            List<net.modtale.launcher.model.worldlist.WorldListConfig> conflicts) {
+        // Config installation runs on a worker; show each decision on the UI thread.
+        var decision = new CompletableFuture<Boolean>();
+        Platform.runLater(() -> {
+            try {
+                Map<String, String> titles = new LinkedHashMap<>();
+                for (HytaleInstalledMod mod : installedMods) titles.putIfAbsent(mod.id(), mod.name());
+                var config = conflicts.getFirst();
+                Path root = world.directory().resolve("mods");
+                String title = ShareConfigSelectionModal.modTitle(
+                        new net.modtale.launcher.config.HytaleConfigFiles.ConfigFile(root, root.resolve(config.path()), "",
+                                config.modIds().isEmpty() ? "" : config.modIds().getFirst()), titles);
+                decision.complete(StatusModal.builder(overlayHost)
+                        .type(StatusModal.Type.INFO)
+                        .title("Replace configs for " + title + "?")
+                        .message(world.name() + " already has " + conflicts.size() + " config file"
+                                + LibraryProjectSupport.plural(conflicts.size()) + " for " + title
+                                + ". Replace them with the included configs? Keeping existing configs preserves your settings.")
+                        .actionLabel("Replace configs")
+                        .secondaryLabel("Keep existing")
+                        .showAndWait() == StatusModal.Result.PRIMARY);
+            } catch (RuntimeException ex) {
+                decision.completeExceptionally(ex);
+            }
+        });
+        return decision.join();
     }
 
     private List<String> modIdsForFiles(List<Path> files) {
@@ -1233,7 +1263,8 @@ public final class LauncherLibraryController {
                     boolean entirePack = !packIds.isEmpty() && ids.containsAll(packIds);
                     var configs = installed.universeConfigs().stream().filter(config -> config.appliesTo(ids, entirePack)).toList();
                     if (!configs.isEmpty()) {
-                        try { net.modtale.launcher.install.WorldListConfigInstaller.install(configs, "WORLD", world.directory().resolve("mods"), 32 * 1024 * 1024); }
+                        try { net.modtale.launcher.install.WorldListConfigInstaller.install(configs, "WORLD", world.directory().resolve("mods"),
+                                32 * 1024 * 1024, conflicts -> confirmConfigReplacement(world, conflicts)); }
                         catch (java.io.IOException ex) { throw new ModtaleApiException("Could not apply world config defaults.", ex); }
                     }
                 }
