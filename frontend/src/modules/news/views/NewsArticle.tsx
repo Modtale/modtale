@@ -12,9 +12,6 @@ export const NewsArticle: React.FC<{ currentUser?: User | null }> = () => {
     const { slug } = useParams();
     const post = getNewsPostBySlug(slug);
     if (!post) return <Navigate to={NEWS_INDEX_PATH} replace />;
-    const sections = post.slug === 'modtale-launcher'
-        ? [['launcher', 'Your worlds'], ['curseforge', 'CurseForge'], ['everyday', 'Everyday details'], ['sync', 'Account sync'], ['wardrobe', 'Wardrobe'], ['next', 'Get the launcher']]
-        : [['creators', 'Build a pack'], ['configs', 'Mod configs'], ['curseforge', 'External mods'], ['sharing', 'Share a mod list'], ['releases', 'Releases'], ['modpacks', 'Install a pack'], ['next', 'Get started']];
     return (
         <main className="news-page news-editorial">
             <div className="news-wrap">
@@ -53,10 +50,6 @@ export const NewsArticle: React.FC<{ currentUser?: User | null }> = () => {
                     </figure>
                     </div>
                     <div className="news-reading-layout">
-                        <nav className="news-contents" aria-label="Article sections">
-                            <span>In this article</span>
-                            {sections.map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}
-                        </nav>
                     <div className="news-copy news-prose">
                         {post.slug === 'modtale-launcher' ? (
                             <LauncherStory />
