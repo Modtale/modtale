@@ -18,18 +18,18 @@ describe('Article feature layout', () => {
             <p key="d">After the download.</p>, <h3 key="e">Library</h3>,
             <p key="f">Manage your worlds.</p>, <FeatureDemo key="g" clip="world-library" alt="Library demo" />,
         ]);
-        const rows = article.querySelectorAll('.news-feature-row');
-        expect(rows).toHaveLength(2);
-        expect(rows[0].querySelector('.news-feature-copy')?.textContent).toContain('After the download.');
-        expect(rows[0].querySelector('img')?.alt).toBe('Download demo');
-        expect(rows[1].querySelector('h3')?.textContent).toBe('Library');
-        expect(rows[1].querySelector('img')?.alt).toBe('Library demo');
+        const section = article.querySelector('section')!;
+        expect(Array.from(section.children).map(child => child.tagName)).toEqual([
+            'H2', 'P', 'FIGURE', 'P', 'H3', 'P', 'FIGURE'
+        ]);
+        expect(section.querySelectorAll('img')[0]?.alt).toBe('Download demo');
+        expect(section.querySelectorAll('img')[1]?.alt).toBe('Library demo');
     });
 
     it('preserves text-only sections without an empty media column', () => {
         const article = render([<h2 key="a">Configs</h2>, <p key="b">Keep your settings.</p>]);
-        expect(article.querySelector('.news-section-heading')?.textContent).toBe('Configs');
-        expect(article.querySelector('.news-section-copy')?.textContent).toBe('Keep your settings.');
+        expect(article.querySelector('h2')?.textContent).toBe('Configs');
+        expect(article.querySelector('p')?.textContent).toBe('Keep your settings.');
         expect(article.querySelector('.news-feature-media')).toBeNull();
     });
 });

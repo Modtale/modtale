@@ -1,4 +1,4 @@
-/* Shared article shell: restrained product surfaces, generous space for demos. */
+/* Shared article shell: one reading column with inline product walkthroughs. */
 .news-editorial {
     --np-bg: #f8fafc;
     --np-paper: #fff;
@@ -15,14 +15,14 @@
     --np-line: #ffffff1a;
     --np-accent: #60a5fa;
 }
-.news-editorial .news-wrap { max-width:1792px; padding:0 112px; }
+.news-editorial .news-wrap { max-width:896px; padding:0 32px; }
 .news-editorial .news-masthead { padding:24px 0; border:0; }
 .news-editorial .news-masthead a { padding:8px 12px; border-radius:10px; font-weight:700; transition:color .15s,background .15s; }
 .news-editorial .news-masthead a:hover { background:var(--np-paper); color:var(--np-accent); }
-.news-article-intro { display:grid; grid-template-columns:1.1fr 1fr; align-items:center; gap:40px; padding:24px 0 40px; border-bottom:1px solid var(--np-line); }
+.news-article-intro { display:flex; flex-direction:column; align-items:stretch; gap:32px; padding:24px 0 40px; border-bottom:1px solid var(--np-line); }
 .news-editorial .news-heading { max-width:none; padding:0; margin:0; }
 .news-editorial .news-heading h1 { margin:0; font-size:clamp(30px,3.3vw,42px); line-height:1.15; font-weight:800; letter-spacing:normal; text-wrap:balance; }
-.news-editorial .news-deck { margin:18px 0 0; font-size:16px; line-height:1.7; letter-spacing:normal; }
+.news-editorial .news-deck { margin:18px 0 0; font-size:18px; line-height:1.7; letter-spacing:normal; }
 .news-editorial .news-byline { margin-top:24px; justify-content:flex-start; flex-wrap:wrap; gap:8px; font-size:12px; }
 .news-editorial .news-byline img { width:28px; height:28px; border-radius:8px; }
 .news-editorial .news-byline strong { font-weight:700; }
@@ -35,58 +35,26 @@
 .news-editorial .news-copy .news-lead { color:var(--np-ink); font-size:21px; line-height:1.7; letter-spacing:normal; }
 .news-editorial .news-copy h2 { margin:0 0 16px; font-size:30px; font-weight:800; line-height:1.3; letter-spacing:normal; text-wrap:balance; }
 .news-editorial .news-copy h3 { font-size:24px; font-weight:700; letter-spacing:normal; }
-.news-editorial .news-copy section { margin-top:40px; scroll-margin-top:112px; }
-.news-editorial .news-demo { margin:24px 0; }
 .news-editorial .news-demo .launcher-demo-media, .news-editorial .news-demo > video, .news-editorial .news-screenshot img { display:block; width:100%; height:auto; border:1px solid var(--np-line); border-radius:16px; background:#020617; }
 .news-editorial .news-note { background:var(--np-paper); border:1px solid var(--np-line); border-radius:12px; padding:16px 20px; }
 .news-editorial .news-article-footer { margin-top:40px; padding-top:24px; font-size:14px; font-weight:700; }
 .news-editorial .news-article-footer a { text-decoration:none; }
-@media(max-width:900px) {
-    .news-article-intro { grid-template-columns:1fr; gap:24px; padding-top:12px; }
-    .news-editorial .news-article-hero { max-width:640px; }
-    .news-reading-layout { grid-template-columns:1fr; gap:24px; padding-top:24px; }
-}
-@media(max-width:600px) {
-    .news-editorial .news-masthead { padding:16px 0; }
-    .news-editorial .news-heading h1 { font-size:30px; }
-    .news-editorial .news-copy h2 { font-size:23px; }
-    .news-editorial .news-copy p, .news-editorial .news-copy li { font-size:17px; }
-    .news-editorial .news-copy .news-lead { font-size:17px; }
-}
 
-.news-editorial .news-copy p, .news-editorial .news-copy ul { max-width:68ch; }
-@media(max-width:1279px) { .news-editorial .news-wrap { padding:0 80px; } }
-@media(max-width:1023px) { .news-editorial .news-wrap { padding:0 64px; } }
-@media(max-width:767px) { .news-editorial .news-wrap { padding:0 48px; } }
-@media(max-width:639px) { .news-editorial .news-wrap { padding:0 24px; } }
-
-/* One reading path; media accompanies it rather than moving the prose around. */
-.news-feature-row { display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr); gap:clamp(32px,4vw,64px); align-items:start; }
-.news-story-intro, .news-text-row { width:calc((100% - clamp(32px,4vw,64px)) * .45); }
 .news-story-intro { padding-top:8px; }
-.news-feature-copy, .news-feature-media, .news-section-copy { min-width:0; }
-.news-feature-media { position:sticky; top:120px; display:grid; gap:24px; }
-.news-editorial .news-feature-row .news-demo { margin:0; }
-.news-editorial .news-feature-copy > :first-child,
-.news-editorial .news-section-heading > :first-child { margin-top:0; }
-.news-editorial .news-feature-copy > :last-child,
-.news-editorial .news-section-copy > :last-child,
-.news-editorial .news-story-intro > :last-child { margin-bottom:0; }
-.news-editorial .news-copy section { margin-top:48px; padding-top:0; border:0; }
-.news-feature-row + .news-feature-row,
-.news-feature-row + .news-text-row,
-.news-text-row + .news-feature-row,
-.news-text-row + .news-text-row { margin-top:40px; }
-.news-editorial .news-copy p, .news-editorial .news-copy ul { max-width:none; }
-.news-editorial .news-section-heading h2, .news-editorial .news-section-heading h3 { margin-bottom:16px; }
+.news-editorial .news-copy section { margin-top:48px; scroll-margin-top:112px; }
+.news-editorial .news-copy h3 { margin:36px 0 16px; }
+.news-editorial .news-demo { margin:28px 0 32px; }
 .news-editorial .news-note { font-size:16px; line-height:1.75; margin:24px 0; }
-@media(max-width:1100px) {
-    .news-feature-row { grid-template-columns:1fr; gap:24px; }
-    .news-story-intro, .news-text-row { width:100%; }
-    .news-feature-media { position:static; }
-}
 @media(max-width:600px) {
+    .news-editorial .news-wrap { padding:0 24px; }
+    .news-editorial .news-masthead { padding:16px 0; }
+    .news-article-intro { gap:24px; padding-top:12px; padding-bottom:28px; }
+    .news-editorial .news-heading h1 { font-size:30px; }
+    .news-reading-layout { padding-top:28px; }
+    .news-editorial .news-copy h2 { font-size:25px; }
+    .news-editorial .news-copy h3 { font-size:22px; }
+    .news-editorial .news-copy p, .news-editorial .news-copy li, .news-editorial .news-deck { font-size:17px; }
+    .news-editorial .news-copy .news-lead { font-size:19px; }
     .news-editorial .news-copy section { margin-top:36px; }
-    .news-feature-row + .news-feature-row, .news-feature-row + .news-text-row { margin-top:32px; }
+    .news-editorial .news-demo { margin:24px 0; }
 }
-@media(max-height:700px) { .news-feature-media { position:static; } }
