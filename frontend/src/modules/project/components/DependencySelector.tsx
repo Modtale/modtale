@@ -1,3 +1,5 @@
+import { formatCompatibleVersions } from '@/utils/manifestVersionLabel';
+import { Checkbox } from '@/components/ui/Checkbox';
 import { modpackDialog } from './modpackDialogStyles';
 import { useDialogFocus } from '@/hooks/useDialogFocus';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -9,7 +11,7 @@ import { BACKEND_URL } from '@/utils/api';
 import type { DependencySource, DependencyType, ExternalProjectFile, ExternalProjectReference, Project, ProjectDependency, ProjectVersion } from '@/types';
 import { VersionRelationKind } from '@/types';
 import { useScrollLock } from '@/hooks/useScrollLock';
-import { dependencyProjectKey, getDependencyType, isExternalDependency, isOptionalDependency, normalizeDependencyReference } from '../utils/dependencyEntries';
+import { dependencyProjectKey, getDependencyType, isExternalDependency, normalizeDependencyReference } from '../utils/dependencyEntries';
 import { useToast } from '@/components/ui/Toast';
 import { ModalPortal } from '@/components/ui/ModalPortal';
 
@@ -185,36 +187,58 @@ const DependencyPrompt = ({
 }: {
     projectTitle: string;
     dependencies: ProjectDependency[];
-    onAdd: () => void;
+    onAdd: (dependencies: ProjectDependency[]) => void;
     onClose: () => void;
 }) => {
     useScrollLock(true);
+    const [selected, setSelected] = useState(() => new Set(dependencies.map(dependencyProjectKey)));
+    const [projects, setProjects] = useState<Record<string, Project>>({});
+    useEffect(() => {
+        let cancelled = false;
+        Promise.all(dependencies.filter(dep => !isExternalDependency(dep)).map(async dep => {
+            try {
+                const [project, versions] = await Promise.all([projectClient.getProject(dep.projectId), projectClient.getProjectVersions(dep.projectId)]);
+                return [dep.projectId, { ...project, versions }] as const;
+            }
+            catch { return null; }
+        })).then(entries => {
+            if (!cancelled) setProjects(Object.fromEntries(entries.filter(entry => entry !== null)));
+        });
+        return () => { cancelled = true; };
+    }, [dependencies]);
     return (
         <div className={theme.components.modalOverlay}>
-            <div role="dialog" aria-modal="true" aria-label="Add dependencies" className={modpackDialog.content}>
+            <div role="dialog" aria-modal="true" aria-label={`Add dependencies for ${projectTitle}`} className={modpackDialog.content}>
                 <div className={modpackDialog.header}>
                     <div>
                         <h3 className={modpackDialog.title}><PackagePlus className={`w-5 h-5 shrink-0 ${theme.colors.accent}`} />Add dependencies</h3>
-                        <p className={`text-sm ${theme.colors.textMuted} mt-1`}>{projectTitle} lists {dependencies.length} related project{dependencies.length === 1 ? '' : 's'} that are not in this pack yet.</p>
                     </div>
                     <button type="button" onClick={onClose} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
                 </div>
                 <div className={`${modpackDialog.body} !space-y-2`}>
-                    {dependencies.map(dep => (
-                        <div key={`${dep.projectId}:${dep.versionNumber}`} className={`${modpackDialog.row} flex items-center justify-between gap-3`}>
-                            <div className="min-w-0">
-                                <div className={`font-bold ${theme.colors.textPrimary} truncate`}>{dep.projectTitle || dep.projectId}</div>
-                                <div className={`text-xs ${theme.colors.textMuted}`}>{dep.versionNumber}</div>
+                    {dependencies.map(dep => {
+                        const project = projects[dep.projectId];
+                        const version = project?.versions?.find(version => version.versionNumber === dep.versionNumber);
+                        const games = version?.gameVersions || dep.externalGameVersions;
+                        const key = dependencyProjectKey(dep);
+                        return <label key={key} className={`${modpackDialog.row} flex items-center gap-3 cursor-pointer`}>
+                            <Checkbox checked={selected.has(key)} onChange={checked => setSelected(current => {
+                                const next = new Set(current);
+                                if (checked) next.add(key); else next.delete(key);
+                                return next;
+                            })} className="shrink-0" />
+                            <img src={getIconUrl(project?.imageUrl || dep.icon)} alt="" className="w-12 h-12 rounded-xl object-cover shrink-0" onError={event => { event.currentTarget.src = '/assets/favicon.svg'; }} />
+                            <div className="min-w-0 flex-1">
+                                <div className={`font-bold ${theme.colors.textPrimary}`}>{dep.projectTitle || project?.title || dep.projectId}</div>
+                                <div className={`text-xs ${theme.colors.textMuted} mt-1`}>{dep.versionNumber} · {games?.length ? `For ${formatCompatibleVersions(games)}` : 'Game versions unavailable'}</div>
                             </div>
-                            <span className={`text-[10px] font-semibold px-2 py-1 rounded-md ${isOptionalDependency(dep) ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'}`}>
-                                {getDependencyType(dep)}
-                            </span>
-                        </div>
-                    ))}
+                            <span className={`shrink-0 text-[10px] font-bold px-2 py-1 rounded-md ${getDependencyType(dep) === 'OPTIONAL' ? 'bg-blue-500/10 text-blue-500' : 'bg-amber-500/10 text-amber-500'}`}>{getDependencyType(dep) === 'OPTIONAL' ? 'Optional' : getDependencyType(dep) === 'EMBEDDED' ? 'Embedded' : 'Required'}</span>
+                        </label>;
+                    })}
                 </div>
                 <div className={modpackDialog.footer}>
                     <button type="button" onClick={onClose} className={`px-4 py-2 font-bold rounded-lg ${theme.colors.textMuted} ${theme.colors.bgSurfaceHover}`}>Skip</button>
-                    <button type="button" onClick={onAdd} className={`px-5 py-2 font-bold rounded-lg ${theme.components.buttonPrimary} flex items-center gap-2`}><PackagePlus className="w-4 h-4" /> Add All</button>
+                    <button type="button" disabled={!selected.size} onClick={() => onAdd(dependencies.filter(dep => selected.has(dependencyProjectKey(dep))))} className={`disabled:opacity-50 px-5 py-2 font-bold rounded-lg ${theme.components.buttonPrimary} flex items-center gap-2`}><PackagePlus className="w-4 h-4" /> Add {selected.size === dependencies.length ? 'All' : 'Selected'}</button>
                 </div>
             </div>
         </div>
@@ -614,9 +638,9 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                     projectTitle={pendingPrompt.projectTitle}
                     dependencies={pendingPrompt.dependencies}
                     onClose={() => setPendingPrompt(null)}
-                    onAdd={() => {
+                    onAdd={selected => {
                         const existingKeys = new Set(pendingPrompt.baseDeps.map(dependencyProjectKey));
-                        const toAdd = pendingPrompt.dependencies.filter(dep => !existingKeys.has(dependencyProjectKey(dep)));
+                        const toAdd = selected.filter(dep => !existingKeys.has(dependencyProjectKey(dep)));
                         onChange([...pendingPrompt.baseDeps, ...toAdd]);
                         setPendingPrompt(null);
                     }}
@@ -723,7 +747,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                                         <option value="REQUIRED">Required</option><option value="OPTIONAL">Optional</option>{!isModpack && <option value="EMBEDDED">Embedded</option>}
                                     </select>
                                 </label>
-                                {!externalResolved.hytaleProjectConfirmed && <label className={`flex gap-2 text-xs ${theme.colors.textSecondary}`}><input type="checkbox" checked={externalConfirmed} onChange={event => setExternalConfirmed(event.target.checked)} />This mod is for Hytale.</label>}
+                                {!externalResolved.hytaleProjectConfirmed && <label className={`flex gap-2 text-xs ${theme.colors.textSecondary}`}><input className="themed-checkbox" type="checkbox" checked={externalConfirmed} onChange={event => setExternalConfirmed(event.target.checked)} />This mod is for Hytale.</label>}
                                 {externalSuggestions.length > 0 && <div className={`text-xs ${theme.colors.textMuted}`}>Also on Modtale{externalSuggestions.map(project => <button key={project.id} type="button" onClick={() => { setShowExternalModal(false); void openVersionPicker(project); }} className={`block mt-2 ${theme.colors.accent} hover:underline`}>{project.title}</button>)}</div>}
                                 {externalResolved.source === 'CURSEFORGE' && <p className={`text-xs ${theme.colors.textMuted}`}>Launcher installation only</p>}
                             </>}
