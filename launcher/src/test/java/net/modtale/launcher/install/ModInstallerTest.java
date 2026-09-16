@@ -43,10 +43,60 @@ class ModInstallerTest {
 
     private HttpServer server;
 
+    private Path isolatedGameDirectory() throws IOException {
+        Path game = tempDir.resolve("isolated-game");
+        Path client = Files.createDirectories(game.resolve("Client"));
+        for (String executable : List.of("HytaleClient", "HytaleClient.exe", "Hytale.app/Contents/MacOS/HytaleClient")) {
+            Path path = client.resolve(executable);
+            Files.createDirectories(path.getParent());
+            Files.writeString(path, "test client");
+        }
+        return game;
+    }
+
     @AfterEach
     void stopServer() {
         if (server != null) {
             server.stop(0);
+        }
+    }
+
+    @Test
+    void rejectsBetterMap06BeforeRemovingExistingModOnEveryReplacementPath() throws Exception {
+        Path game = tempDir.resolve("game");
+        Files.createDirectories(game.resolve("Server"));
+        var manifest = new java.util.jar.Manifest();
+        manifest.getMainAttributes().putValue("Manifest-Version", "1.0");
+        manifest.getMainAttributes().putValue("Implementation-Version", "0.5.6");
+        try (var jar = new java.util.jar.JarOutputStream(
+                Files.newOutputStream(game.resolve("Server/HytaleServer.jar")), manifest)) { }
+        Path mods = Files.createDirectories(tempDir.resolve("mods"));
+        Path previousFile = Files.writeString(mods.resolve("BetterMap-1.3.7.jar"), "existing mod");
+        LauncherSettings settings = new LauncherSettings();
+        settings.setHytaleGamePath(isolatedGameDirectory().toString());
+        settings.setHytaleGamePath(game.toString());
+        settings.setHytaleModsPath(mods.toString());
+        settings.setGameVersion("0.6"); // A catalog choice must not override the actual server.
+        InstalledProject previous = new InstalledProject("project", "project", "BetterMap", "PLUGIN",
+                "1.3.7", "8230539", "0.5", java.time.Instant.now(), java.time.Instant.now(),
+                List.of(previousFile.toString()), List.of(), List.of());
+        settings.setInstalledProjects(List.of(previous));
+        ProjectVersion incompatible = new ProjectVersion("8747205", "BetterMap-1.3.8.jar", List.of("0.6", "Early Access"),
+                "", 0, "", "", List.of(), "RELEASE");
+        ProjectDetail project = project(incompatible);
+        ModInstaller installer = new ModInstaller(new ModtaleApiClient("http://127.0.0.1:1/api/v1"),
+                new SettingsStore(tempDir.resolve("settings.json")));
+        List<org.junit.jupiter.api.function.Executable> attempts = List.of(
+                () -> installer.installAndRecord(project, incompatible, settings, "0.6"),
+                () -> installer.installAndRecord(project, incompatible, settings, "0.6", List.of()),
+                () -> installer.updateAndRecord(project, incompatible, settings),
+                () -> installer.switchVersionAndRecord(previous, project, incompatible, settings, "0.6"));
+        for (var attempt : attempts) {
+            var error = assertThrows(net.modtale.launcher.api.ModtaleApiException.class, attempt);
+            assertTrue(error.getMessage().contains("0.5.6"));
+            assertTrue(error.getMessage().contains("0.6"));
+            assertEquals("existing mod", Files.readString(previousFile));
+            assertEquals(List.of(previous), settings.getInstalledProjects());
         }
     }
 
@@ -98,6 +148,7 @@ class ModInstallerTest {
                 List.of(version)
         );
         LauncherSettings settings = new LauncherSettings();
+        settings.setHytaleGamePath(isolatedGameDirectory().toString());
         Path mods = tempDir.resolve("mods");
         settings.setHytaleModsPath(mods.toString());
         settings.setGameVersion("2026.1");
@@ -150,6 +201,7 @@ class ModInstallerTest {
         ProjectVersion second = version("v2", "1.1.0", dependency);
         ProjectDetail project = project(first, second);
         LauncherSettings settings = new LauncherSettings();
+        settings.setHytaleGamePath(isolatedGameDirectory().toString());
         Path mods = tempDir.resolve("mods");
         settings.setHytaleModsPath(mods.toString());
         settings.setGameVersion("2026.1");
@@ -202,6 +254,7 @@ class ModInstallerTest {
                 "2026-01-01T00:00:00Z", "MIT", "", List.of(), List.of(version, next));
         Path instance = tempDir.resolve("UserData");
         LauncherSettings settings = new LauncherSettings();
+        settings.setHytaleGamePath(isolatedGameDirectory().toString());
         settings.setHytaleUserDataPath(instance.toString());
         settings.setHytaleModsPath(instance.resolve("Mods").toString());
         settings.setGameVersion("2026.1");
@@ -261,6 +314,7 @@ class ModInstallerTest {
                 "2026-01-01T00:00:00Z", "MIT", "", List.of(), List.of(version)
         );
         LauncherSettings settings = new LauncherSettings();
+        settings.setHytaleGamePath(isolatedGameDirectory().toString());
         Path instance = tempDir.resolve("instance");
         settings.setHytaleUserDataPath(instance.toString());
         settings.setHytaleModsPath(instance.resolve("mods").toString());
@@ -294,6 +348,7 @@ class ModInstallerTest {
                 "Compost things", "Builder", "MOD", "2026-09-01T00:00:00Z", null, null,
                 List.of("Gameplay"), List.of(version));
         LauncherSettings settings = new LauncherSettings();
+        settings.setHytaleGamePath(isolatedGameDirectory().toString());
         Path mods = tempDir.resolve("mods");
         settings.setHytaleModsPath(mods.toString());
         settings.setGameVersion("2026.09");
@@ -319,6 +374,7 @@ class ModInstallerTest {
         ProjectDetail project = new ProjectDetail("curseforge:1450386", "curseforge:1450386", "Simple Compost",
                 "Compost things", "Builder", "MOD", null, null, null, List.of(), List.of(version));
         LauncherSettings settings = new LauncherSettings();
+        settings.setHytaleGamePath(isolatedGameDirectory().toString());
         Path mods = tempDir.resolve("mods-tampered");
         settings.setHytaleModsPath(mods.toString());
 
@@ -355,6 +411,7 @@ class ModInstallerTest {
         ProjectDetail project = new ProjectDetail("pack", "pack", "Pack", "Pack description", "Creator", "MODPACK",
                 "2026-01-01T00:00:00Z", "MIT", "", List.of(), List.of(version));
         LauncherSettings settings = new LauncherSettings();
+        settings.setHytaleGamePath(isolatedGameDirectory().toString());
         Path instance = tempDir.resolve("live-instance");
         settings.setHytaleUserDataPath(instance.toString());
         settings.setHytaleModsPath(instance.resolve("mods").toString());
@@ -395,6 +452,7 @@ class ModInstallerTest {
         assertEquals(100897L, resolvedDownload.fileSize());
         assertEquals("298f05d4294ad6573f1860239b667f76ab510716", resolvedDownload.hashes().get("sha1"));
         LauncherSettings settings = new LauncherSettings();
+        settings.setHytaleGamePath(isolatedGameDirectory().toString());
         Path instance = tempDir.resolve("live-direct-instance");
         settings.setHytaleUserDataPath(instance.toString());
         settings.setHytaleModsPath(instance.resolve("mods").toString());

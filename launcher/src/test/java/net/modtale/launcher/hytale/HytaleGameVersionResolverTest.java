@@ -19,6 +19,19 @@ class HytaleGameVersionResolverTest {
     Path tempDir;
 
     @Test
+    void selectedVersionReadsConfiguredGameInsteadOfAnotherInstalledPackage() throws Exception {
+        Path game = tempDir.resolve("custom-game");
+        Files.createDirectories(game.resolve("Server"));
+        writeServerJar(game.resolve("Server/HytaleServer.jar"), "0.5.6");
+        LauncherSettings settings = new LauncherSettings();
+        settings.setHytaleGamePath(game.toString());
+        settings.setGameVersion("0.6");
+        assertEquals("0.5.6", HytaleGameVersionResolver.selectedServerVersion(settings).orElseThrow());
+        settings.setHytaleGamePath(tempDir.resolve("missing").toString());
+        assertEquals(java.util.Optional.empty(), HytaleGameVersionResolver.selectedServerVersion(settings));
+    }
+
+    @Test
     void labelsInstalledOfficialPackageBuildFromServerJarManifest() throws Exception {
         Path dataRoot = tempDir.resolve("Hytale");
         Path packageDirectory = dataRoot.resolve(Path.of("install", "release", "package"));

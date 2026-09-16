@@ -2,6 +2,7 @@ package net.modtale.launcher.ui.shell;
 
 import java.util.Objects;
 import java.io.IOException;
+import net.modtale.launcher.hytale.HytaleGameVersionResolver;
 import net.modtale.launcher.ui.wardrobe.LauncherWardrobeController;
 import net.modtale.launcher.wardrobe.WardrobeApiClient;
 import net.modtale.launcher.wardrobe.WardrobeStore;
@@ -114,7 +115,8 @@ public final class LauncherRuntime {
                 accountController,
                 libraryController,
                 feedback,
-                settingsController::gameVersion,
+                () -> HytaleGameVersionResolver.selectedServerVersion(settingsController.settings())
+                        .orElse(settingsController.gameVersion()),
                 services.executor(),
                 services.projectPageImageLoader()
         );
