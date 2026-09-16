@@ -131,6 +131,11 @@ public final class LauncherPlayController {
     private final CatalogShelf newReleasesShelf = new CatalogShelf(ProjectBrowseSort.NEWEST);
     private final CatalogShelf trendingShelf = new CatalogShelf(ProjectBrowseSort.TRENDING);
     private final net.modtale.launcher.hytale.HytaleAvatarClient avatarClient;
+    private final net.modtale.launcher.ui.wardrobe.SavedLookThumbnails profileThumbnails = new net.modtale.launcher.ui.wardrobe.SavedLookThumbnails();
+    private java.util.concurrent.CompletableFuture<com.fasterxml.jackson.databind.JsonNode> profileSkin;
+    private String profileSkinId = "";
+    private long profileSkinAt;
+
     private final Map<String, Image> imageCache = new ConcurrentHashMap<>();
 
     private volatile Process hytaleProcess;
@@ -1304,13 +1309,43 @@ public final class LauncherPlayController {
         image.setClip(clip);
         avatar.getChildren().add(image);
         avatarClient.avatarUrl(username).whenComplete((url, error) -> Platform.runLater(() -> {
-            if (error == null && avatar.getChildren().contains(image)) {
+            if (error == null && avatar.getChildren().contains(image) && image.getUserData() == null) {
                 HytaleProfileAvatarImages.load(image, avatar.getChildren().getFirst(), url,
-                        net.modtale.launcher.hytale.HytaleAvatarClient.usernameAvatarUrl(username),
+                        url,
                         source -> cachedImage(source, size, size, true, true),
                         () -> avatar.getChildren().contains(image));
             }
         }));
+        LauncherSettings current = settingsController.settings();
+        HytaleAuthSession active = current.getHytaleAuthSession();
+        if (active == null || !username.equalsIgnoreCase(active.getUsername())) return;
+        var assets = net.modtale.launcher.wardrobe.LocalSkinLibrary.assets(current);
+        if (!java.nio.file.Files.isRegularFile(assets)) return;
+        String profile = active.getUuid();
+        long now = System.currentTimeMillis();
+        if (profileSkin == null || profileSkin.isCompletedExceptionally() || !profile.equals(profileSkinId) || now - profileSkinAt > 60_000) {
+            profileSkinId = profile; profileSkinAt = now;
+            profileSkin = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                var session = current.getHytaleAuthSession();
+                if (session == null || !profile.equals(session.getUuid())) throw new IllegalStateException("Selected profile changed");
+                var item = new net.modtale.launcher.wardrobe.WardrobeApiClient(hytaleAuthService).currentSkin(current);
+                session = current.getHytaleAuthSession();
+                if (session == null || !profile.equals(session.getUuid())) throw new IllegalStateException("Selected profile changed");
+                try { return new com.fasterxml.jackson.databind.ObjectMapper().readTree(item.payload()).path("skin"); }
+                catch (java.io.IOException ex) { throw new java.io.UncheckedIOException(ex); }
+            }, executor);
+        }
+        profileSkin.thenAccept(skin -> Platform.runLater(() -> {
+            if (!avatar.getChildren().contains(image) || !profile.equals(profileSkinId)) return;
+            profileThumbnails.load(assets, skin, "face").thenAccept(rendered -> {
+                var session = settingsController.settings().getHytaleAuthSession();
+                if (!avatar.getChildren().contains(image) || session == null || !profile.equals(session.getUuid())) return;
+                image.setUserData("local-outfit");
+                image.setImage(rendered);
+                Node initial = avatar.getChildren().getFirst(); initial.visibleProperty().unbind(); initial.setVisible(false);
+            });
+        }));
+
     }
 
     private void updateImageAvatar(StackPane avatar, String name, double size, double radius, String imageUrl) {

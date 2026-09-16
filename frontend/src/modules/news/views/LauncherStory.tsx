@@ -153,7 +153,7 @@ export function LauncherStory() {
                     Grouped cosmetic categories bring the part you’re editing into
                     focus. There’s support for color and style choices, animation
                     previews, and undo and redo. Keep local saved looks, or
-                    browse HyTags skins and collections for another starting
+                    browse local outfits and collections for another starting
                     point.
                 </p>
                 <p>

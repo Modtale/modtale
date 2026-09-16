@@ -59,6 +59,7 @@ public final class CosmeticEditorController implements AutoCloseable {
     private final Button apply = primaryButton("Apply outfit");
     private final Button save = secondaryButton("Save");
     private final CheckBox ownedOnly = new CheckBox("Owned only");
+    private final SavedLookThumbnails thumbnails = new SavedLookThumbnails();
     private CosmeticCatalogClient catalog;
     private Path assets;
     private OutfitDraft draft;
@@ -95,14 +96,7 @@ public final class CosmeticEditorController implements AutoCloseable {
         updateActions();
     }
 
-    private Path findAssets() {
-        Path game = settings.get().getHytaleGamePath().isBlank() ? HytalePathDetector.defaultGameDirectory() : settings.get().hytaleGameDirectory();
-        Path file = game.resolve("Assets.zip");
-        if (Files.isRegularFile(file)) return file;
-        if (game.getFileName() != null && game.getFileName().toString().equalsIgnoreCase("Client") && game.getParent() != null)
-            return game.getParent().resolve("Assets.zip");
-        return file;
-    }
+    private Path findAssets() { return LocalSkinLibrary.assets(settings.get()); }
 
     private void build() {
         root.getStyleClass().add("cosmetic-editor"); root.setMinWidth(0);
@@ -278,20 +272,14 @@ public final class CosmeticEditorController implements AutoCloseable {
     }
 
     private Node optionCard(CosmeticOption option) {
-        ImageView image = new ImageView(new Image(cosmeticImage(option), 256, 256, true, true, true));
+        ImageView image = new ImageView();
         image.setFitWidth(140); image.setFitHeight(135); image.setPreserveRatio(true);
-        CosmeticFraming framing = CosmeticFraming.forCategory(option.category());
-        Runnable crop = () -> {
-            Image source = image.getImage();
-            if (source.getWidth() <= 0 || source.getHeight() <= 0) return;
-            double height = source.getHeight() * framing.cropHeight();
-            double width = Math.min(source.getWidth(), height);
-            image.setViewport(new javafx.geometry.Rectangle2D((source.getWidth() - width) / 2,
-                    source.getHeight() * framing.cropY(), width, height));
-        };
-        image.getImage().progressProperty().addListener((o, before, after) -> crop.run()); crop.run();
         Label fallback = text(option.label(), "wardrobe-card-fallback"); fallback.setMaxWidth(130); fallback.setWrapText(true);
-        fallback.visibleProperty().bind(image.getImage().progressProperty().lessThan(1).or(image.getImage().errorProperty()));
+        var skin = catalog.defaultSkin(); skin.put(option.category(), option.id());
+        thumbnails.load(assetsForPreview(), skin, option.category()).thenAccept(rendered -> {
+            if (disposed) return;
+            image.setImage(rendered); fallback.setVisible(false);
+        });
         StackPane art = new StackPane(fallback, image); art.getStyleClass().add("cosmetic-card-art"); art.setPrefSize(145, 145);
         Label name = text(option.label(), "wardrobe-card-name"); name.setMaxWidth(145);
         VBox contents = new VBox(8, art, name);
@@ -501,7 +489,6 @@ public final class CosmeticEditorController implements AutoCloseable {
     private void style(Dialog<?> dialog) { if (root.getScene() != null) dialog.initOwner(root.getScene().getWindow()); dialog.getDialogPane().getStyleClass().add("wardrobe-dialog"); dialog.getDialogPane().getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm()); }
     private String activeProfile() { HytaleAuthSession s = settings.get().getHytaleAuthSession(); return s == null ? "" : s.getUuid(); }
     private String activeUsername() { HytaleAuthSession s = settings.get().getHytaleAuthSession(); return s == null ? "" : s.getUsername(); }
-    private static String cosmeticImage(CosmeticOption option) { return "https://hyvatar.io/render/cosmetic/" + encode(option.category()) + "/" + encode(option.id()) + "?size=256&rotate=" + (option.category().equals("cape") ? "180" : "25"); }
     private static String encode(String s) { return java.net.URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20"); }
     private static String humanize(String s) { return s.replace('_', ' ').replaceAll("([a-z])([A-Z])", "$1 $2"); }
     private static Label text(String text, String style) { Label l = new Label(text); l.getStyleClass().add(style); return l; }
@@ -515,5 +502,5 @@ public final class CosmeticEditorController implements AutoCloseable {
         return button;
     }
     private static String message(Throwable t) { while (t instanceof CompletionException && t.getCause() != null) t = t.getCause(); return t.getMessage() == null ? "Please try again." : t.getMessage(); }
-    @Override public void close() { disposed = true; resizePages.stop(); generation++; accountGeneration++; preview.dispose(); }
+    @Override public void close() { disposed = true; thumbnails.close(); resizePages.stop(); generation++; accountGeneration++; preview.dispose(); }
 }

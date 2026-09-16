@@ -43,7 +43,7 @@ public final class LocalAvatarRenderer {
         return load(assetsZip, skin, new CosmeticCatalogClient(assetsZip));
     }
 
-    static Group load(Path assetsZip, JsonNode skin, CosmeticCatalogClient catalog) throws IOException {
+    public static Group load(Path assetsZip, JsonNode skin, CosmeticCatalogClient catalog) throws IOException {
         try (ZipFile zip=new ZipFile(assetsZip.toFile())) {
             return new LocalAvatarRenderer(zip, catalog).composition(skin);
         } catch (IllegalArgumentException ex) { throw new IOException("Invalid local avatar data: " + ex.getMessage(),ex); }

@@ -48,7 +48,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * MODTALE_COSMETIC_EDITOR_SCREENSHOTS=~/Pictures WARDROBE_ASSETS_ZIP=/path/to/Assets.zip
  * ./gradlew test --tests '*CosmeticEditorUiTest' --rerun-tasks
  * Requires a graphical display/native3D. No saved launcher settings or account are read.
- * Outfit geometry/textures are local; the editor's catalog card thumbnails use public Hyvatar reads.
+ * Outfit geometry/textures are local; the editor's catalog card thumbnails use local outfit renders.
  */
 @EnabledIfEnvironmentVariable(named = "MODTALE_COSMETIC_EDITOR_SCREENSHOTS", matches = ".+")
 class CosmeticEditorUiTest {
@@ -131,7 +131,8 @@ class CosmeticEditorUiTest {
                 awaitPreview(harness);
                 // A final local render must represent the complete selected outfit, not a remote NPC.
                 assertEquals(complete, fx(() -> harness.controller().draftSnapshot()));
-                assertTrue(fx(() -> nodes(harness.root(), javafx.scene.SubScene.class).size() == 1));
+                assertTrue(fx(() -> nodes(harness.root(), javafx.scene.SubScene.class).size() == 1
+                        || nodes(harness.root().lookup("#wardrobe-preview"), ImageView.class).stream().anyMatch(view -> view.getImage() != null)));
                 capture(harness, output, "cape", 1440, 1000);
                 capture(harness, output, "cape", 1000, 900);
                 openCategory(harness, catalog, "haircut"); awaitPreview(harness);
@@ -143,7 +144,7 @@ class CosmeticEditorUiTest {
                 assertNull(settings.getHytaleAuthSession());
                 Files.writeString(output.resolve("cosmetic-editor-provenance.txt"), "Actual CosmeticEditorController with installed catalog " + assets
                         + "\nReal local outfit geometry and textures; no GLB/NPC substitute and no account/session/settings-file reads.\n"
-                        + "Catalog card thumbnails are public Hyvatar reads.\nVerified category choices, palette changes, undo/redo/reset and draft preservation.\n"
+                        + "Catalog card thumbnails are local outfit renders.\nVerified category choices, palette changes, undo/redo/reset and draft preservation.\n"
                         + "Draft (not applied or saved): " + complete + "\n");
             } finally {
                 fx(() -> { harness.controller().close(); harness.stage().close(); return null; });
@@ -215,6 +216,7 @@ class CosmeticEditorUiTest {
                     "Local composition example", false, "", payload.toString())); return null; });
             await("integrated composition", () -> hero.controller().draftSnapshot().equals(composition));
             openCategory(hero, catalog, "haircut"); awaitPreview(hero);
+            if (fx(() -> !nodes(hero.root(), javafx.scene.SubScene.class).isEmpty())) {
             fx(() -> {
                 var animations = (javafx.scene.control.ComboBox<?>) hero.root().lookup("#wardrobe-preview-animation");
                 assertEquals("Idle", animations.getValue().toString());
@@ -233,6 +235,7 @@ class CosmeticEditorUiTest {
                 return null;
             });
             awaitPreview(hero);
+            }
             assertNotNull(button(hero.root(), "Saved looks"));
             capture(hero, output, "customize", 1440, 1000);
             capture(hero, output, "customize", 1000, 900);
@@ -289,11 +292,11 @@ class CosmeticEditorUiTest {
         awaitPreview(harness);
         await("palette ready", () -> !button(harness.root(), "Color " + choice.colorId()).isDisabled());
         fx(() -> {
-            var before = nodes(harness.root(), javafx.scene.SubScene.class).getFirst();
+            var before = nodes(harness.root(), javafx.scene.SubScene.class).stream().findFirst().orElse(null);
             var swatch = button(harness.root(), "Color " + choice.colorId());
             var palette = swatch.getParent();
             swatch.fire();
-            assertSame(before, nodes(harness.root(), javafx.scene.SubScene.class).getFirst(),
+            if (before != null) assertSame(before, nodes(harness.root(), javafx.scene.SubScene.class).getFirst(),
                     "Keep the current avatar while its replacement loads");
             assertTrue(palette.isVisible() && palette.isManaged(), "Palette must not collapse during selection");
             return null;

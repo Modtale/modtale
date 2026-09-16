@@ -211,17 +211,8 @@ public final class LauncherSettingsController {
         javafx.scene.layout.Region spacer = new javafx.scene.layout.Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         toolbar.getChildren().addAll(title, spacer, saveActions());
-        root.getChildren().addAll(toolbar, shell, avatarCredit());
+        root.getChildren().addAll(toolbar, shell);
         return root;
-    }
-
-    private Node avatarCredit() {
-        Hyperlink credit = new Hyperlink();
-        I18N.bind(credit, "settings.credits.avatars");
-        credit.getStyleClass().add("settings-avatar-credit");
-        credit.setOnAction(event -> LauncherExternalLinks.open("https://hyvatar.io",
-                feedback == null ? null : feedback::showToast));
-        return credit;
     }
 
     private Node saveActions() {

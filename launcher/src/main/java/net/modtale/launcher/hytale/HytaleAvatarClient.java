@@ -1,71 +1,65 @@
 package net.modtale.launcher.hytale;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.awt.Color;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
-import java.util.function.Function;
-import net.modtale.launcher.wardrobe.WardrobeApiClient;
+import javax.imageio.ImageIO;
 
+/** Local, deterministic profile icons. Names and profile activity never leave the device. */
 public final class HytaleAvatarClient {
-    private static final long CACHE_MILLIS = 5 * 60_000;
-    private final Function<String, String> skinIdLookup;
     private final Executor executor;
-    private final ConcurrentHashMap<String, Entry> requests = new ConcurrentHashMap<>();
-    private record Entry(long createdAt, CompletableFuture<String> url) {}
 
-    public HytaleAvatarClient(HytaleAuthService auth, Executor executor) {
-        var wardrobe = new WardrobeApiClient(auth);
-        var mapper = new ObjectMapper();
-        this.skinIdLookup = username -> {
-            try {
-                return mapper.readTree(wardrobe.lookupSkin(username).payload()).path("skinId").asText();
-            } catch (WardrobeApiClient.MissingArchivedSkinException missing) {
-                return "";
-            } catch (java.io.IOException error) {
-                throw new IllegalStateException("Invalid avatar skin response", error);
-            }
-        };
-        this.executor = executor;
-    }
-
-    HytaleAvatarClient(Function<String, String> skinIdLookup, Executor executor) {
-        this.skinIdLookup = skinIdLookup;
-        this.executor = executor;
-    }
+    public HytaleAvatarClient(HytaleAuthService auth, Executor executor) { this.executor = executor; }
 
     public static String usernameAvatarUrl(String username) {
         String name = username == null ? "" : username.trim();
-        if (!name.matches("[a-zA-Z0-9_]{3,16}")) {
-            throw new IllegalArgumentException("Invalid avatar username");
+        if (!name.matches("[a-zA-Z0-9_]{3,16}")) throw new IllegalArgumentException("Invalid avatar username");
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(name.toLowerCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8));
+            // Session-private files are deleted on exit; no growing permanent profile archive.
+            return Icons.url(hash);
+        } catch (java.security.NoSuchAlgorithmException | IOException ex) {
+            throw new IllegalStateException("Could not create local profile icon", ex);
         }
-        return "https://hyvatar.io/render/" + name + "?size=256";
     }
 
     public CompletableFuture<String> avatarUrl(String username) {
-        String name = username == null ? "" : username.trim();
-        if (!name.matches("[a-zA-Z0-9_]{3,16}")) {
-            return CompletableFuture.failedFuture(new IllegalArgumentException("Invalid avatar username"));
+        return CompletableFuture.supplyAsync(() -> usernameAvatarUrl(username), executor);
+    }
+
+    private static final class Icons {
+        private static final java.util.Map<String, String> CACHE = new java.util.LinkedHashMap<>();
+        private static Path directory;
+        static synchronized String url(byte[] hash) throws IOException {
+            String key = HexFormat.of().formatHex(hash);
+            String cached = CACHE.get(key); if (cached != null) return cached;
+            if (directory == null) { directory = Files.createTempDirectory("modtale-profile-icons-"); directory.toFile().deleteOnExit(); }
+            BufferedImage image = new BufferedImage(128, 128, BufferedImage.TYPE_INT_ARGB);
+            var graphics = image.createGraphics();
+            try {
+                graphics.setColor(new Color(0x17263c)); graphics.fillRect(0, 0, 128, 128);
+                graphics.setColor(Color.getHSBColor((hash[0] & 255) / 255f, .55f, .95f));
+                for (int row = 0; row < 5; row++) for (int col = 0; col < 3; col++) {
+                    if ((hash[1 + row * 3 + col] & 1) == 0) continue;
+                    graphics.fillRect(14 + col * 20, 14 + row * 20, 20, 20);
+                    graphics.fillRect(14 + (4 - col) * 20, 14 + row * 20, 20, 20);
+                }
+            } finally { graphics.dispose(); }
+            Path path = directory.resolve(key + ".png");
+            ImageIO.write(image, "png", path.toFile()); path.toFile().deleteOnExit();
+            if (CACHE.size() >= 256) {
+                var first = CACHE.entrySet().iterator(); var entry = first.next();
+                Files.deleteIfExists(Path.of(java.net.URI.create(entry.getValue()))); first.remove();
+            }
+            String url = path.toUri().toString(); CACHE.put(key, url); return url;
         }
-        long now = System.currentTimeMillis();
-        Entry entry = requests.compute(name.toLowerCase(Locale.ROOT), (key, previous) -> {
-            if (previous != null && !previous.url().isCompletedExceptionally()
-                    && now - previous.createdAt() < CACHE_MILLIS) return previous;
-            return new Entry(now, CompletableFuture.supplyAsync(() -> {
-                String skinId = skinIdLookup.apply(name);
-                if ("".equals(skinId)) {
-                    // A profile can have a provider render without an archived skin hash.
-                    return usernameAvatarUrl(name);
-                }
-                if (skinId == null || !skinId.matches("[a-fA-F0-9]{32}")) {
-                    throw new IllegalStateException("No saved avatar skin available");
-                }
-                return "https://hyvatar.io/render/NPC?size=256&skin_id=" + skinId.toLowerCase(Locale.ROOT);
-            }, executor));
-        });
-        // Archive discovery can fail while the public username renderer remains available.
-        // Keep the failed lookup in the entry so the next request retries discovery.
-        return entry.url().exceptionally(error -> usernameAvatarUrl(name));
     }
 }
