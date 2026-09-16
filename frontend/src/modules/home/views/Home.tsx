@@ -1152,23 +1152,23 @@ export const Home: React.FC<{
                         <LauncherPreviewSection projects={combinedProjectPool} loading={isTrendingProjectsLoading || isNewestProjectsLoading} />
                     </FeatureShowcaseSection>
 
-                    <FeatureShowcaseSection glowFrom="rgba(16, 185, 129, 0.1)" glowTo="rgba(20, 184, 166, 0.08)" align="right">
+                    <FeatureShowcaseSection glowFrom="rgba(16, 185, 129, 0.1)" glowTo="rgba(20, 184, 166, 0.08)" align="left">
                         <SmartDependenciesSection randomProject={previewProject} previewProjects={dependencyPreviewProjects} />
                     </FeatureShowcaseSection>
 
-                    <FeatureShowcaseSection glowFrom="rgba(59, 130, 246, 0.1)" glowTo="rgba(99, 102, 241, 0.08)" align="left">
+                    <FeatureShowcaseSection glowFrom="rgba(59, 130, 246, 0.1)" glowTo="rgba(99, 102, 241, 0.08)" align="right">
                         <ProjectAnalyticsSection showConversionRate={isDesktopHeroLayout && validFeaturedProjects.length > 0} />
                     </FeatureShowcaseSection>
 
-                    <FeatureShowcaseSection glowFrom="rgba(99, 102, 241, 0.1)" glowTo="rgba(168, 85, 247, 0.08)" align="right">
+                    <FeatureShowcaseSection glowFrom="rgba(99, 102, 241, 0.1)" glowTo="rgba(168, 85, 247, 0.08)" align="left">
                         <CommunityThreadsSection project={previewProject} currentUser={currentUser} />
                     </FeatureShowcaseSection>
 
-                    <FeatureShowcaseSection glowFrom="rgba(245, 158, 11, 0.1)" glowTo="rgba(249, 115, 22, 0.08)" align="left">
+                    <FeatureShowcaseSection glowFrom="rgba(245, 158, 11, 0.1)" glowTo="rgba(249, 115, 22, 0.08)" align="right">
                         <RealTimeAlertsSection />
                     </FeatureShowcaseSection>
 
-                    <FeatureShowcaseSection glowFrom="rgba(148, 163, 184, 0.12)" glowTo="rgba(100, 116, 139, 0.08)" align="right">
+                    <FeatureShowcaseSection glowFrom="rgba(148, 163, 184, 0.12)" glowTo="rgba(100, 116, 139, 0.08)" align="left">
                         <AccountPreferencesSection />
                     </FeatureShowcaseSection>
                 </div>

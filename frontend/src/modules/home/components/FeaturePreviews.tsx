@@ -949,8 +949,8 @@ export const LauncherPreviewSection = ({ projects, loading }: { projects?: Proje
 
 export const SmartDependenciesSection = ({ randomProject, previewProjects }: { randomProject?: Project; previewProjects?: Project[] }) => {
     return (
-        <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
+        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
                 <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Smart Dependencies
                 </h2>
@@ -971,8 +971,8 @@ export const SmartDependenciesSection = ({ randomProject, previewProjects }: { r
 
 export const ProjectAnalyticsSection = ({ showConversionRate = true }: { showConversionRate?: boolean }) => {
     return (
-        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
+        <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
                 <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Project Analytics
                 </h2>
@@ -993,8 +993,8 @@ export const ProjectAnalyticsSection = ({ showConversionRate = true }: { showCon
 
 export const CommunityThreadsSection = ({ project, currentUser }: { project?: Project; currentUser?: User | null }) => {
     return (
-        <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
+        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
                 <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Comment Threads
                 </h2>
@@ -1015,8 +1015,8 @@ export const CommunityThreadsSection = ({ project, currentUser }: { project?: Pr
 
 export const RealTimeAlertsSection = () => {
     return (
-        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
+        <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
                 <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Push Notifications
                 </h2>
@@ -1037,8 +1037,8 @@ export const RealTimeAlertsSection = () => {
 
 export const AccountPreferencesSection = () => {
     return (
-        <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
+        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
                 <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Notification Control
                 </h2>
