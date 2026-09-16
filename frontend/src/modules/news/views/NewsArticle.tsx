@@ -6,11 +6,15 @@ import type { User } from '@/types';
 import { LauncherStory } from './LauncherStory';
 import { ModpacksStory } from './ModpacksStory';
 import '../styles/news.css';
+import '../styles/article-viewer.css';
 
 export const NewsArticle: React.FC<{ currentUser?: User | null }> = () => {
     const { slug } = useParams();
     const post = getNewsPostBySlug(slug);
     if (!post) return <Navigate to={NEWS_INDEX_PATH} replace />;
+    const sections = post.slug === 'modtale-launcher'
+        ? [['launcher', 'Your worlds'], ['curseforge', 'CurseForge'], ['everyday', 'Everyday details'], ['sync', 'Account sync'], ['wardrobe', 'Wardrobe'], ['next', 'Get the launcher']]
+        : [['creators', 'Build a pack'], ['configs', 'Mod configs'], ['curseforge', 'External mods'], ['sharing', 'Share a mod list'], ['releases', 'Releases'], ['modpacks', 'Install a pack'], ['next', 'Get started']];
     return (
         <main className="news-page news-editorial">
             <div className="news-wrap">
@@ -23,6 +27,7 @@ export const NewsArticle: React.FC<{ currentUser?: User | null }> = () => {
                     </a>
                 </div>
                 <article>
+                    <div className="news-article-intro">
                     <header className="news-heading">
                         <h1>{post.title}</h1>
                         <p className="news-deck">{post.description}</p>
@@ -31,7 +36,7 @@ export const NewsArticle: React.FC<{ currentUser?: User | null }> = () => {
                             <strong>{post.author}</strong>
                             <i />
                             <time dateTime={post.publishedAt}>
-                                September 7, 2026
+                                {new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' }).format(new Date(post.publishedAt))}
                             </time>
                             <i />
                             <span>{post.readingTime}</span>
@@ -46,6 +51,12 @@ export const NewsArticle: React.FC<{ currentUser?: User | null }> = () => {
                             fetchPriority="high"
                         />
                     </figure>
+                    </div>
+                    <div className="news-reading-layout">
+                        <nav className="news-contents" aria-label="Article sections">
+                            <span>In this article</span>
+                            {sections.map(([id, label]) => <a key={id} href={`#${id}`}>{label}</a>)}
+                        </nav>
                     <div className="news-copy news-prose">
                         {post.slug === 'modtale-launcher' ? (
                             <LauncherStory />
@@ -58,6 +69,7 @@ export const NewsArticle: React.FC<{ currentUser?: User | null }> = () => {
                                 <span aria-hidden="true">→</span>
                             </Link>
                         </footer>
+                    </div>
                     </div>
                 </article>
             </div>
