@@ -68,7 +68,7 @@ export function ModpacksStory() {
                 <p>
                     For Modtale projects, the editor tries to read the mod’s
                     manifest and suggest its folder name. You can correct that
-                    name when needed, and expand <strong>Installation paths</strong>{' '}
+                    name when needed, and expand <strong>File details</strong>{' '}
                     to check where the files will go. There’s no need to construct
                     an entire overrides archive just to include a config file.
                 </p>
