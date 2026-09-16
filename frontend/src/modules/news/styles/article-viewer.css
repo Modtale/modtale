@@ -60,14 +60,33 @@
 @media(max-width:767px) { .news-editorial .news-wrap { padding:0 48px; } }
 @media(max-width:639px) { .news-editorial .news-wrap { padding:0 24px; } }
 
-.news-feature-row { display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr); gap:clamp(32px,4vw,64px); align-items:center; margin:32px 0; }
-.news-feature-copy { min-width:0; }
-.news-editorial .news-feature-row .news-demo { min-width:0; margin:0; }
-.news-editorial .news-feature-copy > :first-child { margin-top:0; }
-.news-editorial .news-feature-copy > :last-child { margin-bottom:0; }
-.news-editorial .news-copy section { margin-top:56px; }
-.news-section-copy { max-width:68ch; }
+.news-story-intro,
+.news-feature-row,
+.news-text-row { display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr); gap:clamp(32px,4vw,64px); align-items:start; }
+.news-story-intro { padding:8px 0 0; }
+.news-feature-copy, .news-feature-media, .news-section-copy { min-width:0; }
+.news-feature-media { position:sticky; top:120px; display:grid; gap:24px; }
+.news-editorial .news-feature-row .news-demo { margin:0; }
+.news-editorial .news-feature-copy > :first-child,
+.news-editorial .news-section-heading > :first-child { margin-top:0; }
+.news-editorial .news-feature-copy > :last-child,
+.news-editorial .news-section-copy > :last-child,
+.news-editorial .news-story-intro > :last-child { margin-bottom:0; }
+.news-editorial .news-copy section { margin-top:48px; padding-top:40px; border-top:1px solid var(--np-line); }
+.news-feature-row + .news-feature-row,
+.news-feature-row + .news-text-row,
+.news-text-row + .news-feature-row,
+.news-text-row + .news-text-row { margin-top:48px; }
+.news-editorial .news-section-heading h2,
+.news-editorial .news-section-heading h3 { max-width:24ch; }
+.news-editorial .news-copy p, .news-editorial .news-copy ul { max-width:none; }
+.news-editorial .news-note { font-size:15px; line-height:1.7; margin:24px 0; }
 @media(max-width:1100px) {
-    .news-feature-row { grid-template-columns:1fr; gap:24px; }
-    .news-editorial .news-copy p, .news-editorial .news-copy ul, .news-section-copy { max-width:none; }
+    .news-story-intro, .news-feature-row, .news-text-row { grid-template-columns:1fr; gap:24px; }
+    .news-feature-media { position:static; }
+    .news-editorial .news-section-heading h2, .news-editorial .news-section-heading h3 { max-width:none; margin-bottom:0; }
+}
+@media(max-width:600px) {
+    .news-editorial .news-copy section { margin-top:36px; padding-top:28px; }
+    .news-feature-row + .news-feature-row, .news-feature-row + .news-text-row { margin-top:32px; }
 }

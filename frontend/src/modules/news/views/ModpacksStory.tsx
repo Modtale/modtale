@@ -6,6 +6,7 @@ import { ArticleSection } from '../components/ArticleSection';
 export function ModpacksStory() {
     return (
         <>
+            <div className="news-story-intro">
             <p className="news-lead">
                 You’ve found the right mods, tested the combination, and tuned
                 the settings. Now you want someone else to experience the world
@@ -19,6 +20,7 @@ export function ModpacksStory() {
                 And when a setup starts as something you’re playing with friends,
                 a shared mod list can become the beginning of a published pack.
             </p>
+            </div>
             <ArticleSection id="creators">
                 <h2>Build the pack, right on Modtale</h2>
                 <p>

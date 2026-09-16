@@ -6,6 +6,7 @@ import { ArticleSection } from '../components/ArticleSection';
 export function LauncherStory() {
     return (
         <>
+            <div className="news-story-intro">
             <p className="news-lead">
                 Your next Hytale world starts before you press Play. It starts
                 with the mod that catches your eye, the setup you want to try,
@@ -17,6 +18,7 @@ export function LauncherStory() {
                 catalog, your installed mods, and the game’s launch flow now
                 live together.
             </p>
+            </div>
             <ArticleSection id="launcher">
                 <h2>From finding a mod to your next world</h2>
                 <p>
