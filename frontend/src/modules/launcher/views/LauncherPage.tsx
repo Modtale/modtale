@@ -287,7 +287,7 @@ export const LauncherPage: React.FC = () => {
             </div>
             <div className="launcher-product-features">
                 {demos.map((demo, index) => (
-                    <section className={`launcher-feature${index % 2 ? ' launcher-feature-reverse' : ''}${index === 0 || index === demos.length - 1 ? ' launcher-feature-showcase' : ''}`} data-feature={demo.clip} key={demo.clip} aria-labelledby={`launcher-${demo.clip}-title`}>
+                    <section className={`launcher-feature${index % 2 ? ' launcher-feature-reverse' : ''}${index === demos.length - 1 ? ' launcher-feature-showcase' : ''}`} data-feature={demo.clip} key={demo.clip} aria-labelledby={`launcher-${demo.clip}-title`}>
                         <div className="launcher-feature-inner">
                             <div className="launcher-feature-copy">
                                 <h2 id={`launcher-${demo.clip}-title`}>{demo.title}<br /><span>{demo.accent}</span></h2>

@@ -209,7 +209,7 @@
     .launcher-product-hero::before { background: radial-gradient(ellipse at 50% 85%, #3b82f64a, transparent 62%), radial-gradient(ellipse at 25% 30%, #6366f11f, transparent 50%); }
 }
 
-/* Each walkthrough has a quiet stage, with a larger opening and closing beat. */
+/* Each walkthrough has a quiet stage, with a larger closing beat. */
 .launcher-feature { --stage-color: 59, 130, 246; }
 .launcher-feature[data-feature="world-library"] { --stage-color: 45, 162, 170; }
 .launcher-feature[data-feature="curseforge-mods"] { --stage-color: 230, 133, 85; }
