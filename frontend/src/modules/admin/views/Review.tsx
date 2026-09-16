@@ -1,3 +1,4 @@
+import { FindingGroups } from './FindingGroups';
 import { PriorFindingReasoning } from './PriorFindingReasoning';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Shield, List, FileText, Box, User as UserIcon, Check, ArrowLeft, Copy, ExternalLink, Terminal, Download, ArrowRight, X, ImageIcon, ChevronDown, ChevronUp, ShieldAlert, Eye, RefreshCw, PlayCircle } from 'lucide-react';
@@ -116,9 +117,10 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
 
     const [findingSearch, setFindingSearch] = useState('');
     const [findingFocus, setFindingFocus] = useState('all');
+    const [findingType, setFindingType] = useState<string | null>(null);
     const [findingPage, setFindingPage] = useState(0);
     useEffect(() => {
-        setFindingSearch(''); setFindingFocus('all'); setFindingPage(0);
+        setFindingSearch(''); setFindingFocus('all'); setFindingType(null); setFindingPage(0);
     }, [mod.id, mod.reviewToken, pendingVersion?.id, pendingVersion?.reviewToken]);
 
     const orderedIssues = useMemo(() => {
@@ -147,12 +149,15 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     const matchingIssues = useMemo(() => {
         const search = findingSearch.trim().toLowerCase();
         return orderedIssues.filter(({ issue }) => {
+            if (findingType !== null && issue.type !== findingType) return false;
             if (findingFocus === 'new' && issue.knownIssue) return false;
             if (findingFocus === 'seen' && !issue.knownIssue) return false;
             if (findingFocus === 'always' && (issue.reviewCadence || '').toUpperCase() !== 'ALWAYS') return false;
             return !search || [issue.type, issue.filePath, issue.description].some(value => value?.toLowerCase().includes(search));
         });
-    }, [orderedIssues, findingSearch, findingFocus]);
+    }, [orderedIssues, findingSearch, findingFocus, findingType]);
+    const hiddenHighSeverity = orderedIssues.filter(({ issue }) => ['HIGH', 'CRITICAL'].includes(issue.severity)).length
+        - matchingIssues.filter(({ issue }) => ['HIGH', 'CRITICAL'].includes(issue.severity)).length;
     const findingPages = Math.max(1, Math.ceil(matchingIssues.length / 100));
     const visibleFindingPage = Math.min(findingPage, findingPages - 1);
     const visibleIssues = matchingIssues.slice(visibleFindingPage * 100, (visibleFindingPage + 1) * 100);
@@ -755,6 +760,8 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                             <div className="p-4 bg-white dark:bg-black/20 space-y-2 border-t border-red-200 dark:border-red-900/50">
                                                 {orderedIssues.length === 0 && <p className="text-sm text-slate-600 dark:text-slate-300">No heuristic findings were emitted. Review the evidence and reviewer notes before deciding.</p>}
                                                 {orderedIssues.length > 0 && <div className="space-y-2 pb-3">
+                                                    <FindingGroups key={JSON.stringify([mod.id, mod.reviewToken, pendingVersion.id, pendingVersion.reviewToken])}
+                                                        issues={scanIssues} selected={findingType} onSelect={type => { setFindingType(type); setFindingPage(0); }} />
                                                     <div className="flex flex-wrap gap-3">
                                                         <input aria-label="Search findings" placeholder="Search finding, file or description…" value={findingSearch}
                                                             onChange={event => { setFindingSearch(event.target.value); setFindingPage(0); }}
@@ -770,6 +777,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                         Showing {matchingIssues.length ? visibleFindingPage * 100 + 1 : 0}–{Math.min((visibleFindingPage + 1) * 100, matchingIssues.length)} of {matchingIssues.length} matching findings ({orderedIssues.length} total).
                                                         {' '}Filters only change this view; previously seen findings may still require review.
                                                     </p>
+                                                    {hiddenHighSeverity > 0 && <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">{hiddenHighSeverity} high or critical findings are outside these filters.</p>}
                                                     {matchingIssues.length === 0 && <p className="text-sm text-slate-600 dark:text-slate-300">No findings match these filters.</p>}
                                                     {findingPages > 1 && <nav aria-label="Finding pages" className="flex items-center gap-3 text-sm dark:text-slate-200">
                                                         <button type="button" disabled={visibleFindingPage === 0} onClick={() => setFindingPage(visibleFindingPage - 1)}>Previous findings</button>

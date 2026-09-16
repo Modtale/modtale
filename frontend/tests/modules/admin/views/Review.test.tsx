@@ -273,4 +273,32 @@ describe('Review security clearance status', () => {
         expect(container.querySelectorAll('button[aria-label^="Earlier reasoning for finding"]')).toHaveLength(2);
     });
 
+    it('filters repeated types without losing original reasoning indices or hiding the scan summary', async () => {
+        const issues = [
+            ...Array.from({ length: 120 }, (_, index) => ({ ...twoFindings.issues[0], type: 'BytecodeManipulator', severity: 'LOW', filePath: `Library${index}.class`, knownIssue: true })),
+            { ...twoFindings.issues[1], type: 'RuntimeExec', severity: 'HIGH', filePath: 'Runner.class', knownIssue: false, reviewCadence: 'ALWAYS' }
+        ];
+        vi.mocked(loadPriorFindingReasoning).mockReset().mockResolvedValue(earlierResponse('Execution evidence'));
+        await render({ ...twoFindings, issues }, true, 'snapshot', 2, earlierSources); await showFindings();
+        expect(container.textContent).toContain('Finding groups (2 types)');
+        const show = async (type: string) => act(async () => container.querySelector<HTMLButtonElement>(`button[aria-label="Show ${type} findings"]`)!.click());
+        await show('BytecodeManipulator');
+        expect(container.textContent).toContain('Showing 1–100 of 120 matching findings (121 total)');
+        expect(container.textContent).toContain('1 high or critical findings are outside these filters');
+        await click('Next findings');
+        await show('RuntimeExec');
+        expect(container.textContent).toContain('Showing 1–1 of 1 matching findings (121 total)');
+        expect(container.textContent).not.toContain('high or critical findings are outside these filters');
+        await act(async () => container.querySelector<HTMLButtonElement>('button[aria-label="Earlier reasoning for finding 121"]')!.click());
+        expect(loadPriorFindingReasoning).toHaveBeenCalledExactlyOnceWith('project', 'version', 'baseline', 120, 'snapshot');
+        await searchFindings('Library');
+        expect(container.textContent).toContain('No findings match these filters');
+        await click('Show all types');
+        expect(container.textContent).toContain('Showing 1–100 of 120 matching findings (121 total)');
+        await show('RuntimeExec');
+        await render({ ...twoFindings, issues }, true, 'fresh-snapshot', 2, earlierSources);
+        expect(container.textContent).not.toContain('Selected type:');
+        expect(container.textContent).toContain('Showing 1–100 of 121 matching findings (121 total)');
+    });
+
 });
