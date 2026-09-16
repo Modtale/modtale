@@ -24,6 +24,7 @@ describe('Finding groups', () => {
         await act(async () => button.click()); expect(select).toHaveBeenCalledWith('Library');
         await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Show all types')!.click());
         expect(select).toHaveBeenLastCalledWith(null);
+        expect(document.activeElement).toBe(container.querySelector('summary'));
     });
     it('bounds groups without dropping later types or interpreting hostile names as markup', async () => {
         const issues = Array.from({ length: 26 }, (_, i) => issue(`Type${String(i).padStart(2, '0')}`));
@@ -34,8 +35,11 @@ describe('Finding groups', () => {
         expect(container.querySelector('tbody tr')?.textContent).toContain('<img src=x onerror=alert(1)>');
         const next = () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Next groups')!;
         await act(async () => next().click()); expect(container.querySelectorAll('tbody tr')).toHaveLength(12);
+        expect(document.activeElement).toBe(container.querySelector('[role=status]'));
+        expect(document.activeElement?.textContent).toContain('13–24');
         await act(async () => next().click()); expect(container.querySelectorAll('tbody tr')).toHaveLength(3);
         expect(next().disabled).toBe(true); expect(container.textContent).toContain('Type25');
+        expect(document.activeElement?.textContent).toContain('25–27');
     });
     it('keeps an unrecognized severity visible instead of presenting its group as low severity', async () => {
         await act(async () => root.render(<FindingGroups issues={[issue('__proto__', { severity: '__proto__' }), issue('__proto__'), issue('Critical', { severity: 'CRITICAL' })]} selected={null} onSelect={vi.fn()} />));
