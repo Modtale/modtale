@@ -1,4 +1,4 @@
-import React, { useId, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { ArrowLeft, RotateCcw, Search, SlidersHorizontal } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { modpackDialog } from './modpackDialogStyles';
@@ -14,15 +14,17 @@ export function ModConfigEditor({ headingId, title, filename, document, onSave, 
     const [error, setError] = useState<string | null>(null);
     const [discard, setDiscard] = useState(false);
     const id = useId();
+    const editorRef = useRef<HTMLDivElement>(null);
+    useEffect(() => { editorRef.current?.focus(); }, []);
     const dirty = document.settings.some(setting => (values[setting.id] ?? setting.value) !== setting.value);
     const invalid = document.settings.some(setting => settingError(setting, values[setting.id] ?? setting.value));
     const categories = ['All settings', ...Array.from(new Set(document.settings.map(setting => setting.category))).sort()];
     const visible = document.settings.filter(setting => (category === 'All settings' || setting.category === category) && `${setting.label} ${setting.context} ${setting.category}`.toLowerCase().includes(search.toLowerCase().trim()));
     const close = () => dirty ? setDiscard(true) : onCancel();
-    return <div className="flex flex-col min-h-0 flex-1" onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>
+    return <div ref={editorRef} tabIndex={-1} className="flex flex-col min-h-0 flex-1 outline-none" onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>
         <div className={modpackDialog.header}>
             <div className="min-w-0"><h3 id={headingId} className={modpackDialog.title}><SlidersHorizontal className={`w-5 h-5 ${theme.colors.accent}`} />{title}</h3><p className={`text-xs mt-1 ${theme.colors.textMuted}`}>{filename}</p></div>
-            <button type="button" onClick={close} className={theme.components.buttonGhost}><ArrowLeft className="w-4 h-4" /> Back</button>
+            <button type="button" onClick={close} className={`${theme.components.buttonGhost} inline-flex items-center justify-center gap-2`}><ArrowLeft className="w-4 h-4" /> Back</button>
         </div>
         <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
             <nav aria-label="Setting categories" className={`sm:w-52 shrink-0 p-4 border-b sm:border-b-0 sm:border-r ${theme.colors.border} overflow-auto max-h-36 sm:max-h-none`}>
@@ -42,7 +44,7 @@ export function ModConfigEditor({ headingId, title, filename, document, onSave, 
         </div>
         <div className={`${modpackDialog.footer} flex-wrap`}>
             <span role="status" className={`text-sm flex-1 ${error ? theme.colors.dangerText : theme.colors.textMuted}`}>{error || (discard ? 'Discard your unsaved changes?' : dirty ? 'Unsaved changes' : '')}</span>
-            {discard ? <><button type="button" onClick={() => setDiscard(false)} className={theme.components.buttonGhost}>Keep editing</button><button type="button" onClick={onCancel} className={theme.components.buttonSecondary}>Discard changes</button></> : <><button type="button" disabled={!dirty} onClick={() => { setValues({}); setError(null); }} className={theme.components.buttonGhost}><RotateCcw className="w-4 h-4" />Reset changes</button><button type="button" disabled={!dirty || invalid} onClick={() => { try { onSave(document.save(values)); } catch (e) { setError((e as Error).message); } }} className={theme.components.buttonPrimary}>Save changes</button></>}
+            {discard ? <><button type="button" onClick={() => setDiscard(false)} className={`${theme.components.buttonGhost} inline-flex items-center justify-center gap-2`}>Keep editing</button><button type="button" onClick={onCancel} className={theme.components.buttonSecondary}>Discard changes</button></> : <><button type="button" disabled={!dirty} onClick={() => { setValues({}); setError(null); }} className={`${theme.components.buttonGhost} inline-flex items-center justify-center gap-2`}><RotateCcw className="w-4 h-4" />Reset changes</button><button type="button" disabled={!dirty || invalid} onClick={() => { try { onSave(document.save(values)); } catch (e) { setError((e as Error).message); } }} className={theme.components.buttonPrimary}>Save changes</button></>}
         </div>
     </div>;
 }
