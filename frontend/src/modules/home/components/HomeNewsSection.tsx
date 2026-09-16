@@ -30,10 +30,8 @@ export const HomeNewsSection = () => {
                                     <img src={post.heroImage} alt={post.heroAlt} width={2400} height={1260} loading="lazy" decoding="async" />
                                 </div>
                                 <div className="home-news-story-copy">
-                                    <div className="home-news-date"><time dateTime={post.publishedAt}>{dateFormat.format(new Date(post.publishedAt))}</time><span>{post.readingTime}</span></div>
+                                    <time className="home-news-date" dateTime={post.publishedAt}>{dateFormat.format(new Date(post.publishedAt))}</time>
                                     <h3>{post.title}</h3>
-                                    <p>{post.excerpt}</p>
-                                    <span className="home-news-read">Read the story <ArrowRight size={17} aria-hidden="true" /></span>
                                 </div>
                             </Link>
                         </article>
