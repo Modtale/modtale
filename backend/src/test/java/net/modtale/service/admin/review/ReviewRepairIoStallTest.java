@@ -40,6 +40,22 @@ class ReviewRepairIoStallTest {
     }
     ReviewSnapshotArchive.Snapshot snapshot(int size){long now=System.currentTimeMillis();return new ReviewSnapshotArchive.Snapshot(UUID.randomUUID().toString(),"p",0,"actor",ReviewSnapshotArchive.Action.ISOLATE_REVIEW,now,now+60000,new byte[size]);}
 
+    @Test void dependencyInventoryDeadlineBoundsAnActualStalledMongoReply() throws Exception {
+        var directMongo=new MongoTemplate(direct,database);
+        directMongo.getCollection("projects").insertOne(new Document("_id","p").append("versions",List.of(
+                new Document("_id","v").append("versionNumber","1").append("hash","a".repeat(64)).append("fileUrl","file"))));
+        assertEquals(net.modtale.service.security.scan.DependencyReviewGraph.State.FOUND,
+                new net.modtale.service.security.scan.DependencyReviewSource(mongo).readRoot("p","v").state());
+        proxy.paused.set(true);long started=System.nanoTime();
+        try(var worker=Executors.newSingleThreadExecutor()) {
+            var pending=worker.submit(()->new net.modtale.service.security.scan.DependencyReviewSource(mongo).readRoot("p","v"));
+            assertTrue(proxy.withheld.await(3,TimeUnit.SECONDS));
+            assertEquals(net.modtale.service.security.scan.DependencyReviewGraph.State.UNAVAILABLE,pending.get(8,TimeUnit.SECONDS).state());
+            assertTrue(System.nanoTime()-started<TimeUnit.SECONDS.toNanos(9));
+        } finally {proxy.paused.set(false);proxy.release.countDown();}
+        assertEquals(net.modtale.service.security.scan.DependencyReviewGraph.State.FOUND,
+                new net.modtale.service.security.scan.DependencyReviewSource(mongo).readRoot("p","v").state());
+    }
     @Test void stalledReadKeepsAdmissionUntilDriverActuallyReturns()throws Exception {
         var reader=new RawReviewSnapshotReader(mongo);var preparation=new ReviewRepairPreparation(archive,reader,Clock.systemUTC(),1,60000);var isolation=mock(ReviewIsolationExecutor.class);
         var workflow=new ReviewRepairWorkflow(preparation,isolation,1,1000,System::nanoTime);

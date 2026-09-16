@@ -36,7 +36,7 @@ public final class DependencyReviewSource implements Source {
         try {
             var ids=new ArrayList<Object>();ids.add(projectId);if(ObjectId.isValid(projectId))ids.add(new ObjectId(projectId));
             var projection=new Document("_id",1).append("versions",new Document("$map",new Document("input",new Document("$slice",List.of("$versions",MAX_VERSIONS+1)))
-                    .append("as","v").append("in",new Document("id","$$v._id").append("label","$$v.versionNumber"))));
+                    .append("as","v").append("in",new Document("id","$$v._id").append("label","$$v.versionNumber").append("unique",uniqueNames("$$v")))));
             var roots=query(new Document("_id",new Document("$in",ids)),projection);
             if(roots.isEmpty())return absent(State.MISSING);
             if(roots.size()!=1)return absent(State.AMBIGUOUS);
@@ -44,7 +44,7 @@ public final class DependencyReviewSource implements Source {
             if(versions.size()>MAX_VERSIONS)return absent(State.UNAVAILABLE);
             int selected=-1;String id=null,label=null;Set<String> versionIds=new HashSet<>();
             for(int i=0;i<versions.size();i++) {
-                var v=document(versions.get(i));String candidateId=string(v,"id"),candidateLabel=string(v,"label");
+                var v=document(versions.get(i));if(!Boolean.TRUE.equals(v.get("unique")))throw new AmbiguousRecord();String candidateId=string(v,"id"),candidateLabel=string(v,"label");
                 new Reference(projectId,candidateId);new Reference(projectId,candidateLabel);
                 if(!versionIds.add(candidateId))return absent(State.AMBIGUOUS);
                 if(byId?candidateId.equals(selector):candidateLabel.equalsIgnoreCase(selector)) {
@@ -61,7 +61,8 @@ public final class DependencyReviewSource implements Source {
             var result=snapshot(projectId,v);
             remaining();
             return new Lookup(State.FOUND,result);
-        } catch(RuntimeException malformedOrUnavailable) {return absent(State.UNAVAILABLE);}
+        } catch(AmbiguousRecord ambiguous) {return absent(State.AMBIGUOUS);}
+        catch(RuntimeException malformedOrUnavailable) {return absent(State.UNAVAILABLE);}
     }
     private List<Document> query(Document match,Document projection) {
         if(++queries>256)throw new IllegalStateException("Inspection query limit exceeded");
@@ -69,13 +70,47 @@ public final class DependencyReviewSource implements Source {
         // Size-check on the server before a document crosses the wire. Missing/malformed arrays fail closed.
         var bounded=new Document("$replaceWith",new Document("$cond",List.of(
                 new Document("$lte",List.of(new Document("$bsonSize","$$ROOT"),MAX_BYTES)),"$$ROOT",new Document("oversized",true))));
-        var result=projects.withTimeout(millis,TimeUnit.MILLISECONDS).aggregate(List.of(new Document("$match",match),
+        // Projection would otherwise erase duplicate root fields before the driver could detect them.
+        projection.append("sourceUnique",uniqueNames("$$ROOT"));
+        var raw=projects.withDocumentClass(org.bson.RawBsonDocument.class).withTimeout(millis,TimeUnit.MILLISECONDS).aggregate(List.of(new Document("$match",match),
                 new Document("$limit",2),new Document("$project",projection),bounded))
                 .collation(Collation.builder().locale("simple").build()).maxTime(millis,TimeUnit.MILLISECONDS).into(new ArrayList<>());
         remaining();
+        var result=new ArrayList<Document>();
+        for(var stored:raw) {
+            if(stored.getByteBuffer().remaining()>MAX_BYTES)throw new IllegalStateException("Inspection record exceeds limit");
+            // Validate raw names before DocumentCodec can collapse repeated fields into map entries.
+            try(var reader=new org.bson.BsonBinaryReader(stored.getByteBuffer().asNIO())) {validateDocument(reader,0);}
+            var decoded=stored.decode(new org.bson.codecs.DocumentCodec());
+            if(Boolean.FALSE.equals(decoded.get("sourceUnique")))throw new AmbiguousRecord();
+            result.add(decoded);
+        }
         if(result.stream().anyMatch(d->d.containsKey("oversized")))throw new IllegalStateException("Inspection record exceeds limit");
         return result;
     }
+    private static Document uniqueNames(String expression) {
+        var names=new Document("$map",new Document("input",new Document("$objectToArray",expression)).append("as","field").append("in","$$field.k"));
+        return new Document("$eq",List.of(new Document("$size",names),new Document("$size",new Document("$setUnion",List.of(names,List.of())))));
+    }
+    private void validateDocument(org.bson.BsonBinaryReader reader,int depth) {
+        if(depth>64)throw new IllegalArgumentException("Inspection document depth exceeds limit");
+        remaining();reader.readStartDocument();var names=new HashSet<String>();
+        while(reader.readBsonType()!=org.bson.BsonType.END_OF_DOCUMENT) {
+            remaining();if(!names.add(reader.readName()))throw new AmbiguousRecord();validateValue(reader,depth+1);
+        }
+        reader.readEndDocument();
+    }
+    private void validateValue(org.bson.BsonBinaryReader reader,int depth) {
+        if(depth>64)throw new IllegalArgumentException("Inspection document depth exceeds limit");
+        remaining();
+        if(reader.getCurrentBsonType()==org.bson.BsonType.DOCUMENT)validateDocument(reader,depth);
+        else if(reader.getCurrentBsonType()==org.bson.BsonType.ARRAY) {
+            reader.readStartArray();
+            while(reader.readBsonType()!=org.bson.BsonType.END_OF_DOCUMENT)validateValue(reader,depth+1);
+            reader.readEndArray();
+        } else reader.skipValue();
+    }
+    private static final class AmbiguousRecord extends IllegalArgumentException {}
     private long remaining() {
         long remaining=budget-(clock.getAsLong()-started);
         if(remaining<=0)throw new IllegalStateException("Inspection deadline exceeded");return remaining;

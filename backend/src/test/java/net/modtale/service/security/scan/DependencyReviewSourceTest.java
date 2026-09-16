@@ -31,6 +31,40 @@ class DependencyReviewSourceTest {
                 .append("gameVersions",List.of("1")).append("dependencies",List.of());
     }
     void project(Object id,Document... versions){mongo.getCollection("projects").insertOne(new Document("_id",id).append("versions",List.of(versions)));}
+    @Test void duplicateBsonNamesCannotResolveEvenWhenRepeatedValuesAgree() {
+        for(boolean conflicting:List.of(false,true))for(String level:List.of("root","version","dependency","scan","evidence")) {
+            var buffer=new org.bson.io.BasicOutputBuffer();
+            try(var writer=new org.bson.BsonBinaryWriter(buffer)) {
+                writer.writeStartDocument();writer.writeString("_id","duplicate-"+level+conflicting);
+                writer.writeString("title","same");if(level.equals("root"))writer.writeString("title",conflicting?"different":"same");
+                writer.writeStartArray("versions");writer.writeStartDocument();
+                writer.writeString("_id","v");writer.writeString("versionNumber","1");writer.writeString("fileUrl","file");
+                writer.writeString("hash","a".repeat(64));if(level.equals("version"))writer.writeString("hash",(conflicting?"b":"a").repeat(64));
+                writer.writeStartArray("dependencies");
+                if(level.equals("dependency")) {
+                    writer.writeStartDocument();writer.writeString("projectId","child");writer.writeString("versionNumber","1");
+                    writer.writeString("source","MODTALE");writer.writeString("source",conflicting?"WEBSITE":"MODTALE");writer.writeEndDocument();
+                }
+                writer.writeEndArray();writer.writeStartDocument("scanResult");
+                writer.writeString("verdict","REVIEW");if(level.equals("scan"))writer.writeString("verdict",conflicting?"CLEAN":"REVIEW");
+                writer.writeStartDocument("securityEvidence");writer.writeString("artifactSha256","a".repeat(64));
+                if(level.equals("evidence"))writer.writeString("artifactSha256",(conflicting?"b":"a").repeat(64));
+                writer.writeString("contentSha256","b".repeat(64));writer.writeString("policyVersion","policy");
+                writer.writeEndDocument();writer.writeEndDocument();writer.writeEndDocument();writer.writeEndArray();writer.writeEndDocument();
+            }
+            mongo.getCollection("projects").withDocumentClass(org.bson.RawBsonDocument.class).insertOne(new org.bson.RawBsonDocument(buffer.toByteArray()));
+            assertEquals(State.AMBIGUOUS,new DependencyReviewSource(mongo).readRoot("duplicate-"+level+conflicting,"v").state(),level);
+        }
+    }
+    @Test void projectedRecordDepthAndMalformedVersionContainersFailClosed() {
+        Document nested=new Document("value","leaf");for(int i=0;i<70;i++)nested=new Document("child",nested);
+        project("deep",version("v","1").append("metadata",nested));
+        assertEquals(State.UNAVAILABLE,new DependencyReviewSource(mongo).readRoot("deep","v").state());
+        mongo.getCollection("projects").insertOne(new Document("_id","malformed").append("versions",List.of("not a version")));
+        assertEquals(State.UNAVAILABLE,new DependencyReviewSource(mongo).readRoot("malformed","v").state());
+        project("normal",version("v","1").append("metadata",new Document("outer",List.of(new Document("value","ok")))));
+        assertEquals(State.FOUND,new DependencyReviewSource(mongo).readRoot("normal","v").state());
+    }
     @Test void realGraphResolvesPinnedLabelsAndRevalidatesEveryRecord() {
         var child=version("child-id","Release-A");project("child",child);
         var root=version("root-id","1").append("dependencies",List.of(new Document("projectId","child").append("versionNumber","release-a")));
