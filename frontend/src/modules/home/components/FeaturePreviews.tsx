@@ -148,6 +148,22 @@ type ModpackPreviewProps = {
     loading?: boolean;
 };
 
+const CURSEFORGE_PREVIEW_DEPENDENCY: ProjectDependency = {
+    projectId: 'curseforge:1430352',
+    projectTitle: 'BetterMap',
+    versionNumber: 'BetterMap-1.3.8.jar',
+    source: 'CURSEFORGE',
+    dependencyType: 'REQUIRED',
+    externalId: '1430352',
+    externalUrl: 'https://www.curseforge.com/hytale/mods/bettermap/files/8747205',
+    externalFileUrl: 'https://www.curseforge.com/hytale/mods/bettermap/files/8747205',
+    externalFileName: 'BetterMap-1.3.8.jar',
+    externalGameVersions: ['0.6'],
+    externalDistributionAllowed: true,
+    hytaleProjectConfirmed: true,
+    icon: 'https://media.forgecdn.net/avatars/thumbnails/1763/122/256/256/639121281719878876.png'
+};
+
 export const InlineModpackBuilderUI = ({ randomProject, projects, loading = false }: ModpackPreviewProps) => {
     const candidates = useMemo(() => Array.from(new Map(
         (projects?.length ? projects : randomProject ? [randomProject] : [])
@@ -188,7 +204,7 @@ export const InlineModpackBuilderUI = ({ randomProject, projects, loading = fals
             }));
             if (cancelled) return;
             const resolved = entries.filter((entry): entry is ProjectDependency => entry !== null);
-            setDependencies(resolved);
+            setDependencies(resolved.length ? [...resolved, { ...CURSEFORGE_PREVIEW_DEPENDENCY }] : []);
             initialized.current = resolved.length > 0;
             setPreparing(false);
         };

@@ -207,9 +207,13 @@ describe('Modpack builder preview', () => {
     it('uses the real modpack selector and configuration dialog with site metadata', async () => {
         await render();
         expect(container.textContent).toContain('Modpack Contents');
-        expect(container.textContent).toContain('Selected (1)');
+        expect(container.textContent).toContain('Selected (2)');
         expect(container.textContent).toContain('Arcane Toolkit');
         expect(container.textContent).toContain('by Ada');
+        expect(container.textContent).toContain('BetterMap');
+        expect(container.textContent).toContain('CurseForge');
+        expect(container.textContent).toContain('Launcher required');
+        expect(container.querySelector('img[src*="forgecdn.net"]')).not.toBeNull();
         expect(container.textContent).toContain('v2.4.0');
         expect(container.querySelector('input[placeholder="Search for projects..."]')).not.toBeNull();
         const config = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('Config'))!;
@@ -222,19 +226,19 @@ describe('Modpack builder preview', () => {
             { ...projects[0], id: 'blocked', allowModpacks: false },
             { ...projects[0], id: 'pack', classification: 'MODPACK' }];
         await render(items);
-        expect(container.textContent).toContain('Selected (1)');
+        expect(container.textContent).toContain('Selected (2)');
         const remove = container.querySelector('.group button:last-child') as HTMLButtonElement;
         await act(async () => remove.click());
-        expect(container.textContent).toContain('Selected (0)');
+        expect(container.textContent).toContain('Selected (1)');
         await render([...items]);
-        expect(container.textContent).toContain('Selected (0)');
+        expect(container.textContent).toContain('Selected (1)');
     });
 
     it('recovers when projects arrive after an empty initial render', async () => {
         await render([]);
         expect(container.textContent).not.toContain('Selected (0)');
         await render(projects);
-        expect(container.textContent).toContain('Selected (1)');
+        expect(container.textContent).toContain('Selected (2)');
         expect(container.textContent).toContain('Arcane Toolkit');
     });
 
@@ -248,7 +252,7 @@ describe('Modpack builder preview', () => {
             : { ...projects[0], icon: projects[0].imageUrl } }) as any);
         const retry = Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Try again')!;
         await act(async () => retry.click());
-        expect(container.textContent).toContain('Selected (1)');
+        expect(container.textContent).toContain('Selected (2)');
         expect(container.textContent).toContain('v2.4.0');
     });
 });
