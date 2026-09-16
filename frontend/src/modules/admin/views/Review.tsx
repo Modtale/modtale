@@ -6,6 +6,7 @@ import { API_BASE_URL, BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
 import { adminClient } from '../api/adminClient';
 import { SourceInspector } from './SourceInspector';
 import { ArtifactChanges } from './ArtifactChanges';
+import { DependencyInspection } from './DependencyInspection';
 import { FindingDecisions } from './FindingDecisions';
 import { SiteRoutes } from '@/utils/routes';
 import type { ScanIssue, ProjectVersion, ScanReviewTarget } from '@/types';
@@ -658,6 +659,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                     </div>
                                 )}
 
+                                {pendingVersion?.id && <DependencyInspection projectId={mod.id} versionId={pendingVersion.id} reviewToken={mod.reviewToken || ''} />}
                                 {pendingVersion && <ArtifactChanges projectId={mod.id} version={pendingVersion.versionNumber} reviewToken={mod.reviewToken || ''}
                                     onInspect={(version, path, token) => openInspector(version, version === pendingVersion.versionNumber ? scanIssues : [], path, undefined, undefined, token)} />}
                                 {pendingVersion && <FindingDecisions key={`${pendingVersion.id}:${pendingVersion.reviewToken}`}

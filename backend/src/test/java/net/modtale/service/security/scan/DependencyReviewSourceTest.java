@@ -103,6 +103,24 @@ class DependencyReviewSourceTest {
         },1_000_000_000L);
         assertEquals(State.UNAVAILABLE,source.readRoot("root","first").state());
     }
+    @Test void controllerComposesRealDatabaseGraphWithTheOpenedReviewSnapshot() {
+        project("root",version("v","1").append("dependencies",List.of(new Document("projectId","child").append("versionNumber","1"))));
+        project("child",version("child-v","1"));
+        mongo.save(mongo.findById("root",net.modtale.model.project.Project.class));
+        var projects=org.mockito.Mockito.mock(net.modtale.service.project.query.ProjectService.class);
+        org.mockito.Mockito.when(projects.getRawProjectById("root")).thenAnswer(i->mongo.findById("root",net.modtale.model.project.Project.class));
+        var controller=new net.modtale.controller.admin.DependencyInspectionController(projects,mongo);
+        String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(projects.getRawProjectById("root"));
+        var response=controller.inspect("root","v",token).getBody();
+        assertFalse(response.artifactBytesVerified());assertEquals(2,response.inventory().nodes().size());assertTrue(response.inventory().resolved());
+        var calls=new java.util.concurrent.atomic.AtomicInteger();
+        org.mockito.Mockito.when(projects.getRawProjectById("root")).thenAnswer(i->{
+            if(calls.incrementAndGet()==2)mongo.getCollection("projects").updateOne(new Document("_id","root"),
+                    new Document("$set",new Document("versions.0.findingReviewHead","changed")));
+            return mongo.findById("root",net.modtale.model.project.Project.class);
+        });
+        assertEquals(409,assertThrows(org.springframework.web.server.ResponseStatusException.class,()->controller.inspect("root","v",token)).getStatusCode().value());
+    }
     @Test void graphRejectsRealStoredReplacementAfterRootCapture() {
         project("root",version("v","1"));var source=new DependencyReviewSource(mongo);var root=source.readRoot("root","v").snapshot();
         mongo.getCollection("projects").updateOne(new Document("_id","root"),new Document("$set",new Document("versions.0.hash","b".repeat(64))));
