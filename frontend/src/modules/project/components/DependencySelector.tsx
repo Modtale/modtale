@@ -24,6 +24,7 @@ interface DependencySelectorProps {
     currentProjectId?: string;
     isModpack?: boolean;
     disabled?: boolean;
+    disableExternalReferences?: boolean;
     renderDependencyDetails?: (dependency: ProjectDependency) => React.ReactNode;
 }
 
@@ -230,7 +231,8 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
     currentProjectId,
     isModpack = false,
     renderDependencyDetails,
-    disabled
+    disabled,
+    disableExternalReferences = false
 }) => {
     const [search, setSearch] = useState('');
     const [results, setResults] = useState<Project[]>([]);
@@ -690,7 +692,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                 </ModalPortal>
             )}
 
-            {showExternalModal && !disabled && !isIncompatibilityMode && (
+            {showExternalModal && !disabled && !disableExternalReferences && !isIncompatibilityMode && (
                 <ModalPortal><div className={theme.components.modalOverlay} onMouseDown={event => { if (event.target === event.currentTarget) setShowExternalModal(false); }}>
                     <div ref={externalDialogRef} role="dialog" aria-modal="true" aria-label="Add external mod" className={`${theme.components.modalContent} w-full max-w-md max-h-[90dvh]`} onKeyDown={event => { if (event.key === 'Escape') setShowExternalModal(false); }}>
                         <div className={theme.components.modalHeader}>
@@ -739,7 +741,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <h3 className={`font-bold ${theme.colors.textPrimary} flex items-center gap-2 text-sm uppercase tracking-wide`}><Search className="w-4 h-4" /> {effectiveLabel}</h3>
                 {!isIncompatibilityMode && (
-                    <button type="button" disabled={disabled} onClick={() => setShowExternalModal(true)} className={`text-xs font-bold px-3 py-2 rounded-lg border ${theme.colors.border} ${theme.colors.bgBase} ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} flex items-center gap-2 ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                    <button type="button" disabled={disabled || disableExternalReferences} onClick={() => setShowExternalModal(true)} className={`text-xs font-bold px-3 py-2 rounded-lg border ${theme.colors.border} ${theme.colors.bgBase} ${theme.colors.textSecondary} flex items-center gap-2 ${disabled || disableExternalReferences ? 'opacity-60 cursor-not-allowed' : `hover:${theme.colors.textPrimary}`}`}>
                         <ExternalLink className="w-3.5 h-3.5" /> Add External
                     </button>
                 )}
