@@ -201,7 +201,6 @@ export const InlineModpackBuilderUI = ({ randomProject, projects, loading = fals
                     selectedDeps={dependencies}
                     onChange={setDependencies}
                     isModpack
-                    disableExternalReferences
                     label="Modpack Contents"
                     renderDependencyDetails={dependency => (
                         <ModConfigFields
