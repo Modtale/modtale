@@ -180,6 +180,7 @@ public final class LauncherRuntime {
                 projectPageController::openCreator,
                 projectActions::toggleFavorite
         );
+        playController.setOverlayHost(() -> sceneRoot() instanceof StackPane stack ? stack : null);
         playController.setOnBrowseCatalog(sort -> browseController.selectBrowseView(sort.browseView()));
         projectActions.attachBrowse(browseController);
         settingsController.addRefreshListener(browseController::refreshControls);

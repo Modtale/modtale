@@ -139,6 +139,9 @@ public final class LauncherPlayController {
     private final Map<String, Image> imageCache = new ConcurrentHashMap<>();
 
     private volatile Process hytaleProcess;
+    private boolean launchInProgress;
+    private Supplier<StackPane> overlayHost = () -> null;
+    private net.modtale.launcher.ui.common.TransferLoadingModal gameUpdateModal;
     private boolean versionsLoading;
     private boolean suppressBranchVersionLoad;
     private boolean friendsLoading;
@@ -196,6 +199,16 @@ public final class LauncherPlayController {
         } : onOpenCreator;
         this.onToggleFavorite = onToggleFavorite == null ? project -> {
         } : onToggleFavorite;
+    }
+
+    public void setOverlayHost(Supplier<StackPane> overlayHost) {
+        this.overlayHost = overlayHost;
+    }
+
+    private void finishLaunchPreparation() {
+        launchInProgress = false;
+        if (gameUpdateModal != null) gameUpdateModal.dismiss();
+        gameUpdateModal = null;
     }
 
     public Node view() {
@@ -453,13 +466,29 @@ public final class LauncherPlayController {
     }
 
     public void launchHytale() {
+        if (launchInProgress) return;
         if (isHytaleRunning()) {
             feedback.showToast("Already running", "Hytale is already running.");
             return;
         }
         settingsController.saveFromFields(false);
-        feedback.runAsync("Launching Hytale...", () -> hytaleGameLauncher.launch(settingsController.settings()), result -> {
+        launchInProgress = true;
+        gameUpdateModal = new net.modtale.launcher.ui.common.TransferLoadingModal(
+                "Preparing Hytale", "Checking the selected channel for updates...");
+        StackPane host = overlayHost.get();
+        if (host != null) {
+            host.getChildren().add(gameUpdateModal);
+            gameUpdateModal.requestFocus();
+        }
+        var modal = gameUpdateModal;
+        feedback.runAsync("Preparing Hytale...", () -> hytaleGameLauncher.launch(settingsController.settings(), message -> {
+            modal.update("Preparing Hytale", message);
+            feedback.log(message);
+        }), result -> {
+            finishLaunchPreparation();
+            settingsController.form().reloadFrom(settingsController.settings());
             hytaleProcess = result.process();
+            settingsController.saveCurrentSettings();
             long startedAtMillis = System.currentTimeMillis();
             discordRichPresence.showPlayingHytale(selectedVersionLabel(settingsController.settings()), startedAtMillis);
             monitorHytaleProcess(result, startedAtMillis);
@@ -469,6 +498,9 @@ public final class LauncherPlayController {
             feedback.log("Launched Hytale" + build + " as " + result.username() + ".");
             feedback.showToast("Hytale ready", "Launching as " + result.username() + ".");
             syncMetrics();
+        }, ignored -> {
+            finishLaunchPreparation();
+            settingsController.form().reloadFrom(settingsController.settings());
         });
     }
 

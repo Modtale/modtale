@@ -14,12 +14,24 @@ import net.modtale.launcher.settings.LauncherSettings;
 public class HytaleGameLauncher {
 
     private final HytaleAuthService authService;
+    private final HytaleGameUpdater updater;
 
     public HytaleGameLauncher(HytaleAuthService authService) {
+        this(authService, new HytaleGameUpdater(authService));
+    }
+
+    HytaleGameLauncher(HytaleAuthService authService, HytaleGameUpdater updater) {
         this.authService = authService;
+        this.updater = updater;
     }
 
     public HytaleLaunchResult launch(LauncherSettings settings) {
+        return launch(settings, ignored -> { });
+    }
+
+    public HytaleLaunchResult launch(LauncherSettings settings, java.util.function.Consumer<String> progress) {
+        updater.prepare(settings, progress);
+        progress.accept("Starting Hytale...");
         HytaleAuthSession session = authService.ensureFreshSessionForLaunch(settings);
         if (!session.hasLaunchTokens()) {
             throw new HytaleApiException("A fresh Hytale-authenticated session is required before launch.");
