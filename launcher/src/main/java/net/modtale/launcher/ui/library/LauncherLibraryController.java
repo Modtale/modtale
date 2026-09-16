@@ -1080,6 +1080,9 @@ public final class LauncherLibraryController {
 
     private void finishWorldModListInstall(WorldModListInstallResult result) {
         WorldModList list = result.list();
+        settingsController.saveReconciledInstalledProjects(LibrarySharedListRecords.merge(
+                settingsController.settings().getInstalledProjects(), list,
+                worldManager.loadInstalledMods(settingsController.settings()), result.installedFiles()));
         renderLibrary();
         accountController.syncLocalSettings();
         String title = list.title().isBlank() ? "shared mod list" : list.title();
