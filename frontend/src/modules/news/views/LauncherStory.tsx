@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FeatureDemo } from '../components/FeatureDemo';
+import { ArticleSection } from '../components/ArticleSection';
 
 export function LauncherStory() {
     return (
@@ -16,7 +17,7 @@ export function LauncherStory() {
                 catalog, your installed mods, and the game’s launch flow now
                 live together.
             </p>
-            <section id="launcher">
+            <ArticleSection id="launcher">
                 <h2>From finding a mod to your next world</h2>
                 <p>
                     Modtale now has a place on your desktop. The launcher brings
@@ -66,8 +67,8 @@ export function LauncherStory() {
                     different purposes: launching the game uses Hytale’s
                     official authentication.
                 </p>
-            </section>{' '}
-            <section id="curseforge">
+            </ArticleSection>{' '}
+            <ArticleSection id="curseforge">
                 <h2>More of the mods you love</h2>
                 <p>
                     A great world can draw from more than one community. You can
@@ -88,8 +89,8 @@ export function LauncherStory() {
                     clip="curseforge-mods"
                     alt="Browse CurseForge, expand and scroll BetterMap’s release notes, download from the changelog, and enable it in a world."
                 />
-            </section>
-            <section id="everyday">
+            </ArticleSection>
+            <ArticleSection id="everyday">
                 <h2>A home for the everyday details</h2>
                 <p>
                     Keep your installed mods up to date from the library.
@@ -114,8 +115,8 @@ export function LauncherStory() {
                     <Link to="/news/modpacks-v2">modpacks v2 announcement</Link>
                     .
                 </p>
-            </section>
-            <section id="sync">
+            </ArticleSection>
+            <ArticleSection id="sync">
                 <h2>Your setup, ready to follow you</h2>
                 <p>
                     Getting a setup right takes time. Signing in with Modtale
@@ -140,8 +141,8 @@ export function LauncherStory() {
                     and progress;
                     the synced project list currently covers Modtale installs.
                 </p>
-            </section>
-            <section id="wardrobe">
+            </ArticleSection>
+            <ArticleSection id="wardrobe">
                 <h2>And a little more you</h2>
                 <p>
                     We couldn’t bring Modtale to the desktop without leaving
@@ -167,8 +168,8 @@ export function LauncherStory() {
                     clip="wardrobe"
                     alt="Start with a popular skin, customize its hair and eye colors, then save it alongside your other looks."
                 />
-            </section>
-            <section id="next">
+            </ArticleSection>
+            <ArticleSection id="next">
                 <h2>Make room for your next adventure</h2>
                 <p>
                     Whether you’re keeping a familiar world running or
@@ -203,7 +204,7 @@ export function LauncherStory() {
                     <br />
                     <strong>— The Modtale team</strong>
                 </p>
-            </section>
+            </ArticleSection>
         </>
     );
 }
