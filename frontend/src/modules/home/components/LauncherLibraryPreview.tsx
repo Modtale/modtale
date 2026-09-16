@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Library, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Checkbox } from '@/components/ui/Checkbox';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { BACKEND_URL } from '@/utils/api';
@@ -24,10 +24,6 @@ export function LauncherLibraryPreview({ projects = [], loading = false }: { pro
     const visible = mods.filter(project => `${project.title} ${project.author}`.toLowerCase().includes(search.toLowerCase()));
     return (
         <div className="launcher-library-preview" aria-label="Interactive launcher library preview">
-            <div className="llp-navbar">
-                <img src="/assets/logo_light.svg" alt="Modtale" width={112} />
-                <span><Library size={14} aria-hidden="true" /> Library</span>
-            </div>
             <div className="llp-workspace">
                 <div className="llp-worlds" role="group" aria-label="Choose a demo world">
                     {worlds.map(({ name, image }, index) => (

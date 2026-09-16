@@ -1,7 +1,4 @@
 .launcher-library-preview { container-type:inline-size; background:#090f19; border:1px solid #ffffff1a; border-radius:20px; overflow:hidden; color:#f8fafc; box-shadow:0 16px 48px #02061733; font-family:'Inter Variable',Inter,sans-serif; }
-.llp-navbar { display:flex; align-items:center; justify-content:space-between; padding:18px 20px; background:#141e2c; border-bottom:1px solid #ffffff08; }
-.llp-navbar > img { width:112px; height:auto; }
-.llp-navbar > span { display:flex; align-items:center; gap:7px; background:#2563eb1a; color:#60a5fa; padding:8px 10px; border-radius:6px; font-size:12px; font-weight:700; }
 .llp-workspace { display:grid; grid-template-columns:108px minmax(0,1fr); gap:12px; padding:16px; }
 .llp-worlds, .llp-library { background:#0e1524; border:1px solid #ffffff12; border-radius:16px; }
 .llp-worlds { padding:8px; display:flex; flex-direction:column; gap:8px; }
