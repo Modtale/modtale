@@ -91,7 +91,7 @@ export function ModConfigFields({ projectId, title, source = 'MODTALE', versionN
     };
 
     return <>
-        <button type="button" disabled={disabled} onClick={startEditing} aria-label={`${configs.length ? 'Edit configs' : 'Add config'} for ${title}`} className={`inline-flex w-28 justify-start items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors ${configs.length ? theme.colors.accent : theme.colors.textMuted} ${disabled ? 'cursor-default' : theme.colors.bgSurfaceHover}`}><FileCode2 className="w-3.5 h-3.5" /><span>{configs.length ? `Configs (${configs.length})` : 'Config'}</span></button>
+        <button type="button" disabled={disabled} onClick={startEditing} aria-label={`${configs.length ? 'Edit configs' : 'Add config'} for ${title}`} className={`inline-flex w-fit shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors ${configs.length ? theme.colors.accent : theme.colors.textMuted} ${disabled ? 'cursor-default' : theme.colors.bgSurfaceHover}`}><FileCode2 className="w-3.5 h-3.5" /><span>{configs.length ? `Configs (${configs.length})` : 'Config'}</span></button>
         {open && <ModalPortal><div className={theme.components.modalOverlay} onMouseDown={event => { if (event.target === event.currentTarget && !editing) setOpen(false); }}>
             <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={dialogId} className={editing ? `${theme.components.modalContent} w-full max-w-5xl h-[min(720px,85dvh)]` : modpackDialog.content}>
                 {editing ? <ModConfigEditor headingId={dialogId} title={title} filename={configFileName(editing.config)} document={editing.document} onCancel={() => setEditing(null)} onSave={text => {
