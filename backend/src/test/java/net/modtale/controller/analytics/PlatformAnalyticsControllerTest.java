@@ -57,6 +57,9 @@ class PlatformAnalyticsControllerTest {
     void getPlatformAnalyticsReturnsSummary() {
         PlatformAnalyticsSummary summary = new PlatformAnalyticsSummary();
         summary.setTotalDownloads(42);
+        summary.setLauncherDownloads(5);
+        summary.setPreviousLauncherDownloads(2);
+        summary.setLauncherDownloadsChart(List.of(new AnalyticsDataPoint("2026-06-01", 5)));
         summary.setDownloadsChart(List.of(new AnalyticsDataPoint("2026-06-01", 7)));
         when(queryService.getPlatformAnalytics("30d")).thenReturn(summary);
 
@@ -64,6 +67,9 @@ class PlatformAnalyticsControllerTest {
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals(42, response.getBody().totalDownloads());
+        assertEquals(5, response.getBody().launcherDownloads());
+        assertEquals(2, response.getBody().previousLauncherDownloads());
+        assertEquals(5, response.getBody().launcherDownloadsChart().getFirst().count());
         assertEquals(7, response.getBody().downloadsChart().getFirst().count());
     }
 }

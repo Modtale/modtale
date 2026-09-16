@@ -9,6 +9,8 @@ public record PlatformAnalyticsSummaryView(
         long previousTotalDownloads,
         long totalViews,
         long previousTotalViews,
+        long launcherDownloads,
+        long previousLauncherDownloads,
         long apiDownloads,
         long previousApiDownloads,
         long frontendDownloads,
@@ -24,6 +26,7 @@ public record PlatformAnalyticsSummaryView(
         List<AnalyticsDataPointView> newProjectsChart,
         List<AnalyticsDataPointView> newUsersChart,
         List<AnalyticsDataPointView> newOrgsChart,
+        List<AnalyticsDataPointView> launcherDownloadsChart,
         List<AnalyticsDataPointView> apiDownloadsChart
 ) {
     public static PlatformAnalyticsSummaryView from(PlatformAnalyticsSummary summary) {
@@ -33,6 +36,8 @@ public record PlatformAnalyticsSummaryView(
                 summary.getPreviousTotalDownloads(),
                 summary.getTotalViews(),
                 summary.getPreviousTotalViews(),
+                summary.getLauncherDownloads(),
+                summary.getPreviousLauncherDownloads(),
                 summary.getApiDownloads(),
                 summary.getPreviousApiDownloads(),
                 summary.getFrontendDownloads(),
@@ -48,6 +53,7 @@ public record PlatformAnalyticsSummaryView(
                 toPoints(summary.getNewProjectsChart()),
                 toPoints(summary.getNewUsersChart()),
                 toPoints(summary.getNewOrgsChart()),
+                toPoints(summary.getLauncherDownloadsChart()),
                 toPoints(summary.getApiDownloadsChart())
         );
     }
