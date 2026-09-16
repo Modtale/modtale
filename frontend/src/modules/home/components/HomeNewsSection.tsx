@@ -1,16 +1,14 @@
+import { useNewsPosts } from '@/modules/news/api/useNews';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
-import { NEWS_POSTS, NEWS_INDEX_PATH } from '@/data/news';
+import { NEWS_INDEX_PATH } from '@/data/news';
 import './home-news.css';
 import { NewsCard } from '@/modules/news/components/NewsCard';
 
-const posts = [...NEWS_POSTS]
-    .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))
-    .slice(0, 2);
-
-
 export const HomeNewsSection = () => {
+    const { posts: allPosts } = useNewsPosts();
+    const posts = allPosts.slice(0, 2);
     if (!posts.length) return null;
     return (
         <section id="news" className="home-news" aria-labelledby="home-news-title">

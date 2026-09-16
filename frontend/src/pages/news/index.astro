@@ -1,21 +1,23 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import App from '../../App';
+import { fetchNewsPosts } from '@/modules/news/api/newsClient';
 import {
     NEWS_INDEX_PATH,
-    NEWS_POSTS,
     SITE_URL,
     getAbsoluteUrl,
     getNewsPostUrl,
 } from '../../data/news';
 
-const [featuredPost] = NEWS_POSTS;
+let posts;
+try { posts = await fetchNewsPosts(); } catch { return new Response('News is temporarily unavailable.', { status: 503 }); }
+const [featuredPost] = posts;
 const title = 'Modtale News | Product Updates and Creator Notes';
 const description = 'Read Modtale product updates, creator notes, feature tours, and platform news for Hytale mods, plugins, worlds, assets, and modpacks.';
-const image = getAbsoluteUrl(featuredPost.socialImage);
+const image = getAbsoluteUrl(featuredPost?.socialImage || '/assets/logo_light.svg');
 const path = Astro.url.pathname;
 
-const initialData = {};
+const initialData = { newsPosts: posts };
 
 
 const jsonLd = [
@@ -33,7 +35,7 @@ const jsonLd = [
                 url: `${SITE_URL}/assets/logo.svg`,
             },
         },
-        hasPart: NEWS_POSTS.map((post) => ({
+        hasPart: posts.map((post) => ({
             '@type': 'NewsArticle',
             headline: post.title,
             description: post.description,

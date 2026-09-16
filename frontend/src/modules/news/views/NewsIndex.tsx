@@ -1,11 +1,13 @@
+import { useNewsPosts } from '../api/useNews';
 import React from 'react';
 import { Rss } from 'lucide-react';
-import { NEWS_POSTS, NEWS_RSS_PATH } from '@/data/news';
+import { NEWS_RSS_PATH } from '@/data/news';
 import { NewsCard } from '../components/NewsCard';
 
-const posts = [...NEWS_POSTS].sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
 
-export const NewsIndex: React.FC = () => (
+export const NewsIndex: React.FC = () => {
+    const { posts, loading, error } = useNewsPosts();
+    return (
     <main className="min-h-[70vh] bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white">
         <div className="max-w-[112rem] mx-auto px-6 sm:px-12 md:px-16 lg:px-20 xl:px-28 py-10 sm:py-12">
             <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 mb-8">
@@ -17,9 +19,12 @@ export const NewsIndex: React.FC = () => (
                     <Rss size={16} aria-hidden="true" /> RSS feed
                 </a>
             </header>
+            {loading && <p role="status">Loading news…</p>}
+            {error && <p role="alert">News is temporarily unavailable. Please try again shortly.</p>}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {posts.map((post, index) => <NewsCard key={post.slug} post={post} priority={index === 0} />)}
             </div>
         </div>
     </main>
 );
+};

@@ -1,17 +1,18 @@
+import { useNewsPost } from '../api/useNews';
+import { NewsBody } from '../components/NewsBody';
 import React from 'react';
 import { ArrowLeft, Rss } from 'lucide-react';
 import { Link, Navigate, useParams } from 'react-router-dom';
-import { NEWS_INDEX_PATH, NEWS_RSS_PATH, getNewsPostBySlug } from '@/data/news';
+import { NEWS_INDEX_PATH, NEWS_RSS_PATH } from '@/data/news';
 import type { User } from '@/types';
-import { LauncherStory } from './LauncherStory';
-import { ModpacksStory } from './ModpacksStory';
 import '../styles/news.css';
 import '../styles/article-viewer.css';
 
 export const NewsArticle: React.FC<{ currentUser?: User | null }> = () => {
     const { slug } = useParams();
-    const post = getNewsPostBySlug(slug);
-    if (!post) return <Navigate to={NEWS_INDEX_PATH} replace />;
+    const { post, error, missing } = useNewsPost(slug);
+    if (missing) return <Navigate to={NEWS_INDEX_PATH} replace />;
+    if (!post) return <main className="news-page news-editorial"><div className="news-wrap py-12" role={error ? 'alert' : 'status'}>{error ? 'News is temporarily unavailable. Please try again shortly.' : 'Loading article…'}</div></main>;
     return (
         <main className="news-page news-editorial">
             <div className="news-wrap">
@@ -51,11 +52,7 @@ export const NewsArticle: React.FC<{ currentUser?: User | null }> = () => {
                     </div>
                     <div className="news-reading-layout">
                     <div className="news-copy news-prose">
-                        {post.slug === 'modtale-launcher' ? (
-                            <LauncherStory />
-                        ) : (
-                            <ModpacksStory />
-                        )}
+                        <NewsBody content={post.body || ''} />
                         <footer className="news-article-footer">
                             <Link to={NEWS_INDEX_PATH}>
                                 More from Modtale{' '}

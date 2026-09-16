@@ -1,6 +1,7 @@
 import mediaVersions from './newsMediaVersions.json';
 
 export interface NewsPost {
+    body?: string;
     slug: string;
     title: string;
     description: string;

@@ -1,11 +1,11 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import App from '../../App';
+import { fetchNewsPosts } from '@/modules/news/api/newsClient';
 import {
     NEWS_INDEX_PATH,
     SITE_URL,
     getAbsoluteUrl,
-    getNewsPostBySlug,
     getNewsPostUrl,
 } from '../../data/news';
 
@@ -13,7 +13,9 @@ const { slug } = Astro.params;
 if (slug === 'fresh-feature-showcase' || slug === 'launcher-and-modpacks') {
     return Astro.redirect('/news', 301);
 }
-const post = getNewsPostBySlug(slug);
+let posts;
+try { posts = await fetchNewsPosts(); } catch { return new Response('News is temporarily unavailable.', { status: 503 }); }
+const post = posts.find(post => post.slug === slug);
 
 if (!post) {
     return Astro.redirect(NEWS_INDEX_PATH, 302);
@@ -22,7 +24,7 @@ if (!post) {
 const path = Astro.url.pathname;
 const canonicalUrl = getNewsPostUrl(post);
 
-const initialData = {};
+const initialData = { newsPost: post };
 
 
 const articleSchema = {

@@ -1,3 +1,4 @@
+import type { NewsPost } from '@/data/news';
 import {
     NEWS_INDEX_PATH,
     NEWS_POSTS,
@@ -5,7 +6,6 @@ import {
     SITE_URL,
     getNewsPostUrl,
     getNewsPostPath,
-    getLatestNewsPostDate,
 } from '@/data/news';
 
 const escapeXml = (value: string) => value
@@ -17,17 +17,17 @@ const escapeXml = (value: string) => value
 
 const cdata = (value: string) => `<![CDATA[${value.replace(/]]>/g, ']]]]><![CDATA[>')}]]>`;
 
-export const buildNewsRssXml = (siteUrl = SITE_URL) => {
+export const buildNewsRssXml = (siteUrl = SITE_URL, posts: NewsPost[] = NEWS_POSTS) => {
     const origin = new URL(siteUrl);
     const localHost = ['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname);
     if (!localHost) origin.protocol = 'https:';
     const absoluteUrl = (path: string) => new URL(path, origin).href;
-    const lastUpdated = getLatestNewsPostDate();
+    const lastUpdated = Math.max(...posts.map(post => Date.parse(post.updatedAt)));
     const lastBuildDate = typeof lastUpdated === 'number' && Number.isFinite(lastUpdated)
         ? new Date(lastUpdated).toUTCString()
         : new Date().toUTCString();
 
-    const items = NEWS_POSTS.map((post) => {
+    const items = posts.map((post) => {
         const postUrl = absoluteUrl(getNewsPostPath(post));
         const imageUrl = absoluteUrl(post.socialImage);
         const categories = post.tags
@@ -75,13 +75,13 @@ ${items}
 
 const NEWS_RSS_HEADERS = {
     'Content-Type': 'application/rss+xml; charset=utf-8',
-    'Cache-Control': 'public, max-age=900, s-maxage=3600, stale-while-revalidate=86400',
+    'Cache-Control': 'public, max-age=60, s-maxage=60',
 };
 
 export const buildNewsRssHeadResponse = () => new Response(null, {
     headers: NEWS_RSS_HEADERS,
 });
 
-export const buildNewsRssResponse = (siteUrl = SITE_URL) => new Response(buildNewsRssXml(siteUrl), {
+export const buildNewsRssResponse = (siteUrl = SITE_URL, posts: NewsPost[] = NEWS_POSTS) => new Response(buildNewsRssXml(siteUrl, posts), {
     headers: NEWS_RSS_HEADERS,
 });
