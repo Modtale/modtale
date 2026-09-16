@@ -432,7 +432,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
 
     const previewTitle = metaData.title.trim() || projectData.title || '';
     const previewSummary = metaData.summary.trim() || projectData.description || '';
-    const previewProject: Project = { ...projectData, title: previewTitle, description: previewSummary };
+    const previewProject: Project = { ...projectData, title: previewTitle, description: previewSummary, ...(isModpack ? { childProjectIds: (versionData.dependencies || []).map(dep => dep.projectId) } : {}) };
 
     const isCustomLicense = typeof metaData.license === 'string' && !LICENSES.some(l => l.id === metaData.license);
     const hasTitle = metaData.title && metaData.title.trim().length > 0;
@@ -893,6 +893,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                 document.body)}
 
             <ProjectLayout
+                modpackCount={isModpack ? (versionData.dependencies || []).length : undefined}
                 isEditing={true}
                 bannerUrl={bannerPreview}
                 iconUrl={metaData.iconPreview}

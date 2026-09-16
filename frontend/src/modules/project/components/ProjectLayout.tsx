@@ -1,3 +1,4 @@
+import { ModpackCountBadge } from './ModpackCountBadge';
 import { SkeletonSurface } from '@/components/ui/Skeleton';
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ImageIcon, Plus, ChevronDown, ChevronUp } from 'lucide-react';
@@ -62,6 +63,7 @@ interface ProjectLayoutProps {
     loading?: boolean;
     bannerUrl?: string | null;
     iconUrl?: string | null;
+    modpackCount?: number;
     isEditing?: boolean;
     onBannerUpload?: (file: File, preview: string) => void;
     onIconUpload?: (file: File, preview: string) => void;
@@ -78,6 +80,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                                                            loading = false,
                                                                            bannerUrl,
                                                                            iconUrl,
+                                                                           modpackCount,
                                                                            isEditing,
                                                                            onBannerUpload,
                                                                            onIconUpload,
@@ -267,7 +270,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                     <div className="relative md:p-12 md:pb-6 border-b border-slate-200 dark:border-white/10 p-4 pt-0">
                         <div className="md:hidden flex justify-between items-end -mt-16 mb-6 relative z-50">
                             <div className="flex-shrink-0">
-                                <label title={`Icon upload: max 10 MB · ${IMAGE_FORMAT_LABEL} · ${IMAGE_DIMENSION_LABEL} · square`} className={`block w-32 h-32 rounded-3xl bg-transparent backdrop-blur-md shadow-md border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden relative group ${isEditing ? 'cursor-pointer' : ''}`}>
+                                <label title={`Icon upload: max 10 MB · ${IMAGE_FORMAT_LABEL} · ${IMAGE_DIMENSION_LABEL} · square`} className={`[container-type:inline-size] block w-32 h-32 rounded-3xl bg-transparent backdrop-blur-md shadow-md border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden relative group ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <div className="absolute inset-0 bg-white/40 dark:bg-slate-900/40 z-0 backdrop-blur-md" />
                                     <input type="file" disabled={!isEditing || loading} accept={IMAGE_ACCEPT} onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
                                     {loading ? mediaPlaceholder : finalIcon ? (
@@ -282,6 +285,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                             <ImageIcon className="w-8 h-8 opacity-50" aria-hidden="true" />
                                         </div>
                                     )}
+                                    <ModpackCountBadge count={modpackCount} />
                                 </label>
                             </div>
                             {headerActions && (
@@ -293,7 +297,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
 
                         <div className="flex flex-col md:flex-row gap-8 items-start relative z-10">
                             <div className="hidden md:block flex-shrink-0 relative z-50 -mt-24 ml-2">
-                                <label title={`Icon upload: max 10 MB · ${IMAGE_FORMAT_LABEL} · ${IMAGE_DIMENSION_LABEL} · square`} className={`block w-56 h-56 rounded-3xl bg-transparent backdrop-blur-md shadow-xl border-[8px] border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden group relative ${isEditing ? 'cursor-pointer' : ''}`}>
+                                <label title={`Icon upload: max 10 MB · ${IMAGE_FORMAT_LABEL} · ${IMAGE_DIMENSION_LABEL} · square`} className={`[container-type:inline-size] block w-56 h-56 rounded-3xl bg-transparent backdrop-blur-md shadow-xl border-[8px] border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden group relative ${isEditing ? 'cursor-pointer' : ''}`}>
                                     <div className="absolute inset-0 bg-white/40 dark:bg-slate-900/40 z-0 backdrop-blur-md" />
                                     <input type="file" disabled={!isEditing || loading} accept={IMAGE_ACCEPT} onChange={e => handleFileSelect(e, 'icon')} className="hidden" />
                                     {loading ? mediaPlaceholder : finalIcon ? (
@@ -317,6 +321,7 @@ export const ProjectLayout: React.FC<ProjectLayoutProps> = React.memo(({
                                             <span className="text-[10px] font-medium text-white/70">{t('project:recommendedIconSize')}</span>
                                         </div>
                                     )}
+                                    <ModpackCountBadge count={modpackCount} />
                                 </label>
                             </div>
 

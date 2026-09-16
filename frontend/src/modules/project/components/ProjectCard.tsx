@@ -1,6 +1,7 @@
+import { ModpackCountBadge } from './ModpackCountBadge';
 import { SkeletonSurface } from '@/components/ui/Skeleton';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Download, Calendar, Heart, Box, ChevronRight, Settings2 } from 'lucide-react';
+import { Download, Calendar, Heart, ChevronRight, Settings2 } from 'lucide-react';
 import { BACKEND_URL } from '@/utils/api';
 import { Link } from 'react-router-dom';
 import { SiteRoutes } from '@/utils/routes';
@@ -199,12 +200,14 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                 {!disableNavigation && <Link to={canonicalPath} state={{ project }} className="absolute inset-0 z-10" />}
 
                 {disableNavigation ? (
-                    <span className="w-12 h-12 rounded-lg bg-transparent backdrop-blur-md shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30">
+                    <span className="[container-type:inline-size] w-12 h-12 rounded-lg bg-transparent backdrop-blur-md shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30">
                         <OptimizedImage src={resolvedImage} alt={title} baseWidth={48} priority={priority} className="w-full h-full bg-transparent object-cover" initialQuality="standard" onFirstLoad={reportReady} />
+                        <ModpackCountBadge count={classification === 'MODPACK' ? childCount : undefined} />
                     </span>
                 ) : (
-                    <Link to={canonicalPath} state={{ project }} aria-label={`View ${title}`} className="w-12 h-12 rounded-lg bg-transparent backdrop-blur-md shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30 focus:outline-none">
+                    <Link to={canonicalPath} state={{ project }} aria-label={`View ${title}`} className="[container-type:inline-size] w-12 h-12 rounded-lg bg-transparent backdrop-blur-md shadow-sm border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30 focus:outline-none">
                         <OptimizedImage src={resolvedImage} alt={title} baseWidth={48} priority={priority} className="w-full h-full bg-transparent object-cover" initialQuality="standard" onFirstLoad={reportReady} />
+                        <ModpackCountBadge count={classification === 'MODPACK' ? childCount : undefined} />
                     </Link>
                 )}
                 <div className="flex-1 min-w-0 relative z-20 pointer-events-none">
@@ -250,12 +253,14 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                 {!disableNavigation && <Link to={canonicalPath} state={{ project }} className="absolute inset-0 z-10" />}
 
                 {disableNavigation ? (
-                    <span className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-transparent backdrop-blur-md shadow-xl border-2 sm:border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30">
+                    <span className="[container-type:inline-size] w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-transparent backdrop-blur-md shadow-xl border-2 sm:border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30">
                         <OptimizedImage src={resolvedImage} alt={title} baseWidth={128} priority={priority} className="w-full h-full bg-transparent object-cover" initialQuality="standard" onFirstLoad={reportReady} />
+                        <ModpackCountBadge count={classification === 'MODPACK' ? childCount : undefined} />
                     </span>
                 ) : (
-                    <Link to={canonicalPath} state={{ project }} aria-label={`View ${title}`} className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-transparent backdrop-blur-md shadow-xl border-2 sm:border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30 focus:outline-none">
+                    <Link to={canonicalPath} state={{ project }} aria-label={`View ${title}`} className="[container-type:inline-size] w-24 h-24 sm:w-32 sm:h-32 rounded-xl bg-transparent backdrop-blur-md shadow-xl border-2 sm:border-4 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 overflow-hidden transform-gpu shrink-0 group-hover:-translate-y-1 transition-transform duration-500 relative z-30 focus:outline-none">
                         <OptimizedImage src={resolvedImage} alt={title} baseWidth={128} priority={priority} className="w-full h-full bg-transparent object-cover" initialQuality="standard" onFirstLoad={reportReady} />
+                        <ModpackCountBadge count={classification === 'MODPACK' ? childCount : undefined} />
                     </Link>
                 )}
 
@@ -374,7 +379,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
 
             <div className="min-w-0 px-6 pb-6 relative flex flex-col flex-1 bg-transparent z-20 pointer-events-none">
                 {disableNavigation ? (
-                    <span className="w-20 h-20 rounded-2xl bg-transparent backdrop-blur-md shadow-xl border-4 border-white dark:border-slate-800 overflow-hidden absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10 z-30 pointer-events-auto">
+                    <span className="[container-type:inline-size] w-20 h-20 rounded-2xl bg-transparent backdrop-blur-md shadow-xl border-4 border-white dark:border-slate-800 overflow-hidden absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10 z-30 pointer-events-auto">
                         <OptimizedImage
                             src={resolvedImage}
                             alt={title}
@@ -384,14 +389,10 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                             initialQuality="standard"
                             onFirstLoad={reportReady}
                         />
-                        {classification === 'MODPACK' && childCount > 0 && (
-                            <div className="absolute bottom-0 right-0 bg-slate-900/75 backdrop-blur-sm text-white text-[10px] font-bold px-1 py-0.5 rounded-tl-xl flex items-center">
-                                <Box className="w-3 h-3 mr-0.5" /> {childCount}
-                            </div>
-                        )}
+                        <ModpackCountBadge count={classification === 'MODPACK' ? childCount : undefined} />
                     </span>
                 ) : (
-                    <Link to={canonicalPath} aria-label={`View ${title}`} className="w-20 h-20 rounded-2xl bg-transparent backdrop-blur-md shadow-xl border-4 border-white dark:border-slate-800 overflow-hidden absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10 z-30 pointer-events-auto focus:outline-none">
+                    <Link to={canonicalPath} aria-label={`View ${title}`} className="[container-type:inline-size] w-20 h-20 rounded-2xl bg-transparent backdrop-blur-md shadow-xl border-4 border-white dark:border-slate-800 overflow-hidden absolute -top-10 group-hover:-translate-y-1 transition-transform duration-500 ring-1 ring-black/5 dark:ring-white/10 z-30 pointer-events-auto focus:outline-none">
                         <OptimizedImage
                             src={resolvedImage}
                             alt={title}
@@ -401,11 +402,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = React.memo(({ project, pa
                             initialQuality="standard"
                             onFirstLoad={reportReady}
                         />
-                        {classification === 'MODPACK' && childCount > 0 && (
-                            <div className="absolute bottom-0 right-0 bg-slate-900/75 backdrop-blur-sm text-white text-[10px] font-bold px-1 py-0.5 rounded-tl-xl flex items-center">
-                                <Box className="w-3 h-3 mr-0.5" /> {childCount}
-                            </div>
-                        )}
+                        <ModpackCountBadge count={classification === 'MODPACK' ? childCount : undefined} />
                     </Link>
                 )}
 

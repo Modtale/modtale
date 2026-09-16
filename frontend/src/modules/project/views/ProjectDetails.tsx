@@ -819,6 +819,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             </Suspense>
 
             <ProjectLayout
+                modpackCount={project.classification === 'MODPACK' ? (project.childProjectIds || []).length : undefined}
                 bannerUrl={project.bannerUrl}
                 iconUrl={project.imageUrl}
                 onBack={() => navigate(browseBackTarget)}

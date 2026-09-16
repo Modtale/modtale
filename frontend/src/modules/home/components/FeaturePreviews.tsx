@@ -1,3 +1,4 @@
+import { ModpackCountBadge } from '@/modules/project/components/ModpackCountBadge';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Download, List, X, ChevronDown, ChevronRight, Check, Box, AlertCircle, Bell, Search, ArrowUpRight, MessageSquare, Send, Save, PieChart, TrendingUp, Eye, ArrowBigUp, ArrowBigDown, Settings } from 'lucide-react';
@@ -699,13 +700,14 @@ const CompactFeaturedModCard = ({ project }: { project: Project }) => {
             </div>
 
             <div className="px-3 pb-3 relative flex flex-col flex-1 bg-transparent">
-                <div className="w-10 h-10 rounded-lg absolute -top-5 left-3 group-hover:-translate-y-0.5 transition-transform duration-300 z-20 overflow-hidden border-2 border-white dark:border-slate-800 shadow-md bg-white dark:bg-slate-950">
+                <div className="[container-type:inline-size] w-10 h-10 rounded-lg absolute -top-5 left-3 group-hover:-translate-y-0.5 transition-transform duration-300 z-20 overflow-hidden border-2 border-white dark:border-slate-800 shadow-md bg-white dark:bg-slate-950">
                     <img
                         src={iconUrl}
                         alt={`${project.title} Icon`}
                         loading="lazy"
                         className="w-full h-full bg-transparent object-cover"
                     />
+                    <ModpackCountBadge count={project.classification === 'MODPACK' ? (project.childProjectIds || []).length : undefined} />
                 </div>
 
                 <div className="mt-6 flex-1 relative z-20 pointer-events-none">
