@@ -204,7 +204,7 @@ describe('Modpack builder preview', () => {
         root.render(<MemoryRouter><ToastProvider><InlineModpackBuilderUI projects={items} /></ToastProvider></MemoryRouter>);
     });
 
-    it('uses the real modpack selector and configuration dialog with site metadata', async () => {
+    it('uses the real modpack selector with non-interactive configuration buttons', async () => {
         await render();
         expect(container.textContent).toContain('Modpack Contents');
         expect(container.textContent).toContain('Selected (2)');
@@ -217,8 +217,9 @@ describe('Modpack builder preview', () => {
         expect(container.textContent).toContain('v2.4.0');
         expect(container.querySelector('input[placeholder="Search for projects..."]')).not.toBeNull();
         const config = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('Config'))!;
+        expect(config.disabled).toBe(true);
         await act(async () => config.click());
-        expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+        expect(document.querySelector('[role="dialog"]')).toBeNull();
     });
 
     it('deduplicates projects, excludes packs and disallowed entries, and preserves edits on rerender', async () => {

@@ -232,6 +232,7 @@ export const InlineModpackBuilderUI = ({ randomProject, projects, loading = fals
                     label="Modpack Contents"
                     renderDependencyDetails={dependency => (
                         <ModConfigFields
+                            disabled
                             projectId={dependency.projectId}
                             title={dependency.projectTitle}
                             source={dependency.source}
