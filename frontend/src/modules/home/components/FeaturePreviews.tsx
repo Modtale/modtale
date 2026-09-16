@@ -159,10 +159,16 @@ export const InlineModpackBuilderUI = ({ randomProject, projects, loading = fals
     const [configs, setConfigs] = useState<Record<string, ModConfig[]>>({});
     const [preparing, setPreparing] = useState(true);
     const initialized = useRef(false);
+    const [retry, setRetry] = useState(0);
 
     useEffect(() => {
         if (initialized.current || (!candidates.length && loading)) return;
+        if (!candidates.length) {
+            setPreparing(false);
+            return;
+        }
         let cancelled = false;
+        setPreparing(true);
         const prepare = async () => {
             const entries = await Promise.all(candidates.map(async project => {
                 try {
@@ -182,13 +188,14 @@ export const InlineModpackBuilderUI = ({ randomProject, projects, loading = fals
                 }
             }));
             if (cancelled) return;
-            setDependencies(entries.filter((entry): entry is ProjectDependency => entry !== null));
-            initialized.current = true;
+            const resolved = entries.filter((entry): entry is ProjectDependency => entry !== null);
+            setDependencies(resolved);
+            initialized.current = resolved.length > 0;
             setPreparing(false);
         };
         void prepare();
         return () => { cancelled = true; };
-    }, [candidates, loading]);
+    }, [candidates, loading, retry]);
 
     return (
         <div className="relative">
@@ -196,6 +203,11 @@ export const InlineModpackBuilderUI = ({ randomProject, projects, loading = fals
                 <div className={`${GLASS_CARD} p-6 space-y-4`} role="status">
                     <span className="sr-only">Loading projects</span>
                     {[0, 1, 2].map(index => <div key={index} className="h-20 animate-pulse rounded-xl bg-slate-200/60 dark:bg-white/5" />)}
+                </div>
+            ) : !initialized.current ? (
+                <div className={`${GLASS_CARD} p-6 flex items-center justify-between gap-4`} role="status">
+                    <span className="text-sm text-slate-500 dark:text-slate-400">Projects couldn’t load.</span>
+                    <button type="button" onClick={() => setRetry(value => value + 1)} className={theme.components.buttonPrimary}>Try again</button>
                 </div>
             ) : (
                 <DependencySelector
@@ -858,7 +870,7 @@ export const ModpackPreviewSection = ({ randomProject, projects, loading }: Modp
         <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
             <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
                 <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
-                    Modpacks v2
+                    Modpacks
                 </h2>
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-emerald-500 dark:from-blue-400 dark:to-emerald-400">
                     Curated packs with dependency intelligence.

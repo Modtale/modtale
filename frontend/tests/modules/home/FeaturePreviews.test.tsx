@@ -230,11 +230,25 @@ describe('Modpack builder preview', () => {
         expect(container.textContent).toContain('Selected (0)');
     });
 
-    it('does not invent a version when the release endpoint fails', async () => {
+    it('recovers when projects arrive after an empty initial render', async () => {
+        await render([]);
+        expect(container.textContent).not.toContain('Selected (0)');
+        await render(projects);
+        expect(container.textContent).toContain('Selected (1)');
+        expect(container.textContent).toContain('Arcane Toolkit');
+    });
+
+    it('offers a retry after a failed release lookup without inventing versions', async () => {
         vi.mocked(api.get).mockRejectedValue(new Error('Unavailable'));
         await render([{ ...projects[0], versions: [] }]);
-        expect(container.textContent).toContain('Selected (0)');
+        expect(container.textContent).toContain('Projects couldn’t load.');
         expect(container.textContent).not.toContain('vlatest');
-        expect(container.querySelector('input')).not.toBeNull();
+        vi.mocked(api.get).mockImplementation(async (url: any) => ({ data: String(url).endsWith('/versions')
+            ? { versions: projects[0].versions }
+            : { ...projects[0], icon: projects[0].imageUrl } }) as any);
+        const retry = Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Try again')!;
+        await act(async () => retry.click());
+        expect(container.textContent).toContain('Selected (1)');
+        expect(container.textContent).toContain('v2.4.0');
     });
 });
