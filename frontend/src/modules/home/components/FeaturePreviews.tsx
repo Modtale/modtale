@@ -2,8 +2,7 @@ import { ModpackCountBadge } from '@/modules/project/components/ModpackCountBadg
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Download, List, X, ChevronDown, ChevronRight, Check, Box, AlertCircle, Bell, Search, ArrowUpRight, MessageSquare, Send, Save, PieChart, TrendingUp, Eye, ArrowBigUp, ArrowBigDown, Settings } from 'lucide-react';
-import { LauncherDemo } from '@/modules/launcher/components/LauncherDemo';
-import '@/modules/launcher/styles/launcher-product.css';
+import { LauncherLibraryPreview } from './LauncherLibraryPreview';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { api, BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
@@ -909,7 +908,7 @@ export const DirectDownloadsSection = () => {
     );
 };
 
-export const LauncherPreviewSection = () => (
+export const LauncherPreviewSection = ({ projects, loading }: { projects?: Project[]; loading?: boolean }) => (
     <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
         <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
             <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
@@ -927,7 +926,7 @@ export const LauncherPreviewSection = () => (
         </div>
         <div className="flex-1 w-full max-w-xl relative overflow-visible">
             <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/5 via-transparent to-indigo-500/5 dark:from-blue-500/10 dark:via-transparent dark:to-indigo-500/10 rounded-3xl blur-2xl pointer-events-none" />
-            <LauncherDemo clip="world-library" alt="The real Modtale Launcher switching between Hytale worlds with different enabled mods" />
+            <LauncherLibraryPreview projects={projects} loading={loading} />
         </div>
     </div>
 );

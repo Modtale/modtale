@@ -1149,7 +1149,7 @@ export const Home: React.FC<{
                     </FeatureShowcaseSection>
 
                     <FeatureShowcaseSection id="launcher-preview" glowFrom="rgba(37, 99, 235, 0.1)" glowTo="rgba(16, 185, 129, 0.08)" align="right">
-                        <LauncherPreviewSection />
+                        <LauncherPreviewSection projects={combinedProjectPool} loading={isTrendingProjectsLoading || isNewestProjectsLoading} />
                     </FeatureShowcaseSection>
 
                     <FeatureShowcaseSection glowFrom="rgba(16, 185, 129, 0.1)" glowTo="rgba(20, 184, 166, 0.08)" align="right">

@@ -1,0 +1,44 @@
+.launcher-library-preview { container-type:inline-size; background:#090f19; border:1px solid #ffffff1a; border-radius:20px; overflow:hidden; color:#f8fafc; box-shadow:0 16px 48px #02061733; font-family:'Inter Variable',Inter,sans-serif; }
+.llp-navbar { display:flex; align-items:center; justify-content:space-between; padding:18px 20px; background:#141e2c; border-bottom:1px solid #ffffff08; }
+.llp-navbar > img { width:112px; height:auto; }
+.llp-navbar > span { display:flex; align-items:center; gap:7px; background:#2563eb1a; color:#60a5fa; padding:8px 10px; border-radius:6px; font-size:12px; font-weight:700; }
+.llp-workspace { display:grid; grid-template-columns:108px minmax(0,1fr); gap:12px; padding:16px; }
+.llp-worlds, .llp-library { background:#0e1524; border:1px solid #ffffff12; border-radius:16px; }
+.llp-worlds { padding:8px; display:flex; flex-direction:column; gap:8px; }
+.llp-worlds button { display:flex; flex-direction:column; align-items:center; gap:8px; padding:10px 4px; border:1px solid #94a3b826; border-radius:12px; background:#182132; color:#f8fafc; font-size:11px; font-weight:800; transition:background .15s,border-color .15s; }
+.llp-worlds button[aria-pressed=true] { background:#1b2b50; border-color:#609ef080; }
+.llp-worlds button:hover { border-color:#60a5fa; }
+.llp-worlds img, .llp-world-heading > img { object-fit:cover; border:3px solid #334155; border-radius:12px; flex-shrink:0; }
+.llp-worlds img { width:40px; height:40px; }
+.llp-library { min-width:0; padding:14px; }
+.llp-world-heading { display:flex; align-items:center; gap:10px; padding-bottom:14px; border-bottom:1px solid #ffffff0a; }
+.llp-world-heading > img { width:48px; height:48px; }
+.llp-world-heading h3 { font-size:20px; line-height:1.2; font-weight:900; margin:0; color:#fff; }
+.llp-world-heading p { margin:5px 0 0; color:#94a3b8; font-size:11px; font-weight:600; }
+.llp-search { display:flex; align-items:center; gap:8px; background:#101827; border:1px solid #ffffff14; border-radius:9px; margin:14px 0; padding:9px 10px; color:#94a3b8; }
+.llp-search input { min-width:0; width:100%; background:transparent; color:#f8fafc; border:0; outline:none; font:inherit; font-size:11px; padding:0; box-shadow:none; }
+.llp-search:focus-within { border-color:#60a5fa; }
+.llp-groups { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; min-height:248px; align-content:start; }
+.llp-groups h4 { color:#94a3b8; font-size:11px; font-weight:700; margin:0 0 8px; }
+.llp-mod { display:flex; align-items:center; gap:9px; padding:10px; margin-top:7px; border:1px solid #94a3b826; border-radius:12px; background:#101827; cursor:pointer; transition:background .15s,border-color .15s; }
+.llp-mod:hover { background:#172236; border-color:#60a5fa47; }
+.llp-mod .themed-checkbox { width:16px; height:16px; min-width:16px; }
+.llp-mod-icon { width:38px; height:38px; flex-shrink:0; object-fit:cover; border:2px solid #334155; border-radius:10px; }
+.llp-mod-copy { min-width:0; }
+.llp-mod-copy strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#fff; font-size:12px; font-weight:800; transition:color .15s; }
+.llp-mod:hover strong { color:#60a5fa; }
+.llp-mod-copy > span { display:block; color:#94a3b8; font-size:10px; margin-top:4px; }
+.llp-empty, .llp-loading { font-size:11px; color:#94a3b8; padding:8px 0; margin:0; }
+.llp-worlds button:focus-visible { outline:2px solid #60a5fa; outline-offset:2px; }
+@container(max-width:460px) {
+    .llp-workspace { grid-template-columns:52px minmax(0,1fr); padding:10px; gap:8px; }
+    .llp-worlds { padding:5px; }
+    .llp-worlds button { padding:4px; }
+    .llp-worlds img { width:30px; height:30px; border-width:2px; border-radius:8px; }
+    .llp-worlds button > span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+    .llp-library { padding:10px; }
+    .llp-world-heading h3 { font-size:18px; }
+    .llp-mod { gap:7px; padding:8px; }
+    .llp-mod-icon { width:32px; height:32px; }
+}
+@media(prefers-reduced-motion:reduce) { .launcher-library-preview * { transition:none!important; } }
