@@ -659,7 +659,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                             <button type="button" onClick={() => setSelectedProject(null)} aria-label="Close version picker" className={modpackDialog.close}><X className="w-5 h-5" /></button>
                         </div>
 
-                        <div className="px-6 pt-5 pb-4 space-y-3">
+                        <div className="px-6 py-2 space-y-3">
                             <div className="flex items-center justify-between">
                                 <span className={`text-xs ${theme.colors.textMuted}`}>Show Alpha/Beta</span>
                                 <button type="button" onClick={() => setShowAlphaBeta(!showAlphaBeta)} className={`transition-colors ${showAlphaBeta ? theme.colors.accent : theme.colors.textMuted}`}>
@@ -673,7 +673,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                             </label>
                         </div>
 
-                        <div className={`${modpackDialog.body} !space-y-2`}>
+                        <div className={`${modpackDialog.body} !pt-2 !pb-4 !space-y-2`}>
                             {loadingProjectVersions ? (
                                 <div className={`p-4 text-center text-xs ${theme.colors.textMuted} flex items-center justify-center gap-2`}>
                                     <Loader2 className="w-4 h-4 animate-spin" /> Loading versions...

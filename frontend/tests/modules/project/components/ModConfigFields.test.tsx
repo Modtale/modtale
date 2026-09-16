@@ -18,7 +18,9 @@ it.each(['author:Plugin', 'bad/path:Plugin', undefined])('detects a safe release
         await act(async () => button('Config').click());
         expect(document.querySelector('input[placeholder="Group_PluginName"]')).toBeNull();
         if (manifestId === 'author:Plugin') {
-            expect(document.body.textContent).toContain('author_Plugin · Detected automatically');
+            expect(document.body.textContent).toContain('author_Plugin');
+            expect(document.body.textContent).not.toContain('Detected automatically');
+            expect(document.body.textContent).not.toContain('Plugin config folder');
         } else {
             expect(document.body.textContent).toContain('Import config folder');
             expect(document.body.textContent).not.toContain('Detected automatically');
