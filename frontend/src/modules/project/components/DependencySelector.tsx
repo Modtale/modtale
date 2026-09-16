@@ -194,14 +194,14 @@ const DependencyPrompt = ({
             <div role="dialog" aria-modal="true" aria-label="Add dependencies" className={modpackDialog.content}>
                 <div className={modpackDialog.header}>
                     <div>
-                        <h3 className={`text-lg font-bold ${theme.colors.textPrimary}`}>Add dependencies</h3>
-                        <p className={`text-sm ${theme.colors.textMuted} mt-1`}>{projectTitle} needs {dependencies.length} project{dependencies.length === 1 ? '' : 's'} that are not in this pack yet.</p>
+                        <h3 className={modpackDialog.title}><PackagePlus className={`w-5 h-5 shrink-0 ${theme.colors.accent}`} />Add dependencies</h3>
+                        <p className={`text-sm ${theme.colors.textMuted} mt-1`}>{projectTitle} lists {dependencies.length} related project{dependencies.length === 1 ? '' : 's'} that are not in this pack yet.</p>
                     </div>
                     <button type="button" onClick={onClose} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
                 </div>
-                <div className={`${modpackDialog.body} !space-y-0 divide-y divide-slate-200 dark:divide-white/10`}>
+                <div className={`${modpackDialog.body} !space-y-2`}>
                     {dependencies.map(dep => (
-                        <div key={`${dep.projectId}:${dep.versionNumber}`} className={`py-3 flex items-center justify-between gap-3`}>
+                        <div key={`${dep.projectId}:${dep.versionNumber}`} className={`${modpackDialog.row} flex items-center justify-between gap-3`}>
                             <div className="min-w-0">
                                 <div className={`font-bold ${theme.colors.textPrimary} truncate`}>{dep.projectTitle || dep.projectId}</div>
                                 <div className={`text-xs ${theme.colors.textMuted}`}>{dep.versionNumber}</div>
@@ -629,13 +629,13 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                     <div role="dialog" aria-modal="true" aria-label="Select mod version" className={`${modpackDialog.content}`} onKeyDown={event => { if (event.key === 'Escape') setSelectedProject(null); }}>
                         <div className={modpackDialog.header}>
                             <div>
-                                <h3 className={`font-bold ${theme.colors.textPrimary}`}>Select Version</h3>
+                                <h3 className={modpackDialog.title}><PackagePlus className={`w-5 h-5 shrink-0 ${theme.colors.accent}`} />Select Version</h3>
                                 <p className={`text-xs ${theme.colors.textMuted} mt-1 truncate max-w-[20rem]`}>{selectedProject.title}</p>
                             </div>
-                            <button type="button" onClick={() => setSelectedProject(null)} aria-label="Close version picker" className={theme.components.iconButton}><X className="w-5 h-5" /></button>
+                            <button type="button" onClick={() => setSelectedProject(null)} aria-label="Close version picker" className={modpackDialog.close}><X className="w-5 h-5" /></button>
                         </div>
 
-                        <div className="px-6 pb-4 space-y-3">
+                        <div className="px-6 pt-5 pb-4 space-y-3">
                             <div className="flex items-center justify-between">
                                 <span className={`text-xs ${theme.colors.textMuted}`}>Show Alpha/Beta</span>
                                 <button type="button" onClick={() => setShowAlphaBeta(!showAlphaBeta)} className={`transition-colors ${showAlphaBeta ? theme.colors.accent : theme.colors.textMuted}`}>
@@ -661,7 +661,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                                         key={version.id}
                                         type="button"
                                         onClick={() => addDependency(buildModtaleDependency(selectedProject, version.versionNumber, isModpack ? 'REQUIRED' : dependencyType), selectedProject, version)}
-                                        className={`w-full text-left px-4 py-3 flex justify-between items-center rounded-xl transition-colors border ${!isCompatible ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30' : 'bg-transparent border-slate-200 dark:border-white/10 hover:border-modtale-accent/40 dark:hover:border-modtale-accent/50'}`}
+                                        className={`w-full text-left px-4 py-3 flex justify-between items-center rounded-xl transition-colors border ${!isCompatible ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30' : `${theme.colors.bgBase} ${theme.colors.border} hover:border-modtale-accent dark:hover:border-modtale-accent` }`}
                                     >
                                         <div>
                                             <div className="flex items-center gap-2">
@@ -695,8 +695,8 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                 <ModalPortal><div className={theme.components.modalOverlay} onMouseDown={event => { if (event.target === event.currentTarget) setShowExternalModal(false); }}>
                     <div ref={externalDialogRef} role="dialog" aria-modal="true" aria-label="Add external mod" className={`${modpackDialog.content}`} onKeyDown={event => { if (event.key === 'Escape') setShowExternalModal(false); }}>
                         <div className={modpackDialog.header}>
-                            <h3 className={`font-bold ${theme.colors.textPrimary}`}>Add external mod</h3>
-                            <button type="button" onClick={() => setShowExternalModal(false)} aria-label="Close external mod" className={theme.components.iconButton}><X className="w-4 h-4" /></button>
+                            <h3 className={modpackDialog.title}><ExternalLink className={`w-5 h-5 shrink-0 ${theme.colors.accent}`} />Add external mod</h3>
+                            <button type="button" onClick={() => setShowExternalModal(false)} aria-label="Close external mod" className={modpackDialog.close}><X className="w-5 h-5" /></button>
                         </div>
                         <div className={modpackDialog.body}>
                             <label className={`block text-xs font-bold ${theme.colors.textSecondary}`}>Project or file link
@@ -704,7 +704,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                             </label>
 
                             {externalResolved && <>
-                                <div className="flex items-center gap-3 py-1">
+                                <div className={`${modpackDialog.row} flex items-center gap-3`}>
                                     <div className={`w-10 h-10 rounded-lg ${theme.colors.bgSurfaceAlt} flex items-center justify-center shrink-0 overflow-hidden ${theme.colors.textMuted}`}>
                                         {externalResolved.iconUrl ? <img src={externalResolved.iconUrl} alt="" className="w-full h-full object-cover" /> : <ExternalLink className="w-4 h-4" />}
                                     </div>
