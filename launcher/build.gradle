@@ -61,7 +61,7 @@ dependencies {
     implementation 'net.java.dev.jna:jna:5.19.1'
     implementation "org.openjfx:javafx-base:26.0.2:${javafxPlatform()}"
     if (currentOs.isLinux()) {
-        implementation "net.modtale.javafx:javafx-graphics:26.0.2-modtale.1:${javafxPlatform()}"
+        implementation "net.modtale.javafx:javafx-graphics:26.0.2-modtale.2:${javafxPlatform()}"
     } else {
         implementation "org.openjfx:javafx-graphics:26.0.2:${javafxPlatform()}"
     }
