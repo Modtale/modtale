@@ -1,8 +1,8 @@
 package net.modtale.launcher.api;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.io.IOException;
@@ -11,37 +11,51 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
-import net.modtale.launcher.logging.LogSanitizer;
+import net.modtale.launcher.http.RateLimitHandler;
 import net.modtale.launcher.logging.LauncherLog;
 import net.modtale.launcher.logging.LauncherLogger;
+import net.modtale.launcher.logging.LogSanitizer;
 
-final class ModtaleApiTransport {
+final class JsonApiTransport {
 
-    private static final LauncherLogger LOG = LauncherLog.getLogger(ModtaleApiTransport.class);
+    private static final LauncherLogger LOG = LauncherLog.getLogger(JsonApiTransport.class);
     private static final String CSRF_HEADER_NAME = "X-XSRF-TOKEN";
     static final String CLIENT_HEADER_NAME = "X-Modtale-Client";
     static final String CLIENT_HEADER_VALUE = "launcher";
 
-    private final java.util.concurrent.ConcurrentMap<URI, Long> retryAt = new java.util.concurrent.ConcurrentHashMap<>();
+    private final RateLimitHandler<URI> rateLimits =
+            new RateLimitHandler<>(Clock.systemUTC(), Duration.ofMinutes(1));
+    private final String providerName;
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
     private final ApiResponseCache responseCache;
     private final Supplier<Optional<String>> csrfTokenSupplier;
 
-    ModtaleApiTransport(HttpClient httpClient, ApiResponseCache responseCache) {
+    JsonApiTransport(HttpClient httpClient, ApiResponseCache responseCache) {
         this(httpClient, responseCache, Optional::empty);
     }
 
-    ModtaleApiTransport(
+    JsonApiTransport(HttpClient httpClient, ApiResponseCache responseCache, String providerName) {
+        this(httpClient, responseCache, Optional::empty, providerName);
+    }
+
+    JsonApiTransport(
             HttpClient httpClient,
             ApiResponseCache responseCache,
             Supplier<Optional<String>> csrfTokenSupplier
     ) {
+        this(httpClient, responseCache, csrfTokenSupplier, "Modtale");
+    }
+
+    private JsonApiTransport(HttpClient httpClient, ApiResponseCache responseCache,
+                             Supplier<Optional<String>> csrfTokenSupplier, String providerName) {
+        this.providerName = providerName;
         this.httpClient = httpClient;
         this.responseCache = responseCache;
         this.csrfTokenSupplier = csrfTokenSupplier == null ? Optional::empty : csrfTokenSupplier;
@@ -110,82 +124,31 @@ final class ModtaleApiTransport {
     }
 
     private <T> T sendJson(HttpRequest request, Class<T> type, Duration cacheTtl) {
-        if (ApiCachePolicy.isEnabled(cacheTtl) && request.method().equals("GET")) {
-            return responseCache.withRequestLock(request.uri(), () -> sendCachedJson(request, type, cacheTtl));
-        }
-        return sendCachedJson(request, type, Duration.ZERO);
-    }
-
-    private <T> T sendCachedJson(HttpRequest request, Class<T> type, Duration cacheTtl) {
-        if (ApiCachePolicy.isEnabled(cacheTtl)) {
-            Optional<String> cached = responseCache.getFresh(request.uri(), cacheTtl);
-            if (cached.isPresent()) {
-                try {
-                    return mapper.readValue(cached.get(), type);
-                } catch (IOException ex) {
-                    responseCache.invalidate(request.uri());
-                }
-            }
-        }
-
-        try {
-            LOG.info(request.method() + " " + LogSanitizer.uri(request.uri()));
-            Instant started = Instant.now();
-            retryAt.values().removeIf(deadline -> deadline <= System.currentTimeMillis());
-            if (ApiCachePolicy.isEnabled(cacheTtl)
-                    && retryAt.getOrDefault(request.uri(), 0L) > System.currentTimeMillis()) {
-                throw new ModtaleApiException("API requests are temporarily rate limited. Please try again shortly.", 429, null);
-            }
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (response.statusCode() == 429) {
-                retryAt.put(request.uri(), retryDeadline(response));
-            }
-            logResponse(request, response.statusCode(), response.body(), started);
-            ensureSuccess(response.statusCode(), request.uri().toString(), response.body());
-            T result = readResponseBody(response.body(), type);
-            if (ApiCachePolicy.isEnabled(cacheTtl)) {
-                responseCache.put(request.uri(), response.body());
-            }
-            return result;
-        } catch (ModtaleApiException ex) {
-            if (ex.statusCode() == 429 || ex.statusCode() >= 500) {
-                Optional<T> stale = readStaleFallback(request, type, cacheTtl);
-                if (stale.isPresent()) return stale.get();
-            }
-            throw ex;
-        } catch (IOException ex) {
-            LOG.warn("I/O failure reading " + request.method() + " " + LogSanitizer.uri(request.uri()), ex);
-            Optional<T> stale = readStaleFallback(request, type, cacheTtl);
-            if (stale.isPresent()) {
-                LOG.warn("Using stale cached response for " + LogSanitizer.uri(request.uri()));
-                return stale.get();
-            }
-            throw new ModtaleApiException("Could not read API response from " + LogSanitizer.uri(request.uri()), ex);
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            LOG.warn("Interrupted while reading " + request.method() + " " + LogSanitizer.uri(request.uri()), ex);
-            Optional<T> stale = readStaleFallback(request, type, cacheTtl);
-            if (stale.isPresent()) {
-                LOG.warn("Using stale cached response for " + LogSanitizer.uri(request.uri()));
-                return stale.get();
-            }
-            throw new ModtaleApiException("API request was interrupted.", ex);
-        }
+        return sendJson(request, body -> readResponseBody(body, type), cacheTtl);
     }
 
     private <T> T sendJson(HttpRequest request, TypeReference<T> type, Duration cacheTtl) {
-        if (ApiCachePolicy.isEnabled(cacheTtl) && request.method().equals("GET")) {
-            return responseCache.withRequestLock(request.uri(), () -> sendCachedJson(request, type, cacheTtl));
-        }
-        return sendCachedJson(request, type, Duration.ZERO);
+        return sendJson(request, body -> mapper.readValue(body, type), cacheTtl);
     }
 
-    private <T> T sendCachedJson(HttpRequest request, TypeReference<T> type, Duration cacheTtl) {
+    @FunctionalInterface
+    private interface Decoder<T> {
+        T read(String body) throws IOException;
+    }
+
+    private <T> T sendJson(HttpRequest request, Decoder<T> decoder, Duration cacheTtl) {
+        if (ApiCachePolicy.isEnabled(cacheTtl) && request.method().equals("GET")) {
+            return responseCache.withRequestLock(request.uri(), () -> sendCachedJson(request, decoder, cacheTtl));
+        }
+        return sendCachedJson(request, decoder, Duration.ZERO);
+    }
+
+    private <T> T sendCachedJson(HttpRequest request, Decoder<T> decoder, Duration cacheTtl) {
         if (ApiCachePolicy.isEnabled(cacheTtl)) {
             Optional<String> cached = responseCache.getFresh(request.uri(), cacheTtl);
             if (cached.isPresent()) {
                 try {
-                    return mapper.readValue(cached.get(), type);
+                    return decoder.read(cached.get());
                 } catch (IOException ex) {
                     responseCache.invalidate(request.uri());
                 }
@@ -195,31 +158,29 @@ final class ModtaleApiTransport {
         try {
             LOG.info(request.method() + " " + LogSanitizer.uri(request.uri()));
             Instant started = Instant.now();
-            retryAt.values().removeIf(deadline -> deadline <= System.currentTimeMillis());
-            if (ApiCachePolicy.isEnabled(cacheTtl)
-                    && retryAt.getOrDefault(request.uri(), 0L) > System.currentTimeMillis()) {
+            if (rateLimits.remainingMillis(request.uri()) > 0) {
                 throw new ModtaleApiException("API requests are temporarily rate limited. Please try again shortly.", 429, null);
             }
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() == 429) {
-                retryAt.put(request.uri(), retryDeadline(response));
+                rateLimits.record(request.uri(), response.headers());
             }
             logResponse(request, response.statusCode(), response.body(), started);
             ensureSuccess(response.statusCode(), request.uri().toString(), response.body());
-            T result = mapper.readValue(response.body(), type);
+            T result = decoder.read(response.body());
             if (ApiCachePolicy.isEnabled(cacheTtl)) {
                 responseCache.put(request.uri(), response.body());
             }
             return result;
         } catch (ModtaleApiException ex) {
             if (ex.statusCode() == 429 || ex.statusCode() >= 500) {
-                Optional<T> stale = readStaleFallback(request, type, cacheTtl);
+                Optional<T> stale = readStaleFallback(request, decoder, cacheTtl);
                 if (stale.isPresent()) return stale.get();
             }
             throw ex;
         } catch (IOException ex) {
             LOG.warn("I/O failure reading " + request.method() + " " + LogSanitizer.uri(request.uri()), ex);
-            Optional<T> stale = readStaleFallback(request, type, cacheTtl);
+            Optional<T> stale = readStaleFallback(request, decoder, cacheTtl);
             if (stale.isPresent()) {
                 LOG.warn("Using stale cached response for " + LogSanitizer.uri(request.uri()));
                 return stale.get();
@@ -228,28 +189,8 @@ final class ModtaleApiTransport {
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             LOG.warn("Interrupted while reading " + request.method() + " " + LogSanitizer.uri(request.uri()), ex);
-            Optional<T> stale = readStaleFallback(request, type, cacheTtl);
-            if (stale.isPresent()) {
-                LOG.warn("Using stale cached response for " + LogSanitizer.uri(request.uri()));
-                return stale.get();
-            }
             throw new ModtaleApiException("API request was interrupted.", ex);
         }
-    }
-
-    private static long retryDeadline(HttpResponse<?> response) {
-        long now = System.currentTimeMillis();
-        String value = response.headers().firstValue("Retry-After").orElse("");
-        try {
-            long seconds = Long.parseLong(value);
-            if (seconds > 0) return Math.addExact(now, Math.multiplyExact(seconds, 1000));
-        } catch (NumberFormatException | ArithmeticException ignored) { }
-        try {
-            long date = java.time.ZonedDateTime.parse(value, java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME)
-                    .toInstant().toEpochMilli();
-            if (date > now) return date;
-        } catch (java.time.DateTimeException ignored) { }
-        return now + 60_000;
     }
 
     private <T> T readResponseBody(String body, Class<T> type) throws IOException {
@@ -261,7 +202,7 @@ final class ModtaleApiTransport {
         return mapper.readValue(body, type);
     }
 
-    private <T> Optional<T> readStaleFallback(HttpRequest request, Class<T> type, Duration cacheTtl) {
+    private <T> Optional<T> readStaleFallback(HttpRequest request, Decoder<T> decoder, Duration cacheTtl) {
         if (!ApiCachePolicy.isEnabled(cacheTtl)) {
             return Optional.empty();
         }
@@ -270,23 +211,7 @@ final class ModtaleApiTransport {
             return Optional.empty();
         }
         try {
-            return Optional.of(mapper.readValue(cached.get(), type));
-        } catch (IOException ex) {
-            responseCache.invalidate(request.uri());
-            return Optional.empty();
-        }
-    }
-
-    private <T> Optional<T> readStaleFallback(HttpRequest request, TypeReference<T> type, Duration cacheTtl) {
-        if (!ApiCachePolicy.isEnabled(cacheTtl)) {
-            return Optional.empty();
-        }
-        Optional<String> cached = responseCache.getStaleFallback(request.uri());
-        if (cached.isEmpty()) {
-            return Optional.empty();
-        }
-        try {
-            return Optional.of(mapper.readValue(cached.get(), type));
+            return Optional.ofNullable(decoder.read(cached.get()));
         } catch (IOException ex) {
             responseCache.invalidate(request.uri());
             return Optional.empty();
@@ -331,7 +256,7 @@ final class ModtaleApiTransport {
         if (status < 200 || status >= 300) {
             String safeTarget = LogSanitizer.url(target);
             LOG.warn("HTTP " + status + " for " + safeTarget);
-            throw new ModtaleApiException("Modtale API returned HTTP " + status + " for " + safeTarget, status, null);
+            throw new ModtaleApiException("API returned HTTP " + status + " for " + safeTarget, status, null);
         }
     }
 
@@ -343,7 +268,7 @@ final class ModtaleApiTransport {
         if (serverMessage == null || serverMessage.isBlank()) {
             String safeTarget = LogSanitizer.url(target);
             LOG.warn("HTTP " + status + " for " + safeTarget);
-            throw new ModtaleApiException("Modtale API returned HTTP " + status + " for " + safeTarget, status, null);
+            throw new ModtaleApiException(providerName + " API returned HTTP " + status + " for " + safeTarget, status, null);
         }
         throw new ModtaleApiException(serverMessage, status, null);
     }

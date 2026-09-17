@@ -28,7 +28,7 @@ class ApiResponseCachingTest {
         HttpServer server = server(requests, new AtomicInteger(200));
         try {
             URI uri = uri(server, "/data");
-            var transport = new ModtaleApiTransport(HttpClient.newHttpClient(), new ApiResponseCache(temp));
+            var transport = new JsonApiTransport(HttpClient.newHttpClient(), new ApiResponseCache(temp));
             try (var executor = Executors.newFixedThreadPool(8)) {
                 var calls = new ArrayList<Future<?>>();
                 for (int i = 0; i < 16; i++) {
@@ -54,7 +54,7 @@ class ApiResponseCachingTest {
             URI uri = uri(server, "/data");
             var cache = new ApiResponseCache(temp);
             cache.put(uri, "{\"name\":\"cached\"}");
-            var transport = new ModtaleApiTransport(HttpClient.newHttpClient(), cache);
+            var transport = new JsonApiTransport(HttpClient.newHttpClient(), cache);
             for (int i = 0; i < 3; i++) {
                 assertEquals("cached", transport.get(uri, Map.class, Duration.ofNanos(1)).get("name"));
             }
@@ -73,11 +73,39 @@ class ApiResponseCachingTest {
             URI uri = uri(server, "/data");
             var cache = new ApiResponseCache(temp);
             cache.put(uri, "{\"name\":\"cached\"}");
-            var transport = new ModtaleApiTransport(HttpClient.newHttpClient(), cache);
+            var transport = new JsonApiTransport(HttpClient.newHttpClient(), cache);
             assertEquals("cached", transport.get(uri, new TypeReference<Map<String, String>>() {}, Duration.ofNanos(1)).get("name"));
             status.set(401);
             assertThrows(ModtaleApiException.class, () -> transport.get(uri, Map.class, Duration.ofNanos(1)));
         } finally { server.stop(0); }
+    }
+
+    @Test
+    void uncachedReadsAndWritesRespectCooldownEvenAfterClearingCache() throws Exception {
+        AtomicInteger requests = new AtomicInteger();
+        HttpServer server = server(requests, new AtomicInteger(429));
+        try {
+            URI uri = uri(server, "/data");
+            var transport = new JsonApiTransport(HttpClient.newHttpClient(), new ApiResponseCache(temp));
+            assertEquals(429, assertThrows(ModtaleApiException.class,
+                    () -> transport.get(uri, Map.class, Duration.ZERO)).statusCode());
+            transport.clearResponseCache();
+            assertEquals(429, assertThrows(ModtaleApiException.class,
+                    () -> transport.get(uri, new TypeReference<Map<String, String>>() {}, Duration.ZERO)).statusCode());
+            assertEquals(429, assertThrows(ModtaleApiException.class,
+                    () -> transport.post(uri, Map.of("value", "new"), Map.class)).statusCode());
+            assertEquals(1, requests.get());
+        } finally { server.stop(0); }
+    }
+
+    @Test
+    void diskCacheKeepsOriginalAgeAcrossInstances() {
+        URI uri = URI.create("https://example.test/data");
+        var writtenAt = java.time.Instant.parse("2026-09-16T00:00:00Z");
+        new ApiResponseCache(temp, java.time.Clock.fixed(writtenAt, java.time.ZoneOffset.UTC)).put(uri, "body");
+        var cache = new ApiResponseCache(temp, java.time.Clock.fixed(writtenAt.plusSeconds(60), java.time.ZoneOffset.UTC));
+        assertTrue(cache.getFresh(uri, Duration.ofSeconds(60)).isEmpty());
+        assertEquals("body", cache.getStaleFallback(uri).orElseThrow());
     }
 
     private static HttpServer server(AtomicInteger requests, AtomicInteger status) throws Exception {

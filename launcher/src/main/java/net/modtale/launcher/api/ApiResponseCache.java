@@ -4,51 +4,48 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
-import net.modtale.launcher.io.AtomicJsonFile;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
-
-
 import java.util.stream.Stream;
 import net.modtale.launcher.cache.LauncherCachePaths;
+import net.modtale.launcher.http.ResponseCache;
+import net.modtale.launcher.io.AtomicJsonFile;
 
 public final class ApiResponseCache {
 
     private static final Duration STALE_FALLBACK_TTL = Duration.ofDays(7);
 
-    private final Object[] requestLocks = java.util.stream.IntStream.range(0, 64)
-            .mapToObj(i -> new Object()).toArray();
-
-    <T> T withRequestLock(URI uri, java.util.function.Supplier<T> request) {
-        synchronized (requestLocks[Math.floorMod(uri.hashCode(), requestLocks.length)]) {
-            return request.get();
-        }
-    }
-
     private final Path cacheDirectory;
     private final ObjectMapper mapper;
-    private final java.util.Map<String, CacheEntry> memory = java.util.Collections.synchronizedMap(
-            new java.util.LinkedHashMap<>(128, 0.75f, true) {
-                @Override protected boolean removeEldestEntry(java.util.Map.Entry<String, CacheEntry> entry) {
-                    return size() > 1024;
-                }
-            });
+    private final Clock clock;
+    private final ResponseCache<URI, String> memory;
+
+    <T> T withRequestLock(URI uri, java.util.function.Supplier<T> request) {
+        return memory.withRequestLock(uri, request);
+    }
 
     public ApiResponseCache() {
         this(LauncherCachePaths.cacheDirectory("api"));
     }
 
     public ApiResponseCache(Path cacheDirectory) {
+        this(cacheDirectory, Clock.systemUTC());
+    }
+
+    public ApiResponseCache(Path cacheDirectory, Clock clock) {
+        this.clock = clock;
+        this.memory = new ResponseCache<>(1024, clock);
         this.cacheDirectory = cacheDirectory;
         this.mapper = new ObjectMapper()
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -66,9 +63,8 @@ public final class ApiResponseCache {
         if (body == null) {
             return;
         }
-        String key = uri.toString();
-        CacheEntry entry = new CacheEntry(body, Instant.now());
-        memory.put(key, entry);
+        CacheEntry entry = new CacheEntry(body, clock.instant());
+        memory.put(uri, body, entry.writtenAt());
         if (cacheDirectory == null) return;
         try {
             AtomicJsonFile.write(cacheFile(uri), mapper.writer(), CachedBody.from(entry));
@@ -78,7 +74,7 @@ public final class ApiResponseCache {
     }
 
     void invalidate(URI uri) {
-        memory.remove(uri.toString());
+        memory.invalidate(uri);
         if (cacheDirectory == null) return;
         try {
             Files.deleteIfExists(cacheFile(uri));
@@ -110,15 +106,10 @@ public final class ApiResponseCache {
             return Optional.empty();
         }
 
-        String key = uri.toString();
-        CacheEntry memoryEntry = memory.get(key);
-        if (memoryEntry != null) {
-            return memoryEntry.isFresh(ttl) ? Optional.of(memoryEntry.body()) : Optional.empty();
-        }
-
-        Optional<CacheEntry> diskEntry = readDisk(uri);
-        diskEntry.ifPresent(entry -> memory.put(key, entry));
-        return diskEntry.filter(entry -> entry.isFresh(ttl)).map(CacheEntry::body);
+        Optional<String> cached = memory.get(uri, ttl);
+        if (cached.isPresent() || memory.contains(uri)) return cached;
+        readDisk(uri).ifPresent(entry -> memory.put(uri, entry.body(), entry.writtenAt()));
+        return memory.get(uri, ttl);
     }
 
     private Optional<CacheEntry> readDisk(URI uri) {
@@ -154,12 +145,7 @@ public final class ApiResponseCache {
         }
     }
 
-    private record CacheEntry(String body, Instant writtenAt) {
-
-        boolean isFresh(Duration ttl) {
-            return writtenAt != null && writtenAt.plus(ttl).isAfter(Instant.now());
-        }
-    }
+    private record CacheEntry(String body, Instant writtenAt) { }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record CachedBody(long writtenAtEpochMilli, String body) {
