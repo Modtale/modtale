@@ -99,7 +99,10 @@ class LauncherWardrobeUiTest {
                         new Label(), new Label(), () -> "Fixture ready");
                 var preview = new WardrobePreview(executor, false);
                 var controller = new LauncherWardrobeController(gateway, store, () -> { var settings = new LauncherSettings(); settings.setHytaleGamePath(directory.resolve("no-game").toString()); return settings; },
-                        feedback, executor, preview, item -> thumbnails.get(item.id()).toUri().toString(), query -> gateway.skins);
+                        feedback, executor, preview, item -> thumbnails.get(item.id()).toUri().toString(), new net.modtale.launcher.wardrobe.PopularSkinClient() {
+                            @Override public Page page(int page) { return new Page(gateway.skins, false); }
+                            @Override public String thumbnail(String hash) { return thumbnails.get(UUID.fromString(hash)).toUri().toString(); }
+                        });
                 var scroll = new ScrollPane(controller.view());
                 scroll.setFitToWidth(true);
                 scroll.setStyle("-fx-background: #0B1120; -fx-background-color: #0B1120; -fx-padding: 24;");
@@ -112,7 +115,7 @@ class LauncherWardrobeUiTest {
                 stage.setTitle("Wardrobe fictional fixtures — no connected account");
                 stage.setScene(scene);
                 stage.show();
-                button(controller.view(), "Local outfits").fire();
+                button(controller.view(), "Popular skins").fire();
                 controller.refresh();
                 return new Harness(controller, stage, scroll);
             });
@@ -173,7 +176,7 @@ class LauncherWardrobeUiTest {
                 click(harness, "Preview Fixture Ember Favorite");
                 awaitPreview(harness);
                 capturePair(harness, output, "saved");
-                click(harness, "Local outfits");
+                click(harness, "Popular skins");
                 await("return to skin browser", () -> cards(harness).size() == 3);
                 assertNamedBrowser(harness);
                 click(harness, "Preview Fixture Ember Scout");

@@ -25,10 +25,14 @@ import static net.modtale.launcher.ui.common.LauncherUi.*;
 
 /** Native wardrobe. Network work never blocks the application thread. */
 public final class LauncherWardrobeController implements AutoCloseable {
-    private enum Tab { CUSTOMIZE, SKINS, SAVED }
+    private enum Tab { CUSTOMIZE, POPULAR, SAVED }
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final PseudoClass SELECTED = PseudoClass.getPseudoClass("selected");
-    private final java.util.function.Function<String, List<WardrobeItem>> discovery;
+    private final PopularSkinClient popular;
+    private long selectionRequest;
+    private boolean resolvingPopular;
+    private final HBox searchRow = new HBox(10);
+    private final Label feedCredit = label("Popular skins by HyTags · Images by Hyvatar", "wardrobe-muted");
     private final WardrobeApiClient api;
     private final WardrobeStore store;
     private final Supplier<LauncherSettings> settings;
@@ -64,17 +68,14 @@ public final class LauncherWardrobeController implements AutoCloseable {
     private boolean loaded, busy, applying, disposed;
     public LauncherWardrobeController(WardrobeApiClient api, WardrobeStore store,
             Supplier<LauncherSettings> settings, LauncherFeedback feedback, Executor executor) {
-        this(api, store, settings, feedback, executor, new WardrobePreview(executor), LauncherWardrobeController::thumbnail, query -> {
-            try { return LocalSkinLibrary.discover(LocalSkinLibrary.assets(settings.get()), store.items(), query); }
-            catch (java.io.IOException ex) { throw new java.io.UncheckedIOException(ex); }
-        });
+        this(api, store, settings, feedback, executor, new WardrobePreview(executor), LauncherWardrobeController::thumbnail, new PopularSkinClient());
     }
 
     LauncherWardrobeController(WardrobeApiClient api, WardrobeStore store,
             Supplier<LauncherSettings> settings, LauncherFeedback feedback, Executor executor,
             WardrobePreview preview, java.util.function.Function<WardrobeItem, String> thumbnailResolver,
-            java.util.function.Function<String, List<WardrobeItem>> discovery) {
-        this.discovery = discovery;
+            PopularSkinClient popular) {
+        this.popular = popular;
         this.api = api; this.store = store; this.settings = settings; this.feedback = feedback;
         this.executor = executor; this.preview = preview; this.thumbnailResolver = thumbnailResolver;
         this.editor = new CosmeticEditorController(api, store, settings, feedback, executor);
@@ -103,7 +104,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
         root.setMinWidth(0);
         HBox tabBar = new HBox(6); tabBar.getStyleClass().add("wardrobe-tabs");
         ToggleGroup group = new ToggleGroup();
-        String[] names = {"Customize", "Local outfits", "Saved looks"};
+        String[] names = {"Customize", "Popular skins", "Saved looks"};
         LauncherIcons.Glyph[] icons = {LauncherIcons.Glyph.PALETTE, LauncherIcons.Glyph.GRID,
                 LauncherIcons.Glyph.HEART};
         for (Tab value : Tab.values()) {
@@ -113,14 +114,19 @@ public final class LauncherWardrobeController implements AutoCloseable {
             tabs.put(value, button); tabBar.getChildren().add(button);
         }
         tabs.get(tab).setSelected(true);
-        search.setPromptText("Search local outfits"); search.getStyleClass().add("wardrobe-search");
+        search.setPromptText("Search names and collections"); search.getStyleClass().add("wardrobe-search");
         search.setOnAction(e -> { page = 1; totalPages = 1; load(); }); HBox.setHgrow(search, Priority.ALWAYS);
         Button lookup = iconButton("Search", LauncherIcons.Glyph.SEARCH, () -> { page = 1; totalPages = 1; load(); });
         filter.setId("wardrobe-saved-filter"); filter.setVisible(false); filter.setManaged(false);
         filter.getStyleClass().add("wardrobe-filter"); filter.setOnAction(e -> { page = 1; totalPages = 1; load(); });
         Button importLook = secondaryButton("Import outfit"); importLook.setOnAction(e -> importOutfit());
         Button exportLook = secondaryButton("Export outfit"); exportLook.setOnAction(e -> exportOutfit());
-        HBox searchRow = new HBox(10, search, lookup, filter);
+        searchRow.getChildren().addAll(search, lookup, filter);
+        feedCredit.setVisible(false); feedCredit.setManaged(false);
+        Button refreshFeed = secondaryButton("Retry popular feed");
+        refreshFeed.setOnAction(e -> { if (tab == Tab.POPULAR) load(); });
+        refreshFeed.visibleProperty().bind(feedCredit.visibleProperty());
+        refreshFeed.managedProperty().bind(refreshFeed.visibleProperty());
         FlowPane fileActions = new FlowPane(10, 6, importLook, exportLook);
         fileActions.getChildren().add(label("Outfits stay on this device. Share by exporting a file.", "wardrobe-muted"));
         cards.setId("wardrobe-cards"); cards.setMinWidth(0); cards.setHgap(14); cards.setVgap(14);
@@ -133,7 +139,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
             if (loaded && tab != Tab.CUSTOMIZE) resizeReload.playFromStart();
         });
         pagination.setId("wardrobe-pagination");
-        catalog.getChildren().addAll(searchRow, fileActions, status, cards, pagination);
+        catalog.getChildren().addAll(searchRow, feedCredit, refreshFeed, fileActions, status, cards, pagination);
         catalog.setMinWidth(0); HBox.setHgrow(catalog, Priority.ALWAYS);
         status.managedProperty().bind(status.visibleProperty()); status.setVisible(false);
         inspector.getStyleClass().add("wardrobe-inspector"); inspector.setPrefWidth(350); inspector.setMinWidth(290);
@@ -146,7 +152,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
         apply.setMaxWidth(Double.MAX_VALUE); apply.setOnAction(e -> applySelection());
         save.setMaxWidth(Double.MAX_VALUE); save.setOnAction(e -> saveSelection());
         Button customize = iconButton("Customize look", LauncherIcons.Glyph.PALETTE, () -> {
-            if (selected == null) return;
+            if (selected == null || resolvingPopular) return;
             WardrobeItem item = selected;
             if (item.kind() == WardrobeItem.Kind.CAPE) {
                 editor.editCape(payload(item).path("cape").asText());
@@ -171,6 +177,10 @@ public final class LauncherWardrobeController implements AutoCloseable {
     }
 
     private void selectTab(Tab value) {
+        selectionRequest++; resolvingPopular = false;
+        if (tab == Tab.POPULAR || value == Tab.POPULAR) { selected = null; preview.clear(); selectedName.setText(""); selectedDetail.setText(""); }
+        feedCredit.setVisible(value == Tab.POPULAR); feedCredit.setManaged(value == Tab.POPULAR);
+        searchRow.setVisible(value != Tab.POPULAR); searchRow.setManaged(value != Tab.POPULAR);
         request++; tab = value; page = 1; totalPages = 1; search.clear();
         if (selected != null) {
             if (value == Tab.SAVED) selected = store.items().stream()
@@ -189,7 +199,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
         filter.setVisible(value == Tab.SAVED); filter.setManaged(value == Tab.SAVED);
         filter.getSelectionModel().selectFirst();
         filter.setOnAction(e -> { page = 1; totalPages = 1; load(); });
-        search.setPromptText(value == Tab.SAVED ? "Search names and collections" : "Search local outfits");
+        search.setPromptText("Search names and collections");
         load();
     }
 
@@ -202,13 +212,13 @@ public final class LauncherWardrobeController implements AutoCloseable {
         String query = search.getText().trim(); String ordering = filter.getValue();
         busy = true; setStatus("Loading looks…"); updateSelectionActions();
         CompletableFuture.supplyAsync(() -> {
-            if (requestedTab == Tab.SAVED) return pageItems(savedLooks(query, ordering), requestedPage, pageSize);
-            return pageItems(discovery.apply(query), requestedPage, pageSize);
+            if (requestedTab == Tab.POPULAR) return popularPage(requestedPage, pageSize);
+            return pageItems(savedLooks(query, ordering), requestedPage, pageSize);
         }, executor).whenComplete((items, error) -> Platform.runLater(() -> {
             if (disposed || generation != request) return;
             busy = false;
-            if (error != null) { totalPages = Math.max(1, page); entries = List.of(); renderCards(); setStatus(message(error) + "  Try Search again."); }
-            else { entries = items.items(); totalPages = requestedTab == Tab.SKINS && items.hasNext()
+            if (error != null) { totalPages = Math.max(1, page); entries = List.of(); renderCards(); setStatus(message(error) + (requestedTab == Tab.POPULAR ? "  Retry the popular feed." : "  Try Search again.")); }
+            else { entries = items.items(); totalPages = requestedTab == Tab.POPULAR && items.hasNext()
                     ? Math.max(totalPages, items.totalPages()) : items.totalPages(); setStatus(""); renderCards(); if (selected == null && !entries.isEmpty()) select(entries.getFirst()); }
             updateSelectionActions();
         }));
@@ -247,6 +257,19 @@ public final class LauncherWardrobeController implements AutoCloseable {
     }
 
     private record CardPage(List<WardrobeItem> items, boolean hasNext, int totalPages) {}
+
+    private CardPage popularPage(int page, int size) {
+        int offset = (page - 1) * size, sourcePage = offset / 20 + 1, skip = offset % 20;
+        List<WardrobeItem> items = new ArrayList<>();
+        while (items.size() <= size) {
+            var batch = popular.page(sourcePage++);
+            for (int i = skip; i < batch.items().size() && items.size() <= size; i++) items.add(batch.items().get(i));
+            if (!batch.hasNext()) break;
+            skip = 0;
+        }
+        boolean more = items.size() > size;
+        return new CardPage(List.copyOf(items.subList(0, Math.min(size, items.size()))), more, page + (more ? 1 : 0));
+    }
 
     private static CardPage pageItems(List<WardrobeItem> items, int page, int size) {
         int from = Math.min(items.size(), (page - 1) * size);
@@ -296,7 +319,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
         WardrobeItem item = tab == Tab.SAVED
                 ? store.items().stream().filter(saved -> saved.id().equals(entry.id())).findFirst().orElse(entry) : entry;
         ImageView image = new ImageView(); image.setFitHeight(150); image.setFitWidth(158); image.setPreserveRatio(true);
-        String url = thumbnailResolver.apply(item);
+        String url = tab == Tab.POPULAR ? popular.thumbnail(payload(item).path("skinId").asText()) : thumbnailResolver.apply(item);
         if (!url.isBlank()) image.setImage(new Image(url, 190, 190, true, true, true));
         Label fallback = label(item.kind() == WardrobeItem.Kind.CAPE ? "CAPE" : "SKIN", "wardrobe-card-fallback");
         if (image.getImage() != null) fallback.visibleProperty().bind(image.getImage().errorProperty().or(image.getImage().progressProperty().lessThan(1)));
@@ -334,6 +357,20 @@ public final class LauncherWardrobeController implements AutoCloseable {
     }
 
     private void select(WardrobeItem item) {
+        long ticket = ++selectionRequest;
+        resolvingPopular = false;
+        if (tab == Tab.POPULAR && !payload(item).path("skin").isObject()) {
+            selected = item; resolvingPopular = true; preview.clear(); selectedDetail.setText("Loading popular outfit…");
+            updateSelectionActions();
+            CompletableFuture.supplyAsync(() -> popular.download(payload(item).path("skinId").asText()), executor)
+                    .whenComplete((downloaded, error) -> Platform.runLater(() -> {
+                        if (disposed || ticket != selectionRequest || tab != Tab.POPULAR) return;
+                        resolvingPopular = false;
+                        if (error == null) select(downloaded);
+                        else { selected = null; selectedDetail.setText(message(error)); updateSelectionActions(); }
+                    }));
+            return;
+        }
         selected = item; previewProfile = activeProfile(); selectedName.setText(displayedLookName(item));
         selectedDetail.setText("");
         JsonNode payload = payload(item);
@@ -364,15 +401,15 @@ public final class LauncherWardrobeController implements AutoCloseable {
         HytaleAuthSession session = settings.get().getHytaleAuthSession();
         String username = session == null ? "" : session.getUsername();
         apply.setText(applying ? "Applying…" : username.isBlank() ? "Apply" : "Apply to " + username);
-        apply.setDisable(selected == null || session == null || applying);
+        apply.setDisable(selected == null || resolvingPopular || session == null || applying);
         apply.setTooltip(new Tooltip(username.isBlank() ? "Hytale account unavailable." : "Apply to " + username + ". The previous look is saved locally."));
-        save.setDisable(selected == null || applying);
+        save.setDisable(selected == null || resolvingPopular || applying);
         save.setText(selected != null && store.items().stream().anyMatch(i -> i.id().equals(selected.id())) ? "Edit saved look" : "Save look");
         updatePagination();
     }
 
     private void applySelection() {
-        if (selected == null || applying) return;
+        if (selected == null || resolvingPopular || applying) return;
         WardrobeItem item = selected; LauncherSettings current = settings.get();
         HytaleAuthSession session = current.getHytaleAuthSession(); if (session == null) return;
         String target = session.getUuid(); String username = session.getUsername();
@@ -393,7 +430,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
     }
 
     private void saveSelection() {
-        if (selected == null) return;
+        if (selected == null || resolvingPopular) return;
         WardrobeItem item = store.items().stream().filter(saved -> saved.id().equals(selected.id())).findFirst().orElse(selected);
         Dialog<ButtonType> dialog = new Dialog<>(); dialog.setTitle("Save look");
         dialog.getDialogPane().getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
