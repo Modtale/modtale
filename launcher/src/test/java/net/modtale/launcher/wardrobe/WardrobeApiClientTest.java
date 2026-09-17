@@ -29,6 +29,7 @@ class WardrobeApiClientTest {
     private Runnable duringSessionRefresh;
     private Runnable duringRejectedSessionRenewal;
     private int renewals;
+    private Runnable afterWrite;
 
     @BeforeEach void start() throws Exception {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -40,7 +41,9 @@ class WardrobeApiClientTest {
             bodies.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             if ((path.startsWith("/player-skins?") || path.equals("/player-skins")) && afterSlots != null) afterSlots.run();
             headers.add(exchange.getRequestHeaders().getFirst("Authorization"));
-            Reply reply = replies.getOrDefault(path, new Reply(404, "application/json", "{}"));
+            Reply reply = replies.getOrDefault(exchange.getRequestMethod() + " " + path,
+                    replies.getOrDefault(path, new Reply(404, "application/json", "{}")));
+            if (!exchange.getRequestMethod().equals("GET") && afterWrite != null) afterWrite.run();
             byte[] bytes = reply.body.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", reply.type);
             exchange.sendResponseHeaders(reply.status, bytes.length);
@@ -218,6 +221,140 @@ class WardrobeApiClientTest {
         assertTrue(requests.isEmpty());
         assertEquals(0, tokenCalls);
     }
+    @Test void noActiveSlotLoadsInstalledDefaultWithoutWriting(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+        LauncherSettings settings = defaultAssets(directory);
+        for (String active : List.of("null", "\"\"")) {
+            json("/player-skins", "{\"activeSkin\":" + active + ",\"maxSkins\":5,\"skins\":[]}");
+            var look = api.currentSkin(settings);
+            var payload = new ObjectMapper().readTree(look.payload());
+            assertEquals(ID, payload.path("playerUuid").asText());
+            assertEquals(new CosmeticCatalogClient(directory.resolve("Assets.zip")).defaultSkin(), payload.path("skin"));
+            assertEquals(look, api.hydrate(look));
+        }
+        assertEquals(List.of("GET", "GET"), methods);
+    }
+
+    @Test void firstSkinIsCreatedAndActivatedWithoutInstalledAssets() throws Exception {
+        noActiveSlots(5);
+        afterWrite = () -> {
+            if (methods.getLast().equals("POST")) createdSlots(bodies.getLast());
+        };
+        api.apply(newLook(), settings());
+        assertEquals(List.of("GET", "POST", "GET", "PUT"), methods);
+        assertEquals(List.of("/player-skins", "/player-skins", "/player-skins", "/player-skins/active"), requests);
+        assertEquals("{\"skinId\":\"" + SLOT + "\"}", bodies.getLast());
+        assertTrue(headers.stream().allMatch("Bearer official-session"::equals));
+        assertEquals("Default.01", new ObjectMapper().readTree(new ObjectMapper().readTree(bodies.get(1)).path("skinData").asText())
+                .path("bodyCharacteristic").asText());
+    }
+
+    @Test void firstCapeUsesDefaultSkin(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+        LauncherSettings settings = defaultAssets(directory);
+        noActiveSlots(5);
+        afterWrite = () -> { if (methods.getLast().equals("POST")) createdSlots(bodies.getLast()); };
+        api.apply(new WardrobeItem(UUID.randomUUID(), WardrobeItem.Kind.CAPE, "Cape", false, "", "{\"cape\":\"Cape.Green\"}"), settings);
+        var expected = new CosmeticCatalogClient(directory.resolve("Assets.zip")).defaultSkin().put("cape", "Cape.Green");
+        assertEquals(expected, new ObjectMapper().readTree(new ObjectMapper().readTree(bodies.get(1)).path("skinData").asText()));
+        assertEquals(List.of("GET", "POST", "GET", "PUT"), methods);
+    }
+
+    @Test void inactiveSavedSlotsArePreservedWhenApplying() throws Exception {
+        noActiveSlots(5);
+        var mapper = new ObjectMapper();
+        var initial = mapper.readTree(replies.get("/player-skins").body());
+        var saved = ((com.fasterxml.jackson.databind.node.ArrayNode) initial.path("skins")).addObject()
+                .put("id", OTHER_SLOT).put("name", "Saved outfit")
+                .put("skinData", "{\"bodyCharacteristic\":\"Original\"}");
+        json("/player-skins", initial.toString());
+        afterWrite = () -> {
+            if (methods.getLast().equals("POST")) {
+                createdSlots(bodies.getLast());
+                try {
+                    var refreshed = mapper.readTree(replies.get("/player-skins").body());
+                    ((com.fasterxml.jackson.databind.node.ArrayNode) refreshed.path("skins")).add(saved);
+                    json("/player-skins", refreshed.toString());
+                } catch (Exception e) { throw new AssertionError(e); }
+            }
+        };
+        api.apply(newLook(), settings());
+        assertEquals(List.of("GET", "POST", "GET", "PUT"), methods);
+        assertFalse(requests.contains("/player-skins/" + OTHER_SLOT));
+        assertEquals(SLOT, mapper.readTree(bodies.getLast()).path("skinId").asText());
+    }
+
+    @Test void creationFailureIsNotRetriedOrActivated() {
+        noActiveSlots(5);
+        replies.put("POST /player-skins", new Reply(403, "application/json", "{}"));
+        assertThrows(IllegalStateException.class, () -> api.apply(newLook(), settings()));
+        assertEquals(List.of("GET", "POST"), methods);
+        assertEquals(0, renewals);
+    }
+
+    @Test void activationFailureIsReportedWithoutRepeatingCreation() {
+        noActiveSlots(5);
+        afterWrite = () -> { if (methods.getLast().equals("POST")) createdSlots(bodies.getLast()); };
+        replies.put("/player-skins/active", new Reply(403, "application/json", "{}"));
+        assertThrows(IllegalStateException.class, () -> api.apply(newLook(), settings()));
+        assertEquals(List.of("GET", "POST", "GET", "PUT"), methods);
+        assertEquals(0, renewals);
+    }
+
+    @Test void fullSlotsWithoutActiveSkinDoNotOverwriteSavedOutfits() {
+        noActiveSlots(0);
+        assertThrows(IllegalStateException.class, () -> api.apply(newLook(), settings()));
+        assertEquals(List.of("GET"), methods);
+    }
+
+    @Test void profileChangeAfterCreationStopsActivation() {
+        var settings = settings();
+        noActiveSlots(5);
+        afterWrite = settings::removeActiveHytaleAuthSession;
+        assertThrows(IllegalStateException.class, () -> api.apply(newLook(), settings));
+        assertEquals(List.of("GET", "POST"), methods);
+    }
+
+    @Test void unidentifiedCreatedSlotDoesNotActivateAnotherOutfit() {
+        noActiveSlots(5);
+        assertThrows(IllegalStateException.class, () -> api.apply(newLook(), settings()));
+        assertEquals(List.of("GET", "POST", "GET"), methods);
+    }
+
+    private WardrobeItem newLook() {
+        return new WardrobeItem(UUID.randomUUID(), WardrobeItem.Kind.SKIN, "New look", false, "",
+                "{\"skin\":{\"bodyCharacteristic\":\"Default.01\"}}");
+    }
+
+    private void noActiveSlots(int max) {
+        json("/player-skins", "{\"activeSkin\":null,\"maxSkins\":" + max + ",\"skins\":[]}");
+        json("/player-skins/active", "{}");
+    }
+
+    private void createdSlots(String body) {
+        try {
+            var mapper = new ObjectMapper();
+            var root = mapper.createObjectNode().putNull("activeSkin").put("maxSkins", 5);
+            root.putArray("skins").add(((com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(body)).put("id", SLOT));
+            json("/player-skins", root.toString());
+        } catch (Exception e) { throw new AssertionError(e); }
+    }
+
+    private LauncherSettings defaultAssets(java.nio.file.Path directory) throws Exception {
+        Map<String, String> entries = new LinkedHashMap<>();
+        for (var category : CosmeticCatalogClient.categories()) entries.put(CosmeticCatalogClient.assetFile(category.key()), "[]");
+        entries.put("Cosmetics/CharacterCreator/GradientSets.json", "[]");
+        entries.put(CosmeticCatalogClient.assetFile("bodyCharacteristic"), "[{\"Id\":\"Default\",\"IsDefaultAsset\":true}]");
+        try (var zip = new java.util.zip.ZipOutputStream(java.nio.file.Files.newOutputStream(directory.resolve("Assets.zip")))) {
+            for (var entry : entries.entrySet()) {
+                zip.putNextEntry(new java.util.zip.ZipEntry(entry.getKey()));
+                zip.write(entry.getValue().getBytes(StandardCharsets.UTF_8));
+                zip.closeEntry();
+            }
+        }
+        var settings = settings();
+        settings.setHytaleGamePath(directory.toString());
+        return settings;
+    }
+
     private LauncherSettings settings() {
         var settings = new LauncherSettings();
         var session = new net.modtale.launcher.hytale.HytaleAuthSession();

@@ -171,8 +171,8 @@ public class WardrobeApiClient {
     public WardrobeItem currentSkin(LauncherSettings settings) {
         ActiveSkin slot = activeSkin(settings);
         ObjectNode payload = mapper.createObjectNode().put("playerUuid", slot.profileId());
-        payload.set("skin", slot.skin());
-        return item(WardrobeItem.Kind.SKIN, slot.id() + ":" + slot.skin(), slot.name(), payload);
+        payload.set("skin", slot.skin() == null ? defaultSkin(settings) : slot.skin());
+        return item(WardrobeItem.Kind.SKIN, slot.id() + ":" + payload.path("skin"), slot.name(), payload);
     }
 
     public Profile profile(UUID uuid, LauncherSettings settings) {
@@ -206,28 +206,58 @@ public class WardrobeApiClient {
             if (cape == null || (!cape.isNull() && (!cape.isTextual() || cape.asText().isBlank()))) {
                 throw new IllegalArgumentException("Cape item has no cosmetic identifier");
             }
-            ObjectNode updated = slot.skin().deepCopy();
+            ObjectNode updated = slot.skin() == null ? defaultSkin(settings) : slot.skin().deepCopy();
             updated.set("cape", cape);
             definition = updated;
         }
         ObjectNode body = mapper.createObjectNode().put("name", slot.name()).put("skinData", definition.toString());
+        if (!slot.id().isEmpty()) {
+            writeSkin(settings, slot, "PUT", "player-skins/" + encode(slot.id()), body);
+            return;
+        }
+        if (slot.slots().slots().size() >= slot.slots().max()) throw failure("All official outfit slots are occupied");
+        writeSkin(settings, slot, "POST", "player-skins", body);
+        ProfileResponse response = profileJson(settings, expectedProfile, "player-skins");
+        SkinSlots refreshed = parseSlots(response.body());
+        Set<String> previousIds = new LinkedHashSet<>();
+        slot.slots().slots().forEach(previous -> previousIds.add(previous.id()));
+        JsonNode appliedSkin = definition;
+        List<SkinSlot> created = refreshed.slots().stream()
+                .filter(candidate -> !previousIds.contains(candidate.id()) && candidate.name().equals(slot.name())
+                        && readJson(candidate.skinData()).equals(appliedSkin)).toList();
+        if (created.size() != 1) throw failure("Could not identify the newly created official outfit slot");
+        ActiveSkin target = new ActiveSkin(slot.profileId(), created.getFirst().id(), slot.name(),
+                null, response.token(), refreshed);
+        writeSkin(settings, target, "PUT", "player-skins/active",
+                mapper.createObjectNode().put("skinId", target.id()));
+    }
+
+    private void writeSkin(LauncherSettings settings, ActiveSkin slot, String method, String path, JsonNode body) {
         requireSelectedProfile(settings, slot.profileId());
-        HttpRequest request = HttpRequest.newBuilder(official.resolve("player-skins/" + encode(slot.id())))
+        HttpRequest request = HttpRequest.newBuilder(official.resolve(path))
                 .timeout(Duration.ofSeconds(30)).header("Authorization", "Bearer " + slot.token())
                 .header("Content-Type", "application/json").header("Accept", "application/json").header("User-Agent", "ModtaleLauncher/1.0")
-                .PUT(HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8)).build();
+                .method(method, HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8)).build();
         send(request, null, true);
     }
 
-    private record ActiveSkin(String profileId, String id, String name, ObjectNode skin, String token) {}
+    private ObjectNode defaultSkin(LauncherSettings settings) {
+        try {
+            return new CosmeticCatalogClient(LocalSkinLibrary.assets(settings)).defaultSkin();
+        } catch (IOException e) {
+            throw failure("Could not load the default skin from the installed Hytale assets");
+        }
+    }
+
+    private record ActiveSkin(String profileId, String id, String name, ObjectNode skin, String token, SkinSlots slots) {}
 
     private ActiveSkin activeSkin(LauncherSettings settings) {
         UUID profile = selectedProfile(settings);
         ProfileResponse response = profileJson(settings, profile, "player-skins");
         SkinSlots slots = parseSlots(response.body());
-        SkinSlot active = slots.slots().stream().filter(slot -> slot.id().equals(slots.activeId())).findFirst()
-                .orElseThrow(() -> failure("Official account has no active skin slot"));
-        return new ActiveSkin(profile.toString(), active.id(), active.name(), (ObjectNode) readJson(active.skinData()), response.token());
+        SkinSlot active = slots.slots().stream().filter(slot -> slot.id().equals(slots.activeId())).findFirst().orElse(null);
+        if (active == null) return new ActiveSkin(profile.toString(), "", "Default outfit", null, response.token(), slots);
+        return new ActiveSkin(profile.toString(), active.id(), active.name(), (ObjectNode) readJson(active.skinData()), response.token(), slots);
     }
 
     private static void requireSelectedProfile(LauncherSettings settings, String uuid) {
