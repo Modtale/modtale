@@ -132,6 +132,12 @@ class WardrobeApiClientTest {
         json("/profile/uuid/" + ID, profile("11111111-1111-1111-1111-111111111111", "WrongPlayer"));
         assertThrows(IllegalStateException.class, () -> api.profile(UUID.fromString(ID), new LauncherSettings()).username());
     }
+    @Test void profileWithoutSavedSkinReturnsEmptyComposition() throws Exception {
+        var response = new ObjectMapper().createObjectNode().put("uuid", ID).put("username", "Wtrlmn");
+        json("/profile/uuid/" + ID, response.toString());
+        assertEquals("{}", api.profile(UUID.fromString(ID), settings()).skin());
+    }
+
     @Test void publicProfileDecodesSerializedCharacterSkin() throws Exception {
         var mapper = new ObjectMapper();
         var skin = mapper.createObjectNode()

@@ -1368,7 +1368,7 @@ public final class LauncherPlayController {
                         .profile(java.util.UUID.fromString(profileUuid), current);
                 try {
                     var definition = new com.fasterxml.jackson.databind.ObjectMapper().readTree(publicProfile.skin());
-                    if (!definition.isObject() || !definition.has("bodyCharacteristic")) {
+                    if (!definition.isObject() || (!definition.isEmpty() && !definition.has("bodyCharacteristic"))) {
                         throw new IllegalStateException("Public profile has no character skin");
                     }
                     return definition;

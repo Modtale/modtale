@@ -52,6 +52,9 @@ public final class SavedLookThumbnails implements AutoCloseable {
                     catalogAssets = key.assets();
                 }
                 JsonNode composition = key.skin();
+                if (category.equals("face") && composition.isObject() && composition.isEmpty()) {
+                    composition = catalog.defaultSkin();
+                }
                 if (category.equals("cape") && !composition.has("bodyCharacteristic")) {
                     var baseline = catalog.defaultSkin(); baseline.set("cape", composition.path("cape")); composition = baseline;
                 }
