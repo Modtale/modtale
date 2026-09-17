@@ -123,11 +123,9 @@ public final class LauncherWardrobeController implements AutoCloseable {
         Button exportLook = secondaryButton("Export outfit"); exportLook.setOnAction(e -> exportOutfit());
         searchRow.getChildren().addAll(search, lookup, filter);
         feedCredit.setVisible(false); feedCredit.setManaged(false);
-        Button refreshFeed = secondaryButton("Retry popular feed");
-        refreshFeed.setOnAction(e -> { if (tab == Tab.POPULAR) load(); });
-        refreshFeed.visibleProperty().bind(feedCredit.visibleProperty());
-        refreshFeed.managedProperty().bind(refreshFeed.visibleProperty());
         FlowPane fileActions = new FlowPane(10, 6, importLook, exportLook);
+        fileActions.visibleProperty().bind(feedCredit.visibleProperty().not());
+        fileActions.managedProperty().bind(fileActions.visibleProperty());
         fileActions.getChildren().add(label("Outfits stay on this device. Share by exporting a file.", "wardrobe-muted"));
         cards.setId("wardrobe-cards"); cards.setMinWidth(0); cards.setHgap(14); cards.setVgap(14);
         rebuildCardColumns();
@@ -139,7 +137,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
             if (loaded && tab != Tab.CUSTOMIZE) resizeReload.playFromStart();
         });
         pagination.setId("wardrobe-pagination");
-        catalog.getChildren().addAll(searchRow, feedCredit, refreshFeed, fileActions, status, cards, pagination);
+        catalog.getChildren().addAll(searchRow, fileActions, status, cards, pagination, feedCredit);
         catalog.setMinWidth(0); HBox.setHgrow(catalog, Priority.ALWAYS);
         status.managedProperty().bind(status.visibleProperty()); status.setVisible(false);
         inspector.getStyleClass().add("wardrobe-inspector"); inspector.setPrefWidth(350); inspector.setMinWidth(290);
@@ -217,7 +215,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
         }, executor).whenComplete((items, error) -> Platform.runLater(() -> {
             if (disposed || generation != request) return;
             busy = false;
-            if (error != null) { totalPages = Math.max(1, page); entries = List.of(); renderCards(); setStatus(message(error) + (requestedTab == Tab.POPULAR ? "  Retry the popular feed." : "  Try Search again.")); }
+            if (error != null) { totalPages = Math.max(1, page); entries = List.of(); renderCards(); setStatus(message(error) + (requestedTab == Tab.POPULAR ? "  Reopen Popular skins to retry." : "  Try Search again.")); }
             else { entries = items.items(); totalPages = requestedTab == Tab.POPULAR && items.hasNext()
                     ? Math.max(totalPages, items.totalPages()) : items.totalPages(); setStatus(""); renderCards(); if (selected == null && !entries.isEmpty()) select(entries.getFirst()); }
             updateSelectionActions();
