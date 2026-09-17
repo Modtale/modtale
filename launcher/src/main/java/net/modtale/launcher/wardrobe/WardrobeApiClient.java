@@ -257,6 +257,7 @@ public class WardrobeApiClient {
             if (!uuid.toString().equalsIgnoreCase(value)) throw new IllegalArgumentException();
         } catch (IllegalArgumentException e) { throw failure("Profile response has no valid UUID"); }
         JsonNode skin = root.path("skin");
+        if (skin.isTextual() && !skin.asText().isBlank()) skin = readJson(skin.asText());
         return new Profile(uuid, name, skin.isObject() ? skin.toString() : "{}");
     }
 

@@ -132,6 +132,30 @@ class WardrobeApiClientTest {
         json("/profile/uuid/" + ID, profile("11111111-1111-1111-1111-111111111111", "WrongPlayer"));
         assertThrows(IllegalStateException.class, () -> api.profile(UUID.fromString(ID), new LauncherSettings()).username());
     }
+    @Test void publicProfileDecodesSerializedCharacterSkin() throws Exception {
+        var mapper = new ObjectMapper();
+        var skin = mapper.createObjectNode()
+                .put("bodyCharacteristic", "Muscular.01")
+                .put("haircut", "Sideslick.BrownDark")
+                .putNull("cape");
+        var response = mapper.createObjectNode().put("uuid", ID).put("username", "ItsNeil")
+                .put("skin", skin.toString());
+        json("/profile/uuid/" + ID, response.toString());
+        var friend = api.profile(UUID.fromString(ID), settings());
+        assertEquals(skin, mapper.readTree(friend.skin()));
+        assertEquals("Bearer official-session", headers.getFirst());
+
+        json("/profile/uuid/" + ID, mapper.createObjectNode().set("profile", response).toString());
+        assertEquals(skin, mapper.readTree(api.profile(UUID.fromString(ID), settings()).skin()));
+    }
+
+    @Test void malformedSerializedCharacterSkinIsRejected() throws Exception {
+        var response = new ObjectMapper().createObjectNode().put("uuid", ID).put("username", "ItsNeil")
+                .put("skin", "{invalid");
+        json("/profile/uuid/" + ID, response.toString());
+        assertThrows(IllegalStateException.class, () -> api.profile(UUID.fromString(ID), settings()));
+    }
+
     @Test void skinApplyWritesSerializedDefinitionToActiveSlotAndPreservesName() throws Exception {
         slots();
         api.apply(new WardrobeItem(UUID.randomUUID(), WardrobeItem.Kind.SKIN, "Outfit", false, "", "{\"skin\":{\"bodyCharacteristic\":\"Muscular.01\",\"cape\":null}}"), settings());

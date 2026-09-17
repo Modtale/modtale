@@ -726,7 +726,7 @@ public final class LauncherPlayController {
     }
 
     private Node identitySection() {
-        VBox section = sidebarSection("User");
+        VBox section = sidebarSection();
         configureIdentityButton();
         section.getChildren().add(identityButton);
         return section;
@@ -1321,11 +1321,11 @@ public final class LauncherPlayController {
         return avatar;
     }
 
-    private StackPane hytaleProfileAvatar(String username, double size, String styleClass) {
+    private StackPane hytaleProfileAvatar(HytaleProfile profile, double size, String styleClass) {
         StackPane avatar = new StackPane();
         avatar.getStyleClass().add(styleClass);
         sizeSquare(avatar, size);
-        updateHytaleProfileAvatar(avatar, username, size);
+        updateHytaleProfileAvatar(avatar, profile.displayName(), size, profile.uuid());
         return avatar;
     }
 
@@ -1333,7 +1333,7 @@ public final class LauncherPlayController {
         updateHytaleProfileAvatar(avatar, username, size, "");
     }
 
-    private void updateHytaleProfileAvatar(StackPane avatar, String username, double size, String friendUuid) {
+    private void updateHytaleProfileAvatar(StackPane avatar, String username, double size, String profileUuid) {
         updateImageAvatar(avatar, username, size, PROFILE_AVATAR_RADIUS, "");
         ImageView image = new ImageView();
         image.setFitWidth(size);
@@ -1356,20 +1356,20 @@ public final class LauncherPlayController {
         LauncherSettings current = settingsController.settings();
         HytaleAuthSession active = current.getHytaleAuthSession();
         if (active == null) return;
-        boolean ownProfile = friendUuid.isBlank()
-                ? username.equalsIgnoreCase(active.getUsername()) : friendUuid.equalsIgnoreCase(active.getUuid());
-        if (!ownProfile && friendUuid.isBlank()) return;
+        boolean ownProfile = profileUuid.isBlank()
+                ? username.equalsIgnoreCase(active.getUsername()) : profileUuid.equalsIgnoreCase(active.getUuid());
+        if (!ownProfile && profileUuid.isBlank()) return;
         var assets = net.modtale.launcher.wardrobe.LocalSkinLibrary.assets(current);
         if (!java.nio.file.Files.isRegularFile(assets)) return;
         String profile = active.getUuid();
         if (!ownProfile) {
             var skin = CompletableFuture.supplyAsync(() -> {
-                var friend = new net.modtale.launcher.wardrobe.WardrobeApiClient(hytaleAuthService)
-                        .profile(java.util.UUID.fromString(friendUuid), current);
+                var publicProfile = new net.modtale.launcher.wardrobe.WardrobeApiClient(hytaleAuthService)
+                        .profile(java.util.UUID.fromString(profileUuid), current);
                 try {
-                    var definition = new com.fasterxml.jackson.databind.ObjectMapper().readTree(friend.skin());
+                    var definition = new com.fasterxml.jackson.databind.ObjectMapper().readTree(publicProfile.skin());
                     if (!definition.isObject() || !definition.has("bodyCharacteristic")) {
-                        throw new IllegalStateException("Friend profile has no character skin");
+                        throw new IllegalStateException("Public profile has no character skin");
                     }
                     return definition;
                 } catch (java.io.IOException ex) { throw new java.io.UncheckedIOException(ex); }
@@ -1521,7 +1521,7 @@ public final class LauncherPlayController {
         row.getStyleClass().add("play-identity-menu-header");
         row.setAlignment(Pos.CENTER_LEFT);
         HytaleProfile selectedProfile = selectedProfileFor(session);
-        StackPane icon = hytaleProfileAvatar(selectedProfile.displayName(), IDENTITY_MENU_AVATAR_SIZE, "play-identity-menu-avatar");
+        StackPane icon = hytaleProfileAvatar(selectedProfile, IDENTITY_MENU_AVATAR_SIZE, "play-identity-menu-avatar");
 
         VBox copy = new VBox(2);
         Label name = new Label(accountLabel(session));
@@ -1553,7 +1553,7 @@ public final class LauncherPlayController {
             row.getStyleClass().add("selected");
         }
         row.setAlignment(Pos.CENTER_LEFT);
-        StackPane profileAvatar = hytaleProfileAvatar(profile.displayName(), IDENTITY_MENU_AVATAR_SIZE, "play-identity-menu-avatar");
+        StackPane profileAvatar = hytaleProfileAvatar(profile, IDENTITY_MENU_AVATAR_SIZE, "play-identity-menu-avatar");
         if (selected) {
             StackPane badge = new StackPane(LauncherIcons.icon(LauncherIcons.Glyph.CHECK, 8));
             badge.getStyleClass().add("play-identity-menu-avatar-badge");
