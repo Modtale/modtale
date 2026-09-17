@@ -39,6 +39,57 @@ class HytaleAuthServiceTest {
     }
 
     @Test
+    void switchingProfileDiscardsOldTokensAndRequestsSelectedProfile() {
+        FakeHytaleApiClient api = new FakeHytaleApiClient();
+        SettingsStore store = new SettingsStore(tempDir.resolve("switch.json"));
+        HytaleAuthService auth = new HytaleAuthService(api, store);
+        LauncherSettings settings = new LauncherSettings();
+        HytaleAuthSession session = linkedAccount("previous-uuid", true);
+        session.setAccountOwnerId("owner");
+        session.setSessionToken(jwtWithExpiration(Instant.now().plusSeconds(3600)));
+        session.setIdentityToken("previous-identity");
+        session.setSessionProfileId("previous-uuid");
+        settings.setHytaleAuthSession(session);
+        auth.selectProfile(settings, new HytaleProfile("Wtrlmn", "player-uuid", "owner", 0));
+        assertEquals("Wtrlmn", session.getUsername());
+        assertEquals("", session.getSessionToken());
+        assertEquals("", session.getIdentityToken());
+        assertEquals("", store.load().getHytaleAuthSession().getSessionToken());
+        assertEquals("fresh-session-token", auth.freshSessionToken(settings));
+        assertEquals(1, api.createGameSessionCalls);
+        assertEquals("player-uuid", store.load().getHytaleAuthSession().getSessionProfileId());
+    }
+
+    @Test
+    void legacyOrMismatchedCachedSessionIsRefreshed() {
+        for (String binding : List.of("", "previous-uuid")) {
+            FakeHytaleApiClient api = new FakeHytaleApiClient();
+            HytaleAuthService auth = new HytaleAuthService(api, new SettingsStore(tempDir.resolve("legacy.json")));
+            LauncherSettings settings = new LauncherSettings();
+            HytaleAuthSession session = linkedAccount("player-uuid", true);
+            session.setSessionToken(jwtWithExpiration(Instant.now().plusSeconds(3600)));
+            session.setIdentityToken("old-identity");
+            session.setSessionProfileId(binding);
+            settings.setHytaleAuthSession(session);
+            assertEquals("fresh-session-token", auth.freshSessionToken(settings));
+            assertEquals(1, api.createGameSessionCalls);
+        }
+    }
+
+    @Test
+    void profileChangeDuringSessionCreationDoesNotSaveOldProfileTokens() {
+        FakeHytaleApiClient api = new FakeHytaleApiClient();
+        HytaleAuthService auth = new HytaleAuthService(api, new SettingsStore(tempDir.resolve("race.json")));
+        LauncherSettings settings = new LauncherSettings();
+        HytaleAuthSession session = linkedAccount("player-uuid", true);
+        settings.setHytaleAuthSession(session);
+        api.onCreateGameSession = () -> session.setUuid("other-uuid");
+        assertThrows(HytaleApiException.class, () -> auth.freshSessionToken(settings));
+        assertEquals("", session.getSessionToken());
+        assertEquals("", session.getSessionProfileId());
+    }
+
+    @Test
     void freshAccessTokenRefreshesAndPersistsRotationWithoutCreatingGameSession() {
         FakeHytaleApiClient apiClient = new FakeHytaleApiClient();
         SettingsStore store = new SettingsStore(tempDir.resolve("settings.json"));
@@ -164,6 +215,7 @@ class HytaleAuthServiceTest {
         LauncherSettings settings = new LauncherSettings();
         HytaleAuthSession session = linkedAccount("player-uuid", true);
         String rejected = jwtWithExpiration(Instant.now().plusSeconds(3600));
+        session.setSessionProfileId("player-uuid");
         session.setSessionToken(rejected);
         session.setIdentityToken("identity");
         settings.setHytaleAuthSession(session);
@@ -180,6 +232,7 @@ class HytaleAuthServiceTest {
         LauncherSettings settings = new LauncherSettings();
         HytaleAuthSession session = linkedAccount("player-uuid", true);
         String replacement = jwtWithExpiration(Instant.now().plusSeconds(3600));
+        session.setSessionProfileId("player-uuid");
         session.setSessionToken(replacement);
         session.setIdentityToken("identity");
         settings.setHytaleAuthSession(session);
@@ -195,6 +248,7 @@ class HytaleAuthServiceTest {
         LauncherSettings settings = new LauncherSettings();
         HytaleAuthSession session = linkedAccount("player-uuid", true);
         String rejected = jwtWithExpiration(Instant.now().plusSeconds(3600));
+        session.setSessionProfileId("player-uuid");
         session.setSessionToken(rejected);
         session.setIdentityToken("identity");
         settings.setHytaleAuthSession(session);
@@ -215,6 +269,7 @@ class HytaleAuthServiceTest {
         session.setUuid("player-uuid");
         session.setUsername("Player");
         session.setExpiresAt(Instant.now().plusSeconds(600));
+        session.setSessionProfileId("player-uuid");
         session.setSessionToken("expired-session");
         session.setIdentityToken("expired-identity");
         settings.setHytaleAuthSession(session);
@@ -262,6 +317,7 @@ class HytaleAuthServiceTest {
         session.setUuid("player-uuid");
         session.setUsername("Player");
         session.setIdentityToken("cached-identity-token");
+        session.setSessionProfileId("player-uuid");
         session.setSessionToken("cached-session-token");
         settings.setHytaleAuthSession(session);
 
@@ -309,6 +365,7 @@ class HytaleAuthServiceTest {
         session.setUuid("player-uuid");
         session.setUsername("Player");
         session.setIdentityToken("cached-identity-token");
+        session.setSessionProfileId("player-uuid");
         session.setSessionToken(cachedSessionToken);
         settings.setHytaleAuthSession(session);
 
@@ -364,6 +421,7 @@ class HytaleAuthServiceTest {
         session.setUuid("player-uuid");
         session.setUsername("Player");
         session.setIdentityToken("cached-identity-token");
+        session.setSessionProfileId("player-uuid");
         session.setSessionToken(cachedSessionToken);
         settings.setHytaleAuthSession(session);
 

@@ -63,6 +63,7 @@ public class HytaleAuthService {
         session.setProfiles(profiles);
         session.setSessionToken(gameSession.sessionToken());
         session.setIdentityToken(gameSession.identityToken());
+        session.setSessionProfileId(session.getUuid());
         settings.upsertHytaleAuthSession(session);
         settingsStore.save(settings);
         return session;
@@ -311,20 +312,30 @@ public class HytaleAuthService {
         requireLinkedSession(settings, session);
         session.setSessionToken(gameSession.sessionToken());
         session.setIdentityToken(gameSession.identityToken());
+        session.setSessionProfileId(session.getUuid());
         settingsStore.save(settings);
         return session;
     }
 
     private HytaleGameSession createGameSessionWithRefresh(LauncherSettings settings, HytaleAuthSession session) {
+        String profileId = session.getUuid();
+        HytaleGameSession gameSession;
         try {
-            return apiClient.createGameSession(session.getAccessToken(), session.getUuid());
+            gameSession = apiClient.createGameSession(session.getAccessToken(), profileId);
         } catch (HytaleApiException ex) {
             if (!ex.isAuthFailure()) {
                 throw ex;
             }
             HytaleAuthSession refreshed = refresh(settings, session);
-            return apiClient.createGameSession(refreshed.getAccessToken(), refreshed.getUuid());
+            if (!profileId.equals(refreshed.getUuid())) {
+                throw new HytaleApiException("Selected Hytale profile changed while creating its session.");
+            }
+            gameSession = apiClient.createGameSession(refreshed.getAccessToken(), profileId);
         }
+        if (!profileId.equals(session.getUuid())) {
+            throw new HytaleApiException("Selected Hytale profile changed while creating its session.");
+        }
+        return gameSession;
     }
 
     /** Returns a usable OAuth token, persisting refresh-token rotation before returning. */
@@ -426,6 +437,7 @@ public class HytaleAuthService {
         return session != null
                 && session.hasRefreshToken()
                 && session.hasLaunchTokens()
+                && session.getUuid().equals(session.getSessionProfileId())
                 && permitsCachedLaunchSession(failure);
     }
 
@@ -437,6 +449,7 @@ public class HytaleAuthService {
     private static boolean canUseCachedFriendsSession(HytaleAuthSession session) {
         return session != null
                 && session.hasLaunchTokens()
+                && session.getUuid().equals(session.getSessionProfileId())
                 && jwtExpiresAfter(session.getSessionToken(), Instant.now().plusSeconds(60));
     }
 
