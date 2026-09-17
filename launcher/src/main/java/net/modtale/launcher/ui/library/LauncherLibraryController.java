@@ -171,6 +171,12 @@ public final class LauncherLibraryController {
     public Node libraryView() {
         if (libraryView == null) {
             libraryView = buildLibraryView();
+            libraryView.sceneProperty().flatMap(javafx.scene.Scene::windowProperty)
+                    .flatMap(javafx.stage.Window::focusedProperty).subscribe(focused -> {
+                        if (Boolean.TRUE.equals(focused) && libraryView.isVisible()) {
+                            renderLibrary();
+                        }
+                    });
             renderLibrary();
         }
         return libraryView;
@@ -584,7 +590,7 @@ public final class LauncherLibraryController {
     }
 
     private LibraryWorldModel worldModel(HytaleWorld world) {
-        HytaleWorldConfig config = worldManager.loadConfig(world.configPath());
+        HytaleWorldConfig config = worldManager.loadConfig(world.configPath(), installedMods);
         List<LibraryWorldProjectModel> projects = installedProjects.stream()
                 .flatMap(project -> worldProjectModels(project, config).stream())
                 .toList();
@@ -601,7 +607,7 @@ public final class LauncherLibraryController {
     }
 
     private LibraryWorldListItem worldListItem(HytaleWorld world) {
-        HytaleWorldConfig config = worldManager.loadConfig(world.configPath());
+        HytaleWorldConfig config = worldManager.loadConfig(world.configPath(), installedMods);
         int enabledProjects = 0;
         int totalProjects = 0;
         for (InstalledProject project : installedProjects) {
@@ -670,9 +676,7 @@ public final class LauncherLibraryController {
                 manifestIds.add(mod.id());
             }
         }
-        return manifestIds.isEmpty()
-                ? LibraryProjectSupport.projectWorldModIds(installed)
-                : List.copyOf(manifestIds);
+        return List.copyOf(manifestIds);
     }
 
     private Optional<HytaleWorld> selectedWorld() {
@@ -794,7 +798,7 @@ public final class LauncherLibraryController {
         }
         boolean installed = installedMods.stream()
                 .anyMatch(mod -> candidate.equals(mod.id()));
-        if (installed || config.enabledByMod().containsKey(candidate)) {
+        if (installed) {
             return List.of(candidate);
         }
         return List.of();
@@ -1118,7 +1122,7 @@ public final class LauncherLibraryController {
     private List<PostDownloadWorldModal.WorldOption> postDownloadWorldOptions(List<String> modIds) {
         return worlds.stream()
                 .map(world -> {
-                    HytaleWorldConfig config = worldManager.loadConfig(world.configPath());
+                    HytaleWorldConfig config = worldManager.loadConfig(world.configPath(), installedMods);
                     int enabled = enabledCount(config, modIds);
                     return new PostDownloadWorldModal.WorldOption(
                             world,
@@ -1281,10 +1285,14 @@ public final class LauncherLibraryController {
     }
 
     private CreateWorldModListRequest snapshotRequest(HytaleWorld world) {
-        HytaleWorldConfig config = worldManager.loadConfig(world.configPath());
+        List<HytaleInstalledMod> availableMods = worldManager.loadInstalledMods(settingsController.settings());
+        HytaleWorldConfig config = worldManager.loadConfig(world.configPath(), availableMods);
+        Set<String> availableIds = availableMods.stream().map(HytaleInstalledMod::id)
+                .collect(java.util.stream.Collectors.toSet());
         Set<String> enabledModIds = config.enabledByMod().entrySet().stream()
                 .filter(Map.Entry::getValue)
                 .map(Map.Entry::getKey)
+                .filter(availableIds::contains)
                 .filter(id -> id != null && !id.isBlank())
                 .map(String::trim)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
@@ -1292,9 +1300,6 @@ public final class LauncherLibraryController {
             throw new ModtaleApiException(world.name() + " does not have any enabled mods to share.");
         }
 
-        List<HytaleInstalledMod> availableMods = installedMods.isEmpty()
-                ? worldManager.loadInstalledMods(settingsController.settings())
-                : installedMods;
         List<CreateWorldModListRequest.Item> items = LibraryWorldSnapshotMapper.itemsFor(
                 enabledModIds,
                 installedProjects,

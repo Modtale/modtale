@@ -7,8 +7,10 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Collection;
@@ -35,10 +37,11 @@ public final class HytaleWorldManager {
         if (!Files.isDirectory(savesDirectory)) {
             return List.of();
         }
+        List<HytaleInstalledMod> installedMods = loadInstalledMods(settings);
         try (var stream = Files.list(savesDirectory)) {
             return stream
                     .filter(Files::isDirectory)
-                    .map(this::worldFromDirectory)
+                    .map(directory -> worldFromDirectory(directory, installedMods))
                     .sorted(Comparator.comparing(HytaleWorld::name, String.CASE_INSENSITIVE_ORDER))
                     .toList();
         } catch (IOException ex) {
@@ -47,14 +50,24 @@ public final class HytaleWorldManager {
     }
 
     public HytaleWorldConfig loadConfig(Path configPath) {
+        return loadConfig(configPath, List.of());
+    }
+
+    public HytaleWorldConfig loadConfig(Path configPath, List<HytaleInstalledMod> installedMods) {
         ObjectNode root = readConfigRoot(configPath);
+        boolean defaultEnabled = root.path("DefaultModsEnabled").asBoolean(false);
         JsonNode mods = root.get("Mods");
         Map<String, Boolean> enabledByMod = new LinkedHashMap<>();
         if (mods != null && mods.isObject()) {
             mods.properties().forEach(entry -> {
                 JsonNode enabled = entry.getValue().get("Enabled");
-                enabledByMod.put(entry.getKey(), enabled != null && enabled.asBoolean(false));
+                if (enabled != null && enabled.isBoolean()) {
+                    enabledByMod.put(entry.getKey(), enabled.booleanValue());
+                }
             });
+        }
+        for (HytaleInstalledMod mod : installedMods) {
+            enabledByMod.putIfAbsent(mod.id(), defaultEnabled && !mod.disabledByDefault());
         }
         return new HytaleWorldConfig(configPath, enabledByMod);
     }
@@ -76,11 +89,23 @@ public final class HytaleWorldManager {
             ObjectNode mod = objectNode(mods, modId.trim());
             mod.put("Enabled", enabled);
         }
+        Path temporary = null;
         try {
-            Files.createDirectories(configPath.getParent());
-            MAPPER.writeValue(configPath.toFile(), root);
+            Path target = Files.exists(configPath) ? configPath.toRealPath() : configPath.toAbsolutePath();
+            Files.createDirectories(target.getParent());
+            temporary = Files.createTempFile(target.getParent(), "config-", ".tmp");
+            MAPPER.writeValue(temporary.toFile(), root);
+            try {
+                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException ex) {
+                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (IOException ex) {
             throw new ModtaleApiException("Could not update Hytale world config " + configPath, ex);
+        } finally {
+            if (temporary != null) {
+                try { Files.deleteIfExists(temporary); } catch (IOException ignored) { }
+            }
         }
     }
 
@@ -103,11 +128,8 @@ public final class HytaleWorldManager {
     }
 
     public Path savesDirectory(LauncherSettings settings) {
-        Path configured = settings.hytaleUserDataDirectory().resolve("Saves");
-        if (Files.isDirectory(configured)) {
-            return configured;
-        }
-        return HytalePathDetector.detectExistingSavesDirectory().orElse(configured);
+        // Match Hytale's --user-dir, including before the first save is created.
+        return settings.hytaleUserDataDirectory().resolve("Saves");
     }
 
     public Path modsDirectory(LauncherSettings settings) {
@@ -128,11 +150,12 @@ public final class HytaleWorldManager {
         return userDataDirectory == null ? null : userDataDirectory.resolve("Mods");
     }
 
-    private HytaleWorld worldFromDirectory(Path directory) {
+    private HytaleWorld worldFromDirectory(Path directory, List<HytaleInstalledMod> installedMods) {
         Path configPath = directory.resolve("config.json");
-        HytaleWorldConfig config = loadConfig(configPath);
+        HytaleWorldConfig config = loadConfig(configPath, installedMods);
         HytaleWorldMetadata metadata = readMetadata(directory);
-        long enabledMods = config.enabledByMod().values().stream().filter(Boolean::booleanValue).count();
+        List<String> installedIds = installedMods.stream().map(HytaleInstalledMod::id).distinct().toList();
+        long enabledMods = installedIds.stream().filter(id -> config.enabledByMod().getOrDefault(id, false)).count();
         return new HytaleWorld(
                 directory.toAbsolutePath().normalize(),
                 directory.getFileName() == null ? directory.toString() : directory.getFileName().toString(),
@@ -140,7 +163,7 @@ public final class HytaleWorldManager {
                 metadata.patchline(),
                 metadata.previewImage(),
                 (int) enabledMods,
-                config.enabledByMod().size(),
+                installedIds.size(),
                 lastModified(directory, configPath)
         );
     }
@@ -279,8 +302,6 @@ public final class HytaleWorldManager {
     }
 
     private HytaleInstalledMod installedModFromJar(Path jar) {
-        String fallbackName = jar.getFileName() == null ? jar.toString() : jar.getFileName().toString();
-        String baseName = fallbackName.replaceFirst("(?i)\\.(jar|zip)$", "");
         try (ZipFile zip = new ZipFile(jar.toFile())) {
             ZipEntry manifest = zip.getEntry("manifest.json");
             if (manifest == null) {
@@ -289,32 +310,34 @@ public final class HytaleWorldManager {
                 if (nested.size() == 1) manifest = nested.getFirst();
             }
             if (manifest == null) {
-                if (fallbackName.toLowerCase(Locale.ROOT).endsWith(".zip")) return null;
-                return installedMod(baseName, baseName, "", "", "", jar);
+                return null;
             }
             try (InputStream input = zip.getInputStream(manifest)) {
                 JsonNode root = MAPPER.readTree(input);
+                if (root == null || !root.isObject()) return null;
                 String group = root.path("Group").asText("");
-                String name = root.path("Name").asText(baseName);
-                String id = group.isBlank() || name.isBlank() ? baseName : group + ":" + name;
+                String name = root.path("Name").asText("");
+                if (group.isBlank() || name.isBlank()) return null;
+                String id = group + ":" + name;
                 return installedMod(
                         id,
-                        name.isBlank() ? baseName : name,
+                        name,
                         root.path("Version").asText(""),
                         root.path("Description").asText(""),
                         root.path("Website").asText(""),
-                        jar
+                        jar,
+                        root.path("DisabledByDefault").asBoolean(false)
                 );
             }
         } catch (IOException ex) {
-            return installedMod(baseName, baseName, "", "", "", jar);
+            return null;
         }
     }
 
     private HytaleInstalledMod installedMod(String id, String name, String version, String description,
-                                             String website, Path jar) {
+                                             String website, Path jar, boolean disabledByDefault) {
         Path file = jar.toAbsolutePath().normalize();
-        return new HytaleInstalledMod(id, name, version, description, file, website, "", null);
+        return new HytaleInstalledMod(id, name, version, description, file, website, "", null, disabledByDefault);
     }
 
     private ObjectNode readConfigRoot(Path configPath) {
@@ -332,10 +355,7 @@ public final class HytaleWorldManager {
         } catch (IOException ex) {
             throw new ModtaleApiException("Could not read Hytale world config " + configPath, ex);
         }
-        ObjectNode replacement = MAPPER.createObjectNode();
-        replacement.put("Version", 4);
-        replacement.set("Mods", MAPPER.createObjectNode());
-        return replacement;
+        throw new ModtaleApiException("Hytale world config must contain a JSON object: " + configPath);
     }
 
     private static ObjectNode objectNode(ObjectNode parent, String field) {
@@ -389,8 +409,14 @@ public final class HytaleWorldManager {
             Path file,
             String website,
             String sha256,
-            Long curseForgeFingerprint
+            Long curseForgeFingerprint,
+            boolean disabledByDefault
     ) {
+        public HytaleInstalledMod(String id, String name, String version, String description, Path file,
+                                  String website, String sha256, Long curseForgeFingerprint) {
+            this(id, name, version, description, file, website, sha256, curseForgeFingerprint, false);
+        }
+
         public HytaleInstalledMod(String id, String name, String version, String description, Path file) {
             this(id, name, version, description, file, "", "", null);
         }
