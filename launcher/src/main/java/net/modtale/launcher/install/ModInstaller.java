@@ -392,6 +392,12 @@ public class ModInstaller {
         InstalledProject recorded = mergeInstallMetadata(result.installedProject(), previous);
         settings.upsertInstalledProject(recorded);
         settingsStore.save(settings);
+        try {
+            new net.modtale.launcher.hytale.HytaleModRegistry(settings.hytaleModsDirectory())
+                    .exportProjects(List.of(recorded), apiClient);
+        } catch (IOException | RuntimeException ex) {
+            LOG.warn("Could not sync Hytale mod library after installation", ex);
+        }
         return new InstallResult(recorded, result.installedFiles(), result.warnings());
     }
 
@@ -457,6 +463,11 @@ public class ModInstaller {
                 // Stale files should not block an update; the new install can still succeed.
             }
         });
+        try {
+            new net.modtale.launcher.hytale.HytaleModRegistry(settings.hytaleModsDirectory()).removeFiles(installed.files());
+        } catch (IOException ex) {
+            LOG.warn("Could not remove Hytale mod library entry", ex);
+        }
     }
 
     private static InstallOptions optionsFrom(LauncherSettings settings) {

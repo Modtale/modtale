@@ -207,6 +207,10 @@ public class ModtaleApiClient {
         return curseForgeClient.download(projectId, fileId);
     }
 
+    public com.fasterxml.jackson.databind.JsonNode matchCurseForgeFiles(List<Long> fingerprints) {
+        return curseForgeClient.matchFiles(fingerprints);
+    }
+
     public ArtifactIdentity.Response identifyArtifacts(List<ArtifactIdentity.Artifact> artifacts) {
         return post("/projects/external/identify", new ArtifactIdentity.Request(artifacts), ArtifactIdentity.Response.class);
     }

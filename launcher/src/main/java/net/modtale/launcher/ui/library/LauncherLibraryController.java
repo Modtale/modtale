@@ -107,6 +107,7 @@ public final class LauncherLibraryController {
     private StackPane installLoadingOverlay;
     private String identityResolutionSignature = "";
     private boolean identityResolutionInFlight;
+    private boolean nativeRegistryExportInFlight;
 
     public LauncherLibraryController(
             ModtaleApiClient apiClient,
@@ -385,8 +386,10 @@ public final class LauncherLibraryController {
             installedMods = List.of();
             feedback.log(ex.getMessage());
         }
+        importHytaleRegistry();
         recoverLocalInstalls();
         normalizeBundledDependencyInstalls();
+        exportHytaleRegistry();
         resolveInstalledArtifactIdentities();
         installedProjects = settingsController.settings().getInstalledProjects().stream()
                 .sorted(Comparator
@@ -405,6 +408,33 @@ public final class LauncherLibraryController {
         renderWorldRows();
         renderWorldDetail();
         ensureProjectMetadataLoaded();
+    }
+
+    private void importHytaleRegistry() {
+        try {
+            var registry = new net.modtale.launcher.hytale.HytaleModRegistry(worldManager.modsDirectory(settingsController.settings()));
+            var projects = registry.importProjects(settingsController.settings().getInstalledProjects());
+            if (!projects.equals(settingsController.settings().getInstalledProjects())) {
+                settingsController.saveReconciledInstalledProjects(projects);
+            }
+            registry.metadata().forEach(projectMetadata::putIfAbsent);
+        } catch (java.io.IOException | RuntimeException ex) {
+            feedback.log("Could not read Hytale mod library: " + ex.getMessage());
+        }
+    }
+
+    private void exportHytaleRegistry() {
+        if (executor == null || apiClient == null || nativeRegistryExportInFlight) return;
+        var registry = new net.modtale.launcher.hytale.HytaleModRegistry(worldManager.modsDirectory(settingsController.settings()));
+        var projects = List.copyOf(settingsController.settings().getInstalledProjects());
+        nativeRegistryExportInFlight = true;
+        CompletableFuture.runAsync(() -> {
+            try { registry.exportProjects(projects, apiClient); }
+            catch (java.io.IOException ex) { throw new java.io.UncheckedIOException(ex); }
+        }, executor).whenComplete((ignored, error) -> Platform.runLater(() -> {
+            nativeRegistryExportInFlight = false;
+            if (error != null) feedback.log("Could not sync Hytale mod library: " + error.getMessage());
+        }));
     }
 
     private void recoverLocalInstalls() {

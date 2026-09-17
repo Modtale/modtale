@@ -27,6 +27,10 @@ final class CurseForgeClient {
         this.base = base;
     }
 
+    JsonNode matchFiles(List<Long> fingerprints) {
+        return transport.post(base.resolve("fingerprints/70216"), Map.of("fingerprints", fingerprints), JsonNode.class);
+    }
+
     ProjectPage search(ProjectSearchQuery query) {
         int size = Math.max(1, query.size());
         long offset = (long) query.page() * size;
