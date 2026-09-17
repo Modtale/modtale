@@ -123,7 +123,10 @@ class WardrobeApiClientTest {
     }
     @Test void uuidLookupUsesOfficialSessionAndVerifiesIdentity() throws Exception {
         json("/profile/uuid/" + ID, profile(ID, "Renamed"));
-        assertEquals("Renamed", api.profile(UUID.fromString(ID), new LauncherSettings()).username());
+        var friend = api.profile(UUID.fromString(ID), new LauncherSettings());
+        assertEquals("Renamed", friend.username());
+        assertEquals("Muscular.01", new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(friend.skin()).path("bodyCharacteristic").asText());
         assertEquals("Bearer official-session", headers.getFirst());
         assertEquals(1, tokenCalls);
         json("/profile/uuid/" + ID, profile("11111111-1111-1111-1111-111111111111", "WrongPlayer"));

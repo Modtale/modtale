@@ -62,6 +62,56 @@ class HytaleProfileAvatarImagesTest {
         });
     }
 
+    @Test void characterRenderReplacesPlaceholderAndPreventsLatePlaceholderOverwrite() throws Exception {
+        var skin = new java.util.concurrent.CompletableFuture<com.fasterxml.jackson.databind.JsonNode>();
+        var rendered = new java.util.concurrent.CompletableFuture<Image>();
+        var definition = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode()
+                .put("bodyCharacteristic", "Muscular.01");
+        var view = new ImageView();
+        var initial = new Label("F");
+        var face = new WritableImage(16, 16);
+        onFx(() -> HytaleProfileAvatarImages.render(view, initial, skin, actual -> {
+            assertEquals(definition, actual);
+            assertTrue(Platform.isFxApplicationThread());
+            return rendered;
+        }, () -> true));
+        skin.complete(definition);
+        onFx(() -> {});
+        rendered.complete(face);
+        onFx(() -> {
+            assertSame(face, view.getImage());
+            assertEquals("local-outfit", view.getUserData());
+            assertFalse(initial.isVisible());
+        });
+    }
+
+    @Test void characterRenderCannotReplaceAnObsoleteProfile() throws Exception {
+        var current = new java.util.concurrent.atomic.AtomicBoolean(true);
+        var rendered = new java.util.concurrent.CompletableFuture<Image>();
+        var view = new ImageView(new WritableImage(16, 16));
+        Image original = view.getImage();
+        onFx(() -> HytaleProfileAvatarImages.render(view, new Label("F"),
+                java.util.concurrent.CompletableFuture.completedFuture(
+                        new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode()),
+                skin -> rendered, current::get));
+        onFx(() -> current.set(false));
+        rendered.complete(new WritableImage(16, 16));
+        onFx(() -> {
+            assertSame(original, view.getImage());
+            assertNull(view.getUserData());
+        });
+    }
+
+    @Test void unavailableFriendSkinKeepsPlaceholder() throws Exception {
+        var view = new ImageView(new WritableImage(16, 16));
+        Image original = view.getImage();
+        onFx(() -> HytaleProfileAvatarImages.render(view, new Label("F"),
+                java.util.concurrent.CompletableFuture.failedFuture(new IllegalStateException("Unavailable")),
+                skin -> { throw new AssertionError("Unavailable skins must not render a default character"); },
+                () -> true));
+        onFx(() -> assertSame(original, view.getImage()));
+    }
+
     private static Image brokenImage() {
         Image image = new Image(new ByteArrayInputStream(new byte[]{0}));
         assertTrue(image.isError());

@@ -1123,9 +1123,10 @@ public final class LauncherPlayController {
         row.getStyleClass().add("play-friend-row");
         row.setAlignment(Pos.CENTER_LEFT);
 
-        StackPane avatar = friend.username().isBlank()
-                ? avatar(friend.displayName(), FRIEND_AVATAR_SIZE, "play-friend-avatar", friend.avatarUrl())
-                : hytaleProfileAvatar(friend.username(), FRIEND_AVATAR_SIZE, "play-friend-avatar");
+        StackPane avatar = new StackPane();
+        avatar.getStyleClass().add("play-friend-avatar");
+        sizeSquare(avatar, FRIEND_AVATAR_SIZE);
+        updateHytaleProfileAvatar(avatar, friend.displayName(), FRIEND_AVATAR_SIZE, friend.uuid());
         Region presence = new Region();
         presence.getStyleClass().addAll("play-friend-presence", friend.online() ? "online" : "offline");
         StackPane.setAlignment(presence, Pos.BOTTOM_RIGHT);
@@ -1329,6 +1330,10 @@ public final class LauncherPlayController {
     }
 
     private void updateHytaleProfileAvatar(StackPane avatar, String username, double size) {
+        updateHytaleProfileAvatar(avatar, username, size, "");
+    }
+
+    private void updateHytaleProfileAvatar(StackPane avatar, String username, double size, String friendUuid) {
         updateImageAvatar(avatar, username, size, PROFILE_AVATAR_RADIUS, "");
         ImageView image = new ImageView();
         image.setFitWidth(size);
@@ -1350,10 +1355,32 @@ public final class LauncherPlayController {
         }));
         LauncherSettings current = settingsController.settings();
         HytaleAuthSession active = current.getHytaleAuthSession();
-        if (active == null || !username.equalsIgnoreCase(active.getUsername())) return;
+        if (active == null) return;
+        boolean ownProfile = friendUuid.isBlank()
+                ? username.equalsIgnoreCase(active.getUsername()) : friendUuid.equalsIgnoreCase(active.getUuid());
+        if (!ownProfile && friendUuid.isBlank()) return;
         var assets = net.modtale.launcher.wardrobe.LocalSkinLibrary.assets(current);
         if (!java.nio.file.Files.isRegularFile(assets)) return;
         String profile = active.getUuid();
+        if (!ownProfile) {
+            var skin = CompletableFuture.supplyAsync(() -> {
+                var friend = new net.modtale.launcher.wardrobe.WardrobeApiClient(hytaleAuthService)
+                        .profile(java.util.UUID.fromString(friendUuid), current);
+                try {
+                    var definition = new com.fasterxml.jackson.databind.ObjectMapper().readTree(friend.skin());
+                    if (!definition.isObject() || !definition.has("bodyCharacteristic")) {
+                        throw new IllegalStateException("Friend profile has no character skin");
+                    }
+                    return definition;
+                } catch (java.io.IOException ex) { throw new java.io.UncheckedIOException(ex); }
+            }, executor);
+            HytaleProfileAvatarImages.render(image, avatar.getChildren().getFirst(), skin,
+                    definition -> profileThumbnails.load(assets, definition, "face"),
+                    () -> avatar.getChildren().contains(image)
+                            && settingsController.settings().getHytaleAuthSession() != null
+                            && profile.equals(settingsController.settings().getHytaleAuthSession().getUuid()));
+            return;
+        }
         long now = System.currentTimeMillis();
         if (profileSkin == null || profileSkin.isCompletedExceptionally() || !profile.equals(profileSkinId) || now - profileSkinAt > 60_000) {
             profileSkinId = profile; profileSkinAt = now;
@@ -1367,16 +1394,11 @@ public final class LauncherPlayController {
                 catch (java.io.IOException ex) { throw new java.io.UncheckedIOException(ex); }
             }, executor);
         }
-        profileSkin.thenAccept(skin -> Platform.runLater(() -> {
-            if (!avatar.getChildren().contains(image) || !profile.equals(profileSkinId)) return;
-            profileThumbnails.load(assets, skin, "face").thenAccept(rendered -> {
-                var session = settingsController.settings().getHytaleAuthSession();
-                if (!avatar.getChildren().contains(image) || session == null || !profile.equals(session.getUuid())) return;
-                image.setUserData("local-outfit");
-                image.setImage(rendered);
-                Node initial = avatar.getChildren().getFirst(); initial.visibleProperty().unbind(); initial.setVisible(false);
-            });
-        }));
+        HytaleProfileAvatarImages.render(image, avatar.getChildren().getFirst(), profileSkin,
+                skin -> profileThumbnails.load(assets, skin, "face"),
+                () -> avatar.getChildren().contains(image) && profile.equals(profileSkinId)
+                        && settingsController.settings().getHytaleAuthSession() != null
+                        && profile.equals(settingsController.settings().getHytaleAuthSession().getUuid()));
 
     }
 
