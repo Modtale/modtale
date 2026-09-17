@@ -27,6 +27,7 @@ final class ModtaleApiTransport {
     static final String CLIENT_HEADER_NAME = "X-Modtale-Client";
     static final String CLIENT_HEADER_VALUE = "launcher";
 
+    private final java.util.concurrent.ConcurrentMap<URI, Long> retryAt = new java.util.concurrent.ConcurrentHashMap<>();
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
     private final ApiResponseCache responseCache;
@@ -109,6 +110,13 @@ final class ModtaleApiTransport {
     }
 
     private <T> T sendJson(HttpRequest request, Class<T> type, Duration cacheTtl) {
+        if (ApiCachePolicy.isEnabled(cacheTtl) && request.method().equals("GET")) {
+            return responseCache.withRequestLock(request.uri(), () -> sendCachedJson(request, type, cacheTtl));
+        }
+        return sendCachedJson(request, type, Duration.ZERO);
+    }
+
+    private <T> T sendCachedJson(HttpRequest request, Class<T> type, Duration cacheTtl) {
         if (ApiCachePolicy.isEnabled(cacheTtl)) {
             Optional<String> cached = responseCache.getFresh(request.uri(), cacheTtl);
             if (cached.isPresent()) {
@@ -123,13 +131,28 @@ final class ModtaleApiTransport {
         try {
             LOG.info(request.method() + " " + LogSanitizer.uri(request.uri()));
             Instant started = Instant.now();
+            retryAt.values().removeIf(deadline -> deadline <= System.currentTimeMillis());
+            if (ApiCachePolicy.isEnabled(cacheTtl)
+                    && retryAt.getOrDefault(request.uri(), 0L) > System.currentTimeMillis()) {
+                throw new ModtaleApiException("API requests are temporarily rate limited. Please try again shortly.", 429, null);
+            }
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (response.statusCode() == 429) {
+                retryAt.put(request.uri(), retryDeadline(response));
+            }
             logResponse(request, response.statusCode(), response.body(), started);
             ensureSuccess(response.statusCode(), request.uri().toString(), response.body());
+            T result = readResponseBody(response.body(), type);
             if (ApiCachePolicy.isEnabled(cacheTtl)) {
                 responseCache.put(request.uri(), response.body());
             }
-            return readResponseBody(response.body(), type);
+            return result;
+        } catch (ModtaleApiException ex) {
+            if (ex.statusCode() == 429 || ex.statusCode() >= 500) {
+                Optional<T> stale = readStaleFallback(request, type, cacheTtl);
+                if (stale.isPresent()) return stale.get();
+            }
+            throw ex;
         } catch (IOException ex) {
             LOG.warn("I/O failure reading " + request.method() + " " + LogSanitizer.uri(request.uri()), ex);
             Optional<T> stale = readStaleFallback(request, type, cacheTtl);
@@ -151,6 +174,13 @@ final class ModtaleApiTransport {
     }
 
     private <T> T sendJson(HttpRequest request, TypeReference<T> type, Duration cacheTtl) {
+        if (ApiCachePolicy.isEnabled(cacheTtl) && request.method().equals("GET")) {
+            return responseCache.withRequestLock(request.uri(), () -> sendCachedJson(request, type, cacheTtl));
+        }
+        return sendCachedJson(request, type, Duration.ZERO);
+    }
+
+    private <T> T sendCachedJson(HttpRequest request, TypeReference<T> type, Duration cacheTtl) {
         if (ApiCachePolicy.isEnabled(cacheTtl)) {
             Optional<String> cached = responseCache.getFresh(request.uri(), cacheTtl);
             if (cached.isPresent()) {
@@ -165,13 +195,28 @@ final class ModtaleApiTransport {
         try {
             LOG.info(request.method() + " " + LogSanitizer.uri(request.uri()));
             Instant started = Instant.now();
+            retryAt.values().removeIf(deadline -> deadline <= System.currentTimeMillis());
+            if (ApiCachePolicy.isEnabled(cacheTtl)
+                    && retryAt.getOrDefault(request.uri(), 0L) > System.currentTimeMillis()) {
+                throw new ModtaleApiException("API requests are temporarily rate limited. Please try again shortly.", 429, null);
+            }
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (response.statusCode() == 429) {
+                retryAt.put(request.uri(), retryDeadline(response));
+            }
             logResponse(request, response.statusCode(), response.body(), started);
             ensureSuccess(response.statusCode(), request.uri().toString(), response.body());
+            T result = mapper.readValue(response.body(), type);
             if (ApiCachePolicy.isEnabled(cacheTtl)) {
                 responseCache.put(request.uri(), response.body());
             }
-            return mapper.readValue(response.body(), type);
+            return result;
+        } catch (ModtaleApiException ex) {
+            if (ex.statusCode() == 429 || ex.statusCode() >= 500) {
+                Optional<T> stale = readStaleFallback(request, type, cacheTtl);
+                if (stale.isPresent()) return stale.get();
+            }
+            throw ex;
         } catch (IOException ex) {
             LOG.warn("I/O failure reading " + request.method() + " " + LogSanitizer.uri(request.uri()), ex);
             Optional<T> stale = readStaleFallback(request, type, cacheTtl);
@@ -190,6 +235,21 @@ final class ModtaleApiTransport {
             }
             throw new ModtaleApiException("API request was interrupted.", ex);
         }
+    }
+
+    private static long retryDeadline(HttpResponse<?> response) {
+        long now = System.currentTimeMillis();
+        String value = response.headers().firstValue("Retry-After").orElse("");
+        try {
+            long seconds = Long.parseLong(value);
+            if (seconds > 0) return Math.addExact(now, Math.multiplyExact(seconds, 1000));
+        } catch (NumberFormatException | ArithmeticException ignored) { }
+        try {
+            long date = java.time.ZonedDateTime.parse(value, java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME)
+                    .toInstant().toEpochMilli();
+            if (date > now) return date;
+        } catch (java.time.DateTimeException ignored) { }
+        return now + 60_000;
     }
 
     private <T> T readResponseBody(String body, Class<T> type) throws IOException {

@@ -17,44 +17,59 @@ import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+
+
 import java.util.stream.Stream;
 import net.modtale.launcher.cache.LauncherCachePaths;
 
-final class ApiResponseCache {
+public final class ApiResponseCache {
 
     private static final Duration STALE_FALLBACK_TTL = Duration.ofDays(7);
 
+    private final Object[] requestLocks = java.util.stream.IntStream.range(0, 64)
+            .mapToObj(i -> new Object()).toArray();
+
+    <T> T withRequestLock(URI uri, java.util.function.Supplier<T> request) {
+        synchronized (requestLocks[Math.floorMod(uri.hashCode(), requestLocks.length)]) {
+            return request.get();
+        }
+    }
+
     private final Path cacheDirectory;
     private final ObjectMapper mapper;
-    private final ConcurrentMap<String, CacheEntry> memory = new ConcurrentHashMap<>();
+    private final java.util.Map<String, CacheEntry> memory = java.util.Collections.synchronizedMap(
+            new java.util.LinkedHashMap<>(128, 0.75f, true) {
+                @Override protected boolean removeEldestEntry(java.util.Map.Entry<String, CacheEntry> entry) {
+                    return size() > 1024;
+                }
+            });
 
-    ApiResponseCache() {
+    public ApiResponseCache() {
         this(LauncherCachePaths.cacheDirectory("api"));
     }
 
-    ApiResponseCache(Path cacheDirectory) {
+    public ApiResponseCache(Path cacheDirectory) {
         this.cacheDirectory = cacheDirectory;
         this.mapper = new ObjectMapper()
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     }
 
-    Optional<String> getFresh(URI uri, Duration ttl) {
+    public Optional<String> getFresh(URI uri, Duration ttl) {
         return get(uri, ttl);
     }
 
-    Optional<String> getStaleFallback(URI uri) {
+    public Optional<String> getStaleFallback(URI uri) {
         return get(uri, STALE_FALLBACK_TTL);
     }
 
-    void put(URI uri, String body) {
+    public void put(URI uri, String body) {
         if (body == null) {
             return;
         }
         String key = uri.toString();
         CacheEntry entry = new CacheEntry(body, Instant.now());
         memory.put(key, entry);
+        if (cacheDirectory == null) return;
         try {
             AtomicJsonFile.write(cacheFile(uri), mapper.writer(), CachedBody.from(entry));
         } catch (IOException ignored) {
@@ -64,6 +79,7 @@ final class ApiResponseCache {
 
     void invalidate(URI uri) {
         memory.remove(uri.toString());
+        if (cacheDirectory == null) return;
         try {
             Files.deleteIfExists(cacheFile(uri));
         } catch (IOException ignored) {
@@ -71,9 +87,9 @@ final class ApiResponseCache {
         }
     }
 
-    void clear() {
+    public void clear() {
         memory.clear();
-        if (!Files.exists(cacheDirectory)) {
+        if (cacheDirectory == null || !Files.exists(cacheDirectory)) {
             return;
         }
         try (Stream<Path> stream = Files.walk(cacheDirectory)) {
@@ -96,8 +112,8 @@ final class ApiResponseCache {
 
         String key = uri.toString();
         CacheEntry memoryEntry = memory.get(key);
-        if (memoryEntry != null && memoryEntry.isFresh(ttl)) {
-            return Optional.of(memoryEntry.body());
+        if (memoryEntry != null) {
+            return memoryEntry.isFresh(ttl) ? Optional.of(memoryEntry.body()) : Optional.empty();
         }
 
         Optional<CacheEntry> diskEntry = readDisk(uri);
@@ -106,6 +122,7 @@ final class ApiResponseCache {
     }
 
     private Optional<CacheEntry> readDisk(URI uri) {
+        if (cacheDirectory == null) return Optional.empty();
         Path file = cacheFile(uri);
         if (!Files.isRegularFile(file)) {
             return Optional.empty();

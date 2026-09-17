@@ -55,6 +55,31 @@ class HytaleGameUpdaterTest {
         assertTrue(progress.getFirst().contains(branch));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"release", "pre-release", "v0.4"})
+    void rateLimitedCheckCanLaunchVerifiedLastKnownLatest(String branch) throws Exception {
+        LauncherSettings settings = settings(branch);
+        var updater = new HytaleGameUpdater(temp.resolve("managed"), (s, b) -> List.of(version(b, 29, true)),
+                (v, token, destination, status) -> game(destination, "0.6.6"));
+        updater.prepare(settings, ignored -> {});
+        Path installed = settings.hytaleGameDirectory();
+        var limited = new HytaleGameUpdater(temp.resolve("managed"), (s, b) -> {
+            throw new HytaleApiException("rate limited", 429, null, 60_000);
+        }, (v, token, destination, status) -> fail("Already installed"));
+        List<String> progress = new ArrayList<>();
+        limited.prepare(settings, progress::add);
+        assertEquals(installed, settings.hytaleGameDirectory());
+        assertTrue(progress.getLast().contains("last known latest"));
+        // A known newer build must not silently fall back to the old installation.
+        settings.cacheHytaleVersions(LauncherSettings.hytaleAccountId(settings.getHytaleAuthSession()),
+                HytalePlatform.os() + "/" + HytalePlatform.arch(), branch, List.of(version(branch, 30, true)));
+        assertThrows(HytaleApiException.class, () -> limited.prepare(settings, ignored -> {}));
+        settings.cacheHytaleVersions(LauncherSettings.hytaleAccountId(settings.getHytaleAuthSession()),
+                HytalePlatform.os() + "/" + HytalePlatform.arch(), branch, List.of(version(branch, 29, true)));
+        Files.delete(installed.resolve("Assets.zip"));
+        assertThrows(HytaleApiException.class, () -> limited.prepare(settings, ignored -> {}));
+    }
+
     @Test
     void channelSwitchNeverUsesPreviouslyConfiguredChannel() throws Exception {
         LauncherSettings settings = settings("release");

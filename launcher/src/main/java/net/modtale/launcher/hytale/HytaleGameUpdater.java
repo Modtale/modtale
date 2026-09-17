@@ -38,7 +38,17 @@ public final class HytaleGameUpdater {
         String branch = HytaleApiClient.normalizeBranch(settings.getHytaleBranch());
         progress.accept("Checking Hytale " + branch + " for updates...");
         // Build numbers saved by the UI are display state, not a pin: every channel follows its latest build.
-        HytaleVersion latest = versions.get(settings, branch).stream()
+        List<HytaleVersion> available;
+        String account = LauncherSettings.hytaleAccountId(settings.getHytaleAuthSession());
+        String platform = HytalePlatform.os() + "/" + HytalePlatform.arch();
+        try {
+            available = versions.get(settings, branch);
+            settings.cacheHytaleVersions(account, platform, branch, available);
+        } catch (HytaleApiException ex) {
+            if (ex.statusCode() == 429 && useInstalledLatest(settings, branch, account, platform, progress)) return;
+            throw ex;
+        }
+        HytaleVersion latest = available.stream()
                 .filter(version -> branch.equals(version.branch()) && version.latest() && version.build() > 0)
                 .max(Comparator.comparingInt(HytaleVersion::build))
                 .orElseThrow(() -> new HytaleApiException("No current build is available for Hytale " + branch + "."));
@@ -79,6 +89,25 @@ public final class HytaleGameUpdater {
         } catch (IOException | java.nio.channels.OverlappingFileLockException ex) {
             throw new HytaleApiException("Could not update Hytale. The game was not launched; please try again.", ex);
         }
+    }
+
+    private boolean useInstalledLatest(LauncherSettings settings, String branch, String account,
+            String platform, Consumer<String> progress) {
+        HytaleVersion known = settings.cachedHytaleVersions(account, platform, branch).stream()
+                .filter(version -> branch.equals(version.branch()) && version.latest() && version.build() > 0)
+                .max(Comparator.comparingInt(HytaleVersion::build)).orElse(null);
+        if (known == null) return false;
+        Path target = root.resolve(branch).resolve(Integer.toString(known.build()));
+        try {
+            if (!complete(target, known)) return false;
+        } catch (IOException ex) {
+            return false;
+        }
+        settings.setHytaleGamePath(target.toString());
+        settings.setHytaleBuild(known.build());
+        progress.accept("Hytale's update check is rate limited. Launching installed " + branch
+                + " build " + known.build() + ", the last known latest build. Updates will be checked on the next launch.");
+        return true;
     }
 
     private static boolean complete(Path game, HytaleVersion version) throws IOException {

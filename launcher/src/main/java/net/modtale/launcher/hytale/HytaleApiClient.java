@@ -36,6 +36,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import net.modtale.launcher.api.ApiResponseCache;
+import net.modtale.launcher.cache.LauncherCachePaths;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -79,8 +81,12 @@ public class HytaleApiClient {
     private static final long PATCH_CACHE_MILLIS = 30_000;
     private static final long DEFAULT_RATE_LIMIT_MILLIS = 60_000;
     private final Clock clock;
+    private final ApiResponseCache usernameCache;
+    private final Map<ResponseKey, CachedResponse> readCache = new LinkedHashMap<>();
+    private record ResponseKey(URI uri, String authorization) { }
+    private record CachedResponse(String body, long expiresAt) { }
     private final Map<URI, CachedPatches> patchCache = new LinkedHashMap<>();
-    private final Map<String, Long> hostRetryAt = new LinkedHashMap<>();
+    private final Map<URI, Long> endpointRetryAt = new LinkedHashMap<>();
     private String patchCacheToken;
     private record CachedPatches(OfficialPatchesResponse response, long expiresAt) { }
 
@@ -95,7 +101,7 @@ public class HytaleApiClient {
         this(HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(15))
                 .followRedirects(HttpClient.Redirect.NORMAL)
-                .build());
+                .build(), Clock.systemUTC(), new ApiResponseCache(LauncherCachePaths.cacheDirectory("hytale-usernames")));
     }
 
     HytaleApiClient(HttpClient httpClient) {
@@ -103,10 +109,24 @@ public class HytaleApiClient {
     }
 
     HytaleApiClient(HttpClient httpClient, Clock clock) {
+        this(httpClient, clock, new ApiResponseCache(null));
+    }
+
+    HytaleApiClient(HttpClient httpClient, Clock clock, ApiResponseCache usernameCache) {
+        this.usernameCache = usernameCache;
         this.clock = clock;
         this.httpClient = httpClient;
         this.mapper = new ObjectMapper()
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    }
+
+    public synchronized void clearResponseCache() {
+        usernameCache.clear();
+        readCache.clear();
+        patchCache.clear();
+        blogPostCache = List.of();
+        blogPostFetchedAt = 0;
+        // Cache clearing does not cancel a server's Retry-After instruction.
     }
 
     public TokenResponse exchangeCode(String code, String codeVerifier) {
@@ -148,10 +168,19 @@ public class HytaleApiClient {
                 .GET()
                 .header("Authorization", "Bearer " + sessionToken)
                 .build();
-        return parseFriends(sendJson(request, JsonNode.class));
+        List<HytaleFriend> friends = parseFriends(sendJson(request, JsonNode.class));
+        for (HytaleFriend friend : friends) {
+            if (!friend.uuid().isBlank() && !friend.username().isBlank()) {
+                URI uri = publicProfileUri(friend.uuid());
+                if (!usernameCache.getFresh(uri, Duration.ofHours(6)).filter(friend.username()::equals).isPresent()) {
+                    usernameCache.put(uri, friend.username());
+                }
+            }
+        }
+        return friends;
     }
 
-    public Map<String, String> fetchPublicProfileUsernames(String sessionToken, List<String> uuids) {
+    public synchronized Map<String, String> fetchPublicProfileUsernames(String sessionToken, List<String> uuids) {
         if (sessionToken == null || sessionToken.isBlank() || uuids == null || uuids.isEmpty()) {
             return Map.of();
         }
@@ -163,19 +192,31 @@ public class HytaleApiClient {
             if (normalizedUuid.isBlank() || !seen.add(key)) {
                 continue;
             }
+            URI profileUri = publicProfileUri(normalizedUuid);
+            Optional<String> cached = usernameCache.getFresh(profileUri, Duration.ofHours(6));
+            if (cached.isPresent()) {
+                usernames.put(key, cached.get());
+                continue;
+            }
             try {
                 HttpRequest request = officialRequestBuilder(
-                        URI.create(PUBLIC_PROFILE_BY_UUID_URL + "/" + encodePathSegment(normalizedUuid)),
+                        profileUri,
                         "release")
                         .GET()
                         .header("Authorization", "Bearer " + sessionToken)
                         .build();
                 parsePublicProfileUsername(sendJson(request, JsonNode.class))
-                        .ifPresent(username -> usernames.put(key, username));
+                        .ifPresent(username -> {
+                            usernameCache.put(profileUri, username);
+                            usernames.put(key, username);
+                        });
             } catch (HytaleApiException ex) {
-                if (ex.isAuthFailure()) {
+                if (ex.isAuthFailure() && usernameCache.getStaleFallback(profileUri).isEmpty()) {
                     throw ex;
                 }
+            }
+            if (!usernames.containsKey(key)) {
+                usernameCache.getStaleFallback(profileUri).ifPresent(name -> usernames.put(key, name));
             }
         }
         return usernames;
@@ -484,18 +525,37 @@ public class HytaleApiClient {
         return sendJson(request, type);
     }
 
-    private <T> T sendJson(HttpRequest request, Class<T> type) {
-        String body = sendString(request);
+    private static URI publicProfileUri(String uuid) {
+        return URI.create(PUBLIC_PROFILE_BY_UUID_URL + "/" + encodePathSegment(uuid.trim().toLowerCase(Locale.ROOT)));
+    }
+
+    private synchronized <T> T sendJson(HttpRequest request, Class<T> type) {
+        long ttl = 0;
+        if (request.method().equals("GET")) {
+            if (request.uri().equals(launcherDataUrl())) ttl = 60_000;
+            else if (request.uri().toString().equals(SOCIAL_FRIENDS_URL)) ttl = 15_000;
+        }
+        long now = clock.millis();
+        readCache.values().removeIf(entry -> entry.expiresAt() <= now);
+        ResponseKey key = new ResponseKey(request.uri(), request.headers().firstValue("Authorization").orElse(""));
+        CachedResponse cached = ttl > 0 ? readCache.get(key) : null;
+        String body = cached == null ? sendString(request) : cached.body();
         try {
-            return mapper.readValue(body, type);
+            T result = mapper.readValue(body, type);
+            if (ttl > 0 && cached == null) {
+                if (readCache.size() >= 128) readCache.remove(readCache.keySet().iterator().next());
+                readCache.put(key, new CachedResponse(body, clock.millis() + ttl));
+            }
+            return result;
         } catch (IOException ex) {
             throw new HytaleApiException("Could not read Hytale API response from " + request.uri(), ex);
         }
     }
 
     private synchronized String sendString(HttpRequest request) {
-        String host = request.uri().getHost();
-        long remaining = hostRetryAt.getOrDefault(host, 0L) - clock.millis();
+        URI endpoint = request.uri();
+        endpointRetryAt.values().removeIf(deadline -> deadline <= clock.millis());
+        long remaining = endpointRetryAt.getOrDefault(endpoint, 0L) - clock.millis();
         if (remaining > 0) {
             throw rateLimited(remaining);
         }
@@ -505,7 +565,7 @@ public class HytaleApiClient {
                 long delay = retryAfterMillis(response.headers(), clock.instant());
                 if (delay <= 0) delay = DEFAULT_RATE_LIMIT_MILLIS;
                 long now = clock.millis();
-                hostRetryAt.put(host, now + Math.min(delay, Long.MAX_VALUE - now));
+                endpointRetryAt.put(endpoint, now + Math.min(delay, Long.MAX_VALUE - now));
                 throw rateLimited(delay);
             }
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
