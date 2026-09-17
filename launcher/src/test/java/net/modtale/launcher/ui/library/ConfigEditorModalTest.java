@@ -94,6 +94,67 @@ class ConfigEditorModalTest {
         }
     }
 
+    @Test
+    void editsWorldRulesWithValidationInheritanceAndSaveProtection() throws Exception {
+        Path config = directory.resolve("universe/worlds/default/config.json");
+        Files.createDirectories(config.getParent());
+        Files.writeString(config, "{\"UUID\":\"keep\",\"Death\":{\"ItemsLossMode\":\"Configured\"}}");
+        var saves = new java.util.concurrent.atomic.AtomicInteger();
+        StackPane host = fx(() -> {
+            var root = new StackPane();
+            net.modtale.launcher.ui.common.LauncherFonts.load();
+            root.getStyleClass().add("app-root");
+            var scene = new Scene(root, 1120, 800);
+            scene.getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
+            new ConfigEditorModal(root, Runnable::run, saves::incrementAndGet).showWorldSettings(directory, "My world");
+            return root;
+        });
+        fx(() -> {
+            host.applyCss(); host.layout();
+            assertTrue(button(host, "Save changes").isDisabled());
+            assertNotNull(button(host, "Open folder"));
+            assertEquals("", input(host, "Day duration (seconds)").getText());
+            assertEquals("", input(host, "Resource loss on death (%)").getText());
+            assertTrue(host.lookupAll(".text-field").stream().noneMatch(n -> "UUID".equals(n.getAccessibleText())));
+            input(host, "World display name").setText("Our world");
+            input(host, "Resource loss on death (%)").setText("101");
+            assertTrue(button(host, "Save changes").isDisabled());
+            input(host, "Resource loss on death (%)").setText("30");
+            input(host, "Day duration (seconds)").setText("3600");
+            var choice = host.lookupAll(".combo-box").stream().filter(n -> "Inventory penalty on death".equals(n.getAccessibleText()))
+                    .map(javafx.scene.control.ComboBox.class::cast).findFirst().orElseThrow();
+            choice.getSelectionModel().select(3);
+            button(host, "Done").fire();
+            assertFalse(host.getChildren().isEmpty());
+            if (System.getenv("MODTALE_WORLD_SETTINGS_SNAPSHOT") != null) {
+                var image = host.snapshot(null, null);
+                var output = new java.awt.image.BufferedImage((int) image.getWidth(), (int) image.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                for (int y = 0; y < output.getHeight(); y++) for (int x = 0; x < output.getWidth(); x++)
+                    output.setRGB(x, y, image.getPixelReader().getArgb(x, y));
+                javax.imageio.ImageIO.write(output, "png", Path.of(System.getenv("MODTALE_WORLD_SETTINGS_SNAPSHOT")).toFile());
+            }
+            button(host, "Save changes").fire();
+            return null;
+        });
+        fx(() -> {
+            assertEquals(1, saves.get());
+            assertTrue(button(host, "Save changes").isDisabled());
+            var saved = new com.fasterxml.jackson.databind.ObjectMapper().readTree(Files.readString(config));
+            assertEquals("Our world", saved.path("DisplayName").asText());
+            assertEquals(3600, saved.path("DaytimeDurationSeconds").asInt());
+            assertEquals("All", saved.path("Death").path("ItemsLossMode").asText());
+            assertEquals(30, saved.path("Death").path("ItemsAmountLossPercentage").asInt());
+            assertEquals("keep", saved.path("UUID").asText());
+            assertFalse(saved.has("NighttimeDurationSeconds"));
+            input(host, "Day duration (seconds)").setText("1800");
+            button(host, "Reset changes").fire();
+            assertEquals("3600", input(host, "Day duration (seconds)").getText());
+            button(host, "Done").fire();
+            assertTrue(host.getChildren().isEmpty());
+            return null;
+        });
+    }
+
     private static javafx.scene.control.TextField input(Parent root, String name) {
         return root.lookupAll(".text-field").stream().filter(javafx.scene.control.TextField.class::isInstance)
                 .map(javafx.scene.control.TextField.class::cast).filter(field -> name.equals(field.getAccessibleText())).findFirst().orElseThrow();
@@ -197,7 +258,11 @@ class ConfigEditorModalTest {
                     new LibraryWorldProjectModel(pack, null, null, null, false, java.util.List.of("Author:Second"), 0, 1, java.util.List.of(child))));
             var root = new javafx.scene.layout.VBox();
             new Scene(root, 1200, 800);
+            var settingsWorld = new java.util.concurrent.atomic.AtomicReference<net.modtale.launcher.hytale.HytaleWorldManager.HytaleWorld>();
+            renderer.setWorldSettingsAction(settingsWorld::set);
             root.getChildren().setAll(renderer.worldDetail(model));
+            button(root, "World settings").fire();
+            assertEquals(world, settingsWorld.get());
             root.applyCss(); root.layout();
             assertNull(button(root, "Config"));
             assertNull(button(root, "Configs"));

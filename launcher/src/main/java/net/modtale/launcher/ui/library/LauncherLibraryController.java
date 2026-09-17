@@ -154,10 +154,17 @@ public final class LauncherLibraryController {
                 this::renderLibrary,
                 this::checkUpdates
         );
+        worldRenderer.setWorldSettingsAction(this::editWorldSettings);
     }
 
     public void setNavigationActions(Consumer<ProjectSummary> openProject, Consumer<ProjectSummary> openCreator) {
         worldRenderer.setNavigationActions(openProject, openCreator);
+    }
+
+    private void editWorldSettings(HytaleWorld world) {
+        StackPane host = overlayHost.get();
+        if (host == null) return;
+        new ConfigEditorModal(host, executor, this::renderLibrary).showWorldSettings(world.directory(), world.name());
     }
 
     private void editConfigs(String modName, List<ConfigFile> configs) {

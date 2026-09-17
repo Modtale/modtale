@@ -55,18 +55,24 @@ public final class HytaleConfigFiles {
         return attribute(discoverWorldFiles(world), HytaleConfigOwnership.read(world.resolve("mods")));
     }
 
+    public List<ConfigFile> discoverWorldSettings(Path world) throws IOException {
+        List<ConfigFile> files = new ArrayList<>();
+        Path worlds = world.resolve("universe/worlds");
+        if (Files.isDirectory(worlds, LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(worlds)) {
+            try (Stream<Path> children = Files.list(worlds)) {
+                for (Path child : children.limit(1000).toList())
+                    add(world, child.resolve("config.json"), "World", files);
+            }
+        }
+        files.sort(Comparator.comparing(ConfigFile::label, String.CASE_INSENSITIVE_ORDER));
+        return List.copyOf(files);
+    }
+
     private List<ConfigFile> discoverWorldFiles(Path world) throws IOException {
         List<ConfigFile> files = new ArrayList<>();
         scan(world.resolve("mods"), "World mods", files);
         add(world, world.resolve("config.json"), "World", files);
-        Path worlds = world.resolve("universe/worlds");
-        if (Files.isDirectory(worlds, LinkOption.NOFOLLOW_LINKS) && !Files.isSymbolicLink(worlds)) {
-            try (Stream<Path> children = Files.list(worlds)) {
-                for (Path child : children.limit(1000).toList()) {
-                    add(world, child.resolve("config.json"), "World", files);
-                }
-            }
-        }
+        files.addAll(discoverWorldSettings(world));
         files.sort(Comparator.comparing(ConfigFile::label, String.CASE_INSENSITIVE_ORDER));
         return List.copyOf(files);
     }

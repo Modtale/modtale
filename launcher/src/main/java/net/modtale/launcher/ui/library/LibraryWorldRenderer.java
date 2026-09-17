@@ -59,6 +59,9 @@ final class LibraryWorldRenderer {
     private String librarySearch = "";
     void setKnownGameVersions(List<String> versions) { knownGameVersions = List.copyOf(versions); }
 
+    private Consumer<HytaleWorld> editWorldSettings = ignored -> {};
+    void setWorldSettingsAction(Consumer<HytaleWorld> action) { editWorldSettings = action; }
+
     private Consumer<ProjectSummary> openProject = ignored -> {};
     private Consumer<ProjectSummary> openCreator = ignored -> {};
 
@@ -194,14 +197,18 @@ final class LibraryWorldRenderer {
         pack.setMinHeight(40);
         pack.setPrefHeight(40);
         pack.setMaxHeight(40);
-        actions.getChildren().addAll(tools, pack);
+        Button settings = secondaryButton("World settings");
+        settings.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.SLIDERS, 14));
+        settings.setAccessibleText("World settings");
+        settings.setOnAction(event -> editWorldSettings.accept(model.world()));
+        actions.getChildren().addAll(tools, settings, pack);
         actions.setMinWidth(Region.USE_PREF_SIZE);
 
         row.getChildren().addAll(icon, copy);
         actions.setAlignment(Pos.CENTER_LEFT);
         section.getChildren().addAll(row, actions);
         section.widthProperty().addListener((observable, previous, width) -> {
-            boolean inline = width.doubleValue() >= 720;
+            boolean inline = width.doubleValue() >= 920;
             if (inline && !row.getChildren().contains(actions)) {
                 section.getChildren().remove(actions);
                 row.getChildren().add(actions);
