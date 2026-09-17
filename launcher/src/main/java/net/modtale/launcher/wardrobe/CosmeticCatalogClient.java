@@ -149,14 +149,15 @@ public final class CosmeticCatalogClient {
                 .orElseThrow(() -> new IllegalArgumentException("Unknown cosmetic selection for " + category + ": " + selectedId));
         ObjectNode merged = merged(definitions.get(category).get(option.assetId()), option.variantId());
         JsonNode textures = merged.get("Textures");
-        if (textures != null && textures.isObject() && !option.colorId().isEmpty()) {
+        boolean explicitTexture = textures != null && textures.has(option.colorId());
+        if (explicitTexture) {
             JsonNode texture = textures.get(option.colorId());
             merged.put("Texture", texture.path("Texture").asText());
             if (texture.has("BaseColor")) merged.set("BaseColor", texture.get("BaseColor").deepCopy());
         } else if (merged.has("GreyscaleTexture")) {
             merged.put("Texture", merged.path("GreyscaleTexture").asText());
         }
-        if (!option.colorId().isEmpty() && merged.has("GradientSet") && textures == null) {
+        if (!option.colorId().isEmpty() && merged.has("GradientSet") && !explicitTexture) {
             applyGradient(merged, option.colorId());
         }
         merged.put("Category", category); merged.put("SelectedId", selectedId);
@@ -220,12 +221,21 @@ public final class CosmeticCatalogClient {
         for (String variantId : variantIds) {
             if (!variantId.isEmpty()) token(JSON.getNodeFactory().textNode(variantId), "variant Id");
             ObjectNode merged = merged(record, variantId);
-            JsonNode colors = merged.get("Textures");
-            if (colors == null && merged.has("GradientSet") && !INHERITED_SKIN.contains(category)) {
-                colors = gradients.get(merged.path("GradientSet").asText());
-                if (colors == null) throw new IOException("Unknown gradient set " + merged.path("GradientSet").asText());
+            ObjectNode colors = null;
+            JsonNode textures = merged.get("Textures");
+            if (textures != null) {
+                if (!textures.isObject() || textures.isEmpty()) throw new IOException("Invalid texture palette");
+                colors = ((ObjectNode) textures).deepCopy();
             }
-            if (colors != null && (!colors.isObject() || colors.isEmpty())) throw new IOException("Invalid texture palette");
+            if (merged.has("GradientSet") && !INHERITED_SKIN.contains(category)) {
+                JsonNode palette = gradients.get(merged.path("GradientSet").asText());
+                if (palette == null) throw new IOException("Unknown gradient set " + merged.path("GradientSet").asText());
+                if (palette.isEmpty()) throw new IOException("Invalid texture palette");
+                if (colors == null) colors = JSON.createObjectNode();
+                for (var entry : palette.properties()) {
+                    if (!colors.has(entry.getKey())) colors.set(entry.getKey(), entry.getValue().deepCopy());
+                }
+            }
             for (String colorId : colors == null ? List.of("") : fieldNames(colors)) {
                 if (!colorId.isEmpty()) token(JSON.getNodeFactory().textNode(colorId), "color Id");
                 String assetId = record.path("Id").asText();

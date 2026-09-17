@@ -45,6 +45,34 @@ class CosmeticCatalogClientTest {
         assertEquals(List.of("Neutral"), client.options("face", "Neutral").stream().map(CosmeticOption::id).toList());
     }
 
+    @Test void resolvesExplicitTexturesAndGradientColorsInTheSamePalette() throws Exception {
+        var data = definitions();
+        data.put(ROOT + "Overtops.json", """
+                [{"Id":"Scarf","Model":"Scarf.blockymodel","GreyscaleTexture":"ScarfGrey.png",
+                  "GradientSet":"Hair","Textures":{
+                    "Colorful":{"Texture":"Colorful.png"},
+                    "Blond":{"Texture":"BlondOverride.png","BaseColor":["#abcdef"]}}}]
+                """);
+        var client = new CosmeticCatalogClient(archive(data));
+        assertEquals(List.of("Scarf.Colorful", "Scarf.Blond", "Scarf.Black"),
+                client.options("overtop", "Scarf").stream().map(CosmeticOption::id).toList());
+        var black = client.resolve("overtop", "Scarf.Black");
+        assertEquals("ScarfGrey.png", black.path("Texture").asText());
+        assertEquals("Tint/Black.png", black.path("GradientTexture").asText());
+        assertEquals("#111111", black.path("BaseColor").get(0).asText());
+        var colorful = client.resolve("overtop", "Scarf.Colorful");
+        assertEquals("Colorful.png", colorful.path("Texture").asText());
+        assertFalse(colorful.has("GradientTexture"));
+        var blond = client.resolve("overtop", "Scarf.Blond");
+        assertEquals("BlondOverride.png", blond.path("Texture").asText());
+        assertEquals("#abcdef", blond.path("BaseColor").get(0).asText());
+        assertFalse(blond.has("GradientTexture"));
+        ObjectNode skin = client.defaultSkin();
+        skin.put("overtop", "Scarf.Black");
+        assertTrue(client.resolveComposition(skin).stream().anyMatch(part -> part.selectedId().equals("Scarf.Black")));
+        assertThrows(IllegalArgumentException.class, () -> client.resolve("overtop", "Scarf.Unknown"));
+    }
+
     @Test void paginatesUniqueAssetsAndSearchesLabelsIdsAndColors() throws Exception {
         var client = new CosmeticCatalogClient(archive(definitions()));
         var page = client.browseAssets("haircut", "", 1, 1);
