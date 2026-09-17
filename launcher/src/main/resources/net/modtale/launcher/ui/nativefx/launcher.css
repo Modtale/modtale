@@ -7844,7 +7844,7 @@
 }
 
 .play-sidebar {
-    -fx-padding: 16px;
+    -fx-padding: 4px 16px 16px;
     -fx-spacing: 14px;
     -fx-background-radius: 0;
     -fx-border-radius: 0;
