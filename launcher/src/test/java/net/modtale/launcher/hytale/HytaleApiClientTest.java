@@ -288,6 +288,94 @@ class HytaleApiClientTest {
     }
 
     @Test
+    void patchDiscoveryAndLaunchReuseRecentResponsesButRefreshAfterExpiry() {
+        var responses = new java.util.HashMap<String, StubResponse>();
+        responses.put(HytaleApiClient.LAUNCHER_INFO_URL, new StubResponse(200, "{}"));
+        responses.put(patchesUrl("release", 0), new StubResponse(200,
+                "{\"steps\":[{\"from\":0,\"to\":29}]}"));
+        responses.put(patchesUrl("release", 1), new StubResponse(200, "{\"steps\":[]}"));
+        FakeHttpClient http = new FakeHttpClient(responses);
+        MutableClock clock = new MutableClock();
+        HytaleApiClient client = new HytaleApiClient(http, clock);
+        client.getAvailablePatchlines("token", List.of());
+        assertEquals(29, client.getAvailableVersions("token", "release").getFirst().build());
+        client.getAvailableVersions("token", "release");
+        assertEquals(1, http.requestUris().stream().filter(URI.create(patchesUrl("release", 0))::equals).count());
+        assertEquals(1, http.requestUris().stream().filter(URI.create(patchesUrl("release", 1))::equals).count());
+        responses.put(patchesUrl("release", 0), new StubResponse(200,
+                "{\"steps\":[{\"from\":0,\"to\":30}]}"));
+        clock.now += 30_000;
+        assertEquals(30, client.getAvailableVersions("token", "release").getFirst().build());
+        client.getAvailableVersions("different-account-token", "release");
+        assertEquals(3, http.requestUris().stream().filter(URI.create(patchesUrl("release", 0))::equals).count());
+    }
+
+    @Test
+    void concurrentBuildLoadsSharePatchRequests() throws Exception {
+        FakeHttpClient http = new FakeHttpClient(Map.of(
+                HytaleApiClient.LAUNCHER_INFO_URL, new StubResponse(200, "{}"),
+                patchesUrl("release", 0), new StubResponse(200,
+                        "{\"steps\":[{\"from\":0,\"to\":29}]}"),
+                patchesUrl("release", 1), new StubResponse(200, "{\"steps\":[]}")));
+        HytaleApiClient client = new HytaleApiClient(http, new MutableClock());
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(8)) {
+            var calls = new ArrayList<java.util.concurrent.Future<List<HytaleVersion>>>();
+            for (int i = 0; i < 16; i++) {
+                calls.add(executor.submit(() -> client.getAvailableVersions("token", "release")));
+            }
+            for (var call : calls) assertEquals(29, call.get(5, java.util.concurrent.TimeUnit.SECONDS).getFirst().build());
+        }
+        assertEquals(1, http.requestUris().stream().filter(URI.create(patchesUrl("release", 0))::equals).count());
+        assertEquals(1, http.requestUris().stream().filter(URI.create(patchesUrl("release", 1))::equals).count());
+    }
+
+    @Test
+    void rateLimitStopsRequestsAcrossPatchlinesUntilRetryAfterExpires() {
+        var responses = new java.util.HashMap<String, StubResponse>();
+        responses.put(HytaleApiClient.LAUNCHER_INFO_URL, new StubResponse(200, "{}"));
+        responses.put(patchesUrl("pre-release", 0), new StubResponse(429, "error code: 1015",
+                Map.of("Retry-After", List.of("7"))));
+        FakeHttpClient http = new FakeHttpClient(responses);
+        MutableClock clock = new MutableClock();
+        HytaleApiClient client = new HytaleApiClient(http, clock);
+        var initial = assertThrows(HytaleApiException.class,
+                () -> client.getAvailableVersions("token", "pre-release"));
+        assertEquals(7_000, initial.retryAfterMillis());
+        assertFalse(initial.getMessage().contains("1015"));
+        int requests = http.requests.size();
+        clock.now += 2_000;
+        var blocked = assertThrows(HytaleApiException.class,
+                () -> client.getAvailableVersions("token", "release"));
+        assertEquals(5_000, blocked.retryAfterMillis());
+        assertEquals(requests, http.requests.size());
+        responses.put(patchesUrl("pre-release", 0), new StubResponse(200,
+                "{\"steps\":[{\"from\":0,\"to\":30}]}"));
+        clock.now += 5_000;
+        assertEquals(30, client.getAvailableVersions("token", "pre-release").getFirst().build());
+    }
+
+    @Test
+    void cloudflareRateLimitWithoutRetryAfterUsesOneMinuteCooldown() {
+        FakeHttpClient http = new FakeHttpClient(Map.of(
+                HytaleApiClient.LAUNCHER_INFO_URL, new StubResponse(200, "{}"),
+                patchesUrl("release", 0), new StubResponse(429, "error code: 1015")));
+        HytaleApiClient client = new HytaleApiClient(http, new MutableClock());
+        var error = assertThrows(HytaleApiException.class,
+                () -> client.getAvailableVersions("token", "release"));
+        assertEquals(60_000, error.retryAfterMillis());
+        int requests = http.requests.size();
+        assertThrows(HytaleApiException.class, () -> client.fetchProfiles("token"));
+        assertEquals(requests, http.requests.size());
+    }
+
+    private static final class MutableClock extends java.time.Clock {
+        long now = 1_000_000;
+        @Override public java.time.ZoneId getZone() { return java.time.ZoneOffset.UTC; }
+        @Override public java.time.Clock withZone(java.time.ZoneId zone) { return this; }
+        @Override public java.time.Instant instant() { return java.time.Instant.ofEpochMilli(now); }
+    }
+
+    @Test
     void rateLimitExceptionIncludesRetryAfterHeader() {
         String releaseUrl = patchesUrl("release", 0);
         FakeHttpClient httpClient = new FakeHttpClient(Map.of(

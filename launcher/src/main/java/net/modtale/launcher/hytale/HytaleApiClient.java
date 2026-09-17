@@ -14,6 +14,7 @@ import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -75,6 +76,14 @@ public class HytaleApiClient {
             .appendPattern("MMMM d, yyyy")
             .toFormatter(Locale.ENGLISH);
 
+    private static final long PATCH_CACHE_MILLIS = 30_000;
+    private static final long DEFAULT_RATE_LIMIT_MILLIS = 60_000;
+    private final Clock clock;
+    private final Map<URI, CachedPatches> patchCache = new LinkedHashMap<>();
+    private final Map<String, Long> hostRetryAt = new LinkedHashMap<>();
+    private String patchCacheToken;
+    private record CachedPatches(OfficialPatchesResponse response, long expiresAt) { }
+
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
     private volatile String launcherVersion;
@@ -90,6 +99,11 @@ public class HytaleApiClient {
     }
 
     HytaleApiClient(HttpClient httpClient) {
+        this(httpClient, Clock.systemUTC());
+    }
+
+    HytaleApiClient(HttpClient httpClient, Clock clock) {
+        this.clock = clock;
         this.httpClient = httpClient;
         this.mapper = new ObjectMapper()
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
@@ -334,13 +348,25 @@ public class HytaleApiClient {
                 .toList();
     }
 
-    private OfficialPatchesResponse fetchPatches(String accessToken, String os, String arch, String branch, int fromBuild) {
+    private synchronized OfficialPatchesResponse fetchPatches(String accessToken, String os, String arch, String branch, int fromBuild) {
         URI uri = URI.create(PATCHES_BASE_URL + "/" + os + "/" + arch + "/" + normalizeBranch(branch) + "/" + fromBuild);
+        if (!java.util.Objects.equals(patchCacheToken, accessToken)) {
+            patchCache.clear();
+            patchCacheToken = accessToken;
+        }
+        long now = clock.millis();
+        patchCache.values().removeIf(entry -> entry.expiresAt() <= now);
+        CachedPatches cached = patchCache.get(uri);
+        if (cached != null) {
+            return cached.response();
+        }
         HttpRequest request = officialRequestBuilder(uri, branch)
                 .GET()
                 .header("Authorization", "Bearer " + accessToken)
                 .build();
-        return sendJson(request, OfficialPatchesResponse.class);
+        OfficialPatchesResponse response = sendJson(request, OfficialPatchesResponse.class);
+        patchCache.put(uri, new CachedPatches(response, clock.millis() + PATCH_CACHE_MILLIS));
+        return response;
     }
 
     private void addAvailablePatchline(
@@ -467,9 +493,21 @@ public class HytaleApiClient {
         }
     }
 
-    private String sendString(HttpRequest request) {
+    private synchronized String sendString(HttpRequest request) {
+        String host = request.uri().getHost();
+        long remaining = hostRetryAt.getOrDefault(host, 0L) - clock.millis();
+        if (remaining > 0) {
+            throw rateLimited(remaining);
+        }
         try {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (response.statusCode() == 429) {
+                long delay = retryAfterMillis(response.headers(), clock.instant());
+                if (delay <= 0) delay = DEFAULT_RATE_LIMIT_MILLIS;
+                long now = clock.millis();
+                hostRetryAt.put(host, now + Math.min(delay, Long.MAX_VALUE - now));
+                throw rateLimited(delay);
+            }
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new HytaleApiException("Hytale API returned HTTP " + response.statusCode()
                         + " for " + request.uri() + responseSnippet(response.body()),
@@ -484,6 +522,12 @@ public class HytaleApiClient {
             Thread.currentThread().interrupt();
             throw new HytaleApiException("Hytale API request was interrupted.", ex);
         }
+    }
+
+    private static HytaleApiException rateLimited(long delay) {
+        long seconds = Math.max(1, (long) Math.ceil(delay / 1000.0));
+        return new HytaleApiException("Hytale is temporarily limiting requests. Try again in "
+                + seconds + " seconds.", 429, null, delay);
     }
 
     private static String formEncode(Map<String, String> values) {
