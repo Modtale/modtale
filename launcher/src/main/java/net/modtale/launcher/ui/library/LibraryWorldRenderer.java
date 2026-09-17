@@ -54,6 +54,8 @@ final class LibraryWorldRenderer {
     private static final PseudoClass CONTENTS_HOVERED = PseudoClass.getPseudoClass("contents-hovered");
 
     private List<String> knownGameVersions = List.of();
+    private String currentGameVersion = "";
+    void setCurrentGameVersion(String version) { currentGameVersion = version == null ? "" : version; }
     private String librarySearch = "";
     void setKnownGameVersions(List<String> versions) { knownGameVersions = List.copyOf(versions); }
 
@@ -761,6 +763,18 @@ final class LibraryWorldRenderer {
             Label compatibility = versionMetadata(ManifestVersionLabel.format(requirement, knownGameVersions), "Compatible versions", "build");
             compatibility.setTooltip(new Tooltip("Manifest ServerVersion: " + requirement));
             row.getChildren().add(compatibility);
+            if (ManifestVersionCompatibility.incompatible(requirement, currentGameVersion)) {
+                String message = "This mod targets " + requirement + " but the current game version is "
+                        + currentGameVersion + ". It may not work correctly.";
+                Label warning = new Label(null, LauncherIcons.icon(LauncherIcons.Glyph.ALERT_TRIANGLE, 16));
+                warning.getStyleClass().add("library-compatibility-warning");
+                warning.setAccessibleText(message);
+                Tooltip tooltip = new Tooltip(message);
+                tooltip.setWrapText(true);
+                tooltip.setMaxWidth(440);
+                warning.setTooltip(tooltip);
+                row.getChildren().add(warning);
+            }
         }
     }
 

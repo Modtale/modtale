@@ -8860,6 +8860,10 @@
     -fx-text-fill: #cbd5e1;
 }
 
+.library-compatibility-warning .svg-icon {
+    -fx-stroke: #e34d67;
+}
+
 .library-version-divider {
     -fx-text-fill: #64748b;
 }

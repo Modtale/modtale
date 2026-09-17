@@ -583,6 +583,9 @@ public final class LauncherLibraryController {
     }
 
     private void renderWorldDetail() {
+        worldRenderer.setCurrentGameVersion(settingsController == null ? "" :
+                net.modtale.launcher.hytale.HytaleGameVersionResolver
+                        .selectedServerVersion(settingsController.settings()).orElse(""));
         Optional<HytaleWorld> selected = selectedWorld();
         if (selected.isEmpty()) {
             if (worlds.isEmpty()) {
