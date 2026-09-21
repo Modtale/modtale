@@ -116,7 +116,7 @@ final class ConfigEditorModal {
                 work("Opening world folder…", () -> {
                     net.modtale.launcher.platform.SystemFileOpener.openDirectory(worldDirectory);
                     return true;
-                }, ignored -> status.setText("Close Hytale before making changes."), "Could not open the world folder.");
+                }, ignored -> status.setText(""), "Could not open the world folder.");
             });
             footer.getChildren().addFirst(folder);
         }
@@ -145,7 +145,7 @@ final class ConfigEditorModal {
             return loaded;
         }, loaded -> {
             documents.addAll(loaded); buildRows(); buildNavigation(); filter();
-            status.setText(unavailable > 0 ? "Some settings cannot be edited here yet." : "Close Hytale before making changes.");
+            status.setText(unavailable > 0 ? "Some settings cannot be edited here yet." : worldSettings ? "" : "Close Hytale before making changes.");
         }, "Settings couldn't be loaded. Try refreshing the library.");
     }
 

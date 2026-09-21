@@ -111,6 +111,8 @@ class ConfigEditorModalTest {
         });
         fx(() -> {
             host.applyCss(); host.layout();
+            assertTrue(host.lookupAll(".label").stream().map(node -> ((javafx.scene.control.Label) node).getText())
+                    .noneMatch("Close Hytale before making changes."::equals));
             assertTrue(button(host, "Save changes").isDisabled());
             assertNotNull(button(host, "Open folder"));
             assertEquals("", input(host, "Day duration (seconds)").getText());
