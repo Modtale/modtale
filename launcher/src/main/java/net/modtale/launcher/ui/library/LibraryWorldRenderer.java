@@ -198,7 +198,11 @@ final class LibraryWorldRenderer {
         pack.setPrefHeight(40);
         pack.setMaxHeight(40);
         Button settings = secondaryButton("World settings");
+        settings.getStyleClass().addAll("small", "library-action-emphasis");
         settings.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.SLIDERS, 14));
+        settings.setMinHeight(40);
+        settings.setPrefHeight(40);
+        settings.setMaxHeight(40);
         settings.setAccessibleText("World settings");
         settings.setOnAction(event -> editWorldSettings.accept(model.world()));
         actions.getChildren().addAll(tools, settings, pack);
