@@ -168,7 +168,7 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                         <X className="w-5 h-5" />
                     </button>
 
-                    <div className="text-center mb-6">
+                    <div className="text-center mb-3">
                         <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-normal mb-2">
                             {mode === 'signin' ? 'Welcome Back' : (mode === 'register' ? 'Create Account' : 'Reset Password')}
                         </h2>
