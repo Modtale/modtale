@@ -637,6 +637,10 @@ public final class LauncherPlayController {
         control.setAlignment(Pos.CENTER);
         control.setMaxWidth(Region.USE_PREF_SIZE);
 
+        patchlineMetric.getStyleClass().add("play-launch-patchline");
+        patchlineMetric.setMaxWidth(Double.MAX_VALUE);
+        patchlineMetric.setAlignment(Pos.CENTER);
+
         StackPane split = new StackPane();
         split.getStyleClass().add("play-launch-split");
         split.setAlignment(Pos.CENTER);
@@ -656,7 +660,7 @@ public final class LauncherPlayController {
         StackPane.setMargin(setup, new Insets(0, 7, 0, 0));
 
         split.getChildren().addAll(play, setup);
-        control.getChildren().add(split);
+        control.getChildren().addAll(split, patchlineMetric);
         return control;
     }
 
@@ -1676,10 +1680,8 @@ public final class LauncherPlayController {
 
     private void syncPatchlineMetric(String selectedPatchline) {
         String patchline = HytaleApiClient.normalizeBranch(selectedPatchline);
-        boolean showPatchline = !"release".equals(patchline);
         patchlineMetric.setText(launchPatchlineLabel(patchline));
-        Node container = patchlineMetric.getParent();
-        setVisibleManaged(container == null ? patchlineMetric : container, showPatchline);
+        setVisibleManaged(patchlineMetric, true);
     }
 
     private String launchPatchlineLabel(String patchline) {

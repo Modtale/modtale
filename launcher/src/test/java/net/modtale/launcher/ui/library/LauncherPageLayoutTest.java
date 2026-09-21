@@ -104,6 +104,9 @@ class LauncherPageLayoutTest {
                 var avatarBounds = avatar.localToScene(avatar.getBoundsInLocal());
                 assertEquals((avatarBounds.getMinY() + avatarBounds.getMaxY()) / 2, copyCenter, 1);
                 Node launch = view.lookup(".play-launch-main");
+                Label patchline = (Label) view.lookup(".play-launch-patchline");
+                assertNotNull(patchline);
+                assertEquals("Latest release", patchline.getText());
                 assertTrue(launch.localToScene(launch.getBoundsInLocal()).getMaxY() < (width == 1280 ? 800 : 1000));
                 var scroll = (ScrollPane) view.lookup(".play-stage-scroll");
                 assertTrue(scroll.getViewportBounds().getHeight() > 0);
@@ -154,6 +157,11 @@ class LauncherPageLayoutTest {
                 snapshot(host, "play-catalog-" + width);
                 scroll.setVvalue(0);
             }
+            Label patchline = (Label) view.lookup(".play-launch-patchline");
+            settings.form().hytaleBranchCombo().setValue("pre-release");
+            assertEquals("Pre-release", patchline.getText());
+            settings.form().hytaleBranchCombo().setValue("release");
+            assertEquals("Latest release", patchline.getText());
             Node compact = view.lookup(".project-card-compact");
             ((javafx.scene.control.Button) compact.lookup(".project-install-button")).fire();
             ((javafx.scene.control.Button) compact.lookup(".favorite-stat")).fire();

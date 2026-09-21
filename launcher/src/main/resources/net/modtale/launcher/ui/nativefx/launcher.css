@@ -8307,6 +8307,13 @@
     -fx-effect: none;
 }
 
+.play-launch-patchline {
+    -fx-text-fill: #9ca3af;
+    -fx-font-size: 12px;
+    -fx-font-family: "Inter SemiBold", "Inter", "SF Pro Text", "Segoe UI", "System";
+    -fx-font-weight: 700;
+}
+
 .play-launch-split {
     -fx-min-width: 310px;
     -fx-pref-width: 310px;
