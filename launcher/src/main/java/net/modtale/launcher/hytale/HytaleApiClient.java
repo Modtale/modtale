@@ -913,7 +913,7 @@ public class HytaleApiClient {
         if (node == null || node.isNull()) {
             return;
         }
-        String normalized = fieldName == null ? "" : fieldName.toLowerCase();
+        String normalized = fieldName == null ? "" : fieldName.toLowerCase(Locale.ROOT);
         if (node.isArray()) {
             if (normalized.contains("friend")) {
                 friendArrays.add(node);
@@ -936,7 +936,7 @@ public class HytaleApiClient {
         String username = firstIdentityText(node, identity,
                 "username", "displayName", "display_name", "name", "playerName", "player_name");
         String uuid = firstIdentityText(node, identity,
-                "uuid", "profileUuid", "profile_uuid", "playerUuid", "player_uuid", "id", "playerId", "player_id");
+                "uuid", "profileUuid", "profile_uuid", "playerUuid", "player_uuid", "friendUuid", "friend_uuid", "id", "playerId", "player_id");
         if (username.isBlank() && uuid.isBlank()) {
             return Optional.empty();
         }
@@ -970,12 +970,25 @@ public class HytaleApiClient {
         return firstText(nestedIdentity, fields);
     }
 
+    private static JsonNode fieldIgnoringCase(JsonNode node, String field) {
+        JsonNode exact = node.get(field);
+        if (exact != null) {
+            return exact;
+        }
+        for (var entry : node.properties()) {
+            if (entry.getKey().equalsIgnoreCase(field)) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
     private static JsonNode firstObject(JsonNode node, String... fields) {
         if (node == null || !node.isObject()) {
             return null;
         }
         for (String field : fields) {
-            JsonNode child = node.get(field);
+            JsonNode child = fieldIgnoringCase(node, field);
             if (child != null && child.isObject()) {
                 return child;
             }
@@ -988,7 +1001,7 @@ public class HytaleApiClient {
             return "";
         }
         for (String field : fields) {
-            JsonNode child = node.get(field);
+            JsonNode child = fieldIgnoringCase(node, field);
             String value = textValue(child);
             if (!value.isBlank()) {
                 return value;
@@ -1016,7 +1029,7 @@ public class HytaleApiClient {
             return false;
         }
         for (String field : fields) {
-            JsonNode child = node.get(field);
+            JsonNode child = fieldIgnoringCase(node, field);
             if (child != null && child.isBoolean() && child.asBoolean()) {
                 return true;
             }

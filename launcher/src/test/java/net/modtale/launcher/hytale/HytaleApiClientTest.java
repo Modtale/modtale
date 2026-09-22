@@ -182,6 +182,46 @@ class HytaleApiClientTest {
     }
 
     @Test
+    void extractsCapitalizedSocialFriendsAndPresence() throws Exception {
+        List<HytaleFriend> friends = HytaleApiClient.parseFriends(new ObjectMapper().readTree("""
+                {"Friends": [
+                  {"Uuid": "friend-one", "Username": "Builder", "IsOnline": true},
+                  {"Profile": {"Uuid": "friend-two", "Username": "Explorer"},
+                   "Presence": {"Status": "IN_GAME", "IsOnline": true}},
+                  {"Uuid": "friend-three", "IsOnline": false}
+                ]}
+                """));
+
+        assertEquals(3, friends.size());
+        assertEquals("Builder", friends.get(0).username());
+        assertEquals("friend-one", friends.get(0).uuid());
+        assertTrue(friends.get(0).online());
+        assertEquals("Explorer", friends.get(1).username());
+        assertEquals("In game", friends.get(1).displayStatus());
+        assertTrue(friends.get(1).online());
+        assertEquals("friend-three", friends.get(2).uuid());
+        assertEquals("", friends.get(2).username());
+        assertFalse(friends.get(2).online());
+    }
+
+    @Test
+    void preservesFriendUuidEntriesForProfileLookupAndDeduplicatesThem() throws Exception {
+        List<HytaleFriend> friends = HytaleApiClient.parseFriends(new ObjectMapper().readTree("""
+                {"friends": [
+                  {"friendUuid": "friend-one", "isOnline": true},
+                  {"friend_uuid": "friend-two"},
+                  {"FriendUuid": "FRIEND-ONE"}
+                ]}
+                """));
+
+        assertEquals(2, friends.size());
+        assertEquals("friend-one", friends.getFirst().uuid());
+        assertEquals("", friends.getFirst().username());
+        assertTrue(friends.getFirst().online());
+        assertEquals("friend-two", friends.get(1).uuid());
+    }
+
+    @Test
     void fetchFriendsUsesSocialSessionToken() {
         FakeHttpClient httpClient = new FakeHttpClient(Map.of(
                 HytaleApiClient.LAUNCHER_INFO_URL,
