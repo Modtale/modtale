@@ -264,6 +264,12 @@ public final class HytaleModRegistry {
 
     private static Path canonical(Path path) {
         try { return path.toRealPath(); }
-        catch (IOException ignored) { return path.toAbsolutePath().normalize(); }
+        catch (IOException ignored) {
+            Path absolute = path.toAbsolutePath().normalize();
+            Path parent = absolute.getParent();
+            // Deleted files cannot resolve themselves, but their directory may still
+            // have a canonical spelling (a symlink or a Windows short path).
+            return parent == null ? absolute : canonical(parent).resolve(absolute.getFileName());
+        }
     }
 }
