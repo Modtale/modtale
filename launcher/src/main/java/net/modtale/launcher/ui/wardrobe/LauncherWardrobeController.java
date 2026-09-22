@@ -337,9 +337,11 @@ public final class LauncherWardrobeController implements AutoCloseable {
         }
         visual.setPrefHeight(170); visual.setMinWidth(0); visual.setMaxWidth(Double.MAX_VALUE);
         String displayName = displayedLookName(item);
-        Label name = label(displayName, "wardrobe-card-name"); hideWhenEmpty(name); name.setMinWidth(0); name.setMaxWidth(Double.MAX_VALUE);
-        VBox contents = new VBox(8, visual, name);
-        if (tab == Tab.SAVED && !item.collection().isBlank()) contents.getChildren().add(label(item.collection(), "wardrobe-card-detail"));
+        VBox contents = new VBox(8, visual);
+        if (tab != Tab.SAVED) {
+            Label name = label(displayName, "wardrobe-card-name"); hideWhenEmpty(name); name.setMinWidth(0); name.setMaxWidth(Double.MAX_VALUE);
+            contents.getChildren().add(name);
+        }
         Button button = new Button(); button.setId("wardrobe-look-" + item.id()); button.setGraphic(contents); button.getStyleClass().add("wardrobe-card");
         button.setMinWidth(0); button.setMaxWidth(Double.MAX_VALUE);
         GridPane.setHgrow(button, Priority.ALWAYS); GridPane.setFillWidth(button, true);
@@ -351,7 +353,6 @@ public final class LauncherWardrobeController implements AutoCloseable {
         button.setAccessibleText(displayName.isBlank() ? "Preview skin " + ((page - 1) * cardColumns * 4 + entries.indexOf(entry) + 1) : "Preview " + displayName);
         button.pseudoClassStateChanged(SELECTED, selected != null && selected.id().equals(item.id()));
         button.setOnAction(e -> select(item));
-        if (tab == Tab.SAVED && item.favorite()) name.setText("♥  " + displayName);
         return button;
     }
 
