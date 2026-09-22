@@ -169,6 +169,7 @@ public final class ProjectBrowseCategories {
     private void addCategory(HBox pane, BrowseOptions.ClassificationOption option) {
         Button button = new Button();
         button.getStyleClass().add("pill");
+        button.setAccessibleText(option.label());
         HBox content = new HBox(8, LauncherIcons.icon(option.icon(), 15),
                 spacedTitleText(option.label(), "pill-label", 14));
         content.setAlignment(Pos.CENTER);
