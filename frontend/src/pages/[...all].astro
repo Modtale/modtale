@@ -27,6 +27,11 @@ const url = Astro.url;
 const path = url.pathname;
 const cleanPath = normalizeSeoPath(path);
 const searchParams = url.searchParams;
+
+if (cleanPath === '/status') {
+    return Astro.redirect('/', 302);
+}
+
 if (cleanPath === '/blogs' || cleanPath.startsWith('/blogs/')) {
     const destinationPath = cleanPath === '/blogs'
         ? '/news'
