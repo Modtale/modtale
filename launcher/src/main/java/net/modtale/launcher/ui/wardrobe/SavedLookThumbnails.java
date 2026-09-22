@@ -20,6 +20,9 @@ public final class SavedLookThumbnails implements AutoCloseable {
         return thread;
     });
     private final Map<Key, CompletableFuture<Image>> cache = new LinkedHashMap<>(16, .75f, true);
+    private final Map<String, CompletableFuture<Image>> skeletons = new LinkedHashMap<>();
+    private Path skeletonAssets;
+    private Group skeletonModel;
     private boolean closed;
     private record Key(Path assets, JsonNode skin, String category) {}
     private Path catalogAssets;
@@ -73,10 +76,40 @@ public final class SavedLookThumbnails implements AutoCloseable {
         return result;
     }
 
+    public CompletableFuture<Image> loadSkeleton(Path assets, String category) {
+        if (closed) return CompletableFuture.failedFuture(new IllegalStateException("Thumbnail renderer closed"));
+        Path source = assets.toAbsolutePath().normalize();
+        var framing = CosmeticFraming.forCategory(category);
+        double yaw = "cape".equals(category) ? 180 : -20;
+        String key = source + ":" + framing + ":" + yaw;
+        var cached = skeletons.get(key);
+        if (cached != null) return cached;
+        CompletableFuture<Image> result = new CompletableFuture<>();
+        skeletons.put(key, result);
+        worker.execute(() -> {
+            try {
+                if (result.isCancelled()) return;
+                if (!source.equals(skeletonAssets)) {
+                    var sourceCatalog = new net.modtale.launcher.wardrobe.CosmeticCatalogClient(source);
+                    skeletonModel = LocalAvatarRenderer.load(source, sourceCatalog.defaultSkin(), sourceCatalog);
+                    skeletonAssets = source;
+                }
+                Image image = net.modtale.launcher.wardrobe.LocalAvatarThumbnail.renderSkeleton(skeletonModel, 256,
+                        yaw, framing.centerY(), framing.scale());
+                Platform.runLater(() -> { if (closed) result.cancel(false); else result.complete(image); });
+            } catch (Exception error) {
+                Platform.runLater(() -> { skeletons.remove(key, result); result.completeExceptionally(error); });
+            }
+        });
+        return result;
+    }
+
     @Override public void close() {
         closed = true;
         worker.shutdownNow();
         cache.values().forEach(future -> future.cancel(false));
         cache.clear();
+        skeletons.values().forEach(future -> future.cancel(false));
+        skeletons.clear();
     }
 }

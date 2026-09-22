@@ -66,10 +66,10 @@ class LauncherWardrobeControllerTest {
                 assertTrue(gridCards(h).isEmpty());
                 return null;
             });
-            await(() -> card(h.root(), "Catalog skin") != null);
-            fx(() -> {
-                assertTrue(h.root().lookupAll(".wardrobe-skeleton-card").isEmpty());
-                return null;
+            await(() -> {
+                h.root().applyCss(); ((javafx.scene.Parent) h.root()).layout();
+                return card(h.root(), "Catalog skin") != null
+                        && h.root().lookupAll(".wardrobe-skeleton-card").isEmpty();
             });
         }
     }

@@ -265,7 +265,7 @@ public final class CosmeticEditorController implements AutoCloseable {
 
     private void showGridSkeletons() {
         grid.getChildren().clear();
-        for (int i = 0; i < columns * 4; i++) grid.getChildren().add(WardrobeSkeleton.cosmeticCard(category));
+        for (int i = 0; i < columns * 4; i++) grid.getChildren().add(WardrobeSkeleton.cosmeticCard(thumbnails.loadSkeleton(assetsForPreview(), category)));
         layoutCards();
     }
 
@@ -301,7 +301,7 @@ public final class CosmeticEditorController implements AutoCloseable {
         image.setFitWidth(140); image.setFitHeight(135); image.setPreserveRatio(true);
         Label fallback = text(option.label(), "wardrobe-card-fallback"); fallback.setMaxWidth(130); fallback.setWrapText(true);
         var skin = catalog.defaultSkin(); skin.put(option.category(), option.id());
-        StackPane skeleton = WardrobeSkeleton.cosmetic(option.category());
+        StackPane skeleton = WardrobeSkeleton.cosmetic(thumbnails.loadSkeleton(assetsForPreview(), option.category()));
         fallback.setVisible(false);
         thumbnails.load(assetsForPreview(), skin, option.category()).whenComplete((rendered, error) -> {
             if (disposed) return;

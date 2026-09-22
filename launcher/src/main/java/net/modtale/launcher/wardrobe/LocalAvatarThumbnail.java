@@ -19,12 +19,20 @@ public final class LocalAvatarThumbnail {
     private LocalAvatarThumbnail() {}
 
     public static Image render(Group model, int size, double yaw, double centerY, double scale) throws IOException {
+        return render(model, size, yaw, centerY, scale, false);
+    }
+
+    public static Image renderSkeleton(Group model, int size, double yaw, double centerY, double scale) throws IOException {
+        return render(model, size, yaw, centerY, scale, true);
+    }
+
+    private static Image render(Group model, int size, double yaw, double centerY, double scale, boolean skeleton) throws IOException {
         if (size < 32 || size > 1024 || !Double.isFinite(yaw) || !Double.isFinite(centerY) || !Double.isFinite(scale) || scale <= 0)
             throw new IllegalArgumentException("Invalid thumbnail framing");
         Bounds bounds = LocalAvatarRenderer.bounds(model);
         double radius = Math.sqrt(bounds.getWidth() * bounds.getWidth() + bounds.getHeight() * bounds.getHeight() + bounds.getDepth() * bounds.getDepth()) / 2;
         if (!Double.isFinite(radius) || radius < 1e-8) throw new IOException("Empty avatar bounds");
-        var raster = new Raster(size, bounds, radius, yaw, centerY, scale);
+        var raster = new Raster(size, bounds, radius, yaw, centerY, scale, skeleton);
         raster.visit(model);
         WritableImage image = new WritableImage(size, size);
         image.getPixelWriter().setPixels(0, 0, size, size, PixelFormat.getIntArgbInstance(), raster.pixels, 0, size);
@@ -38,7 +46,9 @@ public final class LocalAvatarThumbnail {
         final Bounds bounds;
         final double radius, sin, cos, centerY, distance, focal;
         int triangles;
-        Raster(int size, Bounds bounds, double radius, double yaw, double centerY, double scale) {
+        final boolean skeleton;
+        Raster(int size, Bounds bounds, double radius, double yaw, double centerY, double scale, boolean skeleton) {
+            this.skeleton = skeleton;
             this.size = size; this.bounds = bounds; this.radius = radius; this.centerY = centerY;
             sin = Math.sin(Math.toRadians(yaw)); cos = Math.cos(Math.toRadians(yaw));
             distance = 1.1 / Math.sin(Math.toRadians(17.5)) * scale;
@@ -82,6 +92,14 @@ public final class LocalAvatarThumbnail {
                 int maxX = Math.min(size - 1, (int)Math.ceil(Math.max(a[0], Math.max(b[0], c[0]))));
                 int minY = Math.max(0, (int)Math.floor(Math.min(a[1], Math.min(b[1], c[1]))));
                 int maxY = Math.min(size - 1, (int)Math.ceil(Math.max(a[1], Math.max(b[1], c[1]))));
+                int grey = 0;
+                if (skeleton) {
+                    Point3D pa = vertex(view, points, faces[f]), pb = vertex(view, points, faces[f + stride]), pc = vertex(view, points, faces[f + stride * 2]);
+                    Point3D normal = pb.subtract(pa).crossProduct(pc.subtract(pa)).normalize();
+                    double light = Math.abs(normal.dotProduct(new Point3D(-.4, -.7, -.6).normalize()));
+                    int shade = (int) (135 + 60 * light);
+                    grey = 0x78000000 | shade << 16 | shade << 8 | shade;
+                }
                 int ta = faces[f + uvOffset] * 2, tb = faces[f + stride + uvOffset] * 2, tc = faces[f + stride * 2 + uvOffset] * 2;
                 for (int y = minY; y <= maxY; y++) for (int x = minX; x <= maxX; x++) {
                     double wa = edge(b, c, x + .5, y + .5) / area;
@@ -101,9 +119,12 @@ public final class LocalAvatarThumbnail {
                     }
                     // Cosmetic textures use cutout alpha; transparent texels must not occlude layers behind them.
                     if ((color >>> 24) < 128) continue;
-                    pixels[index] = color; depth[index] = z;
+                    pixels[index] = skeleton ? grey : color; depth[index] = z;
                 }
             }
+        }
+        static Point3D vertex(MeshView view, float[] points, int index) {
+            return view.localToScene(points[index * 3], points[index * 3 + 1], points[index * 3 + 2]);
         }
         static double edge(double[] a, double[] b, double x, double y) { return (x - a[0]) * (b[1] - a[1]) - (y - a[1]) * (b[0] - a[0]); }
     }
