@@ -39,7 +39,7 @@ class WorldListConfigCaptureTest {
         Path root = directory.resolve("mods");
         Path outside = Files.createDirectory(directory.resolve("outside"));
         Files.createDirectories(root);
-        Files.createSymbolicLink(root.resolve("linked"), outside);
+        net.modtale.launcher.TestSymlinks.createSymbolicLink(root.resolve("linked"), outside);
         var configs = List.of(new WorldListConfig("WORLD", "Safe/config.json", "{}"),
                 new WorldListConfig("WORLD", "linked/config.json", "{}"));
         assertThrows(java.io.IOException.class, () -> WorldListConfigInstaller.install(configs, "WORLD", root));

@@ -78,7 +78,7 @@ class WorldSettingsTest {
         Files.createDirectories(mod.getParent()); Files.writeString(mod, "{}");
         Path other = directory.resolve("other/config.json");
         Files.createDirectories(other.getParent()); Files.writeString(other, "{}");
-        Files.createSymbolicLink(directory.resolve("universe/worlds/linked"), other.getParent());
+        net.modtale.launcher.TestSymlinks.createSymbolicLink(directory.resolve("universe/worlds/linked"), other.getParent());
         var found = files.discoverWorldSettings(directory);
         assertEquals(1, found.size());
         assertEquals(directory.resolve("universe/worlds/default/config.json"), found.getFirst().path());
