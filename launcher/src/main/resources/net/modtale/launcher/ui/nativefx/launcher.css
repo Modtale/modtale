@@ -8195,8 +8195,11 @@
 }
 
 .play-friend-avatar {
-    -fx-background-radius: 999px;
+    -fx-background-radius: 8px;
     -fx-background-color: transparent;
+    -fx-border-radius: 8px;
+    -fx-border-width: 2px;
+    -fx-border-color: rgba(191, 219, 254, 0.26);
     -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.18), 8, 0.12, 0, 3);
 }
 

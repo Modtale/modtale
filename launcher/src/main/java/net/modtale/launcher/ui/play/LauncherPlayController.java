@@ -1352,7 +1352,7 @@ public final class LauncherPlayController {
 
     private void updateHytaleProfileAvatar(StackPane avatar, String username, double size, String profileUuid) {
         updateImageAvatar(avatar, username, size, PROFILE_AVATAR_RADIUS, "");
-        double inset = avatar == identityAvatar ? 3 : 0;
+        double inset = avatar == identityAvatar || avatar.getStyleClass().contains("play-friend-avatar") ? 3 : 0;
         double imageSize = size - inset * 2;
         ImageView image = new ImageView();
         image.setFitWidth(imageSize);
