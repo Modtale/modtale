@@ -54,7 +54,7 @@ class HytaleModRegistryTest {
         assertEquals("MODTALE", refreshed.getFirst().source());
         assertEquals("2.0", refreshed.getFirst().installedVersion());
         assertEquals("", refreshed.getFirst().installedVersionId());
-        assertEquals(updated.toString(), refreshed.getFirst().files().getFirst());
+        assertEquals(updated.toRealPath().toString(), refreshed.getFirst().files().getFirst());
         Files.delete(updated);
         writeRegistry(null, null);
         assertTrue(registry.importProjects(refreshed).isEmpty());
@@ -111,7 +111,26 @@ class HytaleModRegistryTest {
         var result = new HytaleModRegistry(root).importProjects(List.of(previous));
         assertEquals(1, result.size());
         assertEquals("123", result.getFirst().installedVersionId());
-        assertEquals(List.of(current.toString()), result.getFirst().files());
+        assertEquals(List.of(current.toRealPath().toString()), result.getFirst().files());
+    }
+
+    @Test void removesDeletedFilesRecordedThroughADirectoryAlias() throws Exception {
+        Path file = jar("mod.jar", "1");
+        Path alias = root.resolve("mods-alias");
+        try {
+            Files.createSymbolicLink(alias, root.toRealPath());
+        } catch (UnsupportedOperationException | java.io.IOException ex) {
+            org.junit.jupiter.api.Assumptions.abort("Directory symlinks unavailable: " + ex.getMessage());
+        }
+        Path recorded = alias.resolve(file.getFileName());
+        var registry = new HytaleModRegistry(alias);
+        registry.exportProjects(List.of(project(recorded, "mt", "1", "MODTALE")), api(file));
+        assertTrue(JSON.readTree(root.resolve(".installed.json").toFile()).path("mods").has("curseforge:42"));
+
+        Files.delete(file);
+        registry.removeFiles(List.of(recorded.toString()));
+
+        assertFalse(JSON.readTree(root.resolve(".installed.json").toFile()).path("mods").has("curseforge:42"));
     }
 
     private ModtaleApiClient api(Path file) {
