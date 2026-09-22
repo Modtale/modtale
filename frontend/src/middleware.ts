@@ -35,6 +35,18 @@ export const onRequest: MiddlewareHandler = async ({ url }, next) => {
         response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet, noimageindex');
     }
 
+    if (contentType.includes('text/html')) {
+        const policy = response.headers.get('Cache-Control') || 'no-store';
+        // Keep the origin's edge policy, but never retain an old release in browsers.
+        response.headers.set('CDN-Cache-Control', policy);
+        response.headers.set('Cache-Control', /\b(?:private|no-store)\b/i.test(policy)
+            ? policy : 'public, max-age=0, must-revalidate');
+        response.headers.set('Cache-Tag', `modtale-html-${url.hostname}`);
+        if (process.env.MODTALE_DEPLOYMENT_REVISION) {
+            response.headers.set('X-Modtale-Revision', process.env.MODTALE_DEPLOYMENT_REVISION);
+        }
+    }
+
     if (contentType.includes('text/html') && !isLocal) {
         response.headers.set('Content-Security-Policy', SECURITY_CSP);
         response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
