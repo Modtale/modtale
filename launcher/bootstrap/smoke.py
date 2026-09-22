@@ -64,7 +64,9 @@ with tempfile.TemporaryDirectory(prefix="modtale bootstrap ü ") as directory:
     (updates / "active").write_text(payload.name)
     subprocess.run([executable, "--modtale-bootstrap-check"], env=environment, check=True, timeout=45)
     log = log_path.read_text(encoding="utf-8")
-    assert f"Launcher application: {payload}" in log, "Existing executable must load the activated update"
+    application_prefix = "Launcher application: "
+    applications = [line.removeprefix(application_prefix) for line in log.splitlines() if line.startswith(application_prefix)]
+    assert applications and Path(applications[-1]).samefile(payload), f"Existing executable must load the activated update:\n{log}"
     (payload / "bootstrap.json").write_text("invalid")
     subprocess.run([executable, "--modtale-bootstrap-check"], env=environment, check=True, timeout=45)
     assert not (updates / "active").exists(), "Broken update must be deactivated"
