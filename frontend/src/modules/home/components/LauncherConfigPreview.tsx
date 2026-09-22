@@ -18,7 +18,6 @@ export function LauncherConfigPreview({ project, saved, onSave, onClose }: {
     const [draft, setDraft] = useState(saved);
     const [category, setCategory] = useState('All settings');
     const [search, setSearch] = useState('');
-    const [status, setStatus] = useState('');
     const dialog = useRef<HTMLDivElement>(null);
     const titleId = useId();
     const dirty = settings.some(({ key }) => saved[key] !== draft[key]);
@@ -29,13 +28,11 @@ export function LauncherConfigPreview({ project, saved, onSave, onClose }: {
         return () => trigger?.focus();
     }, []);
     const close = () => {
-        if (dirty || invalid) setStatus('Save or reset your changes before closing.');
-        else onClose();
+        if (!dirty && !invalid) onClose();
     };
     const save = () => {
         if (!dirty || invalid) return;
         onSave({ ...draft });
-        setStatus('Changes saved. Ready for your next game.');
     };
     const visible = settings.filter(setting => search.trim()
         ? `${setting.name} ${setting.category}`.toLowerCase().includes(search.trim().toLowerCase())
@@ -66,16 +63,15 @@ export function LauncherConfigPreview({ project, saved, onSave, onClose }: {
                         {visible.map(setting => <label className="llp-setting" key={setting.key}>
                             <strong>{setting.name}</strong>
                             {setting.key === 'cooldown'
-                                ? <input type="number" min="0" step="any" value={draft.cooldown} aria-invalid={invalid} onChange={event => { setDraft({ ...draft, cooldown: event.target.value }); setStatus(''); }} />
-                                : <input type="checkbox" role="switch" className="llp-toggle" checked={draft[setting.key]} onChange={event => { setDraft({ ...draft, [setting.key]: event.target.checked }); setStatus(''); }} />}
+                                ? <input type="number" min="0" step="any" value={draft.cooldown} aria-invalid={invalid} onChange={event => setDraft({ ...draft, cooldown: event.target.value })} />
+                                : <input type="checkbox" role="switch" className="llp-toggle" checked={draft[setting.key]} onChange={event => setDraft({ ...draft, [setting.key]: event.target.checked })} />}
                         </label>)}
                     </div>
                     {!visible.length && <p className="llp-empty">No matching settings. Try another search.</p>}
                 </div>
             </div>
             <div className="llp-settings-footer">
-                <p role="status" className={invalid ? 'llp-error' : ''}>{invalid ? 'Enter a number of zero or more.' : status || (dirty ? 'Unsaved changes' : '')}</p>
-                <div><button type="button" className="llp-button" disabled={!dirty} onClick={() => { setDraft({ ...saved }); setStatus('Changes reset.'); }}>Reset changes</button>
+                <div><button type="button" className="llp-button" disabled={!dirty} onClick={() => setDraft({ ...saved })}>Reset changes</button>
                     <button type="button" className="llp-button llp-primary" disabled={!dirty || invalid} onClick={save}>Save changes</button></div>
             </div>
         </div>

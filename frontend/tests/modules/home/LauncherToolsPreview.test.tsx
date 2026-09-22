@@ -30,7 +30,8 @@ it('opens a mod config modal from its row, saves per mod, and guards unsaved cha
         expect(container.textContent).toContain('2 of 3 mods enabled');
         await act(async () => toggle().click());
         await act(async () => button('Done').click());
-        expect(dialog().textContent).toContain('Save or reset your changes before closing.');
+        expect(dialog()).not.toBeNull();
+        expect(dialog().querySelector('[role=status]')).toBeNull();
         await act(async () => button('Save changes').click());
         await act(async () => button('Done').click());
         expect(dialog()).toBeNull();

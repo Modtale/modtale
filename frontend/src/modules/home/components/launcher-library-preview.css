@@ -62,8 +62,6 @@
 .llp-toggle:checked { background-color:#2563eb; border-color:#3b82f6; }
 .llp-toggle:checked::before { transform:translateX(12px); }
 .llp-settings-footer { padding-top:12px; border-top:1px solid #ffffff1a; }
-.llp-settings-footer p { color:#94a3b8; font-size:10px; min-height:15px; margin:0 0 10px; }
-.llp-settings-footer p.llp-error { color:#fda4af; }
 .llp-settings-footer > div { display:flex; justify-content:flex-end; gap:8px; }
 .llp-button { display:inline-flex; align-items:center; justify-content:center; gap:5px; border:1px solid #ffffff1a; background:#182132; color:#e2e8f0; border-radius:8px; padding:8px 10px; font-size:10px; font-weight:750; white-space:nowrap; cursor:pointer; }
 .llp-button.llp-primary { background:#2563eb; border-color:#3b82f6; color:#fff; }
