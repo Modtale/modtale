@@ -595,6 +595,12 @@ jobs:
             echo "API_URL=$BACKEND_SERVICE_URL/api/v1" >> $GITHUB_ENV
           fi
 
+      - name: Require frontend cache invalidation credential
+        if: (env.ENV_TYPE == 'prod' || env.ENV_TYPE == 'dev') && (steps.filter.outputs.frontend == 'true' || env.FRONTEND_EXISTS == 'false')
+        env:
+          CLOUDFLARE_CACHE_PURGE_TOKEN: ${{ secrets.CLOUDFLARE_CACHE_PURGE_TOKEN }}
+        run: ': "${CLOUDFLARE_CACHE_PURGE_TOKEN:?Set the repository secret CLOUDFLARE_CACHE_PURGE_TOKEN before deploying.}"'
+
       - name: Build and Deploy Frontend
         id: deploy_frontend
         if: steps.filter.outputs.frontend == 'true' || env.FRONTEND_EXISTS == 'false'
@@ -616,7 +622,7 @@ jobs:
             "--memory" "256Mi"
             "--concurrency" "80"
             "--cpu-throttling"
-            "--set-env-vars" "PUBLIC_API_URL=$API_URL"
+            "--set-env-vars" "PUBLIC_API_URL=$API_URL,MODTALE_DEPLOYMENT_REVISION=$GITHUB_SHA"
           )
 
           if [ "${{ env.ENV_TYPE }}" = "preview" ]; then
@@ -641,6 +647,15 @@ jobs:
             FRONTEND_REVISION=$(gcloud run services describe "$FRONTEND_SERVICE" --region "$REGION" --format="value(status.latestReadyRevisionName)")
             echo "revision=$FRONTEND_REVISION" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Invalidate deployed frontend HTML and verify public release
+        if: (env.ENV_TYPE == 'prod' || env.ENV_TYPE == 'dev') && (steps.filter.outputs.frontend == 'true' || env.FRONTEND_EXISTS == 'false')
+        env:
+          CLOUDFLARE_CACHE_PURGE_TOKEN: ${{ secrets.CLOUDFLARE_CACHE_PURGE_TOKEN }}
+          FRONTEND_PUBLIC_URL: ${{ env.FRONTEND_DOMAIN }}
+        run: |
+          export FRONTEND_ORIGIN_URL="$(cat frontend/frontend_url.txt)"
+          node .github/scripts/invalidate-frontend-cache.mjs
 
       - name: Notify Admin Bot of Frontend Production Deploy
         if: env.ENV_TYPE == 'prod' && steps.deploy_frontend.outputs.revision != ''
