@@ -51,7 +51,6 @@ public final class LauncherWardrobeController implements AutoCloseable {
     private final PauseTransition resizeReload = new PauseTransition(Duration.millis(150));
     private int cardColumns = 3;
     private final TextField search = new TextField();
-    private final ComboBox<String> filter = new ComboBox<>();
     private final Label selectedName = label("", "wardrobe-selected-title");
     private final Label selectedDetail = label("", "wardrobe-muted");
     private final Label status = label("", "wardrobe-muted");
@@ -118,9 +117,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
         search.setPromptText("Search names and collections"); search.getStyleClass().add("wardrobe-search");
         search.setOnAction(e -> { page = 1; totalPages = 1; load(); }); HBox.setHgrow(search, Priority.ALWAYS);
         Button lookup = iconButton("Search", LauncherIcons.Glyph.SEARCH, () -> { page = 1; totalPages = 1; load(); });
-        filter.setId("wardrobe-saved-filter"); filter.setVisible(false); filter.setManaged(false);
-        filter.getStyleClass().add("wardrobe-filter"); filter.setOnAction(e -> { page = 1; totalPages = 1; load(); });
-        searchRow.getChildren().addAll(search, lookup, filter);
+        searchRow.getChildren().addAll(search, lookup);
         feedCredit.setVisible(false); feedCredit.setManaged(false);
         cards.setId("wardrobe-cards"); cards.setMinWidth(0); cards.setHgap(14); cards.setVgap(14);
         rebuildCardColumns();
@@ -187,11 +184,6 @@ public final class LauncherWardrobeController implements AutoCloseable {
         root.getChildren().removeAll(columns, editor.view());
         if (value == Tab.CUSTOMIZE) { root.getChildren().add(editor.view()); editor.refresh(); return; }
         root.getChildren().add(columns);
-        filter.setOnAction(null);
-        filter.getItems().setAll("All looks", "Favorites", "Skins", "Capes");
-        filter.setVisible(value == Tab.SAVED); filter.setManaged(value == Tab.SAVED);
-        filter.getSelectionModel().selectFirst();
-        filter.setOnAction(e -> { page = 1; totalPages = 1; load(); });
         search.setPromptText("Search names and collections");
         load();
     }
@@ -202,11 +194,11 @@ public final class LauncherWardrobeController implements AutoCloseable {
         resizeReload.stop(); loaded = true;
         long generation = ++request;
         Tab requestedTab = tab; int requestedPage = page; int pageSize = cardColumns * 4;
-        String query = search.getText().trim(); String ordering = filter.getValue();
+        String query = search.getText().trim();
         busy = true; setStatus("Loading looks…"); updateSelectionActions();
         CompletableFuture.supplyAsync(() -> {
             if (requestedTab == Tab.POPULAR) return popularPage(requestedPage, pageSize);
-            return pageItems(savedLooks(query, ordering), requestedPage, pageSize);
+            return pageItems(savedLooks(query), requestedPage, pageSize);
         }, executor).whenComplete((items, error) -> Platform.runLater(() -> {
             if (disposed || generation != request) return;
             busy = false;
@@ -247,12 +239,10 @@ public final class LauncherWardrobeController implements AutoCloseable {
         }
     }
 
-    private List<WardrobeItem> savedLooks(String query, String ordering) {
+    private List<WardrobeItem> savedLooks(String query) {
         String needle = query.toLowerCase(Locale.ROOT);
         return store.items().stream().filter(i -> (i.name() + " " + i.collection()).toLowerCase(Locale.ROOT).contains(needle))
-                .filter(i -> !"Favorites".equals(ordering) || i.favorite())
-                .filter(i -> !"Skins".equals(ordering) || i.kind() == WardrobeItem.Kind.SKIN)
-                .filter(i -> !"Capes".equals(ordering) || i.kind() == WardrobeItem.Kind.CAPE).toList();
+                .toList();
     }
 
     private void goToPage(int target) {

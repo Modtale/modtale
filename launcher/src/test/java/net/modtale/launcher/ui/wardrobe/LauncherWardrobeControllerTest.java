@@ -177,8 +177,7 @@ class LauncherWardrobeControllerTest {
             fx(() -> { h.root().setManaged(false); ((javafx.scene.layout.Region) h.root()).resize(1750, 800); button(h.root(), "Popular skins").fire(); h.controller.refresh(); return null; });
             await(() -> gridReady(h));
             fx(() -> {
-                assertFalse(h.root().lookup("#wardrobe-saved-filter").isVisible(), "Skin sort dropdown must be hidden");
-                assertFalse(h.root().lookup("#wardrobe-saved-filter").isManaged());
+                assertNull(h.root().lookup("#wardrobe-saved-filter"), "Look filter dropdown must be absent");
                 assertGridWidth(h); return null;
             });
             // The explicit layout above can trigger responsive repagination.
