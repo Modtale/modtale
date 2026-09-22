@@ -1,4 +1,4 @@
-import { configOwnerLabel } from '@/modules/worldlist/utils/configOwner';
+import { configOwners } from '@/modules/worldlist/utils/configOwner';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link, useParams } from 'react-router-dom';
@@ -67,7 +67,7 @@ const worldListItemToProject = (item: WorldModListItem, list: WorldModList): Pro
 };
 
 const projectPathForItem = (project: Project, item: WorldModListItem) => {
-    if (!item.projectId && !item.slug) return undefined;
+    if (item.source === 'CURSEFORGE' || (!item.projectId && !item.slug)) return undefined;
     return SiteRoutes.project(project);
 };
 
@@ -86,7 +86,12 @@ const WorldListProjectCard = ({ item, list, priority }: { item: WorldModListItem
             viewStyle="list"
             isVisible={true}
             disableNavigation={!path}
-            versionLabel={item.versionNumber ? `v${item.versionNumber}` : undefined}
+            sourceLabel={item.source === 'CURSEFORGE' ? 'CurseForge' : undefined}
+            bundledConfigCount={list.configs?.filter(config => {
+                const owners = configOwners(config.path, list.mods);
+                return owners.length === 1 && owners[0].modId === item.modId;
+            }).length}
+            versionLabel={item.versionNumber ? (item.source === 'CURSEFORGE' ? item.versionNumber : `v${item.versionNumber}`) : undefined}
         />
     );
 };
@@ -136,6 +141,7 @@ export const WorldModListView: React.FC = () => {
         return '';
     }, [list?.shareUrl]);
 
+    const requiresLauncher = list?.mods.some(mod => mod.source === 'CURSEFORGE') || false;
     const downloadUrl = list ? worldListDownloadUrl(list.id) : '';
 
     const installWithLauncher = () => {
@@ -145,7 +151,8 @@ export const WorldModListView: React.FC = () => {
             { listId: list.id, shareUrl },
             () => {
                 setInstalling(false);
-                if (downloadUrl) window.location.assign(downloadUrl);
+                if (requiresLauncher) window.location.assign('/launcher');
+                else if (downloadUrl) window.location.assign(downloadUrl);
             }
         );
         window.setTimeout(() => setInstalling(false), 2600);
@@ -175,9 +182,10 @@ export const WorldModListView: React.FC = () => {
             <section className="border-b border-slate-200 pb-8 dark:border-white/10">
                 <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
                     <div className="min-w-0">
-                        <p className="text-2xl font-bold text-slate-950 dark:text-white sm:text-3xl">
-                            Shared mod list
-                        </p>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <h1 className="text-2xl font-bold text-slate-950 dark:text-white sm:text-3xl">{list.title || 'Shared mod list'}</h1>
+                            {requiresLauncher && <span className="inline-flex items-center gap-1.5 rounded-md border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-xs font-semibold text-blue-600 dark:text-blue-400"><MonitorDown className="h-3.5 w-3.5" aria-hidden="true" />Launcher only</span>}
+                        </div>
                         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 dark:text-slate-400">
                             {list.gameVersion && <span>Hytale {list.gameVersion}</span>}
                             {list.ownerUsername && <span>Shared by {list.ownerUsername}</span>}
@@ -189,10 +197,10 @@ export const WorldModListView: React.FC = () => {
                     </div>
 
                     <div className="flex flex-wrap gap-2 md:justify-end">
-                        <a href={downloadUrl} className={secondaryButton}>
+                        {!requiresLauncher && <a href={downloadUrl} className={secondaryButton}>
                             <Download className="h-4 w-4" aria-hidden="true" />
                             Download zip
-                        </a>
+                        </a>}
                         <Link to={SiteRoutes.createModpackFromList(list.id)} className={secondaryButton}>
                             <PackagePlus className="h-4 w-4" aria-hidden="true" />
                             Make modpack
@@ -205,18 +213,7 @@ export const WorldModListView: React.FC = () => {
                 </div>
             </section>
 
-            {!!list.configs?.length && (
-                <section className="space-y-3 pt-6">
-                    <h2 className="text-lg font-bold">Included configs</h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Config defaults are included in the ZIP. The launcher adds world configs to the worlds you select and preserves existing files.</p>
-                    {list.configs.map(config => (
-                        <details key={`${config.scope}/${config.path}`} className="rounded-xl border border-slate-200 p-4 dark:border-white/10">
-                            <summary className="cursor-pointer text-sm font-medium">{configOwnerLabel(config.path, list.mods)} · {config.scope === 'GLOBAL' ? 'Global mods' : 'World mods'} / {config.path}</summary>
-                            <pre className="mt-3 max-h-80 overflow-auto whitespace-pre text-xs">{config.content}</pre>
-                        </details>
-                    ))}
-                </section>
-            )}
+            {requiresLauncher && <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">Includes CurseForge mods. Install with Modtale Launcher.</p>}
 
             <section className="space-y-4 pt-6">
                 {list.mods.map((item, index) => (

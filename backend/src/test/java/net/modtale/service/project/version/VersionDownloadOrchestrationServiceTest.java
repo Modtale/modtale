@@ -24,6 +24,8 @@ import net.modtale.service.storage.DownloadTokenService;
 import net.modtale.service.storage.StorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -124,6 +126,62 @@ class VersionDownloadOrchestrationServiceTest {
         DownloadUrlResponse response = service.createDownloadUrl("pack-1", "1.0.0", null, user, true);
 
         assertEquals("/download/launcher-token", response.downloadUrl());
+        assertThrows(InvalidVersionRequestException.class,
+                () -> service.createBundleDownloadUrl("pack-1", "1.0.0", null, null, user));
+        if (pack.getClassification() == ProjectClassification.MODPACK) assertThrows(InvalidVersionRequestException.class, () -> service.createBundleDownloadUrl("pack-1", "1.0.0", null, null, user, true));
+        else assertEquals("/download-bundle/launcher-token", service.createBundleDownloadUrl("pack-1", "1.0.0", null, null, user, true).downloadUrl());
+    }
+
+    @Test
+    void allowsPluginDownloadButRejectsExplicitCurseForgeBundleSelection() {
+        User user = new User();
+        user.setId("user-1");
+        Project pack = project("pack-1", "Sky Pack", ProjectClassification.PLUGIN);
+        ProjectVersion version = version("version-1", "1.0.0", "modpacks/pack.zip");
+        version.setDependencies(List.of(ProjectDependency.curseForge(
+                "1450386", "Simple Compost", "1.0.0",
+                "https://www.curseforge.com/hytale/mods/simple-compost",
+                ProjectDependency.DependencyType.REQUIRED
+        )));
+
+        when(projectService.getProjectById("pack-1", user)).thenReturn(pack);
+        when(projectVersionAccessService.requireByVersionNumber(
+                org.mockito.Mockito.eq(pack), org.mockito.Mockito.eq("1.0.0"),
+                org.mockito.Mockito.isNull(), org.mockito.Mockito.any())).thenReturn(version);
+        when(downloadTokenService.generateToken("pack-1", "1.0.0", null, null, "user-1"))
+                .thenReturn("launcher-token");
+        when(downloadTokenService.getTokenValiditySeconds()).thenReturn(300);
+
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> service.createDownloadUrl("pack-1", "1.0.0", null, user));
+        DownloadUrlResponse response = service.createDownloadUrl("pack-1", "1.0.0", null, user, true);
+
+        assertEquals("/download/launcher-token", response.downloadUrl());
+        assertThrows(InvalidVersionRequestException.class,
+                () -> service.createBundleDownloadUrl("pack-1", "1.0.0", null, List.of(version.getDependencies().getFirst().getProjectId()), user));
+        if (pack.getClassification() == ProjectClassification.MODPACK) assertThrows(InvalidVersionRequestException.class, () -> service.createBundleDownloadUrl("pack-1", "1.0.0", null, null, user, true));
+        else assertEquals("/download-bundle/launcher-token", service.createBundleDownloadUrl("pack-1", "1.0.0", null, null, user, true).downloadUrl());
+    }
+
+    @Test
+    void bundlesWithSelectedDependenciesThatRequireCurseForgeAreLauncherOnly() {
+        User user = new User();
+        Project main = project("main", "Main", ProjectClassification.PLUGIN);
+        Project child = project("child", "Child", ProjectClassification.PLUGIN);
+        ProjectVersion mainVersion = version("main-v", "1.0.0", "main.jar");
+        ProjectVersion childVersion = version("child-v", "1.0.0", "child.jar");
+        ProjectDependency childReference = new ProjectDependency();
+        childReference.setProjectId("child"); childReference.setVersionNumber("1.0.0");
+        mainVersion.setDependencies(List.of(childReference));
+        childVersion.setDependencies(List.of(ProjectDependency.curseForge("1", "External", "1.0.0",
+                "https://www.curseforge.com/hytale/mods/example/files/1", ProjectDependency.DependencyType.REQUIRED)));
+        child.setVersions(List.of(childVersion));
+        when(projectService.getProjectById("main", user)).thenReturn(main);
+        when(projectService.getRawProjectById("child")).thenReturn(child);
+        when(projectVersionAccessService.requireByVersionNumber(org.mockito.Mockito.eq(main), org.mockito.Mockito.eq("1.0.0"),
+                org.mockito.Mockito.isNull(), org.mockito.Mockito.any())).thenReturn(mainVersion);
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> service.createBundleDownloadUrl("main", "1.0.0", null, List.of("child"), user));
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> service.createBundleDownloadUrl("main", "1.0.0", null, List.of(), user));
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> service.createBundleDownloadUrl("main", "1.0.0", null, List.of("child"), user, true));
     }
 
     @Test
@@ -152,6 +210,10 @@ class VersionDownloadOrchestrationServiceTest {
                 "launcher-token", true, null, null, null, user, true);
 
         assertArrayEquals(new byte[]{9, 8, 7}, payload.bytes());
+        assertThrows(InvalidVersionRequestException.class,
+                () -> service.downloadBundle("web-token", true, null, null, null, user));
+        when(downloadService.generateBundleZip(pack, version, null, user)).thenReturn(new byte[]{1, 2});
+        assertThrows(InvalidVersionRequestException.class, () -> service.downloadBundle("launcher-token", true, null, null, null, user, true));
     }
 
     @Test
@@ -180,11 +242,12 @@ class VersionDownloadOrchestrationServiceTest {
 
         assertEquals("sky-tools.jar", payload.filename());
         assertArrayEquals(new byte[]{1, 2, 3}, payload.bytes());
-        verify(trackingService).logDownload("project-1", "version-1", "author-name", false, "203.0.113.1");
+        verify(trackingService).logDownload("project-1", "version-1", "author-name", false, "203.0.113.1", false);
     }
 
-    @Test
-    void downloadVersionGeneratesModpackZipAndTracksDependencies() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void downloadVersionGeneratesModpackZipAndTracksDependencies(boolean launcher) throws Exception {
         User user = new User();
         Project pack = project("pack-1", "Sky Pack!", ProjectClassification.MODPACK);
         ProjectVersion version = version("version-1", "1.0.0", "modpacks/pack.zip");
@@ -201,16 +264,17 @@ class VersionDownloadOrchestrationServiceTest {
         when(analyticsEligibilityService.shouldCountProjectEngagement(dependencyProject, user)).thenReturn(true);
         when(downloadService.generateModpackZip(pack, version, user)).thenReturn(new byte[]{9, 8, 7});
 
-        VersionDownloadPayload payload = service.downloadVersion("token", true, null, "198.51.100.9", null, user);
+        VersionDownloadPayload payload = service.downloadVersion("token", true, null, "198.51.100.9", null, user, launcher);
 
         assertEquals("Sky_Pack_-1.0.0.zip", payload.filename());
         assertArrayEquals(new byte[]{9, 8, 7}, payload.bytes());
-        verify(trackingService).logDownload("pack-1", "version-1", "author-name", true, "198.51.100.9");
-        verify(trackingService).logDownload("dep-1", null, "author-name", true, "198.51.100.9");
+        verify(trackingService).logDownload("pack-1", "version-1", "author-name", true, "198.51.100.9", launcher);
+        verify(trackingService).logDownload("dep-1", null, "author-name", true, "198.51.100.9", launcher);
     }
 
-    @Test
-    void downloadBundleTracksOnlySelectedNonEmbeddedDependenciesAndReturnsZipName() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void downloadBundleTracksOnlySelectedNonEmbeddedDependenciesAndReturnsZipName(boolean launcher) throws Exception {
         User user = new User();
         Project project = project("project-1", "Sky Tools", ProjectClassification.PLUGIN);
         ProjectVersion version = version("version-1", "1.0.0", "files/mod.jar");
@@ -231,12 +295,12 @@ class VersionDownloadOrchestrationServiceTest {
         when(analyticsEligibilityService.shouldCountProjectEngagement(dependencyProject, user)).thenReturn(true);
         when(downloadService.generateBundleZip(project, version, List.of("dep-1"), user)).thenReturn(new byte[]{4, 5});
 
-        VersionDownloadPayload payload = service.downloadBundle("token", false, null, "198.51.100.9", null, user);
+        VersionDownloadPayload payload = service.downloadBundle("token", false, null, "198.51.100.9", null, user, launcher);
 
         assertEquals("Sky_Tools-UNZIP-ME.zip", payload.filename());
         assertArrayEquals(new byte[]{4, 5}, payload.bytes());
-        verify(trackingService).logDownload("project-1", "version-1", "author-name", true, "198.51.100.9");
-        verify(trackingService).logDownload("dep-1", null, "author-name", true, "198.51.100.9");
+        verify(trackingService).logDownload("project-1", "version-1", "author-name", true, "198.51.100.9", launcher);
+        verify(trackingService).logDownload("dep-1", null, "author-name", true, "198.51.100.9", launcher);
         verify(projectService, never()).getRawProjectById("dep-2");
         verify(projectService, never()).getRawProjectById("embedded");
     }

@@ -45,6 +45,34 @@ class CosmeticCatalogClientTest {
         assertEquals(List.of("Neutral"), client.options("face", "Neutral").stream().map(CosmeticOption::id).toList());
     }
 
+    @Test void resolvesExplicitTexturesAndGradientColorsInTheSamePalette() throws Exception {
+        var data = definitions();
+        data.put(ROOT + "Overtops.json", """
+                [{"Id":"Scarf","Model":"Scarf.blockymodel","GreyscaleTexture":"ScarfGrey.png",
+                  "GradientSet":"Hair","Textures":{
+                    "Colorful":{"Texture":"Colorful.png"},
+                    "Blond":{"Texture":"BlondOverride.png","BaseColor":["#abcdef"]}}}]
+                """);
+        var client = new CosmeticCatalogClient(archive(data));
+        assertEquals(List.of("Scarf.Colorful", "Scarf.Blond", "Scarf.Black"),
+                client.options("overtop", "Scarf").stream().map(CosmeticOption::id).toList());
+        var black = client.resolve("overtop", "Scarf.Black");
+        assertEquals("ScarfGrey.png", black.path("Texture").asText());
+        assertEquals("Tint/Black.png", black.path("GradientTexture").asText());
+        assertEquals("#111111", black.path("BaseColor").get(0).asText());
+        var colorful = client.resolve("overtop", "Scarf.Colorful");
+        assertEquals("Colorful.png", colorful.path("Texture").asText());
+        assertFalse(colorful.has("GradientTexture"));
+        var blond = client.resolve("overtop", "Scarf.Blond");
+        assertEquals("BlondOverride.png", blond.path("Texture").asText());
+        assertEquals("#abcdef", blond.path("BaseColor").get(0).asText());
+        assertFalse(blond.has("GradientTexture"));
+        ObjectNode skin = client.defaultSkin();
+        skin.put("overtop", "Scarf.Black");
+        assertTrue(client.resolveComposition(skin).stream().anyMatch(part -> part.selectedId().equals("Scarf.Black")));
+        assertThrows(IllegalArgumentException.class, () -> client.resolve("overtop", "Scarf.Unknown"));
+    }
+
     @Test void paginatesUniqueAssetsAndSearchesLabelsIdsAndColors() throws Exception {
         var client = new CosmeticCatalogClient(archive(definitions()));
         var page = client.browseAssets("haircut", "", 1, 1);
@@ -111,37 +139,6 @@ class CosmeticCatalogClientTest {
         assertThrows(IOException.class, () -> new CosmeticCatalogClient(archive(large)));
     }
 
-    @Test void remoteUsesPublishedSearchAndNeverClaimsCompletenessOrInventsColors() throws Exception {
-        AtomicInteger count = new AtomicInteger(); AtomicReference<String> request = new AtomicReference<>();
-        AtomicReference<String> response = new AtomicReference<>("[\"Short.Black\",\"Short.Black\",\"Short.Blond\",\"Long.Black\"]");
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext("/", exchange -> {
-            count.incrementAndGet(); request.set(exchange.getRequestURI().toString());
-            assertNull(exchange.getRequestHeaders().getFirst("Authorization"));
-            byte[] bytes = response.get().getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(200, bytes.length); exchange.getResponseBody().write(bytes); exchange.close();
-        });
-        server.start();
-        try {
-            var client = new CosmeticCatalogClient(HttpClient.newHttpClient(), URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/"));
-            var page = client.browse("haircut", "Short", 1, 1);
-            assertEquals("/api/cosmetic-values/haircut?search=Short", request.get());
-            assertEquals("Short.Black", page.options().getFirst().id()); assertFalse(page.complete()); assertEquals(-1, page.total()); assertTrue(page.hasNext());
-            assertTrue(page.options().getFirst().entitlements().isEmpty());
-            assertEquals("Short.Blond", client.browse("haircut", "Short", 2, 1).options().getFirst().id());
-            assertEquals(1, count.get()); assertThrows(IllegalStateException.class, client::defaultSkin);
-            assertThrows(IllegalStateException.class, () -> client.resolve("haircut", "Short.Black"));
-            assertThrows(IllegalArgumentException.class, () -> client.browse("haircut", "", 0, 10)); assertEquals(1, count.get());
-            response.set("[\"../bad\"]"); assertThrows(IOException.class, () -> client.browse("haircut", "Other", 1, 10));
-            response.set("{}"); assertThrows(IOException.class, () -> client.browse("haircut", "Other", 1, 10));
-        } finally { server.stop(0); }
-    }
-
-    @Test void refusesRedirectFollowingAndForeignOrigins() {
-        assertThrows(IllegalArgumentException.class, () -> new CosmeticCatalogClient(HttpClient.newHttpClient(), URI.create("https://example.com/")));
-        assertThrows(IllegalArgumentException.class, () -> new CosmeticCatalogClient(HttpClient.newBuilder().followRedirects(HttpClient.Redirect.ALWAYS).build(), URI.create("https://hytags.com/")));
-    }
-
     @Test void preservesPublishedMulticolorPaletteTokensWithPlusSigns() throws Exception {
         var data = definitions();
         data.put(ROOT + "EarAccessory.json", """
@@ -186,7 +183,7 @@ class CosmeticCatalogClientTest {
 
     private static Map<String, String> definitions() {
         var result = new LinkedHashMap<String, String>();
-        for (var category : new CosmeticCatalogClient().categories()) result.put(CosmeticCatalogClient.assetFile(category.key()), "[]");
+        for (var category : CosmeticCatalogClient.categories()) result.put(CosmeticCatalogClient.assetFile(category.key()), "[]");
         result.put(ROOT + "GradientSets.json", """
                 [{"Id":"Skin","Gradients":{"01":{"Texture":"Tint/Skin01.png","BaseColor":["#aa8866"]},"02":{"Texture":"Tint/Skin02.png","BaseColor":["#ddbb88"]}}},
                  {"Id":"Hair","Gradients":{"Black":{"Texture":"Tint/Black.png","BaseColor":["#111111"]},"Blond":{"Texture":"Tint/Blond.png","BaseColor":["#ffdd99"]}}}]

@@ -25,7 +25,10 @@ resolve_push_base() {
 
   if ! is_zero_sha "$before_sha"; then
     if ! commit_exists "$before_sha"; then
-      echo "::error::Push base commit '$before_sha' is missing from the checkout."
+      git fetch --no-tags origin "$before_sha" >/dev/null 2>&1 || true
+    fi
+    if ! commit_exists "$before_sha"; then
+      echo "::error::Push base commit '$before_sha' is missing from the checkout." >&2
       exit 1
     fi
 
@@ -78,6 +81,7 @@ fi
 
 changed_files="$(git diff --name-only --no-renames "$base_sha" "$head_sha")"
 
+status=false
 frontend=false
 backend=false
 launcher=false
@@ -86,6 +90,11 @@ launcher_build=false
 while IFS= read -r path; do
   [[ -z "$path" ]] && continue
 
+  case "$path" in
+    backend/src/main/java/net/modtale/status/*|backend/src/main/resources/application*.properties|backend/src/main/resources/status-static/*|backend/build.gradle|backend/settings.gradle|backend/gradle/*|backend/gradlew|backend/Dockerfile.status|backend/cloudbuild-status.yml)
+      status=true
+      ;;
+  esac
   case "$path" in
     frontend/*)
       frontend=true
@@ -96,6 +105,11 @@ while IFS= read -r path; do
     launcher/*)
       launcher=true
       launcher_build=true
+      ;;
+    .github/workflows/ci-cd.yml|.github/scripts/build-container.sh|.github/scripts/sync-preview-r2.py)
+      frontend=true
+      backend=true
+      status=true
       ;;
     .github/workflows/tests.yml|.github/scripts/detect-component-changes.sh|.github/scripts/should-run-tests-workflow.sh)
       frontend=true
@@ -123,6 +137,7 @@ done <<< "$changed_files"
 }
 
 {
+  echo "status=$status"
   echo "frontend=$frontend"
   echo "backend=$backend"
   echo "launcher=$launcher"

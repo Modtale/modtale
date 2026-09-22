@@ -4,7 +4,6 @@ import static net.modtale.launcher.ui.browse.card.ProjectCardFormatter.number;
 import static net.modtale.launcher.ui.browse.card.ProjectCardFormatter.timeAgo;
 import static net.modtale.launcher.ui.common.LauncherUi.primaryButton;
 import static net.modtale.launcher.ui.common.LauncherUi.secondaryButton;
-import static net.modtale.launcher.ui.common.LauncherUi.setVisibleManaged;
 import static net.modtale.launcher.ui.common.LauncherUi.value;
 
 import java.io.IOException;
@@ -17,7 +16,6 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -70,8 +68,6 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
 import net.modtale.launcher.ui.common.LauncherSkeleton;
 import net.modtale.launcher.ui.common.LauncherSkeletonContent;
 import net.modtale.launcher.api.ModtaleApiClient;
@@ -131,8 +127,9 @@ public final class ProjectPageController {
     private final ProjectCardFactory projectCardFactory;
     private final Consumer<ProjectSummary> installProject;
     private final VersionInstallAction installProjectVersion;
-    private final Runnable showDiscover;
+    private final Runnable goBack;
     private final Runnable showProject;
+    private Consumer<Runnable> pageNavigation;
     private final BiConsumer<String, String> toast;
     private final Supplier<String> gameVersion;
     private final Supplier<CurrentUser> currentUserSupplier;
@@ -210,7 +207,7 @@ public final class ProjectPageController {
             ProjectCardFactory projectCardFactory,
             Consumer<ProjectSummary> installProject,
             VersionInstallAction installProjectVersion,
-            Runnable showDiscover,
+            Runnable goBack,
             Runnable showProject,
             BiConsumer<String, String> toast,
             Supplier<String> gameVersion,
@@ -232,7 +229,7 @@ public final class ProjectPageController {
                 this.installProject.accept(summaryFromDetail(project));
             }
         } : installProjectVersion;
-        this.showDiscover = showDiscover;
+        this.goBack = goBack;
         this.showProject = showProject;
         this.toast = toast;
         this.gameVersion = gameVersion;
@@ -307,13 +304,25 @@ public final class ProjectPageController {
                 this::openProject,
                 this::openCreator,
                 toggleFavorite,
-                showDiscover,
+                goBack,
                 this::toggleCreatorFollow,
                 this::copyCreatorId,
                 this::showCreatorReportModal,
                 this::openUrlInBrowser,
                 scrollPixels
         );
+    }
+
+    public void setPageNavigation(Consumer<Runnable> pageNavigation) {
+        this.pageNavigation = pageNavigation;
+    }
+
+    private void showPage(Runnable restorePage) {
+        if (pageNavigation == null) {
+            showProject.run();
+        } else {
+            pageNavigation.accept(restorePage);
+        }
     }
 
     public Node view() {
@@ -356,7 +365,7 @@ public final class ProjectPageController {
         long requestId = ++detailRequestId;
         fetchGalleryForCurrentProject();
         renderProject(true);
-        showProject.run();
+        showPage(() -> openProject(project));
         fetchProjectDetail(project, requestId);
     }
 
@@ -384,7 +393,7 @@ public final class ProjectPageController {
         fetchGalleryForCurrentProject();
         fetchCommentsForCurrentProject();
         renderProject(false);
-        showProject.run();
+        showPage(() -> openProjectChangelog(detail));
         Platform.runLater(this::showChangelogModal);
     }
 
@@ -416,7 +425,7 @@ public final class ProjectPageController {
         ++detailRequestId;
         creatorLoading = true;
         renderCreator(true);
-        showProject.run();
+        showPage(() -> openCreator(project));
         fetchCreatorProfile(currentCreatorHandle, requestId);
     }
 
@@ -485,7 +494,10 @@ public final class ProjectPageController {
         Node page = creatorProfileView.render(currentCreator, currentCreatorProjects, currentCreatorRelations, loading, compactLayout);
         if (page instanceof Region pageRegion) {
             syncProjectDocumentHeight(pageRegion);
-            pageRegion.prefHeightProperty().addListener((observable, previous, height) ->
+            pageRegion.needsLayoutProperty().addListener((observable, previous, needsLayout) -> {
+                if (needsLayout) Platform.runLater(() -> syncProjectDocumentHeight(pageRegion));
+            });
+            pageRegion.widthProperty().addListener((observable, previous, width) ->
                     Platform.runLater(() -> syncProjectDocumentHeight(pageRegion)));
         }
         content.getChildren().setAll(page);
@@ -1202,6 +1214,8 @@ public final class ProjectPageController {
     }
 
     private void syncProjectDocumentHeight(Region page) {
+        // Layout callbacks from a replaced loading/profile page must not resize the current document.
+        if (page.getParent() != content) return;
         double height = page.getPrefHeight();
         if (!Double.isFinite(height) || height <= 0) {
             height = page.prefHeight(content.getWidth() > 0 ? content.getWidth() : -1);
@@ -1268,63 +1282,20 @@ public final class ProjectPageController {
     }
 
     private StackPane banner(ProjectSummary summary, ProjectDetail detail, boolean hasBanner) {
-        StackPane banner = new StackPane();
-        banner.getStyleClass().add("project-detail-banner");
-        banner.setMinWidth(0);
-        banner.setMaxWidth(Double.MAX_VALUE);
-        banner.setPrefHeight(BANNER_FALLBACK_HEIGHT);
-        banner.setMaxHeight(Double.MAX_VALUE);
+        StackPane banner = NativePageBanner.create("project-detail-banner", "project-detail",
+                hasBanner ? first(detail == null ? null : detail.bannerUrl(), summary.bannerUrl()) : "",
+                imageLoader, scrollPixels, goBack, BANNER_FALLBACK_HEIGHT);
         banner.prefHeightProperty().bind(Bindings.createDoubleBinding(
                 () -> bannerHeight(content.getWidth()),
                 content.widthProperty()
         ));
         banner.minHeightProperty().bind(banner.prefHeightProperty());
 
-        StackPane media = new StackPane();
-        media.getStyleClass().add("project-detail-banner-media");
-        media.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-
-        String bannerUrl = first(detail == null ? null : detail.bannerUrl(), summary.bannerUrl());
-        if (hasBanner) {
-            media.getStyleClass().add("letterboxed");
-            ImageView image = new ImageView();
-            image.getStyleClass().add("project-detail-banner-image");
-            image.setPreserveRatio(true);
-            image.setSmooth(true);
-            image.fitWidthProperty().bind(banner.widthProperty());
-            image.fitHeightProperty().bind(banner.heightProperty());
-            imageLoader.loadInto(image, bannerUrl, 1920, 640, true);
-            media.getChildren().add(image);
-        } else {
-            Region fallback = new Region();
-            fallback.getStyleClass().add("project-detail-banner-fallback");
-            fallback.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-            media.getChildren().add(fallback);
-        }
-        banner.getChildren().add(media);
-
-        Region fade = new Region();
-        fade.getStyleClass().add("project-detail-banner-fade");
-        fade.setMouseTransparent(true);
-        NativeBannerScrollEffect.bind(media, fade, scrollPixels, banner.widthProperty());
-        banner.getChildren().add(fade);
-
-        HBox backLayer = new HBox();
-        backLayer.setAlignment(Pos.TOP_LEFT);
-        backLayer.setMaxWidth(Double.MAX_VALUE);
-        backLayer.setMouseTransparent(false);
-        StackPane.setAlignment(backLayer, Pos.TOP_CENTER);
-        StackPane.setMargin(backLayer, LauncherLayout.launcherPageInsets(25, 0));
-        Button back = new Button("Back", LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_LEFT, 16));
-        back.getStyleClass().add("project-detail-back");
-        back.setOnAction(event -> showDiscover.run());
-        backLayer.getChildren().add(back);
-        banner.getChildren().add(backLayer);
         return banner;
     }
 
     static double bannerHeight(double width) {
-        return Double.isFinite(width) && width > 0 ? width / 3.0 : BANNER_FALLBACK_HEIGHT;
+        return NativePageBanner.height(width, BANNER_FALLBACK_HEIGHT);
     }
 
     private Node header(ProjectSummary summary, ProjectDetail detail, boolean loading) {
@@ -1894,7 +1865,7 @@ public final class ProjectPageController {
             indicator.setMinWidth(12);
             indicator.setPrefWidth(12);
             indicator.setMaxWidth(12);
-            HBox row = new HBox(12, name, count, indicator);
+            HBox row = new HBox(8, name, count, indicator);
             row.setAlignment(Pos.CENTER_LEFT);
             row.setMaxWidth(Double.MAX_VALUE);
             if (group.grouped()) {
@@ -1915,7 +1886,7 @@ public final class ProjectPageController {
                 toggle.getStyleClass().add("project-detail-version-row");
                 toggle.setMaxWidth(Double.MAX_VALUE);
                 toggle.setGraphic(row);
-                row.prefWidthProperty().bind(toggle.widthProperty().subtract(24));
+                row.prefWidthProperty().bind(toggle.widthProperty().subtract(20));
                 toggle.setAccessibleText("Expand " + group.label() + " versions");
                 toggle.selectedProperty().addListener((observable, previous, expanded) -> {
                     children.setVisible(expanded);
@@ -1986,8 +1957,7 @@ public final class ProjectPageController {
 
     private void requestDependencyMetadata(ProjectSummary summary, ProjectDetail detail) {
         List<String> missing = latestDependencies(summary, detail).stream()
-                .filter(dependency -> dependency != null && !dependency.isExternal())
-                .map(ProjectDependency::projectId)
+                .map(ProjectDependencyMetadata::lookupKey)
                 .filter(id -> !isBlank(id))
                 .filter(id -> !dependencyMetaCache.containsKey(id) && requestedDependencyMetaIds.add(id))
                 .distinct()
@@ -1995,7 +1965,8 @@ public final class ProjectPageController {
         if (missing.isEmpty()) {
             return;
         }
-        CompletableFuture.supplyAsync(() -> apiClient.getProjectMetaBatch(missing), executor)
+        CompletableFuture.supplyAsync(() -> ProjectDependencyMetadata.load(
+                        missing, apiClient::getProjectMetaBatch, apiClient::getProjectMeta), executor)
                 .whenComplete((result, error) -> Platform.runLater(() -> {
                     boolean changed = false;
                     if (error == null && result != null) {
@@ -2196,22 +2167,29 @@ public final class ProjectPageController {
         ));
     }
 
-    private Node simpleSection(String title, LauncherIcons.Glyph icon, String value) {
-        Label label = new Label(value);
-        label.getStyleClass().add("project-detail-simple-value");
-        label.setWrapText(true);
-        return section(title, icon, label);
-    }
-
     private Node licenseSection(ProjectDetail detail) {
         String license = textLicense(detail);
         String url = detail == null ? "" : value(detail.links().get("LICENSE"), "");
-        if (url.isBlank()) return simpleSection("License", LauncherIcons.Glyph.SCALE, license);
+        if (url.isBlank()) {
+            Label label = new Label(license);
+            label.getStyleClass().add("project-detail-simple-value");
+            label.setWrapText(true);
+            label.setMaxWidth(Double.MAX_VALUE);
+            label.setAlignment(Pos.CENTER);
+            HBox.setHgrow(label, Priority.ALWAYS);
+            HBox value = new HBox(label);
+            value.setAlignment(Pos.CENTER_LEFT);
+            return section("License", LauncherIcons.Glyph.SCALE, value);
+        }
         Button link = new Button(license, LauncherIcons.icon(LauncherIcons.Glyph.EXTERNAL_LINK, 13));
         link.getStyleClass().add("project-detail-simple-link");
         link.setMaxWidth(Double.MAX_VALUE);
+        link.setAlignment(Pos.CENTER);
+        HBox.setHgrow(link, Priority.ALWAYS);
         link.setOnAction(event -> openUrlInBrowser(url));
-        return section("License", LauncherIcons.Glyph.SCALE, link);
+        HBox value = new HBox(link);
+        value.setAlignment(Pos.CENTER_LEFT);
+        return section("License", LauncherIcons.Glyph.SCALE, value);
     }
 
     private Node projectIdSection(ProjectSummary summary, ProjectDetail detail) {
@@ -2324,31 +2302,15 @@ public final class ProjectPageController {
     }
 
     private String dependencyTitle(ProjectDependency dependency) {
-        ProjectMeta meta = dependencyMeta(dependency);
-        return first(
-                meta == null ? null : meta.title(),
-                dependency.title(),
-                dependency.projectTitle(),
-                dependency.projectId(),
-                dependency.externalId(),
-                dependency.id(),
-                "External dependency"
-        );
+        return ProjectDependencyMetadata.title(dependency, dependencyMeta(dependency));
     }
 
     private String dependencyIconUrl(ProjectDependency dependency) {
-        if (dependency == null || dependency.isExternal()) {
-            return "";
-        }
-        ProjectMeta meta = dependencyMeta(dependency);
-        return first(meta == null ? null : meta.icon(), dependency.icon());
+        return dependency == null ? "" : ProjectDependencyMetadata.icon(dependency, dependencyMeta(dependency));
     }
 
     private ProjectMeta dependencyMeta(ProjectDependency dependency) {
-        if (dependency == null || isBlank(dependency.projectId())) {
-            return null;
-        }
-        return dependencyMetaCache.get(dependency.projectId());
+        return dependencyMetaCache.get(ProjectDependencyMetadata.lookupKey(dependency));
     }
 
     private static ProjectMeta dependencyFallbackMeta(String projectId) {
@@ -2356,14 +2318,7 @@ public final class ProjectPageController {
     }
 
     private String dependencyNoticeTitle(ProjectDependency dependency) {
-        return first(
-                dependency.projectTitle(),
-                dependency.projectId(),
-                dependency.title(),
-                dependency.externalId(),
-                dependency.id(),
-                "External dependency"
-        );
+        return dependencyTitle(dependency);
     }
 
     private String dependencyTypeLabel(ProjectDependency dependency) {
@@ -2709,6 +2664,14 @@ public final class ProjectPageController {
             return;
         }
 
+        double scrollOffset = 0;
+        if (changelogOverlay != null
+                && changelogOverlay.lookup(".project-changelog-scroll") instanceof ScrollPane previous) {
+            double range = Math.max(0, previous.getContent().getLayoutBounds().getHeight()
+                    - previous.getViewportBounds().getHeight());
+            scrollOffset = previous.getVvalue() * range;
+        }
+        final double retainedOffset = scrollOffset;
         hideChangelogOverlay();
         hideGalleryOverlay();
         hideCommentDeleteOverlay();
@@ -2739,7 +2702,17 @@ public final class ProjectPageController {
         host.getChildren().add(overlay);
         StackPane.setAlignment(overlay, Pos.CENTER);
         changelogOverlay = overlay;
-        Platform.runLater(overlay::requestFocus);
+        Platform.runLater(() -> {
+            if (changelogOverlay != overlay) return;
+            overlay.applyCss();
+            overlay.layout();
+            if (overlay.lookup(".project-changelog-scroll") instanceof ScrollPane scroll) {
+                double range = Math.max(0, scroll.getContent().getLayoutBounds().getHeight()
+                        - scroll.getViewportBounds().getHeight());
+                scroll.setVvalue(range > 0 ? Math.min(1, retainedOffset / range) : 0);
+            }
+            overlay.requestFocus();
+        });
     }
 
     private VBox changelogModal(List<ChangelogEntry> entries, boolean loading) {
@@ -2810,6 +2783,7 @@ public final class ProjectPageController {
         header.setAlignment(Pos.CENTER_LEFT);
 
         VBox copy = new VBox(5);
+        copy.setAlignment(Pos.CENTER_LEFT);
         copy.setMinWidth(0);
         HBox titleRow = new HBox(8);
         titleRow.setAlignment(Pos.CENTER_LEFT);
@@ -2871,11 +2845,17 @@ public final class ProjectPageController {
         HBox.setHgrow(meta, Priority.ALWAYS);
         HBox versionLine = new HBox(10);
         versionLine.setAlignment(Pos.CENTER_LEFT);
-        Label version = new Label("v" + value(entry.versionNumber(), "Unknown"));
+        Label version = new Label((isCurseForge(currentProject, currentDetail) ? "" : "v")
+                + value(entry.versionNumber(), "Unknown"));
+        version.setMinWidth(0);
+        version.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(version, Priority.ALWAYS);
         version.getStyleClass().add("project-changelog-version");
         versionLine.getChildren().add(version);
         if (!isRelease(entry.channel())) {
-            versionLine.getChildren().add(channelBadge(entry.channel()));
+            Label badge = channelBadge(entry.channel());
+            badge.setMinWidth(Region.USE_PREF_SIZE);
+            versionLine.getChildren().add(badge);
         }
         meta.getChildren().add(versionLine);
 
@@ -2896,6 +2876,7 @@ public final class ProjectPageController {
         }
 
         Button download = secondaryButton("Download");
+        download.setMinWidth(Region.USE_PREF_SIZE);
         download.getStyleClass().add("project-changelog-download");
         download.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 15));
         download.setOnAction(event -> {
@@ -2964,7 +2945,8 @@ public final class ProjectPageController {
         boolean isExpanded = expandedChangelogIds.contains(entry.stableId());
         VBox body = new VBox(0);
         body.getStyleClass().add("project-changelog-markdown-wrap");
-        Node markdown = markdownRenderer.render(changelog);
+        Node markdown = isCurseForge(currentProject, currentDetail)
+                ? markdownRenderer.renderCurseForgeDescription(changelog) : markdownRenderer.render(changelog);
         if (isLong && !isExpanded) {
             StackPane clamp = new StackPane(markdown);
             clamp.getStyleClass().add("project-changelog-markdown-clamp");
@@ -3283,7 +3265,7 @@ public final class ProjectPageController {
         Button back = secondaryButton("Back");
         back.getStyleClass().add("small");
         back.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_LEFT, 14));
-        back.setOnAction(event -> showDiscover.run());
+        back.setOnAction(event -> goBack.run());
         Button open = secondaryButton(actionLabel);
         open.getStyleClass().add("small");
         open.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.EXTERNAL_LINK, 14));

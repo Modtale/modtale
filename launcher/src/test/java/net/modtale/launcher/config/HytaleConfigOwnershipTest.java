@@ -18,15 +18,19 @@ class HytaleConfigOwnershipTest {
         jar("Mods/other.jar", "{\"Group\":\"Other\",\"Name\":\"levelingcore\"}");
         config("world/mods/com.azuredoom_levelingcore/config.json");
         config("world/mods/Other_levelingcore/settings.toml");
-        config("world/mods/com.azuredoom_Levelingcore/config.json");
+        config("different-world/mods/com.azuredoom_Levelingcore/config.json");
         config("world/mods/unrelated-download-name/config.json");
         config("world/mods/levelingcore/config.json");
         var found = new HytaleConfigFiles().discover(directory.resolve("Mods"), directory.resolve("world"));
-        assertEquals(5, found.size());
+        assertEquals(4, found.size());
         assertEquals(2, found.stream().filter(file -> !file.pluginId().isEmpty()).count());
         assertTrue(found.stream().anyMatch(file -> file.pluginId().equals("com.azuredoom:levelingcore")
                 && file.label().contains("World mods / com.azuredoom:levelingcore /")));
-        assertEquals(3, found.stream().filter(file -> file.label().contains("Unattributed")).count());
+        assertEquals(2, found.stream().filter(file -> file.label().contains("Unattributed")).count());
+        // Use a separate directory so case-insensitive filesystems do not merge the fixtures.
+        var wrongCase = new HytaleConfigFiles().discover(directory.resolve("Mods"), directory.resolve("different-world"));
+        assertEquals(1, wrongCase.size());
+        assertTrue(wrongCase.getFirst().pluginId().isEmpty());
     }
 
     @Test void handlesLocalWorldModsInheritedSubPluginsAndAmbiguousUnderscores() throws Exception {

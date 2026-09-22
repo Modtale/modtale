@@ -15,23 +15,38 @@ const notification = (type: string, metadata?: Record<string, string>): Notifica
 
 describe('resolveNotificationAction', () => {
     it('uses canonical projectId metadata for contributor invitations', () => {
-        const invite = notification('CONTRIBUTOR_INVITE', { projectId: 'project-1' });
+        const invite = notification('CONTRIBUTOR_INVITE', { projectId: 'project-1', requestId: 'invite-1' });
 
         expect(resolveNotificationAction(invite, true)).toEqual({
-            endpoint: '/projects/project-1/invite/accept'
+            endpoint: '/projects/project-1/invite/accept', body: { requestId: 'invite-1' }
         });
         expect(resolveNotificationAction(invite, false)).toEqual({
-            endpoint: '/projects/project-1/invite/decline'
+            endpoint: '/projects/project-1/invite/decline', body: { requestId: 'invite-1' }
         });
     });
 
     it('uses canonical projectId metadata for project transfers', () => {
-        const transfer = notification('TRANSFER_REQUEST', { projectId: 'project-1' });
+        const transfer = notification('TRANSFER_REQUEST', { projectId: 'project-1', requestId: 'request-1' });
 
         expect(resolveNotificationAction(transfer, true)).toEqual({
             endpoint: '/projects/project-1/transfer/resolve',
-            body: { accept: true }
+            body: { accept: true, requestId: 'request-1' }
         });
+    });
+
+    it('binds organization invitation responses and refuses unbound legacy requests', () => {
+        const invite = notification('ORG_INVITE', { orgId: 'org-1', requestId: 'request-1' });
+        expect(resolveNotificationAction(invite, true)).toEqual({ endpoint: '/orgs/org-1/invite/accept', body: { requestId: 'request-1' } });
+        expect(resolveNotificationAction(invite, false)).toEqual({ endpoint: '/orgs/org-1/invite/decline', body: { requestId: 'request-1' } });
+        expect(resolveNotificationAction(notification('ORG_INVITE', { orgId: 'org-1' }), true)).toBeNull();
+    });
+
+    it('rejects legacy transfers without request identity', () => {
+        expect(resolveNotificationAction(notification('TRANSFER_REQUEST', { projectId: 'project-1' }), true)).toBeNull();
+    });
+
+    it('rejects legacy contributor invitations without request identity', () => {
+        expect(resolveNotificationAction(notification('CONTRIBUTOR_INVITE', { projectId: 'project-1' }), true)).toBeNull();
     });
 
     it('rejects contributor invitations without projectId metadata', () => {

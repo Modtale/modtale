@@ -27,6 +27,13 @@ import org.junit.jupiter.api.io.TempDir;
 class LauncherSettingsSyncServiceTest {
     @TempDir Path directory;
 
+    @Test void savedReleaseUsesItsOwnSupportedDownloadVersion() {
+        var version = new net.modtale.launcher.model.project.ProjectVersion("release-id", "1.10.2",
+                java.util.List.of("0.5.3", "0.5.1"), null, 0, null, null, java.util.List.of(), "RELEASE");
+        assertEquals("0.5.3", LauncherSettingsSyncService.downloadGameVersion(version, "0.5.5"));
+        assertEquals("0.5.1", LauncherSettingsSyncService.downloadGameVersion(version, "0.5.1"));
+    }
+
     @BeforeAll static void toolkit() {
         try { Platform.startup(() -> Platform.setImplicitExit(false)); }
         catch (IllegalStateException alreadyStarted) { }
@@ -61,7 +68,7 @@ class LauncherSettingsSyncServiceTest {
         LinkedBlockingQueue<Runnable> work = new LinkedBlockingQueue<>();
         LauncherSettingsSyncService service = fx(() -> {
             var controller = new LauncherSettingsController(store, api, () -> null, () -> LauncherView.LIBRARY);
-            var feedback = new LauncherFeedback(work::add, new Label(), new VBox(), new StackPane(), new Label(), new Label(), () -> "");
+            var feedback = new LauncherFeedback(work::add, new Label(), new StackPane(), new Label(), new Label(), () -> "");
             return new LauncherSettingsSyncService(api, store, controller, null, feedback, signedIn::get, StackPane::new);
         });
         fx(() -> { service.syncAfterLocalChange(); return null; });
@@ -82,6 +89,44 @@ class LauncherSettingsSyncServiceTest {
         assertEquals("{\"value\":2}", uploads.getLast().getConfigs().getFirst().content());
         assertEquals("{\"value\":2}", store.load().getConfigs().getFirst().content());
         assertTrue(work.isEmpty());
+    }
+
+    @Test void advancesStatusBeforeMetadataLookupEvenWhenPreviousRestoreFails() throws Exception {
+        SettingsStore store = new SettingsStore(directory.resolve("settings.json"));
+        LauncherSettings settings = new LauncherSettings();
+        settings.setHytaleModsPath(directory.resolve("Mods").toString());
+        settings.setHytaleUserDataPath(directory.resolve("UserData").toString());
+        store.save(settings);
+        var progress = fx(() -> new net.modtale.launcher.ui.common.TransferLoadingModal("Syncing", "Starting"));
+        var statuses = new ArrayList<String>();
+        ModtaleApiClient api = new ModtaleApiClient("https://example.invalid") {
+            @Override public net.modtale.launcher.model.project.ProjectDetail getProject(String id) {
+                try {
+                    statuses.add(fx(() -> {
+                        VBox card = (VBox) progress.getChildren().getFirst();
+                        return ((Label) card.getChildren().getLast()).getText();
+                    }));
+                } catch (Exception ex) { throw new AssertionError(ex); }
+                throw new IllegalStateException("Provider temporarily unavailable");
+            }
+        };
+        var service = fx(() -> new LauncherSettingsSyncService(api, store,
+                new LauncherSettingsController(store, api, () -> null, () -> LauncherView.LIBRARY), null,
+                new LauncherFeedback(Runnable::run, new Label(), new StackPane(), new Label(), new Label(), () -> ""),
+                () -> true, StackPane::new));
+        var first = new LauncherSettingsSnapshot.InstalledProjectSnapshot();
+        first.setProjectId("first");
+        first.setTitle("First mod");
+        var second = new LauncherSettingsSnapshot.InstalledProjectSnapshot();
+        second.setProjectId("second");
+        second.setTitle("Second mod");
+        var snapshot = new LauncherSettingsSnapshot();
+        snapshot.setInstalledProjects(java.util.List.of(first, new LauncherSettingsSnapshot.InstalledProjectSnapshot(), second));
+        var restore = LauncherSettingsSyncService.class.getDeclaredMethod("restore", LauncherSettingsSnapshot.class,
+                net.modtale.launcher.ui.common.TransferLoadingModal.class);
+        restore.setAccessible(true);
+        restore.invoke(service, snapshot, progress);
+        assertEquals(java.util.List.of("Checking First mod • 1 of 2", "Checking Second mod • 2 of 2"), statuses);
     }
 
     private static void runWork(LinkedBlockingQueue<Runnable> work) throws Exception {

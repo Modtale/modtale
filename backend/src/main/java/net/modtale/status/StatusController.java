@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -32,6 +33,12 @@ public class StatusController {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(detachedStatusService.getSystemStatus(range));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<Void> refresh() {
+        detachedStatusService.refreshIfDue();
+        return ResponseEntity.noContent().header("Cache-Control", "no-store").build();
     }
 
     @GetMapping("/live")

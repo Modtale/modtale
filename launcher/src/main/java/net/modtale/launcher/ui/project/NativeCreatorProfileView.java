@@ -45,7 +45,6 @@ final class NativeCreatorProfileView {
 
     private static final double CONTENT_MAX_WIDTH = 1568;
     private static final double BANNER_FALLBACK_HEIGHT = 360;
-    private static final double PROFILE_CARD_HEIGHT = 316;
     private static final double PROFILE_CARD_LIFT = -32;
     private static final double AVATAR_SIZE = 224;
     private static final double PROJECT_GRID_GAP = 24;
@@ -117,7 +116,7 @@ final class NativeCreatorProfileView {
         ));
         hero.minHeightProperty().bind(hero.prefHeightProperty());
 
-        Node card = loading ? loadingCard() : profileCard(profile, projects);
+        Region card = loading ? loadingCard() : profileCard(profile, projects);
         VBox.setMargin(card, LauncherLayout.launcherPageInsets(PROFILE_CARD_LIFT, 0));
 
         VBox body = profileBody(profile, projects, relatedProfiles, loading, compact);
@@ -126,64 +125,24 @@ final class NativeCreatorProfileView {
                 : LauncherLayout.launcherPageInsets(64, 80));
 
         page.getChildren().addAll(hero, card, body);
-        page.minHeightProperty().bind(Bindings.createDoubleBinding(
-                () -> hero.getPrefHeight() + PROFILE_CARD_LIFT + PROFILE_CARD_HEIGHT
-                        + (compact ? 36 : 64) + body.prefHeight(-1) + 80,
-                hero.prefHeightProperty(),
-                body.heightProperty()
-        ));
-        page.prefHeightProperty().bind(page.minHeightProperty());
+        // Let VBox measure its complete width-dependent subtree, including project cards
+        // whose preferred sizes change after CSS and image loading.
+        page.setMinHeight(Region.USE_PREF_SIZE);
         return page;
     }
 
     private StackPane hero(CreatorProfile profile) {
-        StackPane hero = new StackPane();
-        hero.getStyleClass().add("creator-profile-hero");
-        hero.setMaxWidth(Double.MAX_VALUE);
+        return NativePageBanner.create("creator-profile-hero", "creator-profile",
+                profile == null ? "" : value(profile.bannerUrl(), ""), imageLoader,
+                scrollPixels, showDiscover, BANNER_FALLBACK_HEIGHT);
+    }
 
-        StackPane media = new StackPane();
-        media.getStyleClass().add("creator-profile-banner");
-        media.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        String bannerUrl = profile == null ? "" : value(profile.bannerUrl(), "");
-        if (bannerUrl.isBlank()) {
-            media.getChildren().add(fallbackBanner());
-        } else {
-            media.getStyleClass().add("letterboxed");
-            media.setClip(rectangleClip(media));
-            ImageView image = coverImage(bannerUrl, media, 2400, 800);
-            image.getStyleClass().add("creator-profile-banner-image");
-            media.getChildren().add(image);
-        }
-
-        Region fade = new Region();
-        fade.getStyleClass().add("creator-profile-banner-fade");
-        fade.setMouseTransparent(true);
-        NativeBannerScrollEffect.bind(media, fade, scrollPixels, hero.widthProperty());
-
-        HBox backLayer = new HBox();
-        backLayer.setAlignment(Pos.TOP_LEFT);
-        backLayer.setMaxWidth(Double.MAX_VALUE);
-        backLayer.setMouseTransparent(false);
-        StackPane.setAlignment(backLayer, Pos.TOP_CENTER);
-        StackPane.setMargin(backLayer, LauncherLayout.launcherPageInsets(25, 0));
-        Button back = new Button("Back", LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_LEFT, 16));
-        back.getStyleClass().add("creator-profile-back");
-        back.setOnAction(event -> showDiscover.run());
-        backLayer.getChildren().add(back);
-
-        hero.getChildren().addAll(media, fade, backLayer);
-        return hero;
+    static ImageView bannerImage(Region banner) {
+        return NativePageBanner.image(banner, "creator-profile-banner-image");
     }
 
     static double bannerHeight(double width) {
-        return Double.isFinite(width) && width > 0 ? width / 3.0 : BANNER_FALLBACK_HEIGHT;
-    }
-
-    private Region fallbackBanner() {
-        Region fallback = new Region();
-        fallback.getStyleClass().add("creator-profile-banner-fallback");
-        fallback.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        return fallback;
+        return NativePageBanner.height(width, BANNER_FALLBACK_HEIGHT);
     }
 
     private HBox loadingCard() {
@@ -191,20 +150,30 @@ final class NativeCreatorProfileView {
                 new ProjectPage(List.of(LauncherSkeletonContent.project()), 1, 1, 0, true)));
     }
 
-    private HBox profileCard(CreatorProfile profile, ProjectPage projects) {
+    static HBox profileCardContainer() {
         HBox card = new HBox(40);
         card.getStyleClass().add("creator-profile-card");
         card.setAlignment(Pos.TOP_LEFT);
         card.setMaxWidth(Double.MAX_VALUE);
-        card.setMinHeight(PROFILE_CARD_HEIGHT);
-        card.setPrefHeight(PROFILE_CARD_HEIGHT);
+        card.setMinHeight(Region.USE_PREF_SIZE);
+        return card;
+    }
+
+    static double preferredHeightAtPageWidth(Region child, double pageWidth) {
+        Insets margin = VBox.getMargin(child);
+        double horizontalMargin = margin == null ? 0 : margin.getLeft() + margin.getRight();
+        double width = pageWidth > horizontalMargin ? pageWidth - horizontalMargin : -1;
+        return child.prefHeight(width);
+    }
+
+    private HBox profileCard(CreatorProfile profile, ProjectPage projects) {
+        HBox card = profileCardContainer();
 
         StackPane avatar = avatar(profile);
         HBox.setMargin(avatar, new Insets(-96, 0, 0, 8));
 
         VBox copy = new VBox(0);
         copy.getStyleClass().add("creator-profile-copy");
-        copy.setTranslateY(-15);
         copy.setMinWidth(0);
         HBox.setHgrow(copy, Priority.ALWAYS);
         copy.getChildren().addAll(
@@ -596,40 +565,18 @@ final class NativeCreatorProfileView {
     }
 
     private ImageView coverImage(String url, Region box, double requestedWidth, double requestedHeight) {
+        ImageView image = coverImage(box);
+        imageLoader.loadInto(image, url, requestedWidth, requestedHeight);
+        return image;
+    }
+
+    static ImageView coverImage(Region box) {
         ImageView image = new ImageView();
         image.setSmooth(true);
         image.setPreserveRatio(false);
-        // Keep the remote image's natural/request dimensions out of parent layout. Otherwise the
-        // banner can make the page thousands of pixels wide before its viewport has been measured,
-        // creating a self-sustaining oversized cover crop.
-        image.setFitWidth(1);
-        image.setFitHeight(1);
-        imageLoader.loadInto(image, url, requestedWidth, requestedHeight, true);
-        Runnable update = () -> {
-            double width = box.getWidth();
-            double height = box.getHeight();
-            javafx.scene.image.Image loaded = image.getImage();
-            if (!Double.isFinite(width) || width <= 1 || !Double.isFinite(height) || height <= 1 || loaded == null) {
-                return;
-            }
-            double imageWidth = loaded.getWidth();
-            double imageHeight = loaded.getHeight();
-            if (!Double.isFinite(imageWidth) || imageWidth <= 0 || !Double.isFinite(imageHeight) || imageHeight <= 0) {
-                return;
-            }
-            double imageRatio = imageWidth / imageHeight;
-            double boxRatio = width / height;
-            if (imageRatio > boxRatio) {
-                image.setFitWidth(height * imageRatio);
-                image.setFitHeight(height);
-            } else {
-                image.setFitWidth(width);
-                image.setFitHeight(width / imageRatio);
-            }
-        };
-        box.widthProperty().addListener((observable, previous, current) -> update.run());
-        box.heightProperty().addListener((observable, previous, current) -> update.run());
-        image.imageProperty().addListener((observable, previous, current) -> update.run());
+        // Size independently of asynchronous decoding; the shared loader updates the cover crop.
+        image.fitWidthProperty().bind(box.widthProperty());
+        image.fitHeightProperty().bind(box.heightProperty());
         return image;
     }
 

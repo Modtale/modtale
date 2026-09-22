@@ -79,6 +79,10 @@ public class ValidationService {
         return gameVersionService.getCatalog().allVersions();
     }
 
+    public boolean isGameVersionSupported(String gameVersion) {
+        return gameVersionService.isVersionSupported(gameVersion);
+    }
+
     public List<String> getAllowedReleaseGameVersions() {
         return gameVersionService.getCatalog().releaseVersions();
     }

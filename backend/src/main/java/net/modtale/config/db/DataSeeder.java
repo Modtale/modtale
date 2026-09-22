@@ -1003,7 +1003,9 @@ public class DataSeeder implements CommandLineRunner {
         }
 
         String markerKey = r2SeedMarkerKey(objects.values());
-        if (hasR2SeedMarker(markerKey, objects.size()) && r2SeedObjectsPresent(objects.values())) {
+        Set<String> existingKeys = storageService.findExistingKeys(objects.keySet());
+        if (existingKeys.containsAll(objects.keySet())) {
+            logger.info("All {} R2 artifacts are already present; skipping seed copy.", objects.size());
             return;
         }
 
@@ -1045,7 +1047,7 @@ public class DataSeeder implements CommandLineRunner {
                 }
 
                 try {
-                    if (storageService.exists(object.key())) {
+                    if (existingKeys.contains(object.key())) {
                         skipped++;
                     } else {
                         R2ObjectBytes bytes = sourceClient == null
@@ -1114,65 +1116,6 @@ public class DataSeeder implements CommandLineRunner {
                     failed
             );
         }
-    }
-
-    private boolean hasR2SeedMarker(String markerKey, int objectCount) {
-        try {
-            if (storageService.exists(markerKey)) {
-                logger.info(
-                        "R2 artifact seed marker exists for current artifact set (objects={}, marker={}). Verifying target objects before skipping copy.",
-                        objectCount,
-                        markerKey
-                );
-                return true;
-            }
-            logger.info("R2 artifact seed marker not found for current artifact set (marker={}). Validating target objects.", markerKey);
-        } catch (RuntimeException e) {
-            logger.warn(
-                    "Could not check R2 artifact seed marker '{}': {}. Falling back to object validation.",
-                    markerKey,
-                    e.getMessage()
-            );
-        }
-        return false;
-    }
-
-    private boolean r2SeedObjectsPresent(Collection<R2SeedObject> objects) {
-        int checked = 0;
-        int missing = 0;
-        List<String> missingSample = new ArrayList<>();
-
-        for (R2SeedObject object : objects) {
-            checked++;
-            try {
-                if (!storageService.exists(object.key())) {
-                    missing++;
-                    if (missingSample.size() < 10) {
-                        missingSample.add(object.key());
-                    }
-                }
-            } catch (RuntimeException e) {
-                logger.warn(
-                        "Could not verify R2 artifact object '{}' despite seed marker: {}. Falling back to object seeding.",
-                        object.key(),
-                        e.getMessage()
-                );
-                return false;
-            }
-        }
-
-        if (missing == 0) {
-            logger.info("R2 artifact seed marker verified: all {} target object keys are present.", checked);
-            return true;
-        }
-
-        logger.warn(
-                "R2 artifact seed marker is stale: {} of {} target object keys are missing. Missing sample: {}. Reseeding missing objects.",
-                missing,
-                checked,
-                missingSample
-        );
-        return false;
     }
 
     private void writeR2SeedMarker(

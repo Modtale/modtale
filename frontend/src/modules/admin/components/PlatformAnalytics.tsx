@@ -63,7 +63,7 @@ export function PlatformAnalytics() {
         totalViews: 5678, previousTotalViews: 5000,
         totalNewUsers: 123, previousTotalNewUsers: 100,
         totalNewProjects: 123, previousTotalNewProjects: 100,
-        ...Object.fromEntries(['downloadsChart', 'apiDownloadsChart', 'viewsChart', 'newProjectsChart', 'newUsersChart', 'newOrgsChart'].map(key => [key,
+        ...Object.fromEntries(['downloadsChart', 'launcherDownloadsChart', 'apiDownloadsChart', 'viewsChart', 'newProjectsChart', 'newUsersChart', 'newOrgsChart'].map(key => [key,
             Array.from({ length: 65 }, (_, i) => ({ date: new Date(Date.UTC(2026, 0, i + 1)).toISOString().slice(0, 10), count: 0 }))
         ])),
     } : null);
@@ -91,6 +91,7 @@ export function PlatformAnalytics() {
     };
 
     const downloadsData = formatData(data.downloadsChart);
+    const launcherDownloadsData = formatData(data.launcherDownloadsChart);
     const apiDownloadsData = formatData(data.apiDownloadsChart);
     const viewsData = formatData(data.viewsChart);
     const downloadsAvg7 = calculateRollingAverage(downloadsData, 7);
@@ -104,6 +105,7 @@ export function PlatformAnalytics() {
     const chartDatasets = {
         downloads: [
             { id: 'downloads', label: 'Platform Downloads', color: '#3b82f6', data: sliceData(downloadsData), hidden: isHidden('downloads', 'downloads') },
+            { id: 'launcherDownloads', label: 'Launcher Downloads', color: '#ec4899', data: sliceData(launcherDownloadsData), hidden: isHidden('downloads', 'launcherDownloads') },
             { id: 'apiDownloads', label: 'API Downloads', color: '#f97316', data: sliceData(apiDownloadsData), hidden: isHidden('downloads', 'apiDownloads') },
             { id: 'downloadsAvg7', label: 'Downloads 7d Avg', color: '#14b8a6', data: sliceData(downloadsAvg7), hidden: isHidden('downloads', 'downloadsAvg7', true) },
             { id: 'downloadsAvg30', label: 'Downloads 30d Avg', color: '#a855f7', data: sliceData(downloadsAvg30), hidden: isHidden('downloads', 'downloadsAvg30', true) }
@@ -194,7 +196,7 @@ export function PlatformAnalytics() {
                             <div className="p-2.5 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-white/5 shadow-sm text-blue-500"><Download className="w-5 h-5" /></div>
                             <div>
                                 <h3 data-skeleton-keep className="font-bold text-lg text-slate-900 dark:text-white leading-tight">Downloads over Time</h3>
-                                <p data-skeleton-keep className="text-xs text-slate-500 dark:text-slate-400 font-medium">Platform vs API daily downloads.</p>
+                                <p data-skeleton-keep className="text-xs text-slate-500 dark:text-slate-400 font-medium">Platform, launcher, and API daily downloads.</p>
                             </div>
                         </div>
                         <LoadingChartFrame pending={loading} className="flex-1 min-h-0 px-6 pb-6">

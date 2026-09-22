@@ -244,14 +244,14 @@ final class LibraryWorldSnapshotMapper {
         if (file == null || file.isBlank()) {
             return "";
         }
-        return normalizedFileKey(Path.of(file));
+        return LibraryFileIdentity.key(file);
     }
 
     private static String normalizedFileKey(Path file) {
         if (file == null) {
             return "";
         }
-        return file.toAbsolutePath().normalize().toString();
+        return LibraryFileIdentity.key(file);
     }
 
     private static String worldListSource(String source) {
@@ -307,7 +307,12 @@ final class LibraryWorldSnapshotMapper {
                     project.classification(),
                     modtaleProject ? InstalledProject.SOURCE_MODTALE : first(project.source(), "OTHER"),
                     modtaleProject ? "" : first(project.projectId(), project.slug()),
-                    "",
+                    !modtaleProject && InstalledProject.SOURCE_CURSEFORGE.equalsIgnoreCase(project.source())
+                            && project.installedVersionId().matches("[1-9][0-9]*")
+                            ? (project.slug().matches("[a-zA-Z0-9][a-zA-Z0-9-]*")
+                                    ? "https://www.curseforge.com/hytale/mods/" + project.slug()
+                                    : "https://www.curseforge.com/projects/" + project.projectId().replace("curseforge:", ""))
+                                    + "/files/" + project.installedVersionId() : "",
                     ""
             );
         }

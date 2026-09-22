@@ -2,6 +2,7 @@ package net.modtale.launcher.ui.shell;
 
 import java.util.Objects;
 import java.io.IOException;
+import net.modtale.launcher.hytale.HytaleGameVersionResolver;
 import net.modtale.launcher.ui.wardrobe.LauncherWardrobeController;
 import net.modtale.launcher.wardrobe.WardrobeApiClient;
 import net.modtale.launcher.wardrobe.WardrobeStore;
@@ -114,7 +115,8 @@ public final class LauncherRuntime {
                 accountController,
                 libraryController,
                 feedback,
-                settingsController::gameVersion,
+                () -> HytaleGameVersionResolver.selectedServerVersion(settingsController.settings())
+                        .orElse(settingsController.gameVersion()),
                 services.executor(),
                 services.projectPageImageLoader()
         );
@@ -126,7 +128,7 @@ public final class LauncherRuntime {
                 services.projectCardFactory(),
                 projectActions::installSelectedProject,
                 projectActions::installSelectedProjectVersion,
-                () -> navigation.show(LauncherView.DISCOVER),
+                navigation::back,
                 () -> navigation.show(LauncherView.PROJECT),
                 feedback::showToast,
                 settingsController::gameVersion,
@@ -137,6 +139,8 @@ public final class LauncherRuntime {
                 projectActions::toggleFavorite,
                 services.scrollSupport()
         );
+        projectPageController.setPageNavigation(restorePage -> navigation.show(LauncherView.PROJECT, restorePage));
+        libraryController.setNavigationActions(projectPageController::openProject, projectPageController::openCreator);
         projectActions.attachOverlay(() -> sceneRoot() instanceof StackPane stack ? stack : null);
         projectActions.setViewHistoryAction(projectPageController::openProjectChangelog);
         LauncherPlayController playController = new LauncherPlayController(
@@ -176,6 +180,7 @@ public final class LauncherRuntime {
                 projectPageController::openCreator,
                 projectActions::toggleFavorite
         );
+        playController.setOverlayHost(() -> sceneRoot() instanceof StackPane stack ? stack : null);
         playController.setOnBrowseCatalog(sort -> browseController.selectBrowseView(sort.browseView()));
         projectActions.attachBrowse(browseController);
         settingsController.addRefreshListener(browseController::refreshControls);

@@ -21,7 +21,8 @@ public final class SystemBrowser {
 
         IOException failure = null;
         try {
-            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+            if (!System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("linux")
+                    && Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
                 Desktop.getDesktop().browse(uri);
                 return;
             }

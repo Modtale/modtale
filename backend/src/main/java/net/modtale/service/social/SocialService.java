@@ -24,7 +24,7 @@ public class SocialService {
             NotificationService notificationService,
             SanitizationService sanitizer,
             MongoTemplate mongoTemplate,
-            ScoringService scoringService
+            ScoringService scoringService, FavoritePersistence favorites
     ) {
         this.projectSocialService = new ProjectSocialService(
                 projectRepository,
@@ -32,7 +32,7 @@ public class SocialService {
                 projectService,
                 notificationService,
                 sanitizer,
-                scoringService
+                scoringService, favorites
         );
         this.userFollowService = new UserFollowService(userRepository, notificationService, mongoTemplate);
     }

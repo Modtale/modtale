@@ -18,6 +18,7 @@ import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.DatePicker;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -33,7 +34,7 @@ public final class ProjectBrowseFilterOptions {
 
     private final Runnable onSearch;
     private final Runnable onChange;
-    private final Runnable onResetTags;
+    private final ProjectBrowseTags tags;
     private final VBox popover = new VBox(20);
     private final GameVersionDropdown gameVersionDropdown = GameVersionDropdown.multiSelect();
     private final Button preReleaseToggle = new Button("Pre Releases");
@@ -53,10 +54,10 @@ public final class ProjectBrowseFilterOptions {
     private boolean downloadSort;
     private boolean suppressSearch;
 
-    public ProjectBrowseFilterOptions(Runnable onSearch, Runnable onChange, Runnable onResetTags) {
+    public ProjectBrowseFilterOptions(Runnable onSearch, Runnable onChange, ProjectBrowseTags tags) {
         this.onSearch = onSearch;
         this.onChange = onChange;
-        this.onResetTags = onResetTags;
+        this.tags = tags;
         configureInputs();
         configurePopover();
     }
@@ -66,7 +67,7 @@ public final class ProjectBrowseFilterOptions {
     }
 
     public int activeFilterCount() {
-        int count = 0;
+        int count = tags.isEmpty() ? 0 : 1;
         if (selectedGameVersion() != null) {
             count++;
         }
@@ -232,7 +233,15 @@ public final class ProjectBrowseFilterOptions {
         VBox resetSection = new VBox(reset);
         resetSection.getStyleClass().add("filter-reset-section");
 
-        popover.getChildren().setAll(version, license, favorites, downloads, updated, resetSection);
+        VBox options = new VBox(20, tags.section(), version, license, favorites, downloads, updated);
+        ScrollPane scroll = new ScrollPane(options);
+        scroll.getStyleClass().add("tag-scroll");
+        scroll.setFitToWidth(true);
+        scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scroll.setPrefViewportHeight(440);
+        scroll.setMinHeight(0);
+        VBox.setVgrow(scroll, Priority.ALWAYS);
+        popover.getChildren().setAll(scroll, resetSection);
         refreshPresetButtons();
     }
 
@@ -363,7 +372,7 @@ public final class ProjectBrowseFilterOptions {
             customMinFavoritesField.clear();
             customMinDownloadsField.clear();
             updatedAfterPicker.setValue(null);
-            onResetTags.run();
+            tags.clear();
             updateGameVersionOptions(null);
         });
         refreshAndNotify(runSearch);

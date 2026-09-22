@@ -1,9 +1,7 @@
 package net.modtale.launcher.ui.library;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import net.modtale.launcher.model.install.InstalledProject;
@@ -22,6 +20,8 @@ final class LibraryArtifactIdentityReconciler {
         for (InstalledProject project : installed == null ? List.<InstalledProject>of() : installed) {
             ArtifactIdentity.Match match = project.files().stream().map(LibraryArtifactIdentityReconciler::normalize)
                     .map(byFile::get).filter(java.util.Objects::nonNull).findFirst().orElse(null);
+            if (match != null && !InstalledProject.SOURCE_LOCAL.equals(project.source())
+                    && !match.source().equalsIgnoreCase(project.source())) match = null;
             boolean sameIdentity = match != null && match.projectId().equals(project.projectId())
                     && match.source().equalsIgnoreCase(project.source());
             boolean sameOrUnknownVersion = match != null && (match.versionId() == null || match.versionId().isBlank()
@@ -35,7 +35,7 @@ final class LibraryArtifactIdentityReconciler {
                     first(project.installedVersion(), match.versionNumber()), first(match.versionId(), project.installedVersionId()),
                     project.gameVersion(), project.installedAt(), project.updatedAt(), project.files(), project.dependencyProjectIds(),
                     project.externalDependencies(), match.source(), project.installType(), project.modpackUnlocked(),
-                    project.bundledProjects());
+                    project.bundledProjects(), project.universeConfigs());
             int existingIndex = indexOf(output, replacement.projectId());
             if (existingIndex >= 0) output.set(existingIndex, mergeFiles(output.get(existingIndex), replacement.files()));
             else output.add(replacement);
@@ -55,18 +55,17 @@ final class LibraryArtifactIdentityReconciler {
     }
 
     private static InstalledProject mergeFiles(InstalledProject project, List<String> files) {
-        LinkedHashSet<String> merged = new LinkedHashSet<>(project.files());
-        merged.addAll(files);
+        Map<String, String> merged = new LinkedHashMap<>();
+        project.files().forEach(file -> merged.putIfAbsent(normalize(file), file));
+        files.forEach(file -> merged.putIfAbsent(normalize(file), file));
         return new InstalledProject(project.projectId(), project.slug(), project.title(), project.classification(),
                 project.installedVersion(), project.installedVersionId(), project.gameVersion(), project.installedAt(),
-                project.updatedAt(), List.copyOf(merged), project.dependencyProjectIds(), project.externalDependencies(),
-                project.source(), project.installType(), project.modpackUnlocked(), project.bundledProjects());
+                project.updatedAt(), List.copyOf(merged.values()), project.dependencyProjectIds(), project.externalDependencies(),
+                project.source(), project.installType(), project.modpackUnlocked(), project.bundledProjects(), project.universeConfigs());
     }
 
     private static String normalize(String path) {
-        if (path == null || path.isBlank()) return "";
-        try { return Path.of(path).toAbsolutePath().normalize().toString(); }
-        catch (RuntimeException ignored) { return path.trim(); }
+        return LibraryFileIdentity.key(path);
     }
 
     private static String first(String... values) {

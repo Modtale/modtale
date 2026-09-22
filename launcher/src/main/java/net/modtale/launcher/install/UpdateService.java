@@ -3,6 +3,7 @@ package net.modtale.launcher.install;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import net.modtale.launcher.hytale.HytaleGameVersionResolver;
 import net.modtale.launcher.api.ModtaleApiClient;
 import net.modtale.launcher.model.install.InstalledProject;
 import net.modtale.launcher.model.install.UpdateCandidate;
@@ -58,6 +59,8 @@ public class UpdateService {
     }
 
     private static String effectiveGameVersion(LauncherSettings settings, InstalledProject installed) {
+        String selected = HytaleGameVersionResolver.selectedServerVersion(settings).orElse("");
+        if (!selected.isBlank()) return selected;
         if (installed.gameVersion() != null && !installed.gameVersion().isBlank()) {
             return installed.gameVersion();
         }

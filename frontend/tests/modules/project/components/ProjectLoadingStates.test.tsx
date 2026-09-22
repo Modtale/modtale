@@ -48,4 +48,15 @@ describe('Project loading dialog dismissal', () => {
         expect(document.body.style.overflow).toBe('');
         root = createRoot(container);
     });
+
+    it('keeps the full changelog action usable on the download skeleton', async () => {
+        const onViewHistory = vi.fn();
+        await act(async () => root.render(<DownloadModalSkeleton onViewHistory={onViewHistory} />));
+
+        const historyButton = Array.from(document.querySelectorAll('button'))
+            .find(button => button.textContent?.includes('View Full Changelog')) as HTMLButtonElement;
+        await act(async () => historyButton.click());
+
+        expect(onViewHistory).toHaveBeenCalledTimes(1);
+    });
 });

@@ -106,6 +106,10 @@ public class ProjectDeletionService {
         projectArtifactDeletionService.deleteVersionFile(fileUrl);
     }
 
+    public void deleteProjectMediaFile(Project project, String location) {
+        projectArtifactDeletionService.deleteProjectMediaFile(project, location);
+    }
+
     public void deleteStoredFile(String fileUrl) {
         projectArtifactDeletionService.deleteStoredFile(fileUrl);
     }

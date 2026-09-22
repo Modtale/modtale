@@ -32,6 +32,10 @@ final class ModpackArchiveValidator {
     private ModpackArchiveValidator() {}
 
     static void validate(byte[] archive) throws IOException {
+        validate(archive, false);
+    }
+
+    static void validate(byte[] archive, boolean requireConfigOwners) throws IOException {
         if (archive == null || archive.length == 0) {
             throw new IOException("Modpack archive is empty.");
         }
@@ -59,7 +63,7 @@ final class ModpackArchiveValidator {
                 }
 
                 MessageDigest digest = sha256Digest();
-                ByteArrayOutputStream captured = METADATA_FILES.contains(name)
+                ByteArrayOutputStream captured = (METADATA_FILES.contains(name) || name.equals(ModpackOverrideArchive.CONFIG_MANIFEST))
                         ? new ByteArrayOutputStream()
                         : null;
                 long size = 0;
@@ -89,12 +93,13 @@ final class ModpackArchiveValidator {
         if (!entries.keySet().containsAll(METADATA_FILES)) {
             throw new IOException("Modpack archive is missing required metadata files.");
         }
-        validateMetadata(metadata, entries);
+        validateMetadata(metadata, entries, requireConfigOwners);
     }
 
     private static void validateMetadata(
             Map<String, byte[]> metadata,
-            Map<String, EntryFingerprint> archiveEntries
+            Map<String, EntryFingerprint> archiveEntries,
+            boolean requireConfigOwners
     ) throws IOException {
         JsonNode legacy = readJson(metadata.get("modpack.json"), "Legacy modpack manifest");
         if (!legacy.isObject() || legacy.path("formatVersion").asInt(-1) != 1
@@ -112,12 +117,17 @@ final class ModpackArchiveValidator {
         }
         JsonNode lock = readJson(metadata.get("modtale.lock.json"), "Modpack lockfile");
         if (lock == null || !"modtale-lock".equals(lock.path("format").asText())
-                || lock.path("lockVersion").asInt(-1) != 1 || !"hytale".equals(lock.path("game").asText())
+                || !Set.of(1, 2).contains(lock.path("lockVersion").asInt(-1)) || !"hytale".equals(lock.path("game").asText())
                 || !lock.path("pack").isObject()
                 || !lock.path("gameVersions").isArray() || !lock.path("entries").isArray()) {
             throw new IOException("Modpack lockfile has an unsupported format.");
         }
+        boolean configOwners = lock.path("lockVersion").asInt() == 2;
+        if (requireConfigOwners && !configOwners) throw new IOException("Cached archive predates config ownership.");
         Set<String> expectedFiles = new HashSet<>(METADATA_FILES);
+        if (metadata.containsKey(ModpackOverrideArchive.CONFIG_MANIFEST)) expectedFiles.add(ModpackOverrideArchive.CONFIG_MANIFEST);
+        Set<String> ownerKeys = new HashSet<>();
+        for (JsonNode item : lock.path("entries")) ownerKeys.add(item.path("source").asText() + ":" + item.path("id").asText());
         for (JsonNode item : lock.path("entries")) {
             String distribution = item.path("distribution").asText();
             String source = item.path("source").asText();
@@ -158,8 +168,18 @@ final class ModpackArchiveValidator {
             throw new IOException("Modpack lockfile overrides must be an array.");
         }
         for (JsonNode item : lock.path("overrides")) {
+            if (configOwners) {
+                if (!"SEED_ONLY".equals(item.path("installPolicy").asText())
+                        || !item.path("path").asText().equals("overrides/" + item.path("destination").asText()) || !item.has("owner")) {
+                    throw new IOException("Invalid config installation policy or destination.");
+                }
+                JsonNode owner = item.path("owner");
+                if (!owner.isNull() && (!owner.isObject() || !ownerKeys.contains(owner.path("source").asText() + ":" + owner.path("projectId").asText()))) {
+                    throw new IOException("Config owner is not included in this pack.");
+                }
+            }
             String path = validatePath(item.path("path").asText(null));
-            if (!(path.startsWith("overrides/Mods/") || path.startsWith("overrides/Saves/"))
+            if (!(configOwners && !item.path("owner").isNull() && path.startsWith("overrides/Universe/mods/"))
                     || !expectedFiles.add(path)) {
                 throw new IOException("Modpack override has an invalid or duplicate path: " + path);
             }

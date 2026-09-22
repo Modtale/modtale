@@ -95,15 +95,15 @@ public class OrganizationApplicationService {
         return new ResourceUrlResponse(url);
     }
 
-    public void acceptOrganizationInvite(String orgId, User currentUser) {
-        organizationService.resolveOrgInvite(orgId, true, currentUser);
+    public void acceptOrganizationInvite(String orgId, String requestId, User currentUser) {
+        organizationService.resolveOrgInvite(orgId, true, requestId, currentUser);
     }
 
-    public void declineOrganizationInvite(String orgId, User currentUser) {
-        organizationService.resolveOrgInvite(orgId, false, currentUser);
+    public void declineOrganizationInvite(String orgId, String requestId, User currentUser) {
+        organizationService.resolveOrgInvite(orgId, false, requestId, currentUser);
     }
 
-    public void cancelOrganizationInvite(String orgId, String userId, User currentUser) {
-        organizationService.voidOrgInvite(orgId, userId, currentUser);
+    public void cancelOrganizationInvite(String orgId, String userId, String requestId, User currentUser) {
+        organizationService.voidOrgInvite(orgId, userId, requestId, currentUser);
     }
 }

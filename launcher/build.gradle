@@ -12,33 +12,60 @@ version = configuredLauncherVersion
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 
 repositories {
     mavenCentral()
+    exclusiveContent {
+        forRepository {
+            ivy {
+                name = 'modtaleJavafx'
+                url = uri('https://github.com/Modtale/jfx/releases/download')
+                patternLayout {
+                    artifact '[revision]/[artifact]-[revision]-[classifier].[ext]'
+                }
+                metadataSources { artifact() }
+            }
+        }
+        filter { includeGroup 'net.modtale.javafx' }
+    }
 }
 
 def currentOs = org.gradle.internal.os.OperatingSystem.current()
+if (currentOs.isLinux()) {
+    configurations.configureEach {
+        exclude group: 'org.openjfx', module: 'javafx-graphics'
+    }
+}
+
+
+def packagingJavaLauncher = javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(26)
+}
+
 
 dependencies {
     implementation 'com.twelvemonkeys.imageio:imageio-webp:3.15.0'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.22.2'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.22.2'
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.22.2'
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.22.2'
     implementation 'com.vladsch.flexmark:flexmark:0.64.8'
     implementation 'com.vladsch.flexmark:flexmark-ext-autolink:0.64.8'
     implementation 'com.vladsch.flexmark:flexmark-ext-gfm-strikethrough:0.64.8'
     implementation 'com.vladsch.flexmark:flexmark-ext-tables:0.64.8'
     implementation 'com.vladsch.flexmark:flexmark-ext-gfm-tasklist:0.64.8'
     implementation 'com.vladsch.flexmark:flexmark-html2md-converter:0.64.8'
-    compileOnly 'net.java.dev.jna:jna:5.19.1'
+    implementation 'net.java.dev.jna:jna:5.19.1'
+    implementation "org.openjfx:javafx-base:26.0.2:${javafxPlatform()}"
     if (currentOs.isLinux()) {
-        runtimeOnly 'net.java.dev.jna:jna:5.19.1'
+        implementation "net.modtale.javafx:javafx-graphics:26.0.2-modtale.2:${javafxPlatform()}"
+    } else {
+        implementation "org.openjfx:javafx-graphics:26.0.2:${javafxPlatform()}"
     }
-    implementation "org.openjfx:javafx-base:21.0.12:${javafxPlatform()}"
-    implementation "org.openjfx:javafx-graphics:21.0.12:${javafxPlatform()}"
-    implementation "org.openjfx:javafx-controls:21.0.12:${javafxPlatform()}"
+    implementation "org.openjfx:javafx-controls:26.0.2:${javafxPlatform()}"
 
     testImplementation 'org.junit.jupiter:junit-jupiter:6.1.3'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:6.1.3'
@@ -65,7 +92,9 @@ def modtaleApiBaseUrl = providers.gradleProperty('modtaleApiBaseUrl')
         .orElse(providers.gradleProperty('apiBaseUrl'))
         .orElse('')
         .get()
-def launcherJvmArgs = ["-Dmodtale.launcherVersion=${packageVersion}"]
+// JavaFX and JNA load native libraries from the class path.
+def nativeAccessJvmArgs = ['--enable-native-access=ALL-UNNAMED']
+def launcherJvmArgs = nativeAccessJvmArgs + ["-Dmodtale.launcherVersion=${packageVersion}"]
 if (!discordClientId.isBlank()) {
     launcherJvmArgs.add("-Dmodtale.discordClientId=${discordClientId.trim()}")
 }
@@ -170,20 +199,73 @@ def linuxFlatpakFile = distributionDirectory.map {
     it.file("${appId}-${installerVersion}-${flatpakArchitecture()}.flatpak")
 }
 
+// Installer icons are consumed by jpackage directly from the source tree.
+tasks.named('processResources') {
+    exclude '**/favicon.ico', '**/favicon.icns'
+}
+
+def packagedJna = tasks.register('packageHostJna', Jar) {
+    archiveFileName = 'jna-host.jar'
+    destinationDirectory = layout.buildDirectory.dir('jpackage/host-libraries')
+    def jnaFiles = configurations.runtimeClasspath.filter { it.name.startsWith('jna-') }
+    inputs.files(jnaFiles)
+    def hostArch = System.getProperty('os.arch', '').toLowerCase(Locale.ROOT)
+    def nativePrefix = (currentOs.isMacOsX() ? 'darwin-' : currentOs.isWindows() ? 'win32-' : 'linux-') + (hostArch in ['amd64', 'x86_64'] ? 'x86-64'
+            : hostArch in ['arm64', 'aarch64'] ? 'aarch64' : hostArch)
+    inputs.property('nativePrefix', nativePrefix)
+    from({ jnaFiles.collect { zipTree(it) } }) {
+        exclude 'META-INF/MANIFEST.MF'
+        eachFile { entry ->
+            if (entry.path.matches('com/sun/jna/[^/]+/[^/]+[.](so|dll|jnilib|a)')
+                    && !entry.path.startsWith("com/sun/jna/${nativePrefix}/")) {
+                entry.exclude()
+            }
+        }
+        includeEmptyDirs = false
+    }
+}
+
 tasks.register('prepareJpackageInput', Sync) {
     group = 'distribution'
     description = 'Collects launcher jars for self-contained jpackage installers.'
     dependsOn tasks.named('jar')
     into layout.buildDirectory.dir('jpackage/input')
     from(appJar)
-    from(runtimeClasspathFiles)
+    from(runtimeClasspathFiles) {
+        exclude 'jna-*.jar'
+    }
+    from(packagedJna)
+    inputs.property('jarCompressionLevel', 9)
+    doLast {
+        long before = 0
+        long after = 0
+        fileTree(destinationDir) { include '*.jar' }.files.each { archive ->
+            before += archive.length()
+            def optimized = new File(temporaryDir, archive.name)
+            optimized.parentFile.mkdirs()
+            new java.util.zip.ZipFile(archive).withCloseable { source ->
+                new java.util.zip.ZipOutputStream(new FileOutputStream(optimized)).withCloseable { output ->
+                    output.setLevel(9)
+                    source.entries().each { original ->
+                        def entry = new java.util.zip.ZipEntry(original)
+                        entry.setMethod(java.util.zip.ZipEntry.DEFLATED)
+                        entry.setCompressedSize(-1)
+                        output.putNextEntry(entry)
+                        source.getInputStream(original).withCloseable { it.transferTo(output) }
+                        output.closeEntry()
+                    }
+                }
+            }
+            if (optimized.length() < archive.length()) {
+                java.nio.file.Files.move(optimized.toPath(), archive.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            }
+            after += archive.length()
+        }
+        logger.lifecycle("Packaged JARs: ${before} -> ${after} bytes (lossless compression)")
+    }
 }
 
-def java21Launcher = javaToolchains.launcherFor {
-    languageVersion = JavaLanguageVersion.of(21)
-}
-
-def jpackageExecutable = java21Launcher.map {
+def jpackageExecutable = packagingJavaLauncher.map {
     def extension = currentOs.isWindows() ? '.exe' : ''
     file("${it.executablePath.asFile.parentFile}/jpackage${extension}")
 }
@@ -256,17 +338,68 @@ def metainfoContent = {
 """
 }
 
+def bootstrapTarget = layout.buildDirectory.dir('bootstrap-target')
+def bootstrapExecutable = bootstrapTarget.map {
+    it.file('release/modtale-bootstrap' + (currentOs.isWindows() ? '.exe' : ''))
+}
+tasks.register('buildBootstrap', Exec) {
+    inputs.dir('bootstrap/src')
+    inputs.files('bootstrap/Cargo.toml', 'bootstrap/Cargo.lock', 'bootstrap/build.rs')
+    outputs.file(bootstrapExecutable)
+    environment 'CARGO_TARGET_DIR', bootstrapTarget.get().asFile.absolutePath
+    commandLine 'cargo', 'build', '--locked', '--release', '--manifest-path', file('bootstrap/Cargo.toml').absolutePath
+}
+tasks.register('testBootstrap', Exec) {
+    environment 'CARGO_TARGET_DIR', bootstrapTarget.get().asFile.absolutePath
+    commandLine 'cargo', 'test', '--locked', '--manifest-path', file('bootstrap/Cargo.toml').absolutePath
+}
+tasks.named('check') { dependsOn tasks.named('testBootstrap') }
+
+// Keep jpackage's native bundle/installer metadata, then replace the VM-dependent entry point.
+def installBootstrap = { File image ->
+    def treeSize = { File root ->
+        long bytes = 0
+        root.eachFileRecurse(groovy.io.FileType.FILES) { bytes += it.length() }
+        bytes
+    }
+    long originalBytes = treeSize(image)
+    def appDir = new File(image, currentOs.isWindows() ? 'app' : currentOs.isMacOsX() ? 'Contents/app' : 'lib/app')
+    def entry = new File(image, currentOs.isWindows() ? "${appDisplayName}.exe"
+            : currentOs.isMacOsX() ? "Contents/MacOS/${appDisplayName}" : "bin/${appDisplayName}")
+    delete entry
+    java.nio.file.Files.copy(bootstrapExecutable.get().asFile.toPath(), entry.toPath())
+    entry.setExecutable(true, false)
+    new File(appDir, 'bootstrap.json').text = groovy.json.JsonOutput.toJson([
+            jvm_args: ['-Dfile.encoding=UTF-8'] + launcherJvmArgs
+    ])
+    delete new File(image, currentOs.isWindows() ? 'runtime' : currentOs.isMacOsX() ? 'Contents/runtime' : 'lib/runtime')
+    if (currentOs.isLinux()) { delete new File(image, 'lib/libapplauncher.so') }
+    if (currentOs.isMacOsX()) {
+        // Replacing the executable invalidates jpackage's ad-hoc signature.
+        runExternalCommand(['codesign', '--force', '--deep', '--sign', '-', image.absolutePath])
+    }
+    long finalBytes = treeSize(image)
+    def report = layout.buildDirectory.file('reports/package-size.json').get().asFile
+    report.parentFile.mkdirs()
+    report.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
+            os: System.getProperty('os.name'), arch: System.getProperty('os.arch'),
+            withRuntimeBytes: originalBytes, packageBytes: finalBytes,
+            bootstrapBytes: entry.length(), savedBytes: originalBytes - finalBytes
+    ]))
+    logger.lifecycle("Application image: ${originalBytes} -> ${finalBytes} bytes")
+}
+
 def configureJpackageTask = { TaskProvider<Exec> packageTask, String packageType, Closure<Boolean> hostPredicate, Closure<List<String>> platformArgs ->
     packageTask.configure {
         group = 'distribution'
-        dependsOn tasks.named('prepareJpackageInput')
+        dependsOn tasks.named('jpackageAppImage')
         onlyIf {
             hostPredicate.call()
         }
         doFirst {
             def executable = jpackageExecutable.get()
             if (!executable.exists()) {
-                throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 21 to build native launcher installers.")
+                throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 26 to build native launcher installers.")
             }
 
             delete layout.buildDirectory.dir("jpackage/tmp/${name}")
@@ -276,15 +409,18 @@ def configureJpackageTask = { TaskProvider<Exec> packageTask, String packageType
                     executable.absolutePath,
                     '--type', packageType,
                     '--dest', distributionDirectory.get().asFile.absolutePath,
-                    '--temp', layout.buildDirectory.dir("jpackage/tmp/${name}").get().asFile.absolutePath
-            ] + commonJpackageArgs.call() + installerJpackageArgs.call() + platformArgs.call())
+                    '--temp', layout.buildDirectory.dir("jpackage/tmp/${name}").get().asFile.absolutePath,
+                    '--name', appDisplayName,
+                    '--app-version', jpackageAppVersion,
+                    '--app-image', layout.buildDirectory.dir('jpackage/app-image').get().dir(appDisplayName + (currentOs.isMacOsX() ? '.app' : '')).asFile.absolutePath
+            ] + installerJpackageArgs.call() + platformArgs.call())
         }
     }
 }
 
 configureJpackageTask(
         tasks.register('packageWindows', Exec) {
-            description = 'Builds a self-contained Windows .exe installer with an embedded Java runtime.'
+            description = 'Builds a self-contained Windows .exe installer with automatic Java runtime setup.'
         },
         windowsPackageType,
         { currentOs.isWindows() },
@@ -307,7 +443,7 @@ configureJpackageTask(
 
 configureJpackageTask(
         tasks.register('packageMac', Exec) {
-            description = 'Builds a self-contained macOS .dmg containing a native .app bundle and embedded Java runtime.'
+            description = 'Builds a self-contained macOS .dmg containing a native .app bundle and automatic Java runtime setup.'
         },
         macPackageType,
         { currentOs.isMacOsX() },
@@ -322,14 +458,14 @@ configureJpackageTask(
 tasks.register('prepareLinuxAppImageRuntime', Exec) {
     group = 'distribution'
     description = 'Builds the self-contained Linux runtime image used by the AppImage package.'
-    dependsOn tasks.named('prepareJpackageInput')
+    dependsOn tasks.named('prepareJpackageInput'), tasks.named('buildBootstrap')
     onlyIf {
         currentOs.isLinux()
     }
     doFirst {
         def executable = jpackageExecutable.get()
         if (!executable.exists()) {
-            throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 21 to build the Linux AppImage.")
+            throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 26 to build the Linux AppImage.")
         }
 
         delete linuxAppImageDirectory
@@ -383,9 +519,7 @@ tasks.register('prepareLinuxAppDir') {
         appRun.text = '''#!/usr/bin/env sh
 set -eu
 APPDIR="${APPDIR:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}"
-if [ -n "${WAYLAND_DISPLAY:-}" ]; then
-    export GDK_BACKEND=x11
-fi
+export GDK_BACKEND=wayland
 exec "$APPDIR/bin/Modtale Launcher" "$@"
 '''
         appRun.setExecutable(true, false)
@@ -406,7 +540,7 @@ exec "$APPDIR/bin/Modtale Launcher" "$@"
 
 tasks.register('packageLinux', Exec) {
     group = 'distribution'
-    description = 'Builds a self-contained Linux AppImage with an embedded Java runtime.'
+    description = 'Builds a self-contained Linux AppImage with automatic Java runtime setup.'
     dependsOn tasks.named('prepareLinuxAppDir')
     onlyIf {
         currentOs.isLinux()
@@ -512,7 +646,7 @@ Priority: optional
 Architecture: ${debArchitecture()}
 Maintainer: ${linuxDebMaintainer}
 Installed-Size: ${installedSizeKb}
-Depends: libc6, libx11-6, libxext6, libxrender1, libxtst6, libxi6, libfreetype6, fontconfig, libgtk-3-0, zlib1g
+Depends: libc6, libwayland-client0, libwayland-egl1, libegl1, libopengl0, libfreetype6, fontconfig, libgtk-3-0, zlib1g
 Homepage: ${appHomepage}
 Description: ${appDescription}
  Install, update, and manage Hytale mods from Modtale with a self-contained native launcher.
@@ -666,14 +800,11 @@ size = ${installedBytes}
 arch = ${pacmanArchitecture()}
 license = ${appLicenseId}
 depend = glibc
-depend = libx11
-depend = libxext
-depend = libxrender
-depend = libxtst
-depend = libxi
 depend = freetype2
 depend = fontconfig
 depend = gtk3
+depend = wayland
+depend = libglvnd
 """
 
         runExternalCommand([
@@ -753,10 +884,10 @@ exec "\$APPDIR/bin/${appDisplayName}" "\$@"
                 "--command=${appSlug}",
                 '--share=network',
                 '--share=ipc',
-                '--socket=x11',
                 '--socket=wayland',
                 '--device=dri',
                 '--filesystem=home',
+                '--filesystem=~/.var/app/com.hypixel.HytaleLauncher/data/Hytale/install:ro',
                 '--talk-name=org.freedesktop.portal.Desktop',
                 buildDir.absolutePath
         ])
@@ -792,11 +923,11 @@ tasks.register('packageAll') {
 tasks.register('jpackageAppImage', Exec) {
     group = 'distribution'
     description = 'Builds a self-contained unpacked app image for the current host OS.'
-    dependsOn tasks.named('prepareJpackageInput')
+    dependsOn tasks.named('prepareJpackageInput'), tasks.named('buildBootstrap')
     doFirst {
         def executable = jpackageExecutable.get()
         if (!executable.exists()) {
-            throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 21 to build native launcher app images.")
+            throw new GradleException("jpackage was not found at ${executable}. Install a full JDK 26 to build native launcher app images.")
         }
 
         delete layout.buildDirectory.dir('jpackage/app-image')
@@ -805,6 +936,25 @@ tasks.register('jpackageAppImage', Exec) {
                 '--type', 'app-image',
                 '--dest', layout.buildDirectory.dir('jpackage/app-image').get().asFile.absolutePath
         ] + commonJpackageArgs.call())
+    }
+}
+
+// Preserve exported JNI/runtime symbols while removing unused local ELF symbol tables.
+// strip-debug alone leaves these tables in many JDK distributions.
+['jpackageAppImage', 'prepareLinuxAppImageRuntime'].each { taskName ->
+    tasks.named(taskName) {
+        doLast {
+            def imageRoot = taskName == 'jpackageAppImage'
+                    ? layout.buildDirectory.dir('jpackage/app-image').get().asFile
+                    : linuxAppImageDirectory.get().asFile
+            installBootstrap(new File(imageRoot, appDisplayName + (currentOs.isMacOsX() ? '.app' : '')))
+            if (currentOs.isLinux()) {
+                def stripTool = resolveExecutable('strip', 'strip', 'Install binutils to package the Linux runtime.')
+                fileTree(imageRoot) { include '**/*.so' }.files.each { nativeLibrary ->
+                    runExternalCommand([stripTool, '--strip-unneeded', nativeLibrary.absolutePath])
+                }
+            }
+        }
     }
 }
 
@@ -829,12 +979,19 @@ tasks.named('installDist') {
 }
 
 tasks.withType(JavaCompile).configureEach {
+    options.release = 25
     options.encoding = 'UTF-8'
     options.compilerArgs += ['-parameters']
 }
 
 tasks.named('test') {
     useJUnitPlatform()
+    jvmArgs nativeAccessJvmArgs
+    if (currentOs.isMacOsX()) {
+        systemProperty 'prism.order', 'mtl,es2,sw'
+    }
+    timeout = java.time.Duration.ofMinutes(10)
+    systemProperty 'junit.jupiter.execution.timeout.default', '60 s'
 }
 
 def javafxPlatform() {

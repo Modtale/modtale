@@ -132,8 +132,8 @@ class ApiKeyRequestedContextAuthorizationServiceTest {
         assertTrue(needsRemoval.getContextPermissions().isEmpty());
         assertEquals(EnumSet.of(ApiKey.ApiPermission.VERSION_READ), unchanged.getContextPermissions().get("project-1"));
 
-        verify(apiKeyRepository).save(needsTrim);
-        verify(apiKeyRepository).save(needsRemoval);
+        verify(apiKeyRepository).restrictContexts(org.mockito.ArgumentMatchers.eq(needsTrim.getId()),org.mockito.ArgumentMatchers.eq(needsTrim.getUserId()),org.mockito.ArgumentMatchers.eq(needsTrim.getKeyHash()),org.mockito.ArgumentMatchers.anyMap(),org.mockito.ArgumentMatchers.eq(needsTrim.getContextPermissions()));
+        verify(apiKeyRepository).restrictContexts(org.mockito.ArgumentMatchers.eq(needsRemoval.getId()),org.mockito.ArgumentMatchers.eq(needsRemoval.getUserId()),org.mockito.ArgumentMatchers.eq(needsRemoval.getKeyHash()),org.mockito.ArgumentMatchers.anyMap(),org.mockito.ArgumentMatchers.eq(needsRemoval.getContextPermissions()));
         verify(apiKeyRepository, never()).save(unchanged);
         verify(apiKeyRepository, never()).save(noContext);
     }
@@ -148,7 +148,7 @@ class ApiKeyRequestedContextAuthorizationServiceTest {
         service.syncUserProjectPermissions("user-1", "project-1", Set.of());
 
         assertTrue(key.getContextPermissions().isEmpty());
-        verify(apiKeyRepository).save(key);
+        verify(apiKeyRepository).restrictContexts(org.mockito.ArgumentMatchers.eq(key.getId()),org.mockito.ArgumentMatchers.eq(key.getUserId()),org.mockito.ArgumentMatchers.eq(key.getKeyHash()),org.mockito.ArgumentMatchers.anyMap(),org.mockito.ArgumentMatchers.eq(key.getContextPermissions()));
     }
 
     private static User user(String id) {

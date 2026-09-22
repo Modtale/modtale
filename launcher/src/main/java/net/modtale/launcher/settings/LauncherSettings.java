@@ -37,6 +37,7 @@ public class LauncherSettings {
     private boolean includeOptionalDependencies;
     private boolean autoCheckUpdates = true;
     private boolean launcherAutoUpdates;
+    private String launcherChannel = "stable";
     private String locale = "en";
     private List<HytalePatchlineCacheEntry> hytalePatchlineCaches = new ArrayList<>();
     private List<HytaleVersionCacheEntry> hytaleVersionCaches = new ArrayList<>();
@@ -389,6 +390,14 @@ public class LauncherSettings {
 
     public void setAutoCheckUpdates(boolean autoCheckUpdates) {
         this.autoCheckUpdates = autoCheckUpdates;
+    }
+
+    public String getLauncherChannel() {
+        return "develop".equalsIgnoreCase(launcherChannel) ? "develop" : "stable";
+    }
+
+    public void setLauncherChannel(String launcherChannel) {
+        this.launcherChannel = "develop".equalsIgnoreCase(launcherChannel) ? "develop" : "stable";
     }
 
     public boolean isLauncherAutoUpdates() {

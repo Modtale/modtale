@@ -26,6 +26,8 @@ export interface OrganizationRole {
 }
 
 export interface OrganizationMember {
+    requestId?: string;
+    requestExpiresAt?: number;
     userId: string;
     roleId: string;
 }
@@ -230,6 +232,8 @@ export interface ScanResult {
 }
 
 export interface ProjectVersion {
+    manifestId?: string;
+    modpackConfigs?: { projectId: string; source: string; path: string; sha256: string }[];
     id: string;
     versionNumber: string;
     gameVersion: string;
@@ -285,6 +289,8 @@ export interface ProjectRole {
 }
 
 export interface ProjectMember {
+    requestId?: string;
+    requestExpiresAt?: number;
     userId: string;
     roleId: string;
     username?: string;

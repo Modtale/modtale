@@ -14,8 +14,6 @@ import javafx.scene.SubScene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
@@ -24,25 +22,14 @@ import javafx.scene.paint.Color;
 import javafx.scene.transform.Rotate;
 import javafx.scene.transform.Scale;
 import javafx.scene.transform.Translate;
-import net.modtale.launcher.platform.SystemBrowser;
-import net.modtale.launcher.wardrobe.GltfModelLoader;
 import net.modtale.launcher.wardrobe.LocalAvatarRenderer;
 import net.modtale.launcher.wardrobe.CosmeticCatalogClient;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.function.Consumer;
 
 /** Native JavaFX wardrobe viewer. Construct and invoke its public methods on the FX thread.
  * The caller owns the executor; dispose cancels this component's work without shutting it down.
@@ -50,27 +37,21 @@ import java.util.function.Consumer;
 public final class WardrobePreview {
     private final Executor executor;
     private final boolean supports3d;
-    private final Fetcher fetcher;
-    private final Consumer<URI> browser;
     private final BorderPane root = new BorderPane();
     private final StackPane viewport = new StackPane();
     private final javafx.scene.control.Tooltip interactionHelp = new javafx.scene.control.Tooltip();
     private final Label status = new Label("Select an outfit to preview");
-    private final Button rotateLeft = new Button("Rotate left");
-    private final Button rotateRight = new Button("Rotate right");
     private final Button retry = new Button("Retry");
     private final Button reset = new Button("Reset");
-    private final Button external = new Button("Open 3D");
     private final javafx.scene.control.ComboBox<AnimationChoice> animations = new javafx.scene.control.ComboBox<>();
-    private final Button pause = new Button("Pause");
-    private final HBox animationControls = new HBox(6, animations, pause);
+    private final HBox animationControls = new HBox(6, animations);
     private LocalAvatarRenderer.Rig animationRig;
     private LocalAvatarRenderer.Clip animationClip;
     private AnimationChoice selectedAnimation;
+    private boolean viewActions = true;
     private FutureTask<Void> animationPending;
     private long animationGeneration, lastPulse;
     private double animationSeconds, animationSpeed = 1;
-    private boolean animationPaused;
     private final javafx.animation.AnimationTimer animationTimer = new javafx.animation.AnimationTimer() {
         @Override public void handle(long now) {
             if (lastPulse != 0) animationSeconds += (now-lastPulse)/1_000_000_000.0 * animationSpeed;
@@ -89,30 +70,32 @@ public final class WardrobePreview {
     private final Rotate pitch = new Rotate(0, Rotate.X_AXIS);
     private PerspectiveCamera camera;
     private SubScene scene;
-    private ImageView image;
     private FutureTask<Void> pending;
-    private Request request;
     private java.nio.file.Path localAssets;
     private com.fasterxml.jackson.databind.JsonNode localSkin;
     private long generation;
     private boolean disposed;
     private double dragX, dragY, zoom = 1;
-    private double capeAngle = 180;
-    private boolean capeDragged;
+    private CosmeticFraming framing = CosmeticFraming.forCategory("");
+    private boolean focusBack;
 
-    public WardrobePreview(Executor executor) {
-        this(executor, Platform.isSupported(ConditionalFeature.SCENE3D), WardrobePreview::fetch, uri -> {
-            try { SystemBrowser.open(uri); }
-            catch (IOException ex) { throw new IllegalStateException("Could not open the system browser", ex); }
-        });
+    void focusCategory(String category) {
+        CosmeticFraming next = CosmeticFraming.forCategory(category);
+        if (next.equals(framing)) return;
+        framing = next;
+        if (!supports3d) cancel();
+        focusBack = "cape".equals(category);
+        resetView();
     }
 
-    WardrobePreview(Executor executor, boolean supports3d, Fetcher fetcher, Consumer<URI> browser) {
+    public WardrobePreview(Executor executor) {
+        this(executor, Platform.isSupported(ConditionalFeature.SCENE3D));
+    }
+
+    WardrobePreview(Executor executor, boolean supports3d) {
         requireFx();
         this.executor = Objects.requireNonNull(executor);
         this.supports3d = supports3d;
-        this.fetcher = Objects.requireNonNull(fetcher);
-        this.browser = Objects.requireNonNull(browser);
         root.setId("wardrobe-preview");
         root.setMinSize(180, 240);
         root.setPrefSize(300, 335);
@@ -131,7 +114,7 @@ public final class WardrobePreview {
         status.setMinWidth(0);
         status.setMaxWidth(Double.MAX_VALUE);
         status.setId("wardrobe-preview-status");
-        for (Button button : new Button[]{reset, retry, external, rotateLeft, rotateRight, pause}) {
+        for (Button button : new Button[]{reset, retry}) {
             button.getStyleClass().addAll("btn", "secondary", "small");
         }
         reset.setText(""); reset.setAccessibleText("Reset view");
@@ -140,137 +123,52 @@ public final class WardrobePreview {
                 net.modtale.launcher.ui.common.LauncherIcons.Glyph.ROTATE_CCW, 14));
         reset.getStyleClass().add("wardrobe-preview-reset");
         reset.setMinSize(30, 30); reset.setPrefSize(30, 30);
-        HBox controls = new HBox(6, animationControls, reset, retry, external);
+        HBox controls = new HBox(6, animationControls, reset, retry);
         HBox.setHgrow(animationControls, javafx.scene.layout.Priority.ALWAYS);
         controls.setAlignment(Pos.CENTER);
-        HBox rotationControls = new HBox(6, rotateLeft, rotateRight);
-        rotationControls.setAlignment(Pos.CENTER);
-        rotationControls.visibleProperty().bind(rotateLeft.visibleProperty());
-        rotationControls.managedProperty().bind(rotationControls.visibleProperty());
         animations.setId("wardrobe-preview-animation");
         animations.getStyleClass().addAll("select", "wardrobe-preview-motion");
         animations.setStyle("-fx-font-size: 11px;");
         animations.setAccessibleText("Preview animation");
         animations.setMinWidth(0); animations.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(animations, javafx.scene.layout.Priority.ALWAYS);
-        pause.setId("wardrobe-preview-pause");
-        pause.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
         animationControls.setAlignment(Pos.CENTER);
         animationControls.setVisible(false);
         animationControls.managedProperty().bind(animationControls.visibleProperty());
         animations.valueProperty().addListener((observable, before, after) -> selectAnimation());
-        pause.visibleProperty().bind(javafx.beans.binding.Bindings.createBooleanBinding(
-                () -> animationControls.isVisible() && animations.getValue()!=null && animations.getValue().option!=null,
-                animationControls.visibleProperty(), animations.valueProperty()));
-        pause.managedProperty().bind(pause.visibleProperty());
-        pause.setOnAction(event -> {
-            if (animationClip == null) return;
-            animationPaused = !animationPaused;
-            if (animationPaused) animationTimer.stop();
-            else {
-                lastPulse=0; animationTimer.start();
-            }
-            pause.setText(animationPaused ? "Play" : "Pause");
-        });
-        VBox footer = new VBox(6, status, rotationControls, controls);
+        VBox footer = new VBox(6, status, controls);
         footer.setAlignment(Pos.CENTER);
         footer.setPadding(new Insets(8));
         root.setBottom(footer);
         retry.setOnAction(event -> {
             if (localAssets != null) showLocal(localAssets, localSkin);
-            else if (request != null) show(request.username, request.skinId, request.cape);
         });
         reset.setOnAction(event -> {
             selectedAnimation = null;
-            if (!animations.getItems().isEmpty()) animations.getSelectionModel().selectFirst();
-            if (renderedCape()) { capeAngle = 180; zoom = 1; reloadCape(); } else resetView();
+            if (!animations.getItems().isEmpty()) animations.getSelectionModel().select(defaultAnimation());
+            resetView();
         });
-        rotateLeft.setOnAction(event -> rotateCape(-30));
-        rotateRight.setOnAction(event -> rotateCape(30));
-        external.setOnAction(event -> openExternal());
-        viewport.setOnMousePressed(event -> { dragX = event.getSceneX(); dragY = event.getSceneY(); capeDragged = false; });
+        viewport.setOnMousePressed(event -> { dragX = event.getSceneX(); dragY = event.getSceneY(); });
         viewport.setOnMouseDragged(event -> {
             if (!event.isPrimaryButtonDown()) return;
-            if (renderedCape() && image != null) {
-                capeAngle = normalizeAngle(capeAngle + (event.getSceneX()-dragX)*0.6);
-                capeDragged |= event.getSceneX() != dragX;
-                dragX = event.getSceneX();
-                event.consume();
-                return;
-            }
             if (scene == null) return;
             yaw.setAngle(yaw.getAngle() + (event.getSceneX()-dragX)*0.6);
             pitch.setAngle(clamp(pitch.getAngle()-(event.getSceneY()-dragY)*0.6, -80, 80));
             dragX = event.getSceneX(); dragY = event.getSceneY();
             event.consume();
         });
-        viewport.setOnMouseReleased(event -> {
-            if (renderedCape() && capeDragged) { capeDragged = false; reloadCape(); event.consume(); }
-        });
         viewport.setOnScroll(event -> {
-            if (scene == null && !(renderedCape() && image != null)) return;
+            if (scene == null) return;
             zoom = clamp(zoom * Math.exp(-event.getDeltaY()*0.002), 0.45, 3);
             fitCamera();
-            if (image != null) { image.setScaleX(zoom); image.setScaleY(zoom); }
             event.consume();
         });
         viewport.widthProperty().addListener((observable, before, after) -> fitCamera());
         viewport.heightProperty().addListener((observable, before, after) -> fitCamera());
-        controls(false, false, false);
+        controls(false, false);
     }
 
     public Node view() { return root; }
-
-    public void show(String username, String skinId, String cape) {
-        requireFx();
-        if (disposed) return;
-        cancel();
-        localAssets = null; localSkin = null;
-        removeContent();
-        try {
-            Request next = new Request(username, skinId, cape);
-            if (!next.equals(request)) { capeAngle = 180; zoom = 1; }
-            request = next;
-        }
-        catch (IllegalArgumentException ex) {
-            request = null;
-            showStatus(ex.getMessage());
-            controls(false, false, false);
-            return;
-        }
-        Request selected = request;
-        long ticket = generation;
-        int angle = (int)Math.round(capeAngle);
-        showStatus("Loading preview…");
-        viewport.getChildren().setAll(progress);
-        controls(false, false, true);
-        FutureTask<Void> task = new FutureTask<>(() -> {
-            try {
-                Object result = supports3d && !selected.renderedCape()
-                        ? GltfModelLoader.load(fetcher.fetch(selected.glb(), GltfModelLoader.MAX_BYTES))
-                        : png(fetcher.fetch(selected.png(angle), 8 * 1024 * 1024));
-                if (!Thread.currentThread().isInterrupted()) Platform.runLater(() -> {
-                    if (!current(ticket)) return;
-                    pending = null;
-                    try {
-                        if (result instanceof Group model) installModel(model);
-                        else installImage((Image)result);
-                    } catch (RuntimeException ex) { failed(ticket); }
-                });
-            } catch (Exception ex) {
-                if (!Thread.currentThread().isInterrupted()) Platform.runLater(() -> failed(ticket));
-            }
-            return null;
-        });
-        pending = task;
-        try {
-            // Even a direct/caller-runs executor must never fetch or parse on the FX thread.
-            executor.execute(() -> {
-                if (Platform.isFxApplicationThread()) Thread.startVirtualThread(task);
-                else task.run();
-            });
-        } catch (RejectedExecutionException ex) { failed(ticket); }
-    }
 
     /** Preview an arbitrary local cosmetic draft without applying it or contacting a rendering service. */
     public void showLocal(java.nio.file.Path assetsZip, com.fasterxml.jackson.databind.JsonNode cosmeticDefinition) {
@@ -281,27 +179,37 @@ public final class WardrobePreview {
         boolean replacing = scene != null && localAssets != null;
         cancel();
         if (!replacing) removeContent();
-        request = null;
         localAssets = assetsZip;
         localSkin = cosmeticDefinition == null ? null : cosmeticDefinition.deepCopy();
         long ticket = generation;
-        if (!replacing) controls(false, false, false);
-        if (!supports3d) {
-            showStatus("Preview unavailable on this device.");
-            return;
-        }
+        if (!replacing) controls(false, false);
         if (!replacing) {
             showStatus("Loading preview…");
             viewport.getChildren().setAll(progress);
         } else status.setText("Updating preview…");
         var draft = localSkin;
+        var localFraming = framing;
+        boolean back = focusBack;
         FutureTask<Void> task = new FutureTask<>(() -> {
             try {
                 Group model = net.modtale.launcher.wardrobe.LocalAvatarRenderer.load(assetsZip, draft);
+                var thumbnail = supports3d ? null : net.modtale.launcher.wardrobe.LocalAvatarThumbnail.render(
+                        model, 512, back ? 180 : -20, localFraming.centerY(), localFraming.scale());
                 if (!Thread.currentThread().isInterrupted()) Platform.runLater(() -> {
                     if (!current(ticket)) return;
                     pending = null;
                     try {
+                        if (thumbnail != null) {
+                            removeContent();
+                            var image = new javafx.scene.image.ImageView(thumbnail);
+                            image.setPreserveRatio(true);
+                            image.fitWidthProperty().bind(viewport.widthProperty());
+                            image.fitHeightProperty().bind(viewport.heightProperty());
+                            viewport.getChildren().setAll(image);
+                            readyStatus("Local outfit preview · Static image", "Rendered locally. Interactive 3D is unavailable on this device.");
+                            controls(false, false);
+                            return;
+                        }
                         double previousYaw = yaw.getAngle(), previousPitch = pitch.getAngle(), previousZoom = zoom;
                         installModel(model);
                         if (replacing) {
@@ -312,10 +220,10 @@ public final class WardrobePreview {
                         animationRig.animations().forEach(option -> animations.getItems().add(new AnimationChoice(option)));
                         AnimationChoice resume = selectedAnimation;
                         animations.getSelectionModel().select(animations.getItems().stream()
-                                .filter(choice -> choice.equals(resume)).findFirst().orElse(animations.getItems().getFirst()));
+                                .filter(choice -> choice.equals(resume)).findFirst().orElseGet(this::defaultAnimation));
                         animationControls.setVisible(animations.getItems().size()>1);
                         readyStatus("Local outfit preview · Drag to rotate · Scroll to zoom", "Drag to rotate. Scroll to zoom.");
-                        controls(true, false, false);
+                        controls(true, false);
                     } catch (RuntimeException ex) { localFailed(ticket, ex); }
                 });
             } catch (Exception ex) {
@@ -332,17 +240,16 @@ public final class WardrobePreview {
         if (!current(ticket)) return;
         pending = null; removeContent();
         showStatus("Preview unavailable: " + (error.getMessage() == null ? "Please retry." : error.getMessage()));
-        controls(false, true, false);
+        controls(false, true);
     }
 
     public void clear() {
         requireFx();
         cancel();
-        request = null;
         localAssets = null; localSkin = null;
         removeContent();
         showStatus("Select an outfit to preview");
-        controls(false, false, false);
+        controls(false, false);
     }
 
     public void dispose() {
@@ -352,9 +259,6 @@ public final class WardrobePreview {
         disposed = true;
         retry.setOnAction(null);
         reset.setOnAction(null);
-        rotateLeft.setOnAction(null);
-        rotateRight.setOnAction(null);
-        external.setOnAction(null);
         viewport.setOnMousePressed(null);
         viewport.setOnMouseDragged(null);
         viewport.setOnMouseReleased(null);
@@ -388,50 +292,7 @@ public final class WardrobePreview {
         viewport.getChildren().setAll(scene);
         resetView();
         readyStatus("Live 3D preview · Drag to rotate · Scroll to zoom", "Drag to rotate. Scroll to zoom.");
-        controls(true, false, true);
-    }
-
-    private void installImage(Image png) {
-        removeContent();
-        image = new ImageView(png);
-        image.setPreserveRatio(true);
-        image.setSmooth(true);
-        image.fitWidthProperty().bind(viewport.widthProperty());
-        image.fitHeightProperty().bind(viewport.heightProperty());
-        image.setScaleX(zoom); image.setScaleY(zoom);
-        viewport.getChildren().setAll(image);
-        if (renderedCape()) {
-            readyStatus("Rendered cape preview · Drag to rotate · Scroll to zoom", "Drag and release to rotate the cape. Scroll to zoom.");
-            controls(true, false, true);
-            return;
-        }
-        readyStatus("Static PNG preview — native 3D is unavailable on this platform. Open 3D to rotate.", "Static preview. Open 3D in your browser to rotate.");
-        controls(false, false, true);
-    }
-
-    private void failed(long ticket) {
-        if (!current(ticket)) return;
-        pending = null;
-        removeContent();
-        showStatus(renderedCape() ? "Cape preview could not be loaded. Retry or view the render." : "Preview could not be loaded. Retry or open 3D in your browser.");
-        controls(false, true, request != null);
-    }
-
-    private void openExternal() {
-        if (disposed || request == null) return;
-        URI uri = renderedCape() ? request.png((int)Math.round(capeAngle)) : request.preview();
-        long ticket = generation;
-        try {
-            executor.execute(() -> {
-                Runnable open = () -> {
-                    try { browser.accept(uri); }
-                    catch (RuntimeException ex) { Platform.runLater(() -> {
-                        if (current(ticket)) showStatus("Could not open your browser. Try again.");
-                    }); }
-                };
-                if (Platform.isFxApplicationThread()) Thread.startVirtualThread(open); else open.run();
-            });
-        } catch (RejectedExecutionException ex) { showStatus("Could not open your browser. Try again."); }
+        controls(true, false);
     }
 
     private void showStatus(String message) {
@@ -451,18 +312,8 @@ public final class WardrobePreview {
         viewport.setAccessibleHelp(help);
     }
 
-    private boolean renderedCape() { return request != null && request.renderedCape(); }
-    private static double normalizeAngle(double value) { return ((value % 360) + 360) % 360; }
-    private void rotateCape(double delta) {
-        capeAngle = normalizeAngle(capeAngle + delta);
-        reloadCape();
-    }
-    private void reloadCape() {
-        if (renderedCape()) show(request.username, request.skinId, request.cape);
-    }
-
     private void resetView() {
-        yaw.setAngle(-20);
+        yaw.setAngle(focusBack ? 180 : -20);
         pitch.setAngle(0);
         zoom = 1;
         fitCamera();
@@ -472,15 +323,21 @@ public final class WardrobePreview {
         if (camera == null) return;
         double aspect = Math.max(0.1, viewport.getWidth()/Math.max(1, viewport.getHeight()));
         double halfAngle = Math.atan(Math.tan(Math.toRadians(camera.getFieldOfView()/2))*Math.min(1,aspect));
-        camera.setTranslateZ(-1.15/Math.sin(halfAngle)*zoom);
+        camera.setTranslateY(framing.centerY());
+        camera.setTranslateZ(-1.15/Math.sin(halfAngle)*zoom*framing.scale());
     }
 
     private void stopAnimation() {
         animationGeneration++;
         if(animationPending!=null) { animationPending.cancel(true); animationPending=null; }
         animationTimer.stop(); lastPulse=0; animationSeconds=0; animationClip=null;
-        animationPaused=false; pause.setText("Pause"); pause.setDisable(true);
         if(animationRig!=null)animationRig.reset();
+    }
+
+    private AnimationChoice defaultAnimation() {
+        return animations.getItems().stream()
+                .filter(choice -> choice.option != null && choice.option.id().equalsIgnoreCase("Idle"))
+                .findFirst().orElse(animations.getItems().getFirst());
     }
 
     private void selectAnimation() {
@@ -502,7 +359,7 @@ public final class WardrobePreview {
                 if(!Thread.currentThread().isInterrupted())Platform.runLater(() -> {
                     if(disposed || ticket!=animationGeneration)return;
                     animationPending=null; animationClip=clip; animationSpeed=option.speed();
-                    animationRig.apply(clip,0); pause.setDisable(false); animationTimer.start();
+                    animationRig.apply(clip,0); animationTimer.start();
                     readyStatus("Local outfit preview · Drag to rotate · Scroll to zoom", "Drag to rotate. Scroll to zoom.");
                 });
             } catch(Exception error) {
@@ -524,9 +381,6 @@ public final class WardrobePreview {
             scene.widthProperty().unbind(); scene.heightProperty().unbind();
             scene.setRoot(new Group()); scene.setCamera(null); scene = null;
         }
-        if (image != null) {
-            image.fitWidthProperty().unbind(); image.fitHeightProperty().unbind(); image.setImage(null); image = null;
-        }
         camera = null;
         viewport.getChildren().clear();
     }
@@ -536,73 +390,19 @@ public final class WardrobePreview {
         if (pending != null) { pending.cancel(true); pending = null; }
     }
 
+    void hideViewActions() {
+        viewActions = false;
+        reset.setVisible(false); reset.setManaged(false);
+    }
+
     private boolean current(long ticket) { return !disposed && ticket == generation; }
-    private void controls(boolean canReset, boolean canRetry, boolean canOpen) {
-        rotateLeft.setVisible(canReset && renderedCape()); rotateLeft.setManaged(canReset && renderedCape());
-        rotateRight.setVisible(canReset && renderedCape()); rotateRight.setManaged(canReset && renderedCape());
-        external.setText(renderedCape() ? "View render" : "Open 3D");
-        reset.setVisible(canReset); reset.setManaged(canReset);
+    private void controls(boolean canReset, boolean canRetry) {
+        reset.setVisible(canReset && viewActions); reset.setManaged(canReset && viewActions);
         retry.setVisible(canRetry); retry.setManaged(canRetry);
-        external.setVisible(canOpen); external.setManaged(canOpen);
     }
     private static double clamp(double value, double min, double max) { return Math.max(min,Math.min(max,value)); }
     private static void requireFx() {
         if (!Platform.isFxApplicationThread()) throw new IllegalStateException("WardrobePreview must be used on the FX thread");
     }
 
-    @FunctionalInterface interface Fetcher { byte[] fetch(URI uri, int limit) throws IOException; }
-
-    /** Bound both response size and time, close every connection, and never follow redirects to other hosts. */
-    static byte[] fetch(URI uri, int limit) throws IOException {
-        HttpURLConnection connection = (HttpURLConnection) uri.toURL().openConnection();
-        connection.setConnectTimeout(8_000);
-        connection.setReadTimeout(8_000);
-        connection.setInstanceFollowRedirects(false);
-        connection.setRequestProperty("Accept", "model/gltf-binary, image/png");
-        connection.setRequestProperty("User-Agent", "ModtaleLauncher-Wardrobe/1.0");
-        long deadline = System.nanoTime() + Duration.ofSeconds(35).toNanos();
-        try {
-            int status = connection.getResponseCode();
-            if (status != 200) throw new IOException("Preview server returned HTTP " + status);
-            if (connection.getContentLengthLong() > limit) throw new IOException("Preview exceeds size limit");
-            try (var input = connection.getInputStream(); var output = new ByteArrayOutputStream()) {
-                byte[] buffer = new byte[16 * 1024];
-                int read;
-                while ((read = input.read(buffer)) != -1) {
-                    if (Thread.currentThread().isInterrupted() || System.nanoTime() > deadline) throw new IOException("Preview request cancelled or timed out");
-                    if ((long)output.size()+read > limit) throw new IOException("Preview exceeds size limit");
-                    output.write(buffer,0,read);
-                }
-                return output.toByteArray();
-            }
-        } finally { connection.disconnect(); }
-    }
-
-    private static Image png(byte[] bytes) throws IOException {
-        if (bytes.length < 24 || ByteBuffer.wrap(bytes).getLong() != 0x89504e470d0a1a0aL) throw new IOException("Expected a PNG preview");
-        int width = ByteBuffer.wrap(bytes).getInt(16), height = ByteBuffer.wrap(bytes).getInt(20);
-        if (width <= 0 || height <= 0 || width > 2048 || height > 2048) throw new IOException("Invalid PNG dimensions");
-        Image image = new Image(new ByteArrayInputStream(bytes));
-        if (image.isError()) throw new IOException("Invalid PNG preview", image.getException());
-        return image;
-    }
-
-    record Request(String username, String skinId, String cape) {
-        Request {
-            if (username == null || !username.matches("[A-Za-z0-9_]{3,16}")) throw new IllegalArgumentException("Enter a valid Hytale username to preview");
-            if ((skinId != null && skinId.length() > 2048) || (cape != null && cape.length() > 2048))
-                throw new IllegalArgumentException("Outfit preview parameters are too long");
-        }
-        URI glb() { return url("glb/", "download=true"); }
-        boolean renderedCape() { return (skinId == null || skinId.isBlank()) && cape != null && !cape.isBlank(); }
-        URI png() { return png(180); }
-        URI png(int angle) { return renderedCape() ? url("cape/", "size=1024&rotate=" + angle) : url("full/", "size=1024&rotate=25"); }
-        URI preview() { return url("glb/", "bg=101b2d"); }
-        private URI url(String kind, String query) {
-            if (skinId != null && !skinId.isBlank()) query += "&skin_id=" + encode(skinId);
-            if (cape != null && !cape.isBlank()) query += "&cape=" + encode(cape);
-            return URI.create("https://hyvatar.io/render/" + kind + username + "?" + query);
-        }
-        private static String encode(String value) { return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20"); }
-    }
 }

@@ -28,6 +28,13 @@ public record CreateWorldModListRequest(
             ProjectDependency.Source source,
             @Size(max = 180) String externalId,
             @Size(max = 600) String externalUrl,
-            @Size(max = 600) String icon
-    ) {}
+            @Size(max = 600) String icon,
+            @Size(max = 500) String author,
+            @Size(max = 5000) String description
+    ) {
+        public Item(String modId, String projectId, String slug, String title, String versionNumber,
+                ProjectClassification classification, ProjectDependency.Source source, String externalId, String externalUrl, String icon) {
+            this(modId, projectId, slug, title, versionNumber, classification, source, externalId, externalUrl, icon, "", "");
+        }
+    }
 }

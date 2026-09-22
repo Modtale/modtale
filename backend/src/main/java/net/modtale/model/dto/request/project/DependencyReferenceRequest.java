@@ -6,6 +6,11 @@ import net.modtale.model.project.ProjectDependency;
 
 public class DependencyReferenceRequest {
 
+    private boolean dependencyTypeSpecified;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isDependencyTypeSpecified() { return dependencyTypeSpecified; }
+
     private String id;
     private String projectId;
     private String projectTitle;
@@ -41,6 +46,7 @@ public class DependencyReferenceRequest {
     }
 
     public void setDependencyType(ProjectDependency.DependencyType dependencyType) {
+        this.dependencyTypeSpecified = true;
         this.dependencyType = dependencyType == null ? ProjectDependency.DependencyType.REQUIRED : dependencyType;
     }
 

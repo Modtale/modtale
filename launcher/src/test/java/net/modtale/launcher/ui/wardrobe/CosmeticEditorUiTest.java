@@ -48,7 +48,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * MODTALE_COSMETIC_EDITOR_SCREENSHOTS=~/Pictures WARDROBE_ASSETS_ZIP=/path/to/Assets.zip
  * ./gradlew test --tests '*CosmeticEditorUiTest' --rerun-tasks
  * Requires a graphical display/native3D. No saved launcher settings or account are read.
- * Outfit geometry/textures are local; the editor's catalog card thumbnails use public Hyvatar reads.
+ * Outfit geometry/textures are local; the editor's catalog card thumbnails use local outfit renders.
  */
 @EnabledIfEnvironmentVariable(named = "MODTALE_COSMETIC_EDITOR_SCREENSHOTS", matches = ".+")
 class CosmeticEditorUiTest {
@@ -80,7 +80,7 @@ class CosmeticEditorUiTest {
         };
         try (var executor = Executors.newFixedThreadPool(4)) {
             Harness harness = fx(() -> {
-                var feedback = new LauncherFeedback(executor, new Label(), new VBox(), new StackPane(), new Label(), new Label(), () -> "Local editor test");
+                var feedback = new LauncherFeedback(executor, new Label(), new StackPane(), new Label(), new Label(), () -> "Local editor test");
                 var controller = new CosmeticEditorController(gateway, store, () -> settings, feedback, executor);
                 var scroll = new ScrollPane(controller.view()); scroll.setFitToWidth(true);
                 scroll.setStyle("-fx-background: #0B1120; -fx-background-color: #0B1120; -fx-padding: 24;");
@@ -98,8 +98,9 @@ class CosmeticEditorUiTest {
                 assertEquals(catalog.defaultSkin(), baseline);
                 awaitPreview(harness);
                 assertTrue(fx(() -> button(harness.root(), "Apply").isDisabled()));
-                assertTrue(fx(() -> ((javafx.scene.control.MenuButton) button(harness.root(), "Save")).getItems().get(1).isDisable()));
+                assertFalse(fx(() -> button(harness.root(), "Save").isDisabled()));
 
+                verifyPagination(harness, catalog);
                 CosmeticOption hair = selectFirst(harness, catalog, "haircut");
                 chooseColor(harness, catalog, hair, "Blond");
                 JsonNode colored = fx(() -> harness.controller().draftSnapshot());
@@ -130,7 +131,8 @@ class CosmeticEditorUiTest {
                 awaitPreview(harness);
                 // A final local render must represent the complete selected outfit, not a remote NPC.
                 assertEquals(complete, fx(() -> harness.controller().draftSnapshot()));
-                assertTrue(fx(() -> nodes(harness.root(), javafx.scene.SubScene.class).size() == 1));
+                assertTrue(fx(() -> nodes(harness.root(), javafx.scene.SubScene.class).size() == 1
+                        || nodes(harness.root().lookup("#wardrobe-preview"), ImageView.class).stream().anyMatch(view -> view.getImage() != null)));
                 capture(harness, output, "cape", 1440, 1000);
                 capture(harness, output, "cape", 1000, 900);
                 openCategory(harness, catalog, "haircut"); awaitPreview(harness);
@@ -142,13 +144,41 @@ class CosmeticEditorUiTest {
                 assertNull(settings.getHytaleAuthSession());
                 Files.writeString(output.resolve("cosmetic-editor-provenance.txt"), "Actual CosmeticEditorController with installed catalog " + assets
                         + "\nReal local outfit geometry and textures; no GLB/NPC substitute and no account/session/settings-file reads.\n"
-                        + "Catalog card thumbnails are public Hyvatar reads.\nVerified category choices, palette changes, undo/redo/reset and draft preservation.\n"
+                        + "Catalog card thumbnails are local outfit renders.\nVerified category choices, palette changes, undo/redo/reset and draft preservation.\n"
                         + "Draft (not applied or saved): " + complete + "\n");
             } finally {
                 fx(() -> { harness.controller().close(); harness.stage().close(); return null; });
                 executor.shutdownNow();
             }
         }
+    }
+
+    private static void verifyPagination(Harness harness, CosmeticCatalogClient catalog) throws Exception {
+        openCategory(harness, catalog, "haircut");
+        int total = catalog.browseAssets("haircut", "", 1, 100).total();
+        await("four full rows", () -> {
+            var grid = (javafx.scene.layout.GridPane) harness.root().lookup("#cosmetic-cards");
+            return cards(harness).size() == Math.min(total, grid.getColumnConstraints().size() * 4);
+        });
+        fx(() -> {
+            var grid = (javafx.scene.layout.GridPane) harness.root().lookup("#cosmetic-cards");
+            harness.root().applyCss(); harness.root().layout();
+            int columns = grid.getColumnConstraints().size();
+            var last = cards(harness).get(columns - 1);
+            assertEquals(grid.getWidth(), last.getBoundsInParent().getMaxX(), 2, "Cards fill the results width");
+            Node pagination = harness.root().lookup("#cosmetic-pagination");
+            assertEquals(total > columns * 4, pagination.isVisible());
+            assertTrue(pagination.getStyleClass().contains("pagination-nav"));
+            return null;
+        });
+        String first = fx(() -> cards(harness).getFirst().getAccessibleText());
+        click(harness, "Next Page");
+        await("next cosmetic page", () -> !cards(harness).getFirst().getAccessibleText().equals(first));
+        click(harness, "Previous Page");
+        await("previous cosmetic page", () -> cards(harness).getFirst().getAccessibleText().equals(first));
+        openCategory(harness, catalog, "ears");
+        assertFalse(fx(() -> harness.root().lookup("#cosmetic-pagination").isManaged()), "Single page has no pagination");
+        openCategory(harness, catalog, "haircut");
     }
 
     private static void showAllCosmetics(Harness harness) throws Exception {
@@ -171,7 +201,7 @@ class CosmeticEditorUiTest {
             LauncherSettings settings, java.util.concurrent.Executor executor, CosmeticCatalogClient catalog,
             JsonNode composition, Path output) throws Exception {
         LauncherWardrobeController wardrobe = fx(() -> {
-            var feedback = new LauncherFeedback(executor, new Label(), new VBox(), new StackPane(), new Label(), new Label(), () -> "Local editor test");
+            var feedback = new LauncherFeedback(executor, new Label(), new StackPane(), new Label(), new Label(), () -> "Local editor test");
             var controller = new LauncherWardrobeController(gateway, store, () -> settings, feedback, executor);
             standalone.scroll().setContent(controller.view());
             button(standalone.root(), "Customize").fire();
@@ -186,35 +216,45 @@ class CosmeticEditorUiTest {
                     "Local composition example", false, "", payload.toString())); return null; });
             await("integrated composition", () -> hero.controller().draftSnapshot().equals(composition));
             openCategory(hero, catalog, "haircut"); awaitPreview(hero);
+            if (fx(() -> !nodes(hero.root(), javafx.scene.SubScene.class).isEmpty())) {
             fx(() -> {
                 var animations = (javafx.scene.control.ComboBox<?>) hero.root().lookup("#wardrobe-preview-animation");
-                assertEquals("Rest pose", animations.getValue().toString());
+                assertEquals("Idle", animations.getValue().toString());
                 int walk = java.util.stream.IntStream.range(0, animations.getItems().size())
                         .filter(index -> animations.getItems().get(index).toString().equals("Walk")).findFirst().orElseThrow();
                 animations.getSelectionModel().select(walk);
                 return null;
             });
-            await("walk clip ready", () -> !hero.root().lookup("#wardrobe-preview-pause").isDisabled());
+            awaitPreview(hero);
             fx(() -> {
-                var pause = (Button) hero.root().lookup("#wardrobe-preview-pause");
-                hero.root().applyCss(); hero.root().layout();
-                assertTrue(pause.isVisible(), "Playback control is visible for an active clip");
-                assertTrue(pause.getWidth() + 1 >= pause.prefWidth(-1), "Active Pause label fits the compact inspector");
-                assertEquals("Pause", pause.getText()); pause.fire(); assertEquals("Play", pause.getText());
+                assertNull(hero.root().lookup("#wardrobe-preview-pause"));
                 var animations = (javafx.scene.control.ComboBox<?>) hero.root().lookup("#wardrobe-preview-animation");
                 button(hero.root(), "Reset view").fire();
-                assertEquals("Rest pose", animations.getValue().toString()); assertTrue(pause.isDisabled());
+                assertEquals("Idle", animations.getValue().toString());
                 assertEquals(composition, hero.controller().draftSnapshot(), "Preview motion cannot change the outfit");
                 return null;
             });
             awaitPreview(hero);
+            }
             assertNotNull(button(hero.root(), "Saved looks"));
             capture(hero, output, "customize", 1440, 1000);
             capture(hero, output, "customize", 1000, 900);
+            openCategory(hero, catalog, "pants"); awaitPreview(hero);
+            capture(hero, output, "customize-pants", 1000, 900);
             openCategory(hero, catalog, "cape"); awaitPreview(hero);
             capture(hero, output, "customize-cape", 1440, 1000);
             capture(hero, output, "customize-cape", 1000, 900);
             assertEquals(composition, fx(() -> hero.controller().draftSnapshot()));
+            FutureTask<Void> saveDialog = new FutureTask<>(() -> { button(hero.root(), "Save").fire(); return null; });
+            Platform.runLater(saveDialog);
+            await("save modal", () -> hero.stage().getScene().lookup(".status-modal-primary") != null);
+            try {
+                capture(hero, output, "save", 1440, 1000);
+                capture(hero, output, "save", 1000, 900);
+            } finally {
+                fx(() -> { ((Button) hero.stage().getScene().lookup(".status-modal-secondary")).fire(); return null; });
+                saveDialog.get(5, TimeUnit.SECONDS);
+            }
         } finally { fx(() -> { wardrobe.close(); return null; }); }
     }
 
@@ -229,7 +269,15 @@ class CosmeticEditorUiTest {
 
     private static void openCategory(Harness harness, CosmeticCatalogClient catalog, String category) throws Exception {
         String label = catalog.categories().stream().filter(value -> value.key().equals(category)).findFirst().orElseThrow().label();
-        click(harness, label);
+        var before = fx(() -> harness.controller().draftSnapshot());
+        click(harness, CosmeticFraming.forCategory(category).group());
+        fx(() -> {
+            var choice = nodes(harness.root(), Button.class).stream().filter(button -> button.getStyleClass().contains("cosmetic-category")
+                    && button.getText().equals(label)).findFirst().orElseThrow();
+            assertTrue(choice.getParent().isVisible(), "Group must reveal the selected submenu");
+            choice.fire(); return null;
+        });
+        assertEquals(before, fx(() -> harness.controller().draftSnapshot()), "Navigation must preserve the outfit");
         String expected = "Choose " + catalog.browseAssets(category, "", 1, 12).options().getFirst().label();
         await("category " + category, () -> cards(harness).stream().anyMatch(button -> expected.equals(button.getAccessibleText()))
                 && nodes(harness.root(), Label.class).stream().noneMatch(node -> node.getText().equals("Loading cosmetics…")));
@@ -242,12 +290,13 @@ class CosmeticEditorUiTest {
                 .orElseGet(() -> options.stream().filter(option -> !option.id().equals(current)).findFirst().orElseThrow());
         await("target palette", () -> nodes(harness.root(), Button.class).stream().anyMatch(button -> ("Color " + choice.colorId()).equals(button.getAccessibleText())));
         awaitPreview(harness);
+        await("palette ready", () -> !button(harness.root(), "Color " + choice.colorId()).isDisabled());
         fx(() -> {
-            var before = nodes(harness.root(), javafx.scene.SubScene.class).getFirst();
+            var before = nodes(harness.root(), javafx.scene.SubScene.class).stream().findFirst().orElse(null);
             var swatch = button(harness.root(), "Color " + choice.colorId());
             var palette = swatch.getParent();
             swatch.fire();
-            assertSame(before, nodes(harness.root(), javafx.scene.SubScene.class).getFirst(),
+            if (before != null) assertSame(before, nodes(harness.root(), javafx.scene.SubScene.class).getFirst(),
                     "Keep the current avatar while its replacement loads");
             assertTrue(palette.isVisible() && palette.isManaged(), "Palette must not collapse during selection");
             return null;
@@ -260,16 +309,19 @@ class CosmeticEditorUiTest {
     }
 
     private static void capture(Harness harness, Path output, String name, int width, int height) throws Exception {
-        fx(() -> { harness.stage().setWidth(width); harness.stage().setHeight(height); harness.scroll().setVvalue(0); return null; });
+        fx(() -> { harness.stage().setWidth(width); harness.stage().setHeight(height); harness.scroll().setVvalue(0); harness.root().applyCss(); harness.root().layout(); return null; });
         await("resize", () -> Math.round(harness.stage().getScene().getWidth()) == width && Math.round(harness.stage().getScene().getHeight()) == height);
+        Thread.sleep(250); // Allow the 150 ms resize debounce to schedule its catalog replacement.
+        await("responsive page settled", () -> {
+            var grid = (javafx.scene.layout.GridPane) harness.root().lookup("#cosmetic-cards");
+            return !cards(harness).isEmpty() && cards(harness).size() <= grid.getColumnConstraints().size() * 4
+                    && nodes(harness.root(), Label.class).stream().noneMatch(label -> label.getText().equals("Loading cosmetics…"));
+        });
         await("catalog thumbnail response", () -> cards(harness).stream().allMatch(card -> nodes(card, ImageView.class).stream()
                 .allMatch(view -> view.getImage() != null && view.getImage().getProgress() == 1)));
         WritableImage image = fx(() -> {
             harness.root().applyCss(); harness.root().layout();
-            var pause = (Button) harness.root().lookup("#wardrobe-preview-pause");
-            if (pause != null && pause.isVisible()) {
-                assertTrue(pause.getWidth() + 1 >= pause.prefWidth(-1), "Preview Pause/Play label must fit at " + width + "px");
-            }
+            assertNull(harness.root().lookup("#wardrobe-preview-pause"));
             return harness.stage().getScene().snapshot(null);
         });
         var outputImage = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);

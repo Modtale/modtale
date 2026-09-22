@@ -15,7 +15,7 @@ export const organizationClient = {
     addMember: async (orgId: string, userId: string, roleId: string) => (await api.post(`/orgs/${orgId}/members`, { userId, roleId })).data,
     removeMember: async (orgId: string, userId: string) => (await api.delete(`/orgs/${orgId}/members/${userId}`)).data,
     updateMemberRole: async (orgId: string, userId: string, roleId: string) => (await api.put(`/orgs/${orgId}/members/${userId}`, { roleId })).data,
-    cancelInvite: async (orgId: string, userId: string) => (await api.delete(`/orgs/${orgId}/invites/${userId}`)).data,
+    cancelInvite: async (orgId: string, userId: string, requestId: string) => (await api.delete(`/orgs/${orgId}/invites/${userId}`, { params: { requestId } })).data,
 
     createRole: async (orgId: string, role: Partial<OrganizationRole>) => (await api.post<User>(`/orgs/${orgId}/roles`, role)).data,
     updateRole: async (orgId: string, roleId: string, role: Partial<OrganizationRole>) => (await api.put<User>(`/orgs/${orgId}/roles/${roleId}`, role)).data,

@@ -14,6 +14,10 @@ final class ApiCachePolicy {
         if (pathAndQuery.startsWith("/meta/")) {
             return Duration.ofHours(24);
         }
+        String path = pathAndQuery.split("\\?", 2)[0];
+        if (path.equals("/projects/meta") || path.matches("/projects/[^/]+/meta")) {
+            return Duration.ofDays(7);
+        }
         if (pathAndQuery.startsWith("/projects")) {
             return Duration.ofHours(26);
         }

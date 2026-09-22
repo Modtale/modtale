@@ -28,6 +28,20 @@ class HytaleConfigFilesTest {
     }
 
     @Test
+    void excludesGeneratedStateButKeepsRealSettings() throws Exception {
+        write("Saves/My World/mods/com.azuredoom_levelingcore/levelingcore.json", "{\"XPLossPercentage\":0.15}");
+        write("Saves/My World/mods/com.azuredoom_levelingcore/data/config/data/mob-levels.json", "{\"e388ec52-193d-3379-b449-e94e04982b00\":{\"Level\":6}}");
+        write("Mods/Example/cache/index.json", "{}");
+        write("Mods/Example/playerdata/player.json", "{}");
+        write("Mods/Data/settings.toml", "enabled=true");
+        write("Mods/Example/configs/balance.json", "{}");
+        var files = discover();
+        assertEquals(3, files.size());
+        assertTrue(files.stream().anyMatch(file -> file.path().getFileName().toString().equals("levelingcore.json")));
+        assertFalse(files.stream().anyMatch(file -> file.path().getFileName().toString().equals("mob-levels.json")));
+    }
+
+    @Test
     void saveValidatesJsonAndKeepsExactBackup() throws Exception {
         Path path = write("Saves/My World/mods/Example_Plugin/config.json", "{\r\n  \"value\": 1\r\n}\r\n");
         var snapshot = service.read(discover().getFirst());

@@ -185,7 +185,9 @@ final class LibraryProjectRenderer {
                     }
                 });
 
-        Button switchButton = primaryButton("Switch");
+        Button switchButton = primaryButton("");
+        switchButton.setAccessibleText("Switch version");
+        switchButton.setTooltip(new Tooltip("Switch version"));
         switchButton.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 14));
         switchButton.setOnAction(event -> {
             LibraryVersionChoice choice = versions.getValue();

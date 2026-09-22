@@ -30,3 +30,6 @@ launcher/bin/
 mock-db/collections/
 mock-db/generated/
 mock-db/node_modules/
+
+# Local campaign briefs, drafts, and review exports
+/media/2026-09-update/

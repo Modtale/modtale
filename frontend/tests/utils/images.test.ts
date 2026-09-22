@@ -31,6 +31,16 @@ describe('image utils', () => {
         expect(getCloudflareUrl('blob:https://modtale.net/123', 640, 80)).toBe('blob:https://modtale.net/123');
     });
 
+    it.each([
+        'https://cdn.modtale.net/banners/animated.gif',
+        'https://cdn.modtale.net/icons/animated.GIF?v=2#preview',
+        '/gallery/animated.gif',
+        'data:image/gif;base64,R0lGODlh',
+    ])('preserves animation by serving the original GIF: %s', (url) => {
+        setWindowLocation('modtale.net', 'https://modtale.net');
+        expect(getCloudflareUrl(url, 640, 80)).toBe(url);
+    });
+
     it('skips rewriting in local environments', () => {
         setWindowLocation('localhost', 'http://localhost:4321');
         expect(getCloudflareUrl('/images/hero.png', 640, 75)).toBe('/images/hero.png');

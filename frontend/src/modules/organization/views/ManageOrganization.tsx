@@ -15,6 +15,7 @@ import { Roles } from '../tabs/Roles';
 import { Projects } from '../tabs/Projects';
 import { Settings } from '../tabs/Settings';
 import type { User } from '@/types';
+import { ACCOUNT_NAME_FORMAT_LABEL, MAX_DISPLAY_NAME_CHARACTERS, MIN_DISPLAY_NAME_CHARACTERS } from '@/utils/siteLimits';
 
 interface ManageOrganizationProps {
     user: User;
@@ -150,7 +151,8 @@ export const ManageOrganization: React.FC<ManageOrganizationProps> = ({ user }) 
                         <form onSubmit={handleCreateOrg} className="flex flex-col gap-4">
                             <div className="space-y-1.5">
                                 <label className={`text-[10px] font-bold ${theme.colors.textMuted} uppercase tracking-widest px-1`}>Organization Name</label>
-                                <input type="text" placeholder="e.g. Modtale Team" value={newOrgName} onChange={e => setNewOrgName(e.target.value)} className={theme.components.inputField} autoFocus />
+                                <input type="text" placeholder="e.g. modtale-team" value={newOrgName} onChange={e => setNewOrgName(e.target.value)} minLength={MIN_DISPLAY_NAME_CHARACTERS} maxLength={MAX_DISPLAY_NAME_CHARACTERS} aria-label="Organization name" className={theme.components.inputField} autoFocus required />
+                                <p className={`text-[10px] ${theme.colors.textMuted}`}>{MIN_DISPLAY_NAME_CHARACTERS}–{MAX_DISPLAY_NAME_CHARACTERS} characters; {ACCOUNT_NAME_FORMAT_LABEL}.</p>
                             </div>
                             <div className="flex justify-end gap-3 mt-2">
                                 <button type="button" onClick={() => setIsCreating(false)} className={theme.components.buttonSecondary}>Cancel</button>

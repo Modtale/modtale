@@ -8,14 +8,8 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
-import java.net.URI;
-import java.net.URLEncoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -26,16 +20,10 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.zip.ZipFile;
 
-/**
- * Installed CharacterCreator catalogs are complete for that installed version. The no-argument
- * client uses HyTags' observed-value suggestions, which are capped and never claimed complete.
- * No account/settings access, asset extraction, ownership claims, or generated remote endpoints.
- * HyTags route and twenty wire keys are published by https://hytags.com/cosmetics's own script.
- */
+/** Complete cosmetic metadata read directly from the installed game archive. */
 public final class CosmeticCatalogClient {
     private static final int MAX_ENTRY_BYTES = 4 * 1024 * 1024;
     private static final int MAX_OPTIONS = 100_000;
-    private static final URI HYTAGS = URI.create("https://hytags.com/");
     private static final String ROOT = "Cosmetics/CharacterCreator/";
     private static final JsonMapper JSON = JsonMapper.builder(JsonFactory.builder()
             .streamReadConstraints(StreamReadConstraints.builder().maxNestingDepth(40).maxStringLength(65536).build())
@@ -49,11 +37,7 @@ public final class CosmeticCatalogClient {
     private final Map<String, String> labels = new LinkedHashMap<>();
     private final Map<String, JsonNode> animationCatalogs = new LinkedHashMap<>();
     private List<Tag> tags = List.of();
-    private final Map<String, String> suggestionCache = new LinkedHashMap<>();
-    private final HttpClient http;
-    private final URI base;
     private final String source;
-    private final boolean local;
 
     public record Page(List<CosmeticOption> options, int page, int pageSize, int total,
                        boolean hasNext, boolean complete, String source) {
@@ -70,27 +54,9 @@ public final class CosmeticCatalogClient {
                                   boolean looping, boolean hideItemInHand, double speed) {}
     public record Tag(String id, String label, int displayOrder) {}
 
-    public CosmeticCatalogClient() {
-        this(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build(), HYTAGS);
-    }
-
-    /** Loopback base override for contract tests; the production origin is fixed. */
-    public CosmeticCatalogClient(HttpClient http, URI base) {
-        this.http = Objects.requireNonNull(http);
-        this.base = Objects.requireNonNull(base);
-        if (http.followRedirects() != HttpClient.Redirect.NEVER) throw new IllegalArgumentException("Redirects are not supported");
-        if (!(base.equals(HYTAGS) || ("http".equals(base.getScheme()) && Set.of("localhost", "127.0.0.1", "[::1]").contains(base.getHost())))
-                || base.getUserInfo() != null || base.getQuery() != null || base.getFragment() != null || !"/".equals(base.getPath())) {
-            throw new IllegalArgumentException("Catalog origin must be HyTags or loopback");
-        }
-        local = false;
-        source = "HyTags observed suggestions (incomplete)";
-    }
-
     /** Reads a bounded snapshot of actual definitions. Malformed or incomplete archives fail closed. */
     public CosmeticCatalogClient(Path assetsZip) throws IOException {
         Objects.requireNonNull(assetsZip, "assetsZip");
-        http = null; base = null; local = true;
         source = "Installed catalog: " + assetsZip.toAbsolutePath().normalize();
         try (ZipFile zip = new ZipFile(assetsZip.toFile())) {
             loadLabels(zip);
@@ -130,7 +96,7 @@ public final class CosmeticCatalogClient {
         } catch (IllegalArgumentException ex) { throw new IOException("Invalid installed cosmetic catalog", ex); }
     }
 
-    public List<CosmeticCategory> categories() {
+    public static List<CosmeticCategory> categories() {
         return FILES.keySet().stream().map(key -> new CosmeticCategory(key, switch (key) {
             case "bodyCharacteristic" -> "Body";
             case "haircut" -> "Hairstyles";
@@ -144,13 +110,13 @@ public final class CosmeticCatalogClient {
         })).toList();
     }
 
-    public boolean complete() { return local; }
+    public boolean complete() { return true; }
     /** Published tag definitions; assignment semantics remain in the raw asset metadata. */
-    public List<Tag> tags() { requireLocal(); return tags; }
+    public List<Tag> tags() { return tags; }
     public String source() { return source; }
     public static String assetFile(String category) { checkCategory(category); return ROOT + FILES.get(category) + ".json"; }
 
-    /** One-based local pagination. Remote total is -1 because autocomplete is not an exhaustive catalog. */
+    /** One-based pagination of the installed catalog. */
     public Page browse(String category, String search, int page, int pageSize) throws IOException {
         validatePage(page, pageSize);
         return page(select(category, search), page, pageSize);
@@ -166,11 +132,11 @@ public final class CosmeticCatalogClient {
     /** All known valid combinations for an asset; local mode is exhaustive for the installed version. */
     public List<CosmeticOption> options(String category, String assetId) throws IOException {
         Objects.requireNonNull(assetId, "assetId");
-        return select(category, local ? "" : assetId).stream().filter(option -> option.assetId().equals(assetId)).toList();
+        return select(category, "").stream().filter(option -> option.assetId().equals(assetId)).toList();
     }
 
     public JsonNode definition(String category, String assetId) {
-        requireLocal(); checkCategory(category);
+        checkCategory(category);
         JsonNode value = definitions.get(category).get(assetId);
         if (value == null) throw new IllegalArgumentException("Unknown cosmetic asset: " + assetId);
         return value.deepCopy();
@@ -178,19 +144,20 @@ public final class CosmeticCatalogClient {
 
     /** Base+variant metadata, with concrete Texture, optional GradientTexture, and swatches resolved. */
     public JsonNode resolve(String category, String selectedId) {
-        requireLocal(); checkCategory(category);
+        checkCategory(category);
         CosmeticOption option = catalog.get(category).stream().filter(value -> value.id().equals(selectedId)).findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Unknown cosmetic selection for " + category + ": " + selectedId));
         ObjectNode merged = merged(definitions.get(category).get(option.assetId()), option.variantId());
         JsonNode textures = merged.get("Textures");
-        if (textures != null && textures.isObject() && !option.colorId().isEmpty()) {
+        boolean explicitTexture = textures != null && textures.has(option.colorId());
+        if (explicitTexture) {
             JsonNode texture = textures.get(option.colorId());
             merged.put("Texture", texture.path("Texture").asText());
             if (texture.has("BaseColor")) merged.set("BaseColor", texture.get("BaseColor").deepCopy());
         } else if (merged.has("GreyscaleTexture")) {
             merged.put("Texture", merged.path("GreyscaleTexture").asText());
         }
-        if (!option.colorId().isEmpty() && merged.has("GradientSet") && textures == null) {
+        if (!option.colorId().isEmpty() && merged.has("GradientSet") && !explicitTexture) {
             applyGradient(merged, option.colorId());
         }
         merged.put("Category", category); merged.put("SelectedId", selectedId);
@@ -199,7 +166,6 @@ public final class CosmeticCatalogClient {
 
     /** Requires an explicit body. Null slots mean unequipped; unknown categories/selections are rejected. */
     public List<ResolvedPart> resolveComposition(JsonNode skin) {
-        requireLocal();
         if (skin == null || !skin.isObject() || !skin.path("bodyCharacteristic").isTextual())
             throw new IllegalArgumentException("Composition requires bodyCharacteristic");
         skin.fieldNames().forEachRemaining(CosmeticCatalogClient::checkCategory);
@@ -220,7 +186,6 @@ public final class CosmeticCatalogClient {
 
     /** Explicit local baseline assembled from IsDefaultAsset, never an invented remote/NPC outfit. */
     public ObjectNode defaultSkin() {
-        requireLocal();
         ObjectNode skin = JSON.createObjectNode();
         for (String category : FILES.keySet()) {
             skin.putNull(category);
@@ -239,7 +204,6 @@ public final class CosmeticCatalogClient {
 
     /** Animation catalogs are separate from the twenty cosmetic skin slots; no emote apply key is invented. */
     public List<AnimationOption> animations(String kind) {
-        requireLocal();
         JsonNode values = animationCatalogs.get(kind);
         if (values == null) throw new IllegalArgumentException("Unknown/unavailable animation catalog: " + kind);
         var result = new ArrayList<AnimationOption>();
@@ -257,12 +221,21 @@ public final class CosmeticCatalogClient {
         for (String variantId : variantIds) {
             if (!variantId.isEmpty()) token(JSON.getNodeFactory().textNode(variantId), "variant Id");
             ObjectNode merged = merged(record, variantId);
-            JsonNode colors = merged.get("Textures");
-            if (colors == null && merged.has("GradientSet") && !INHERITED_SKIN.contains(category)) {
-                colors = gradients.get(merged.path("GradientSet").asText());
-                if (colors == null) throw new IOException("Unknown gradient set " + merged.path("GradientSet").asText());
+            ObjectNode colors = null;
+            JsonNode textures = merged.get("Textures");
+            if (textures != null) {
+                if (!textures.isObject() || textures.isEmpty()) throw new IOException("Invalid texture palette");
+                colors = ((ObjectNode) textures).deepCopy();
             }
-            if (colors != null && (!colors.isObject() || colors.isEmpty())) throw new IOException("Invalid texture palette");
+            if (merged.has("GradientSet") && !INHERITED_SKIN.contains(category)) {
+                JsonNode palette = gradients.get(merged.path("GradientSet").asText());
+                if (palette == null) throw new IOException("Unknown gradient set " + merged.path("GradientSet").asText());
+                if (palette.isEmpty()) throw new IOException("Invalid texture palette");
+                if (colors == null) colors = JSON.createObjectNode();
+                for (var entry : palette.properties()) {
+                    if (!colors.has(entry.getKey())) colors.set(entry.getKey(), entry.getValue().deepCopy());
+                }
+            }
             for (String colorId : colors == null ? List.of("") : fieldNames(colors)) {
                 if (!colorId.isEmpty()) token(JSON.getNodeFactory().textNode(colorId), "color Id");
                 String assetId = record.path("Id").asText();
@@ -281,7 +254,7 @@ public final class CosmeticCatalogClient {
         if (!variantId.isEmpty()) {
             JsonNode variant = base.path("Variants").get(variantId);
             if (variant == null || !variant.isObject()) throw new IllegalArgumentException("Invalid variant " + variantId);
-            variant.fields().forEachRemaining(entry -> result.set(entry.getKey(), entry.getValue().deepCopy()));
+            variant.properties().forEach(entry -> result.set(entry.getKey(), entry.getValue().deepCopy()));
         }
         return result;
     }
@@ -297,7 +270,7 @@ public final class CosmeticCatalogClient {
     private List<CosmeticOption> select(String category, String search) throws IOException {
         checkCategory(category);
         String query = search == null ? "" : WardrobeStore.text(search, "search", 256, true);
-        List<CosmeticOption> values = local ? catalog.get(category) : suggestions(category, query);
+        List<CosmeticOption> values = catalog.get(category);
         String needle = query.toLowerCase(Locale.ROOT);
         return values.stream().filter(option -> (option.id() + " " + option.label()).toLowerCase(Locale.ROOT).contains(needle)).toList();
     }
@@ -305,43 +278,11 @@ public final class CosmeticCatalogClient {
     private Page page(List<CosmeticOption> options, int page, int size) {
         long from = (long) (page - 1) * size;
         int start = (int) Math.min(from, options.size()), end = Math.min(start + size, options.size());
-        return new Page(options.subList(start, end), page, size, local ? options.size() : -1, end < options.size(), local, source);
+        return new Page(options.subList(start, end), page, size, options.size(), end < options.size(), true, source);
     }
 
     private static void validatePage(int page, int size) {
         if (page < 1 || size < 1 || size > 100) throw new IllegalArgumentException("Page must be positive; page size must be 1–100");
-    }
-
-    private synchronized List<CosmeticOption> suggestions(String category, String query) throws IOException {
-        String key = category + ":" + query;
-        String body = suggestionCache.get(key);
-        if (body == null) {
-            URI uri = base.resolve("api/cosmetic-values/" + category + "?search=" + URLEncoder.encode(query, StandardCharsets.UTF_8));
-            HttpRequest request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(20)).header("Accept", "application/json").GET().build();
-            try {
-                var response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
-                try (var input = response.body()) {
-                    if (response.statusCode() != 200) throw new IOException("Cosmetic lookup returned HTTP " + response.statusCode());
-                    byte[] bytes = input.readNBytes(MAX_ENTRY_BYTES + 1);
-                    if (bytes.length > MAX_ENTRY_BYTES) throw new IOException("Cosmetic response exceeds size limit");
-                    body = new String(bytes, StandardCharsets.UTF_8);
-                }
-            } catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new IOException("Cosmetic lookup interrupted", ex); }
-        }
-        JsonNode root = JSON.readTree(body);
-        array(root, "cosmetic suggestions");
-        if (root.size() > 1000) throw new IOException("Too many cosmetic suggestions");
-        var result = new LinkedHashMap<String, CosmeticOption>();
-        for (JsonNode value : root) {
-            if (!value.isTextual() || !value.asText().matches("[A-Za-z0-9_+-]+(?:\\.[A-Za-z0-9_+-]+){0,2}")) throw new IOException("Invalid cosmetic selection");
-            String[] segments = value.asText().split("\\.");
-            result.putIfAbsent(value.asText(), new CosmeticOption(category, value.asText(), segments[0],
-                    segments.length > 1 ? segments[1] : "", segments.length > 2 ? segments[2] : "",
-                    humanize(segments[0]), List.of(), List.of()));
-        }
-        if (suggestionCache.size() >= 100) suggestionCache.remove(suggestionCache.keySet().iterator().next());
-        suggestionCache.put(key, body);
-        return List.copyOf(result.values());
     }
 
     private void loadLabels(ZipFile zip) throws IOException {
@@ -410,7 +351,6 @@ public final class CosmeticCatalogClient {
         return text.isEmpty() ? text : Character.toUpperCase(text.charAt(0)) + text.substring(1);
     }
     private static void checkCategory(String category) { if (!FILES.containsKey(category)) throw new IllegalArgumentException("Unknown cosmetic category: " + category); }
-    private void requireLocal() { if (!local) throw new IllegalStateException("Installed Assets.zip is required for complete cosmetic metadata"); }
     private static Map<String, String> files() {
         String[] keys = {"bodyCharacteristic", "underwear", "face", "ears", "mouth", "haircut", "facialHair", "eyebrows", "eyes", "pants", "overpants", "undertop", "overtop", "shoes", "headAccessory", "faceAccessory", "earAccessory", "skinFeature", "gloves", "cape"};
         String[] files = {"BodyCharacteristics", "Underwear", "Faces", "Ears", "Mouths", "Haircuts", "FacialHair", "Eyebrows", "Eyes", "Pants", "Overpants", "Undertops", "Overtops", "Shoes", "HeadAccessory", "FaceAccessory", "EarAccessory", "SkinFeatures", "Gloves", "Capes"};

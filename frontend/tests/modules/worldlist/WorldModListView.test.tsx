@@ -3,18 +3,19 @@ import { createRoot } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { expect, it, vi } from 'vitest';
+import { worldListClient } from '@/modules/worldlist/api/worldListClient';
 import WorldModListView from '@/modules/worldlist/views/WorldModListView';
 
 vi.mock('@/modules/worldlist/api/worldListClient', () => ({
     worldListClient: { get: vi.fn().mockResolvedValue({
-        id: 'list', title: 'Shared list', mods: [], modCount: 0, viewCount: 1,
-        expiresAt: '2026-10-01', configs: [{ scope: 'WORLD', path: 'Example/config.json', content: '<script>unsafe()</script>' }],
+        id: 'list', title: 'Shared list', mods: [{ modId: 'Author:Example', title: 'Example', projectId: 'example' }, { modId: 'Author:Other', title: 'Other', projectId: 'other' }], modCount: 2, viewCount: 1,
+        expiresAt: '2026-10-01', configs: [{ scope: 'WORLD', path: 'Author_Example/config.json', content: '<script>unsafe()</script>' }],
     }) },
     worldListDownloadUrl: () => '/download',
 }));
-vi.mock('@/modules/project/components/ProjectCard', () => ({ ProjectCard: () => null }));
+vi.mock('@/modules/project/components/ProjectCard', () => ({ ProjectCard: ({ project, bundledConfigCount, sourceLabel, disableNavigation }: any) => <div data-testid={project.id} data-source={sourceLabel} data-static={disableNavigation}>{bundledConfigCount > 0 ? 'Configs bundled' : 'No configs'}</div> }));
 
-it('shows config scope, path, and escaped content on the shared list', async () => {
+it('marks only the owning mod card and removes the separate config section', async () => {
     const container = document.createElement('div');
     const root = createRoot(container);
     try {
@@ -24,10 +25,30 @@ it('shows config scope, path, and escaped content on the shared list', async () 
             </Routes></MemoryRouter></HelmetProvider>);
         });
         expect(container.textContent).toContain('1 config file');
-        expect(container.querySelector('summary')?.textContent).toContain('World mods / Example/config.json');
-        expect(container.querySelector('pre')?.textContent).toBe('<script>unsafe()</script>');
+        expect(container.textContent).not.toContain('Included configs');
+        expect(container.querySelector('pre')).toBeNull();
+        expect(container.querySelector('[data-testid=example]')?.textContent).toBe('Configs bundled');
+        expect(container.querySelector('[data-testid=other]')?.textContent).toBe('No configs');
         expect(container.querySelector('script')).toBeNull();
     } finally {
         await act(async () => root.unmount());
     }
+});
+
+it('offers only launcher installation for a list containing CurseForge mods', async () => {
+    vi.mocked(worldListClient.get).mockResolvedValueOnce({ id: 'list', title: 'Shared list', mods: [{ projectId: 'curseforge:1', projectTitle: 'Example', source: 'CURSEFORGE', versionNumber: '1.0' }], modCount: 1, configs: [] } as any);
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    try {
+        await act(async () => {
+            root.render(<HelmetProvider><MemoryRouter initialEntries={['/lists/list']}><Routes>
+                <Route path="/lists/:id" element={<WorldModListView />} />
+            </Routes></MemoryRouter></HelmetProvider>);
+        });
+        expect(container.querySelector('a[href="/download"]')).toBeNull();
+        expect(container.textContent).toContain('Install');
+        expect(container.textContent).toContain('CurseForge');
+        expect(container.textContent).toContain('Launcher only');
+        expect(container.querySelector('[data-source=CurseForge]')?.getAttribute('data-static')).toBe('true');
+    } finally { await act(async () => root.unmount()); }
 });

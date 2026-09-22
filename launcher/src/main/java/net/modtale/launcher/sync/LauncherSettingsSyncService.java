@@ -140,16 +140,17 @@ public final class LauncherSettingsSyncService {
 
         lastKnownRemoteHash = remote.effectiveHash();
         lastKnownRemoteInstalledProjectsHash = remote.installedProjectsHash();
-        if (promptLoadRemote(remote, local)) {
+        var choice = promptLoadRemote(remote, local);
+        if (choice == net.modtale.launcher.ui.common.StatusModal.Result.PRIMARY) {
             restoreSnapshot(remote);
             return true;
-        } else {
+        } else if (choice == net.modtale.launcher.ui.common.StatusModal.Result.SECONDARY) {
             uploadSnapshot(local, true);
         }
         return false;
     }
 
-    private boolean promptLoadRemote(LauncherSettingsSnapshot remote, LauncherSettingsSnapshot local) {
+    private net.modtale.launcher.ui.common.StatusModal.Result promptLoadRemote(LauncherSettingsSnapshot remote, LauncherSettingsSnapshot local) {
         return LauncherPreferenceSyncDialog.showAndWait(
                 overlayHost,
                 remote.installedProjects().size(),
@@ -160,21 +161,26 @@ public final class LauncherSettingsSyncService {
 
     private void restoreSnapshot(LauncherSettingsSnapshot snapshot) {
         checking.set(true);
+        var progress = new net.modtale.launcher.ui.common.TransferLoadingModal(
+                "Syncing your launcher", "Restoring settings and configs");
+        if (overlayHost.get() != null) overlayHost.get().getChildren().add(progress);
         feedback.runAsync("Loading launcher settings and configs from Modtale...",
-                () -> restore(snapshot),
+                () -> restore(snapshot, progress),
                 result -> {
                     LauncherSettingsSnapshot local = LauncherSettingsSnapshot.fromSettings(settingsController.settings());
                     lastKnownRemoteHash = local.computeHash();
                     lastKnownRemoteInstalledProjectsHash = local.installedProjectsHash();
+                    progress.update("Syncing your launcher", "Refreshing your Library");
                     settingsController.reloadFromStore();
+                    progress.dismiss();
                     checking.set(false);
                     feedback.log("Loaded launcher preferences from Modtale.");
                     feedback.showToast("Preferences loaded", result.message());
                     drainLocalChanges();
-                }, error -> { checking.set(false); });
+                }, error -> { progress.dismiss(); checking.set(false); });
     }
 
-    private RestoreResult restore(LauncherSettingsSnapshot snapshot) {
+    private RestoreResult restore(LauncherSettingsSnapshot snapshot, net.modtale.launcher.ui.common.TransferLoadingModal progress) {
         LauncherSettings settings = settingsController.settings();
         int restoredConfigs;
         try {
@@ -215,15 +221,21 @@ public final class LauncherSettingsSyncService {
         }
 
         int installed = 0;
+        int attempted = 0;
+        List<LauncherSettingsSnapshot.InstalledProjectSnapshot> projects = snapshot.installedProjects().stream()
+                .filter(project -> project.getProjectId() != null && !project.getProjectId().isBlank())
+                .toList();
         List<String> warnings = new ArrayList<>();
-        for (LauncherSettingsSnapshot.InstalledProjectSnapshot projectSnapshot : snapshot.installedProjects()) {
-            if (projectSnapshot.getProjectId() == null || projectSnapshot.getProjectId().isBlank()) {
-                continue;
-            }
+        for (LauncherSettingsSnapshot.InstalledProjectSnapshot projectSnapshot : projects) {
+            String position = " • " + (++attempted) + " of " + projects.size();
+            String title = projectSnapshot.getTitle().isBlank() ? "mod" : projectSnapshot.getTitle();
+            progress.update("Restoring your mods", "Checking " + title + position);
             try {
                 ProjectDetail project = apiClient.getProject(projectSnapshot.getProjectId());
                 ProjectVersion version = resolveVersion(project, projectSnapshot, settings);
-                InstallResult result = installer.install(project, version, installOptions(settings, projectSnapshot));
+                progress.update("Restoring your mods", "Downloading " + project.title()
+                        + position);
+                InstallResult result = installer.install(project, version, installOptions(settings, projectSnapshot, version));
                 settings.upsertInstalledProject(result.installedProject().withModpackUnlocked(projectSnapshot.isModpackUnlocked()));
                 settingsStore.save(settings);
                 installed++;
@@ -291,12 +303,14 @@ public final class LauncherSettingsSyncService {
 
     private InstallOptions installOptions(
             LauncherSettings settings,
-            LauncherSettingsSnapshot.InstalledProjectSnapshot installed
+            LauncherSettingsSnapshot.InstalledProjectSnapshot installed,
+            ProjectVersion version
     ) {
+        String downloadGameVersion = downloadGameVersion(version, effectiveGameVersion(settings, installed));
         if (installed.getBundledProjects() != null && !installed.getBundledProjects().isEmpty()) {
             return new InstallOptions(
                     settings.hytaleModsDirectory(),
-                    effectiveGameVersion(settings, installed),
+                    downloadGameVersion,
                     true,
                     true,
                     installed.getBundledProjects().stream()
@@ -307,12 +321,17 @@ public final class LauncherSettingsSyncService {
         }
         return new InstallOptions(
                 settings.hytaleModsDirectory(),
-                effectiveGameVersion(settings, installed),
+                downloadGameVersion,
                 settings.isIncludeDependencies(),
                 settings.isIncludeOptionalDependencies(),
                 null,
                 settings.hytaleUserDataDirectory()
         );
+    }
+
+    static String downloadGameVersion(ProjectVersion version, String preferred) {
+        if (version.gameVersions().isEmpty() || version.gameVersions().contains(preferred)) return preferred;
+        return version.gameVersions().getFirst();
     }
 
     private String effectiveGameVersion(

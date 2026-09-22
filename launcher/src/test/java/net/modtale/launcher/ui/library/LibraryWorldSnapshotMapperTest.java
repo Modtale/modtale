@@ -15,6 +15,31 @@ import org.junit.jupiter.api.Test;
 class LibraryWorldSnapshotMapperTest {
 
     @Test
+    void preservesExactCurseForgeFileInSharedList() {
+        Path file = Path.of("/mods/example.jar");
+        var project = new InstalledProject("curseforge:123", "example", "Example", "MOD", "example-1.0.jar", "456", "",
+                Instant.EPOCH, Instant.EPOCH, List.of(file.toString()), List.of(), List.of(),
+                InstalledProject.SOURCE_CURSEFORGE, "DIRECT", false, List.of());
+        var item = LibraryWorldSnapshotMapper.itemsFor(Set.of("Author:Example"), List.of(project),
+                List.of(new HytaleInstalledMod("Author:Example", "Example", "1.0", "", file))).getFirst();
+        assertEquals("CURSEFORGE", item.source());
+        assertEquals("PLUGIN", item.classification());
+        assertEquals("curseforge:123", item.externalId());
+        assertEquals("https://www.curseforge.com/hytale/mods/example/files/456", item.externalUrl());
+    }
+
+    @Test
+    void usesNumericProjectLinkWhenCurseForgeSlugIsAnInternalId() {
+        Path file = Path.of("/mods/example.jar");
+        var project = new InstalledProject("curseforge:123", "curseforge:123", "Example", "MOD", "example.jar", "456", "",
+                Instant.EPOCH, Instant.EPOCH, List.of(file.toString()), List.of(), List.of(),
+                InstalledProject.SOURCE_CURSEFORGE, "DIRECT", false, List.of());
+        var item = LibraryWorldSnapshotMapper.itemsFor(Set.of("Author:Example"), List.of(project),
+                List.of(new HytaleInstalledMod("Author:Example", "Example", "1.0", "", file))).getFirst();
+        assertEquals("https://www.curseforge.com/projects/123/files/456", item.externalUrl());
+    }
+
+    @Test
     void mapsBundledModpackFileToReferencedModtaleProject() {
         Path leveling = Path.of("/mods/leveling-core.jar");
         InstalledProjectReference reference = new InstalledProjectReference(

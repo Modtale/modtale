@@ -1,6 +1,8 @@
 package net.modtale.launcher.install;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.Comparator;
 import java.util.List;
@@ -54,7 +56,11 @@ public final class VersionSelector {
         try {
             return Instant.parse(version.releaseDate());
         } catch (DateTimeParseException ignored) {
-            return null;
+            try {
+                return LocalDateTime.parse(version.releaseDate()).toInstant(ZoneOffset.UTC);
+            } catch (DateTimeParseException invalid) {
+                return null;
+            }
         }
     }
 }

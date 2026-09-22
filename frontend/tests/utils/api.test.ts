@@ -16,6 +16,17 @@ describe('api utils', () => {
         clearCookie('XSRF-TOKEN');
     });
 
+    it('avoids a JSON preflight on GET while preserving JSON writes', async () => {
+        document.cookie = 'XSRF-TOKEN=csrf-token; path=/';
+        const adapter = vi.fn(async (config: any) => ({ data: {}, status: 200, statusText: 'OK', headers: {}, config }));
+        await api.get('/public-read', { adapter });
+        expect(adapter.mock.calls[0][0].headers.get('Content-Type')).toBeUndefined();
+        await api.post('/write', { value: 1 }, { adapter });
+        expect(adapter.mock.calls[1][0].headers.get('Content-Type')).toBe('application/json');
+        expect(adapter.mock.calls[1][0].data).toBe('{"value":1}');
+        expect(adapter.mock.calls[1][0].headers.get('X-XSRF-TOKEN')).toBe('csrf-token');
+    });
+
     it('reads cookie values and decodes them', () => {
         document.cookie = 'session=abc123; path=/';
         document.cookie = 'XSRF-TOKEN=csrf%20token; path=/';

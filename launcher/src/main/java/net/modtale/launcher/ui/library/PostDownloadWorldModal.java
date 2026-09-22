@@ -18,6 +18,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
@@ -35,7 +36,7 @@ final class PostDownloadWorldModal {
 
     private static final double MODAL_WIDTH = 512;
     private static final double MODAL_MAX_HEIGHT = 720;
-    private static final double WORLD_ICON_IMAGE_SIZE = 44;
+    private static final double WORLD_ICON_IMAGE_SIZE = 50;
     private static final PseudoClass SELECTED = PseudoClass.getPseudoClass("selected");
     private static final PseudoClass INDETERMINATE = PseudoClass.getPseudoClass("indeterminate");
 
@@ -53,7 +54,6 @@ final class PostDownloadWorldModal {
     private List<WorldOption> worlds = List.of();
     private Button applyButton;
     private Button toggleAllButton;
-    private Label selectedCount;
 
     PostDownloadWorldModal(Supplier<StackPane> host, Consumer<Selection> apply, CachedImageLoader imageLoader) {
         this.host = host == null ? () -> null : host;
@@ -149,7 +149,7 @@ final class PostDownloadWorldModal {
         header.getStyleClass().add("post-download-modal-header");
         header.setAlignment(Pos.CENTER_LEFT);
 
-        HBox titleRow = new HBox(8, LauncherIcons.icon(LauncherIcons.Glyph.GLOBE, 20), new Label("Enable in Worlds"));
+        HBox titleRow = new HBox(8, LauncherIcons.icon(LauncherIcons.Glyph.GLOBE, 20), new Label("Enable in worlds"));
         titleRow.getStyleClass().add("post-download-modal-title");
         titleRow.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(titleRow, Priority.ALWAYS);
@@ -165,11 +165,7 @@ final class PostDownloadWorldModal {
         VBox body = new VBox(16);
         body.getStyleClass().add("post-download-modal-body");
         body.getChildren().add(summaryRow());
-        if (!configs.isEmpty()) {
-            Label note = new Label(configs.size() + " shared config defaults will be added to the selected worlds. Existing files are preserved.");
-            note.setWrapText(true);
-            body.getChildren().add(note);
-        }
+
 
         VBox list = new VBox(8);
         list.getStyleClass().add("post-download-modal-world-list");
@@ -183,24 +179,23 @@ final class PostDownloadWorldModal {
     private HBox summaryRow() {
         HBox row = new HBox(12);
         row.getStyleClass().add("post-download-modal-summary");
-        row.setAlignment(Pos.TOP_LEFT);
-
-        VBox copy = new VBox(3);
-        copy.setMinWidth(0);
-        HBox.setHgrow(copy, Priority.ALWAYS);
-        Label description = new Label(title + " installed. Choose where it should be enabled.");
-        description.getStyleClass().add("post-download-modal-description");
-        description.setWrapText(true);
-        selectedCount = new Label();
-        selectedCount.getStyleClass().add("post-download-modal-muted");
-        copy.getChildren().addAll(description, selectedCount);
+        row.setAlignment(Pos.CENTER_RIGHT);
 
         toggleAllButton = new Button();
         toggleAllButton.getStyleClass().add("post-download-modal-toggle-all");
         toggleAllButton.setMinWidth(Region.USE_PREF_SIZE);
         toggleAllButton.setMaxWidth(Region.USE_PREF_SIZE);
         toggleAllButton.setOnAction(event -> toggleAll());
-        row.getChildren().addAll(copy, toggleAllButton);
+        if (!configs.isEmpty()) {
+            Label included = new Label("Configs included", LauncherIcons.icon(LauncherIcons.Glyph.SLIDERS, 14));
+            included.getStyleClass().add("share-config-path");
+            included.setAccessibleText("Configs included. Existing settings are kept.");
+            Tooltip.install(included, new Tooltip("Adds bundled configs to the selected worlds without replacing existing settings."));
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            row.getChildren().addAll(included, spacer);
+        }
+        row.getChildren().add(toggleAllButton);
         return row;
     }
 
@@ -224,6 +219,7 @@ final class PostDownloadWorldModal {
         StackPane icon = worldIcon(option.world());
 
         VBox copy = new VBox(3);
+        copy.setAlignment(Pos.CENTER_LEFT);
         Label name = new Label(option.world().name());
         name.getStyleClass().add("post-download-modal-world-title");
         Label meta = new Label(option.enabledCount() + "/" + option.totalCount() + " already enabled - " + option.meta());
@@ -251,11 +247,11 @@ final class PostDownloadWorldModal {
             ImageView image = new ImageView();
             image.setFitWidth(WORLD_ICON_IMAGE_SIZE);
             image.setFitHeight(WORLD_ICON_IMAGE_SIZE);
-            image.setPreserveRatio(false);
+            LibraryWorldIcon.cropToSquare(image);
             image.setSmooth(true);
             image.setMouseTransparent(true);
             image.setClip(roundedClip(WORLD_ICON_IMAGE_SIZE, 10));
-            imageLoader.loadInto(image, preview, WORLD_ICON_IMAGE_SIZE, WORLD_ICON_IMAGE_SIZE);
+            imageLoader.loadInto(image, preview, WORLD_ICON_IMAGE_SIZE * 6, WORLD_ICON_IMAGE_SIZE * 6, true);
             shell.getChildren().add(image);
         } else {
             shell.getChildren().add(LauncherIcons.icon(LauncherIcons.Glyph.GLOBE, 16));
@@ -355,10 +351,6 @@ final class PostDownloadWorldModal {
             applyButton.setDisable(selectedWorldKeys.isEmpty());
             applyButton.setGraphic(applyButtonContent());
         }
-        if (selectedCount != null) {
-            int count = selectedWorldKeys.size();
-            selectedCount.setText(count + " world" + LibraryProjectSupport.plural(count) + " selected");
-        }
         if (toggleAllButton != null) {
             toggleAllButton.setText(selectedWorldKeys.size() == worlds.size() ? "Deselect All" : "Select All");
         }
@@ -405,7 +397,7 @@ final class PostDownloadWorldModal {
             boolean indeterminate
     ) {
         WorldOption {
-            meta = value(meta, "World save");
+            meta = value(meta, "World");
             totalCount = Math.max(0, totalCount);
             enabledCount = Math.max(0, Math.min(enabledCount, totalCount));
         }

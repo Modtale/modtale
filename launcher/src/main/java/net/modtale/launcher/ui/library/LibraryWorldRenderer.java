@@ -15,12 +15,20 @@ import net.modtale.launcher.config.HytaleConfigFiles.ConfigFile;
 import javafx.collections.FXCollections;
 import javafx.css.PseudoClass;
 import javafx.geometry.Pos;
+import javafx.geometry.Insets;
 import javafx.scene.Node;
+import javafx.scene.Cursor;
+import javafx.scene.control.ButtonBase;
+import javafx.scene.control.ComboBoxBase;
+import javafx.scene.input.MouseButton;
+import net.modtale.launcher.ui.browse.card.ProjectCardInteraction;
+import net.modtale.launcher.model.project.ProjectSummary;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
+import javafx.scene.control.TextField;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -36,15 +44,31 @@ import net.modtale.launcher.model.install.UpdateCandidate;
 import net.modtale.launcher.model.project.ProjectClassification;
 import net.modtale.launcher.model.project.ProjectDetail;
 import net.modtale.launcher.model.project.ProjectMeta;
-import net.modtale.launcher.model.project.ProjectVersion;
 import net.modtale.launcher.ui.common.CachedImageLoader;
 import net.modtale.launcher.ui.common.LauncherIcons;
 
 final class LibraryWorldRenderer {
 
-    private static final double PROJECT_ICON_SIZE = 46;
+    private static final double PROJECT_ICON_SIZE = 80;
     private static final double CONTENT_ICON_SIZE = 34;
     private static final PseudoClass CONTENTS_HOVERED = PseudoClass.getPseudoClass("contents-hovered");
+
+    private List<String> knownGameVersions = List.of();
+    private String currentGameVersion = "";
+    void setCurrentGameVersion(String version) { currentGameVersion = version == null ? "" : version; }
+    private String librarySearch = "";
+    void setKnownGameVersions(List<String> versions) { knownGameVersions = List.copyOf(versions); }
+
+    private Consumer<HytaleWorld> editWorldSettings = ignored -> {};
+    void setWorldSettingsAction(Consumer<HytaleWorld> action) { editWorldSettings = action; }
+
+    private Consumer<ProjectSummary> openProject = ignored -> {};
+    private Consumer<ProjectSummary> openCreator = ignored -> {};
+
+    void setNavigationActions(Consumer<ProjectSummary> openProject, Consumer<ProjectSummary> openCreator) {
+        this.openProject = openProject;
+        this.openCreator = openCreator;
+    }
 
     private final CachedImageLoader imageLoader;
     private final Consumer<UpdateCandidate> updateProject;
@@ -108,13 +132,14 @@ final class LibraryWorldRenderer {
         VBox section = new VBox(12);
         section.getStyleClass().addAll("library-detail-hero", "library-world-detail-hero");
 
-        HBox row = new HBox(12);
+        HBox row = new HBox(16);
+        row.setAlignment(Pos.CENTER_LEFT);
         row.getStyleClass().add("library-detail-heading");
         StackPane icon = imageIcon(
                 model.world().previewImage(),
                 model.world().name(),
                 LauncherIcons.Glyph.GLOBE,
-                44,
+                88,
                 "library-detail-icon",
                 false
         );
@@ -124,8 +149,13 @@ final class LibraryWorldRenderer {
         copy.setAlignment(Pos.CENTER_LEFT);
         Label title = new Label(model.world().name());
         title.getStyleClass().addAll("library-detail-title", "library-world-detail-title");
+        title.setTooltip(new Tooltip(model.world().name()));
         title.setMaxWidth(Double.MAX_VALUE);
-        copy.getChildren().add(title);
+        copy.setMinWidth(0);
+        Label summary = new Label(model.enabledProjectCount() + " of " + model.totalProjectCount() + " projects enabled");
+        summary.getStyleClass().addAll("library-project-meta", "library-world-detail-summary");
+        copy.setSpacing(6);
+        copy.getChildren().addAll(title, summary);
         HBox.setHgrow(copy, Priority.ALWAYS);
 
         HBox actions = new HBox(8);
@@ -145,9 +175,6 @@ final class LibraryWorldRenderer {
         updates.setAccessibleText("Check for updates");
         updates.setTooltip(new Tooltip("Check for updates"));
         updates.setOnAction(event -> checkUpdates.run());
-        Region actionDivider = new Region();
-        actionDivider.getStyleClass().add("library-action-divider");
-        actionDivider.setMouseTransparent(true);
         Button share = secondaryButton("Share");
         share.getStyleClass().addAll("small", "library-compact-icon-action");
         share.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.SHARE_2, 14));
@@ -161,20 +188,96 @@ final class LibraryWorldRenderer {
         pack.setMinWidth(Region.USE_PREF_SIZE);
         pack.setTooltip(new Tooltip("Start a Modtale modpack from this world's enabled mods"));
         pack.setOnAction(event -> createModpackFromWorld.accept(model.world()));
-        actions.getChildren().addAll(refresh, updates, actionDivider, share, pack);
+        HBox tools = new HBox(2, refresh, updates, share);
+        tools.setAlignment(Pos.CENTER);
+        tools.getStyleClass().add("library-world-tools");
+        tools.setMinHeight(40);
+        tools.setPrefHeight(40);
+        tools.setMaxHeight(40);
+        pack.setMinHeight(40);
+        pack.setPrefHeight(40);
+        pack.setMaxHeight(40);
+        Button settings = secondaryButton("World settings");
+        settings.getStyleClass().addAll("small", "library-action-emphasis");
+        settings.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.SLIDERS, 14));
+        settings.setMinHeight(40);
+        settings.setPrefHeight(40);
+        settings.setMaxHeight(40);
+        settings.setAccessibleText("World settings");
+        settings.setOnAction(event -> editWorldSettings.accept(model.world()));
+        actions.getChildren().addAll(tools, settings, pack);
+        actions.setMinWidth(Region.USE_PREF_SIZE);
 
-        row.getChildren().addAll(icon, copy, actions);
-        section.getChildren().add(row);
+        row.getChildren().addAll(icon, copy);
+        actions.setAlignment(Pos.CENTER_LEFT);
+        section.getChildren().addAll(row, actions);
+        section.widthProperty().addListener((observable, previous, width) -> {
+            boolean inline = width.doubleValue() >= 920;
+            if (inline && !row.getChildren().contains(actions)) {
+                section.getChildren().remove(actions);
+                row.getChildren().add(actions);
+            } else if (!inline && row.getChildren().contains(actions)) {
+                row.getChildren().remove(actions);
+                section.getChildren().add(actions);
+            }
+        });
         return section;
     }
 
     private Node installedProjectsSection(LibraryWorldModel model, List<ConfigFile> configs) {
-        return installedProjectsSection(
-                model.world(),
-                model.projects(),
-                "No installed projects",
-                "Install mods from Browse to manage them per world.", configs
-        );
+        TextField search = new TextField(librarySearch);
+        search.setPromptText("Search installed mods...");
+        search.setAccessibleText("Search installed mods");
+        search.getStyleClass().addAll("input", "quick-search");
+        search.setMaxWidth(Double.MAX_VALUE);
+        StackPane searchShell = new StackPane(search);
+        searchShell.getStyleClass().add("search-shell");
+        Node searchIcon = LauncherIcons.icon(LauncherIcons.Glyph.SEARCH, 16);
+        searchIcon.getStyleClass().add("search-icon");
+        searchIcon.setMouseTransparent(true);
+        StackPane.setAlignment(searchIcon, Pos.CENTER_LEFT);
+        StackPane.setMargin(searchIcon, new Insets(0, 0, 0, 13));
+        Button clear = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.X, 12));
+        clear.getStyleClass().add("search-clear-button");
+        clear.setAccessibleText("Clear library search");
+        clear.setTooltip(new Tooltip("Clear search"));
+        clear.visibleProperty().bind(search.textProperty().isNotEmpty());
+        clear.managedProperty().bind(clear.visibleProperty());
+        clear.setOnAction(event -> { search.clear(); search.requestFocus(); });
+        StackPane.setAlignment(clear, Pos.CENTER_RIGHT);
+        StackPane.setMargin(clear, new Insets(0, 9, 0, 0));
+        searchShell.getChildren().addAll(searchIcon, clear);
+        VBox results = new VBox(18);
+        Runnable render = () -> {
+            results.getChildren().clear();
+            if (model.projects().isEmpty()) {
+                results.getChildren().add(emptyState("No installed projects", "Install mods from Browse to manage them per world."));
+                return;
+            }
+            List<LibraryWorldProjectModel> visible = LibraryProjectFilter.matching(model.projects(), librarySearch);
+            for (boolean enabled : new boolean[] {true, false}) {
+                List<LibraryWorldProjectModel> group = visible.stream()
+                        .filter(project -> (project.enabledCount() > 0) == enabled).toList();
+                Label subtitle = new Label(enabled ? "Enabled" : "Disabled");
+                subtitle.getStyleClass().addAll("library-section-title", "library-group-title");
+                VBox section = new VBox(10, subtitle);
+                if (group.isEmpty()) {
+                    Label empty = new Label(librarySearch.isBlank()
+                            ? (enabled ? "No enabled mods" : "No disabled mods") : "No matching mods");
+                    empty.getStyleClass().add("library-project-meta");
+                    section.getChildren().add(empty);
+                } else {
+                    section.getChildren().add(installedProjectsSection(model.world(), group, "", "", configs));
+                }
+                results.getChildren().add(section);
+            }
+        };
+        search.textProperty().addListener((observable, before, after) -> {
+            librarySearch = after;
+            render.run();
+        });
+        render.run();
+        return new VBox(18, searchShell, results);
     }
 
     private Node installedProjectsSection(
@@ -197,7 +300,21 @@ final class LibraryWorldRenderer {
     private Node projectRow(HytaleWorld world, LibraryWorldProjectModel model, List<ConfigFile> configs) {
         VBox shell = new VBox(10);
         shell.getStyleClass().add("library-world-project-row");
+        // Keep the expensive shadow separate from the independently moving icon.
+        Region surface = new Region();
+        surface.getStyleClass().add("library-world-project-surface");
+        surface.setManaged(false);
+        surface.setMouseTransparent(true);
+        surface.prefWidthProperty().bind(shell.widthProperty());
+        surface.prefHeightProperty().bind(shell.heightProperty());
+        surface.setCache(true);
+        surface.setCacheHint(javafx.scene.CacheHint.SPEED);
+        shell.widthProperty().addListener((o, before, after) -> surface.resize(shell.getWidth(), shell.getHeight()));
+        shell.heightProperty().addListener((o, before, after) -> surface.resize(shell.getWidth(), shell.getHeight()));
+        shell.getChildren().add(surface);
 
+        StackPane icon = projectIcon(model, PROJECT_ICON_SIZE);
+        VBox copy = projectCopy(model);
         HBox row = new HBox(12);
         row.getStyleClass().add("library-world-project-main");
         row.setAlignment(Pos.CENTER_LEFT);
@@ -216,8 +333,13 @@ final class LibraryWorldRenderer {
             toggle.setOnAction(() -> toggleWorldMods.setEnabled(world, model.modIds(), toggle.isSelected()));
         }
 
-        StackPane icon = projectIcon(model, PROJECT_ICON_SIZE);
-        VBox copy = projectCopy(model);
+        var iconSize = new javafx.beans.property.SimpleDoubleProperty(PROJECT_ICON_SIZE);
+        icon.minWidthProperty().bind(iconSize);
+        icon.prefWidthProperty().bind(iconSize);
+        icon.maxWidthProperty().bind(iconSize);
+        icon.minHeightProperty().bind(iconSize);
+        icon.prefHeightProperty().bind(iconSize);
+        icon.maxHeightProperty().bind(iconSize);
         HBox.setHgrow(copy, Priority.ALWAYS);
 
         HBox actions = projectActions(model, configs);
@@ -235,28 +357,102 @@ final class LibraryWorldRenderer {
                     shell.pseudoClassStateChanged(CONTENTS_HOVERED, hovered));
             shell.getChildren().add(contentsCard);
         }
+        ProjectCardInteraction.addHoverAnimationWithIndependentContent(shell, icon);
+        if (!toggle.isDisabled()) {
+            shell.setCursor(Cursor.HAND);
+        }
+        shell.setOnMouseClicked(event -> {
+            if (event.getButton() == MouseButton.PRIMARY && event.isStillSincePress()
+                    && !isNestedControl(event.getTarget(), shell)) {
+                toggle.fire();
+                event.consume();
+            }
+        });
         return shell;
+    }
+
+    static boolean isNestedControl(Object target, Node card) {
+        Node node = target instanceof Node picked ? picked : null;
+        while (node != null && node != card) {
+            if (node instanceof ButtonBase || node instanceof ComboBoxBase<?> || node instanceof LibraryToggleBox
+                    || node.getStyleClass().contains("author-link")
+                    || node.getStyleClass().contains("library-world-project-title")) {
+                return true;
+            }
+            node = node.getParent();
+        }
+        return false;
+    }
+
+    static ProjectSummary navigationTarget(LibraryWorldProjectModel model) {
+        InstalledProject installed = model.installed();
+        boolean curseForge = InstalledProject.SOURCE_CURSEFORGE.equalsIgnoreCase(installed.source())
+                || installed.projectId().startsWith("curseforge:");
+        if (installed.projectId().isBlank() || installed.projectId().startsWith("local:")
+                || InstalledProject.SOURCE_LOCAL.equalsIgnoreCase(installed.source())
+                || (!curseForge && !LibraryProjectSupport.isModtaleProject(installed))) {
+            return null;
+        }
+        String id = installed.projectId();
+        if (curseForge && !id.startsWith("curseforge:")) id = "curseforge:" + id;
+        ProjectDetail detail = model.detail();
+        ProjectMeta meta = model.meta();
+        return new ProjectSummary(id,
+                curseForge ? id : first(detail == null ? "" : detail.slug(), meta == null ? "" : meta.slug(), installed.slug()),
+                model.display().title(), meta == null ? "" : meta.description(),
+                detail == null ? "" : detail.authorId(),
+                first(detail == null ? "" : detail.author(), meta == null ? "" : meta.author(), model.display().author()),
+                model.display().icon(), null, model.display().classification(), 0, 0, null, List.of(),
+                curseForge ? InstalledProject.SOURCE_CURSEFORGE : InstalledProject.SOURCE_MODTALE, null, null);
     }
 
     private VBox projectCopy(LibraryWorldProjectModel model) {
         InstalledProject installed = model.installed();
         LibraryWorldProjectDisplay display = model.display();
         VBox copy = new VBox(5);
+        copy.getStyleClass().add("library-world-project-copy");
+        copy.setAlignment(Pos.CENTER_LEFT);
         Label title = new Label(display.title());
         title.getStyleClass().add("library-world-project-title");
+        ProjectSummary target = navigationTarget(model);
+        if (target != null) {
+            title.setCursor(Cursor.HAND);
+            title.setOnMouseClicked(event -> {
+                if (event.getButton() == MouseButton.PRIMARY && event.isStillSincePress()) {
+                    openProject.accept(target);
+                    event.consume();
+                }
+            });
+        }
 
         String subtitleText = projectMetaLine(model);
-        Label subtitle = new Label(subtitleText);
-        subtitle.getStyleClass().add("library-world-project-meta");
+        HBox subtitle = new HBox(4);
+        subtitle.setAlignment(Pos.CENTER_LEFT);
+        Label by = new Label("by");
+        by.getStyleClass().add("library-world-project-meta");
+        Label author = new Label(display.author());
+        author.getStyleClass().add("library-world-project-meta");
+        ProjectSummary creatorTarget = navigationTarget(model);
+        if (creatorTarget != null && !display.author().isBlank()) {
+            author.getStyleClass().add("author-link");
+            author.setCursor(Cursor.HAND);
+            author.setOnMouseClicked(event -> {
+                if (event.getButton() == MouseButton.PRIMARY && event.isStillSincePress()) {
+                    openCreator.accept(creatorTarget);
+                    event.consume();
+                }
+            });
+        }
+        subtitle.getChildren().addAll(by, author);
 
-        HBox badges = new HBox(7);
+        HBox badges = new HBox(10);
+        badges.setAlignment(Pos.CENTER_LEFT);
+        badges.setMinWidth(0);
         badges.getStyleClass().add("library-badge-row");
         if (!display.version().isBlank()) {
-            badges.getChildren().add(badge(display.version(), "version"));
+            badges.getChildren().add(versionMetadata(display.version(), "Project version", "version"));
         }
-        if (!installed.gameVersion().isBlank()) {
-            badges.getChildren().add(badge(installed.gameVersion(), "game"));
-        }
+        addCompatibilityMetadata(badges, display.hytaleCompatibility());
         if (model.update() != null) {
             badges.getChildren().add(badge("Update ready", "game"));
         }
@@ -265,6 +461,9 @@ final class LibraryWorldRenderer {
         }
         if (installed.isModpack()) {
             badges.getChildren().add(badge("Modpack", "modpack"));
+        }
+        if (InstalledProject.SOURCE_CURSEFORGE.equalsIgnoreCase(installed.source())) {
+            badges.getChildren().add(badge("CurseForge", "curseforge"));
         }
         copy.getChildren().add(title);
         if (!subtitleText.isBlank()) {
@@ -276,7 +475,7 @@ final class LibraryWorldRenderer {
 
     private HBox projectActions(LibraryWorldProjectModel model, List<ConfigFile> configs) {
         InstalledProject installed = model.installed();
-        boolean modtaleProject = LibraryProjectSupport.isModtaleProject(installed);
+        boolean managedProject = LibraryProjectSupport.isManagedProject(installed);
         HBox actions = new HBox(6);
         actions.getStyleClass().add("library-world-project-actions");
         actions.setAlignment(Pos.CENTER_RIGHT);
@@ -285,7 +484,7 @@ final class LibraryWorldRenderer {
             addConfigButton(actions, model.display().title(), model.modIds(), configs);
         }
 
-        if (modtaleProject && model.update() != null) {
+        if (managedProject && model.update() != null) {
             Button update = primaryButton("Update");
             update.getStyleClass().add("small");
             update.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 13));
@@ -296,19 +495,19 @@ final class LibraryWorldRenderer {
 
         Button versions = iconAction(
                 LauncherIcons.Glyph.LAYERS,
-                !modtaleProject
-                        ? "Local files do not have Modtale version history"
+                !managedProject
+                        ? "Local files do not have provider version history"
                         : model.loading()
                         ? "Loading release metadata"
                         : model.detail() == null ? "Load available versions" : "Version controls are ready below",
                 "neutral",
                 () -> {
-                    if (modtaleProject) {
+                    if (managedProject) {
                         loadVersions.accept(installed);
                     }
                 }
         );
-        versions.setDisable(!modtaleProject || model.detail() != null || model.loading());
+        versions.setDisable(!managedProject || model.detail() != null || model.loading());
 
         actions.getChildren().add(versions);
         if (model.display().unlockVisible()) {
@@ -357,7 +556,9 @@ final class LibraryWorldRenderer {
                 .findFirst()
                 .ifPresentOrElse(versions::setValue, () -> versions.setValue(choices.getFirst()));
 
-        Button switchButton = primaryButton("Switch");
+        Button switchButton = primaryButton("");
+        switchButton.setAccessibleText("Switch version");
+        switchButton.setTooltip(new Tooltip("Switch version"));
         switchButton.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 13));
         switchButton.setOnAction(event -> {
             LibraryVersionChoice choice = versions.getValue();
@@ -405,16 +606,6 @@ final class LibraryWorldRenderer {
         header.getStyleClass().add("library-world-content-header");
         header.setAlignment(Pos.CENTER_LEFT);
         header.setPickOnBounds(true);
-        header.setOnMouseClicked(event -> {
-            Node target = event.getTarget() instanceof Node node ? node : null;
-            while (target != null && target != header) {
-                if (target == toggle) {
-                    return;
-                }
-                target = target.getParent();
-            }
-            toggleModpackContents.accept(model.installed());
-        });
 
         VBox card = new VBox(8);
         card.getStyleClass().add("library-world-content-card");
@@ -448,12 +639,18 @@ final class LibraryWorldRenderer {
         title.getStyleClass().add("library-child-title");
         Label meta = new Label(item.meta().isBlank() ? "Included in modpack" : item.meta());
         meta.getStyleClass().add("library-child-meta");
-        copy.getChildren().addAll(title, meta);
+        HBox metadata = new HBox(10, meta);
+        metadata.setAlignment(Pos.CENTER_LEFT);
+        addCompatibilityMetadata(metadata, item.hytaleCompatibility());
+        copy.getChildren().addAll(title, metadata);
         HBox.setHgrow(copy, Priority.ALWAYS);
 
         Label status = new Label("Included");
         status.getStyleClass().add("library-version-pill");
         row.getChildren().addAll(icon, copy);
+        if (InstalledProject.SOURCE_CURSEFORGE.equalsIgnoreCase(item.source())) {
+            row.getChildren().add(badge("CurseForge", "curseforge"));
+        }
         addConfigButton(row, item.title(), item.modIds(), configs);
         row.getChildren().add(status);
         return row;
@@ -463,8 +660,8 @@ final class LibraryWorldRenderer {
         List<ConfigFile> matching = configs.stream()
                 .filter(file -> !file.pluginId().isBlank() && modIds.contains(file.pluginId())).toList();
         if (matching.isEmpty()) return;
-        Button config = secondaryButton("Config");
-        config.getStyleClass().add("small");
+        Button config = new Button("Config");
+        config.getStyleClass().addAll("library-icon-action", "library-text-action");
         config.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.FILE_CODE, 14));
         config.setAccessibleText("Config for " + title);
         config.setTooltip(new Tooltip("Edit configs for " + title));
@@ -501,45 +698,61 @@ final class LibraryWorldRenderer {
     ) {
         StackPane shell = new StackPane();
         shell.getStyleClass().add(styleClass);
+        double borderWidth = styleClass.equals("library-project-icon") || styleClass.equals("library-detail-icon") ? 4 : 2;
+        if (borderWidth == 4) {
+            shell.getStyleClass().add("library-mod-icon");
+        }
         shell.setMinSize(size, size);
         shell.setPrefSize(size, size);
         shell.setMaxSize(size, size);
-        double mediaSize = Math.max(1, size - 4);
-        double clipRadius = 6;
+        double mediaSize = Math.max(1, size - borderWidth * 2);
+        double clipRadius = (borderWidth == 4 ? 16 : 8) - borderWidth / 2;
 
+        Node fallback;
         if (imageLoader != null && useProjectFallback) {
-            ImageView fallback = new ImageView();
-            fallback.setFitWidth(mediaSize);
-            fallback.setFitHeight(mediaSize);
-            fallback.setPreserveRatio(false);
-            fallback.setSmooth(true);
-            fallback.setClip(roundedClip(mediaSize, clipRadius));
-            imageLoader.loadInto(fallback, null, mediaSize * 2, mediaSize * 2);
-            shell.getChildren().add(fallback);
+            ImageView placeholder = new ImageView();
+            placeholder.fitWidthProperty().bind(shell.widthProperty().subtract(borderWidth * 2));
+            placeholder.fitHeightProperty().bind(shell.heightProperty().subtract(borderWidth * 2));
+            placeholder.setPreserveRatio(true);
+            placeholder.setSmooth(true);
+            placeholder.setClip(roundedClip(placeholder, clipRadius));
+            imageLoader.loadInto(placeholder, null, mediaSize * 3, mediaSize * 3, true);
+            fallback = placeholder;
+        } else {
+            fallback = LauncherIcons.icon(fallbackGlyph, Math.max(15, size * 0.42));
         }
+        shell.getChildren().add(fallback);
 
         if (imageLoader != null && iconUrl != null && !iconUrl.isBlank()) {
             ImageView image = new ImageView();
-            image.setFitWidth(mediaSize);
-            image.setFitHeight(mediaSize);
+            image.fitWidthProperty().bind(shell.widthProperty().subtract(borderWidth * 2));
+            image.fitHeightProperty().bind(shell.heightProperty().subtract(borderWidth * 2));
+            image.setPreserveRatio(true);
+            if (fallbackGlyph == LauncherIcons.Glyph.GLOBE) {
+                LibraryWorldIcon.cropToSquare(image);
+            }
             image.setSmooth(true);
             image.setMouseTransparent(true);
-            image.setClip(roundedClip(mediaSize, clipRadius));
-            imageLoader.loadInto(image, iconUrl, mediaSize, mediaSize);
+            image.setClip(roundedClip(image, clipRadius));
+            double renderScale = fallbackGlyph == LauncherIcons.Glyph.GLOBE ? 6 : 3;
+            imageLoader.loadInto(image, iconUrl, mediaSize * renderScale, mediaSize * renderScale, true);
+            CachedImageLoader.showFallbackUntilLoaded(fallback, image);
             shell.getChildren().add(image);
             return shell;
         }
 
-        Node fallback = LauncherIcons.icon(fallbackGlyph, Math.max(15, size * 0.42));
-        shell.getChildren().add(fallback);
         if (fallbackGlyph == LauncherIcons.Glyph.BOX && title != null && !title.isBlank()) {
             shell.setAccessibleText(title.substring(0, 1).toUpperCase(Locale.ROOT));
         }
         return shell;
     }
 
-    private Rectangle roundedClip(double size, double radius) {
-        Rectangle clip = new Rectangle(size, size);
+    private Rectangle roundedClip(ImageView image, double radius) {
+        Rectangle clip = new Rectangle();
+        clip.widthProperty().bind(javafx.beans.binding.Bindings.createDoubleBinding(
+                () -> image.getLayoutBounds().getWidth(), image.layoutBoundsProperty()));
+        clip.heightProperty().bind(javafx.beans.binding.Bindings.createDoubleBinding(
+                () -> image.getLayoutBounds().getHeight(), image.layoutBoundsProperty()));
         clip.setArcWidth(radius * 2);
         clip.setArcHeight(radius * 2);
         return clip;
@@ -550,11 +763,39 @@ final class LibraryWorldRenderer {
         return author.isBlank() ? "" : "by " + author;
     }
 
-    private boolean hasUnlockableContents(InstalledProject installed) {
-        return installed.isModpack()
-                || !installed.bundledProjects().isEmpty()
-                || !installed.dependencyProjectIds().isEmpty()
-                || !installed.externalDependencies().isEmpty();
+    private void addCompatibilityMetadata(HBox row, List<String> requirements) {
+        for (String requirement : requirements) {
+            if (requirement.isBlank()) continue;
+            if (!row.getChildren().isEmpty()) {
+                Label divider = new Label("·");
+                divider.getStyleClass().add("library-version-divider");
+                row.getChildren().add(divider);
+            }
+            Label compatibility = versionMetadata(ManifestVersionLabel.format(requirement, knownGameVersions), "Compatible versions", "build");
+            compatibility.setTooltip(new Tooltip("Manifest ServerVersion: " + requirement));
+            row.getChildren().add(compatibility);
+            if (ManifestVersionCompatibility.incompatible(requirement, currentGameVersion)) {
+                String message = "This mod targets " + requirement + " but the current game version is "
+                        + currentGameVersion + ". It may not work correctly.";
+                Label warning = new Label(null, LauncherIcons.icon(LauncherIcons.Glyph.ALERT_TRIANGLE, 16));
+                warning.getStyleClass().add("library-compatibility-warning");
+                warning.setAccessibleText(message);
+                Tooltip tooltip = new Tooltip(message);
+                tooltip.setWrapText(true);
+                tooltip.setMaxWidth(440);
+                warning.setTooltip(tooltip);
+                row.getChildren().add(warning);
+            }
+        }
+    }
+
+    private Label versionMetadata(String value, String description, String tone) {
+        Label label = new Label(value);
+        label.getStyleClass().addAll("library-version-metadata", "library-version-metadata-" + tone);
+        label.setMinWidth(0);
+        label.setTooltip(new Tooltip(description + ": " + value));
+        label.setAccessibleText(description + ": " + value);
+        return label;
     }
 
     private Node badge(String text, String tone) {

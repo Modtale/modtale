@@ -32,6 +32,19 @@ class LauncherConfigStoreTest {
         assertTrue(configs.capture(settings).contains(new LauncherConfigSnapshot("Mods/Example/settings.toml", "value=3")));
     }
 
+    @Test void dropsPreviouslyCapturedRuntimeDataWithoutRestoringIt() throws Exception {
+        LauncherSettings target = settings("device");
+        String data = "Saves/My World/mods/Example/data/mob-levels.json";
+        Path live = target.hytaleUserDataDirectory().resolve(data);
+        write(live, "{\"level\":7}");
+        var saved = List.of(new LauncherConfigSnapshot(data, "{\"level\":2}"),
+                new LauncherConfigSnapshot("Mods/Example/config.json", "{\"enabled\":true}"));
+        target.setConfigs(saved);
+        assertEquals(List.of(saved.get(1)), configs.capture(target));
+        assertEquals(1, configs.restore(saved, target));
+        assertEquals("{\"level\":7}", Files.readString(live));
+    }
+
     @Test void restoresUnderRecipientPathsAndBacksUpChangedFiles() throws Exception {
         LauncherSettings target = settings("device-two");
         Path existing = target.hytaleModsDirectory().resolve("Example/config.json");

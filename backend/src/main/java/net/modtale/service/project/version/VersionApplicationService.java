@@ -111,12 +111,24 @@ public class VersionApplicationService {
             List<String> dependencies,
             User currentUser
     ) {
+        return createBundleDownloadUrl(projectId, versionNumber, gameVersion, dependencies, currentUser, false);
+    }
+
+    public BundleDownloadUrlResponse createBundleDownloadUrl(
+            String projectId,
+            String versionNumber,
+            String gameVersion,
+            List<String> dependencies,
+            User currentUser,
+            boolean launcherClient
+    ) {
         return versionDownloadOrchestrationService.createBundleDownloadUrl(
                 projectId,
                 versionNumber,
                 gameVersion,
                 dependencies,
-                currentUser
+                currentUser,
+                launcherClient
         );
     }
 
@@ -166,13 +178,26 @@ public class VersionApplicationService {
             String forwardedFor,
             User currentUser
     ) throws IOException {
+        return downloadBundle(token, apiRole, referer, remoteAddress, forwardedFor, currentUser, false);
+    }
+
+    public VersionDownloadPayload downloadBundle(
+            String token,
+            boolean apiRole,
+            String referer,
+            String remoteAddress,
+            String forwardedFor,
+            User currentUser,
+            boolean launcherClient
+    ) throws IOException {
         return versionDownloadOrchestrationService.downloadBundle(
                 token,
                 apiRole,
                 referer,
                 remoteAddress,
                 forwardedFor,
-                currentUser
+                currentUser,
+                launcherClient
         );
     }
 

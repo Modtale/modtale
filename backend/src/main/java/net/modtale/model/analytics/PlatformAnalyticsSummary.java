@@ -7,7 +7,9 @@ public class PlatformAnalyticsSummary {
     private long previousTotalDownloads;
     private long totalViews;
     private long previousTotalViews;
+    private long launcherDownloads;
     private long apiDownloads;
+    private long previousLauncherDownloads;
     private long previousApiDownloads;
     private long frontendDownloads;
     private long previousFrontendDownloads;
@@ -23,6 +25,7 @@ public class PlatformAnalyticsSummary {
     private List<AnalyticsDataPoint> newProjectsChart;
     private List<AnalyticsDataPoint> newUsersChart;
     private List<AnalyticsDataPoint> newOrgsChart;
+    private List<AnalyticsDataPoint> launcherDownloadsChart;
     private List<AnalyticsDataPoint> apiDownloadsChart;
 
     public PlatformAnalyticsSummary() {}
@@ -37,8 +40,14 @@ public class PlatformAnalyticsSummary {
     public long getPreviousTotalViews() { return previousTotalViews; }
     public void setPreviousTotalViews(long previousTotalViews) { this.previousTotalViews = previousTotalViews; }
 
+    public long getLauncherDownloads() { return launcherDownloads; }
+    public void setLauncherDownloads(long launcherDownloads) { this.launcherDownloads = launcherDownloads; }
+
     public long getApiDownloads() { return apiDownloads; }
     public void setApiDownloads(long apiDownloads) { this.apiDownloads = apiDownloads; }
+    public long getPreviousLauncherDownloads() { return previousLauncherDownloads; }
+    public void setPreviousLauncherDownloads(long value) { this.previousLauncherDownloads = value; }
+
     public long getPreviousApiDownloads() { return previousApiDownloads; }
     public void setPreviousApiDownloads(long previousApiDownloads) { this.previousApiDownloads = previousApiDownloads; }
 
@@ -76,6 +85,9 @@ public class PlatformAnalyticsSummary {
 
     public List<AnalyticsDataPoint> getNewOrgsChart() { return newOrgsChart; }
     public void setNewOrgsChart(List<AnalyticsDataPoint> newOrgsChart) { this.newOrgsChart = newOrgsChart; }
+
+    public List<AnalyticsDataPoint> getLauncherDownloadsChart() { return launcherDownloadsChart; }
+    public void setLauncherDownloadsChart(List<AnalyticsDataPoint> points) { this.launcherDownloadsChart = points; }
 
     public List<AnalyticsDataPoint> getApiDownloadsChart() { return apiDownloadsChart; }
     public void setApiDownloadsChart(List<AnalyticsDataPoint> apiDownloadsChart) { this.apiDownloadsChart = apiDownloadsChart; }

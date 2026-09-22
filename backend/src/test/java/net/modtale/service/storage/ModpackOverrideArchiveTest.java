@@ -18,17 +18,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ModpackOverrideArchiveTest {
 
     @Test
-    void readsOverridesAndPreservesPortablePaths() throws Exception {
-        List<ModpackOverrideArchive.OverrideFile> files = ModpackOverrideArchive.read(new ByteArrayInputStream(zip(Map.of(
-                "overrides/Mods/example/game.json", "{}",
-                "overrides/Mods/example/ui.toml", "scale=2",
-                "overrides/Saves/My World/mods/Example_Plugin/config.json", "{}"
-        ))));
-
-        assertEquals(3, files.size());
-        assertTrue(files.stream().anyMatch(file -> file.path()
-                .equals("overrides/Saves/My World/mods/Example_Plugin/config.json")));
-        assertTrue(files.stream().anyMatch(file -> file.path().equals("overrides/Mods/example/ui.toml")));
+    void rejectsSavesSharedOverridesAndUnassociatedConfigs() throws Exception {
+        for (String path : List.of("overrides/Saves/World/config.json", "overrides/Mods/Example/config.json", "overrides/Universe/mods/Example/config.json")) {
+            assertThrows(IOException.class, () -> ModpackOverrideArchive.read(new ByteArrayInputStream(zip(Map.of(path, "{}")))));
+        }
     }
 
     @Test
@@ -44,6 +37,18 @@ class ModpackOverrideArchiveTest {
         )) {
             assertThrows(IOException.class, () -> ModpackOverrideArchive.read(new ByteArrayInputStream(zip(entries))));
         }
+    }
+
+    @Test
+    void preservesAndValidatesConfigOwnershipAndChecksums() throws Exception {
+        String path = "overrides/Universe/mods/Example/config.json";
+        String hash = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest("{}".getBytes(StandardCharsets.UTF_8)));
+        String manifest = "{\"format\":\"modtale-configs\",\"formatVersion\":1,\"configs\":[{\"projectId\":\"mod-1\",\"source\":\"MODTALE\",\"path\":\"" + path + "\",\"sha256\":\"" + hash + "\"}]}";
+        var bundle = ModpackOverrideArchive.readBundle(new ByteArrayInputStream(zip(Map.of(path, "{}", ModpackOverrideArchive.CONFIG_MANIFEST, manifest))));
+        assertEquals(1, bundle.files().size());
+        assertEquals("MODTALE:mod-1", bundle.configs().getFirst().ownerKey());
+        assertThrows(IOException.class, () -> ModpackOverrideArchive.validateOwners(bundle.configs(), List.of()));
+        assertThrows(IOException.class, () -> ModpackOverrideArchive.readBundle(new ByteArrayInputStream(zip(Map.of(path, "{\"changed\":true}", ModpackOverrideArchive.CONFIG_MANIFEST, manifest)))));
     }
 
     private static byte[] zip(Map<String, String> entries) throws IOException {

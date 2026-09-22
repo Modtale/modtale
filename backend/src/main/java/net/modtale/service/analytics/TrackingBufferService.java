@@ -34,11 +34,15 @@ public class TrackingBufferService {
             .build();
 
     public void logDownload(String projectId, String versionId, String authorId, boolean isApi, String clientIp) {
+        logDownload(projectId, versionId, authorId, isApi, clientIp, false);
+    }
+
+    public void logDownload(String projectId, String versionId, String authorId, boolean isApi, String clientIp, boolean isLauncher) {
         if (isDebounced(projectId, clientIp, "download")) {
             return;
         }
 
-        downloadBuffer.add(new DownloadEvent(projectId, versionId, authorId, isApi, clientIp));
+        downloadBuffer.add(new DownloadEvent(projectId, versionId, authorId, isApi, clientIp, isLauncher));
         pendingDownloadIncrements.merge(projectId, 1, Integer::sum);
         if (versionId != null) {
             pendingVersionDownloadIncrements.merge(projectId + "|||" + versionId, 1, Integer::sum);
@@ -147,7 +151,7 @@ public class TrackingBufferService {
         return count;
     }
 
-    record DownloadEvent(String projectId, String versionId, String authorId, boolean isApi, String clientIp) {
+    record DownloadEvent(String projectId, String versionId, String authorId, boolean isApi, String clientIp, boolean isLauncher) {
     }
 
     record MetricsBatch(Map<String, Integer> downloads, Map<String, Integer> versionDownloads) {

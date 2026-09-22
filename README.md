@@ -1,6 +1,10 @@
 <div align="center">
 <a href="https://modtale.net">
-<img src="logo.svg" alt="Modtale Logo" width="850" height="132">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="frontend/public/assets/logo_light.svg">
+    <source media="(prefers-color-scheme: light)" srcset="frontend/public/assets/logo.svg">
+    <img src="frontend/public/assets/logo.svg" alt="Modtale" width="560">
+  </picture>
 </a>
 
 <p align="center">
@@ -12,7 +16,7 @@
     <a href="https://astro.build"><img src="https://img.shields.io/badge/Astro-7.2-orange?style=flat-square&logo=astro" alt="Astro"></a>
     <a href="https://react.dev"><img src="https://img.shields.io/badge/React-19.0-blue?style=flat-square&logo=react" alt="React"></a>
     <a href="https://spring.io/projects/spring-boot"><img src="https://img.shields.io/badge/Spring_Boot-4.1-green?style=flat-square&logo=springboot" alt="Spring Boot"></a>
-    <a href="https://www.java.com"><img src="https://img.shields.io/badge/Java-21-red?style=flat-square&logo=openjdk" alt="Java 21"></a>
+    <a href="https://www.java.com"><img src="https://img.shields.io/badge/Java-26-red?style=flat-square&logo=openjdk" alt="Java 26"></a>
     <a href="https://www.mongodb.com"><img src="https://img.shields.io/badge/Database-MongoDB-forestgreen?style=flat-square&logo=mongodb" alt="MongoDB"></a>
     <a href="https://github.com/Modtale/modtale"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fghloc.vercel.app%2Fapi%2FModtale%2Fmodtale%2Fbadge&style=flat-square&logo=git" alt="Lines of Code"></a>
 </p>
@@ -60,7 +64,7 @@ Warden is a separate, closed-source security scanner service.
 |  | **React** | Interactive UI Components & SPA Routing (`react-router-dom`) |
 |  | **Tailwind CSS** | Utility-first, responsive, and dark-mode compatible styling |
 |  | **Lucide React** | Consistent, lightweight SVG iconography |
-| **Backend** | **Java 21** | Modern, high-performance server language |
+| **Backend** | **Java 26** | Modern, high-performance server language |
 |  | **Spring Boot** | Enterprise-grade REST API Framework |
 |  | **MongoDB** | Primary NoSQL document data store |
 |  | **Bucket4j / Caffeine** | Token-bucket rate limiting and high-speed in-memory caching |
@@ -92,7 +96,7 @@ Ready to contribute? Follow these steps to get Modtale running on your local mac
 ### Prerequisites
 
 * **Node.js:** v22.12.0 or higher.
-* **Java JDK:** Version 21 (Amazon Corretto, Eclipse Temurin, or standard OpenJDK).
+* **Java JDK:** Version 26 (Eclipse Temurin or standard OpenJDK).
 * **MongoDB:** A local instance running on port `27017`, or a valid MongoDB Atlas connection string.
 
 ### 1. Clone the Repository
@@ -186,7 +190,7 @@ npm run dev
 
 ### 5. Native Launcher
 
-The `launcher/` project is a native Java 21 JavaFX client for installing Modtale projects into a local Hytale mods folder. It does not use Electron.
+The `launcher/` project is a native Java 26 JavaFX client for installing Modtale projects into a local Hytale mods folder. It does not use Electron.
 
 ```bash
 cd launcher

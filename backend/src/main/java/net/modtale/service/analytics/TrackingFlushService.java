@@ -125,7 +125,7 @@ public class TrackingFlushService {
 
         Set<String> missingIds = new HashSet<>(projectIds);
         missingIds.removeAll(foundIds);
-        projectService.evictProjectDetailsCaches(projects, missingIds);
+        projectService.evictProjectCounterCaches(projects, missingIds);
     }
 
     private boolean flushMonthlyStats() {
@@ -149,9 +149,15 @@ public class TrackingFlushService {
 
             if (event.isApi()) {
                 projectAgg.api++;
-                platformAgg.api++;
             } else {
                 projectAgg.frontend++;
+            }
+
+            if (event.isLauncher()) {
+                platformAgg.launcher++;
+            } else if (event.isApi()) {
+                platformAgg.api++;
+            } else {
                 platformAgg.frontend++;
             }
 
@@ -189,6 +195,8 @@ public class TrackingFlushService {
                     .inc("totalDownloads", platformAgg.total)
                     .inc("apiDownloads", platformAgg.api)
                     .inc("frontendDownloads", platformAgg.frontend)
+                    .inc("launcherDownloads", platformAgg.launcher)
+                    .inc("days." + day + ".l", platformAgg.launcher)
                     .inc("days." + day + ".d", platformAgg.total)
                     .inc("days." + day + ".a", platformAgg.api)
                     .inc("days." + day + ".f", platformAgg.frontend);
@@ -281,6 +289,7 @@ public class TrackingFlushService {
     }
 
     private static class PlatformAgg {
+        private int launcher = 0;
         private int total = 0;
         private int api = 0;
         private int frontend = 0;

@@ -328,6 +328,8 @@ public class ProjectMapper {
             dto.setChangelog(version.getChangelog());
         }
         dto.setDependencies(toDependencyDTOs(version.getDependencies()));
+        dto.setManifestId(version.getManifestId());
+        dto.setModpackConfigs(version.getModpackConfigs());
         dto.setIncompatibleProjectIds(version.getIncompatibleProjectIds());
         dto.setChannel(version.getChannel());
         return dto;

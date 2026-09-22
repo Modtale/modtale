@@ -30,8 +30,13 @@ public record CreateWorldModListRequest(
             String source,
             String externalId,
             String externalUrl,
-            String icon
+            String icon,
+            String author,
+            String description
     ) {
+        public Item(String modId, String projectId, String slug, String title, String versionNumber, String classification, String source, String externalId, String externalUrl, String icon) {
+            this(modId, projectId, slug, title, versionNumber, classification, source, externalId, externalUrl, icon, "", "");
+        }
         public Item {
             modId = value(modId);
             projectId = value(projectId);
@@ -39,10 +44,13 @@ public record CreateWorldModListRequest(
             title = value(title);
             versionNumber = value(versionNumber);
             classification = value(classification);
+            if ("MOD".equalsIgnoreCase(classification)) classification = "PLUGIN";
             source = value(source);
             externalId = value(externalId);
             externalUrl = value(externalUrl);
             icon = value(icon);
+            author = value(author);
+            description = value(description);
         }
     }
 

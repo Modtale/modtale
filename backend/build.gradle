@@ -9,7 +9,7 @@ version = '0.0.1-SNAPSHOT'
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(26)
     }
 }
 
@@ -26,6 +26,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
     implementation 'org.springframework.session:spring-session-data-mongodb:4.0.0-M2'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
@@ -62,6 +63,6 @@ tasks.register('statusServiceJar', org.springframework.boot.gradle.tasks.bundlin
     description = 'Builds the detached Modtale status service jar.'
     archiveClassifier = 'status'
     mainClass = 'net.modtale.status.StatusServiceApplication'
-    targetJavaVersion = JavaVersion.VERSION_21
+    targetJavaVersion = JavaVersion.VERSION_26
     classpath = sourceSets.main.runtimeClasspath
 }

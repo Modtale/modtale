@@ -95,6 +95,15 @@ public class VersionCreationCommandHandler {
         }
 
         if (modpack) {
+            if (file != null && !file.isEmpty()) {
+                try (var input = file.getInputStream()) {
+                    var bundle = net.modtale.service.storage.ModpackOverrideArchive.readBundle(input);
+                    net.modtale.service.storage.ModpackOverrideArchive.validateOwners(bundle.configs(), version.getDependencies());
+                    version.setModpackConfigs(bundle.configs());
+                } catch (java.io.IOException ex) {
+                    throw new InvalidVersionRequestException(ex.getMessage());
+                }
+            }
             project.setChildProjectIds(simpleProjectIds);
         }
 

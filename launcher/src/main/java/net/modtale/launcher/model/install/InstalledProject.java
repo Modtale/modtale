@@ -22,7 +22,8 @@ public record InstalledProject(
         String source,
         String installType,
         boolean modpackUnlocked,
-        List<InstalledProjectReference> bundledProjects
+        List<InstalledProjectReference> bundledProjects,
+        List<net.modtale.launcher.model.worldlist.WorldListConfig> universeConfigs
 ) {
     public static final String SOURCE_MODTALE = "MODTALE";
     public static final String SOURCE_CURSEFORGE = "CURSEFORGE";
@@ -45,8 +46,17 @@ public record InstalledProject(
         dependencyProjectIds = dependencyProjectIds == null ? List.of() : List.copyOf(dependencyProjectIds);
         externalDependencies = externalDependencies == null ? List.of() : List.copyOf(externalDependencies);
         source = value(source, SOURCE_MODTALE);
+        universeConfigs = universeConfigs == null ? List.of() : List.copyOf(universeConfigs);
         bundledProjects = bundledProjects == null ? List.of() : List.copyOf(bundledProjects);
         installType = value(installType, defaultInstallType(classification, bundledProjects));
+    }
+
+    public InstalledProject(String projectId, String slug, String title, String classification, String installedVersion,
+            String installedVersionId, String gameVersion, Instant installedAt, Instant updatedAt, List<String> files,
+            List<String> dependencyProjectIds, List<String> externalDependencies, String source, String installType,
+            boolean modpackUnlocked, List<InstalledProjectReference> bundledProjects) {
+        this(projectId, slug, title, classification, installedVersion, installedVersionId, gameVersion, installedAt, updatedAt,
+                files, dependencyProjectIds, externalDependencies, source, installType, modpackUnlocked, bundledProjects, List.of());
     }
 
     public InstalledProject(
@@ -71,7 +81,7 @@ public record InstalledProject(
     public InstalledProject withModpackUnlocked(boolean unlocked) {
         return new InstalledProject(projectId, slug, title, classification, installedVersion, installedVersionId,
                 gameVersion, installedAt, updatedAt, files, dependencyProjectIds, externalDependencies,
-                source, installType, unlocked, bundledProjects);
+                source, installType, unlocked, bundledProjects, universeConfigs);
     }
 
     public List<String> bundledModtaleProjectIds() {

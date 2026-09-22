@@ -206,8 +206,8 @@ class VersionControllerTest {
         ByteArrayResource body = assertInstanceOf(ByteArrayResource.class, response.getBody());
         assertArrayEquals(new byte[]{9, 8, 7}, body.getByteArray());
 
-        verify(trackingService).logDownload("project-1", "version-1", "Ada", false, "198.51.100.8");
-        verify(trackingService).logDownload("dep-1", null, null, false, "198.51.100.8");
+        verify(trackingService).logDownload("project-1", "version-1", "Ada", false, "198.51.100.8", false);
+        verify(trackingService).logDownload("dep-1", null, null, false, "198.51.100.8", false);
     }
 
     @Test
@@ -239,13 +239,45 @@ class VersionControllerTest {
         assertArrayEquals(new byte[]{1, 2, 3, 4}, body.getByteArray());
 
         verify(storageService).download(version.getFileUrl());
-        verify(trackingService).logDownload("project-1", "version-1", "Ada", false, "203.0.113.5");
+        verify(trackingService).logDownload("project-1", "version-1", "Ada", false, "203.0.113.5", false);
+    }
+
+    @Test
+    void authorizedDirectDownloadsRedirectWithoutProxyingFileBytes() throws Exception {
+        Project project = project("project-1", "Sky Tools", ProjectClassification.DATA);
+        ProjectVersion version = version("version-1", "1.0.0");
+        version.setFileUrl("https://cdn.modtale.net/files/123456789012345678901234567890123456-actual.jar");
+
+        when(downloadTokenService.validateAndConsume("token")).thenReturn(
+                new DownloadTokenService.DownloadToken("project-1", "1.0.0", null, null, Instant.now().plusSeconds(60))
+        );
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(accessControlService.canReadProject(project, null)).thenReturn(true);
+        when(projectVersionAccessService.requireByVersionNumber(eq(project), eq("1.0.0"), eq((String) null), any())).thenReturn(version);
+        java.net.URI signed = java.net.URI.create("https://account.r2.cloudflarestorage.com/bucket/files/actual.jar?signature=test");
+        when(storageService.directDownloadUri(version.getFileUrl(), "actual.jar")).thenReturn(signed);
+        when(accountService.getCurrentUser((Authentication) isNull())).thenReturn(null);
+        when(analyticsEligibilityService.shouldCountProjectEngagement(project, null)).thenReturn(true);
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/download/token");
+        request.addHeader("Referer", "https://modtale.net/mod/project-1");
+        request.setRemoteAddr("203.0.113.5");
+
+        var response = controller.downloadWithToken("token", null, request);
+
+        assertEquals(302, response.getStatusCode().value());
+        assertEquals(signed, response.getHeaders().getLocation());
+        assertEquals("no-store", response.getHeaders().getCacheControl());
+        assertEquals("no-referrer", response.getHeaders().getFirst("Referrer-Policy"));
+        org.junit.jupiter.api.Assertions.assertNull(response.getBody());
+        verify(storageService, never()).download(anyString());
+        verify(trackingService).logDownload("project-1", "version-1", "Ada", false, "203.0.113.5", false);
     }
 
     @Test
     void downloadBundleTracksOnlySelectedDependencies() throws Exception {
         User currentUser = user("user-1");
-        Project project = project("project-1", "Sky Tools", ProjectClassification.MODPACK);
+        Project project = project("project-1", "Sky Tools", ProjectClassification.DATA);
         ProjectVersion version = version("version-1", "1.0.0");
         version.setDependencies(List.of(
                 new ProjectDependency("dep-a", "Dependency A", "1.0.0"),
@@ -277,10 +309,10 @@ class VersionControllerTest {
         ByteArrayResource body = assertInstanceOf(ByteArrayResource.class, response.getBody());
         assertArrayEquals(new byte[]{6, 5, 4}, body.getByteArray());
 
-        verify(trackingService).logDownload("project-1", "version-1", "Ada", true, "192.0.2.11");
-        verify(trackingService).logDownload("dep-b", null, "Ada", true, "192.0.2.11");
-        verify(trackingService, never()).logDownload(eq("dep-a"), isNull(), isNull(), anyBoolean(), anyString());
-        verify(trackingService, never()).logDownload(eq("dep-c"), isNull(), isNull(), anyBoolean(), anyString());
+        verify(trackingService).logDownload("project-1", "version-1", "Ada", true, "192.0.2.11", false);
+        verify(trackingService).logDownload("dep-b", null, "Ada", true, "192.0.2.11", false);
+        verify(trackingService, never()).logDownload(eq("dep-a"), isNull(), isNull(), anyBoolean(), anyString(), anyBoolean());
+        verify(trackingService, never()).logDownload(eq("dep-c"), isNull(), isNull(), anyBoolean(), anyString(), anyBoolean());
     }
 
     @Test
@@ -306,7 +338,7 @@ class VersionControllerTest {
         var response = controller.downloadWithToken("token", null, request);
 
         assertEquals(200, response.getStatusCode().value());
-        verify(trackingService, never()).logDownload(eq("project-1"), any(), any(), anyBoolean(), anyString());
+        verify(trackingService, never()).logDownload(eq("project-1"), any(), any(), anyBoolean(), anyString(), anyBoolean());
     }
 
     private static Project project(String id, String title, ProjectClassification classification) {

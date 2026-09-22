@@ -188,10 +188,11 @@ final class NativeDependencyModal {
         row.setAlignment(Pos.TOP_LEFT);
         VBox copy = new VBox(2);
         HBox.setHgrow(copy, Priority.ALWAYS);
-        Label description = new Label("Select dependencies to include in your bundle download.");
+        Label description = new Label("Choose dependencies to install with this mod.");
         description.getStyleClass().add("dependency-modal-description");
         description.setWrapText(true);
         copy.getChildren().add(description);
+
 
         Button toggle = new Button(selectedDependencyIds.size() == dependencies.size() ? "Deselect All" : "Select All");
         toggle.getStyleClass().add("dependency-modal-toggle-all");
@@ -281,7 +282,7 @@ final class NativeDependencyModal {
         HBox meta = new HBox(7);
         meta.getStyleClass().add("dependency-modal-meta");
         meta.setAlignment(Pos.CENTER_LEFT);
-        Label author = new Label("by " + dependencyAuthor(dependency));
+        Label author = new Label(dependency.isExternal() ? (dependency.isCurseForge() ? "CurseForge" : dependency.source()) : "by " + dependencyAuthor(dependency));
         author.getStyleClass().add("dependency-modal-author");
         meta.getChildren().add(author);
         if (!isBlank(dependency.versionNumber())) {
@@ -346,7 +347,7 @@ final class NativeDependencyModal {
         content.setAlignment(Pos.CENTER);
         content.setMaxWidth(Double.MAX_VALUE);
         HBox title = new HBox(8, LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 20),
-                new Label(selectedDependencyIds.isEmpty() ? "Download Project Only" : "Download Bundle"));
+                new Label(selectedDependencyIds.isEmpty() ? "Install mod only" : "Install with dependencies"));
         title.getStyleClass().add("dependency-modal-download-title");
         title.setAlignment(Pos.CENTER);
         title.setMaxWidth(Double.MAX_VALUE);
@@ -409,6 +410,7 @@ final class NativeDependencyModal {
             return;
         }
         List<String> missing = dependencies.stream()
+                .filter(dependency -> !dependency.isExternal())
                 .map(ProjectDependency::projectId)
                 .filter(id -> id != null && !id.isBlank())
                 .filter(id -> !metadata.containsKey(id) && requestedMetadataIds.add(id))
@@ -451,7 +453,6 @@ final class NativeDependencyModal {
         return version.dependencies().stream()
                 .filter(dependency -> dependency != null
                         && !dependency.isEmbedded()
-                        && !dependency.isExternal()
                         && !isBlank(dependency.projectId()))
                 .toList();
     }
