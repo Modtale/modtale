@@ -232,6 +232,7 @@ export const GalleryCarouselViewer: React.FC<GalleryCarouselViewerProps> = ({
                         style={{ animation: 'gallery-carousel-media 420ms ease both' }}
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                         allowFullScreen
+                        loading="lazy"
                     />
                 ) : (
                     <img

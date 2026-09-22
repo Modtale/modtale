@@ -19,6 +19,7 @@ import net.modtale.launcher.hytale.HytaleAuthSession;
 import net.modtale.launcher.settings.LauncherSettings;
 import net.modtale.launcher.ui.common.LauncherIcons;
 import net.modtale.launcher.ui.common.LauncherView;
+import net.modtale.launcher.ui.common.StatusModal;
 import net.modtale.launcher.ui.feedback.LauncherFeedback;
 import net.modtale.launcher.wardrobe.*;
 import static net.modtale.launcher.ui.common.LauncherUi.*;
@@ -50,7 +51,6 @@ public final class LauncherWardrobeController implements AutoCloseable {
     private final PauseTransition resizeReload = new PauseTransition(Duration.millis(150));
     private int cardColumns = 3;
     private final TextField search = new TextField();
-    private final ComboBox<String> filter = new ComboBox<>();
     private final Label selectedName = label("", "wardrobe-selected-title");
     private final Label selectedDetail = label("", "wardrobe-muted");
     private final Label status = label("", "wardrobe-muted");
@@ -117,16 +117,8 @@ public final class LauncherWardrobeController implements AutoCloseable {
         search.setPromptText("Search names and collections"); search.getStyleClass().add("wardrobe-search");
         search.setOnAction(e -> { page = 1; totalPages = 1; load(); }); HBox.setHgrow(search, Priority.ALWAYS);
         Button lookup = iconButton("Search", LauncherIcons.Glyph.SEARCH, () -> { page = 1; totalPages = 1; load(); });
-        filter.setId("wardrobe-saved-filter"); filter.setVisible(false); filter.setManaged(false);
-        filter.getStyleClass().add("wardrobe-filter"); filter.setOnAction(e -> { page = 1; totalPages = 1; load(); });
-        Button importLook = secondaryButton("Import outfit"); importLook.setOnAction(e -> importOutfit());
-        Button exportLook = secondaryButton("Export outfit"); exportLook.setOnAction(e -> exportOutfit());
-        searchRow.getChildren().addAll(search, lookup, filter);
+        searchRow.getChildren().addAll(search, lookup);
         feedCredit.setVisible(false); feedCredit.setManaged(false);
-        FlowPane fileActions = new FlowPane(10, 6, importLook, exportLook);
-        fileActions.visibleProperty().bind(feedCredit.visibleProperty().not());
-        fileActions.managedProperty().bind(fileActions.visibleProperty());
-        fileActions.getChildren().add(label("Outfits stay on this device. Share by exporting a file.", "wardrobe-muted"));
         cards.setId("wardrobe-cards"); cards.setMinWidth(0); cards.setHgap(14); cards.setVgap(14);
         rebuildCardColumns();
         resizeReload.setOnFinished(e -> { if (loaded && tab != Tab.CUSTOMIZE) load(); });
@@ -137,7 +129,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
             if (loaded && tab != Tab.CUSTOMIZE) resizeReload.playFromStart();
         });
         pagination.setId("wardrobe-pagination");
-        catalog.getChildren().addAll(searchRow, fileActions, status, cards, pagination, feedCredit);
+        catalog.getChildren().addAll(searchRow, status, cards, pagination, feedCredit);
         catalog.setMinWidth(0); HBox.setHgrow(catalog, Priority.ALWAYS);
         status.managedProperty().bind(status.visibleProperty()); status.setVisible(false);
         inspector.getStyleClass().add("wardrobe-inspector"); inspector.setPrefWidth(350); inspector.setMinWidth(290);
@@ -192,11 +184,6 @@ public final class LauncherWardrobeController implements AutoCloseable {
         root.getChildren().removeAll(columns, editor.view());
         if (value == Tab.CUSTOMIZE) { root.getChildren().add(editor.view()); editor.refresh(); return; }
         root.getChildren().add(columns);
-        filter.setOnAction(null);
-        filter.getItems().setAll("All looks", "Favorites", "Skins", "Capes");
-        filter.setVisible(value == Tab.SAVED); filter.setManaged(value == Tab.SAVED);
-        filter.getSelectionModel().selectFirst();
-        filter.setOnAction(e -> { page = 1; totalPages = 1; load(); });
         search.setPromptText("Search names and collections");
         load();
     }
@@ -207,51 +194,21 @@ public final class LauncherWardrobeController implements AutoCloseable {
         resizeReload.stop(); loaded = true;
         long generation = ++request;
         Tab requestedTab = tab; int requestedPage = page; int pageSize = cardColumns * 4;
-        String query = search.getText().trim(); String ordering = filter.getValue();
-        busy = true; setStatus("Loading looks…"); updateSelectionActions();
+        String query = search.getText().trim();
+        busy = true; setStatus(""); renderCards(); updateSelectionActions();
+        if (selected == null) preview.showLoading();
         CompletableFuture.supplyAsync(() -> {
             if (requestedTab == Tab.POPULAR) return popularPage(requestedPage, pageSize);
-            return pageItems(savedLooks(query, ordering), requestedPage, pageSize);
+            return pageItems(savedLooks(query), requestedPage, pageSize);
         }, executor).whenComplete((items, error) -> Platform.runLater(() -> {
             if (disposed || generation != request) return;
             busy = false;
+            if (selected == null) preview.clear();
             if (error != null) { totalPages = Math.max(1, page); entries = List.of(); renderCards(); setStatus(message(error) + (requestedTab == Tab.POPULAR ? "  Reopen Popular skins to retry." : "  Try Search again.")); }
             else { entries = items.items(); totalPages = requestedTab == Tab.POPULAR && items.hasNext()
                     ? Math.max(totalPages, items.totalPages()) : items.totalPages(); setStatus(""); renderCards(); if (selected == null && !entries.isEmpty()) select(entries.getFirst()); }
             updateSelectionActions();
         }));
-    }
-
-    private javafx.stage.FileChooser outfitChooser(String title) {
-        var chooser = new javafx.stage.FileChooser(); chooser.setTitle(title);
-        chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("Modtale outfit", "*.json"));
-        return chooser;
-    }
-
-    private void importOutfit() {
-        var file = outfitChooser("Import outfit").showOpenDialog(root.getScene().getWindow());
-        if (file == null) return;
-        feedback.runAsync("Importing outfit", () -> {
-            try {
-                var imported = LocalSkinLibrary.importFile(file.toPath());
-                var item = store.items().stream().filter(saved -> saved.id().equals(imported.id())).findFirst().orElse(imported);
-                store.saveItem(item); return item;
-            }
-            catch (java.io.IOException ex) { throw new java.io.UncheckedIOException(ex); }
-        }, item -> { if (!disposed) { load(); select(item); } });
-    }
-
-    private void exportOutfit() {
-        WardrobeItem item = selected;
-        if (item == null || !payload(item).path("skin").isObject()) {
-            feedback.showToast("Select an outfit", "Select a complete skin to export."); return;
-        }
-        var chooser = outfitChooser("Export outfit"); chooser.setInitialFileName("outfit.json");
-        var file = chooser.showSaveDialog(root.getScene().getWindow()); if (file == null) return;
-        feedback.runAsync("Exporting outfit", () -> {
-            try { LocalSkinLibrary.exportFile(file.toPath(), item); return true; }
-            catch (java.io.IOException ex) { throw new java.io.UncheckedIOException(ex); }
-        }, done -> feedback.showToast("Outfit exported", "Only cosmetic selections were included. No account details were exported."));
     }
 
     private record CardPage(List<WardrobeItem> items, boolean hasNext, int totalPages) {}
@@ -284,12 +241,10 @@ public final class LauncherWardrobeController implements AutoCloseable {
         }
     }
 
-    private List<WardrobeItem> savedLooks(String query, String ordering) {
+    private List<WardrobeItem> savedLooks(String query) {
         String needle = query.toLowerCase(Locale.ROOT);
         return store.items().stream().filter(i -> (i.name() + " " + i.collection()).toLowerCase(Locale.ROOT).contains(needle))
-                .filter(i -> !"Favorites".equals(ordering) || i.favorite())
-                .filter(i -> !"Skins".equals(ordering) || i.kind() == WardrobeItem.Kind.SKIN)
-                .filter(i -> !"Capes".equals(ordering) || i.kind() == WardrobeItem.Kind.CAPE).toList();
+                .toList();
     }
 
     private void goToPage(int target) {
@@ -304,6 +259,11 @@ public final class LauncherWardrobeController implements AutoCloseable {
     private void renderCards() {
         cards.getChildren().clear();
         updatePagination();
+        if (busy) {
+            for (int i = 0; i < cardColumns * 4; i++)
+                cards.add(WardrobeSkeleton.card(170, tab != Tab.SAVED), i % cardColumns, i / cardColumns);
+            return;
+        }
         for (int i = 0; i < entries.size(); i++) cards.add(card(entries.get(i)), i % cardColumns, i / cardColumns);
         if (entries.isEmpty()) {
             VBox empty = new VBox(12, LauncherIcons.icon(tab == Tab.SAVED ? LauncherIcons.Glyph.HEART : LauncherIcons.Glyph.SEARCH, 32),
@@ -320,25 +280,39 @@ public final class LauncherWardrobeController implements AutoCloseable {
         String url = tab == Tab.POPULAR ? popular.thumbnail(payload(item).path("skinId").asText()) : thumbnailResolver.apply(item);
         if (!url.isBlank()) image.setImage(new Image(url, 190, 190, true, true, true));
         Label fallback = label(item.kind() == WardrobeItem.Kind.CAPE ? "CAPE" : "SKIN", "wardrobe-card-fallback");
-        if (image.getImage() != null) fallback.visibleProperty().bind(image.getImage().errorProperty().or(image.getImage().progressProperty().lessThan(1)));
+
         StackPane visual = new StackPane(fallback, image); visual.getStyleClass().add("wardrobe-card-art");
+        StackPane skeleton = WardrobeSkeleton.portrait();
+        visual.getChildren().add(skeleton);
+        skeleton.setVisible(false);
+        if (image.getImage() != null) {
+            Image remote = image.getImage();
+            skeleton.visibleProperty().bind(remote.progressProperty().lessThan(1).and(remote.errorProperty().not()));
+            fallback.visibleProperty().bind(remote.errorProperty());
+        }
         JsonNode savedSkin = payload(item).path("skin");
         java.nio.file.Path assets = editor.assetsForPreview();
         if (url.isBlank() && java.nio.file.Files.isRegularFile(assets)) {
             CompletableFuture<Image> rendered = item.kind() == WardrobeItem.Kind.CAPE
                     ? localThumbnails.loadCape(assets, payload(item).path("cape").asText())
                     : savedSkin.isObject() ? localThumbnails.load(assets, savedSkin) : null;
-            if (rendered != null) rendered.thenAccept(thumbnail -> {
-                if (disposed) return;
-                image.setImage(thumbnail);
-                fallback.setVisible(false);
-            });
+            if (rendered != null) {
+                skeleton.setVisible(true); fallback.setVisible(false);
+                rendered.whenComplete((thumbnail, error) -> {
+                    if (disposed) return;
+                    skeleton.setVisible(false);
+                    fallback.setVisible(error != null);
+                    if (error == null) image.setImage(thumbnail);
+                });
+            }
         }
         visual.setPrefHeight(170); visual.setMinWidth(0); visual.setMaxWidth(Double.MAX_VALUE);
         String displayName = displayedLookName(item);
-        Label name = label(displayName, "wardrobe-card-name"); hideWhenEmpty(name); name.setMinWidth(0); name.setMaxWidth(Double.MAX_VALUE);
-        VBox contents = new VBox(8, visual, name);
-        if (tab == Tab.SAVED && !item.collection().isBlank()) contents.getChildren().add(label(item.collection(), "wardrobe-card-detail"));
+        VBox contents = new VBox(8, visual);
+        if (tab != Tab.SAVED) {
+            Label name = label(displayName, "wardrobe-card-name"); hideWhenEmpty(name); name.setMinWidth(0); name.setMaxWidth(Double.MAX_VALUE);
+            contents.getChildren().add(name);
+        }
         Button button = new Button(); button.setId("wardrobe-look-" + item.id()); button.setGraphic(contents); button.getStyleClass().add("wardrobe-card");
         button.setMinWidth(0); button.setMaxWidth(Double.MAX_VALUE);
         GridPane.setHgrow(button, Priority.ALWAYS); GridPane.setFillWidth(button, true);
@@ -350,7 +324,6 @@ public final class LauncherWardrobeController implements AutoCloseable {
         button.setAccessibleText(displayName.isBlank() ? "Preview skin " + ((page - 1) * cardColumns * 4 + entries.indexOf(entry) + 1) : "Preview " + displayName);
         button.pseudoClassStateChanged(SELECTED, selected != null && selected.id().equals(item.id()));
         button.setOnAction(e -> select(item));
-        if (tab == Tab.SAVED && item.favorite()) name.setText("♥  " + displayName);
         return button;
     }
 
@@ -358,14 +331,14 @@ public final class LauncherWardrobeController implements AutoCloseable {
         long ticket = ++selectionRequest;
         resolvingPopular = false;
         if (tab == Tab.POPULAR && !payload(item).path("skin").isObject()) {
-            selected = item; resolvingPopular = true; preview.clear(); selectedDetail.setText("Loading popular outfit…");
+            selected = item; resolvingPopular = true; preview.showLoading(); selectedDetail.setText("");
             updateSelectionActions();
             CompletableFuture.supplyAsync(() -> popular.download(payload(item).path("skinId").asText()), executor)
                     .whenComplete((downloaded, error) -> Platform.runLater(() -> {
                         if (disposed || ticket != selectionRequest || tab != Tab.POPULAR) return;
                         resolvingPopular = false;
                         if (error == null) select(downloaded);
-                        else { selected = null; selectedDetail.setText(message(error)); updateSelectionActions(); }
+                        else { preview.clear(); selected = null; selectedDetail.setText(message(error)); updateSelectionActions(); }
                     }));
             return;
         }
@@ -376,7 +349,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
         if (java.nio.file.Files.isRegularFile(assets)) {
             if (item.kind() == WardrobeItem.Kind.SKIN && payload.path("skin").isObject()) { preview.focusCategory(""); preview.showLocal(assets, payload.path("skin")); }
             else if (item.kind() == WardrobeItem.Kind.CAPE) {
-                preview.clear();
+                preview.showLoading();
                 CompletableFuture.supplyAsync(() -> {
                     try {
                         var skin = new CosmeticCatalogClient(assets).defaultSkin();
@@ -385,7 +358,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
                 }, executor).whenComplete((skin, error) -> Platform.runLater(() -> {
                     if (disposed || selected != item) return;
                     if (error == null) { preview.focusCategory("cape"); preview.showLocal(assets, skin); }
-                    else selectedDetail.setText(message(error));
+                    else { preview.clear(); selectedDetail.setText(message(error)); }
                 }));
             } else { preview.clear(); selectedDetail.setText("This old saved look needs an outfit file before it can be previewed."); }
         } else { preview.clear(); selectedDetail.setText("Set your Hytale game directory in Settings to preview this look."); }
@@ -430,43 +403,47 @@ public final class LauncherWardrobeController implements AutoCloseable {
     private void saveSelection() {
         if (selected == null || resolvingPopular) return;
         WardrobeItem item = store.items().stream().filter(saved -> saved.id().equals(selected.id())).findFirst().orElse(selected);
-        Dialog<ButtonType> dialog = new Dialog<>(); dialog.setTitle("Save look");
-        dialog.getDialogPane().getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
-        dialog.getDialogPane().getStyleClass().add("wardrobe-dialog");
-        if (root.getScene() != null) dialog.initOwner(root.getScene().getWindow());
+        if (root.getScene() == null || !(root.getScene().getRoot() instanceof StackPane host)) return;
         TextField name = new TextField(lookName(item).isBlank() ? "My look" : lookName(item)); TextField collection = new TextField(item.collection());
         name.setPromptText("Look name"); collection.setPromptText("Collection (optional)");
+        name.getStyleClass().add("wardrobe-search"); collection.getStyleClass().add("wardrobe-search");
+        name.setAccessibleText("Look name"); collection.setAccessibleText("Collection");
         CheckBox favorite = new CheckBox("Add to favorites"); favorite.setSelected(item.favorite());
-        VBox form = new VBox(12, new Label("Name"), name, new Label("Collection"), collection, favorite);
-        form.setPrefWidth(360); dialog.getDialogPane().setContent(form);
-        ButtonType saveType = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
+        favorite.getStyleClass().add("native-check");
+        VBox form = new VBox(12, label("Name", "wardrobe-muted"), name,
+                label("Collection", "wardrobe-muted"), collection, favorite);
         boolean existing = store.items().stream().anyMatch(i -> i.id().equals(item.id()));
-        ButtonType removeType = new ButtonType("Remove saved look", ButtonBar.ButtonData.LEFT);
-        dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
-        if (existing) dialog.getDialogPane().getButtonTypes().add(removeType);
-        dialog.getDialogPane().lookupButton(saveType).disableProperty().bind(name.textProperty().isEmpty());
-        dialog.showAndWait().ifPresent(choice -> {
-            try {
-                if (choice == saveType) {
-                    WardrobeItem saved = new WardrobeItem(item.id(), item.kind(), name.getText(), favorite.isSelected(), collection.getText(), item.payload());
-                    feedback.runAsync("Saving look", () -> {
-                        WardrobeItem hydrated = api.hydrate(saved);
-                        try { store.saveItem(hydrated); } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
-                        return hydrated;
-                    }, hydrated -> {
-                        if (selected != null && selected.id().equals(item.id())) {
-                            if (tab == Tab.SAVED) selected = hydrated;
-                            selectedName.setText(displayedLookName(selected));
-                        }
-                        if (tab == Tab.SAVED) load(); updateSelectionActions();
-                        feedback.showToast("Look saved", "Ready whenever you are.");
-                    });
-                } else if (choice == removeType) feedback.runAsync("Removing saved look", () -> {
-                    try { store.removeItem(item.id()); return true; } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
-                }, done -> { if (tab == Tab.SAVED) load(); updateSelectionActions(); });
-                if (tab == Tab.SAVED) load(); updateSelectionActions();
-            } catch (Exception e) { feedback.showToast("Could not save look", message(e)); }
-        });
+        var invalid = javafx.beans.binding.Bindings.createBooleanBinding(
+                () -> name.getText().isBlank(), name.textProperty());
+        Platform.runLater(() -> { name.requestFocus(); name.selectAll(); });
+        StatusModal.Result choice = StatusModal.builder(() -> host)
+                .type(StatusModal.Type.INFO)
+                .title(existing ? "Edit saved look" : "Save look")
+                .message("Keep this outfit in Saved looks.")
+                .content(form).actionLabel("Save").actionIcon(LauncherIcons.Glyph.SAVE)
+                .secondaryLabel(existing ? "Remove saved look" : "Cancel")
+                .actionDisabled(invalid).showAndWait();
+        if (choice == StatusModal.Result.CLOSED || (!existing && choice == StatusModal.Result.SECONDARY)) return;
+        try {
+            if (choice == StatusModal.Result.PRIMARY) {
+                WardrobeItem saved = new WardrobeItem(item.id(), item.kind(), name.getText(), favorite.isSelected(), collection.getText(), item.payload());
+                feedback.runAsync("Saving look", () -> {
+                    WardrobeItem hydrated = api.hydrate(saved);
+                    try { store.saveItem(hydrated); } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
+                    return hydrated;
+                }, hydrated -> {
+                    if (selected != null && selected.id().equals(item.id())) {
+                        if (tab == Tab.SAVED) selected = hydrated;
+                        selectedName.setText(displayedLookName(selected));
+                    }
+                    if (tab == Tab.SAVED) load(); updateSelectionActions();
+                    feedback.showToast("Look saved", "Ready whenever you are.");
+                });
+            } else if (existing && choice == StatusModal.Result.SECONDARY) feedback.runAsync("Removing saved look", () -> {
+                try { store.removeItem(item.id()); return true; } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
+            }, done -> { if (tab == Tab.SAVED) load(); updateSelectionActions(); });
+            if (tab == Tab.SAVED) load(); updateSelectionActions();
+        } catch (Exception e) { feedback.showToast("Could not save look", message(e)); }
     }
 
     private String displayedLookName(WardrobeItem item) { return lookName(item); }

@@ -55,6 +55,25 @@ class LauncherWardrobeControllerTest {
         fx(() -> { Platform.setImplicitExit(false); return null; });
     }
 
+    @Test void loadingCardsReplaceEmptyStateAndDisappearWhenSavedLooksArrive() throws Exception {
+        try (Harness h = new Harness()) {
+            h.store.saveItem(SKIN);
+            fx(() -> {
+                button(h.root(), "Saved looks").fire();
+                var grid = (javafx.scene.layout.GridPane) h.root().lookup("#wardrobe-cards");
+                assertEquals(grid.getColumnConstraints().size() * 4, grid.getChildren().size());
+                assertTrue(grid.getChildren().stream().allMatch(n -> n.getStyleClass().contains("wardrobe-skeleton-card") && n.isMouseTransparent()));
+                assertTrue(gridCards(h).isEmpty());
+                return null;
+            });
+            await(() -> {
+                h.root().applyCss(); ((javafx.scene.Parent) h.root()).layout();
+                return card(h.root(), "Catalog skin") != null
+                        && h.root().lookupAll(".wardrobe-skeleton-card").isEmpty();
+            });
+        }
+    }
+
     @Test void capePreviewTracksAccountSwitchAndMatchesExplicitApplyTarget() throws Exception {
         try (Harness h = new Harness()) {
             h.store.saveItem(CAPE);
@@ -119,15 +138,16 @@ class LauncherWardrobeControllerTest {
             FutureTask<Void> opened = submitFx(() -> { button(h.root(), "Edit saved look").fire(); return null; });
             await(() -> h.dialog() != null);
             fx(() -> {
-                DialogPane dialog = h.dialog();
+                Node dialog = h.dialog();
                 List<TextField> fields = nodes(dialog, TextField.class);
                 assertEquals(2, fields.size());
                 assertEquals(saved.name(), fields.get(0).getText());
                 assertEquals(saved.collection(), fields.get(1).getText());
                 assertTrue(nodes(dialog, CheckBox.class).getFirst().isSelected());
+                fields.get(0).setText("   ");
+                assertTrue(((Button) dialog.lookup(".status-modal-primary")).isDisabled());
                 fields.get(0).setText("Renamed favorite");
-                var save = dialog.getButtonTypes().stream().filter(t -> t.getButtonData() == ButtonBar.ButtonData.OK_DONE).findFirst().orElseThrow();
-                ((Button) dialog.lookupButton(save)).fire();
+                ((Button) dialog.lookup(".status-modal-primary")).fire();
                 return null;
             });
             opened.get(5, TimeUnit.SECONDS);
@@ -143,6 +163,27 @@ class LauncherWardrobeControllerTest {
             assertTrue(persisted.favorite());
             assertEquals(saved.id(), persisted.id());
             assertEquals(saved.payload(), persisted.payload());
+
+            FutureTask<Void> dismissed = submitFx(() -> { button(h.root(), "Edit saved look").fire(); return null; });
+            await(() -> h.dialog() != null);
+            fx(() -> {
+                nodes(h.dialog(), TextField.class).getFirst().setText("Unsaved change");
+                ((Button) h.dialog().lookup(".status-modal-close")).fire();
+                return null;
+            });
+            dismissed.get(5, TimeUnit.SECONDS);
+            assertEquals("Renamed favorite", h.store.items().getFirst().name());
+
+            FutureTask<Void> removed = submitFx(() -> { button(h.root(), "Edit saved look").fire(); return null; });
+            await(() -> h.dialog() != null);
+            fx(() -> {
+                Button remove = (Button) h.dialog().lookup(".status-modal-secondary");
+                assertEquals("Remove saved look", remove.getText());
+                remove.fire();
+                return null;
+            });
+            removed.get(5, TimeUnit.SECONDS);
+            await(() -> h.store.items().isEmpty());
         }
     }
 
@@ -155,8 +196,7 @@ class LauncherWardrobeControllerTest {
             fx(() -> { h.root().setManaged(false); ((javafx.scene.layout.Region) h.root()).resize(1750, 800); button(h.root(), "Popular skins").fire(); h.controller.refresh(); return null; });
             await(() -> gridReady(h));
             fx(() -> {
-                assertFalse(h.root().lookup("#wardrobe-saved-filter").isVisible(), "Skin sort dropdown must be hidden");
-                assertFalse(h.root().lookup("#wardrobe-saved-filter").isManaged());
+                assertNull(h.root().lookup("#wardrobe-saved-filter"), "Look filter dropdown must be absent");
                 assertGridWidth(h); return null;
             });
             // The explicit layout above can trigger responsive repagination.
@@ -201,13 +241,13 @@ class LauncherWardrobeControllerTest {
                     && !h.root().lookup("#wardrobe-pagination").isDisabled());
             String first = fx(() -> gridCards(h).getFirst().getAccessibleText());
             fx(() -> { button(h.root(), "Page 2").fire(); return null; });
-            await(() -> !gridCards(h).getFirst().getAccessibleText().equals(first)
+            await(() -> !gridCards(h).isEmpty() && !gridCards(h).getFirst().getAccessibleText().equals(first)
                     && !h.root().lookup("#wardrobe-pagination").isDisabled());
             fx(() -> {
                 var input = (TextField) h.root().lookup("#wardrobe-pagination").lookup(".pagination-jump-input");
                 input.setText("1"); button(h.root(), "Go to page").fire(); return null;
             });
-            await(() -> gridCards(h).getFirst().getAccessibleText().equals(first));
+            await(() -> !gridCards(h).isEmpty() && gridCards(h).getFirst().getAccessibleText().equals(first));
             h.gateway.skins = List.of(SKIN);
             fx(() -> { button(h.root(), "Popular skins").fire(); return null; });
             await(() -> h.root().lookup("#wardrobe-look-" + SKIN.id()) != null);
@@ -297,6 +337,7 @@ class LauncherWardrobeControllerTest {
                 .filter(b -> b.getStyleClass().contains("wardrobe-card")).toList();
     }
     private static boolean gridReady(Harness h) {
+        h.root().applyCss(); ((javafx.scene.Parent) h.root()).layout();
         var grid = (javafx.scene.layout.GridPane)h.root().lookup("#wardrobe-cards");
         return gridCards(h).size() == grid.getColumnConstraints().size() * 4 && !button(h.root(), "Next Page").isDisabled();
     }
@@ -341,17 +382,15 @@ class LauncherWardrobeControllerTest {
             });
         }
         Node root() { return controller.view(); }
-        DialogPane dialog() {
-            return Window.getWindows().stream().filter(Window::isShowing)
-                    .filter(w -> w instanceof Stage s && s.getOwner() == stage)
-                    .flatMap(w -> nodes(w.getScene().getRoot(), DialogPane.class).stream()).findFirst().orElse(null);
+        Node dialog() {
+            return stage.getScene().getRoot().lookup(".status-modal");
         }
         @Override public void close() throws Exception {
             popular.release.countDown();
             gateway.releaseHydration.countDown();
             fx(() -> {
-                DialogPane dialog = dialog();
-                if (dialog != null) ((Button)dialog.lookupButton(ButtonType.CANCEL)).fire();
+                Node dialog = dialog();
+                if (dialog != null) ((Button)dialog.lookup(".status-modal-close")).fire();
                 controller.close(); stage.hide(); return null;
             });
             executor.shutdownNow();
