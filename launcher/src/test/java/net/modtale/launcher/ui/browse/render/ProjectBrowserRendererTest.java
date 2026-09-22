@@ -12,20 +12,22 @@ import org.junit.jupiter.api.Test;
 class ProjectBrowserRendererTest {
 
     @Test
-    void gridUsesTwoOrThreeColumnsAcrossBreakpoints() {
-        assertEquals(2, rendererForWidth(719).columnsForView(ProjectCardViewStyle.GRID));
-        assertEquals(2, rendererForWidth(1319).columnsForView(ProjectCardViewStyle.GRID));
-        assertEquals(3, rendererForWidth(1320).columnsForView(ProjectCardViewStyle.GRID));
-        assertEquals(12, rendererForWidth(719).pageSizeForView(ProjectCardViewStyle.GRID));
-        assertEquals(12, rendererForWidth(1320).pageSizeForView(ProjectCardViewStyle.GRID));
+    void gridUsesTheWebColumnBreakpoints() {
+        assertEquals(1, rendererForWidth(543).columnsForView(ProjectCardViewStyle.GRID));
+        assertEquals(2, rendererForWidth(544).columnsForView(ProjectCardViewStyle.GRID));
+        assertEquals(2, rendererForWidth(831).columnsForView(ProjectCardViewStyle.GRID));
+        assertEquals(3, rendererForWidth(832).columnsForView(ProjectCardViewStyle.GRID));
+        assertEquals(12, rendererForWidth(543).pageSizeForView(ProjectCardViewStyle.GRID));
+        assertEquals(12, rendererForWidth(832).pageSizeForView(ProjectCardViewStyle.GRID));
     }
 
     @Test
-    void compactUsesTwoOrThreeColumnsAcrossBreakpoints() {
-        assertEquals(2, rendererForWidth(719).columnsForView(ProjectCardViewStyle.COMPACT));
-        assertEquals(3, rendererForWidth(1120).columnsForView(ProjectCardViewStyle.COMPACT));
-        assertEquals(45, rendererForWidth(719).pageSizeForView(ProjectCardViewStyle.COMPACT));
-        assertEquals(45, rendererForWidth(1120).pageSizeForView(ProjectCardViewStyle.COMPACT));
+    void compactUsesTheSameColumnBreakpoints() {
+        assertEquals(1, rendererForWidth(543).columnsForView(ProjectCardViewStyle.COMPACT));
+        assertEquals(2, rendererForWidth(544).columnsForView(ProjectCardViewStyle.COMPACT));
+        assertEquals(3, rendererForWidth(832).columnsForView(ProjectCardViewStyle.COMPACT));
+        assertEquals(45, rendererForWidth(543).pageSizeForView(ProjectCardViewStyle.COMPACT));
+        assertEquals(45, rendererForWidth(832).pageSizeForView(ProjectCardViewStyle.COMPACT));
     }
 
     @Test
@@ -37,8 +39,8 @@ class ProjectBrowserRendererTest {
 
     @Test
     void layoutUsesConstrainedWidthWhenRenderedResultsAreStale() {
-        assertEquals(2, rendererForWidths(1320, 936, 936).columnsForView(ProjectCardViewStyle.GRID));
-        assertEquals(3, rendererForWidths(936, 1320, 1320).columnsForView(ProjectCardViewStyle.GRID));
+        assertEquals(2, rendererForWidths(832, 719, 719).columnsForView(ProjectCardViewStyle.GRID));
+        assertEquals(3, rendererForWidths(719, 832, 832).columnsForView(ProjectCardViewStyle.GRID));
     }
 
     @Test

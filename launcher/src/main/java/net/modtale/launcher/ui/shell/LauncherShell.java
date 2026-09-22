@@ -72,13 +72,16 @@ public final class LauncherShell {
 
     private static final LauncherI18n I18N = LauncherI18n.get();
 
-    private static final double DEFAULT_STAGE_WIDTH = 1320;
+    private static final double DEFAULT_STAGE_WIDTH = 1440;
     private static final double DEFAULT_STAGE_HEIGHT = 880;
     private static final double MIN_STAGE_WIDTH = 640;
     private static final double MIN_STAGE_HEIGHT = 480;
     private static final double STAGE_SCREEN_MARGIN = 48;
     private static final double WORKSPACE_SPACING = 44;
     private static final double RAIL_WIDTH = 238;
+    private static final double LAUNCHER_CONTENT_MAX_WIDTH = 1792;
+    // The Play cards sit inside 16px of padding and a 12px scroll gutter.
+    private static final double PLAY_SIDEBAR_TRAILING_SPACE = 28;
     private static final double BRAND_LOGO_HOVER_SCALE = 1.06;
     private static final Duration BRAND_LOGO_SCALE_DURATION = Duration.millis(140);
     private static final double NAVBAR_TEXT_FONT_SIZE = 14;
@@ -477,9 +480,12 @@ public final class LauncherShell {
             return Insets.EMPTY;
         }
         Insets pageInsets = LauncherLayout.WORKSPACE_INSETS;
-        boolean boundedWorkspace = view == LauncherView.DISCOVER || view == LauncherView.LIBRARY
+        boolean boundedWorkspace = view == LauncherView.PLAY || view == LauncherView.DISCOVER || view == LauncherView.LIBRARY
                 || view == LauncherView.WARDROBE || view == LauncherView.SETTINGS;
         double right = boundedWorkspace ? pageInsets.getRight() : 0;
+        if (view == LauncherView.PLAY) {
+            right -= PLAY_SIDEBAR_TRAILING_SPACE;
+        }
         return new Insets(pageInsets.getTop(), right, 0, pageInsets.getLeft());
     }
 
@@ -490,7 +496,7 @@ public final class LauncherShell {
         Insets pageInsets = LauncherLayout.WORKSPACE_INSETS;
         boolean launcherPage = view == LauncherView.PLAY || view == LauncherView.LIBRARY || view == LauncherView.WARDROBE;
         double top = view == LauncherView.DISCOVER || launcherPage ? 0 : 16;
-        boolean boundedWorkspace = view == LauncherView.DISCOVER || view == LauncherView.LIBRARY
+        boolean boundedWorkspace = view == LauncherView.PLAY || view == LauncherView.DISCOVER || view == LauncherView.LIBRARY
                 || view == LauncherView.WARDROBE || view == LauncherView.SETTINGS;
         double right = boundedWorkspace ? 0 : pageInsets.getRight();
         return new Insets(top, right, pageInsets.getBottom(), 0);
@@ -523,8 +529,12 @@ public final class LauncherShell {
         navigation.getChildren().clear();
         buttons.add(browseButton);
         HBox bar = LauncherNavbar.build(brand, buttons, notificationsMenu.button(), accountMenu.button());
-        if (undecoratedWindow) configureWindowDrag(bar);
-        return bar;
+        bar.getStyleClass().remove("navbar");
+        bar.setMaxWidth(LAUNCHER_CONTENT_MAX_WIDTH);
+        StackPane header = new StackPane(bar);
+        header.getStyleClass().add("navbar");
+        if (undecoratedWindow) configureWindowDrag(header);
+        return header;
     }
 
     private Node windowControls() {
@@ -839,6 +849,8 @@ public final class LauncherShell {
                 0, LauncherLayout.WORKSPACE_INSETS.getLeft()));
         workspaceRoot.setFillHeight(true);
         workspaceRoot.setMaxHeight(Double.MAX_VALUE);
+        workspaceRoot.setMaxWidth(LAUNCHER_CONTENT_MAX_WIDTH);
+        BorderPane.setAlignment(workspaceRoot, Pos.TOP_CENTER);
         railNode = rail();
         workspaceRoot.getChildren().addAll(railNode, content());
         return workspaceRoot;

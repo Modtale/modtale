@@ -55,4 +55,11 @@ class LauncherShellTest {
     void libraryBodyDoesNotReserveTheNavbarRightInsetTwice() {
         assertEquals(0, LauncherShell.contentBodyInsetsFor(LauncherView.LIBRARY).getRight());
     }
+
+    @Test
+    void playSidebarEndsAtTheNavbarRightInset() {
+        assertEquals(LauncherLayout.navbarRightInset(),
+                LauncherShell.workspaceInsetsFor(LauncherView.PLAY).getRight() + 28);
+        assertEquals(0, LauncherShell.contentBodyInsetsFor(LauncherView.PLAY).getRight());
+    }
 }
