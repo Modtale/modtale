@@ -65,9 +65,16 @@ export const ExternalLinkProvider: React.FC<{ children: React.ReactNode }> = ({ 
                 const currentHost = window.location.hostname;
                 const targetHost = url.hostname;
 
-                if (targetHost === currentHost || targetHost.endsWith('modtale.net')) {
+                if (targetHost === currentHost || targetHost === 'modtale.net' || targetHost.endsWith('.modtale.net')) {
                     return;
                 }
+
+                // Trust only installer assets from official launcher releases, never GitHub broadly.
+                const isLauncherInstaller = url.origin === 'https://github.com'
+                    && !url.username && !url.password && !url.search && !url.hash
+                    && /^\/Modtale\/modtale\/releases\/download\/launcher-(?:(?:stable|develop)-)?v[0-9][A-Za-z0-9.-]*\/[A-Za-z0-9._-]+\.(?:exe|msi|dmg|pkg|AppImage)$/.test(url.pathname);
+
+                if (isLauncherInstaller) return;
 
                 const trustedUrls = [
                     'https://discord.gg/pcfadvyqve',
