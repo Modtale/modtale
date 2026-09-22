@@ -1352,14 +1352,16 @@ public final class LauncherPlayController {
 
     private void updateHytaleProfileAvatar(StackPane avatar, String username, double size, String profileUuid) {
         updateImageAvatar(avatar, username, size, PROFILE_AVATAR_RADIUS, "");
+        double inset = avatar == identityAvatar ? 3 : 0;
+        double imageSize = size - inset * 2;
         ImageView image = new ImageView();
-        image.setFitWidth(size);
-        image.setFitHeight(size);
+        image.setFitWidth(imageSize);
+        image.setFitHeight(imageSize);
         image.setPreserveRatio(true);
         image.setSmooth(true);
-        Rectangle clip = new Rectangle(size, size);
-        clip.setArcWidth(PROFILE_AVATAR_RADIUS * 2);
-        clip.setArcHeight(PROFILE_AVATAR_RADIUS * 2);
+        Rectangle clip = new Rectangle(imageSize, imageSize);
+        clip.setArcWidth((PROFILE_AVATAR_RADIUS - inset) * 2);
+        clip.setArcHeight((PROFILE_AVATAR_RADIUS - inset) * 2);
         image.setClip(clip);
         avatar.getChildren().add(image);
         if (avatar == identityAvatar) HytaleProfileAvatarImages.fitVisibleContent(image);
