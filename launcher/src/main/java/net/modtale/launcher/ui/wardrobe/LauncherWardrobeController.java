@@ -120,14 +120,8 @@ public final class LauncherWardrobeController implements AutoCloseable {
         Button lookup = iconButton("Search", LauncherIcons.Glyph.SEARCH, () -> { page = 1; totalPages = 1; load(); });
         filter.setId("wardrobe-saved-filter"); filter.setVisible(false); filter.setManaged(false);
         filter.getStyleClass().add("wardrobe-filter"); filter.setOnAction(e -> { page = 1; totalPages = 1; load(); });
-        Button importLook = secondaryButton("Import outfit"); importLook.setOnAction(e -> importOutfit());
-        Button exportLook = secondaryButton("Export outfit"); exportLook.setOnAction(e -> exportOutfit());
         searchRow.getChildren().addAll(search, lookup, filter);
         feedCredit.setVisible(false); feedCredit.setManaged(false);
-        FlowPane fileActions = new FlowPane(10, 6, importLook, exportLook);
-        fileActions.visibleProperty().bind(feedCredit.visibleProperty().not());
-        fileActions.managedProperty().bind(fileActions.visibleProperty());
-        fileActions.getChildren().add(label("Outfits stay on this device. Share by exporting a file.", "wardrobe-muted"));
         cards.setId("wardrobe-cards"); cards.setMinWidth(0); cards.setHgap(14); cards.setVgap(14);
         rebuildCardColumns();
         resizeReload.setOnFinished(e -> { if (loaded && tab != Tab.CUSTOMIZE) load(); });
@@ -138,7 +132,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
             if (loaded && tab != Tab.CUSTOMIZE) resizeReload.playFromStart();
         });
         pagination.setId("wardrobe-pagination");
-        catalog.getChildren().addAll(searchRow, fileActions, status, cards, pagination, feedCredit);
+        catalog.getChildren().addAll(searchRow, status, cards, pagination, feedCredit);
         catalog.setMinWidth(0); HBox.setHgrow(catalog, Priority.ALWAYS);
         status.managedProperty().bind(status.visibleProperty()); status.setVisible(false);
         inspector.getStyleClass().add("wardrobe-inspector"); inspector.setPrefWidth(350); inspector.setMinWidth(290);
@@ -221,38 +215,6 @@ public final class LauncherWardrobeController implements AutoCloseable {
                     ? Math.max(totalPages, items.totalPages()) : items.totalPages(); setStatus(""); renderCards(); if (selected == null && !entries.isEmpty()) select(entries.getFirst()); }
             updateSelectionActions();
         }));
-    }
-
-    private javafx.stage.FileChooser outfitChooser(String title) {
-        var chooser = new javafx.stage.FileChooser(); chooser.setTitle(title);
-        chooser.getExtensionFilters().add(new javafx.stage.FileChooser.ExtensionFilter("Modtale outfit", "*.json"));
-        return chooser;
-    }
-
-    private void importOutfit() {
-        var file = outfitChooser("Import outfit").showOpenDialog(root.getScene().getWindow());
-        if (file == null) return;
-        feedback.runAsync("Importing outfit", () -> {
-            try {
-                var imported = LocalSkinLibrary.importFile(file.toPath());
-                var item = store.items().stream().filter(saved -> saved.id().equals(imported.id())).findFirst().orElse(imported);
-                store.saveItem(item); return item;
-            }
-            catch (java.io.IOException ex) { throw new java.io.UncheckedIOException(ex); }
-        }, item -> { if (!disposed) { load(); select(item); } });
-    }
-
-    private void exportOutfit() {
-        WardrobeItem item = selected;
-        if (item == null || !payload(item).path("skin").isObject()) {
-            feedback.showToast("Select an outfit", "Select a complete skin to export."); return;
-        }
-        var chooser = outfitChooser("Export outfit"); chooser.setInitialFileName("outfit.json");
-        var file = chooser.showSaveDialog(root.getScene().getWindow()); if (file == null) return;
-        feedback.runAsync("Exporting outfit", () -> {
-            try { LocalSkinLibrary.exportFile(file.toPath(), item); return true; }
-            catch (java.io.IOException ex) { throw new java.io.UncheckedIOException(ex); }
-        }, done -> feedback.showToast("Outfit exported", "Only cosmetic selections were included. No account details were exported."));
     }
 
     private record CardPage(List<WardrobeItem> items, boolean hasNext, int totalPages) {}
