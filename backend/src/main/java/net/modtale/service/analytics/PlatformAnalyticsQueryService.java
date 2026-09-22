@@ -36,6 +36,7 @@ public class PlatformAnalyticsQueryService {
 
         PlatformAnalyticsSummary summary = new PlatformAnalyticsSummary();
         Map<LocalDate, Integer> downloadSeries = new HashMap<>();
+        Map<LocalDate, Integer> launcherSeries = new HashMap<>();
         Map<LocalDate, Integer> apiSeries = new HashMap<>();
         Map<LocalDate, Integer> viewSeries = new HashMap<>();
         Map<LocalDate, Integer> projectSeries = new HashMap<>();
@@ -46,6 +47,8 @@ public class PlatformAnalyticsQueryService {
         long previousDownloads = 0;
         long currentViews = 0;
         long previousViews = 0;
+        long currentLauncherDownloads = 0;
+        long previousLauncherDownloads = 0;
         long currentApiDownloads = 0;
         long previousApiDownloads = 0;
         long currentFrontendDownloads = 0;
@@ -71,7 +74,8 @@ public class PlatformAnalyticsQueryService {
 
                 PlatformMonthlyStats.DayStats dayStats = entry.getValue();
                 if (!date.isBefore(window.chartStart()) && !date.isAfter(window.end())) {
-                    downloadSeries.put(date, dayStats.getD());
+                    downloadSeries.put(date, dayStats.getD() - dayStats.getA() - dayStats.getL());
+                    launcherSeries.put(date, dayStats.getL());
                     apiSeries.put(date, dayStats.getA());
                     viewSeries.put(date, dayStats.getV());
                     projectSeries.put(date, dayStats.getN());
@@ -82,6 +86,7 @@ public class PlatformAnalyticsQueryService {
                 if (!date.isBefore(window.start()) && !date.isAfter(window.end())) {
                     currentDownloads += dayStats.getD();
                     currentViews += dayStats.getV();
+                    currentLauncherDownloads += dayStats.getL();
                     currentApiDownloads += dayStats.getA();
                     currentFrontendDownloads += dayStats.getF();
                     currentProjects += dayStats.getN();
@@ -90,6 +95,7 @@ public class PlatformAnalyticsQueryService {
                 } else if (!date.isBefore(window.comparisonStart()) && !date.isAfter(window.comparisonEnd())) {
                     previousDownloads += dayStats.getD();
                     previousViews += dayStats.getV();
+                    previousLauncherDownloads += dayStats.getL();
                     previousApiDownloads += dayStats.getA();
                     previousFrontendDownloads += dayStats.getF();
                     previousProjects += dayStats.getN();
@@ -103,6 +109,8 @@ public class PlatformAnalyticsQueryService {
         summary.setPreviousTotalDownloads(previousDownloads);
         summary.setTotalViews(currentViews);
         summary.setPreviousTotalViews(previousViews);
+        summary.setLauncherDownloads(currentLauncherDownloads);
+        summary.setPreviousLauncherDownloads(previousLauncherDownloads);
         summary.setApiDownloads(currentApiDownloads);
         summary.setPreviousApiDownloads(previousApiDownloads);
         summary.setFrontendDownloads(currentFrontendDownloads);
@@ -115,6 +123,7 @@ public class PlatformAnalyticsQueryService {
         summary.setPreviousTotalNewOrgs(previousOrgs);
 
         summary.setDownloadsChart(analyticsQuerySupportService.fillDates(window.chartStart(), window.end(), downloadSeries));
+        summary.setLauncherDownloadsChart(analyticsQuerySupportService.fillDates(window.chartStart(), window.end(), launcherSeries));
         summary.setApiDownloadsChart(analyticsQuerySupportService.fillDates(window.chartStart(), window.end(), apiSeries));
         summary.setViewsChart(analyticsQuerySupportService.fillDates(window.chartStart(), window.end(), viewSeries));
         summary.setNewProjectsChart(analyticsQuerySupportService.fillDates(window.chartStart(), window.end(), projectSeries));

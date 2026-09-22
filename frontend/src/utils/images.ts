@@ -1,3 +1,9 @@
+export const isGifImage = (url: string, file?: File | null): boolean =>
+    file?.type.toLowerCase() === 'image/gif'
+    || /\.gif$/i.test(file?.name ?? '')
+    || /\.gif(?:[?#]|$)/i.test(url)
+    || /^data:image\/gif[;,]/i.test(url);
+
 export const getSteppedWidth = (width: number) => {
     if (width <= 64) return 64;
     if (width <= 128) return 128;
@@ -17,7 +23,7 @@ const isCloudflareImageHost = (hostname: string) =>
     hostname === 'modtale.net' || hostname.endsWith('.modtale.net');
 
 export const getCloudflareUrl = (url: string, width: number, quality: number) => {
-    if (!url || url.includes('.svg') || url.startsWith('blob:')) {
+    if (!url || url.includes('.svg') || url.startsWith('blob:') || url.startsWith('data:') || isGifImage(url)) {
         return url;
     }
 

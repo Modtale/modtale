@@ -50,6 +50,7 @@ import net.modtale.launcher.model.project.GameVersionCatalog;
 import net.modtale.launcher.model.project.ProjectPage;
 import net.modtale.launcher.model.project.ProjectSummary;
 import net.modtale.launcher.ui.browse.card.ProjectCardFactory;
+import net.modtale.launcher.ui.browse.card.ProjectCardViewStyle;
 import net.modtale.launcher.ui.browse.controls.BrowseOptions;
 import net.modtale.launcher.ui.browse.controls.ProjectBrowseCategories;
 import net.modtale.launcher.ui.browse.controls.ProjectBrowseDownloadTimeframeSelector;
@@ -111,7 +112,6 @@ public final class ProjectBrowseController {
     private final Map<ProjectBrowseSort, Node> sortOptionChecks = new LinkedHashMap<>();
     private final List<Runnable> controlStateListeners = new ArrayList<>();
 
-    private Button tagToggleButton;
     private Button filterToggleButton;
     private Button sortButton;
     private Label sortButtonLabel;
@@ -167,11 +167,11 @@ public final class ProjectBrowseController {
                 favoriteResolver, gameVersion, onInstall, onOpenPage, onOpenCreator, onToggleFavorite);
         this.categories = new ProjectBrowseCategories(scrollSupport, this::searchProjects);
         this.tags = new ProjectBrowseTags(this::searchProjects, this::refreshBrowseControls);
-        this.viewStyles = new ProjectBrowseViewStyleSelector(this::searchProjects);
+        this.viewStyles = new ProjectBrowseViewStyleSelector(this::handleViewStyleChange);
         this.filterOptions = new ProjectBrowseFilterOptions(
                 this::searchProjects,
                 this::refreshBrowseControls,
-                tags::clear
+                tags
         );
         this.downloadTimeframes = new ProjectBrowseDownloadTimeframeSelector(
                 filterOptions::selectDateRange,
@@ -204,7 +204,7 @@ public final class ProjectBrowseController {
     }
 
     public void selectBrowseSort(ProjectBrowseSort sort) {
-        selectSort(sort == null ? ProjectBrowseSort.DOWNLOADS : sort);
+        selectSort(sort == null ? ProjectBrowseSort.defaultSort() : sort);
     }
 
     public void addControlStateListener(Runnable listener) {
@@ -214,6 +214,7 @@ public final class ProjectBrowseController {
     }
 
     public String title() {
+        if (isCurseForgeSource()) return selectedSort().curseForgeLabel();
         if (!tags.isEmpty()) {
             return tags.title();
         }
@@ -237,7 +238,7 @@ public final class ProjectBrowseController {
             return "Browse " + viewOption.label().toLowerCase(Locale.ROOT) + " with the same filters as the web catalog.";
         }
         return sourceSelector.source() == ProjectBrowseSource.CURSEFORGE
-                ? "Browse Hytale mods indexed by nyoCF and install exact provider-hosted files."
+                ? "Browse CurseForge mods and install exact provider-hosted files."
                 : "Browse the Modtale catalog and install compatible Hytale projects.";
     }
 
@@ -258,21 +259,6 @@ public final class ProjectBrowseController {
         categories.selectClassification(classification);
     }
 
-    public void selectDefaultBrowsePage() {
-        withSuppressedSearch(() -> {
-            activeBrowseView = BrowseOptions.BrowseViewOption.defaultOption();
-            searchField.clear();
-            sortCombo.setValue(ProjectBrowseSort.defaultSort());
-            filterOptions.reset(false);
-            tags.popover().setVisible(false);
-            filterOptions.popover().setVisible(false);
-        });
-        searchDebounce.stop();
-        refreshBrowseControls();
-        showDiscover.run();
-        categories.selectClassification(BrowseOptions.ClassificationOption.defaultOption());
-    }
-
     public void refreshControls() {
         categories.refresh();
         tags.refresh();
@@ -288,6 +274,14 @@ public final class ProjectBrowseController {
                     }
                     filterOptions.replaceGameVersionCatalog(catalog);
                 }));
+    }
+
+    private void handleViewStyleChange() {
+        if (viewStyles.style() == ProjectCardViewStyle.COMPACT
+                && selectedPageSize() < 48) {
+            withSuppressedSearch(() -> pageSizeCombo.setValue(48));
+        }
+        searchProjects();
     }
 
     public void searchProjects() {
@@ -376,14 +370,22 @@ public final class ProjectBrowseController {
         controlRow.getStyleClass().add("browse-control-group");
         controlRow.setAlignment(Pos.CENTER_RIGHT);
         controlRow.setMinWidth(Region.USE_PREF_SIZE);
-        tagToggleButton = popoverToggle("Tags", LauncherIcons.Glyph.TAG, tags.popover());
         filterToggleButton = popoverToggle("Filters", LauncherIcons.Glyph.FILTER, filterOptions.popover());
         sortButton = sortControl();
+        sourceSelector.view().setOnAction(event -> {
+            if (sourceSelector.dropdown().isVisible()) {
+                sourceSelector.hide();
+            } else {
+                filterOptions.popover().setVisible(false);
+                hideSortDropdown();
+                sourceSelector.show();
+                positionFilterDropdown(sourceSelector.view(), sourceSelector.dropdown(), false);
+            }
+        });
         controlRow.getChildren().addAll(
                 sourceSelector.view(),
                 pageSizeCombo,
                 viewStyles.view(),
-                tagToggleButton,
                 filterToggleButton,
                 downloadTimeframes.view(),
                 sortButton
@@ -413,13 +415,20 @@ public final class ProjectBrowseController {
         content.getChildren().addAll(filters, projectResults, paginationNav);
 
         configureSortDropdown();
-        StackPane root = new StackPane(content, tags.popover(), filterOptions.popover(), sortDropdown);
+        StackPane root = new StackPane(content, filterOptions.popover(), sortDropdown, sourceSelector.dropdown());
         browseRoot = root;
         root.setUserData(LauncherView.DISCOVER);
         root.getStyleClass().addAll("view", "browse-view");
         root.setMinWidth(0);
         root.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         root.addEventFilter(MouseEvent.MOUSE_PRESSED, this::hideFilterDropdownsOnOutsidePress);
+        root.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == javafx.scene.input.KeyCode.ESCAPE && sourceSelector.dropdown().isVisible()) {
+                sourceSelector.hide();
+                sourceSelector.view().requestFocus();
+                event.consume();
+            }
+        });
         return root;
     }
 
@@ -445,15 +454,6 @@ public final class ProjectBrowseController {
                 return ProjectBrowseSort.fromLabel(value);
             }
         });
-        sortCombo.setOnAction(event -> {
-            refreshBrowseControls();
-            if (!suppressSearch) {
-                activeBrowseView = selectedSort().browseView();
-                showDiscover.run();
-            }
-            notifyControlStateListeners();
-            searchProjects();
-        });
         sortCombo.valueProperty().addListener((observable, oldValue, newValue) -> refreshSortDropdown());
         pageSizeCombo.setItems(FXCollections.observableArrayList(BrowseOptions.BROWSE_ITEMS_PER_PAGE_OPTIONS));
         pageSizeCombo.setValue(BrowseOptions.DEFAULT_ITEMS_PER_PAGE);
@@ -476,7 +476,6 @@ public final class ProjectBrowseController {
             }
         });
         pageSizeCombo.setOnAction(event -> {
-            tags.popover().setVisible(false);
             filterOptions.popover().setVisible(false);
             hideSortDropdown();
             searchProjects();
@@ -501,9 +500,8 @@ public final class ProjectBrowseController {
     private void selectSource(ProjectBrowseSource source) {
         searchState.reset();
         activeBrowseView = BrowseOptions.BrowseViewOption.defaultOption();
-        if (source == ProjectBrowseSource.MODTALE) {
-            withSuppressedSearch(() -> sortCombo.setValue(ProjectBrowseSort.RELEVANCE));
-        }
+        withSuppressedSearch(() -> sortCombo.setValue(source == ProjectBrowseSource.CURSEFORGE
+                ? ProjectBrowseSort.DOWNLOADS : ProjectBrowseSort.RELEVANCE));
         categories.showCurseForgeOptions(source == ProjectBrowseSource.CURSEFORGE);
         updateSortOptions();
         refreshBrowseControls();
@@ -588,14 +586,9 @@ public final class ProjectBrowseController {
 
     private void updateSortOptions() {
         if (sourceSelector.source() == ProjectBrowseSource.CURSEFORGE) {
-            sortDropdown.getChildren().setAll(
-                    sortDropdownItem(ProjectBrowseSort.DOWNLOADS),
-                    sortDropdownItem(ProjectBrowseSort.UPDATED),
-                    sortDropdownItem(ProjectBrowseSort.NEWEST)
-            );
-            if (selectedSort() != ProjectBrowseSort.DOWNLOADS
-                    && selectedSort() != ProjectBrowseSort.UPDATED
-                    && selectedSort() != ProjectBrowseSort.NEWEST) {
+            sortDropdown.getChildren().setAll(ProjectBrowseSort.curseForgeSorts().stream()
+                    .map(this::sortDropdownItem).toList());
+            if (!ProjectBrowseSort.curseForgeSorts().contains(selectedSort())) {
                 sortCombo.setValue(ProjectBrowseSort.DOWNLOADS);
             }
         } else {
@@ -609,7 +602,7 @@ public final class ProjectBrowseController {
     private Button sortDropdownItem(ProjectBrowseSort sort) {
         Button item = new Button();
         item.getStyleClass().add("sort-dropdown-item");
-        Label label = new Label(sort.label());
+        Label label = new Label(isCurseForgeSource() ? sort.curseForgeLabel() : sort.label());
         label.getStyleClass().add("sort-dropdown-item-label");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -630,7 +623,6 @@ public final class ProjectBrowseController {
             hideSortDropdown();
             return;
         }
-        tags.popover().setVisible(false);
         filterOptions.popover().setVisible(false);
         sortDropdown.setVisible(true);
         sortDropdown.toFront();
@@ -647,13 +639,17 @@ public final class ProjectBrowseController {
     private void selectSort(ProjectBrowseSort sort) {
         hideSortDropdown();
         sortCombo.setValue(sort);
-        refreshSortDropdown();
+        activeBrowseView = selectedSort().browseView();
+        refreshBrowseControls();
+        showDiscover.run();
+        notifyControlStateListeners();
+        searchProjects();
     }
 
     private void refreshSortDropdown() {
         ProjectBrowseSort selected = selectedSort();
         if (sortButtonLabel != null) {
-            sortButtonLabel.setText(selected.label());
+            sortButtonLabel.setText(isCurseForgeSource() ? selected.curseForgeLabel() : selected.label());
         }
         if (sortButton != null) {
             pseudo(sortButton, "selected", sortDropdown.isVisible());
@@ -670,7 +666,6 @@ public final class ProjectBrowseController {
         button.setMinWidth(width);
         button.setOnAction(event -> {
             boolean nextVisible = !popover.isVisible();
-            tags.popover().setVisible(false);
             filterOptions.popover().setVisible(false);
             hideSortDropdown();
             popover.setVisible(nextVisible);
@@ -708,21 +703,25 @@ public final class ProjectBrowseController {
         double maxX = Math.max(8, browseRoot.getWidth() - width - 8);
         double x = rightAligned ? anchorMax.getX() - width : anchorMin.getX();
         double y = anchorMax.getY() + 8;
+        if (popover == filterOptions.popover()) {
+            popover.setMaxHeight(Math.max(120, browseRoot.getHeight() - y - 8));
+            popover.autosize();
+        }
         popover.relocate(clamp(x, 8, maxX), y);
     }
 
     private void hideFilterDropdownsOnOutsidePress(MouseEvent event) {
-        boolean tagsVisible = tags.popover().isVisible();
         boolean filtersVisible = filterOptions.popover().isVisible();
         boolean sortVisible = sortDropdown.isVisible();
-        if (!tagsVisible && !filtersVisible && !sortVisible) {
+        boolean sourceVisible = sourceSelector.dropdown().isVisible();
+        if (!filtersVisible && !sortVisible && !sourceVisible) {
             return;
         }
         EventTarget target = event.getTarget();
-        if (tagsVisible
-                && !eventTargetInside(target, tags.popover())
-                && !eventTargetInside(target, tagToggleButton)) {
-            tags.popover().setVisible(false);
+        if (sourceVisible
+                && !eventTargetInside(target, sourceSelector.dropdown())
+                && !eventTargetInside(target, sourceSelector.view())) {
+            sourceSelector.hide();
         }
         if (filtersVisible
                 && !eventTargetInside(target, filterOptions.popover())
@@ -756,10 +755,6 @@ public final class ProjectBrowseController {
     }
 
     private void updateBrowseControlBadges() {
-        if (tagToggleButton != null) {
-            tagToggleButton.setText(tags.isEmpty() ? "Tags" : "Tags " + tags.selectedCount());
-            pseudo(tagToggleButton, "selected", !tags.isEmpty() || tags.popover().isVisible());
-        }
         if (filterToggleButton != null) {
             int count = filterOptions.activeFilterCount();
             filterToggleButton.setText(count == 0 ? "Filters" : "Filters " + count);
@@ -776,11 +771,9 @@ public final class ProjectBrowseController {
         updateBrowseControlBadges();
         refreshSortDropdown();
         if (categoryPills != null) setVisibleManaged(categoryPills, true);
-        if (tagToggleButton != null) setVisibleManaged(tagToggleButton, !curseForge);
         if (filterToggleButton != null) setVisibleManaged(filterToggleButton, !curseForge);
-        if (sortButton != null) setVisibleManaged(sortButton, !curseForge);
+        if (sortButton != null) setVisibleManaged(sortButton, true);
         if (curseForge) {
-            tags.popover().setVisible(false);
             filterOptions.popover().setVisible(false);
         }
     }

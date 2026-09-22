@@ -1,7 +1,5 @@
 package net.modtale.launcher.ui.settings;
 
-import static net.modtale.launcher.ui.common.LauncherUi.addField;
-import static net.modtale.launcher.ui.common.LauncherUi.formGrid;
 import static net.modtale.launcher.ui.common.LauncherUi.primaryButton;
 import static net.modtale.launcher.ui.common.LauncherUi.secondaryButton;
 import static net.modtale.launcher.ui.common.LauncherUi.toggleCard;
@@ -14,6 +12,8 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -25,6 +25,7 @@ import net.modtale.launcher.cache.LauncherCacheService;
 import net.modtale.launcher.i18n.LauncherI18n;
 import net.modtale.launcher.settings.LauncherSettings;
 import net.modtale.launcher.settings.SettingsStore;
+import net.modtale.launcher.model.install.InstalledProject;
 import net.modtale.launcher.ui.common.LauncherIcons;
 import net.modtale.launcher.ui.common.LauncherExternalLinks;
 import net.modtale.launcher.ui.common.LauncherView;
@@ -47,6 +48,7 @@ public final class LauncherSettingsController {
     private Supplier<LauncherCacheService.ClearResult> clearCacheAction;
     private LauncherSettings settings;
     private Node view;
+    private final Label launcherUpdateStatus = new Label();
 
     public LauncherSettingsController(
             SettingsStore settingsStore,
@@ -60,6 +62,7 @@ public final class LauncherSettingsController {
         this.currentView = currentView;
         settings = settingsStore.load();
         I18N.setLocale(settings.getLocale());
+        form.reloadFrom(settings);
     }
 
     public void attachFeedback(LauncherFeedback feedback) {
@@ -74,6 +77,10 @@ public final class LauncherSettingsController {
         if (listener != null) {
             saveListeners.add(listener);
         }
+    }
+
+    public void setLauncherUpdateStatus(String message) {
+        launcherUpdateStatus.setText(message);
     }
 
     public void setLauncherUpdateCheckAction(Runnable launcherUpdateCheckAction) {
@@ -125,6 +132,17 @@ public final class LauncherSettingsController {
         notifySaveListeners();
     }
 
+    public void saveReconciledInstalledProjects(List<InstalledProject> projects) {
+        var retainedIds = projects.stream().map(InstalledProject::projectId)
+                .collect(java.util.stream.Collectors.toSet());
+        // Remove superseded identities before the registry's recovery merge can restore them.
+        settings.getInstalledProjects().stream()
+                .map(InstalledProject::projectId)
+                .filter(id -> !retainedIds.contains(id)).forEach(settingsStore::removeInstalledProject);
+        settings.setInstalledProjects(projects);
+        saveCurrentSettings();
+    }
+
     public void removeInstalledProjectRecord(String projectId) {
         settingsStore.removeInstalledProject(projectId);
     }
@@ -147,17 +165,54 @@ public final class LauncherSettingsController {
         VBox root = new VBox(18);
         root.setUserData(LauncherView.SETTINGS);
         root.getStyleClass().addAll("view", "settings-view");
-        root.getChildren().addAll(languageSection(), runtimePathsSection(), libraryDefaultsSection(), maintenanceSection(), saveActions(), avatarCredit());
+        HBox shell = new HBox(18);
+        shell.setAlignment(Pos.TOP_LEFT);
+        VBox navigation = new VBox(10);
+        navigation.getStyleClass().addAll("library-projects-pane", "settings-navigation");
+        Label heading = new Label();
+        I18N.bind(heading, "view.settings.title");
+        heading.getStyleClass().add("settings-navigation-title");
+        navigation.getChildren().add(heading);
+        VBox detail = new VBox(24);
+        detail.setMinWidth(0);
+        detail.getStyleClass().addAll("library-detail-pane", "settings-detail");
+        HBox.setHgrow(detail, Priority.ALWAYS);
+        ToggleGroup categories = new ToggleGroup();
+        List<Node> sections = List.of(languageSection(), libraryDefaultsSection(),
+                runtimePathsSection(), maintenanceSection());
+        String[] keys = {"settings.language.section", "settings.library.section",
+                "settings.paths.section", "settings.maintenance.section"};
+        LauncherIcons.Glyph[] icons = {LauncherIcons.Glyph.GLOBE, LauncherIcons.Glyph.BOX,
+                LauncherIcons.Glyph.GEAR, LauncherIcons.Glyph.DATABASE};
+        for (int index = 0; index < sections.size(); index++) {
+            Node section = sections.get(index);
+            ToggleButton category = new ToggleButton();
+            I18N.bind(category, keys[index]);
+            category.setGraphic(settingsIcon(icons[index]));
+            category.setToggleGroup(categories);
+            category.setMaxWidth(Double.MAX_VALUE);
+            category.getStyleClass().add("settings-category");
+            category.setOnAction(event -> {
+                category.setSelected(true);
+                detail.getChildren().setAll(section);
+            });
+            navigation.getChildren().add(category);
+            if (index == 0) {
+                category.setSelected(true);
+                detail.getChildren().setAll(section);
+            }
+        }
+        shell.getChildren().addAll(navigation, detail);
+        HBox toolbar = new HBox();
+        toolbar.setAlignment(Pos.CENTER_LEFT);
+        Label title = new Label();
+        I18N.bind(title, "view.settings.title");
+        title.getStyleClass().add("settings-page-title");
+        javafx.scene.layout.Region spacer = new javafx.scene.layout.Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        toolbar.getChildren().addAll(title, spacer, saveActions());
+        root.getChildren().addAll(toolbar, shell);
         return root;
-    }
-
-    private Node avatarCredit() {
-        Hyperlink credit = new Hyperlink();
-        I18N.bind(credit, "settings.credits.avatars");
-        credit.getStyleClass().add("settings-avatar-credit");
-        credit.setOnAction(event -> LauncherExternalLinks.open("https://hyvatar.io",
-                feedback == null ? null : feedback::showToast));
-        return credit;
     }
 
     private Node saveActions() {
@@ -201,13 +256,12 @@ public final class LauncherSettingsController {
         VBox defaults = settingsSection("settings.library.section", "settings.library.description",
                 LauncherIcons.Glyph.BOX);
         GridPane grid = settingsGrid();
-        addField(grid, 0, I18N.binding("settings.library.gameVersion"), form.gameVersionField());
-        HBox toggles = new HBox(12,
+        VBox toggles = new VBox(10,
                 toggleCard(form.includeDependenciesCheck()),
                 toggleCard(form.includeOptionalCheck()),
                 toggleCard(form.autoUpdatesCheck()));
         toggles.getStyleClass().add("settings-toggle-row");
-        addField(grid, 1, I18N.binding("settings.library.projectDefaults"), toggles);
+        addField(grid, 0, I18N.binding("settings.library.projectDefaults"), toggles);
         defaults.getChildren().add(grid);
         return defaults;
     }
@@ -215,7 +269,7 @@ public final class LauncherSettingsController {
     private Node maintenanceSection() {
         VBox maintenance = settingsSection("settings.maintenance.section", "settings.maintenance.description",
                 LauncherIcons.Glyph.DATABASE);
-        HBox cards = new HBox(12);
+        VBox cards = new VBox(16);
         cards.getStyleClass().add("settings-card-row");
 
         VBox launcherUpdates = settingsActionCard("settings.launcherUpdates.title", "settings.launcherUpdates.description",
@@ -226,12 +280,17 @@ public final class LauncherSettingsController {
         I18N.bind(checkLauncher, "action.checkNow");
         checkLauncher.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.REFRESH_CW, 14));
         checkLauncher.setOnAction(event -> {
-            saveFromFields(false);
             if (launcherUpdateCheckAction != null) {
                 launcherUpdateCheckAction.run();
             }
         });
-        launcherUpdates.getChildren().addAll(launcherToggles, checkLauncher);
+        GridPane channelGrid = settingsGrid();
+        addField(channelGrid, 0, I18N.binding("settings.launcherUpdates.channel"), form.launcherChannelCombo());
+        Label channelDescription = new Label();
+        I18N.bind(channelDescription, "settings.launcherUpdates.channelsDescription");
+        channelDescription.setWrapText(true);
+        launcherUpdateStatus.setWrapText(true);
+        launcherUpdates.getChildren().addAll(channelGrid, channelDescription, launcherToggles, launcherUpdateStatus, checkLauncher);
 
         VBox cache = settingsActionCard("settings.cache.title", "settings.cache.description",
                 LauncherIcons.Glyph.DATABASE);
@@ -256,12 +315,16 @@ public final class LauncherSettingsController {
         header.setAlignment(Pos.CENTER_LEFT);
         StackPane icon = settingsIcon(glyph);
         VBox copy = new VBox(4);
+        copy.setAlignment(Pos.CENTER_LEFT);
         Label titleLabel = new Label();
         I18N.bind(titleLabel, titleKey);
         titleLabel.getStyleClass().add("settings-section-title");
         Label subtitleLabel = new Label();
         I18N.bind(subtitleLabel, subtitleKey);
         subtitleLabel.getStyleClass().add("settings-section-subtitle");
+        subtitleLabel.setWrapText(true);
+        copy.setMinWidth(0);
+        HBox.setHgrow(copy, Priority.ALWAYS);
         copy.getChildren().addAll(titleLabel, subtitleLabel);
         header.getChildren().addAll(icon, copy);
         section.getChildren().add(header);
@@ -275,12 +338,16 @@ public final class LauncherSettingsController {
         heading.setAlignment(Pos.CENTER_LEFT);
         StackPane icon = settingsIcon(glyph);
         VBox copy = new VBox(3);
+        copy.setAlignment(Pos.CENTER_LEFT);
         Label titleLabel = new Label();
         I18N.bind(titleLabel, titleKey);
         titleLabel.getStyleClass().add("settings-card-title");
         Label subtitleLabel = new Label();
         I18N.bind(subtitleLabel, subtitleKey);
         subtitleLabel.getStyleClass().add("settings-card-subtitle");
+        subtitleLabel.setWrapText(true);
+        copy.setMinWidth(0);
+        HBox.setHgrow(copy, Priority.ALWAYS);
         copy.getChildren().addAll(titleLabel, subtitleLabel);
         heading.getChildren().addAll(icon, copy);
         card.getChildren().add(heading);
@@ -289,9 +356,29 @@ public final class LauncherSettingsController {
     }
 
     private GridPane settingsGrid() {
-        GridPane grid = formGrid();
+        GridPane grid = new GridPane();
+        grid.setVgap(22);
+        javafx.scene.layout.ColumnConstraints column = new javafx.scene.layout.ColumnConstraints();
+        column.setHgrow(Priority.ALWAYS);
+        column.setFillWidth(true);
+        grid.getColumnConstraints().add(column);
         grid.getStyleClass().add("settings-form-grid");
         return grid;
+    }
+
+    private void addField(GridPane grid, int row,
+            javafx.beans.value.ObservableValue<String> label, Node field) {
+        Label caption = new Label();
+        caption.textProperty().bind(label);
+        caption.getStyleClass().add("field-label");
+        caption.setLabelFor(field);
+        VBox content = new VBox(10, caption, field);
+        content.setMinWidth(0);
+        if (field instanceof javafx.scene.layout.Region region) {
+            region.setMaxWidth(Double.MAX_VALUE);
+        }
+        grid.add(content, 0, row);
+        GridPane.setHgrow(content, Priority.ALWAYS);
     }
 
     private StackPane settingsIcon(LauncherIcons.Glyph glyph) {

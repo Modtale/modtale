@@ -59,6 +59,14 @@ public final class HytaleGameVersionResolver {
         return labels;
     }
 
+    /** Reads the same configured game directory/build that the launcher will run. */
+    public static Optional<String> selectedServerVersion(LauncherSettings settings) {
+        if (settings == null || settings.getHytaleGamePath().isBlank()) return Optional.empty();
+        Path gameDirectory = HytaleGameLauncher.resolveGameDirectory(
+                settings.hytaleGameDirectory(), settings.getHytaleBranch(), settings.getHytaleBuild());
+        return serverVersionFromJar(gameDirectory.resolve(Path.of("Server", "HytaleServer.jar")));
+    }
+
     public static Optional<String> installedServerVersion(LauncherSettings settings) {
         return installedServerVersion(settings, settings == null ? "release" : settings.getHytaleBranch());
     }

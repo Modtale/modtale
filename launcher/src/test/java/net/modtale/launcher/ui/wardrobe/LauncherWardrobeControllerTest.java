@@ -46,7 +46,7 @@ class LauncherWardrobeControllerTest {
 
     @BeforeAll static void toolkit() throws Exception {
         if (System.getProperty("os.name", "").toLowerCase().contains("linux"))
-            assumeTrue(!System.getenv().getOrDefault("DISPLAY", "").isBlank(), "JavaFX controller tests require DISPLAY");
+            assumeTrue(!System.getenv().getOrDefault("WAYLAND_DISPLAY", "").isBlank(), "JavaFX controller tests require WAYLAND_DISPLAY");
         try { Platform.startup(() -> Platform.setImplicitExit(false)); }
         catch (IllegalStateException alreadyStarted) { /* Shared toolkit. */ }
         catch (UnsupportedOperationException unavailable) {
@@ -60,10 +60,6 @@ class LauncherWardrobeControllerTest {
             h.store.saveItem(CAPE);
             fx(() -> { button(h.root(), "Saved looks").fire(); return null; });
             await(() -> card(h.root(), "Catalog cape") != null);
-            URI alice = h.previews.poll(5, TimeUnit.SECONDS);
-            assertNotNull(alice);
-            assertEquals("/render/cape/Alice", alice.getPath(), "Cape payload's old username must not determine the fitting-room account");
-            assertTrue(alice.getQuery().contains("cape=Cape_Test.Blue"));
             assertEquals("Apply to Alice", fx(() -> button(h.root(), "Apply to Alice").getText()));
 
             fx(() -> {
@@ -72,10 +68,6 @@ class LauncherWardrobeControllerTest {
                 assertFalse(button(h.root(), "Apply to Bob").isDisabled());
                 return null;
             });
-            URI bob = h.previews.poll(5, TimeUnit.SECONDS);
-            assertNotNull(bob, "Account change must reload the selected cape preview");
-            assertEquals("/render/cape/Bob", bob.getPath());
-            assertEquals(alice.getQuery(), bob.getQuery(), "Switching accounts must preserve the selected cape");
             fx(() -> { button(h.root(), "Apply to Bob").fire(); return null; });
             Apply applied = h.gateway.applies.poll(5, TimeUnit.SECONDS);
             assertNotNull(applied);
@@ -87,12 +79,42 @@ class LauncherWardrobeControllerTest {
         }
     }
 
+    @Test void selectingALookKeepsLoadedThumbnailNodes() throws Exception {
+        try (Harness h = new Harness()) {
+            fx(() -> { button(h.root(), "Popular skins").fire(); return null; });
+            await(() -> h.root().lookup("#wardrobe-look-" + SKIN.id()) != null);
+            fx(() -> {
+                Button original = (Button) h.root().lookup("#wardrobe-look-" + SKIN.id());
+                Node artwork = original.getGraphic();
+                original.fire();
+                assertSame(original, h.root().lookup("#wardrobe-look-" + SKIN.id()));
+                assertSame(artwork, original.getGraphic());
+                assertTrue(original.getPseudoClassStates().contains(javafx.css.PseudoClass.getPseudoClass("selected")));
+                return null;
+            });
+        }
+    }
+
+    @Test void savedTabDoesNotKeepAnUnsavedCatalogSkinSelected() throws Exception {
+        try (Harness h = new Harness()) {
+            h.store.saveItem(CAPE);
+            fx(() -> { button(h.root(), "Popular skins").fire(); return null; });
+            await(() -> h.root().lookup("#wardrobe-look-" + SKIN.id()) != null);
+            fx(() -> { button(h.root(), "Saved looks").fire(); return null; });
+            await(() -> card(h.root(), "Catalog cape") != null);
+            fx(() -> { button(h.root(), "Apply to Alice").fire(); return null; });
+            Apply applied = h.gateway.applies.poll(5, TimeUnit.SECONDS);
+            assertNotNull(applied);
+            assertEquals(CAPE.id(), applied.item().id(), "Saved looks must apply the displayed saved selection, not a stale catalog skin");
+        }
+    }
+
     @Test void rediscoveredSavedLookInitializesDialogFromStoredMetadataAndSavesAsynchronously() throws Exception {
         try (Harness h = new Harness()) {
             WardrobeItem saved = new WardrobeItem(SKIN.id(), SKIN.kind(), "My favorite outfit", true, "Adventures", SKIN.payload());
             h.store.saveItem(saved);
-            fx(() -> { h.controller.refresh(); return null; });
-            await(() -> card(h.root(), saved.name()) != null);
+            fx(() -> { button(h.root(), "Popular skins").fire(); h.controller.refresh(); return null; });
+            await(() -> h.root().lookup("#wardrobe-look-" + saved.id()) != null);
             // Catalog auto-selection retains the raw item; the dialog must independently resolve its saved UUID.
             FutureTask<Void> opened = submitFx(() -> { button(h.root(), "Edit saved look").fire(); return null; });
             await(() -> h.dialog() != null);
@@ -114,7 +136,7 @@ class LauncherWardrobeControllerTest {
             assertEquals("responsive", fx(() -> "responsive"));
             assertEquals(saved, h.store.items().getFirst());
             h.gateway.releaseHydration.countDown();
-            await(() -> nodes(h.root(), Label.class).stream().anyMatch(l -> "Renamed favorite".equals(l.getText())));
+            await(() -> h.store.items().getFirst().name().equals("Renamed favorite"));
             WardrobeItem persisted = new WardrobeStore(directory).items().getFirst();
             assertEquals("Renamed favorite", persisted.name());
             assertEquals(saved.collection(), persisted.collection());
@@ -130,7 +152,7 @@ class LauncherWardrobeControllerTest {
             for (int i = 0; i < 83; i++) all.add(new WardrobeItem(new UUID(0, i + 100),
                     WardrobeItem.Kind.SKIN, "Grid " + i, false, "", SKIN.payload()));
             h.gateway.skins = List.copyOf(all);
-            fx(() -> { h.stage.setWidth(1750); h.controller.refresh(); return null; });
+            fx(() -> { h.root().setManaged(false); ((javafx.scene.layout.Region) h.root()).resize(1750, 800); button(h.root(), "Popular skins").fire(); h.controller.refresh(); return null; });
             await(() -> gridReady(h));
             fx(() -> {
                 assertFalse(h.root().lookup("#wardrobe-saved-filter").isVisible(), "Skin sort dropdown must be hidden");
@@ -141,23 +163,132 @@ class LauncherWardrobeControllerTest {
             await(() -> gridReady(h));
             List<String> seen = new ArrayList<>();
             while (true) {
-                List<String> current = fx(() -> gridCards(h).stream().map(Button::getAccessibleText).toList());
+                List<String> current = fx(() -> gridCards(h).stream().map(Button::getId).toList());
                 seen.addAll(current);
-                if (fx(() -> button(h.root(), "Next").isDisabled())) break;
+                if (fx(() -> button(h.root(), "Next Page").isDisabled())) break;
                 int count = fx(() -> ((javafx.scene.layout.GridPane)h.root().lookup("#wardrobe-cards")).getColumnConstraints().size());
                 assertEquals(count * 4, current.size(), "Every nonfinal page must have four full rows");
                 String first = current.getFirst();
-                fx(() -> { button(h.root(), "Next").fire(); return null; });
-                await(() -> !gridCards(h).isEmpty() && !gridCards(h).getFirst().getAccessibleText().equals(first)
+                fx(() -> { button(h.root(), "Next Page").fire(); return null; });
+                await(() -> !gridCards(h).isEmpty() && !gridCards(h).getFirst().getId().equals(first)
                         && nodes(h.root(), Label.class).stream().noneMatch(l -> l.getText().equals("Loading looks…")));
             }
-            assertEquals(all.stream().map(item -> "Preview " + item.name()).toList(), seen,
+            assertEquals(all.stream().map(item -> "wardrobe-look-" + item.id()).toList(), seen,
                     "Provider page boundaries must not duplicate or skip skins");
             for (int width : new int[]{1100, 1450}) {
-                fx(() -> { h.stage.setWidth(width); return null; });
-                await(() -> gridReady(h) && gridCards(h).getFirst().getAccessibleText().equals("Preview Grid 0"));
+                fx(() -> { ((javafx.scene.layout.Region) h.root()).resize(width, 800); return null; });
+                await(() -> gridReady(h) && gridCards(h).getFirst().getId().equals("wardrobe-look-" + all.getFirst().id()));
                 fx(() -> { assertGridWidth(h); return null; });
             }
+        }
+    }
+
+    @Test void sharedPagerHidesSinglePagesAndNavigatesSavedLooks() throws Exception {
+        try (Harness h = new Harness()) {
+            h.store.saveItem(CAPE);
+            fx(() -> { button(h.root(), "Saved looks").fire(); return null; });
+            await(() -> card(h.root(), "Catalog cape") != null);
+            fx(() -> {
+                Node pager = h.root().lookup("#wardrobe-pagination");
+                assertTrue(pager instanceof WardrobePagination);
+                assertFalse(pager.isVisible()); assertFalse(pager.isManaged());
+                return null;
+            });
+            for (int i = 0; i < 65; i++) h.store.saveItem(new WardrobeItem(new UUID(0, i + 100),
+                    WardrobeItem.Kind.SKIN, "Saved " + i, false, "", SKIN.payload()));
+            fx(() -> { h.controller.refresh(); return null; });
+            await(() -> h.root().lookup("#wardrobe-pagination").isVisible()
+                    && !h.root().lookup("#wardrobe-pagination").isDisabled());
+            String first = fx(() -> gridCards(h).getFirst().getAccessibleText());
+            fx(() -> { button(h.root(), "Page 2").fire(); return null; });
+            await(() -> !gridCards(h).getFirst().getAccessibleText().equals(first)
+                    && !h.root().lookup("#wardrobe-pagination").isDisabled());
+            fx(() -> {
+                var input = (TextField) h.root().lookup("#wardrobe-pagination").lookup(".pagination-jump-input");
+                input.setText("1"); button(h.root(), "Go to page").fire(); return null;
+            });
+            await(() -> gridCards(h).getFirst().getAccessibleText().equals(first));
+            h.gateway.skins = List.of(SKIN);
+            fx(() -> { button(h.root(), "Popular skins").fire(); return null; });
+            await(() -> h.root().lookup("#wardrobe-look-" + SKIN.id()) != null);
+            fx(() -> {
+                assertFalse(h.root().lookup("#wardrobe-pagination").isVisible());
+                assertFalse(h.root().lookup("#wardrobe-pagination").isManaged());
+                return null;
+            });
+        }
+    }
+
+    @Test void popularFeedIsLazyAndDownloadedDefinitionIsAppliedWithoutProviderIdentity() throws Exception {
+        try (Harness h = new Harness()) {
+            h.popular.useArchivedEntry = true;
+            assertTrue(fx(() -> nodes(h.root(), javafx.scene.control.ToggleButton.class).stream()
+                    .map(javafx.scene.control.ToggleButton::getText).toList()
+                    .containsAll(List.of("Customize", "Popular skins", "Saved looks"))));
+            assertTrue(fx(() -> nodes(h.root(), javafx.scene.control.ToggleButton.class).stream()
+                    .noneMatch(b -> b.getText().equals("Local outfits"))));
+            h.store.saveItem(SKIN);
+            fx(() -> { button(h.root(), "Saved looks").fire(); return null; });
+            await(() -> h.root().lookup("#wardrobe-look-" + SKIN.id()) != null);
+            assertEquals(0, h.popular.pageCalls.get()); assertEquals(0, h.popular.thumbnailCalls.get());
+            fx(() -> { button(h.root(), "Popular skins").fire(); return null; });
+            await(() -> h.popular.downloadCalls.get() == 1 && !button(h.root(), "Save look").isDisabled());
+            assertTrue(h.popular.thumbnailCalls.get() > 0);
+            assertTrue(fx(() -> nodes(h.root(), Label.class).stream().anyMatch(l -> l.isVisible() && l.getText().contains("Images by Hyvatar"))));
+            fx(() -> { button(h.root(), "Apply to Alice").fire(); return null; });
+            Apply applied = h.gateway.applies.poll(5, TimeUnit.SECONDS);
+            assertNotNull(applied);
+            assertTrue(applied.item().payload().contains("bodyCharacteristic"));
+            assertFalse(applied.item().payload().contains("username"));
+            await(() -> !button(h.root(), "Apply to Alice").isDisabled());
+            h.store.saveItem(applied.item());
+            int thumbnails = h.popular.thumbnailCalls.get(), downloads = h.popular.downloadCalls.get();
+            fx(() -> { button(h.root(), "Saved looks").fire(); return null; });
+            await(() -> h.root().lookup("#wardrobe-look-" + applied.item().id()) != null);
+            assertEquals(thumbnails, h.popular.thumbnailCalls.get()); assertEquals(downloads, h.popular.downloadCalls.get());
+            assertTrue(fx(() -> nodes(h.root(), Label.class).stream().noneMatch(l -> l.isVisible() && l.getText().contains("Images by Hyvatar"))));
+        }
+    }
+
+    @Test void leavingPopularFeedDiscardsAnInFlightDownload() throws Exception {
+        try (Harness h = new Harness()) {
+            h.store.saveItem(SKIN);
+            h.popular.useArchivedEntry = true;
+            h.popular.blockDownloads = true;
+            fx(() -> { button(h.root(), "Popular skins").fire(); return null; });
+            await(() -> h.popular.downloadCalls.get() == 1);
+            assertTrue(fx(() -> button(h.root(), "Save look").isDisabled()));
+            fx(() -> { button(h.root(), "Saved looks").fire(); return null; });
+            await(() -> h.root().lookup("#wardrobe-look-" + SKIN.id()) != null);
+            h.popular.release.countDown();
+            fx(() -> { button(h.root(), "Apply to Alice").fire(); return null; });
+            Apply applied = h.gateway.applies.poll(5, TimeUnit.SECONDS);
+            assertNotNull(applied); assertEquals(SKIN.id(), applied.item().id());
+        }
+    }
+
+    private static class PopularFixture extends net.modtale.launcher.wardrobe.PopularSkinClient {
+        final java.util.concurrent.atomic.AtomicInteger pageCalls = new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.atomic.AtomicInteger thumbnailCalls = new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.atomic.AtomicInteger downloadCalls = new java.util.concurrent.atomic.AtomicInteger();
+        final CountDownLatch release = new CountDownLatch(1);
+        volatile boolean blockDownloads, useArchivedEntry;
+        final java.util.function.Supplier<List<WardrobeItem>> skins;
+        PopularFixture(java.util.function.Supplier<List<WardrobeItem>> skins) { this.skins = skins; }
+        final WardrobeItem entry = new WardrobeItem(UUID.randomUUID(), WardrobeItem.Kind.SKIN, "Popular fixture", false, "",
+                "{\"skinId\":\"aa6a8b217c26ee19a02791eb2064b513\"}");
+        @Override public Page page(int page) {
+            pageCalls.incrementAndGet(); var items = useArchivedEntry ? List.of(entry) : skins.get();
+            int offset = (page - 1) * 20;
+            return new Page(items.stream().skip(offset).limit(20).toList(), items.size() > offset + 20);
+        }
+        @Override public String thumbnail(String hash) { thumbnailCalls.incrementAndGet(); return ""; }
+        @Override public WardrobeItem download(String hash) {
+            assertFalse(Platform.isFxApplicationThread()); downloadCalls.incrementAndGet();
+            if (blockDownloads) try { release.await(5, TimeUnit.SECONDS); }
+            catch (InterruptedException ex) { Thread.currentThread().interrupt(); throw new IllegalStateException(ex); }
+            return new WardrobeItem(entry.id(), entry.kind(), entry.name(), false, "",
+                    "{\"skinId\":\"" + hash + "\",\"skin\":{\"bodyCharacteristic\":\"Default.01\"}}");
         }
     }
 
@@ -167,7 +298,7 @@ class LauncherWardrobeControllerTest {
     }
     private static boolean gridReady(Harness h) {
         var grid = (javafx.scene.layout.GridPane)h.root().lookup("#wardrobe-cards");
-        return gridCards(h).size() == grid.getColumnConstraints().size() * 4 && !button(h.root(), "Next").isDisabled();
+        return gridCards(h).size() == grid.getColumnConstraints().size() * 4 && !button(h.root(), "Next Page").isDisabled();
     }
     private static void assertGridWidth(Harness h) {
         h.root().applyCss(); ((javafx.scene.Parent) h.root()).layout();
@@ -182,6 +313,7 @@ class LauncherWardrobeControllerTest {
     private final class Harness implements AutoCloseable {
         final ExecutorService executor = Executors.newFixedThreadPool(2);
         final Gateway gateway = new Gateway();
+        final PopularFixture popular = new PopularFixture(() -> gateway.skins);
         final WardrobeStore store;
         final AtomicReference<LauncherSettings> settings = new AtomicReference<>(settings("Alice", ALICE));
         final BlockingQueue<URI> previews = new LinkedBlockingQueue<>();
@@ -194,18 +326,18 @@ class LauncherWardrobeControllerTest {
             ImageIO.write(pixel, "png", output);
             byte[] png = output.toByteArray();
             controller = fx(() -> {
-                var feedback = new LauncherFeedback(executor, new Label(), new VBox(), new StackPane(), new Label(), new Label(), () -> "Ready");
-                var preview = new WardrobePreview(executor, false, (uri, limit) -> {
-                    assertFalse(Platform.isFxApplicationThread());
-                    previews.add(uri); return png;
-                }, uri -> fail("Tests must not open a browser"));
-                return new LauncherWardrobeController(gateway, store, settings::get, feedback, executor, preview, item -> "");
+                var feedback = new LauncherFeedback(executor, new Label(), new StackPane(), new Label(), new Label(), () -> "Ready");
+                var preview = new WardrobePreview(executor, false);
+                return new LauncherWardrobeController(gateway, store, settings::get, feedback, executor, preview, item -> "", popular);
             });
             stage = fx(() -> {
                 Stage stage = new Stage();
                 Scene scene = new Scene(new StackPane(controller.view()), 1100, 800);
                 scene.getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
-                stage.setScene(scene); stage.show(); return stage;
+                stage.setScene(scene); stage.show();
+                assertTrue(((ToggleButton) button(controller.view(), "Customize")).isSelected());
+                assertNotNull(button(controller.view(), "Load current look"));
+                return stage;
             });
         }
         Node root() { return controller.view(); }
@@ -215,6 +347,7 @@ class LauncherWardrobeControllerTest {
                     .flatMap(w -> nodes(w.getScene().getRoot(), DialogPane.class).stream()).findFirst().orElse(null);
         }
         @Override public void close() throws Exception {
+            popular.release.countDown();
             gateway.releaseHydration.countDown();
             fx(() -> {
                 DialogPane dialog = dialog();
@@ -235,7 +368,6 @@ class LauncherWardrobeControllerTest {
         Gateway() { super(new HytaleAuthService(null, null) {
             @Override public String freshSessionToken(LauncherSettings settings) { throw new AssertionError("No real authentication in regression tests"); }
         }); }
-        @Override public List<WardrobeItem> browseSkins(int page, String sort) { assertFalse(Platform.isFxApplicationThread()); assertEquals("user_count", sort); return skins.stream().skip((long)(page - 1) * 20).limit(20).toList(); }
         @Override public WardrobeItem hydrate(WardrobeItem item) {
             assertFalse(Platform.isFxApplicationThread());
             hydrationStarted.countDown();
@@ -257,7 +389,7 @@ class LauncherWardrobeControllerTest {
         LauncherSettings settings = new LauncherSettings(); settings.setHytaleAuthSession(session); return settings;
     }
     private static Button card(Node root, String name) { return nodes(root, Button.class).stream().filter(b -> ("Preview " + name).equals(b.getAccessibleText())).findFirst().orElse(null); }
-    private static ButtonBase button(Node root, String text) { return nodes(root, ButtonBase.class).stream().filter(b -> text.equals(b.getText())).findFirst().orElseThrow(); }
+    private static ButtonBase button(Node root, String text) { return nodes(root, ButtonBase.class).stream().filter(b -> (text.equals(b.getText()) || text.equals(b.getAccessibleText()))).findFirst().orElseThrow(); }
     private static <T> List<T> nodes(Node node, Class<T> type) {
         List<T> result = new ArrayList<>();
         if (type.isInstance(node)) result.add(type.cast(node));

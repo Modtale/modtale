@@ -43,14 +43,6 @@ public final class LauncherAuthFlow {
     }
 
     public CurrentUser authenticate() {
-        return authenticate(this::buildAuthUri);
-    }
-
-    public CurrentUser authenticateWithOAuthProvider(String provider) {
-        return authenticate((callbackUri, state) -> buildOAuthAuthUri(provider, callbackUri, state));
-    }
-
-    private CurrentUser authenticate(AuthUriFactory authUriFactory) {
         HttpServer callbackServer = null;
         CompletableFuture<String> codeFuture = new CompletableFuture<>();
         try {
@@ -61,7 +53,7 @@ public final class LauncherAuthFlow {
             callbackServer.start();
 
             URI callbackUri = URI.create("http://127.0.0.1:" + callbackServer.getAddress().getPort() + "/callback");
-            openBrowser(authUriFactory.build(callbackUri, state));
+            openBrowser(buildAuthUri(callbackUri, state));
 
             String code = codeFuture.get(AUTH_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
             apiClient.exchangeLauncherCode(code);
@@ -95,18 +87,6 @@ public final class LauncherAuthFlow {
                 + "&state=" + encode(state)
                 + "&app_name=" + encode(APP_NAME);
         return URI.create(base + "/launcher/auth?" + query);
-    }
-
-    private URI buildOAuthAuthUri(String provider, URI callbackUri, String state) {
-        String normalizedProvider = provider == null ? "" : provider.trim().toLowerCase(java.util.Locale.ROOT);
-        if (!normalizedProvider.matches("[a-z0-9_-]+")) {
-            throw new RuntimeException("That OAuth provider is not valid.");
-        }
-        String base = apiClient.apiBaseUri().toString().replaceAll("/+$", "");
-        String query = "redirect_uri=" + encode(callbackUri.toString())
-                + "&state=" + encode(state)
-                + "&app_name=" + encode(APP_NAME);
-        return URI.create(base + "/auth/launcher/oauth/" + encodePath(normalizedProvider) + "?" + query);
     }
 
     private void handleCallback(HttpExchange exchange, CompletableFuture<String> codeFuture, String expectedState) throws IOException {
@@ -200,10 +180,6 @@ public final class LauncherAuthFlow {
         return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
     }
 
-    private static String encodePath(String value) {
-        return encode(value).replace("+", "%20");
-    }
-
     private static String decode(String value) {
         return URLDecoder.decode(value == null ? "" : value, StandardCharsets.UTF_8);
     }
@@ -217,8 +193,4 @@ public final class LauncherAuthFlow {
                 .replace("'", "&#39;");
     }
 
-    @FunctionalInterface
-    private interface AuthUriFactory {
-        URI build(URI callbackUri, String state);
-    }
 }

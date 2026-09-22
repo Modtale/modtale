@@ -20,11 +20,11 @@ import net.modtale.launcher.i18n.LauncherI18n.LocaleOption;
 import net.modtale.launcher.settings.LauncherConfig;
 import net.modtale.launcher.settings.LauncherSettings;
 import net.modtale.launcher.ui.common.LauncherView;
+import net.modtale.launcher.ui.library.LibraryToggleBox;
 
 public final class LauncherSettingsForm {
 
     private final TextField modsPathField = new TextField();
-    private final TextField gameVersionField = new TextField();
     private final TextField hytaleGamePathField = new TextField();
     private final TextField hytaleUserDataPathField = new TextField();
     private final TextField hytaleJavaPathField = new TextField();
@@ -33,11 +33,12 @@ public final class LauncherSettingsForm {
     private final TextField playHytaleJavaPathField = new TextField();
     private final ComboBox<String> hytaleBranchCombo = new ComboBox<>();
     private final ComboBox<HytaleVersion> hytaleVersionCombo = new ComboBox<>();
+    private final ComboBox<String> launcherChannelCombo = new ComboBox<>();
     private final ComboBox<LocaleOption> localeCombo = new ComboBox<>();
-    private final CheckBox includeDependenciesCheck = new CheckBox();
-    private final CheckBox includeOptionalCheck = new CheckBox();
-    private final CheckBox autoUpdatesCheck = new CheckBox();
-    private final CheckBox launcherAutoUpdatesCheck = new CheckBox();
+    private final CheckBox includeDependenciesCheck = new LibraryToggleBox();
+    private final CheckBox includeOptionalCheck = new LibraryToggleBox();
+    private final CheckBox autoUpdatesCheck = new LibraryToggleBox();
+    private final CheckBox launcherAutoUpdatesCheck = new LibraryToggleBox();
 
     public LauncherSettingsForm() {
         LauncherI18n i18n = LauncherI18n.get();
@@ -59,21 +60,18 @@ public final class LauncherSettingsForm {
             }
         });
         hytaleBranchCombo.setOnAction(event -> hytaleVersionCombo.getItems().clear());
-        styleInput(modsPathField, gameVersionField, hytaleGamePathField, hytaleUserDataPathField, hytaleJavaPathField,
+        styleInput(modsPathField, hytaleGamePathField, hytaleUserDataPathField, hytaleJavaPathField,
                 playHytaleGamePathField, playHytaleUserDataPathField, playHytaleJavaPathField);
-        styleCombo(localeCombo, hytaleBranchCombo, hytaleVersionCombo);
-        includeDependenciesCheck.getStyleClass().add("native-check");
-        includeOptionalCheck.getStyleClass().add("native-check");
-        autoUpdatesCheck.getStyleClass().add("native-check");
-        launcherAutoUpdatesCheck.getStyleClass().add("native-check");
+        launcherChannelCombo.setItems(FXCollections.observableArrayList("stable", "develop"));
+        styleCombo(localeCombo, hytaleBranchCombo, hytaleVersionCombo, launcherChannelCombo);
+        includeDependenciesCheck.accessibleTextProperty().bind(includeDependenciesCheck.textProperty());
+        includeOptionalCheck.accessibleTextProperty().bind(includeOptionalCheck.textProperty());
+        autoUpdatesCheck.accessibleTextProperty().bind(autoUpdatesCheck.textProperty());
+        launcherAutoUpdatesCheck.accessibleTextProperty().bind(launcherAutoUpdatesCheck.textProperty());
     }
 
     public TextField modsPathField() {
         return modsPathField;
-    }
-
-    public TextField gameVersionField() {
-        return gameVersionField;
     }
 
     public TextField hytaleGamePathField() {
@@ -131,13 +129,16 @@ public final class LauncherSettingsForm {
         return autoUpdatesCheck;
     }
 
+    public ComboBox<String> launcherChannelCombo() {
+        return launcherChannelCombo;
+    }
+
     public CheckBox launcherAutoUpdatesCheck() {
         return launcherAutoUpdatesCheck;
     }
 
     public void applyTo(LauncherSettings settings, LauncherView currentView, ModtaleApiClient apiClient) {
         settings.setHytaleModsPath(modsPathField.getText());
-        settings.setGameVersion(gameVersionField.getText());
         boolean playView = currentView == LauncherView.PLAY;
         settings.setHytaleGamePath(playView ? playHytaleGamePathField.getText() : hytaleGamePathField.getText());
         settings.setHytaleUserDataPath(playView ? playHytaleUserDataPathField.getText() : hytaleUserDataPathField.getText());
@@ -151,6 +152,7 @@ public final class LauncherSettingsForm {
         settings.setIncludeOptionalDependencies(includeOptionalCheck.isSelected());
         settings.setAutoCheckUpdates(autoUpdatesCheck.isSelected());
         settings.setLauncherAutoUpdates(launcherAutoUpdatesCheck.isSelected());
+        settings.setLauncherChannel(launcherChannelCombo.getValue());
         LocaleOption selectedLocale = localeCombo.getValue();
         if (selectedLocale != null) {
             settings.setLocale(selectedLocale.locale().toLanguageTag());
@@ -161,7 +163,6 @@ public final class LauncherSettingsForm {
 
     public void reloadFrom(LauncherSettings settings) {
         modsPathField.setText(settings.getHytaleModsPath());
-        gameVersionField.setText(settings.getGameVersion());
         hytaleGamePathField.setText(settings.getHytaleGamePath());
         hytaleUserDataPathField.setText(settings.getHytaleUserDataPath());
         hytaleJavaPathField.setText(settings.getHytaleJavaPath());
@@ -173,6 +174,7 @@ public final class LauncherSettingsForm {
         includeOptionalCheck.setSelected(settings.isIncludeOptionalDependencies());
         autoUpdatesCheck.setSelected(settings.isAutoCheckUpdates());
         launcherAutoUpdatesCheck.setSelected(settings.isLauncherAutoUpdates());
+        launcherChannelCombo.setValue(settings.getLauncherChannel());
         localeCombo.getItems().stream()
                 .filter(option -> option.locale().getLanguage().equals(LauncherI18n.normalize(settings.getLocale()).getLanguage()))
                 .findFirst()

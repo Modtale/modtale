@@ -69,7 +69,7 @@ final class CurseForgeCommentsClient {
         try {
             HttpResponse<String> response = httpClient.send(request,
                     HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            ModtaleApiTransport.ensureSuccess(response.statusCode(), uri.toString());
+            JsonApiTransport.ensureSuccess(response.statusCode(), uri.toString());
             return mapper.readTree(response.body());
         } catch (IOException ex) {
             throw new ModtaleApiException("Could not read comments from CurseForge.", ex);

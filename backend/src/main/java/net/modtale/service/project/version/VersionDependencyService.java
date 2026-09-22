@@ -47,12 +47,8 @@ public class VersionDependencyService {
                 continue;
             }
 
+            if (isModpack && reference.isDependencyTypeSpecified()) throw new InvalidVersionRequestException("Modpack entries do not accept dependencyType. All included mods are required.");
             ProjectDependency.Source source = reference.getSource();
-            if (isModpack && source == ProjectDependency.Source.CURSEFORGE) {
-                throw new InvalidVersionRequestException(
-                        "CurseForge projects cannot be added to modpacks until Modtale Launcher support is available."
-                );
-            }
             ProjectDependency dependency = source == ProjectDependency.Source.MODTALE
                     ? resolveModtaleDependency(reference, allowDraftDependencies)
                     : resolveExternalDependency(reference, source);
@@ -60,6 +56,7 @@ public class VersionDependencyService {
             if (!dependencyKeys.add(dependencyKey)) {
                 throw new InvalidVersionRequestException("Each dependency can only be included once.");
             }
+            if (isModpack) dependency.setDependencyType(ProjectDependency.DependencyType.REQUIRED);
             dependencies.add(dependency);
             if (!dependency.isExternal()) {
                 simpleProjectIds.add(dependency.getProjectId());

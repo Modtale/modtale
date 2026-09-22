@@ -14,6 +14,26 @@ import org.junit.jupiter.api.Test;
 class LibraryBundledInstallNormalizerTest {
 
     @Test
+    void retainsNewDependencyFilesWhenTheProjectIsAlreadyRegistered() {
+        InstalledProjectReference reference = new InstalledProjectReference("ref", "dependency-project", "dependency",
+                "Dependency", "PLUGIN", "2.0", "OPTIONAL", "MODTALE", "", "", "", "dependency.jar", "", "", null, null);
+        InstalledProject existing = new InstalledProject("dependency-project", "dependency", "Dependency", "PLUGIN",
+                "2.0", "version-2", "0.6.0", Instant.EPOCH, Instant.EPOCH, List.of("/mods/dependency.jar"), List.of(), List.of());
+        InstalledProject parent = new InstalledProject("parent", "parent", "Parent", "PLUGIN", "1.0", "version-1", "0.6.0",
+                Instant.EPOCH, Instant.EPOCH.plusSeconds(1), List.of("/mods/parent.jar", "/mods/dependency-2.jar"),
+                List.of("dependency-project"), List.of(), "MODTALE", "BUNDLE", false, List.of(reference));
+        var result = LibraryBundledInstallNormalizer.normalize(List.of(existing, parent),
+                List.of(new HytaleInstalledMod("dependency", "Dependency", "2.0", "", Path.of("/mods/dependency-2.jar"))));
+        assertEquals(2, result.projects().size());
+        InstalledProject dependency = result.projects().getFirst();
+        assertEquals(List.of("/mods/dependency.jar", "/mods/dependency-2.jar"), dependency.files());
+        assertEquals("version-2", dependency.installedVersionId());
+        assertEquals("MODTALE", dependency.source());
+        assertEquals(List.of("/mods/parent.jar"), result.projects().get(1).files());
+        assertEquals(0, LibraryBundledInstallNormalizer.normalize(result.projects(), List.of()).addedChildren());
+    }
+
+    @Test
     void promotesBundledDependencyToNormalInstalledProject() {
         Path main = Path.of("/mods/main.jar");
         Path dependency = Path.of("/mods/dependency.jar");

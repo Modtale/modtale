@@ -234,18 +234,19 @@ public final class ProjectCardFactory {
         title.setTextOverrun(OverrunStyle.ELLIPSIS);
         copy.getChildren().addAll(title, authorLine(project, "by", "compact-byline", onOpenCreator));
 
-        VBox stats = new VBox(4, statLabel(LauncherIcons.Glyph.DOWNLOAD, number(project.downloadCount())),
+        HBox stats = new HBox(12, statLabel(LauncherIcons.Glyph.DOWNLOAD, number(project.downloadCount())),
                 favoriteStat(project, favorite, onToggleFavorite));
         stats.getStyleClass().add("compact-stats");
+        stats.setAlignment(Pos.CENTER_LEFT);
+        copy.getChildren().add(stats);
 
         Button install = installButton(project, onInstall);
         install.getStyleClass().add("icon-only-button");
         install.setText("");
-        install.setMinWidth(42);
-        install.setPrefWidth(42);
+        squareInstallButton(install, 42);
         install.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 16));
 
-        card.getChildren().addAll(icon, copy, stats, install, LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_RIGHT, 16));
+        card.getChildren().addAll(icon, copy, install);
         ProjectCardInteraction.addHoverAnimation(card, icon);
         return card;
     }
@@ -290,8 +291,7 @@ public final class ProjectCardFactory {
         if (tight) {
             install.getStyleClass().add("icon-only-button");
             install.setText("");
-            install.setMinWidth(38);
-            install.setPrefWidth(38);
+            squareInstallButton(install, CARD_STAT_HEIGHT);
         }
         install.setMinHeight(CARD_STAT_HEIGHT);
         install.setPrefHeight(CARD_STAT_HEIGHT);
@@ -396,19 +396,26 @@ public final class ProjectCardFactory {
     }
 
     private Button installButton(ProjectSummary project, Consumer<ProjectSummary> onInstall) {
-        boolean providerHandoff = project.isCurseForge() && !Boolean.TRUE.equals(project.distributionAllowed());
-        Button install = new Button(providerHandoff ? "Get on CurseForge" : "Install");
+        Button install = new Button("Install");
         install.getStyleClass().addAll("btn", "primary", "small", "project-install-button");
-        install.setGraphic(LauncherIcons.icon(
-                providerHandoff ? LauncherIcons.Glyph.EXTERNAL_LINK : LauncherIcons.Glyph.DOWNLOAD, 16));
-        install.setTooltip(new Tooltip(providerHandoff
-                ? "The author requires downloads through CurseForge"
-                : project.isCurseForge() ? "Install this verified CurseForge file" : "Install this project"));
+        install.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.DOWNLOAD, 16));
+        install.setTooltip(new Tooltip(project.isCurseForge()
+                ? "Install this verified CurseForge file" : "Install this project"));
         install.setOnAction(event -> {
             event.consume();
             onInstall.accept(project);
         });
         return install;
+    }
+
+    private void squareInstallButton(Button button, double size) {
+        button.setMinSize(size, size);
+        button.setPrefSize(size, size);
+        button.setMaxSize(size, size);
+        button.setPadding(javafx.geometry.Insets.EMPTY);
+        button.setAlignment(Pos.CENTER);
+        button.setContentDisplay(javafx.scene.control.ContentDisplay.GRAPHIC_ONLY);
+        button.setGraphicTextGap(0);
     }
 
     private Optional<ProjectVersion> latestCompatible(ProjectSummary project, String gameVersion) {

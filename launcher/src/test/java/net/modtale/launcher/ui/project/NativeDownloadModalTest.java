@@ -13,10 +13,10 @@ import org.junit.jupiter.api.Test;
 class NativeDownloadModalTest {
 
     @Test
-    void defaultsToLatestCatalogGameVersionInsteadOfPreferredOrGroupedFamily() throws Exception {
+    void defaultsToInstalledGameVersionFamily() throws Exception {
         NativeDownloadModal modal = new NativeDownloadModal(
                 () -> null,
-                () -> "0.5.3",
+                () -> "0.5.6",
                 ignored -> {
                 },
                 ignored -> {
@@ -24,12 +24,12 @@ class NativeDownloadModalTest {
         );
 
         modal.show(project(List.of(
-                version("v53", "1.0.0", "0.5.3"),
-                version("v54", "1.1.0", "0.5.4"),
+                version("v53", "1.3.7", "0.5"),
+                version("v54", "1.3.8", "0.6"),
                 version("v49", "0.9.0", "0.4.9")
-        )), catalog("0.5.4", "0.5.3", "0.4.9"));
+        )), catalog("0.6", "0.5", "0.4.9"));
 
-        assertEquals(List.of("0.5.4"), selectedGameVersions(modal));
+        assertEquals(List.of("0.5"), selectedGameVersions(modal));
     }
 
     @Test
@@ -74,6 +74,27 @@ class NativeDownloadModalTest {
         )), catalog("Early Access", "0.5.0"));
 
         assertEquals(List.of("0.5.0"), selectedGameVersions(modal));
+    }
+
+    @Test
+    void hydrationReplacesSummaryDefaultWithInstalledFamilyAndReopeningResetsSelection() throws Exception {
+        NativeDownloadModal modal = new NativeDownloadModal(() -> null, () -> "0.5.6", ignored -> {}, ignored -> {});
+        ProjectVersion next = version("8747205", "BetterMap-1.3.8.jar", "0.6");
+        ProjectVersion current = version("8230539", "BetterMap-1.3.7.jar", "0.5");
+        modal.show(project(List.of(next)), catalog("0.6"));
+        markShowing(modal);
+        modal.refresh(project(List.of(next, current)), catalog("0.6", "0.5"));
+        assertEquals(List.of("0.5"), selectedGameVersions(modal));
+        Field selected = NativeDownloadModal.class.getDeclaredField("selectedGameVersions");
+        selected.setAccessible(true);
+        selected.set(modal, List.of("0.6"));
+        Field changed = NativeDownloadModal.class.getDeclaredField("gameVersionSelectionChanged");
+        changed.setAccessible(true);
+        changed.set(modal, true);
+        modal.refresh(project(List.of(next, current)), catalog("0.6", "0.5"));
+        assertEquals(List.of("0.6"), selectedGameVersions(modal));
+        modal.show(project(List.of(next, current)), catalog("0.6", "0.5"));
+        assertEquals(List.of("0.5"), selectedGameVersions(modal));
     }
 
     private static ProjectDetail project(List<ProjectVersion> versions) {

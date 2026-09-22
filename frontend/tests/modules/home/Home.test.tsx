@@ -7,6 +7,8 @@ import { SSRProvider } from '@/context/SSRContext';
 import { Home } from '@/modules/home/views/Home';
 import { api } from '@/utils/api';
 
+vi.mock('@/modules/news/api/newsClient', () => ({ newsClient: { list: vi.fn().mockResolvedValue([]) } }));
+
 vi.mock('@/utils/api', () => ({
     api: {
         get: vi.fn(),

@@ -113,9 +113,9 @@ export const ROUTE_SEO: Record<string, RouteSeoEntry> = {
     '/launcher': {
         title: 'Modtale Launcher | Native Hytale Mod Manager',
         h1: 'Modtale Launcher',
-        description: 'Download the Modtale Launcher for Windows, macOS, and Linux. Install, update, and manage Hytale projects with a native launcher built for Modtale releases.',
+        description: 'Make Hytale yours with the Modtale Launcher. Browse Modtale and CurseForge mods, choose a setup for each world, and customize your look.',
         keywords: 'modtale launcher, hytale launcher, hytale mod manager, hytale mods launcher, download hytale mods, modtale download',
-        intro: 'The Modtale Launcher is a native desktop app for browsing Modtale projects, installing compatible Hytale releases, resolving dependencies, and keeping your local library ready to play.',
+        intro: 'Discover mods on Modtale and CurseForge, install their dependencies, choose which mods belong in each Hytale world, and save your own outfits in one native desktop app.',
         contentBlocks: [
             {
                 title: 'Desktop Launcher Packages',

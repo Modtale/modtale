@@ -19,8 +19,8 @@ import net.modtale.launcher.ui.common.LauncherIcons;
 
 final class LibraryWorldListRenderer {
 
-    private static final double WORLD_ICON_SIZE = 42;
-    private static final double WORLD_ICON_MEDIA_SIZE = WORLD_ICON_SIZE - 4;
+    private static final double WORLD_ICON_SIZE = 64;
+    private static final double WORLD_ICON_MEDIA_SIZE = WORLD_ICON_SIZE - 8;
 
     private final CachedImageLoader imageLoader;
     private final Consumer<HytaleWorld> selectWorld;
@@ -48,23 +48,28 @@ final class LibraryWorldListRenderer {
         StackPane icon = worldIcon(world);
 
         VBox copy = new VBox(4);
+        copy.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
         Label title = new Label(world.name());
         title.getStyleClass().add("library-project-title");
         Label meta = new Label(item.meta());
         meta.getStyleClass().add("library-project-meta");
+        copy.setMinWidth(0);
+        title.setMaxWidth(Double.MAX_VALUE);
+        meta.setMaxWidth(Double.MAX_VALUE);
         copy.getChildren().addAll(title, meta);
         HBox.setHgrow(copy, Priority.ALWAYS);
 
         Label status = new Label(item.enabledProjectCount() + " of " + item.totalProjectCount() + " enabled");
         status.getStyleClass().add("library-world-tab-status");
 
-        row.getChildren().addAll(icon, copy, status);
+        copy.getChildren().add(status);
+        row.getChildren().addAll(icon, copy);
         return row;
     }
 
     private StackPane worldIcon(HytaleWorld world) {
         StackPane shell = new StackPane();
-        shell.getStyleClass().add("library-project-icon");
+        shell.getStyleClass().addAll("library-project-icon", "library-mod-icon", "library-world-list-icon");
         shell.setMinSize(WORLD_ICON_SIZE, WORLD_ICON_SIZE);
         shell.setPrefSize(WORLD_ICON_SIZE, WORLD_ICON_SIZE);
         shell.setMaxSize(WORLD_ICON_SIZE, WORLD_ICON_SIZE);
@@ -74,14 +79,14 @@ final class LibraryWorldListRenderer {
             ImageView image = new ImageView();
             image.setFitWidth(WORLD_ICON_MEDIA_SIZE);
             image.setFitHeight(WORLD_ICON_MEDIA_SIZE);
-            image.setPreserveRatio(false);
+            LibraryWorldIcon.cropToSquare(image);
             image.setSmooth(true);
             image.setMouseTransparent(true);
-            image.setClip(roundedClip(WORLD_ICON_MEDIA_SIZE, 6));
-            imageLoader.loadInto(image, preview, WORLD_ICON_MEDIA_SIZE, WORLD_ICON_MEDIA_SIZE);
+            image.setClip(roundedClip(WORLD_ICON_MEDIA_SIZE, 14));
+            imageLoader.loadInto(image, preview, WORLD_ICON_MEDIA_SIZE * 6, WORLD_ICON_MEDIA_SIZE * 6, true);
             shell.getChildren().add(image);
         } else {
-            shell.getChildren().add(LauncherIcons.icon(LauncherIcons.Glyph.GLOBE, 18));
+            shell.getChildren().add(LauncherIcons.icon(LauncherIcons.Glyph.GLOBE, 24));
         }
         return shell;
     }

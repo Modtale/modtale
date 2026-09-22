@@ -8,8 +8,8 @@ import java.util.Map;
 import java.util.Set;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
-import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextField;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
@@ -23,16 +23,20 @@ public final class ProjectBrowseTags {
     private final Runnable onChange;
     private final Map<String, Button> tagButtons = new LinkedHashMap<>();
     private final Set<String> selectedTags = new LinkedHashSet<>();
-    private final VBox popover = new VBox(12);
+    private final VBox section = new VBox(12);
+    private final TextField search = new TextField();
+    private final Button heading = new Button("Tags");
+    private final ScrollPane tagScroll = new ScrollPane();
+    private boolean expanded;
 
     public ProjectBrowseTags(Runnable onSearch, Runnable onChange) {
         this.onSearch = onSearch;
         this.onChange = onChange;
-        configurePopover();
+        configureSection();
     }
 
-    public VBox popover() {
-        return popover;
+    public VBox section() {
+        return section;
     }
 
     public boolean isEmpty() {
@@ -55,6 +59,7 @@ public final class ProjectBrowseTags {
 
     public void clear() {
         selectedTags.clear();
+        search.clear();
         updateButtons();
     }
 
@@ -62,29 +67,28 @@ public final class ProjectBrowseTags {
         updateButtons();
     }
 
-    private void configurePopover() {
-        popover.getStyleClass().addAll("filter-popover", "tag-popover");
-        popover.setPrefWidth(288);
-        popover.setMaxWidth(288);
-        popover.setVisible(false);
-        popover.setManaged(false);
-        popover.addEventHandler(ScrollEvent.SCROLL, ScrollEvent::consume);
+    private void configureSection() {
+        section.getStyleClass().add("filter-section");
 
         HBox header = new HBox(12);
         header.getStyleClass().add("tag-popover-header");
         header.setAlignment(Pos.CENTER_LEFT);
-        Label title = new Label("Filter by Tag");
-        title.getStyleClass().add("popover-title");
+        heading.getStyleClass().add("filter-toggle-button");
+        heading.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(heading, Priority.ALWAYS);
+        heading.setOnAction(event -> {
+            expanded = !expanded;
+            updateExpansion();
+        });
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        Button clear = new Button("Clear All");
+        Button clear = new Button("Clear Tags");
         clear.getStyleClass().add("tag-clear-button");
         clear.setOnAction(event -> {
-            selectedTags.clear();
-            updateButtons();
+            clear();
             onSearch.run();
         });
-        header.getChildren().addAll(title, spacer, clear);
+        header.getChildren().addAll(heading, spacer, clear);
 
         FlowPane tags = new FlowPane(8, 8);
         tags.getStyleClass().add("tag-grid");
@@ -102,17 +106,42 @@ public final class ProjectBrowseTags {
             tags.getChildren().add(button);
         }
 
-        ScrollPane tagScroll = new ScrollPane(tags);
+        tagScroll.setContent(tags);
         tagScroll.getStyleClass().add("tag-scroll");
         tagScroll.setFitToWidth(true);
         tagScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         tagScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        tagScroll.setMaxHeight(240);
+        tagScroll.setPrefViewportHeight(150);
+        tagScroll.setMaxHeight(150);
         header.addEventFilter(ScrollEvent.SCROLL, ScrollEvent::consume);
-        popover.getChildren().setAll(header, tagScroll);
+        search.setPromptText("Search tags...");
+        search.setAccessibleText("Search tags");
+        net.modtale.launcher.ui.common.LauncherUi.styleInput(search);
+        search.textProperty().addListener((observable, previous, query) -> {
+            String normalized = query.trim().toLowerCase(java.util.Locale.ROOT);
+            tagButtons.forEach((tag, button) -> {
+                boolean matches = tag.toLowerCase(java.util.Locale.ROOT).contains(normalized);
+                button.setVisible(matches);
+                button.setManaged(matches);
+            });
+        });
+        section.getChildren().setAll(header, search, tagScroll);
+        updateExpansion();
+    }
+
+    private void updateExpansion() {
+        search.setVisible(expanded);
+        search.setManaged(expanded);
+        tagScroll.setVisible(expanded);
+        tagScroll.setManaged(expanded);
+        heading.setGraphic(net.modtale.launcher.ui.common.LauncherIcons.icon(
+                expanded ? net.modtale.launcher.ui.common.LauncherIcons.Glyph.CHEVRON_DOWN
+                        : net.modtale.launcher.ui.common.LauncherIcons.Glyph.CHEVRON_RIGHT, 12));
+        heading.setAccessibleHelp(expanded ? "Collapse tag choices" : "Expand tag choices");
     }
 
     private void updateButtons() {
+        heading.setText(isEmpty() ? "Tags" : "Tags (" + selectedCount() + ")");
         tagButtons.forEach((tag, button) -> pseudo(button, "selected", selectedTags.contains(tag)));
         onChange.run();
     }

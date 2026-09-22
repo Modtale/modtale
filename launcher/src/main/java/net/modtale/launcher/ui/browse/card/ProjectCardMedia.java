@@ -99,8 +99,6 @@ public final class ProjectCardMedia {
         clip.setArcHeight(mediaRadius * 2);
         media.setClip(clip);
 
-        media.getChildren().add(iconBackdrop(mediaSize));
-
         ImageView fallback = remoteImage(projectPlaceholderUrl(), mediaSize, mediaSize);
         fallback.setMouseTransparent(true);
         media.getChildren().add(fallback);
@@ -108,6 +106,7 @@ public final class ProjectCardMedia {
         if (project.imageUrl() != null && !project.imageUrl().isBlank()) {
             ImageView foreground = remoteImage(project.imageUrl(), mediaSize, mediaSize);
             foreground.setMouseTransparent(true);
+            CachedImageLoader.showFallbackUntilLoaded(fallback, foreground);
             media.getChildren().add(foreground);
         }
         icon.getChildren().add(media);
@@ -138,16 +137,6 @@ public final class ProjectCardMedia {
         region.setMinHeight(height);
         region.setPrefHeight(height);
         region.setMaxHeight(height);
-    }
-
-    private StackPane iconBackdrop(double size) {
-        StackPane backdrop = new StackPane();
-        backdrop.getStyleClass().add("project-icon-backdrop");
-        backdrop.setMinSize(size, size);
-        backdrop.setPrefSize(size, size);
-        backdrop.setMaxSize(size, size);
-        backdrop.setMouseTransparent(true);
-        return backdrop;
     }
 
     private double projectIconMediaRadius(double borderWidth) {
@@ -195,8 +184,8 @@ public final class ProjectCardMedia {
     }
 
     private ImageView remoteImage(String rawUrl, double width, double height) {
-        ImageView view = imageView(width, height, false);
-        imageLoader.loadInto(view, rawUrl, requestedImageDimension(width, imageRenderScale), requestedImageDimension(height, imageRenderScale));
+        ImageView view = imageView(width, height, true);
+        imageLoader.loadInto(view, rawUrl, requestedImageDimension(width, imageRenderScale), requestedImageDimension(height, imageRenderScale), true);
         return view;
     }
 

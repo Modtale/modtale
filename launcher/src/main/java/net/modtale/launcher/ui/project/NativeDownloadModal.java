@@ -33,6 +33,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import net.modtale.launcher.model.project.GameVersionCompatibility;
 import net.modtale.launcher.ui.common.LauncherSkeleton;
 import net.modtale.launcher.ui.common.LauncherSkeletonContent;
 import net.modtale.launcher.model.project.GameVersionCatalog;
@@ -64,6 +65,7 @@ final class NativeDownloadModal {
     private boolean listExpanded;
     private boolean loading;
     private boolean gameVersionDropdownOpen;
+    private boolean gameVersionSelectionChanged;
 
     NativeDownloadModal(
             Supplier<StackPane> host,
@@ -82,6 +84,8 @@ final class NativeDownloadModal {
     void show(ProjectDetail project, GameVersionCatalog catalog) {
         this.project = project;
         this.catalog = catalog == null ? GameVersionCatalog.fromVersions(List.of()) : catalog;
+        this.selectedGameVersions = List.of();
+        this.gameVersionSelectionChanged = false;
         this.showExperimental = false;
         this.showPreReleaseGameVersions = forceShowPreReleaseGameVersions();
         this.listExpanded = false;
@@ -94,6 +98,8 @@ final class NativeDownloadModal {
     void showLoading(ProjectDetail project, GameVersionCatalog catalog) {
         this.project = project;
         this.catalog = catalog == null ? GameVersionCatalog.fromVersions(List.of()) : catalog;
+        this.selectedGameVersions = List.of();
+        this.gameVersionSelectionChanged = false;
         this.showExperimental = false;
         this.showPreReleaseGameVersions = forceShowPreReleaseGameVersions();
         this.listExpanded = false;
@@ -110,6 +116,9 @@ final class NativeDownloadModal {
         this.project = project;
         this.catalog = catalog == null ? GameVersionCatalog.fromVersions(List.of()) : catalog;
         this.loading = false;
+        if (!gameVersionSelectionChanged) {
+            selectedGameVersions = List.of();
+        }
         List<String> availableGameVersions = gameVersions();
         if (selectedGameVersions.isEmpty() && !availableGameVersions.isEmpty()) {
             selectedGameVersions = preferredVisibleGameVersions();
@@ -198,6 +207,7 @@ final class NativeDownloadModal {
         header.setAlignment(Pos.CENTER_LEFT);
 
         VBox copy = new VBox(4);
+        copy.setAlignment(Pos.CENTER_LEFT);
         copy.setMinWidth(0);
         HBox.setHgrow(copy, Priority.ALWAYS);
         HBox title = new HBox(9);
@@ -279,6 +289,7 @@ final class NativeDownloadModal {
         versions.setSelectedVersions(activeSelectedGameVersions());
         versions.setOnOpenChange(open -> gameVersionDropdownOpen = open);
         versions.setOnSelectionChange(next -> {
+            gameVersionSelectionChanged = true;
             selectedGameVersions = next.isEmpty() ? preferredVisibleGameVersions() : List.copyOf(next);
             listExpanded = false;
             rebuildOverlay();
@@ -340,7 +351,7 @@ final class NativeDownloadModal {
         box.getChildren().addAll(headline, versionLabel);
         if (shouldShowEntryGameVersion()) {
             Label forVersion = new Label("For " + entry.gameVersion());
-            forVersion.getStyleClass().add("download-modal-file-date");
+            forVersion.getStyleClass().add("download-modal-latest-game-version");
             box.getChildren().add(forVersion);
         }
         List<String> others = otherCompatibleVersions(version, entry.gameVersion());
@@ -645,7 +656,10 @@ final class NativeDownloadModal {
                 return validSelections;
             }
         }
-        return List.of(versions.getFirst());
+        String preferred = preferredGameVersion.get();
+        return List.of(versions.stream()
+                .filter(version -> GameVersionCompatibility.matches(version, preferred))
+                .findFirst().orElse(versions.getFirst()));
     }
 
     private Map<String, List<ProjectVersion>> versionsByGame() {

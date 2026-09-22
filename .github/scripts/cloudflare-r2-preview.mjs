@@ -226,9 +226,9 @@ async function revokeToken(accountId, token, tokenId, reason) {
   }
 }
 
-async function createRuntimeToken(accountId, token, bucketName, jurisdiction) {
+async function createRuntimeToken(accountId, token, bucketName, jurisdiction, readOnly = false) {
   const readGroupId = await permissionGroupId(accountId, token, R2_BUCKET_ITEM_READ);
-  const writeGroupId = await permissionGroupId(accountId, token, R2_BUCKET_ITEM_WRITE);
+  const writeGroupId = readOnly ? null : await permissionGroupId(accountId, token, R2_BUCKET_ITEM_WRITE);
   const tokenName = optional("R2_TOKEN_NAME", `modtale preview ${bucketName}`);
   const expiresOn = optional("R2_TOKEN_EXPIRES_ON");
 
@@ -240,7 +240,7 @@ async function createRuntimeToken(accountId, token, bucketName, jurisdiction) {
         resources: {
           [bucketResource(accountId, jurisdiction, bucketName)]: "*",
         },
-        permission_groups: [{ id: readGroupId }, { id: writeGroupId }],
+        permission_groups: [{ id: readGroupId }, ...(writeGroupId ? [{ id: writeGroupId }] : [])],
       },
     ],
   };
@@ -273,7 +273,7 @@ async function createRuntimeToken(accountId, token, bucketName, jurisdiction) {
   };
 }
 
-async function provision() {
+async function provision(readOnly = false) {
   const accountId = required("CLOUDFLARE_ACCOUNT_ID");
   const bucketToken = firstRequired([
     "CLOUDFLARE_R2_PROVISIONER",
@@ -290,6 +290,7 @@ async function provision() {
     tokenProvisioner,
     bucketName,
     jurisdiction,
+    readOnly,
   );
 
   await exportRuntimeValues({
@@ -358,6 +359,8 @@ async function cleanup() {
 try {
   if (mode === "provision") {
     await provision();
+  } else if (mode === "provision-read-only") {
+    await provision(true);
   } else if (mode === "ensure-bucket") {
     await ensureOnly();
   } else if (mode === "cleanup") {

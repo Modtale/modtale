@@ -1,3 +1,4 @@
+import { NewsManagement } from '../components/NewsManagement';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText, Wallet, CalendarClock } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
@@ -19,7 +20,7 @@ interface AdminPanelProps {
     currentUser: any;
 }
 
-type AdminTab = 'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'finance' | 'logs' | 'status';
+type AdminTab = 'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'logs' | 'status' | 'news' | 'finance';
 
 export function AdminPanel({ currentUser }: AdminPanelProps) {
     const [activeTab, setActiveTab] = useState<AdminTab>('verification');
@@ -45,6 +46,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     const canRescanVersions = hasAdminPermission(currentUser, AdminPermission.PROJECT_VERSION_RESCAN);
     const canReadReports = hasAdminPermission(currentUser, AdminPermission.REPORT_READ);
     const canResolveReports = hasAdminPermission(currentUser, AdminPermission.REPORT_RESOLVE);
+    const canManageNews = hasAnyAdminPermission(currentUser, [AdminPermission.NEWS_MANAGE, AdminPermission.USER_PERMISSION_MANAGE]);
     const canReadStatus = hasAnyAdminPermission(currentUser, [AdminPermission.STATUS_INCIDENT_READ, AdminPermission.STATUS_INCIDENT_MANAGE]);
     const canManageStatus = hasAdminPermission(currentUser, AdminPermission.STATUS_INCIDENT_MANAGE);
     const canReadAnalytics = hasAdminPermission(currentUser, AdminPermission.PLATFORM_ANALYTICS_READ);
@@ -69,6 +71,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     ]);
 
     const tabAccess: Record<AdminTab, boolean> = useMemo(() => ({
+        news: canManageNews,
         verification: canReadReviewQueue,
         reports: canReadReports,
         status: canReadStatus,
@@ -78,6 +81,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         users: canUseUserManagement,
         logs: canReadLogs
     }), [
+        canManageNews,
         canReadAnalytics,
         canReadLogs,
         canReadReports,
@@ -107,10 +111,15 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
 
     useEffect(() => {
         if (!canReadReviewQueue) return;
-        const interval = setInterval(() => {
-            fetchQueue(true);
-        }, 30_000);
-        return () => clearInterval(interval);
+        const refreshVisibleQueue = () => {
+            if (document.visibilityState !== 'hidden') fetchQueue(true);
+        };
+        const interval = setInterval(refreshVisibleQueue, 30_000);
+        document.addEventListener('visibilitychange', refreshVisibleQueue);
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', refreshVisibleQueue);
+        };
     }, [canReadReviewQueue]);
 
     useEffect(() => {
@@ -239,6 +248,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                             </div>
 
                             <nav className="space-y-1">
+                                {canManageNews && <SidebarButton tab="news" icon={FileText} label="News" />}
                                 {canReadReviewQueue && (
                                     <SidebarButton
                                         tab="verification"
@@ -302,7 +312,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                     </aside>
 
                     <div className="flex-1 min-w-0">
-                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-8 shadow-2xl">
+                        <div className={`bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl ${activeTab === 'news' ? 'p-4 sm:p-8' : 'p-8'} shadow-2xl`}>
                             {activeTab === 'verification' && canReadReviewQueue && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="mb-8">
@@ -355,6 +365,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                 </div>
                             )}
 
+                            {activeTab === 'news' && canManageNews && <NewsManagement userId={currentUser.id} />}
                             {activeTab === 'status' && canReadStatus && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <StatusIncidents setStatus={setStatus} canManage={canManageStatus} />

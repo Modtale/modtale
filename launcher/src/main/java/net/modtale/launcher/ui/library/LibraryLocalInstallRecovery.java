@@ -32,7 +32,7 @@ final class LibraryLocalInstallRecovery {
             List<InstalledProject> recordedProjects,
             List<HytaleInstalledMod> installedMods
     ) {
-        List<InstalledProject> recorded = recordedProjects == null ? List.of() : List.copyOf(recordedProjects);
+        List<InstalledProject> recorded = recordedProjects == null ? List.of() : removeCoveredLocalRecords(recordedProjects);
         if (installedMods == null || installedMods.isEmpty()) {
             return new RecoveryResult(recorded, 0);
         }
@@ -62,6 +62,21 @@ final class LibraryLocalInstallRecovery {
             recovered++;
         }
         return new RecoveryResult(List.copyOf(byProjectId.values()), recovered);
+    }
+
+    private static List<InstalledProject> removeCoveredLocalRecords(List<InstalledProject> projects) {
+        Set<String> managedFiles = new LinkedHashSet<>();
+        for (InstalledProject project : projects) {
+            if (!InstalledProject.SOURCE_LOCAL.equalsIgnoreCase(project.source())) {
+                project.files().stream().map(LibraryFileIdentity::key)
+                        .filter(key -> !key.isBlank()).forEach(managedFiles::add);
+            }
+        }
+        return projects.stream().filter(project ->
+                !InstalledProject.SOURCE_LOCAL.equalsIgnoreCase(project.source())
+                        || project.files().isEmpty()
+                        || !project.files().stream().map(LibraryFileIdentity::key).allMatch(managedFiles::contains))
+                .toList();
     }
 
     private static InstalledProject fromInstalledMod(
@@ -169,14 +184,14 @@ final class LibraryLocalInstallRecovery {
         if (path == null) {
             return "";
         }
-        return path.toAbsolutePath().normalize().toString();
+        return LibraryFileIdentity.key(path);
     }
 
     private static String normalizedPath(String path) {
         if (path == null || path.isBlank()) {
             return "";
         }
-        return Path.of(path).toAbsolutePath().normalize().toString();
+        return LibraryFileIdentity.key(path);
     }
 
     private static String sanitize(String value) {

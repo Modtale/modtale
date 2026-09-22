@@ -103,7 +103,7 @@ public class NotificationService {
         if (!expired.isEmpty()) {
             logger.info("Cleaning up {} expired actionable notifications.", expired.size());
             for (Notification n : expired) {
-                voidAction(n);
+                voidAction(n, true);
                 notificationRepository.delete(n);
             }
         }
@@ -117,34 +117,66 @@ public class NotificationService {
         notificationDeliveryService.sendNotifcation(userIds, title, message, link, iconUrl);
     }
 
-    private void voidAction(Notification n) {
+    @Scheduled(fixedDelay = 60000)
+    public void cleanupExpiredTransfers() {
+        mongoTemplate.updateMulti(new Query(Criteria.where("pendingTransferExpiresAt").gt(0).lte(System.currentTimeMillis())),
+                clearTransfer(), Project.class);
+    }
+
+    @Scheduled(fixedDelay = 60000)
+    public void cleanupExpiredContributorInvites() {
+        var expired = new Document("requestExpiresAt", new Document("$gt", 0).append("$lte", System.currentTimeMillis()));
+        mongoTemplate.updateMulti(new Query(Criteria.where("teamInvites").elemMatch(
+                Criteria.where("requestExpiresAt").gt(0).lte(System.currentTimeMillis()))),
+                new Update().pull("teamInvites", expired), Project.class);
+    }
+
+    @Scheduled(fixedDelay = 60000)
+    public void cleanupExpiredOrganizationInvites() {
+        long now = System.currentTimeMillis();
+        var expired = new Document("requestExpiresAt", new Document("$gt", 0).append("$lte", now));
+        mongoTemplate.updateMulti(new Query(Criteria.where("accountType").is(User.AccountType.ORGANIZATION)
+                .and("pendingOrgInvites").elemMatch(Criteria.where("requestExpiresAt").gt(0).lte(now))),
+                new Update().pull("pendingOrgInvites", expired), User.class);
+    }
+
+    private Update clearTransfer() {
+        return new Update().unset("pendingTransferTo").unset("pendingTransferRequestId")
+                .unset("pendingTransferOwnerId").unset("pendingTransferExpiresAt");
+    }
+
+    private void voidAction(Notification n) { voidAction(n, false); }
+    private void voidAction(Notification n, boolean expired) {
         try {
             if (n.getType() == NotificationType.TRANSFER_REQUEST) {
                 String projectId = n.getMetadata().get("projectId");
-                if (projectId != null) {
-                    mongoTemplate.updateFirst(
-                            new Query(Criteria.where("_id").is(projectId).and("pendingTransferTo").exists(true)),
-                            new Update().unset("pendingTransferTo"),
+                String requestId = n.getMetadata().get("requestId");
+                String targetUserId = n.getMetadata().get("targetUserId");
+                if (projectId != null && requestId != null && !requestId.isBlank() && targetUserId != null
+                        && (expired || targetUserId.equals(n.getUserId()))) {
+                    var match = Criteria.where("_id").is(projectId).and("pendingTransferTo").is(targetUserId)
+                            .and("pendingTransferRequestId").is(requestId);
+                    if (expired) match.and("pendingTransferExpiresAt").gt(0).lte(System.currentTimeMillis());
+                    mongoTemplate.updateFirst(new Query(match), clearTransfer(),
                             Project.class
                     );
                 }
             } else if (n.getType() == NotificationType.ORG_INVITE) {
                 String orgId = n.getMetadata().get("orgId");
-                if (orgId != null) {
-                    mongoTemplate.updateFirst(
-                            new Query(Criteria.where("_id").is(orgId)),
-                            new Update().pull("pendingOrgInvites", new Document("userId", n.getUserId())),
-                            User.class
-                    );
+                String requestId = n.getMetadata().get("requestId");
+                if (orgId != null && requestId != null && !requestId.isBlank()) {
+                    var invite = new Document("userId", n.getUserId()).append("requestId", requestId);
+                    if (expired) invite.append("requestExpiresAt", new Document("$gt", 0).append("$lte", System.currentTimeMillis()));
+                    mongoTemplate.updateFirst(new Query(Criteria.where("_id").is(orgId)), new Update().pull("pendingOrgInvites", invite), User.class);
                 }
             } else if (n.getType() == NotificationType.CONTRIBUTOR_INVITE) {
                 String projectId = n.getMetadata().get("projectId");
-                if (projectId != null) {
-                    mongoTemplate.updateFirst(
-                            new Query(Criteria.where("_id").is(projectId)),
-                            new Update().pull("teamInvites", new Document("userId", n.getUserId())),
-                            Project.class
-                    );
+                String requestId = n.getMetadata().get("requestId");
+                if (projectId != null && requestId != null && !requestId.isBlank()) {
+                    var invite = new Document("userId", n.getUserId()).append("requestId", requestId);
+                    if (expired) invite.append("requestExpiresAt", new Document("$gt", 0).append("$lte", System.currentTimeMillis()));
+                    mongoTemplate.updateFirst(new Query(Criteria.where("_id").is(projectId)),
+                            new Update().pull("teamInvites", invite), Project.class);
                 }
             }
         } catch (Exception e) {

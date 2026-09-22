@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -170,6 +171,61 @@ class GameVersionServiceTest {
                 List.of("0.5.4", "0.5.3", "0.5.2", "0.5.1", "0.5.0"),
                 service.getCatalog().releaseVersions()
         );
+    }
+
+    @Test
+    void missingVersionTriggersOneMavenRefreshBeforeBeingRejected() {
+        RestTemplate restTemplate = new RestTemplate();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        server.expect(requestTo("https://versions.example/release.xml"))
+                .andRespond(withSuccess(HYTALE_RELEASE_METADATA, MediaType.APPLICATION_XML));
+        server.expect(requestTo("https://versions.example/pre.xml"))
+                .andRespond(withSuccess(HYTALE_PRE_RELEASE_METADATA, MediaType.APPLICATION_XML));
+
+        GameVersionService service = new GameVersionService(
+                mockMongoTemplate(),
+                new AppGameVersionProperties("https://versions.example/release.xml", "https://versions.example/pre.xml", 1_000L),
+                restTemplate
+        );
+
+        service.initialRefresh();
+
+        server.reset();
+        server.expect(requestTo("https://versions.example/release.xml"))
+                .andRespond(withSuccess(HYTALE_RELEASE_METADATA.replace("0.5.4", "0.5.5"), MediaType.APPLICATION_XML));
+        server.expect(requestTo("https://versions.example/pre.xml"))
+                .andRespond(withSuccess(HYTALE_PRE_RELEASE_METADATA, MediaType.APPLICATION_XML));
+
+        assertTrue(service.isVersionSupported("0.5.5"));
+        assertTrue(service.getCatalog().allVersions().contains("0.5.5"));
+    }
+
+    @Test
+    void unknownVersionRefreshIsThrottledAcrossRequests() {
+        RestTemplate restTemplate = new RestTemplate();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
+        server.expect(requestTo("https://versions.example/release.xml"))
+                .andRespond(withSuccess(HYTALE_RELEASE_METADATA, MediaType.APPLICATION_XML));
+        server.expect(requestTo("https://versions.example/pre.xml"))
+                .andRespond(withSuccess(HYTALE_PRE_RELEASE_METADATA, MediaType.APPLICATION_XML));
+
+        GameVersionService service = new GameVersionService(
+                mockMongoTemplate(),
+                new AppGameVersionProperties("https://versions.example/release.xml", "https://versions.example/pre.xml", 1_000L),
+                restTemplate
+        );
+
+        service.initialRefresh();
+
+        server.reset();
+        server.expect(requestTo("https://versions.example/release.xml"))
+                .andRespond(withSuccess(HYTALE_RELEASE_METADATA, MediaType.APPLICATION_XML));
+        server.expect(requestTo("https://versions.example/pre.xml"))
+                .andRespond(withSuccess(HYTALE_PRE_RELEASE_METADATA, MediaType.APPLICATION_XML));
+
+        assertFalse(service.isVersionSupported("0.7.0"));
+        assertFalse(service.isVersionSupported("0.7.1"));
+        server.verify();
     }
 
     private static MongoTemplate mockMongoTemplate() {

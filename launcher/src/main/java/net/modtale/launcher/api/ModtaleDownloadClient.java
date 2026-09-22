@@ -30,7 +30,7 @@ final class ModtaleDownloadClient {
 
     ModtaleApiClient.DownloadedFile download(String rawUrl) {
         URI uri = resolve(rawUrl);
-        HttpRequest request = ModtaleApiTransport.requestBuilder(uri)
+        HttpRequest request = JsonApiTransport.requestBuilder(uri)
                 .GET()
                 .header("Accept", "application/octet-stream, application/zip, */*")
                 .build();
@@ -42,7 +42,7 @@ final class ModtaleDownloadClient {
             LOG.info("GET " + LogSanitizer.uri(uri) + " -> HTTP "
                     + response.statusCode() + " in " + elapsedMs + "ms");
             try (InputStream body = response.body()) {
-                ModtaleApiTransport.ensureSuccess(response.statusCode(), uri.toString());
+                JsonApiTransport.ensureSuccess(response.statusCode(), uri.toString());
                 String filename = filenameFromDisposition(response.headers().firstValue("Content-Disposition"))
                         .or(() -> filenameFromUri(uri))
                         .orElse("download.bin");

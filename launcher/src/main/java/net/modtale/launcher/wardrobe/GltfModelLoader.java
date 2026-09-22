@@ -22,7 +22,7 @@ import java.nio.ByteOrder;
 import java.util.HashSet;
 import java.util.Set;
 
-/** Bounded, self-contained GLB 2.0 loader for Hyvatar's static avatar exports.
+/** Bounded, self-contained GLB 2.0 loader for static avatar exports.
  * Builds a detached scene graph; call on a worker and attach the result on the FX thread.
  * Unsupported compression, external resources, animation and skinning fail explicitly.
  */

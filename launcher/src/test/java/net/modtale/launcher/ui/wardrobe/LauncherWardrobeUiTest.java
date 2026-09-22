@@ -60,7 +60,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * A graphical display (or Xvfb) is required. The environment variable is an output directory,
  * not a boolean. A leading ~/ is expanded explicitly, including when the value was quoted.
  * The deterministic mode uses fictional names, IDs, and schematic local artwork.
- * The separate live mode uses public HyTags/Hyvatar reads and records source/load results.
+ * All fixtures and thumbnails are local.
  * Neither mode uses an account, credentials, settings files, or remote writes.
  * Exercises native dialogs and asynchronous UI updates, then captures the actual controller
  * hosted in a real shown Stage using the launcher's stylesheet.
@@ -95,17 +95,14 @@ class LauncherWardrobeUiTest {
         }
         try (ExecutorService executor = Executors.newFixedThreadPool(3)) {
             Harness harness = fx(() -> {
-                var feedback = new LauncherFeedback(executor, new Label(), new VBox(), new StackPane(),
+                var feedback = new LauncherFeedback(executor, new Label(), new StackPane(),
                         new Label(), new Label(), () -> "Fixture ready");
-                var preview = new WardrobePreview(executor, false, (uri, limit) -> {
-                    assertFalse(Platform.isFxApplicationThread(), "Preview fetch must be asynchronous");
-                    var matcher = java.util.regex.Pattern.compile("(?:^|&)skin_id=([^&]+)").matcher(uri.getQuery());
-                    assertTrue(matcher.find(), "Fixture preview must retain the selected item's ID");
-                    UUID itemId = UUID.fromString(matcher.group(1));
-                    return Files.readAllBytes(thumbnails.get(itemId));
-                }, uri -> fail("Screenshot harness must not open a browser"));
-                var controller = new LauncherWardrobeController(gateway, store, LauncherSettings::new,
-                        feedback, executor, preview, item -> thumbnails.get(item.id()).toUri().toString());
+                var preview = new WardrobePreview(executor, false);
+                var controller = new LauncherWardrobeController(gateway, store, () -> { var settings = new LauncherSettings(); settings.setHytaleGamePath(directory.resolve("no-game").toString()); return settings; },
+                        feedback, executor, preview, item -> thumbnails.get(item.id()).toUri().toString(), new net.modtale.launcher.wardrobe.PopularSkinClient() {
+                            @Override public Page page(int page) { return new Page(gateway.skins, false); }
+                            @Override public String thumbnail(String hash) { return thumbnails.get(UUID.fromString(hash)).toUri().toString(); }
+                        });
                 var scroll = new ScrollPane(controller.view());
                 scroll.setFitToWidth(true);
                 scroll.setStyle("-fx-background: #0B1120; -fx-background-color: #0B1120; -fx-padding: 24;");
@@ -118,12 +115,13 @@ class LauncherWardrobeUiTest {
                 stage.setTitle("Wardrobe fictional fixtures — no connected account");
                 stage.setScene(scene);
                 stage.show();
+                button(controller.view(), "Popular skins").fire();
                 controller.refresh();
                 return new Harness(controller, stage, scroll);
             });
             try {
                 await("initial skin catalog", () -> cards(harness).size() == 3);
-                click(harness, "Preview " + gateway.skins.getFirst().name());
+                click(harness, "Preview Fixture Ember Scout");
                 awaitPreview(harness);
                 assertTrue(fx(() -> button(harness.root(), "Apply").isDisabled()));
                 capturePair(harness, output, "skins");
@@ -151,6 +149,7 @@ class LauncherWardrobeUiTest {
                 assertEquals("Fixture Ember Favorite", saved.name());
                 assertTrue(saved.favorite());
                 assertEquals("Fixture Adventures", saved.collection());
+                assertNamedBrowser(harness);
 
                 click(harness, "Saved looks");
                 await("saved collection", () -> cards(harness).size() == 4);
@@ -177,6 +176,11 @@ class LauncherWardrobeUiTest {
                 click(harness, "Preview Fixture Ember Favorite");
                 awaitPreview(harness);
                 capturePair(harness, output, "saved");
+                click(harness, "Popular skins");
+                await("return to skin browser", () -> cards(harness).size() == 3);
+                assertNamedBrowser(harness);
+                click(harness, "Preview Fixture Ember Scout");
+                assertNamedBrowser(harness);
 
                 assertEquals(0, gateway.applyCalls.get());
                 Files.writeString(output.resolve("wardrobe-fixtures.txt"), """
@@ -184,8 +188,8 @@ class LauncherWardrobeUiTest {
                         Four PNG captures: skins and saved; desktop 1440x1000 and compact 1000x900.
                         All displayed names, UUIDs, cosmetics, and schematic PNG artwork are fictional
                         test fixtures. The pictures are real JavaFX scene snapshots, not artwork of a proposed UI.
-                        The preview deliberately exercises the supported static-image fallback with local test images.
-                        No credentials are loaded. Gateway operations and preview fetches are stubbed; thumbnails
+                        The preview deliberately exercises the missing installed-assets guidance.
+                        No credentials are loaded. Gateway operations are stubbed; thumbnails
                         are local files. Account application and external-browser actions fail if invoked.
                         Actions exercised: selection, native Save dialog, favorite/type/search filters.
                         Run: MODTALE_WARDROBE_SCREENSHOTS=~/Pictures ./gradlew test --tests '*LauncherWardrobeUiTest' --rerun-tasks
@@ -202,96 +206,6 @@ class LauncherWardrobeUiTest {
                 });
             }
         }
-    }
-
-    /** Live public catalog/Hyvatar reads only. Failures are recorded alongside any successful captures. */
-    @Test
-    @EnabledIfEnvironmentVariable(named = "MODTALE_WARDROBE_LIVE_SCREENSHOTS", matches = ".+")
-    void livePublicWardrobeScreenshots() throws Exception {
-        Path output = outputDirectory("MODTALE_WARDROBE_LIVE_SCREENSHOTS");
-        Files.createDirectories(output);
-        List<String> notes = new java.util.concurrent.CopyOnWriteArrayList<>();
-        notes.add("Actual LauncherWardrobeController scenes using public HyTags catalogs and real Hyvatar imagery.");
-        notes.add("Captured at " + java.time.Instant.now() + ". No sign-in, settings-file reads, or account writes.");
-        notes.add("Catalog pages are displayed using the real responsive grid; no synthetic cards are added.");
-        var auth = new HytaleAuthService(null, null) {
-            @Override public String freshSessionToken(LauncherSettings settings) { throw new AssertionError("Live screenshots cannot request credentials"); }
-        };
-        var gateway = new WardrobeApiClient(auth) {
-            @Override public List<WardrobeItem> browseSkins(int page, String sort) {
-                List<WardrobeItem> items = super.browseSkins(page, sort);
-                notes.add("Public skin catalog: " + items.size() + " items from page " + page + ", sort=" + sort);
-                return items;
-            }
-            @Override public WardrobeItem currentSkin(LauncherSettings settings) { throw new AssertionError("No account reads in live screenshots"); }
-            @Override public void apply(WardrobeItem item, LauncherSettings settings) { throw new AssertionError("No account writes in live screenshots"); }
-            @Override public void apply(WardrobeItem item, LauncherSettings settings, UUID target) { throw new AssertionError("No account writes in live screenshots"); }
-        };
-        WardrobeStore store = new WardrobeStore(directory.resolve("live-state"));
-        List<String> failures = new ArrayList<>();
-        try (ExecutorService executor = Executors.newFixedThreadPool(4)) {
-            Harness harness = fx(() -> {
-                var feedback = new LauncherFeedback(executor, new Label(), new VBox(), new StackPane(),
-                        new Label(), new Label(), () -> "Read-only public catalog");
-                var controller = new LauncherWardrobeController(gateway, store, LauncherSettings::new, feedback, executor);
-                var scroll = new ScrollPane(controller.view());
-                scroll.setFitToWidth(true);
-                scroll.setStyle("-fx-background: #0B1120; -fx-background-color: #0B1120; -fx-padding: 24;");
-                var root = new StackPane(scroll);
-                root.getStyleClass().add("app-root");
-                var scene = new Scene(root, 1440, 1000);
-                scene.getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
-                var stage = new Stage(StageStyle.UNDECORATED);
-                stage.setTitle("Wardrobe public catalog — read only, no linked account");
-                stage.setScene(scene); stage.show();
-                controller.refresh();
-                return new Harness(controller, stage, scroll);
-            });
-            try {
-                for (String tab : List.of("Skins")) {
-                    try {
-                        await("live " + tab + " catalog", 180, () -> (cards(harness).size() >= 6
-                                && nodes(harness.root(), Label.class).stream().noneMatch(label -> label.getText().equals("Loading looks…"))
-                                && cards(harness).stream().allMatch(card -> card.getAccessibleText().startsWith("Preview skin ")))
-                                || nodes(harness.root(), Label.class).stream().anyMatch(label -> label.getText().contains("Try Search again.")));
-                        String catalogError = fx(() -> nodes(harness.root(), Label.class).stream()
-                                .map(Label::getText).filter(text -> text.contains("Try Search again.")).findFirst().orElse(""));
-                        assertTrue(catalogError.isEmpty(), catalogError);
-                        assertTrue(fx(() -> cards(harness).size() >= 6), "Need at least six real " + tab + " cards");
-                        assertTrue(fx(() -> nodes(harness.root(), Label.class).stream()
-                                .noneMatch(label -> label.isVisible() && label.getText().matches("(?i).*Skin #[0-9a-f]+.*"))));
-                        assertTrue(fx(() -> cards(harness).stream().allMatch(card -> card.getTooltip() == null)));
-                        String selection = fx(() -> cards(harness).getFirst().getAccessibleText());
-                        click(harness, selection);
-                        await("live preview response", 100, () -> {
-                            String status = ((Label) harness.root().lookup("#wardrobe-preview-status")).getText();
-                            return status.startsWith("Live 3D preview") || status.startsWith("Static PNG preview")
-                                    || status.startsWith("Rendered cape preview") || status.contains("could not be loaded");
-                        });
-                        String previewStatus = fx(() -> ((Label) harness.root().lookup("#wardrobe-preview-status")).getText());
-                        notes.add(tab + " selection: " + selection + "; " + previewStatus);
-                        await("live thumbnails", 100, () -> cards(harness).stream().allMatch(card -> nodes(card, ImageView.class).stream()
-                                .allMatch(view -> view.getImage() != null && view.getImage().getProgress() == 1)));
-                        long rendered = fx(() -> cards(harness).stream().filter(card -> nodes(card, ImageView.class).stream()
-                                .anyMatch(view -> view.getImage() != null && !view.getImage().isError())).count());
-                        notes.add(tab + ": " + rendered + " thumbnails loaded successfully");
-                        assertTrue(rendered >= 6, "Only " + rendered + " real thumbnails loaded for " + tab);
-                        assertFalse(previewStatus.contains("could not be loaded"), "Hyvatar preview failed for " + selection);
-                        assertTrue(fx(() -> button(harness.root(), "Apply").isDisabled()));
-                        capturePair(harness, output, "live-" + tab.toLowerCase(java.util.Locale.ROOT));
-                    } catch (Exception | AssertionError failure) {
-                        String detail = tab + " capture failed: " + failure;
-                        failures.add(detail); notes.add(detail);
-                        System.err.println(detail);
-                    }
-                }
-            } finally {
-                fx(() -> { harness.controller().close(); harness.stage().close(); return null; });
-                executor.shutdownNow();
-                Files.write(output.resolve("wardrobe-live-provenance.txt"), notes);
-            }
-        }
-        assertTrue(failures.isEmpty(), String.join("\n", failures));
     }
 
     private static void capturePair(Harness harness, Path output, String name) throws Exception {
@@ -329,7 +243,19 @@ class LauncherWardrobeUiTest {
     }
 
     private static void awaitPreview(Harness harness) throws Exception {
-        await("fixture preview", () -> ((Label) harness.root().lookup("#wardrobe-preview-status")).getText().startsWith("Static PNG"));
+        await("missing local assets hint", () -> nodes(harness.root(), Label.class).stream().anyMatch(label -> label.getText().contains("Set your Hytale game directory")));
+    }
+
+    private static void assertNamedBrowser(Harness harness) throws Exception {
+        fx(() -> {
+            for (Button card : cards(harness)) {
+                assertTrue(card.getAccessibleText().startsWith("Preview Fixture "));
+                assertNotNull(card.getTooltip());
+                assertTrue(nodes(card.getGraphic(), Label.class).stream().anyMatch(label ->
+                        label.getStyleClass().contains("wardrobe-card-name") && !label.getText().isEmpty()));
+            }
+            return null;
+        });
     }
 
     private static void click(Harness harness, String label) throws Exception {
@@ -420,8 +346,6 @@ class LauncherWardrobeUiTest {
             @Override public String freshSessionToken(LauncherSettings settings) { throw new AssertionError("No fixture auth requests"); }
         }); }
         List<WardrobeItem> allItems() { var items = new ArrayList<>(skins); items.addAll(capeItems); return items; }
-        @Override public List<WardrobeItem> browseSkins(int page, String sort) { return skins; }
-        @Override public WardrobeItem lookupSkin(String name) { return skins.getFirst(); }
         @Override public WardrobeItem hydrate(WardrobeItem item) { return item; }
         @Override public WardrobeItem currentSkin(LauncherSettings settings) { throw new AssertionError("No fixture account reads"); }
         @Override public void apply(WardrobeItem item, LauncherSettings settings) { applyCalls.incrementAndGet(); fail("No fixture account writes"); }

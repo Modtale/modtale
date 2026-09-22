@@ -64,7 +64,7 @@ class ApiKeyResolutionServiceTest {
         assertSame(storedKey, resolved);
         assertNotNull(storedKey.getLastUsed());
         verify(apiKeyIssuanceService).pruneInvalidContexts(storedKey);
-        verify(apiKeyRepository).save(storedKey);
+        verify(apiKeyRepository).recordUse(storedKey.getId(),storedKey.getUserId(),storedKey.getKeyHash(),storedKey.getLastUsed());
     }
 
     @Test

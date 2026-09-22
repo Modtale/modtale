@@ -57,6 +57,21 @@ class WorldModListServiceTest {
     }
 
     @Test
+    void curseForgeListsRequireLauncherForZipDownloads() throws Exception {
+        WorldModList list = new WorldModList();
+        list.setId("cf-list");
+        list.setTitle("CF list");
+        list.setExpiresAt(Instant.now().plusSeconds(3600));
+        WorldModList.Item item = new WorldModList.Item();
+        item.setSource(ProjectDependency.Source.CURSEFORGE);
+        list.setMods(List.of(item));
+        when(repository.findById("cf-list")).thenReturn(Optional.of(list));
+        when(archiveService.generateZip(list)).thenReturn(new byte[]{1});
+        org.junit.jupiter.api.Assertions.assertThrows(net.modtale.exception.InvalidProjectRequestException.class, () -> service.download("cf-list"));
+        org.junit.jupiter.api.Assertions.assertArrayEquals(new byte[]{1}, service.download("cf-list", true).bytes());
+    }
+
+    @Test
     void createEnrichesModtaleItemsDedupesAndLeavesExternalItemsListedOnly() {
         User owner = owner();
         Project project = project();

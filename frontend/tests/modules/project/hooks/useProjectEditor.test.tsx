@@ -43,6 +43,7 @@ const settle = async (times = 8) => {
 };
 
 type HookSnapshot = ReturnType<typeof useProjectEditor> & {
+    setProjectData: (value: any) => void;
     projectData: any;
     metaData: MetadataFormData;
     bannerFile: File | null;
@@ -93,6 +94,7 @@ const Probe = ({
 
     onRender({
         ...snapshot,
+        setProjectData,
         projectData,
         metaData,
         bannerFile,
@@ -192,6 +194,18 @@ describe('useProjectEditor', () => {
         });
         await settle();
     };
+
+    it('keeps a replacement invitation when an old cancellation response arrives', async () => {
+        await renderHook({ projectData: { id: 'project-1', teamInvites: [{ userId: 'user-2', requestId: 'old' }] } });
+        let finish!: () => void;
+        mockedProjectClient.cancelInvite.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+        let pending!: Promise<void>;
+        await act(async () => { pending = latestSnapshot.handleCancelInvite('user-2'); });
+        expect(mockedProjectClient.cancelInvite).toHaveBeenCalledWith('project-1', 'user-2', 'old');
+        await act(async () => { latestSnapshot.setProjectData({ id: 'project-1', teamInvites: [{ userId: 'user-2', requestId: 'new' }] }); });
+        await act(async () => { finish(); await pending; });
+        expect(latestSnapshot.projectData.teamInvites).toEqual([{ userId: 'user-2', requestId: 'new' }]);
+    });
 
     it('validates repository urls against the allowed hosts', async () => {
         await renderHook();

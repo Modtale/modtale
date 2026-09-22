@@ -41,9 +41,9 @@ public class ModtaleApiClient {
     public static final String DEFAULT_SITE_BASE_URL = "https://modtale.net";
 
     private final CookieManager cookieManager;
-    private final ModtaleApiTransport transport;
+    private final JsonApiTransport transport;
     private final ModtaleDownloadClient downloadClient;
-    private final NyoCfClient nyoCfClient;
+    private final CurseForgeClient curseForgeClient;
     private final CurseForgeCommentsClient curseForgeCommentsClient;
     private final LauncherSessionStore sessionStore;
     private volatile URI apiBaseUri;
@@ -93,9 +93,9 @@ public class ModtaleApiClient {
             CurseForgeCommentsClient curseForgeCommentsClient
     ) {
         this.cookieManager = cookieManager;
-        this.transport = new ModtaleApiTransport(httpClient, responseCache, this::csrfToken);
+        this.transport = new JsonApiTransport(httpClient, responseCache, this::csrfToken);
         this.downloadClient = new ModtaleDownloadClient(httpClient, this::apiBaseUri);
-        this.nyoCfClient = new NyoCfClient(httpClient);
+        this.curseForgeClient = new CurseForgeClient(httpClient, responseCache);
         this.curseForgeCommentsClient = curseForgeCommentsClient == null
                 ? new CurseForgeCommentsClient(httpClient) : curseForgeCommentsClient;
         this.sessionStore = sessionStore;
@@ -192,19 +192,23 @@ public class ModtaleApiClient {
     }
 
     public ProjectPage searchCurseForgeMods(ProjectSearchQuery query) {
-        return nyoCfClient.search(query);
+        return curseForgeClient.search(query);
     }
 
     public ProjectSummary enrichCurseForgeBrowseBanner(ProjectSummary summary) {
-        return nyoCfClient.enrichBrowseBanner(summary);
+        return curseForgeClient.enrichBrowseBanner(summary);
     }
 
     public ProjectDetail getCurseForgeProject(long projectId) {
-        return nyoCfClient.project(projectId);
+        return curseForgeClient.project(projectId);
     }
 
     public DownloadUrlResponse getCurseForgeDownloadUrl(long projectId, long fileId) {
-        return nyoCfClient.download(projectId, fileId);
+        return curseForgeClient.download(projectId, fileId);
+    }
+
+    public com.fasterxml.jackson.databind.JsonNode matchCurseForgeFiles(List<Long> fingerprints) {
+        return curseForgeClient.matchFiles(fingerprints);
     }
 
     public ArtifactIdentity.Response identifyArtifacts(List<ArtifactIdentity.Artifact> artifacts) {
@@ -229,6 +233,8 @@ public class ModtaleApiClient {
     }
 
     public ProjectMeta getProjectMeta(String idOrSlug) {
+        Long curseForgeId = curseForgeId(idOrSlug);
+        if (curseForgeId != null) return curseForgeClient.projectMeta(curseForgeId);
         return get("/projects/" + encodePath(idOrSlug) + "/meta", ProjectMeta.class);
     }
 
@@ -239,14 +245,31 @@ public class ModtaleApiClient {
                 .filter(id -> id != null && !id.isBlank())
                 .map(String::trim)
                 .distinct()
-                .limit(50)
                 .toList();
         if (ids.isEmpty()) {
             return Map.of();
         }
-        List<String> params = new ArrayList<>();
-        addParam(params, "ids", String.join(",", ids));
-        return get("/projects/meta?" + String.join("&", params), new TypeReference<>() {});
+        Map<String, ProjectMeta> result = new java.util.LinkedHashMap<>();
+        List<String> modtaleIds = ids.stream().filter(id -> curseForgeId(id) == null).toList();
+        for (int offset = 0; offset < modtaleIds.size(); offset += 50) {
+            List<String> params = new ArrayList<>();
+            addParam(params, "ids", String.join(",", modtaleIds.subList(offset, Math.min(offset + 50, modtaleIds.size()))));
+            try {
+                Map<String, ProjectMeta> batch = get("/projects/meta?" + String.join("&", params), new TypeReference<>() {});
+                result.putAll(batch);
+            } catch (ModtaleApiException ignored) {
+                // Keep metadata from other batches and providers available.
+            }
+        }
+        for (String id : ids) {
+            if (curseForgeId(id) == null) continue;
+            try {
+                result.put(id, getProjectMeta(id));
+            } catch (ModtaleApiException ignored) {
+                // One unavailable project must not hide the rest of the library.
+            }
+        }
+        return result;
     }
 
     public CreatorProfile getUserProfile(String idOrHandle) {
@@ -336,7 +359,8 @@ public class ModtaleApiClient {
     }
 
     public List<ProjectVersionChangelog> getProjectVersionChangelogs(String idOrSlug) {
-        if (curseForgeId(idOrSlug) != null) return List.of();
+        Long curseForgeId = curseForgeId(idOrSlug);
+        if (curseForgeId != null) return curseForgeClient.changelogs(curseForgeId, getCurseForgeProject(curseForgeId).versions());
         return get("/projects/" + encodePath(idOrSlug) + "/versions/changelogs", new TypeReference<>() {});
     }
 

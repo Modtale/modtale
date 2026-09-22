@@ -5,8 +5,8 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.head.sha || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -17,6 +17,7 @@ jobs:
   dedupe:
     name: Avoid Duplicate Test Runs
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     outputs:
       should_run: ${{ steps.dedupe.outputs.should_run }}
     steps:
@@ -35,6 +36,7 @@ jobs:
     needs: dedupe
     if: needs.dedupe.outputs.should_run == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -52,6 +54,7 @@ jobs:
     needs: dedupe
     if: needs.dedupe.outputs.should_run == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
       backend: ${{ steps.filter.outputs.backend }}
@@ -76,6 +79,7 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.frontend == 'true' && github.repository == 'Modtale/modtale' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'Modtale/modtale')
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: frontend
@@ -105,6 +109,7 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: backend
@@ -129,7 +134,8 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: 26
+          check-latest: true
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
@@ -145,6 +151,7 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.launcher == 'true' && github.repository == 'Modtale/modtale' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'Modtale/modtale')
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: launcher
@@ -157,7 +164,8 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
+          java-version: 25
+          check-latest: true
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
@@ -165,5 +173,39 @@ jobs:
       - name: Ensure Gradle wrapper is executable
         run: chmod +x gradlew
 
+      - name: Install Wayland compositor for JavaFX tests
+        run: |
+          sudo apt-get update
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            libgtk-3-0t64 libopengl0 libegl1 libpango-1.0-0 libasound2t64 \
+            libudev1 libwayland-client0 libwayland-egl1
+          sudo apt-get install -y weston libgl1-mesa-dri
+
       - name: Run launcher tests
-        run: ./gradlew test
+        run: |
+          set -euo pipefail
+          # Run Linux validation without an X server.
+          export XDG_RUNTIME_DIR
+          XDG_RUNTIME_DIR=$(mktemp -d)
+          export WAYLAND_DISPLAY=modtale-validation
+          weston --backend=headless-backend.so --renderer=pixman --socket="$WAYLAND_DISPLAY" --idle-time=0 \
+            --width=1600 --height=1000 --no-config > "$XDG_RUNTIME_DIR/weston.log" 2>&1 &
+          weston_pid=$!
+          trap 'kill "$weston_pid" 2>/dev/null || true; cat "$XDG_RUNTIME_DIR/weston.log"; rm -rf "$XDG_RUNTIME_DIR"' EXIT
+          for attempt in {1..100}; do
+            if [ -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]; then break; fi
+            kill -0 "$weston_pid"
+            sleep 0.1
+          done
+          test -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"
+          env -u DISPLAY GDK_BACKEND=wayland ./gradlew test --no-daemon
+
+      - name: Upload launcher test reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-test-reports
+          path: |
+            launcher/build/reports/tests/test
+            launcher/build/test-results/test
+          if-no-files-found: ignore

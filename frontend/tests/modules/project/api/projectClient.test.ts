@@ -25,6 +25,11 @@ describe('projectClient', () => {
         vi.clearAllMocks();
     });
 
+    it('binds invite cancellation to its request identity', async () => {
+        await projectClient.cancelInvite('project-1', 'user-1', 'invite-1');
+        expect(mockedApi.delete).toHaveBeenCalledWith('/projects/project-1/invites/user-1', { params: { requestId: 'invite-1' } });
+    });
+
     it('fetches project details from the lean project endpoint', async () => {
         mockedApi.get.mockResolvedValueOnce({ data: { id: 'project-1' } } as any);
 
@@ -75,6 +80,23 @@ describe('projectClient', () => {
         await expect(projectClient.getProjectVersionChangelogs('project-1')).resolves.toEqual(changelogs);
 
         expect(mockedApi.get).toHaveBeenCalledWith('/projects/project-1/versions/changelogs');
+    });
+
+    it('fetches changelog pages with the requested offset and cancellation signal', async () => {
+        const changelogs = [{ id: 'version-13', versionNumber: '1.0.12', changelog: 'More changes.' }];
+        const signal = new AbortController().signal;
+        mockedApi.get.mockResolvedValueOnce({ data: changelogs } as any);
+
+        await expect(projectClient.getProjectVersionChangelogs('project-1', {
+            offset: 12,
+            limit: 12,
+            signal
+        })).resolves.toEqual(changelogs);
+
+        expect(mockedApi.get).toHaveBeenCalledWith('/projects/project-1/versions/changelogs', {
+            params: { offset: 12, limit: 12 },
+            signal
+        });
     });
 
     it('returns project comments when present and falls back to an empty list', async () => {

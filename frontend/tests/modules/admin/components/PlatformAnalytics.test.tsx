@@ -14,7 +14,7 @@ vi.mock('@/components/ui/charts/LineChart', () => ({
     LineChart: ({ datasets }: any) => (
         <div>
             {datasets.map((dataset: any) => (
-                <span key={dataset.id}>{dataset.label}</span>
+                <span key={dataset.id} data-series={dataset.id} data-values={JSON.stringify(dataset.data)}>{dataset.label}</span>
             ))}
         </div>
     )
@@ -43,6 +43,7 @@ const platformAnalytics = {
     previousTotalNewOrgs: 0,
     downloadsChart: points,
     apiDownloadsChart: points,
+    launcherDownloadsChart: Array.from({ length: 15 }, (_, index) => ({ date: `2026-06-${String(index + 1).padStart(2, '0')}`, count: index + 10 })),
     viewsChart: points,
     newProjectsChart: points,
     newUsersChart: points,
@@ -91,5 +92,10 @@ describe('PlatformAnalytics', () => {
         expect(container.textContent).toContain('-2');
         expect(container.textContent).toContain('350.0%');
         expect(container.textContent).not.toContain('API Traffic');
+        expect(container.textContent).toContain('Launcher Downloads');
+        expect(JSON.parse(container.querySelector('[data-series=launcherDownloads]')!.getAttribute('data-values')!))
+            .toEqual([{ date: '2026-06-15', value: 24 }]);
+        expect(container.textContent).toContain('API Downloads');
+        expect(container.textContent).toContain('Platform Downloads');
     });
 });

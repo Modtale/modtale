@@ -59,6 +59,7 @@ class ModtaleApiClientCacheTest {
 
         assertEquals("Project One", client.searchProjects(query).content().getFirst().title());
         assertEquals("Project One", client.searchProjects(query).content().getFirst().title());
+        assertEquals("Project One", client().searchProjects(query).content().getFirst().title());
 
         assertEquals(1, requests.get());
     }

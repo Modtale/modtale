@@ -27,7 +27,8 @@ public enum AdminPermission {
     PLATFORM_ANALYTICS_READ,
     PLATFORM_FINANCE_MANAGE,
     STATUS_INCIDENT_READ,
-    STATUS_INCIDENT_MANAGE;
+    STATUS_INCIDENT_MANAGE,
+    NEWS_MANAGE;
 
     public static Set<AdminPermission> allPermissions() {
         return EnumSet.allOf(AdminPermission.class);

@@ -63,6 +63,12 @@ public final class LauncherVersion {
         if (version.startsWith("refs/tags/")) {
             version = version.substring("refs/tags/".length());
         }
+        for (String channel : List.of("stable", "develop")) {
+            String prefix = "launcher-" + channel + "-v";
+            if (version.startsWith(prefix)) {
+                return version.substring(prefix.length());
+            }
+        }
         if (version.startsWith("launcher-v")) {
             return version.substring("launcher-v".length());
         }

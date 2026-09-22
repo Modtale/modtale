@@ -32,6 +32,10 @@ public class ProjectService {
         projectCacheService.evictProjectDetailsCaches(projects, fallbackProjectIds);
     }
 
+    public void evictProjectCounterCaches(Collection<Project> projects, Collection<String> fallbackProjectIds) {
+        projectCacheService.evictProjectCounterCaches(projects, fallbackProjectIds);
+    }
+
     public Project getRawProjectById(String id) {
         return projectViewService.getRawProjectById(id);
     }
@@ -127,6 +131,15 @@ public class ProjectService {
 
     public java.util.List<ProjectVersionChangelogDTO> getVersionChangelogsByRouteKey(String routeKey, User viewer) {
         return projectViewService.getVersionChangelogsByRouteKey(routeKey, viewer);
+    }
+
+    public java.util.List<ProjectVersionChangelogDTO> getVersionChangelogsByRouteKey(
+            String routeKey,
+            User viewer,
+            int offset,
+            int limit
+    ) {
+        return projectViewService.getVersionChangelogsByRouteKey(routeKey, viewer, offset, limit);
     }
 
     public Project getAdminProjectDetails(String id) {

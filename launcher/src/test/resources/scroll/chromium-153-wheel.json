@@ -1,0 +1,74 @@
+{
+  "browser": "153.0.8010.12",
+  "url": "https://modtale.net/mods",
+  "input": "X11 wheel button 5, delivered through the OS",
+  "deltaPixels": 120,
+  "frameIntervalMillis": 16.666666666666668,
+  "compositorDurationMillis": 192.751,
+  "frames": [
+    {
+      "millisAfterFirstFrame": 0.0,
+      "scrollY": 2
+    },
+    {
+      "millisAfterFirstFrame": 16.6,
+      "scrollY": 7
+    },
+    {
+      "millisAfterFirstFrame": 33.3,
+      "scrollY": 17
+    },
+    {
+      "millisAfterFirstFrame": 49.9,
+      "scrollY": 30
+    },
+    {
+      "millisAfterFirstFrame": 66.6,
+      "scrollY": 46
+    },
+    {
+      "millisAfterFirstFrame": 83.3,
+      "scrollY": 64
+    },
+    {
+      "millisAfterFirstFrame": 99.9,
+      "scrollY": 81
+    },
+    {
+      "millisAfterFirstFrame": 116.6,
+      "scrollY": 96
+    },
+    {
+      "millisAfterFirstFrame": 133.3,
+      "scrollY": 108
+    },
+    {
+      "millisAfterFirstFrame": 150.0,
+      "scrollY": 116
+    },
+    {
+      "millisAfterFirstFrame": 166.6,
+      "scrollY": 119
+    },
+    {
+      "millisAfterFirstFrame": 183.3,
+      "scrollY": 120
+    },
+    {
+      "millisAfterFirstFrame": 200.0,
+      "scrollY": 120
+    },
+    {
+      "millisAfterFirstFrame": 216.7,
+      "scrollY": 120
+    },
+    {
+      "millisAfterFirstFrame": 233.3,
+      "scrollY": 120
+    },
+    {
+      "millisAfterFirstFrame": 250.0,
+      "scrollY": 120
+    }
+  ]
+}

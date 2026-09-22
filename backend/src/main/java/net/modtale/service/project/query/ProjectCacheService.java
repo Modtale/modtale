@@ -32,6 +32,7 @@ public class ProjectCacheService {
         Cache galleryDtoCache = cacheManager.getCache("projectGalleryDtos");
         Cache teamDtoCache = cacheManager.getCache("projectTeamDtos");
         Cache changelogCache = cacheManager.getCache("projectVersionChangelogs");
+        Cache changelogPageCache = cacheManager.getCache("projectVersionChangelogPages");
         Cache metaDtoCache = cacheManager.getCache("projectMetaDtos");
         Cache permissionCache = cacheManager.getCache("projectPermissionSnapshots");
         Cache wikiProjectJsonCache = cacheManager.getCache("wikiProjectJson");
@@ -48,6 +49,7 @@ public class ProjectCacheService {
         if (galleryDtoCache != null && project.getId() != null) galleryDtoCache.evict("public:" + project.getId());
         if (teamDtoCache != null && project.getId() != null) teamDtoCache.evict("public:" + project.getId());
         if (changelogCache != null && project.getId() != null) changelogCache.evict("public:" + project.getId());
+        if (changelogPageCache != null) changelogPageCache.clear();
         if (metaDtoCache != null && project.getId() != null) metaDtoCache.evict("public:" + project.getId());
         if (permissionCache != null && project.getId() != null) permissionCache.evict(project.getId());
         if (wikiProjectJsonCache != null && project.getId() != null) wikiProjectJsonCache.evict("public:" + project.getId());
@@ -117,6 +119,7 @@ public class ProjectCacheService {
         if (changelogCache != null) {
             changelogCache.evict("public:" + projectId);
         }
+        clearCache("projectVersionChangelogPages");
         Cache metaDtoCache = cacheManager.getCache("projectMetaDtos");
         if (metaDtoCache != null) {
             metaDtoCache.evict("public:" + projectId);
@@ -150,6 +153,34 @@ public class ProjectCacheService {
             fallbackProjectIds.forEach(this::evictProjectDetailsCacheById);
         }
         evictProjectSearchCache();
+    }
+
+    public void evictProjectCounterCaches(Collection<Project> projects, Collection<String> fallbackProjectIds) {
+        if (projects != null) {
+            for (Project project : projects) {
+                if (project == null) continue;
+                evictCounterRoute(project.getId());
+                evictCounterRoute(project.getSlug());
+                evictCounterRoute(projectRouteService.buildProjectHandle(project));
+            }
+        }
+        if (fallbackProjectIds != null) fallbackProjectIds.forEach(this::evictCounterRoute);
+        evictProjectSearchCache();
+    }
+
+    private void evictCounterRoute(String route) {
+        if (route == null || route.isBlank()) return;
+        Cache projects = cacheManager.getCache("projectDetails");
+        if (projects != null) {
+            projects.evict(route);
+            projects.evict("public:" + route);
+            projects.evict("public-page:" + route);
+        }
+        for (String name : java.util.List.of("projectDetailDtos", "projectPageDtos", "projectVersionDtos", "projectMetaDtos")) {
+            Cache cache = cacheManager.getCache(name);
+            if (cache != null) cache.evict("public:" + route);
+        }
+        // Counters do not change comments, permissions, wiki content or changelogs.
     }
 
     private void clearCache(String cacheName) {

@@ -292,6 +292,8 @@ public class SecurityConfig {
                         .requestMatchers("/client-metadata.json").permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/projects/**",
+                                "/api/v1/news",
+                                "/api/v1/news/**",
                                 "/api/v1/tags",
                                 "/api/v1/files/**",
                                 "/api/v1/user/profile/**",
@@ -314,7 +316,7 @@ public class SecurityConfig {
                                 "/api/v1/finance/ads/slot/**",
                                 "/api/v1/finance/ads/click/**"
                         ).permitAll()
-                        .requestMatchers(HttpMethod.HEAD, "/api/v1/projects/**", "/api/v1/tags", "/api/v1/files/**", "/api/v1/user/profile/**", "/api/v1/og/**", "/api/v1/lists/**").permitAll()
+                        .requestMatchers(HttpMethod.HEAD, "/api/v1/news", "/api/v1/news/**", "/api/v1/projects/**", "/api/v1/tags", "/api/v1/files/**", "/api/v1/user/profile/**", "/api/v1/og/**", "/api/v1/lists/**").permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/projects/external/identify",
                                 "/api/v1/users/batch",
@@ -346,6 +348,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/v1/user/analytics",
                                 "/api/v1/user/api-keys/**",
+                                "/api/v1/auth/mfa/setup",
+                                "/api/v1/auth/mfa/verify",
                                 "/api/v1/admin/**"
                         ).access((authentication, context) -> {
                             boolean isApiKeyUser = authentication.get().getAuthorities().stream()
@@ -360,8 +364,6 @@ public class SecurityConfig {
                                 "/api/v1/user/settings/**",
                                 "/api/v1/user/repos/**",
                                 "/api/v1/projects/*/favorite",
-                                "/api/v1/auth/mfa/setup",
-                                "/api/v1/auth/mfa/verify",
                                 "/api/v1/auth/resend-verification",
                                 "/api/v1/auth/change-password",
                                 "/api/v1/auth/credentials"
@@ -438,11 +440,6 @@ public class SecurityConfig {
             }
 
             User user = accountService.getPublicProfile(login);
-            if (user != null && user.isMfaEnabled() && (user.getMfaSecret() == null || user.getMfaSecret().isBlank())) {
-                logger.warn("OAuth User {} has MFA enabled but missing secret. Auto-disabling MFA to prevent lockout.", user.getId());
-                user.setMfaEnabled(false);
-                user = accountService.saveUser(user);
-            }
             boolean isLinking = Boolean.TRUE.equals(oauthUser.getAttribute("is_linking"));
             LauncherOAuthRequest launcherOAuthRequest = consumeLauncherOAuthRequest(request);
             if (launcherOAuthRequest != null && !isLinking) {

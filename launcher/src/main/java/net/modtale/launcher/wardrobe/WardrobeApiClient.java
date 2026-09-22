@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
-import java.io.StringReader;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -20,31 +19,15 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import javax.swing.text.MutableAttributeSet;
-import javax.swing.text.html.HTML;
-import javax.swing.text.html.HTMLEditorKit;
-import javax.swing.text.html.parser.ParserDelegator;
 import net.modtale.launcher.hytale.HytaleAuthService;
 import net.modtale.launcher.settings.LauncherSettings;
 
-/**
- * Public contract evidence: https://hytags.com/api/username/KayNeko and https://hyvatar.io/.
- * Catalogs are HTML compatibility reads, not a documented JSON API. Official UUID reads
- * follow the existing HytaleApiClient contract. Skin slot GET/PUT contracts were recovered
- * from the public HyTags 1.0.0 executable (FetchPlayerSkins/UpdatePlayerSkin).
- * Outfit CRUD and permissions follow the installed official Linux client, SHA-256
- * 8ab9c6f19dbe3bb96266fde4e5dd52df92792517d380d2d97716ececac383c12:
- * route references: GET b83952, POST b84fe5, DELETE b82900, active PUT b8629a, slot PUT b86831;
- * cosmetics b83eef; HTTP method table e4d970 and generated skin JSON serializers a31250/a32180.
- * These recovered contracts are not a public compatibility guarantee.
- */
+/** Official Hytale account operations. Skin discovery and rendering are local. */
 public class WardrobeApiClient {
-    private static final URI HYTAGS = URI.create("https://hytags.com/");
     private static final URI OFFICIAL = URI.create("https://account-data.hytale.com/");
     private static final int MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
     private final HttpClient http;
     private final HytaleAuthService auth;
-    private final URI hytags;
     private final URI official;
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -53,17 +36,16 @@ public class WardrobeApiClient {
     }
 
     public WardrobeApiClient(HttpClient http, HytaleAuthService auth) {
-        this(http, auth, HYTAGS, OFFICIAL);
+        this(http, auth, OFFICIAL);
     }
 
-    /** Base URL overrides are for local contract tests only; auth is never sent to HyTags. */
-    public WardrobeApiClient(HttpClient http, HytaleAuthService auth, URI hytags, URI official) {
+    /** Base URL override for loopback contract tests. */
+    public WardrobeApiClient(HttpClient http, HytaleAuthService auth, URI official) {
         this.http = Objects.requireNonNull(http);
         if (http.followRedirects() != HttpClient.Redirect.NEVER) {
             throw new IllegalArgumentException("Wardrobe HTTP client must not follow redirects");
         }
         this.auth = Objects.requireNonNull(auth);
-        this.hytags = base(hytags, HYTAGS);
         this.official = base(official, OFFICIAL);
     }
 
@@ -77,15 +59,7 @@ public class WardrobeApiClient {
     /** Official game-client contract: profile is scoped by the game-session bearer token. */
     public SkinSlots slots(LauncherSettings settings) {
         UUID profile = selectedProfile(settings);
-        return slots(settings, profile, profileSession(settings, profile));
-    }
-
-    public void createSkin(LauncherSettings settings, String name, JsonNode skin, UUID expectedProfile) {
-        ObjectNode body = skinBody(name, skin);
-        String token = profileSession(settings, expectedProfile);
-        SkinSlots current = slots(settings, expectedProfile, token);
-        if (current.slots().size() >= current.max()) throw failure("All official outfit slots are occupied");
-        writeSkin(settings, expectedProfile, token, "POST", "player-skins", body);
+        return parseSlots(profileJson(settings, profile, "player-skins").body());
     }
 
     /**
@@ -96,15 +70,16 @@ public class WardrobeApiClient {
      */
     public Map<String, Set<String>> unlockedCosmetics(LauncherSettings settings) {
         UUID profile = selectedProfile(settings);
-        JsonNode root = json(official.resolve("my-account/cosmetics"), profileSession(settings, profile));
+        JsonNode root = profileJson(settings, profile, "my-account/cosmetics").body();
         requireSelectedProfile(settings, profile.toString());
         if (root == null || !root.isObject()) throw failure("Invalid unlocked cosmetics response");
         Map<String, Set<String>> result = new LinkedHashMap<>();
-        root.fields().forEachRemaining(entry -> result.put(entry.getKey(), stringSet(entry.getValue())));
+        root.properties().forEach(entry -> result.put(entry.getKey(), stringSet(entry.getValue())));
         return java.util.Collections.unmodifiableMap(result);
     }
 
     private static Set<String> stringSet(JsonNode values) {
+        if (values != null && values.isNull()) return Set.of();
         if (values == null || !values.isArray()) throw failure("Official cosmetic permissions must be arrays");
         Set<String> result = new LinkedHashSet<>();
         for (JsonNode value : values) {
@@ -114,9 +89,7 @@ public class WardrobeApiClient {
         return java.util.Collections.unmodifiableSet(result);
     }
 
-    private SkinSlots slots(LauncherSettings settings, UUID profile, String token) {
-        JsonNode root = json(official.resolve("player-skins"), token);
-        requireSelectedProfile(settings, profile.toString());
+    private SkinSlots parseSlots(JsonNode root) {
         if (root == null || !root.isObject() || !root.path("skins").isArray()
                 || !root.path("maxSkins").isIntegralNumber() || !root.path("maxSkins").canConvertToInt()
                 || root.path("maxSkins").intValue() < 0) throw failure("Invalid official outfit slots response");
@@ -139,12 +112,6 @@ public class WardrobeApiClient {
         return new SkinSlots(activeId, root.path("maxSkins").intValue(), result);
     }
 
-    private ObjectNode skinBody(String name, JsonNode skin) {
-        if (name == null || name.isBlank()) throw new IllegalArgumentException("Outfit name must not be blank");
-        requireSkin(skin);
-        return mapper.createObjectNode().put("name", name).put("skinData", skin.toString());
-    }
-
     private static void validSlotId(String id) {
         if (id == null || !UUID.fromString(id).toString().equalsIgnoreCase(id)) {
             throw new IllegalArgumentException("Invalid official outfit slot UUID");
@@ -165,81 +132,24 @@ public class WardrobeApiClient {
         return token;
     }
 
-    private void writeSkin(LauncherSettings settings, UUID profile, String token, String method, String path, JsonNode body) {
-        HttpRequest.Builder request = HttpRequest.newBuilder(official.resolve(path)).timeout(Duration.ofSeconds(30))
-                .header("Authorization", "Bearer " + token).header("Accept", "application/json");
-        if (body != null) request.header("Content-Type", "application/json");
-        request.method(method, body == null ? HttpRequest.BodyPublishers.noBody()
-                : HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8));
+    private record ProfileResponse(JsonNode body, String token) {}
+
+    private ProfileResponse profileJson(LauncherSettings settings, UUID profile, String path) {
+        String token = profileSession(settings, profile);
+        JsonNode body;
+        try {
+            body = json(official.resolve(path), token);
+        } catch (RejectedSessionException ex) {
+            requireSelectedProfile(settings, profile.toString());
+            token = auth.renewRejectedSessionToken(settings, profile.toString(), token);
+            requireSelectedProfile(settings, profile.toString());
+            body = json(official.resolve(path), token);
+        }
         requireSelectedProfile(settings, profile.toString());
-        send(request.build(), null, true);
+        return new ProfileResponse(body, token);
     }
 
-    /** Page numbers are one-based. Sort must match a value/label actually published in the form. */
-    public List<WardrobeItem> browseSkins(int page, String sort) {
-        if (page < 1) throw new IllegalArgumentException("Page must be at least 1");
-        URI uri = hytags.resolve("skins?page=" + page);
-        Page document = page(uri);
-        if (sort != null && !sort.isBlank() && !sort.equalsIgnoreCase("default")) {
-            String query = document.sortQuery(sort);
-            document = page(URI.create(uri + "&" + query));
-        }
-        Map<String, WardrobeItem> result = new LinkedHashMap<>();
-        for (Link link : document.links) {
-            URI target = localLink(uri, link.href, "/skin/[a-fA-F0-9]{32}");
-            if (target == null) continue;
-            String hash = target.getPath().substring("/skin/".length()).toLowerCase(java.util.Locale.ROOT);
-            ObjectNode payload = mapper.createObjectNode().put("skinId", hash);
-            payload.put("thumbnailUrl", "https://hyvatar.io/render/full/NPC?size=256&skin_id=" + hash);
-            result.putIfAbsent(hash, item(WardrobeItem.Kind.SKIN, hash, "Skin #" + hash.substring(0, 8), payload));
-        }
-        if (result.isEmpty() && !document.text.toString().contains("Skin archive")) {
-            throw failure("HyTags skin catalog format is unavailable or changed");
-        }
-        return List.copyOf(result.values());
-    }
-
-    public Profile profile(String username) {
-        validUsername(username);
-        JsonNode root = json(hytags.resolve("api/username/" + encode(username)), null);
-        Profile profile = parseProfile(root);
-        if (!profile.username().equalsIgnoreCase(username)) throw failure("HyTags returned a different username");
-        return profile;
-    }
-
-    /** HyTags' tracked skin is not guaranteed to be the account's current official skin. */
-    public WardrobeItem lookupSkin(String username) {
-        Profile profile = profile(username);
-        URI uri = hytags.resolve("username/" + encode(profile.username()));
-        Page document = page(uri);
-        for (Link link : document.links) {
-            if (!link.current) continue;
-            URI target = localLink(uri, link.href, "/skin/[a-fA-F0-9]{32}");
-            if (target == null) continue;
-            WardrobeItem saved = lookupSkinHash(target.getPath().substring("/skin/".length()));
-            ObjectNode payload = (ObjectNode) readJson(saved.payload());
-            if (!payload.path("skin").equals(readJson(profile.skin()))) {
-                throw failure("Profile changed while resolving its saved skin; please retry");
-            }
-            payload.put("username", profile.username()).put("playerUuid", profile.uuid().toString());
-            return new WardrobeItem(saved.id(), saved.kind(), profile.username(), false, "", payload.toString());
-        }
-        throw failure("Profile has no current archived skin identifier");
-    }
-
-    public WardrobeItem lookupSkinHash(String hash) {
-        if (hash == null || !hash.matches("[a-fA-F0-9]{32}")) throw new IllegalArgumentException("Invalid skin hash");
-        hash = hash.toLowerCase(java.util.Locale.ROOT);
-        JsonNode skin = json(hytags.resolve("api/skin/" + hash), null);
-        requireSkin(skin);
-        ObjectNode payload = mapper.createObjectNode().put("skinId", hash);
-        payload.set("skin", skin);
-        if (skin.path("cape").isTextual()) payload.put("cape", skin.path("cape").asText());
-        payload.put("thumbnailUrl", "https://hyvatar.io/render/full/NPC?size=256&skin_id=" + hash);
-        return item(WardrobeItem.Kind.SKIN, hash, "Skin #" + hash.substring(0, 8), payload);
-    }
-
-    /** Resolves hash-only catalog entries before persisting; never follows a moving username. */
+    /** Saved definitions remain usable offline; legacy hash-only entries require re-import. */
     public WardrobeItem hydrate(WardrobeItem item) {
         Objects.requireNonNull(item);
         JsonNode original = readJson(item.payload());
@@ -254,20 +164,15 @@ public class WardrobeApiClient {
             requireSkin(original.path("skin"));
             return item;
         }
-        WardrobeItem resolved = lookupSkinHash(original.path("skinId").asText(""));
-        ObjectNode payload = (ObjectNode) readJson(resolved.payload());
-        for (String key : List.of("username", "playerUuid")) {
-            if (original.path(key).isTextual()) payload.set(key, original.path(key));
-        }
-        return new WardrobeItem(item.id(), item.kind(), item.name(), item.favorite(), item.collection(), payload.toString());
+        throw failure("This saved look has no cosmetic definition. Import its outfit file or save it again from your Hytale account.");
     }
 
     /** Exact active official slot contents, suitable for restore; no moving username preview. */
     public WardrobeItem currentSkin(LauncherSettings settings) {
         ActiveSkin slot = activeSkin(settings);
         ObjectNode payload = mapper.createObjectNode().put("playerUuid", slot.profileId());
-        payload.set("skin", slot.skin());
-        return item(WardrobeItem.Kind.SKIN, slot.id() + ":" + slot.skin(), slot.name(), payload);
+        payload.set("skin", slot.skin() == null ? defaultSkin(settings) : slot.skin());
+        return item(WardrobeItem.Kind.SKIN, slot.id() + ":" + payload.path("skin"), slot.name(), payload);
     }
 
     public Profile profile(UUID uuid, LauncherSettings settings) {
@@ -292,9 +197,6 @@ public class WardrobeApiClient {
         JsonNode definition = null;
         if (item.kind() == WardrobeItem.Kind.SKIN) {
             definition = payload.path("skin");
-            if (!definition.isObject() && payload.path("skinId").isTextual()) {
-                definition = readJson(lookupSkinHash(payload.path("skinId").asText()).payload()).path("skin");
-            }
             requireSkin(definition);
         }
         ActiveSkin slot = activeSkin(settings);
@@ -304,40 +206,58 @@ public class WardrobeApiClient {
             if (cape == null || (!cape.isNull() && (!cape.isTextual() || cape.asText().isBlank()))) {
                 throw new IllegalArgumentException("Cape item has no cosmetic identifier");
             }
-            ObjectNode updated = slot.skin().deepCopy();
+            ObjectNode updated = slot.skin() == null ? defaultSkin(settings) : slot.skin().deepCopy();
             updated.set("cape", cape);
             definition = updated;
         }
         ObjectNode body = mapper.createObjectNode().put("name", slot.name()).put("skinData", definition.toString());
+        if (!slot.id().isEmpty()) {
+            writeSkin(settings, slot, "PUT", "player-skins/" + encode(slot.id()), body);
+            return;
+        }
+        if (slot.slots().slots().size() >= slot.slots().max()) throw failure("All official outfit slots are occupied");
+        writeSkin(settings, slot, "POST", "player-skins", body);
+        ProfileResponse response = profileJson(settings, expectedProfile, "player-skins");
+        SkinSlots refreshed = parseSlots(response.body());
+        Set<String> previousIds = new LinkedHashSet<>();
+        slot.slots().slots().forEach(previous -> previousIds.add(previous.id()));
+        JsonNode appliedSkin = definition;
+        List<SkinSlot> created = refreshed.slots().stream()
+                .filter(candidate -> !previousIds.contains(candidate.id()) && candidate.name().equals(slot.name())
+                        && readJson(candidate.skinData()).equals(appliedSkin)).toList();
+        if (created.size() != 1) throw failure("Could not identify the newly created official outfit slot");
+        ActiveSkin target = new ActiveSkin(slot.profileId(), created.getFirst().id(), slot.name(),
+                null, response.token(), refreshed);
+        writeSkin(settings, target, "PUT", "player-skins/active",
+                mapper.createObjectNode().put("skinId", target.id()));
+    }
+
+    private void writeSkin(LauncherSettings settings, ActiveSkin slot, String method, String path, JsonNode body) {
         requireSelectedProfile(settings, slot.profileId());
-        HttpRequest request = HttpRequest.newBuilder(official.resolve("player-skins/" + encode(slot.id())))
+        HttpRequest request = HttpRequest.newBuilder(official.resolve(path))
                 .timeout(Duration.ofSeconds(30)).header("Authorization", "Bearer " + slot.token())
-                .header("Content-Type", "application/json").header("Accept", "application/json")
-                .PUT(HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8)).build();
+                .header("Content-Type", "application/json").header("Accept", "application/json").header("User-Agent", "ModtaleLauncher/1.0")
+                .method(method, HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8)).build();
         send(request, null, true);
     }
 
-    private record ActiveSkin(String profileId, String id, String name, ObjectNode skin, String token) {}
+    private ObjectNode defaultSkin(LauncherSettings settings) {
+        try {
+            return new CosmeticCatalogClient(LocalSkinLibrary.assets(settings)).defaultSkin();
+        } catch (IOException e) {
+            throw failure("Could not load the default skin from the installed Hytale assets");
+        }
+    }
+
+    private record ActiveSkin(String profileId, String id, String name, ObjectNode skin, String token, SkinSlots slots) {}
 
     private ActiveSkin activeSkin(LauncherSettings settings) {
-        if (settings == null || settings.getHytaleAuthSession() == null) throw failure("Hytale account unavailable");
-        String profileId = settings.getHytaleAuthSession().getUuid();
-        UUID.fromString(profileId);
-        String token = auth.freshAccessToken(settings);
-        requireSelectedProfile(settings, profileId);
-        JsonNode root = json(official.resolve("player-skins?profileId=" + encode(profileId)), token);
-        String active = root.path("activeSkin").asText("");
-        if (active.isBlank() || !root.path("skins").isArray()) throw failure("Official account has no active skin slot");
-        for (JsonNode slot : root.path("skins")) {
-            if (!active.equals(slot.path("id").asText())) continue;
-            if (!slot.path("skinData").isTextual()) throw failure("Active skin slot has no serialized cosmetic definition");
-            JsonNode skin = readJson(slot.path("skinData").asText());
-            requireSkin(skin);
-            String name = slot.path("name").asText("");
-            if (name.isBlank()) name = "HytagsSkin";
-            return new ActiveSkin(profileId, active, name, (ObjectNode) skin, token);
-        }
-        throw failure("Active skin slot was not returned by the official account service");
+        UUID profile = selectedProfile(settings);
+        ProfileResponse response = profileJson(settings, profile, "player-skins");
+        SkinSlots slots = parseSlots(response.body());
+        SkinSlot active = slots.slots().stream().filter(slot -> slot.id().equals(slots.activeId())).findFirst().orElse(null);
+        if (active == null) return new ActiveSkin(profile.toString(), "", "Default outfit", null, response.token(), slots);
+        return new ActiveSkin(profile.toString(), active.id(), active.name(), (ObjectNode) readJson(active.skinData()), response.token(), slots);
     }
 
     private static void requireSelectedProfile(LauncherSettings settings, String uuid) {
@@ -367,19 +287,13 @@ public class WardrobeApiClient {
             if (!uuid.toString().equalsIgnoreCase(value)) throw new IllegalArgumentException();
         } catch (IllegalArgumentException e) { throw failure("Profile response has no valid UUID"); }
         JsonNode skin = root.path("skin");
+        if (skin.isTextual() && !skin.asText().isBlank()) skin = readJson(skin.asText());
         return new Profile(uuid, name, skin.isObject() ? skin.toString() : "{}");
     }
 
     private WardrobeItem item(WardrobeItem.Kind kind, String key, String name, ObjectNode payload) {
         return new WardrobeItem(UUID.nameUUIDFromBytes((kind + ":" + key).getBytes(StandardCharsets.UTF_8)),
                 kind, name, false, "", payload.toString());
-    }
-
-    private Page page(URI uri) {
-        Page page = new Page();
-        try { new ParserDelegator().parse(new StringReader(get(uri, null, "text/html")), page, true); }
-        catch (IOException e) { throw failure("Could not parse HyTags page"); }
-        return page;
     }
 
     private JsonNode json(URI uri, String token) { return readJson(get(uri, token, "application/json")); }
@@ -389,7 +303,7 @@ public class WardrobeApiClient {
     }
 
     private String get(URI uri, String token, String accept) {
-        HttpRequest.Builder request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(30))
+        HttpRequest.Builder request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(30)).header("User-Agent", "ModtaleLauncher/1.0")
                 .header("Accept", accept).GET();
         if (token != null) {
             if (token.isBlank()) throw failure("Official authentication returned an empty session token");
@@ -407,6 +321,10 @@ public class WardrobeApiClient {
             })));
             {
                 if (write ? response.statusCode() < 200 || response.statusCode() >= 300 : response.statusCode() != 200) {
+                    if (!write && (response.statusCode() == 401 || response.statusCode() == 403)
+                            && body.toString(StandardCharsets.UTF_8).trim().equals("invalid token")) {
+                        throw new RejectedSessionException(response.statusCode());
+                    }
                     throw failure("Wardrobe request failed (HTTP " + response.statusCode() + ")");
                 }
                 if (write) return "";
@@ -422,6 +340,12 @@ public class WardrobeApiClient {
         } catch (IOException e) { throw failure("Wardrobe service could not be reached"); }
     }
 
+    private static final class RejectedSessionException extends IllegalStateException {
+        private RejectedSessionException(int status) {
+            super("Hytale rejected the wardrobe session (HTTP " + status + ")");
+        }
+    }
+
     private static URI base(URI uri, URI production) {
         Objects.requireNonNull(uri);
         boolean local = "http".equals(uri.getScheme()) && ("localhost".equals(uri.getHost()) || "127.0.0.1".equals(uri.getHost()));
@@ -429,61 +353,10 @@ public class WardrobeApiClient {
                 || !"/".equals(uri.getPath())) throw new IllegalArgumentException("Use the production origin or a loopback test server");
         return uri;
     }
-    private static URI localLink(URI base, String href, String pathPattern) {
-        try {
-            URI uri = base.resolve(href);
-            if (!Objects.equals(uri.getScheme(), base.getScheme()) || !Objects.equals(uri.getAuthority(), base.getAuthority())
-                    || uri.getUserInfo() != null || !uri.getPath().matches(pathPattern)) return null;
-            return uri;
-        } catch (IllegalArgumentException e) { return null; }
-    }
     private static String encode(String text) { return URLEncoder.encode(text, StandardCharsets.UTF_8).replace("+", "%20"); }
     private static void validUsername(String name) {
         if (name == null || !name.matches("[A-Za-z0-9_]{3,16}")) throw new IllegalArgumentException("Username must contain 3–16 letters, digits or underscores");
     }
     private static IllegalStateException failure(String message) { return new IllegalStateException(message); }
 
-    private static class Link {
-        final String href;
-        boolean current;
-        final StringBuilder text = new StringBuilder();
-        Link(String href) { this.href = href; }
-    }
-    private static class Page extends HTMLEditorKit.ParserCallback {
-        final List<Link> links = new ArrayList<>();
-        final StringBuilder text = new StringBuilder();
-        final List<String[]> options = new ArrayList<>();
-        Link current;
-        String select;
-        String option;
-        StringBuilder label;
-        @Override public void handleStartTag(HTML.Tag tag, MutableAttributeSet attrs, int pos) {
-            if (tag == HTML.Tag.A && attrs.getAttribute(HTML.Attribute.HREF) != null) {
-                current = new Link(attrs.getAttribute(HTML.Attribute.HREF).toString()); links.add(current);
-                String classes = String.valueOf(attrs.getAttribute(HTML.Attribute.CLASS));
-                current.current = List.of(classes.split("\\s+")).contains("is-current");
-            }
-            if (tag == HTML.Tag.SELECT) select = (String) attrs.getAttribute(HTML.Attribute.NAME);
-            if (tag == HTML.Tag.OPTION) { option = (String) attrs.getAttribute(HTML.Attribute.VALUE); label = new StringBuilder(); }
-        }
-        @Override public void handleEndTag(HTML.Tag tag, int pos) {
-            if (tag == HTML.Tag.A) current = null;
-            if (tag == HTML.Tag.OPTION && select != null && option != null) options.add(new String[]{select, option, label.toString().trim()});
-            if (tag == HTML.Tag.OPTION) label = null;
-            if (tag == HTML.Tag.SELECT) select = null;
-        }
-        @Override public void handleText(char[] data, int pos) {
-            text.append(data).append(' ');
-            if (current != null) current.text.append(data);
-            if (label != null) label.append(data);
-        }
-        String sortQuery(String sort) {
-            for (String[] entry : options) {
-                if (entry[0].toLowerCase(java.util.Locale.ROOT).contains("sort") && (entry[1].equalsIgnoreCase(sort) || entry[2].equalsIgnoreCase(sort))) {
-                    return encode(entry[0]) + "=" + encode(entry[1]);
-                }
-            }
-            throw new IllegalArgumentException("Sort is not published by the HyTags catalog: " + sort);
-        }
-    }
 }

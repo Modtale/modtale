@@ -7,12 +7,8 @@ import static net.modtale.launcher.ui.common.LauncherUi.value;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.time.Year;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -26,7 +22,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import javafx.application.Platform;
-import javafx.beans.binding.BooleanBinding;
 import javafx.beans.binding.Bindings;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
@@ -44,11 +39,13 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.TilePane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.util.StringConverter;
@@ -58,7 +55,9 @@ import net.modtale.launcher.api.ModtaleApiClient;
 import net.modtale.launcher.api.ProjectSearchQuery;
 import net.modtale.launcher.discord.DiscordRichPresenceService;
 import net.modtale.launcher.hytale.HytaleApiClient;
-import net.modtale.launcher.hytale.HytaleBlogPost;
+import net.modtale.launcher.news.LauncherNewsPost;
+import net.modtale.launcher.news.LauncherNewsFeed;
+import net.modtale.launcher.news.ModtaleNewsClient;
 import net.modtale.launcher.hytale.HytaleApiException;
 import net.modtale.launcher.hytale.HytaleAuthService;
 import net.modtale.launcher.hytale.HytaleAuthSession;
@@ -76,7 +75,6 @@ import net.modtale.launcher.ui.browse.card.ProjectCardViewStyle;
 import net.modtale.launcher.ui.browse.controls.ProjectBrowseSort;
 import net.modtale.launcher.ui.common.LauncherExternalLinks;
 import net.modtale.launcher.ui.common.LauncherIcons;
-import net.modtale.launcher.ui.common.LauncherLayout;
 import net.modtale.launcher.ui.common.LauncherView;
 import net.modtale.launcher.ui.feedback.LauncherFeedback;
 import net.modtale.launcher.ui.settings.LauncherSettingsController;
@@ -91,10 +89,8 @@ public final class LauncherPlayController {
     private static final int BLOG_POST_PAGE_SIZE = 4;
     private static final int FRIEND_LIMIT = 6;
     private static final double SIDEBAR_WIDTH = 336;
-    private static final double SIDEBAR_SCROLL_GUTTER = LauncherLayout.navbarRightInset();
+    private static final double SIDEBAR_SCROLL_GUTTER = 12;
     private static final double SIDEBAR_PREF_HEIGHT = 672;
-    private static final double BLOG_POST_LOAD_THRESHOLD = 0.82;
-    private static final double BLOG_POST_FILL_PADDING = 96;
     private static final double NEWS_THUMBNAIL_WIDTH = 264;
     private static final double NEWS_THUMBNAIL_HEIGHT = 149;
     private static final double FRIEND_AVATAR_SIZE = 34;
@@ -102,23 +98,8 @@ public final class LauncherPlayController {
     private static final double IDENTITY_MENU_AVATAR_SIZE = 28;
     private static final double PROFILE_AVATAR_RADIUS = 8;
     private static final double PLAY_BUTTON_FONT_SIZE = 22;
-    private static final int CATALOG_SHELF_LIMIT = 6;
-    private static final double CATALOG_CARD_WIDTH = 336;
-    private static final double CATALOG_GRID_GAP = 18;
-    private static final double CATALOG_EDGE_FADE_WIDTH = 64;
-    private static final double CATALOG_GRID_CARD_BODY_HEIGHT = 178;
-    private static final double CATALOG_CARD_HEIGHT = Math.round(CATALOG_CARD_WIDTH / 3.0) + CATALOG_GRID_CARD_BODY_HEIGHT;
-    private static final double CATALOG_SCROLL_HEIGHT = CATALOG_CARD_HEIGHT + 18;
-    private static final double CATALOG_STAGE_TOP_MARGIN = 8;
-    private static final double CATALOG_STAGE_LEFT_OFFSET = 0;
-    private static final double CATALOG_STAGE_GAP = 14;
+    private static final int CATALOG_SHELF_LIMIT = 20;
     private static final double CATALOG_SECTION_GAP = 8;
-    private static final double CATALOG_HEADER_HEIGHT = 30;
-    private static final double PLAY_DOCK_BOTTOM_MARGIN = 96;
-    private static final double PLAY_DOCK_CLEARANCE = 24;
-    private static final int HYVATAR_RENDER_SIZE = 256;
-    private static final DateTimeFormatter BLOG_DATE = DateTimeFormatter.ofPattern("MMM d").withZone(ZoneId.systemDefault());
-    private static final DateTimeFormatter BLOG_DATE_WITH_YEAR = DateTimeFormatter.ofPattern("MMM d, yyyy").withZone(ZoneId.systemDefault());
 
     private final ModtaleApiClient apiClient;
     private final ProjectCardFactory projectCardFactory;
@@ -143,21 +124,31 @@ public final class LauncherPlayController {
     private final Label identityTitle = new Label("Signed out");
     private final Label identitySubtitle = new Label();
     private final VBox friendsList = new VBox(9);
-    private final VBox newsList = new VBox(12);
+    private final VBox newsList = new VBox(16);
+    private final Button moreNews = new Button("More news");
+    private final Label newsStatus = new Label();
+    private final ModtaleNewsClient modtaleNews = new ModtaleNewsClient();
     private final CatalogShelf newReleasesShelf = new CatalogShelf(ProjectBrowseSort.NEWEST);
     private final CatalogShelf trendingShelf = new CatalogShelf(ProjectBrowseSort.TRENDING);
+    private final net.modtale.launcher.hytale.HytaleAvatarClient avatarClient;
+    private final net.modtale.launcher.ui.wardrobe.SavedLookThumbnails profileThumbnails = new net.modtale.launcher.ui.wardrobe.SavedLookThumbnails();
+    private java.util.concurrent.CompletableFuture<com.fasterxml.jackson.databind.JsonNode> profileSkin;
+    private String profileSkinId = "";
+    private long profileSkinAt;
+
     private final Map<String, Image> imageCache = new ConcurrentHashMap<>();
 
     private volatile Process hytaleProcess;
+    private boolean launchInProgress;
+    private Supplier<StackPane> overlayHost = () -> null;
+    private net.modtale.launcher.ui.common.TransferLoadingModal gameUpdateModal;
     private boolean versionsLoading;
     private boolean suppressBranchVersionLoad;
     private boolean friendsLoading;
     private boolean playtimeLoading;
     private boolean blogPostsLoading;
     private boolean blogPostsLoaded;
-    private boolean blogPostsComplete;
-    private boolean blogFillCheckScheduled;
-    private List<HytaleBlogPost> blogPosts = List.of();
+    private List<LauncherNewsPost> blogPosts = List.of();
     private int renderedBlogPosts;
     private long versionLoadRetryAfterMillis;
     private long versionRetryScheduledAtMillis;
@@ -165,9 +156,7 @@ public final class LauncherPlayController {
     private String loadedFriendsKey = "";
     private String loadedPlaytimeKey = "";
     private Node view;
-    private Node newReleasesSection;
     private VBox setupPopover;
-    private ScrollPane sidebarScroll;
     private ContextMenu identityMenu;
     private long identityMenuHiddenAtMillis;
     private Runnable onHytaleAccountsChanged = () -> {
@@ -199,6 +188,7 @@ public final class LauncherPlayController {
         this.settingsController = settingsController;
         this.feedback = feedback;
         this.executor = executor;
+        this.avatarClient = new net.modtale.launcher.hytale.HytaleAvatarClient(hytaleAuthService, executor);
         this.favoriteResolver = favoriteResolver == null ? id -> false : favoriteResolver;
         this.gameVersion = gameVersion == null ? () -> "" : gameVersion;
         this.onInstall = onInstall == null ? project -> {
@@ -209,6 +199,16 @@ public final class LauncherPlayController {
         } : onOpenCreator;
         this.onToggleFavorite = onToggleFavorite == null ? project -> {
         } : onToggleFavorite;
+    }
+
+    public void setOverlayHost(Supplier<StackPane> overlayHost) {
+        this.overlayHost = overlayHost;
+    }
+
+    private void finishLaunchPreparation() {
+        launchInProgress = false;
+        if (gameUpdateModal != null) gameUpdateModal.dismiss();
+        gameUpdateModal = null;
     }
 
     public Node view() {
@@ -466,13 +466,29 @@ public final class LauncherPlayController {
     }
 
     public void launchHytale() {
+        if (launchInProgress) return;
         if (isHytaleRunning()) {
             feedback.showToast("Already running", "Hytale is already running.");
             return;
         }
         settingsController.saveFromFields(false);
-        feedback.runAsync("Launching Hytale...", () -> hytaleGameLauncher.launch(settingsController.settings()), result -> {
+        launchInProgress = true;
+        gameUpdateModal = new net.modtale.launcher.ui.common.TransferLoadingModal(
+                "Preparing Hytale", "Checking the selected channel for updates...");
+        StackPane host = overlayHost.get();
+        if (host != null) {
+            host.getChildren().add(gameUpdateModal);
+            gameUpdateModal.requestFocus();
+        }
+        var modal = gameUpdateModal;
+        feedback.runAsync("Preparing Hytale...", () -> hytaleGameLauncher.launch(settingsController.settings(), message -> {
+            modal.update("Preparing Hytale", message);
+            feedback.log(message);
+        }), result -> {
+            finishLaunchPreparation();
+            settingsController.form().reloadFrom(settingsController.settings());
             hytaleProcess = result.process();
+            settingsController.saveCurrentSettings();
             long startedAtMillis = System.currentTimeMillis();
             discordRichPresence.showPlayingHytale(selectedVersionLabel(settingsController.settings()), startedAtMillis);
             monitorHytaleProcess(result, startedAtMillis);
@@ -482,6 +498,9 @@ public final class LauncherPlayController {
             feedback.log("Launched Hytale" + build + " as " + result.username() + ".");
             feedback.showToast("Hytale ready", "Launching as " + result.username() + ".");
             syncMetrics();
+        }, ignored -> {
+            finishLaunchPreparation();
+            settingsController.form().reloadFrom(settingsController.settings());
         });
     }
 
@@ -491,7 +510,7 @@ public final class LauncherPlayController {
         StackPane root = new StackPane();
         root.setUserData(LauncherView.PLAY);
         root.getStyleClass().addAll("view", "play-view");
-        root.setMinHeight(720);
+        root.setMinHeight(0);
         root.setPrefHeight(720);
         root.setMaxHeight(Double.MAX_VALUE);
 
@@ -502,54 +521,66 @@ public final class LauncherPlayController {
         shell.setMaxHeight(Double.MAX_VALUE);
         StackPane.setAlignment(shell, Pos.CENTER);
 
-        StackPane stage = new StackPane();
+        VBox stage = new VBox(24);
         stage.getStyleClass().add("play-stage");
         stage.setMinWidth(0);
-        stage.setMaxWidth(Double.MAX_VALUE);
-        stage.setMinHeight(0);
-        stage.setMaxHeight(Double.MAX_VALUE);
-        Node catalog = catalogStage();
-        if (catalog instanceof Region catalogRegion) {
-            catalogRegion.prefWidthProperty().bind(stage.widthProperty());
-        }
-        stage.getChildren().add(catalog);
-        HBox.setHgrow(stage, Priority.ALWAYS);
+        stage.getChildren().add(catalogStage());
 
-        VBox dock = new VBox(0);
-        dock.getStyleClass().add("play-dock");
-        dock.setAlignment(Pos.CENTER);
-        dock.setFillWidth(false);
-        dock.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
-        dock.getChildren().add(launchControl());
+        ScrollPane stageScroll = new ScrollPane(stage);
+        stageScroll.getStyleClass().add("play-stage-scroll");
+        stageScroll.setFitToWidth(true);
+        stageScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        stageScroll.setMinWidth(0);
+        stageScroll.viewportBoundsProperty().addListener((observable, previous, bounds) -> {
+            int sections = bounds.getWidth() - 8 >= 820 ? 1 : 2;
+            double available = bounds.getHeight() * 0.88 - 24 - (sections - 1) * 36;
+            int capacity = Math.clamp((int) Math.floor((available / sections - 54 + 20) / 110),
+                    1, CATALOG_SHELF_LIMIT);
+            int count = Math.max(1, (int) Math.round(capacity * 2.0 / 3));
+            for (CatalogShelf shelf : List.of(trendingShelf, newReleasesShelf)) {
+                if (shelf.visibleCount != count) {
+                    shelf.visibleCount = count;
+                    if (!shelf.projects.isEmpty()) renderCatalogShelf(shelf, shelf.projects);
+                }
+            }
+        });
+        Node launch = launchBar();
+        VBox.setMargin(launch, new Insets(0, 0, 24, 0));
+        root.heightProperty().addListener((observable, previous, height) ->
+                VBox.setMargin(launch, new Insets(0, 0, Math.clamp(height.doubleValue() * 0.06, 16, 64), 0)));
+        VBox main = new VBox(18, stageScroll, launch);
+        main.setMinWidth(0);
+        VBox.setVgrow(stageScroll, Priority.ALWAYS);
+        HBox.setHgrow(main, Priority.ALWAYS);
 
         setupPopover = setupPopover();
         setVisibleManaged(setupPopover, false);
-
         Node sidebar = sidebarFrame();
         HBox.setHgrow(sidebar, Priority.NEVER);
-        shell.getChildren().addAll(stage, sidebar);
-        root.getChildren().addAll(shell, dock, setupPopover);
-        StackPane.setAlignment(dock, Pos.BOTTOM_CENTER);
-        StackPane.setMargin(dock, new Insets(0, 0, PLAY_DOCK_BOTTOM_MARGIN, 0));
-        StackPane.setAlignment(setupPopover, Pos.BOTTOM_CENTER);
-        StackPane.setMargin(setupPopover, new Insets(0, 0, 184, 0));
-        bindNewReleasesVisibility(root, dock);
+        shell.getChildren().addAll(main, sidebar);
+        root.getChildren().addAll(shell, setupPopover);
+        StackPane.setAlignment(setupPopover, Pos.CENTER);
         syncMetrics();
         return root;
     }
 
+    private Node launchBar() {
+        HBox bar = new HBox(launchControl());
+        bar.getStyleClass().add("play-launch-bar");
+        bar.setAlignment(Pos.CENTER);
+        return bar;
+    }
+
     private Node catalogStage() {
-        VBox content = new VBox(CATALOG_STAGE_GAP);
+        TilePane content = new TilePane(32, 36);
         content.getStyleClass().add("play-catalog-stage");
-        content.setAlignment(Pos.TOP_LEFT);
-        content.setFillWidth(true);
         content.setMinWidth(0);
-        content.setMaxWidth(Double.MAX_VALUE);
-        Node trendingSection = catalogShelf(trendingShelf, "Trending");
-        newReleasesSection = catalogShelf(newReleasesShelf, "New Releases");
-        content.getChildren().addAll(trendingSection, newReleasesSection);
-        StackPane.setAlignment(content, Pos.TOP_LEFT);
-        StackPane.setMargin(content, new Insets(CATALOG_STAGE_TOP_MARGIN, 0, 0, CATALOG_STAGE_LEFT_OFFSET));
+        content.setPrefColumns(2);
+        content.setTileAlignment(Pos.TOP_LEFT);
+        content.prefTileWidthProperty().bind(Bindings.createDoubleBinding(
+                () -> content.getWidth() >= 820 ? Math.floor((content.getWidth() - 32) / 2) : Math.floor(content.getWidth()),
+                content.widthProperty()));
+        content.getChildren().addAll(catalogShelf(trendingShelf, "Trending"), catalogShelf(newReleasesShelf, "New Releases"));
         return content;
     }
 
@@ -588,96 +619,16 @@ public final class LauncherPlayController {
     }
 
     private Node catalogBody(CatalogShelf shelf) {
-        StackPane body = new StackPane();
+        VBox body = new VBox();
         body.getStyleClass().add("play-catalog-body");
-        body.setAlignment(Pos.TOP_LEFT);
         body.setMinWidth(0);
-        body.setMaxWidth(Double.MAX_VALUE);
-
         shelf.cardRow.getStyleClass().add("play-catalog-card-row");
-        shelf.cardRow.setSpacing(CATALOG_GRID_GAP);
-        shelf.cardRow.setAlignment(Pos.TOP_LEFT);
-
-        shelf.scroll.getStyleClass().add("play-catalog-scroll");
-        shelf.scroll.setContent(shelf.cardRow);
-        shelf.scroll.setFitToHeight(true);
-        shelf.scroll.setFitToWidth(false);
-        shelf.scroll.setPannable(true);
-        shelf.scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        shelf.scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        shelf.scroll.setMinSize(0, CATALOG_SCROLL_HEIGHT);
-        shelf.scroll.setPrefSize(0, CATALOG_SCROLL_HEIGHT);
-        shelf.scroll.setMaxSize(Double.MAX_VALUE, CATALOG_SCROLL_HEIGHT);
-
         shelf.message.getStyleClass().add("play-catalog-message");
         shelf.message.setWrapText(true);
-        shelf.message.setAlignment(Pos.CENTER);
         shelf.message.setMaxWidth(Double.MAX_VALUE);
-
-        Region edgeFade = new Region();
-        edgeFade.getStyleClass().add("play-catalog-edge-fade");
-        edgeFade.setMouseTransparent(true);
-        edgeFade.setManaged(false);
-        edgeFade.setMinWidth(CATALOG_EDGE_FADE_WIDTH);
-        edgeFade.setPrefWidth(CATALOG_EDGE_FADE_WIDTH);
-        edgeFade.setMaxWidth(CATALOG_EDGE_FADE_WIDTH);
-        edgeFade.setMinHeight(CATALOG_SCROLL_HEIGHT);
-        edgeFade.setPrefHeight(CATALOG_SCROLL_HEIGHT);
-        edgeFade.setMaxHeight(CATALOG_SCROLL_HEIGHT);
-        edgeFade.opacityProperty().bind(Bindings.createDoubleBinding(
-                () -> catalogEdgeFadeOpacity(shelf.scroll.getHvalue(), shelf.scroll.getHmin(), shelf.scroll.getHmax()),
-                shelf.scroll.hvalueProperty(),
-                shelf.scroll.hminProperty(),
-                shelf.scroll.hmaxProperty()
-        ));
-        StackPane.setAlignment(edgeFade, Pos.TOP_RIGHT);
-
-        body.getChildren().addAll(shelf.scroll, shelf.message, edgeFade);
+        body.getChildren().addAll(shelf.cardRow, shelf.message);
         showCatalogMessage(shelf, "Loading projects...");
         return body;
-    }
-
-    static double catalogEdgeFadeOpacity(double value, double min, double max) {
-        double range = max - min;
-        if (range <= 0) {
-            return 0;
-        }
-        double fadeRange = Math.max(range * 0.08, 0.02);
-        return Math.clamp((max - value) / fadeRange, 0, 1);
-    }
-
-    private void bindNewReleasesVisibility(StackPane root, Region dock) {
-        if (newReleasesSection == null) {
-            return;
-        }
-        BooleanBinding hasVerticalRoom = Bindings.createBooleanBinding(
-                () -> root.getHeight() >= newReleasesRequiredHeight(dockHeight(dock)),
-                root.heightProperty(),
-                dock.layoutBoundsProperty()
-        );
-        newReleasesSection.visibleProperty().bind(hasVerticalRoom);
-        newReleasesSection.managedProperty().bind(hasVerticalRoom);
-    }
-
-    private static double newReleasesRequiredHeight(double dockHeight) {
-        return CATALOG_STAGE_TOP_MARGIN
-                + (catalogShelfHeight() * 2)
-                + CATALOG_STAGE_GAP
-                + PLAY_DOCK_BOTTOM_MARGIN
-                + dockHeight
-                + PLAY_DOCK_CLEARANCE;
-    }
-
-    private static double catalogShelfHeight() {
-        return CATALOG_HEADER_HEIGHT + CATALOG_SECTION_GAP + CATALOG_SCROLL_HEIGHT;
-    }
-
-    private static double dockHeight(Region dock) {
-        double height = dock.getLayoutBounds().getHeight();
-        if (height <= 0 || Double.isNaN(height)) {
-            height = dock.prefHeight(-1);
-        }
-        return height <= 0 || Double.isNaN(height) ? 80 : height;
     }
 
     private Node launchControl() {
@@ -685,6 +636,10 @@ public final class LauncherPlayController {
         control.getStyleClass().add("play-launch-control");
         control.setAlignment(Pos.CENTER);
         control.setMaxWidth(Region.USE_PREF_SIZE);
+
+        patchlineMetric.getStyleClass().add("play-launch-patchline");
+        patchlineMetric.setMaxWidth(Double.MAX_VALUE);
+        patchlineMetric.setAlignment(Pos.CENTER);
 
         StackPane split = new StackPane();
         split.getStyleClass().add("play-launch-split");
@@ -699,12 +654,13 @@ public final class LauncherPlayController {
         Button setup = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_DOWN, 18));
         setup.getStyleClass().add("play-launch-arrow");
         setup.setTooltip(new Tooltip("Select patchline"));
+        setup.setAccessibleText("Select patchline");
         setup.setOnAction(event -> showLaunchDropdown(setup));
         StackPane.setAlignment(setup, Pos.CENTER_RIGHT);
         StackPane.setMargin(setup, new Insets(0, 7, 0, 0));
 
         split.getChildren().addAll(play, setup);
-        control.getChildren().add(split);
+        control.getChildren().addAll(split, patchlineMetric);
         return control;
     }
 
@@ -770,15 +726,11 @@ public final class LauncherPlayController {
         scroll.setMinHeight(0);
         scroll.setPrefHeight(SIDEBAR_PREF_HEIGHT);
         scroll.setMaxHeight(Double.MAX_VALUE);
-        scroll.vvalueProperty().addListener((observable, previous, value) -> maybeAppendBlogPosts(false));
-        scroll.viewportBoundsProperty().addListener((observable, previous, value) -> scheduleBlogFillCheck());
-        sidebar.heightProperty().addListener((observable, previous, value) -> scheduleBlogFillCheck());
-        sidebarScroll = scroll;
         return scroll;
     }
 
     private Node identitySection() {
-        VBox section = sidebarSection("Playing as");
+        VBox section = sidebarSection();
         configureIdentityButton();
         section.getChildren().add(identityButton);
         return section;
@@ -794,12 +746,21 @@ public final class LauncherPlayController {
     }
 
     private Node newsSection() {
-        VBox section = sidebarSection();
-        section.getStyleClass().add("last");
-        section.getChildren().add(sectionHeader("News", LauncherIcons.Glyph.EXTERNAL_LINK, "Open Hytale blog",
-                () -> LauncherExternalLinks.open("https://hytale.com/news", feedback::showToast)));
-        newsList.getStyleClass().add("play-news-list");
-        section.getChildren().add(newsList);
+        VBox section = new VBox(16);
+        section.getStyleClass().add("play-news-section");
+        Node header = sectionHeader("News", LauncherIcons.Glyph.REFRESH_CW, "Refresh news", () -> {
+            if (!blogPostsLoading) loadBlogPosts();
+        });
+        header.getStyleClass().add("play-news-header");
+        newsList.getStyleClass().add("play-news-grid");
+        newsList.setMinWidth(0);
+        newsStatus.getStyleClass().add("play-sidebar-message");
+        newsStatus.setWrapText(true);
+        setVisibleManaged(newsStatus, false);
+        moreNews.getStyleClass().addAll("btn", "secondary");
+        moreNews.setOnAction(event -> appendNextBlogPosts());
+        setVisibleManaged(moreNews, false);
+        section.getChildren().addAll(header, newsStatus, newsList, moreNews);
         return section;
     }
 
@@ -824,6 +785,8 @@ public final class LauncherPlayController {
         header.setAlignment(Pos.CENTER_LEFT);
         Label label = new Label(title);
         label.getStyleClass().add("play-sidebar-section-title");
+        label.setMaxHeight(Double.MAX_VALUE);
+        label.setAlignment(Pos.CENTER_LEFT);
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         Button button = new Button(null, LauncherIcons.icon(glyph, 15));
@@ -853,6 +816,7 @@ public final class LauncherPlayController {
         updateImageAvatar(identityAvatar, "Hytale", IDENTITY_AVATAR_SIZE, PROFILE_AVATAR_RADIUS, "");
 
         VBox copy = new VBox(3);
+        copy.setAlignment(Pos.CENTER_LEFT);
         identityTitle.getStyleClass().add("play-identity-title");
         identitySubtitle.getStyleClass().add("play-identity-subtitle");
         identityTitle.setMaxWidth(Double.MAX_VALUE);
@@ -970,41 +934,36 @@ public final class LauncherPlayController {
     }
 
     private void renderCatalogShelf(CatalogShelf shelf, List<ProjectSummary> projects) {
+        shelf.projects = List.copyOf(projects);
         shelf.cardRow.getChildren().clear();
         if (projects.isEmpty()) {
             showCatalogMessage(shelf, "No " + shelf.sort.title().toLowerCase() + " found.");
             return;
         }
         setVisibleManaged(shelf.message, false);
-        setVisibleManaged(shelf.scroll, true);
-        int cardCount = Math.min(projects.size(), CATALOG_SHELF_LIMIT);
+        setVisibleManaged(shelf.cardRow, true);
+        int cardCount = Math.min(projects.size(), shelf.visibleCount);
         String selectedGameVersion = gameVersion.get();
         for (int index = 0; index < cardCount; index++) {
             ProjectSummary project = projects.get(index);
             shelf.cardRow.getChildren().add(catalogProjectCard(project, selectedGameVersion));
         }
-        shelf.scroll.setHvalue(shelf.scroll.getHmin());
     }
 
     private Node catalogProjectCard(ProjectSummary project, String selectedGameVersion) {
-        return projectCardFactory.create(
-                project,
-                ProjectCardViewStyle.GRID,
-                selectedGameVersion,
-                Boolean.TRUE.equals(favoriteResolver.apply(project.id())),
-                onInstall,
-                onOpenPage,
-                onOpenCreator,
-                onToggleFavorite,
-                CATALOG_CARD_WIDTH,
-                CATALOG_CARD_HEIGHT
-        );
+        Region card = (Region) projectCardFactory.create(project, ProjectCardViewStyle.COMPACT,
+                selectedGameVersion, Boolean.TRUE.equals(favoriteResolver.apply(project.id())),
+                onInstall, onOpenPage, onOpenCreator, onToggleFavorite, 400, 90);
+        card.setMinWidth(0);
+        card.setPrefWidth(Region.USE_COMPUTED_SIZE);
+        card.setMaxWidth(Double.MAX_VALUE);
+        return card;
     }
 
     private void showCatalogMessage(CatalogShelf shelf, String message) {
         shelf.cardRow.getChildren().clear();
         shelf.message.setText(message == null ? "" : message);
-        setVisibleManaged(shelf.scroll, false);
+        setVisibleManaged(shelf.cardRow, false);
         setVisibleManaged(shelf.message, true);
     }
 
@@ -1168,9 +1127,10 @@ public final class LauncherPlayController {
         row.getStyleClass().add("play-friend-row");
         row.setAlignment(Pos.CENTER_LEFT);
 
-        StackPane avatar = friend.username().isBlank()
-                ? avatar(friend.displayName(), FRIEND_AVATAR_SIZE, "play-friend-avatar", friend.avatarUrl())
-                : hytaleProfileAvatar(friend.username(), FRIEND_AVATAR_SIZE, "play-friend-avatar");
+        StackPane avatar = new StackPane();
+        avatar.getStyleClass().add("play-friend-avatar");
+        sizeSquare(avatar, FRIEND_AVATAR_SIZE);
+        updateHytaleProfileAvatar(avatar, friend.displayName(), FRIEND_AVATAR_SIZE, friend.uuid());
         Region presence = new Region();
         presence.getStyleClass().addAll("play-friend-presence", friend.online() ? "online" : "offline");
         StackPane.setAlignment(presence, Pos.BOTTOM_RIGHT);
@@ -1235,63 +1195,38 @@ public final class LauncherPlayController {
 
     private void loadBlogPosts() {
         blogPostsLoading = true;
-        blogPostsComplete = false;
         renderNewsLoading();
-        CompletableFuture.supplyAsync(hytaleAuthService::getAllBlogPosts, executor)
-                .whenComplete((posts, error) -> Platform.runLater(() -> {
+        LauncherNewsFeed.load(modtaleNews::fetch,
+                () -> hytaleAuthService.getAllBlogPosts().stream().map(post -> new LauncherNewsPost(
+                        post.title(), post.url(), post.imageUrl(), post.publishedAt(), "Hytale")).toList(), executor)
+                .thenAccept(result -> Platform.runLater(() -> {
                     blogPostsLoading = false;
-                    if (error != null) {
-                        newsList.getChildren().setAll(messageRow("Could not load the Hytale blog."));
-                        return;
-                    }
                     blogPostsLoaded = true;
-                    renderInitialBlogPosts(posts == null ? List.of() : posts);
+                    newsStatus.setText(result.failedSources().isEmpty() ? ""
+                            : "Could not load " + String.join(" and ", result.failedSources()) + " news. Refresh to try again.");
+                    setVisibleManaged(newsStatus, !result.failedSources().isEmpty());
+                    renderInitialBlogPosts(result.posts());
                 }));
     }
 
     private void renderNewsLoading() {
         newsList.getChildren().clear();
-        for (int i = 0; i < 3; i++) newsList.getChildren().add(LauncherSkeleton.of(
-                blogPostRow(new HytaleBlogPost("The latest news from Hytale", "", "", java.time.Instant.parse(LauncherSkeletonContent.DATE)))));
+        setVisibleManaged(moreNews, false);
+        setVisibleManaged(newsStatus, false);
+        for (int i = 0; i < BLOG_POST_PAGE_SIZE; i++) newsList.getChildren().add(LauncherSkeleton.of(
+                blogPostRow(new LauncherNewsPost("Loading news", "", "",
+                        java.time.Instant.parse(LauncherSkeletonContent.DATE), "Modtale"))));
     }
 
-    private void renderInitialBlogPosts(List<HytaleBlogPost> posts) {
+    private void renderInitialBlogPosts(List<LauncherNewsPost> posts) {
         blogPosts = posts;
         renderedBlogPosts = 0;
-        blogPostsComplete = posts.isEmpty();
         newsList.getChildren().clear();
-        if (posts.isEmpty()) {
-            newsList.getChildren().add(messageRow("No Hytale blog posts found."));
-            return;
+        if (posts.isEmpty() && newsStatus.getText().isBlank()) {
+            newsStatus.setText("No news articles found.");
+            setVisibleManaged(newsStatus, true);
         }
         appendNextBlogPosts();
-        scheduleBlogFillCheck();
-    }
-
-    private void maybeAppendBlogPosts(boolean fillViewport) {
-        if (blogPostsLoading || !blogPostsLoaded || blogPostsComplete || sidebarScroll == null) {
-            return;
-        }
-        if (renderedBlogPosts >= blogPosts.size()) {
-            markBlogPostsComplete();
-            return;
-        }
-        double viewportHeight = sidebarScroll.getViewportBounds().getHeight();
-        double contentHeight = sidebarScroll.getContent() == null
-                ? 0
-                : sidebarScroll.getContent().getBoundsInLocal().getHeight();
-        boolean contentShort = viewportHeight <= 0 || contentHeight <= viewportHeight + BLOG_POST_FILL_PADDING;
-        boolean nearBottom = sidebarScroll.getVvalue() >= BLOG_POST_LOAD_THRESHOLD;
-        if (!fillViewport && !nearBottom) {
-            return;
-        }
-        if (fillViewport && !contentShort && !nearBottom) {
-            return;
-        }
-        appendNextBlogPosts();
-        if (fillViewport) {
-            scheduleBlogFillCheck();
-        }
     }
 
     private void appendNextBlogPosts() {
@@ -1300,62 +1235,65 @@ public final class LauncherPlayController {
             newsList.getChildren().add(blogPostRow(blogPosts.get(index)));
         }
         renderedBlogPosts = nextCount;
-        if (renderedBlogPosts >= blogPosts.size()) {
-            markBlogPostsComplete();
-        }
+        setVisibleManaged(moreNews, renderedBlogPosts < blogPosts.size());
     }
 
-    private void markBlogPostsComplete() {
-        if (blogPostsComplete) {
-            return;
-        }
-        blogPostsComplete = true;
-        newsList.getChildren().add(messageRow("End of Hytale RSS feed."));
-    }
-
-    private void scheduleBlogFillCheck() {
-        if (blogFillCheckScheduled) {
-            return;
-        }
-        blogFillCheckScheduled = true;
-        Platform.runLater(() -> {
-            blogFillCheckScheduled = false;
-            maybeAppendBlogPosts(true);
-        });
-    }
-
-    private Node blogPostRow(HytaleBlogPost post) {
+    private Node blogPostRow(LauncherNewsPost post) {
         VBox row = new VBox(7);
         row.getStyleClass().add("play-news-card");
         row.setAlignment(Pos.TOP_LEFT);
         row.setOnMouseClicked(event -> LauncherExternalLinks.open(post.url(), feedback::showToast));
+        row.setFocusTraversable(true);
+        row.setAccessibleRole(javafx.scene.AccessibleRole.HYPERLINK);
+        row.setAccessibleText(post.source() + ": " + post.title());
+        row.setOnKeyPressed(event -> {
+            if (event.getCode() == javafx.scene.input.KeyCode.ENTER || event.getCode() == javafx.scene.input.KeyCode.SPACE) {
+                LauncherExternalLinks.open(post.url(), feedback::showToast);
+                event.consume();
+            }
+        });
+        row.setMinWidth(0);
+        row.setMinHeight(Region.USE_PREF_SIZE);
+        row.setMaxWidth(Double.MAX_VALUE);
 
         StackPane thumbnail = newsThumbnail(post);
 
-        Label title = new Label(value(post.title(), "Hytale Blog"));
+        Label title = new Label(value(post.title(), "News"));
         title.getStyleClass().add("play-news-title");
         title.setWrapText(true);
-        Label date = new Label(formatBlogDate(post.publishedAt()));
-        date.getStyleClass().add("play-news-date");
-
-        row.getChildren().addAll(thumbnail, title, date);
+        title.setMinHeight(Region.USE_PREF_SIZE);
+        VBox copy = new VBox(title);
+        copy.getStyleClass().add("play-news-copy");
+        row.getChildren().addAll(thumbnail, copy);
         return row;
     }
 
-    private StackPane newsThumbnail(HytaleBlogPost post) {
+    private StackPane newsThumbnail(LauncherNewsPost post) {
         Label initial = new Label(initialFor(post.title()));
         initial.getStyleClass().add("play-news-initial");
-        StackPane thumbnail = new StackPane(initial);
+        StackPane thumbnail = new StackPane(initial) {
+            @Override public javafx.geometry.Orientation getContentBias() {
+                return javafx.geometry.Orientation.HORIZONTAL;
+            }
+
+            @Override protected double computePrefHeight(double width) {
+                return (width < 0 ? NEWS_THUMBNAIL_WIDTH : width) * 9.0 / 16;
+            }
+        };
         thumbnail.getStyleClass().add("play-news-thumbnail");
-        thumbnail.setMinSize(NEWS_THUMBNAIL_WIDTH, NEWS_THUMBNAIL_HEIGHT);
-        thumbnail.setPrefSize(NEWS_THUMBNAIL_WIDTH, NEWS_THUMBNAIL_HEIGHT);
-        thumbnail.setMaxSize(NEWS_THUMBNAIL_WIDTH, NEWS_THUMBNAIL_HEIGHT);
+        thumbnail.setMinSize(0, Region.USE_PREF_SIZE);
+        thumbnail.setPrefWidth(NEWS_THUMBNAIL_WIDTH);
+        thumbnail.setMaxSize(Double.MAX_VALUE, Region.USE_PREF_SIZE);
         if (post.imageUrl() != null && !post.imageUrl().isBlank()) {
             ImageView image = containedImageView(post.imageUrl(), NEWS_THUMBNAIL_WIDTH, NEWS_THUMBNAIL_HEIGHT);
             image.getStyleClass().add("play-news-image");
             Rectangle clip = new Rectangle(NEWS_THUMBNAIL_WIDTH, NEWS_THUMBNAIL_HEIGHT);
             clip.setArcWidth(14);
             clip.setArcHeight(14);
+            image.fitWidthProperty().bind(thumbnail.widthProperty());
+            image.fitHeightProperty().bind(thumbnail.heightProperty());
+            clip.widthProperty().bind(thumbnail.widthProperty());
+            clip.heightProperty().bind(thumbnail.heightProperty());
             image.setClip(clip);
             thumbnail.getChildren().add(image);
         }
@@ -1387,16 +1325,85 @@ public final class LauncherPlayController {
         return avatar;
     }
 
-    private StackPane hytaleProfileAvatar(String username, double size, String styleClass) {
+    private StackPane hytaleProfileAvatar(HytaleProfile profile, double size, String styleClass) {
         StackPane avatar = new StackPane();
         avatar.getStyleClass().add(styleClass);
         sizeSquare(avatar, size);
-        updateHytaleProfileAvatar(avatar, username, size);
+        updateHytaleProfileAvatar(avatar, profile.displayName(), size, profile.uuid());
         return avatar;
     }
 
     private void updateHytaleProfileAvatar(StackPane avatar, String username, double size) {
-        updateImageAvatar(avatar, username, size, PROFILE_AVATAR_RADIUS, hyvatarUrl(username));
+        updateHytaleProfileAvatar(avatar, username, size, "");
+    }
+
+    private void updateHytaleProfileAvatar(StackPane avatar, String username, double size, String profileUuid) {
+        updateImageAvatar(avatar, username, size, PROFILE_AVATAR_RADIUS, "");
+        ImageView image = new ImageView();
+        image.setFitWidth(size);
+        image.setFitHeight(size);
+        image.setPreserveRatio(true);
+        image.setSmooth(true);
+        Rectangle clip = new Rectangle(size, size);
+        clip.setArcWidth(PROFILE_AVATAR_RADIUS * 2);
+        clip.setArcHeight(PROFILE_AVATAR_RADIUS * 2);
+        image.setClip(clip);
+        avatar.getChildren().add(image);
+        avatarClient.avatarUrl(username).whenComplete((url, error) -> Platform.runLater(() -> {
+            if (error == null && avatar.getChildren().contains(image) && image.getUserData() == null) {
+                HytaleProfileAvatarImages.load(image, avatar.getChildren().getFirst(), url,
+                        url,
+                        source -> cachedImage(source, size, size, true, true),
+                        () -> avatar.getChildren().contains(image));
+            }
+        }));
+        LauncherSettings current = settingsController.settings();
+        HytaleAuthSession active = current.getHytaleAuthSession();
+        if (active == null) return;
+        boolean ownProfile = profileUuid.isBlank()
+                ? username.equalsIgnoreCase(active.getUsername()) : profileUuid.equalsIgnoreCase(active.getUuid());
+        if (!ownProfile && profileUuid.isBlank()) return;
+        var assets = net.modtale.launcher.wardrobe.LocalSkinLibrary.assets(current);
+        if (!java.nio.file.Files.isRegularFile(assets)) return;
+        String profile = active.getUuid();
+        if (!ownProfile) {
+            var skin = CompletableFuture.supplyAsync(() -> {
+                var publicProfile = new net.modtale.launcher.wardrobe.WardrobeApiClient(hytaleAuthService)
+                        .profile(java.util.UUID.fromString(profileUuid), current);
+                try {
+                    var definition = new com.fasterxml.jackson.databind.ObjectMapper().readTree(publicProfile.skin());
+                    if (!definition.isObject() || (!definition.isEmpty() && !definition.has("bodyCharacteristic"))) {
+                        throw new IllegalStateException("Public profile has no character skin");
+                    }
+                    return definition;
+                } catch (java.io.IOException ex) { throw new java.io.UncheckedIOException(ex); }
+            }, executor);
+            HytaleProfileAvatarImages.render(image, avatar.getChildren().getFirst(), skin,
+                    definition -> profileThumbnails.load(assets, definition, "face"),
+                    () -> avatar.getChildren().contains(image)
+                            && settingsController.settings().getHytaleAuthSession() != null
+                            && profile.equals(settingsController.settings().getHytaleAuthSession().getUuid()));
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (profileSkin == null || profileSkin.isCompletedExceptionally() || !profile.equals(profileSkinId) || now - profileSkinAt > 60_000) {
+            profileSkinId = profile; profileSkinAt = now;
+            profileSkin = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                var session = current.getHytaleAuthSession();
+                if (session == null || !profile.equals(session.getUuid())) throw new IllegalStateException("Selected profile changed");
+                var item = new net.modtale.launcher.wardrobe.WardrobeApiClient(hytaleAuthService).currentSkin(current);
+                session = current.getHytaleAuthSession();
+                if (session == null || !profile.equals(session.getUuid())) throw new IllegalStateException("Selected profile changed");
+                try { return new com.fasterxml.jackson.databind.ObjectMapper().readTree(item.payload()).path("skin"); }
+                catch (java.io.IOException ex) { throw new java.io.UncheckedIOException(ex); }
+            }, executor);
+        }
+        HytaleProfileAvatarImages.render(image, avatar.getChildren().getFirst(), profileSkin,
+                skin -> profileThumbnails.load(assets, skin, "face"),
+                () -> avatar.getChildren().contains(image) && profile.equals(profileSkinId)
+                        && settingsController.settings().getHytaleAuthSession() != null
+                        && profile.equals(settingsController.settings().getHytaleAuthSession().getUuid()));
+
     }
 
     private void updateImageAvatar(StackPane avatar, String name, double size, double radius, String imageUrl) {
@@ -1426,12 +1433,6 @@ public final class LauncherPlayController {
         node.setMaxSize(size, size);
     }
 
-    private void sizeRegion(Region node, double width, double height) {
-        node.setMinSize(width, height);
-        node.setPrefSize(width, height);
-        node.setMaxSize(width, height);
-    }
-
     private Image cachedImage(String imageUrl, double requestedWidth, double requestedHeight, boolean preserveRatio, boolean resize) {
         if (imageUrl == null || imageUrl.isBlank()) {
             return null;
@@ -1450,25 +1451,9 @@ public final class LauncherPlayController {
         });
     }
 
-    private String hyvatarUrl(String username) {
-        String encoded = URLEncoder.encode(value(username, "Hytale"), StandardCharsets.UTF_8).replace("+", "%20");
-        return "https://hyvatar.io/render/" + encoded + "?size=" + HYVATAR_RENDER_SIZE;
-    }
-
     private String initialFor(String value) {
         String text = value(value, "H");
         return text.substring(0, 1).toUpperCase();
-    }
-
-    private String formatBlogDate(Instant publishedAt) {
-        if (publishedAt == null || publishedAt.equals(Instant.EPOCH)) {
-            return "Hytale Blog";
-        }
-        int postYear = publishedAt.atZone(ZoneId.systemDefault()).getYear();
-        if (postYear == Year.now().getValue()) {
-            return BLOG_DATE.format(publishedAt);
-        }
-        return BLOG_DATE_WITH_YEAR.format(publishedAt);
     }
 
     private void toggleIdentityMenu(Node owner) {
@@ -1487,6 +1472,7 @@ public final class LauncherPlayController {
             identityMenu.hide();
         }
         ContextMenu menu = new ContextMenu();
+        menu.getScene().setFill(Color.TRANSPARENT);
         identityMenu = menu;
         menu.getStyleClass().add("play-identity-menu");
         menu.setOnHidden(event -> {
@@ -1539,7 +1525,7 @@ public final class LauncherPlayController {
         row.getStyleClass().add("play-identity-menu-header");
         row.setAlignment(Pos.CENTER_LEFT);
         HytaleProfile selectedProfile = selectedProfileFor(session);
-        StackPane icon = hytaleProfileAvatar(selectedProfile.displayName(), IDENTITY_MENU_AVATAR_SIZE, "play-identity-menu-avatar");
+        StackPane icon = hytaleProfileAvatar(selectedProfile, IDENTITY_MENU_AVATAR_SIZE, "play-identity-menu-avatar");
 
         VBox copy = new VBox(2);
         Label name = new Label(accountLabel(session));
@@ -1571,7 +1557,7 @@ public final class LauncherPlayController {
             row.getStyleClass().add("selected");
         }
         row.setAlignment(Pos.CENTER_LEFT);
-        StackPane profileAvatar = hytaleProfileAvatar(profile.displayName(), IDENTITY_MENU_AVATAR_SIZE, "play-identity-menu-avatar");
+        StackPane profileAvatar = hytaleProfileAvatar(profile, IDENTITY_MENU_AVATAR_SIZE, "play-identity-menu-avatar");
         if (selected) {
             StackPane badge = new StackPane(LauncherIcons.icon(LauncherIcons.Glyph.CHECK, 8));
             badge.getStyleClass().add("play-identity-menu-avatar-badge");
@@ -1694,10 +1680,8 @@ public final class LauncherPlayController {
 
     private void syncPatchlineMetric(String selectedPatchline) {
         String patchline = HytaleApiClient.normalizeBranch(selectedPatchline);
-        boolean showPatchline = !"release".equals(patchline);
         patchlineMetric.setText(launchPatchlineLabel(patchline));
-        Node container = patchlineMetric.getParent();
-        setVisibleManaged(container == null ? patchlineMetric : container, showPatchline);
+        setVisibleManaged(patchlineMetric, true);
     }
 
     private String launchPatchlineLabel(String patchline) {
@@ -1929,10 +1913,11 @@ public final class LauncherPlayController {
 
     private static final class CatalogShelf {
         private final ProjectBrowseSort sort;
-        private final HBox cardRow = new HBox();
-        private final ScrollPane scroll = new ScrollPane();
+        private final VBox cardRow = new VBox(12);
         private final Label message = new Label();
 
+        private int visibleCount = 3;
+        private List<ProjectSummary> projects = List.of();
         private boolean loading;
         private boolean loaded;
         private long requestId;

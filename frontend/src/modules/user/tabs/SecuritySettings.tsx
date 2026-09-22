@@ -6,6 +6,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { extractApiErrorMessage } from '@/utils/api';
 import type { User } from '@/types';
+import { MFA_CODE_LENGTH, MIN_PASSWORD_CHARACTERS } from '@/utils/siteLimits';
 
 interface SecuritySettingsProps {
     user: User;
@@ -268,12 +269,12 @@ export function SecuritySettings({ user, onUpdate }: SecuritySettingsProps) {
                                         <div>
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 ml-1">Verification Code</label>
                                             <div className="relative max-w-sm">
-                                                <input type="text" placeholder="000 000" value={mfaCode} onChange={e => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, 6))} className="w-full px-5 py-4 pl-12 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 font-mono tracking-[0.5em] text-2xl focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner text-slate-900 dark:text-white" maxLength={6} />
+                                                <input type="text" placeholder="000 000" value={mfaCode} onChange={e => setMfaCode(e.target.value.replace(/\D/g, '').slice(0, MFA_CODE_LENGTH))} aria-label="Verification code" className="w-full px-5 py-4 pl-12 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 font-mono tracking-[0.5em] text-2xl focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner text-slate-900 dark:text-white" maxLength={MFA_CODE_LENGTH} />
                                                 <Smartphone className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-400" />
                                             </div>
                                         </div>
                                         <div className="flex flex-col sm:flex-row gap-3 max-w-sm pt-2">
-                                            <button onClick={handleVerifyMfa} disabled={mfaLoading || mfaCode.length !== 6} className="flex-1 bg-modtale-accent text-white py-3.5 rounded-xl font-bold text-sm hover:bg-modtale-accentHover transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 active:scale-95">
+                                            <button onClick={handleVerifyMfa} disabled={mfaLoading || mfaCode.length !== MFA_CODE_LENGTH} className="flex-1 bg-modtale-accent text-white py-3.5 rounded-xl font-bold text-sm hover:bg-modtale-accentHover transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-modtale-accent/20 active:scale-95">
                                                 {mfaLoading ? <Spinner className="w-5 h-5" /> : <><Check className="w-4 h-4"/> Verify & Enable</>}
                                             </button>
                                             <button onClick={() => { setShowMfaSetup(false); setMfaCode(''); }} className="px-6 py-3.5 text-sm font-bold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 rounded-xl transition-colors">Cancel</button>
@@ -293,7 +294,7 @@ export function SecuritySettings({ user, onUpdate }: SecuritySettingsProps) {
                         <div className="p-6 rounded-2xl bg-white dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 shadow-sm">
                             {hasPassword ? (
                                 <div>
-                                    <p className="text-sm text-slate-600 dark:text-slate-400 font-medium mb-6 max-w-xl">Update your account password to maintain security.</p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400 font-medium mb-6 max-w-xl">Update your account password to maintain security. Passwords must be at least {MIN_PASSWORD_CHARACTERS} characters.</p>
                                     <form onSubmit={handleChangePassword} className="max-w-md space-y-5">
                                         <div>
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 ml-1">Current Password</label>
@@ -301,11 +302,11 @@ export function SecuritySettings({ user, onUpdate }: SecuritySettingsProps) {
                                         </div>
                                         <div className="pt-2 border-t border-slate-100 dark:border-white/5">
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 ml-1 mt-2">New Password</label>
-                                            <input type="password" required minLength={6} value={credPassword} onChange={e => setCredPassword(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm shadow-inner dark:text-white" placeholder="••••••••" />
+                                            <input type="password" required minLength={MIN_PASSWORD_CHARACTERS} value={credPassword} onChange={e => setCredPassword(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm shadow-inner dark:text-white" placeholder="••••••••" />
                                         </div>
                                         <div>
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 ml-1">Confirm New Password</label>
-                                            <input type="password" required minLength={6} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm shadow-inner dark:text-white" placeholder="••••••••" />
+                                            <input type="password" required minLength={MIN_PASSWORD_CHARACTERS} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm shadow-inner dark:text-white" placeholder="••••••••" />
                                         </div>
                                         <button type="submit" disabled={savingCreds} className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-8 py-3 rounded-xl font-bold text-sm hover:opacity-90 transition-all flex items-center justify-center gap-2 mt-4 shadow-lg active:scale-95 w-full sm:w-auto">
                                             {savingCreds ? <Spinner className="w-4 h-4" /> : (credsSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />)} {credsSaved ? 'Saved' : 'Update Password'}
@@ -325,7 +326,7 @@ export function SecuritySettings({ user, onUpdate }: SecuritySettingsProps) {
                                 </div>
                             ) : (
                                 <div>
-                                    <p className="text-sm text-slate-600 dark:text-slate-400 font-medium mb-6 max-w-xl">Set a password to log in with your email address instead of relying solely on a social provider.</p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400 font-medium mb-6 max-w-xl">Set a password to log in with your email address instead of relying solely on a social provider. Passwords must be at least {MIN_PASSWORD_CHARACTERS} characters.</p>
                                     <form onSubmit={handleSaveCredentials} className="max-w-md space-y-5">
                                         {!user.email && (
                                             <div className="mb-4">
@@ -335,11 +336,11 @@ export function SecuritySettings({ user, onUpdate }: SecuritySettingsProps) {
                                         )}
                                         <div>
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 ml-1">New Password</label>
-                                            <input type="password" required minLength={6} value={credPassword} onChange={e => setCredPassword(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm shadow-inner dark:text-white" placeholder="••••••••" />
+                                            <input type="password" required minLength={MIN_PASSWORD_CHARACTERS} value={credPassword} onChange={e => setCredPassword(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm shadow-inner dark:text-white" placeholder="••••••••" />
                                         </div>
                                         <div>
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 ml-1">Confirm Password</label>
-                                            <input type="password" required minLength={6} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm shadow-inner dark:text-white" placeholder="••••••••" />
+                                            <input type="password" required minLength={MIN_PASSWORD_CHARACTERS} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm shadow-inner dark:text-white" placeholder="••••••••" />
                                         </div>
                                         <button type="submit" disabled={savingCreds} className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-8 py-3 rounded-xl font-bold text-sm hover:opacity-90 transition-all flex items-center justify-center gap-2 mt-4 shadow-lg active:scale-95 w-full sm:w-auto">
                                             {savingCreds ? <Spinner className="w-4 h-4" /> : (credsSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />)} {credsSaved ? 'Saved' : 'Set Password'}

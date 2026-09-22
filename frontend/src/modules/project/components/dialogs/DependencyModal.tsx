@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link as LinkIcon, X, Check, AlertCircle, Download } from 'lucide-react';
+import { Link as LinkIcon, X, Check, AlertCircle, Download, ExternalLink } from 'lucide-react';
 import { theme } from '@/styles/theme';
 import { api, BACKEND_URL } from '@/utils/api';
 import { useScrollLock } from '@/hooks/useScrollLock';
@@ -28,7 +28,7 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({
                                                                 }) => {
     useScrollLock(!isInline);
     const [selected, setSelected] = useState<Set<string>>(() => {
-        if (initialSelected) return new Set(initialSelected);
+        if (initialSelected) return new Set(initialSelected.filter(id => dependencies.some(d => d.projectId === id && !isExternalDependency(d) && !isEmbeddedDependency(d))));
         return new Set(dependencies.filter(d => !isEmbeddedDependency(d) && !isExternalDependency(d)).map(d => d.projectId));
     });
     const [metaCache, setMetaCache] = useState<Record<string, { title: string; author: string; icon: string }>>(() => initialMetaCache || {});
@@ -96,6 +96,23 @@ export const DependencyModal: React.FC<DependencyModalProps> = ({
                 </div>
 
                 <div className="space-y-2">
+                    {dependencies.filter(dep => dep.source === 'CURSEFORGE' && !isEmbeddedDependency(dep)).map(dep => (
+                        <div key={`cf:${dep.projectId}`} className={`flex items-center gap-4 p-4 rounded-2xl border ${theme.colors.border} ${theme.colors.bgBase}`}>
+                            <input className="appearance-none w-6 h-6 shrink-0 rounded-full border-2 border-slate-300 dark:border-slate-600 bg-transparent opacity-50 cursor-not-allowed" type="checkbox" disabled checked={false} aria-label={`${dep.projectTitle || dep.projectId}: launcher only`} readOnly />
+                            <div className={`w-12 h-12 rounded-xl border ${theme.colors.border} ${theme.colors.bgBase} flex items-center justify-center shrink-0 ${theme.colors.textMuted}`}><ExternalLink className="w-5 h-5" /></div>
+                            <div className="min-w-0 flex-1">
+                                <div className={`font-bold truncate ${theme.colors.textPrimary}`}>{dep.projectTitle || dep.projectId}</div>
+                                <div className={`flex flex-wrap items-center gap-1.5 mt-1 text-xs ${theme.colors.textMuted}`}>
+                                    {dep.externalUrl && /^https:\/\/(www\.)?curseforge\.com\//i.test(dep.externalUrl)
+                                        ? <a href={dep.externalUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:underline" aria-label={`${dep.projectTitle || dep.projectId} on CurseForge`}>CurseForge <ExternalLink className="w-3 h-3 opacity-60" /></a>
+                                        : <span>CurseForge</span>}
+                                    <span aria-hidden="true">·</span><span>{isOptionalDependency(dep) ? 'Optional' : 'Required'}</span>
+                                </div>
+                            </div>
+                            <span className={`shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-md border ${theme.colors.border} ${theme.colors.textMuted}`} title="This dependency can only be included when installing through the launcher.">Launcher only</span>
+                        </div>
+                    ))}
+
                     {selectableDependencies.map(dep => {
                         const meta = metaCache[dep.projectId];
                         const isSelected = selected.has(dep.projectId);

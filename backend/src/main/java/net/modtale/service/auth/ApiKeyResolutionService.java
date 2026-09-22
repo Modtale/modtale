@@ -77,10 +77,9 @@ public class ApiKeyResolutionService {
     }
 
     private void updateLastUsed(ApiKey key) {
-        taskExecutor.execute(() -> {
-            key.setLastUsed(LocalDateTime.now());
-            apiKeyRepository.save(key);
-        });
+        String id=key.getId(), owner=key.getUserId(), hash=key.getKeyHash();
+        LocalDateTime usedAt=LocalDateTime.now();key.setLastUsed(usedAt);
+        taskExecutor.execute(() -> apiKeyRepository.recordUse(id,owner,hash,usedAt));
     }
 
     private String normalizePlainKey(String plainKey) {

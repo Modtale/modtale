@@ -1,9 +1,8 @@
 import React from 'react';
-import {Activity, FileText, Shield, Layers, Box, Database, Palette, Save, Code, Layout} from 'lucide-react';
+import {FileText, Shield, Layers, Box, Database, Palette, Save, Code, Layout} from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { BlueskyBrandIcon, DiscordBrandIcon, GitHubBrandIcon, XBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { SiteRoutes } from '@/utils/routes';
-import { STATUS_PAGE_URL } from '@/utils/status';
 import { LanguageSelector } from '@/i18n';
 import { useTranslation } from 'react-i18next';
 
@@ -15,7 +14,6 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
     const { t } = useTranslation(['footer', 'navigation']);
     const location = useLocation();
     const path = location.pathname;
-    const isHomePage = path === SiteRoutes.home();
 
     const getFooterDescription = () => {
         switch (path) {
@@ -81,9 +79,6 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
                             <Link to={SiteRoutes.apiDocs()} className={linkClass}>
                                 <Code className="w-4 h-4 mr-2 opacity-70" /> {t('footer:apiDocs')}
                             </Link>
-                            <a href={STATUS_PAGE_URL} className={linkClass}>
-                                <Activity className="w-4 h-4 mr-2 opacity-70" /> {t('footer:status')}
-                            </a>
                             <div className="h-px bg-slate-100 dark:bg-white/5 my-1"></div>
                             <Link to={SiteRoutes.terms()} className={linkClass}>
                                 <FileText className="w-4 h-4 mr-2 opacity-70" /> {t('footer:terms')}
@@ -112,11 +107,6 @@ export const Footer: React.FC<FooterProps> = ({ isDarkMode }) => {
                         </div>
                     </div>
                 </div>
-                {isHomePage && (
-                    <p className="border-t border-slate-200 dark:border-white/5 pt-6 text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400">
-                        Product notes live in <Link to={SiteRoutes.news()} className="font-black text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">Modtale News</Link>. Subscribe via <a href="/rss.xml" className="font-black text-orange-600 hover:text-orange-500 dark:text-orange-300 dark:hover:text-orange-200">RSS</a>.
-                    </p>
-                )}
             </div>
         </footer>
     );

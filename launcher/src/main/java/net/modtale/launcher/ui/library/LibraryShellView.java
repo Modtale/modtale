@@ -36,6 +36,7 @@ final class LibraryShellView {
         VBox.setVgrow(projectList, Priority.ALWAYS);
 
         projectDetail.getStyleClass().add("library-detail-pane");
+        projectDetail.setMinWidth(0);
         HBox.setHgrow(projectDetail, Priority.ALWAYS);
         content.getChildren().addAll(projectsPane, projectDetail);
         return content;

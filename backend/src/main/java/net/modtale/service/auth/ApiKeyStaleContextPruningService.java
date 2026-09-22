@@ -41,6 +41,7 @@ final class ApiKeyStaleContextPruningService {
             return;
         }
 
+        var original=ApiKeyContextSnapshot.copy(apiKey.getContextPermissions());
         boolean changed = false;
         User keyOwner = userRepository.findById(apiKey.getUserId()).orElse(null);
         Iterator<Map.Entry<String, Set<ApiKey.ApiPermission>>> iterator = apiKey.getContextPermissions().entrySet().iterator();
@@ -74,7 +75,9 @@ final class ApiKeyStaleContextPruningService {
         }
 
         if (changed) {
-            taskExecutor.execute(() -> apiKeyRepository.save(apiKey));
+            String id=apiKey.getId(), owner=apiKey.getUserId(), hash=apiKey.getKeyHash();
+            var replacement=ApiKeyContextSnapshot.copy(apiKey.getContextPermissions());
+            taskExecutor.execute(() -> apiKeyRepository.restrictContexts(id,owner,hash,original,replacement));
         }
     }
 

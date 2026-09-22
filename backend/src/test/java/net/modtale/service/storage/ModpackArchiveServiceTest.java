@@ -48,6 +48,38 @@ class ModpackArchiveServiceTest {
     }
 
     @Test
+    void ownedConfigsGenerateValidatedV2ArchiveAndRoundTripSidecar() throws Exception {
+        Project pack = pack();
+        ProjectVersion version = version("1.0.0", null);
+        ProjectDependency dependency = new ProjectDependency("plugin", "Plugin", "2.0.0");
+        version.setDependencies(List.of(dependency));
+        String path = "overrides/Universe/mods/Example_Plugin/config.json";
+        String hash = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes("{}")));
+        var reference = new net.modtale.model.project.ModpackConfigReference("plugin", "MODTALE", path, hash);
+        version.setModpackConfigs(List.of(reference));
+        version.setOverrideFileUrl("configs.zip");
+        String manifest = new ObjectMapper().writeValueAsString(Map.of("format", "modtale-configs", "formatVersion", 1, "configs", List.of(reference)));
+        when(archiveSupport.download("configs.zip")).thenReturn(zip(Map.of(path, "{}", "modtale.configs.json", manifest)));
+        when(archiveSupport.resolveDependency(dependency)).thenReturn(new DownloadArchiveSupport.ResolvedDependency(
+                dependencyProject("plugin", ProjectClassification.PLUGIN), version("2.0.0", "plugin.jar")));
+        when(archiveSupport.download("plugin.jar")).thenReturn(bytes("plugin-binary"));
+        when(archiveSupport.extractOriginalFilename("plugin.jar")).thenReturn("plugin.jar");
+        when(archiveSupport.newZipMultipartFile(any(), any())).thenReturn(mock(MultipartFile.class));
+        byte[] archive = service.generateModpackZip(pack, version);
+        ModpackArchiveValidator.validate(archive, true);
+        Map<String, String> entries = unzip(archive);
+        JsonNode lock = new ObjectMapper().readTree(entries.get("modtale.lock.json"));
+        assertEquals(2, lock.path("lockVersion").asInt());
+        assertEquals("plugin", lock.at("/overrides/0/owner/projectId").asText());
+        assertEquals("Universe/mods/Example_Plugin/config.json", lock.at("/overrides/0/destination").asText());
+        assertEquals("SEED_ONLY", lock.at("/overrides/0/installPolicy").asText());
+        assertEquals(hash, new ObjectMapper().readTree(entries.get("modtale.configs.json")).at("/configs/0/sha256").asText());
+        assertEquals("{}", entries.get(path));
+        version.setFileUrl(null);
+        assertArrayEquals(archive, service.generateModpackZip(pack, version));
+    }
+
+    @Test
     void generateModpackZipReturnsCachedArchiveWhenDownloadSucceeds() throws Exception {
         Project pack = pack();
         ProjectVersion version = version("1.0.0", "modpacks/cached.zip");
@@ -170,13 +202,13 @@ class ModpackArchiveServiceTest {
         assertEquals("REFERENCE_ONLY", lock.at("/entries/1/distribution").asText());
         assertEquals("1450386", lock.at("/entries/1/provider/projectId").asText());
         assertEquals("8227810", lock.at("/entries/1/provider/fileId").asText());
-        assertEquals("OPTIONAL", lock.at("/entries/1/dependencyType").asText());
+        assertEquals("REQUIRED", lock.at("/entries/1/dependencyType").asText());
         assertFalse(lock.at("/entries/1").has("environment"));
         assertFalse(entries.containsKey("External-Mod-1.0.0.jar"));
     }
 
     @Test
-    void generateModpackZipIncludesOneUnifiedOverrideTree() throws Exception {
+    void rejectsLegacySharedFilesInsteadOfShippingSaves() throws Exception {
         Project pack = pack();
         ProjectVersion version = version("1.0.0", null);
         version.setOverrideFileUrl("modpack-overrides/source.zip");
@@ -184,17 +216,7 @@ class ModpackArchiveServiceTest {
                 "overrides/Mods/example/game.json", "{}",
                 "overrides/Saves/My World/mods/Example_Plugin/config.json", "{}"
         )));
-        when(archiveSupport.newZipMultipartFile(eq("sky-pack-1.0.0.zip"), any()))
-                .thenAnswer(invocation -> mock(MultipartFile.class));
-        when(archiveSupport.upload(any(MultipartFile.class), eq("modpacks"))).thenReturn("modpacks/generated.zip");
-
-        Map<String, String> entries = unzip(service.generateModpackZip(pack, version));
-        JsonNode lock = new ObjectMapper().readTree(entries.get("modtale.lock.json"));
-
-        assertTrue(entries.containsKey("overrides/Mods/example/game.json"));
-        assertTrue(entries.containsKey("overrides/Saves/My World/mods/Example_Plugin/config.json"));
-        assertEquals(2, lock.path("overrides").size());
-        assertFalse(lock.at("/overrides/0").has("environment"));
+        assertThrows(java.io.IOException.class, () -> service.generateModpackZip(pack, version));
     }
 
     @Test

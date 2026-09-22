@@ -1,5 +1,6 @@
+import { fetchNewsPosts } from '@/modules/news/api/newsClient';
 import type { APIRoute } from 'astro';
-import { NEWS_INDEX_PATH, NEWS_POSTS, getNewsPostPath, getLatestNewsPostDate } from '../data/news';
+import { NEWS_INDEX_PATH, getNewsPostPath } from '../data/news';
 
 const STATIC_ROUTES: Array<{ path: string; changefreq: string; priority: string; lastmod?: number }> = [
     { path: '/', changefreq: 'daily', priority: '1.0' },
@@ -14,19 +15,16 @@ const STATIC_ROUTES: Array<{ path: string; changefreq: string; priority: string;
         path: NEWS_INDEX_PATH,
         changefreq: 'weekly',
         priority: '0.72',
-        lastmod: getLatestNewsPostDate(),
     },
-    ...NEWS_POSTS.map((post) => ({
-        path: getNewsPostPath(post),
-        changefreq: 'monthly',
-        priority: '0.68',
-        lastmod: new Date(post.updatedAt).getTime(),
-    })),
+
 ];
 
 export const GET: APIRoute = async () => {
     const defaultLastmod = new Date().toISOString();
-    const urls = STATIC_ROUTES.map(({ path, changefreq, priority, lastmod }) => `  <url>
+    let posts;
+    try { posts = await fetchNewsPosts(); } catch { return new Response('Sitemap temporarily unavailable.', { status: 503 }); }
+    const routes = [...STATIC_ROUTES.map(route => route.path === NEWS_INDEX_PATH ? { ...route, lastmod: Math.max(...posts.map(post => Date.parse(post.updatedAt))) } : route), ...posts.map(post => ({ path: getNewsPostPath(post), changefreq: 'monthly', priority: '0.68', lastmod: Date.parse(post.updatedAt) }))];
+    const urls = routes.map(({ path, changefreq, priority, lastmod }) => `  <url>
     <loc>https://modtale.net${path}</loc>
     <lastmod>${typeof lastmod === 'number' && Number.isFinite(lastmod) ? new Date(lastmod).toISOString() : defaultLastmod}</lastmod>
     <changefreq>${changefreq}</changefreq>

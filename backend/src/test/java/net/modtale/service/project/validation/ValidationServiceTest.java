@@ -9,7 +9,9 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ValidationServiceTest {
@@ -97,5 +99,15 @@ class ValidationServiceTest {
                 ),
                 validationService.getAllowedClassifications()
         );
+    }
+
+    @Test
+    void checksTheLiveGameVersionCatalogWhenValidatingAnUnknownVersion() {
+        GameVersionService gameVersionService = mock(GameVersionService.class);
+        ReflectionTestUtils.setField(validationService, "gameVersionService", gameVersionService);
+        when(gameVersionService.isVersionSupported("0.5.5")).thenReturn(true);
+
+        assertTrue(validationService.isGameVersionSupported("0.5.5"));
+        verify(gameVersionService).isVersionSupported("0.5.5");
     }
 }

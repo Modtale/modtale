@@ -50,6 +50,45 @@ class CachedImageLoaderTest {
     }
 
     @Test
+    void centerCoversWideAndTallImagesWithoutStretching() {
+        assertEquals(new javafx.geometry.Rectangle2D(100, 0, 100, 100),
+                CachedImageLoader.coverViewport(300, 100, 64, 64));
+        assertEquals(new javafx.geometry.Rectangle2D(0, 100, 300, 100),
+                CachedImageLoader.coverViewport(300, 300, 600, 200));
+        assertNull(CachedImageLoader.coverViewport(0, 100, 64, 64));
+    }
+
+    @Test
+    void preservesEveryGifFrameInTheDiskCache() throws Exception {
+        Path cached = directory.resolve("animation.img");
+        var writer = ImageIO.getImageWritersByFormatName("gif").next();
+        try (var output = ImageIO.createImageOutputStream(cached.toFile())) {
+            writer.setOutput(output);
+            writer.prepareWriteSequence(null);
+            for (int color : new int[]{0xff4476c4, 0xff0f172a}) {
+                var frame = new java.awt.image.BufferedImage(20, 10, java.awt.image.BufferedImage.TYPE_INT_RGB);
+                frame.setRGB(0, 0, color);
+                writer.writeToSequence(new javax.imageio.IIOImage(frame, null, null), null);
+            }
+            writer.endWriteSequence();
+        } finally {
+            writer.dispose();
+        }
+        byte[] original = Files.readAllBytes(cached);
+        CachedImageLoader.prepareCachedImage(cached);
+        assertArrayEquals(original, Files.readAllBytes(cached));
+        try (var input = ImageIO.createImageInputStream(cached.toFile())) {
+            var reader = ImageIO.getImageReaders(input).next();
+            try {
+                reader.setInput(input);
+                assertEquals(2, reader.getNumImages(true));
+            } finally {
+                reader.dispose();
+            }
+        }
+    }
+
+    @Test
     void failedConversionPreservesOriginalFileAndLeavesNoTemporaryFiles() throws Exception {
         Path cached = directory.resolve("broken.img");
         byte[] broken = "RIFFxxxxWEBP".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
@@ -59,6 +98,29 @@ class CachedImageLoaderTest {
         try (var files = Files.list(directory)) {
             assertEquals(1, files.count());
         }
+    }
+
+    @Test
+    void transparentImageHidesFallbackAndMissingOrFailedImageRestoresIt() {
+        var fallback = new javafx.scene.image.ImageView();
+        var foreground = new javafx.scene.image.ImageView();
+        CachedImageLoader.showFallbackUntilLoaded(fallback, foreground);
+        assertTrue(fallback.isVisible());
+        var transparent = new javafx.scene.image.WritableImage(4, 4);
+        foreground.setImage(transparent);
+        assertFalse(fallback.isVisible());
+        assertEquals(0, foreground.getImage().getPixelReader().getArgb(0, 0));
+        foreground.setImage(new javafx.scene.image.Image(new java.io.ByteArrayInputStream(new byte[] {0})));
+        assertTrue(foreground.getImage().isError());
+        assertTrue(fallback.isVisible());
+        foreground.setImage(transparent);
+        assertFalse(fallback.isVisible());
+        foreground.setImage(null);
+        assertTrue(fallback.isVisible());
+        foreground.setImage(transparent);
+        var cachedFallback = new javafx.scene.image.ImageView();
+        CachedImageLoader.showFallbackUntilLoaded(cachedFallback, foreground);
+        assertFalse(cachedFallback.isVisible());
     }
 
     private Path fixture(String name, String destination) throws Exception {

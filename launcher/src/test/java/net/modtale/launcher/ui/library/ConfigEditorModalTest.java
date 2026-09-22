@@ -31,63 +31,175 @@ class ConfigEditorModalTest {
     }
 
     @Test
-    void editsSavesAndProtectsUnsavedChanges() throws Exception {
-        Path world = directory.resolve("Saves/My World");
-        Path config = world.resolve("mods/Example_Plugin/config.json");
+    void editsSettingsWithoutExposingFilesAndProtectsUnsavedChanges() throws Exception {
+        Path config = directory.resolve("mods/com.azuredoom_levelingcore/levelingcore.json");
         Files.createDirectories(config.getParent());
-        Files.writeString(config, "{\"enabled\":true}");
+        String original = """
+                {"EnableDefaultXPGainSystem":true,"DefaultXPGainPercentage":0.5,
+                 "StatsPerLevel":5,"EnableLevelRewardsConfig":true,
+                 "EnableXPLossOnDeath":false,"XPLossPercentage":0.1,
+                 "EnableStatLeveling":true,"HealthLevelUpMultiplier":2.2,
+                 "ShowXPAmountInHUD":true,"LevelUpSound":"SFX_Divine_Respawn"}
+                """;
+        Files.writeString(config, original);
+        var file = new ConfigFile(directory, config, "World mods / com.azuredoom:levelingcore / levelingcore.json", "com.azuredoom:levelingcore");
         StackPane host = fx(() -> {
-            StackPane root = new StackPane();
-            Scene scene = new Scene(root, 1100, 750);
-            scene.getStylesheets().add(ConfigEditorModal.class.getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
-            new ConfigEditorModal(root, Runnable::run, () -> {}).show(directory.resolve("Mods"), world, "My World");
-            root.applyCss();
-            root.layout();
+            var root = new StackPane();
+            net.modtale.launcher.ui.common.LauncherFonts.load();
+            root.getStyleClass().add("app-root");
+            var scene = new Scene(root, 1120, 800);
+            scene.getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
+            root.setStyle("-fx-background-color: #080f1b;");
+            new ConfigEditorModal(root, Runnable::run, () -> {}).show(java.util.List.of(file), "LevelingCore");
+            root.applyCss(); root.layout(); return root;
+        });
+        fx(() -> {
+            host.applyCss(); host.layout();
+            assertNull(find(host, TextArea.class)); assertNull(find(host, ListView.class));
+            assertTrue(host.lookupAll(".label").stream().map(node -> ((javafx.scene.control.Label) node).getText())
+                    .noneMatch(text -> text.contains(".json") || text.contains("com.azuredoom")));
+            if (System.getenv("MODTALE_CONFIG_EDITOR_SNAPSHOT") != null) {
+                var parameters = new javafx.scene.SnapshotParameters();
+                parameters.setFill(javafx.scene.paint.Color.web("#0b1120"));
+                var image = host.snapshot(parameters, null);
+                var output = new java.awt.image.BufferedImage((int) image.getWidth(), (int) image.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                for (int y = 0; y < output.getHeight(); y++) for (int x = 0; x < output.getWidth(); x++)
+                    output.setRGB(x, y, image.getPixelReader().getArgb(x, y));
+                javax.imageio.ImageIO.write(output, "png", Path.of(System.getenv("MODTALE_CONFIG_EDITOR_SNAPSHOT")).toFile());
+            }
+            var toggle = host.lookupAll(".library-toggle-box").stream().filter(node -> "Default XP gain system".equals(node.getAccessibleText())).findFirst().orElseThrow();
+            toggle.fireEvent(new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED, "", "",
+                    javafx.scene.input.KeyCode.SPACE, false, false, false, false));
+            input(host, "Stats per level").setText("wrong");
+            assertTrue(button(host, "Save changes").isDisabled());
+            button(host, "Done").fire(); assertFalse(host.getChildren().isEmpty());
+            input(host, "Stats per level").setText("8");
+            button(host, "Display & sounds   2").fire();
+            button(host, "Save changes").fire(); return null;
+        });
+        fx(() -> {
+            var saved = new com.fasterxml.jackson.databind.ObjectMapper().readTree(Files.readString(config));
+            assertEquals(8, saved.path("StatsPerLevel").asInt());
+            assertFalse(saved.path("EnableDefaultXPGainSystem").asBoolean());
+            assertEquals("SFX_Divine_Respawn", saved.path("LevelUpSound").asText());
+            assertTrue(button(host, "Save changes").isDisabled());
+            button(host, "All settings   10").fire();
+            input(host, "Stats per level").setText("9");
+            button(host, "Reset changes").fire();
+            assertEquals("8", input(host, "Stats per level").getText());
+            button(host, "Done").fire(); assertTrue(host.getChildren().isEmpty()); return null;
+        });
+        try (var backups = Files.list(config.getParent())) {
+            assertTrue(backups.anyMatch(path -> path.toString().endsWith(".bak")));
+        }
+    }
+
+    @Test
+    void editsWorldRulesWithValidationInheritanceAndSaveProtection() throws Exception {
+        Path config = directory.resolve("universe/worlds/default/config.json");
+        Files.createDirectories(config.getParent());
+        Files.writeString(config, "{\"UUID\":\"keep\",\"Death\":{\"ItemsLossMode\":\"Configured\"}}");
+        var saves = new java.util.concurrent.atomic.AtomicInteger();
+        StackPane host = fx(() -> {
+            var root = new StackPane();
+            net.modtale.launcher.ui.common.LauncherFonts.load();
+            root.getStyleClass().add("app-root");
+            var scene = new Scene(root, 1120, 800);
+            scene.getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
+            new ConfigEditorModal(root, Runnable::run, saves::incrementAndGet).showWorldSettings(directory, "My world");
             return root;
         });
         fx(() -> {
-            ListView<ConfigFile> list = find(host, ListView.class);
-            assertEquals(1, list.getItems().size());
-            list.getSelectionModel().selectFirst();
-            return null;
-        });
-        fx(() -> {
-            TextArea editor = find(host, TextArea.class);
-            assertEquals("{\"enabled\":true}", editor.getText());
-            if (System.getenv("MODTALE_CONFIG_EDITOR_SNAPSHOT") != null) {
-                host.applyCss();
-                host.layout();
-                var image = host.snapshot(null, null);
-                var output = new java.awt.image.BufferedImage((int) image.getWidth(), (int) image.getHeight(),
-                        java.awt.image.BufferedImage.TYPE_INT_ARGB);
-                for (int y = 0; y < output.getHeight(); y++) {
-                    for (int x = 0; x < output.getWidth(); x++) output.setRGB(x, y, image.getPixelReader().getArgb(x, y));
-                }
-                javax.imageio.ImageIO.write(output, "png", Path.of(System.getenv("MODTALE_CONFIG_EDITOR_SNAPSHOT")).toFile());
-            }
-            editor.setText("{broken");
-            button(host, "Close").fire();
+            host.applyCss(); host.layout();
+            assertTrue(host.lookupAll(".label").stream().map(node -> ((javafx.scene.control.Label) node).getText())
+                    .noneMatch("Close Hytale before making changes."::equals));
+            assertTrue(button(host, "Save changes").isDisabled());
+            assertNotNull(button(host, "Open folder"));
+            assertEquals("", input(host, "Day duration (seconds)").getText());
+            assertEquals("", input(host, "Resource loss on death (%)").getText());
+            assertTrue(host.lookupAll(".text-field").stream().noneMatch(n -> "UUID".equals(n.getAccessibleText())));
+            input(host, "World display name").setText("Our world");
+            input(host, "Resource loss on death (%)").setText("101");
+            assertTrue(button(host, "Save changes").isDisabled());
+            input(host, "Resource loss on death (%)").setText("30");
+            input(host, "Day duration (seconds)").setText("3600");
+            var choice = host.lookupAll(".combo-box").stream().filter(n -> "Inventory penalty on death".equals(n.getAccessibleText()))
+                    .map(javafx.scene.control.ComboBox.class::cast).findFirst().orElseThrow();
+            choice.getSelectionModel().select(3);
+            button(host, "Done").fire();
             assertFalse(host.getChildren().isEmpty());
-            assertTrue(find(host, ListView.class).isDisabled());
-            button(host, "Save").fire();
+            if (System.getenv("MODTALE_WORLD_SETTINGS_SNAPSHOT") != null) {
+                var image = host.snapshot(null, null);
+                var output = new java.awt.image.BufferedImage((int) image.getWidth(), (int) image.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                for (int y = 0; y < output.getHeight(); y++) for (int x = 0; x < output.getWidth(); x++)
+                    output.setRGB(x, y, image.getPixelReader().getArgb(x, y));
+                javax.imageio.ImageIO.write(output, "png", Path.of(System.getenv("MODTALE_WORLD_SETTINGS_SNAPSHOT")).toFile());
+            }
+            button(host, "Save changes").fire();
             return null;
         });
         fx(() -> {
-            assertEquals("{\"enabled\":true}", Files.readString(config));
-            assertFalse(button(host, "Discard edits").isDisabled());
-            find(host, TextArea.class).setText("{\"enabled\":false}");
-            button(host, "Save").fire();
-            return null;
-        });
-        fx(() -> {
-            assertEquals("{\"enabled\":false}", Files.readString(config));
-            assertTrue(button(host, "Save").isDisabled());
-            assertFalse(find(host, ListView.class).isDisabled());
-            find(host, TextArea.class).setText("unsaved");
-            button(host, "Discard edits").fire();
-            assertEquals("{\"enabled\":false}", find(host, TextArea.class).getText());
-            button(host, "Close").fire();
+            assertEquals(1, saves.get());
+            assertTrue(button(host, "Save changes").isDisabled());
+            var saved = new com.fasterxml.jackson.databind.ObjectMapper().readTree(Files.readString(config));
+            assertEquals("Our world", saved.path("DisplayName").asText());
+            assertEquals(3600, saved.path("DaytimeDurationSeconds").asInt());
+            assertEquals("All", saved.path("Death").path("ItemsLossMode").asText());
+            assertEquals(30, saved.path("Death").path("ItemsAmountLossPercentage").asInt());
+            assertEquals("keep", saved.path("UUID").asText());
+            assertFalse(saved.has("NighttimeDurationSeconds"));
+            input(host, "Day duration (seconds)").setText("1800");
+            button(host, "Reset changes").fire();
+            assertEquals("3600", input(host, "Day duration (seconds)").getText());
+            button(host, "Done").fire();
             assertTrue(host.getChildren().isEmpty());
+            return null;
+        });
+    }
+
+    private static javafx.scene.control.TextField input(Parent root, String name) {
+        return root.lookupAll(".text-field").stream().filter(javafx.scene.control.TextField.class::isInstance)
+                .map(javafx.scene.control.TextField.class::cast).filter(field -> name.equals(field.getAccessibleText())).findFirst().orElseThrow();
+    }
+
+    @Test
+    void configLabelsUseProjectTitlesAndReadableBuiltInNames() {
+        var titles = java.util.Map.of("com.azuredoom:levelingcore", "LevelingCore", "dev.ninesliced:BetterMap", "BetterMap");
+        var leveling = new ConfigFile(directory, directory.resolve("com.azuredoom_levelingcore/levelingcore.json"), "", "com.azuredoom:levelingcore");
+        assertEquals("LevelingCore", ShareConfigSelectionModal.modTitle(leveling, titles));
+        var map = new ConfigFile(directory, directory.resolve("BetterMap/config.json"), "");
+        assertEquals("BetterMap", ShareConfigSelectionModal.modTitle(map, titles));
+        var generator = new ConfigFile(directory, directory.resolve("Hytale_HytaleGenerator/biome_editor.json"), "");
+        assertEquals("World Generation", ShareConfigSelectionModal.modTitle(generator, titles));
+        var unknown = new ConfigFile(directory, directory.resolve("org.example_SpawnTools/config.json"), "");
+        assertEquals("Spawn Tools", ShareConfigSelectionModal.modTitle(unknown, titles));
+    }
+
+    @Test
+    void groupedConfigsKeepIndependentSelectionsWhenCollapsed() throws Exception {
+        fx(() -> {
+            StackPane host = new StackPane();
+            new Scene(host, 1000, 760);
+            var first = new ConfigFile(directory, directory.resolve("Author_Mod/config.json"), "World config", "Author:Mod");
+            var second = new ConfigFile(directory, directory.resolve("Author_Mod/rewards.json"), "Rewards", "Author:Mod");
+            var third = new ConfigFile(directory, directory.resolve("Other/config.json"), "Other config", "Other");
+            var result = new java.util.concurrent.atomic.AtomicReference<java.util.List<ConfigFile>>();
+            ShareConfigSelectionModal.show(host, java.util.List.of(first, second, third),
+                    java.util.Map.of("Author:Mod", "Example Mod", "Other", "Other Mod"), result::set);
+            host.applyCss(); host.layout();
+            var groups = host.lookupAll(".share-config-group-toggle");
+            assertEquals(2, groups.size());
+            var expand = (Button) groups.stream().filter(node -> "Show configs for Example Mod".equals(node.getAccessibleText())).findFirst().orElseThrow();
+            var card = (javafx.scene.layout.VBox) expand.getParent();
+            var files = card.getChildren().get(1);
+            assertFalse(files.isVisible());
+            expand.fire();
+            assertTrue(files.isVisible());
+            for (var node : ((Parent) files).lookupAll(".library-toggle-box")) ((LibraryToggleBox) node).setSelected(true);
+            expand.fire();
+            assertFalse(files.isVisible());
+            button(host, "Create shared list").fire();
+            assertEquals(java.util.List.of(first, second), result.get());
             return null;
         });
     }
@@ -96,13 +208,26 @@ class ConfigEditorModalTest {
     void sharingOnlyIncludesExplicitlySelectedConfigs() throws Exception {
         fx(() -> {
             StackPane host = new StackPane();
-            new Scene(host, 900, 700);
+            net.modtale.launcher.ui.common.LauncherFonts.load();
+            host.getStyleClass().add("app-root");
+            Scene scene = new Scene(host, 1000, 760);
+            scene.getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
             var file = new ConfigFile(directory, directory.resolve("Example/config.json"), "World mods / Example/config.json");
             var result = new java.util.concurrent.atomic.AtomicReference<java.util.List<ConfigFile>>();
             ShareConfigSelectionModal.show(host, java.util.List.of(file), result::set);
             host.applyCss();
             host.layout();
-            var choice = find(host, javafx.scene.control.CheckBox.class);
+            var choice = find(host, LibraryToggleBox.class);
+            assertNotNull(choice);
+            ShareConfigSelectionModal.show(host, java.util.List.of(file), result::set);
+            assertEquals(1, host.getChildren().size(), "Sharing dialog cannot stack");
+            if (System.getenv("MODTALE_SHARE_SNAPSHOT") != null) {
+                var image = host.snapshot(null, null);
+                var output = new java.awt.image.BufferedImage((int) image.getWidth(), (int) image.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                for (int y = 0; y < output.getHeight(); y++) for (int x = 0; x < output.getWidth(); x++)
+                    output.setRGB(x, y, image.getPixelReader().getArgb(x, y));
+                javax.imageio.ImageIO.write(output, "png", Path.of(System.getenv("MODTALE_SHARE_SNAPSHOT")).toFile());
+            }
             assertFalse(choice.isSelected());
             button(host, "Create shared list").fire();
             assertEquals(java.util.List.of(), result.get());
@@ -135,7 +260,11 @@ class ConfigEditorModalTest {
                     new LibraryWorldProjectModel(pack, null, null, null, false, java.util.List.of("Author:Second"), 0, 1, java.util.List.of(child))));
             var root = new javafx.scene.layout.VBox();
             new Scene(root, 1200, 800);
+            var settingsWorld = new java.util.concurrent.atomic.AtomicReference<net.modtale.launcher.hytale.HytaleWorldManager.HytaleWorld>();
+            renderer.setWorldSettingsAction(settingsWorld::set);
             root.getChildren().setAll(renderer.worldDetail(model));
+            button(root, "World settings").fire();
+            assertEquals(world, settingsWorld.get());
             root.applyCss(); root.layout();
             assertNull(button(root, "Config"));
             assertNull(button(root, "Configs"));
@@ -153,26 +282,6 @@ class ConfigEditorModalTest {
             assertEquals(java.util.List.of(second), received.get());
             root.getChildren().setAll(renderer.worldDetail(model, java.util.List.of(unknown)));
             assertNull(button(root, "Config"));
-            return null;
-        });
-    }
-
-    @Test
-    void modEditorShowsOnlyTheFilesPassedFromItsButton() throws Exception {
-        var selected = new ConfigFile(directory, directory.resolve("Author_First/config.json"), "First", "Author:First");
-        Path other = directory.resolve("Author_Second/config.json");
-        Files.createDirectories(other.getParent());
-        Files.writeString(other, "{}");
-        StackPane host = fx(() -> {
-            var root = new StackPane();
-            new Scene(root, 1000, 700);
-            new ConfigEditorModal(root, Runnable::run, () -> {}).show(java.util.List.of(selected), "First mod");
-            return root;
-        });
-        fx(() -> {
-            host.applyCss(); host.layout();
-            assertEquals(java.util.List.of(selected), find(host, ListView.class).getItems());
-            button(host, "Close").fire();
             return null;
         });
     }

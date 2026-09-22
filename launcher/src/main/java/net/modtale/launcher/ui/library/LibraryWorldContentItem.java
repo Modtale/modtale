@@ -12,15 +12,29 @@ record LibraryWorldContentItem(
         List<String> modIds,
         int enabledCount,
         int totalCount,
-        boolean toggleable
+        boolean toggleable,
+        String source,
+        List<String> hytaleCompatibility
 ) {
+    LibraryWorldContentItem(String id, String title, String meta, String classification, String icon,
+            String author, List<String> modIds, int enabledCount, int totalCount, boolean toggleable) {
+        this(id, title, meta, classification, icon, author, modIds, enabledCount, totalCount, toggleable, "");
+    }
+
+    LibraryWorldContentItem(String id, String title, String meta, String classification, String icon,
+            String author, List<String> modIds, int enabledCount, int totalCount, boolean toggleable, String source) {
+        this(id, title, meta, classification, icon, author, modIds, enabledCount, totalCount, toggleable, source, List.of());
+    }
+
     LibraryWorldContentItem {
+        hytaleCompatibility = hytaleCompatibility == null ? List.of() : List.copyOf(hytaleCompatibility);
         id = value(id);
         title = value(title, "Installed content");
         meta = value(meta);
         classification = value(classification);
         icon = value(icon);
         author = value(author);
+        source = value(source);
         modIds = modIds == null
                 ? List.of()
                 : modIds.stream()

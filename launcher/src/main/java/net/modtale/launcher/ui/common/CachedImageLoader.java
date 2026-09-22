@@ -27,6 +27,10 @@ import java.util.concurrent.Executor;
 import java.util.function.Function;
 import javax.imageio.ImageIO;
 import javafx.application.Platform;
+import javafx.beans.InvalidationListener;
+import javafx.beans.WeakInvalidationListener;
+import javafx.beans.value.ChangeListener;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import net.modtale.launcher.cache.LauncherCachePaths;
@@ -34,6 +38,7 @@ import net.modtale.launcher.cache.LauncherCachePaths;
 public final class CachedImageLoader {
 
     private static final String IMAGE_KEY_PROPERTY = CachedImageLoader.class.getName() + ".imageKey";
+    private static final String COVER_BINDING_PROPERTY = CachedImageLoader.class.getName() + ".coverBinding";
     private static final int MAX_MEMORY_IMAGES = 160;
 
     private final Function<String, String> assetResolver;
@@ -70,10 +75,28 @@ public final class CachedImageLoader {
         String resolvedUrl = assetResolver.apply(rawUrl);
         ImageKey key = new ImageKey(resolvedUrl, requestedWidth, requestedHeight, preserveRatio);
         view.getProperties().put(IMAGE_KEY_PROPERTY, key);
+        if (view.getProperties().putIfAbsent(COVER_BINDING_PROPERTY, Boolean.TRUE) == null) {
+            InvalidationListener dimensionsChanged = observable -> updateViewport(view);
+            WeakInvalidationListener weakDimensionsChanged = new WeakInvalidationListener(dimensionsChanged);
+            view.imageProperty().addListener((observable, oldImage, newImage) -> {
+                if (oldImage != null) {
+                    oldImage.widthProperty().removeListener(weakDimensionsChanged);
+                    oldImage.heightProperty().removeListener(weakDimensionsChanged);
+                }
+                if (newImage != null) {
+                    newImage.widthProperty().addListener(weakDimensionsChanged);
+                    newImage.heightProperty().addListener(weakDimensionsChanged);
+                }
+                dimensionsChanged.invalidated(observable);
+            });
+            view.fitWidthProperty().addListener(observable -> updateViewport(view));
+            view.fitHeightProperty().addListener(observable -> updateViewport(view));
+        }
+        updateViewport(view);
 
         Image memoryImage = memoryImages.get(key);
         if (memoryImage != null) {
-            view.setImage(memoryImage);
+            setImage(view, key, memoryImage);
             return;
         }
 
@@ -94,6 +117,20 @@ public final class CachedImageLoader {
                 }
             });
         });
+    }
+
+    public static void showFallbackUntilLoaded(javafx.scene.Node fallback, ImageView foreground) {
+        foreground.imageProperty().addListener((observable, previous, image) -> bindFallback(fallback, image));
+        bindFallback(fallback, foreground.getImage());
+    }
+
+    private static void bindFallback(javafx.scene.Node fallback, Image image) {
+        fallback.visibleProperty().unbind();
+        if (image == null) {
+            fallback.setVisible(true);
+        } else {
+            fallback.visibleProperty().bind(image.progressProperty().lessThan(1).or(image.errorProperty()));
+        }
     }
 
     public void clearMemory() {
@@ -194,6 +231,21 @@ public final class CachedImageLoader {
         if (!Objects.equals(view.getProperties().get(IMAGE_KEY_PROPERTY), key)) {
             return;
         }
+        if (view.getImage() != null && image.getProgress() < 1) {
+            // Keep the current gallery frame visible until its replacement is decoded.
+            ChangeListener<Number> ready = new ChangeListener<>() {
+                @Override
+                public void changed(javafx.beans.value.ObservableValue<? extends Number> value,
+                                    Number previous, Number progress) {
+                    if (progress.doubleValue() >= 1) {
+                        image.progressProperty().removeListener(this);
+                        setImage(view, key, image);
+                    }
+                }
+            };
+            image.progressProperty().addListener(ready);
+            return;
+        }
         view.setImage(image);
     }
 
@@ -206,12 +258,34 @@ public final class CachedImageLoader {
                 imageUrl,
                 key.requestedWidth(),
                 key.requestedHeight(),
-                key.preserveRatio(),
                 true,
-                isHttpUrl(imageUrl)
+                true,
+                true
         );
         memoryImages.put(key, image);
         return image;
+    }
+
+    private static void updateViewport(ImageView view) {
+        ImageKey key = (ImageKey) view.getProperties().get(IMAGE_KEY_PROPERTY);
+        Image image = view.getImage();
+        if (key == null || key.preserveRatio() || image == null) {
+            view.setViewport(null);
+            return;
+        }
+        // Center-cover uncropped animations just like object-fit: cover on the web.
+        // Keep the Image itself animated instead of snapshotting a frame.
+        double width = view.getFitWidth() > 0 ? view.getFitWidth() : key.requestedWidth();
+        double height = view.getFitHeight() > 0 ? view.getFitHeight() : key.requestedHeight();
+        view.setViewport(coverViewport(image.getWidth(), image.getHeight(), width, height));
+    }
+
+    static Rectangle2D coverViewport(double imageWidth, double imageHeight, double width, double height) {
+        if (imageWidth <= 0 || imageHeight <= 0 || width <= 0 || height <= 0) return null;
+        double scale = Math.max(width / imageWidth, height / imageHeight);
+        double cropWidth = width / scale;
+        double cropHeight = height / scale;
+        return new Rectangle2D((imageWidth - cropWidth) / 2, (imageHeight - cropHeight) / 2, cropWidth, cropHeight);
     }
 
     private Path cacheFile(String resolvedUrl) {

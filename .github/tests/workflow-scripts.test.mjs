@@ -79,3 +79,38 @@ test('test-workflow changes select all components without requesting launcher pa
   }
   assert.match(output, /^launcher_build=false$/m);
 });
+
+test('launcher channel and version follow the source branch', () => {
+  for (const [branch, channel] of [['main', 'stable'], ['develop', 'develop']]) {
+    const output = run('launcher-release-metadata.sh', {
+      GITHUB_REF_NAME: branch, GITHUB_RUN_NUMBER: '42', GITHUB_RUN_ATTEMPT: '2', INPUT_VERSION: '',
+    });
+    assert.match(output, new RegExp(`^channel=${channel}$`, 'm'));
+    assert.match(output, new RegExp(`^tag=launcher-${channel === 'develop' ? 'develop-' : ''}v0\\.2\\.42${channel === 'develop' ? '-develop.42.2' : ''}$`, 'm'));
+  }
+});
+
+test('manual launcher versions retain their branch channel', () => {
+  const output = run('launcher-release-metadata.sh', {
+    GITHUB_REF_NAME: 'develop', GITHUB_RUN_NUMBER: '50', INPUT_VERSION: '1.2.3',
+  });
+  assert.match(output, /^version=1\.2\.3-develop\.50\.1$/m);
+});
+
+test('launcher publishing rejects other refs and unsafe or unsupported versions', () => {
+  for (const overrides of [
+    { GITHUB_REF_NAME: 'feature' },
+    { GITHUB_REF_NAME: 'launcher-v1.0.0' },
+    { INPUT_VERSION: '1.2.3; echo injected' },
+    { INPUT_VERSION: '1.2.3-beta' },
+    { INPUT_VERSION: '1.256.0' },
+    { INPUT_VERSION: '1.2.65536' },
+  ]) {
+    const result = spawnSync('bash', [path.join(scripts, 'launcher-release-metadata.sh')], {
+      encoding: 'utf8',
+      env: { ...process.env, GITHUB_REF_NAME: 'main', GITHUB_RUN_NUMBER: '42', ...overrides },
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /::error::/);
+  }
+});

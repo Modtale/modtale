@@ -24,8 +24,6 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Labeled;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
-import javafx.scene.control.Tooltip;
-import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
@@ -131,9 +129,6 @@ public final class LauncherShell {
     private final Map<BrowseOptions.BrowseViewOption, Button> railButtons = new LinkedHashMap<>();
     private final Map<ProjectBrowseSort, Button> curseForgeRailButtons = new LinkedHashMap<>();
     private final List<PauseTransition> stageVisibilityRetries = new ArrayList<>();
-    private Cursor pendingNativeCursor;
-    private Cursor appliedNativeCursor;
-    private boolean nativeCursorUpdateScheduled;
     private final StackPane viewDeck;
     private final Label pageTitle = new Label();
     private final Label pageSubtitle = new Label();
@@ -288,7 +283,6 @@ public final class LauncherShell {
         if (undecoratedWindow) {
             configureWindowResize(scene);
         }
-        configureNativeCursor(scene);
         primaryStage.titleProperty().bind(I18N.binding("app.title"));
         I18N.localeProperty().addListener((ignored, previous, current) -> refreshLocalizedShellText());
         primaryStage.setResizable(true);
@@ -404,7 +398,8 @@ public final class LauncherShell {
         navigation.activate(nextView);
         boolean webMode = nextView == LauncherView.PROJECT;
         boolean discoverMode = nextView == LauncherView.DISCOVER;
-        boolean launcherPage = nextView == LauncherView.PLAY || nextView == LauncherView.LIBRARY || nextView == LauncherView.WARDROBE;
+        boolean launcherPage = nextView == LauncherView.PLAY || nextView == LauncherView.LIBRARY
+                || nextView == LauncherView.WARDROBE || nextView == LauncherView.SETTINGS;
         boolean documentMode = usesDocumentHeight(nextView);
         boolean playPage = nextView == LauncherView.PLAY;
         toggleStyleClass(sceneLayer, "play-screen", playPage);
@@ -412,7 +407,7 @@ public final class LauncherShell {
         setVisibleManaged(railNode, discoverMode);
         setVisibleManaged(mainToolbar, !webMode && !discoverMode && !launcherPage);
         if (nextView == LauncherView.WARDROBE && wardrobeController != null) {
-            wardrobeController.refresh();
+            wardrobeController.open();
         } else if (nextView == LauncherView.NOTIFICATIONS) {
             notificationsController.refresh();
         } else if (nextView == LauncherView.LIBRARY) {
@@ -478,7 +473,8 @@ public final class LauncherShell {
             return Insets.EMPTY;
         }
         Insets pageInsets = LauncherLayout.WORKSPACE_INSETS;
-        boolean boundedWorkspace = view == LauncherView.DISCOVER || view == LauncherView.LIBRARY || view == LauncherView.WARDROBE;
+        boolean boundedWorkspace = view == LauncherView.DISCOVER || view == LauncherView.LIBRARY
+                || view == LauncherView.WARDROBE || view == LauncherView.SETTINGS;
         double right = boundedWorkspace ? pageInsets.getRight() : 0;
         return new Insets(pageInsets.getTop(), right, 0, pageInsets.getLeft());
     }
@@ -490,7 +486,8 @@ public final class LauncherShell {
         Insets pageInsets = LauncherLayout.WORKSPACE_INSETS;
         boolean launcherPage = view == LauncherView.PLAY || view == LauncherView.LIBRARY || view == LauncherView.WARDROBE;
         double top = view == LauncherView.DISCOVER || launcherPage ? 0 : 16;
-        boolean boundedWorkspace = view == LauncherView.DISCOVER || view == LauncherView.LIBRARY || view == LauncherView.WARDROBE;
+        boolean boundedWorkspace = view == LauncherView.DISCOVER || view == LauncherView.LIBRARY
+                || view == LauncherView.WARDROBE || view == LauncherView.SETTINGS;
         double right = boundedWorkspace ? 0 : pageInsets.getRight();
         return new Insets(top, right, pageInsets.getBottom(), 0);
     }
@@ -510,42 +507,19 @@ public final class LauncherShell {
     }
 
     private Node navbar() {
-        HBox bar = new HBox(8);
-        bar.getStyleClass().add("navbar");
-        bar.setAlignment(Pos.CENTER_LEFT);
-        bar.setPadding(LauncherLayout.NAVBAR_INSETS);
-
-        ImageView logo = new ImageView(new Image(Objects.requireNonNull(getClass()
-                .getResource("/net/modtale/launcher/ui/nativefx/assets/logo_light.png")).toExternalForm(), true));
-        logo.setFitHeight(36);
-        logo.setPreserveRatio(true);
-        Button brand = new Button(null, logo);
-        brand.getStyleClass().add("brand");
-        brand.setMinWidth(142);
-        brand.setAlignment(Pos.CENTER_LEFT);
-        brand.setMnemonicParsing(false);
-        brand.accessibleTextProperty().bind(I18N.binding("nav.goToPlay"));
-        brand.setTooltip(I18N.tooltip("nav.goToPlay"));
-        brand.setOnAction(event -> showView(LauncherView.PLAY));
-        configureBrandLogoHoverAnimation(brand, logo);
-
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        bar.getChildren().addAll(brand, spacer);
-        addLocalizedNav(bar, LauncherView.PLAY, "nav.play", LauncherIcons.Glyph.ZAP);
-        addLocalizedNav(bar, LauncherView.LIBRARY, "nav.library", LauncherIcons.Glyph.SAVE);
-        addLocalizedNav(bar, LauncherView.WARDROBE, "nav.wardrobe", LauncherIcons.Glyph.PALETTE);
+        Button brand = LauncherNavbar.brand(() -> showView(LauncherView.PLAY));
+        configureBrandLogoHoverAnimation(brand, (ImageView) brand.getGraphic());
+        HBox navigation = new HBox();
+        addLocalizedNav(navigation, LauncherView.PLAY, "nav.play", LauncherIcons.Glyph.ZAP);
+        addLocalizedNav(navigation, LauncherView.LIBRARY, "nav.library", LauncherIcons.Glyph.SAVE);
+        addLocalizedNav(navigation, LauncherView.WARDROBE, "nav.wardrobe", LauncherIcons.Glyph.PALETTE);
         Button browseButton = browseMenu.button();
         navButtons.put(LauncherView.DISCOVER, browseButton);
-        bar.getChildren().add(browseButton);
-        Region separator = new Region();
-        separator.getStyleClass().add("nav-divider");
-        bar.getChildren().add(separator);
-        bar.getChildren().add(notificationsMenu.button());
-        bar.getChildren().add(accountMenu.button());
-        if (undecoratedWindow) {
-            configureWindowDrag(bar);
-        }
+        List<Button> buttons = new ArrayList<>(navigation.getChildren().stream().map(Button.class::cast).toList());
+        navigation.getChildren().clear();
+        buttons.add(browseButton);
+        HBox bar = LauncherNavbar.build(brand, buttons, notificationsMenu.button(), accountMenu.button());
+        if (undecoratedWindow) configureWindowDrag(bar);
         return bar;
     }
 
@@ -629,43 +603,6 @@ public final class LauncherShell {
         scene.addEventFilter(MouseEvent.MOUSE_PRESSED, this::startWindowResize);
         scene.addEventFilter(MouseEvent.MOUSE_DRAGGED, this::dragFallbackResize);
         scene.addEventFilter(MouseEvent.MOUSE_RELEASED, event -> fallbackResizeDirection = null);
-    }
-
-    private void configureNativeCursor(Scene scene) {
-        scene.addEventFilter(MouseEvent.MOUSE_MOVED, event -> queueNativeCursor(scene, event));
-        scene.addEventFilter(MouseEvent.MOUSE_DRAGGED, event -> queueNativeCursor(scene, event));
-        scene.addEventFilter(MouseEvent.MOUSE_ENTERED_TARGET, event -> queueNativeCursor(scene, event));
-    }
-
-    private void queueNativeCursor(Scene scene, MouseEvent event) {
-        Cursor cursor = effectiveCursor(scene, event);
-        if (cursor == pendingNativeCursor || (pendingNativeCursor == null && cursor == appliedNativeCursor)) {
-            return;
-        }
-        pendingNativeCursor = cursor;
-        if (nativeCursorUpdateScheduled) {
-            return;
-        }
-        nativeCursorUpdateScheduled = true;
-        Platform.runLater(() -> {
-            nativeCursorUpdateScheduled = false;
-            Cursor next = pendingNativeCursor;
-            pendingNativeCursor = null;
-            if (next != appliedNativeCursor && LinuxWindowManagerSupport.applySystemCursor(stage, next)) {
-                appliedNativeCursor = next;
-            }
-        });
-    }
-
-    private static Cursor effectiveCursor(Scene scene, MouseEvent event) {
-        Node node = event.getTarget() instanceof Node target ? target : null;
-        while (node != null) {
-            if (node.getCursor() != null) {
-                return node.getCursor();
-            }
-            node = node.getParent();
-        }
-        return scene.getCursor() == null ? Cursor.DEFAULT : scene.getCursor();
     }
 
     private void startWindowResize(MouseEvent event) {
@@ -956,9 +893,7 @@ public final class LauncherShell {
                 browseController.isCurseForgeSource() ? "CURSEFORGE" : "BROWSE"));
 
         if (browseController.isCurseForgeSource()) {
-            addCurseForgeRailButton(browseRailCard, ProjectBrowseSort.DOWNLOADS);
-            addCurseForgeRailButton(browseRailCard, ProjectBrowseSort.UPDATED);
-            addCurseForgeRailButton(browseRailCard, ProjectBrowseSort.NEWEST);
+            ProjectBrowseSort.curseForgeSorts().forEach(sort -> addCurseForgeRailButton(browseRailCard, sort));
         } else {
             for (BrowseOptions.BrowseViewOption view : BrowseOptions.BROWSE_VIEWS) {
                 addRailButton(browseRailCard, view, view.label(), view.icon(), false,
@@ -969,7 +904,7 @@ public final class LauncherShell {
     }
 
     private void addCurseForgeRailButton(VBox card, ProjectBrowseSort sort) {
-        String label = sort.title().isBlank() ? sort.label() : sort.title();
+        String label = sort.curseForgeLabel();
         Button button = new Button(label);
         button.getStyleClass().add("rail-link");
         button.setMaxWidth(Double.MAX_VALUE);
@@ -1073,23 +1008,8 @@ public final class LauncherShell {
         libraryController.installWorldModList(request.installListId());
     }
 
-    private void addNav(HBox bar, LauncherView view, String label, LauncherIcons.Glyph icon) {
-        Button button = new Button(label);
-        button.getStyleClass().add("nav-btn");
-        applyNavbarTitleFont(button);
-        button.setGraphic(LauncherIcons.icon(icon, 16));
-        button.setOnAction(event -> showView(view));
-        navButtons.put(view, button);
-        bar.getChildren().add(button);
-    }
-
     private void addLocalizedNav(HBox bar, LauncherView view, String key, LauncherIcons.Glyph icon) {
-        Button button = new Button();
-        I18N.bind(button, key);
-        button.getStyleClass().add("nav-btn");
-        applyNavbarTitleFont(button);
-        button.setGraphic(LauncherIcons.icon(icon, 16));
-        button.setOnAction(event -> showView(view));
+        Button button = LauncherNavbar.navigation(key, icon, () -> showView(view));
         navButtons.put(view, button);
         bar.getChildren().add(button);
     }

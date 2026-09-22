@@ -18,6 +18,7 @@ import net.modtale.service.security.validation.SanitizationService;
 
 final class ProjectSocialService {
 
+    private final FavoritePersistence favorites;
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final ProjectService projectService;
@@ -31,8 +32,9 @@ final class ProjectSocialService {
             ProjectService projectService,
             NotificationService notificationService,
             SanitizationService sanitizer,
-            ScoringService scoringService
+            ScoringService scoringService, FavoritePersistence favorites
     ) {
+        this.favorites = favorites;
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.projectService = projectService;
@@ -43,29 +45,7 @@ final class ProjectSocialService {
 
     void toggleFavorite(String projectId, String userId) {
         Project project = getProject(projectId);
-        User user = getUser(userId);
-        int originalFavoriteCount = project.getFavoriteCount();
-
-        List<String> likes = user.getLikedModIds();
-        if (likes == null) {
-            likes = new ArrayList<>();
-            user.setLikedModIds(likes);
-        }
-
-        String canonicalProjectId = project.getId();
-        if (likes.contains(canonicalProjectId)) {
-            likes.remove(canonicalProjectId);
-            project.setFavoriteCount(Math.max(0, project.getFavoriteCount() - 1));
-        } else {
-            likes.add(canonicalProjectId);
-            project.setFavoriteCount(project.getFavoriteCount() + 1);
-        }
-        if (project.getFavoriteCount() != originalFavoriteCount) {
-            scoringService.markProjectRankingDirty(project);
-        }
-
-        userRepository.save(user);
-        projectRepository.save(project);
+        project.setFavoriteCount(favorites.toggle(project.getId(), userId));
         projectService.evictProjectCache(project);
     }
 

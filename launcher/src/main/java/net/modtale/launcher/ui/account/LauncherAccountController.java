@@ -198,28 +198,6 @@ public final class LauncherAccountController {
                 });
     }
 
-    public void signInWithOAuthProvider(String provider, String label, Consumer<SignInResult> onResult) {
-        String providerLabel = label == null || label.isBlank() ? "OAuth" : label;
-        feedback.runAsync("Opening " + providerLabel + " sign-in...",
-                () -> new LauncherAuthFlow(apiClient).authenticateWithOAuthProvider(provider),
-                user -> {
-                    completeSignIn(user, true);
-                    feedback.log("Signed in as " + user + " with " + providerLabel + ".");
-                    feedback.showToast("Signed in", "You're connected as " + user + ".");
-                    if (onResult != null) {
-                        onResult.accept(SignInResult.signedIn(user));
-                    }
-                },
-                error -> {
-                    currentUser = null;
-                    refreshStatus();
-                    onSignedOut.run();
-                    if (onResult != null) {
-                        onResult.accept(SignInResult.failed(error.getMessage()));
-                    }
-                });
-    }
-
     public void signOut() {
         feedback.runAsync("Signing out...", () -> {
             apiClient.logout();
