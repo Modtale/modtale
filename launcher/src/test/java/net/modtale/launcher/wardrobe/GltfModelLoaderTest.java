@@ -113,9 +113,9 @@ class GltfModelLoaderTest {
         assertThrows(IOException.class,()->GltfModelLoader.load(sparse.bytes()));
     }
 
-    @Test void loadsActualHyvatarSampleWhenProvided() throws Exception {
+    @Test void loadsActualSampleWhenProvided() throws Exception {
         String sample=System.getenv("WARDROBE_SAMPLE_GLB");
-        assumeTrue(sample != null,"Set WARDROBE_SAMPLE_GLB to a curl-downloaded Hyvatar GLB for live-format validation");
+        assumeTrue(sample != null,"Set WARDROBE_SAMPLE_GLB to a local GLB for live-format validation");
         Group root=GltfModelLoader.load(Files.readAllBytes(Path.of(sample)));
         assertFalse(root.getChildren().isEmpty());
         Group node=(Group)root.getChildren().getFirst();

@@ -1,10 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FeatureDemo } from '../components/FeatureDemo';
+import { ArticleSection } from '../components/ArticleSection';
 
 export function ModpacksStory() {
     return (
         <>
+            <div className="news-story-intro">
             <p className="news-lead">
                 You’ve found the right mods, tested the combination, and tuned
                 the settings. Now you want someone else to experience the world
@@ -18,7 +20,8 @@ export function ModpacksStory() {
                 And when a setup starts as something you’re playing with friends,
                 a shared mod list can become the beginning of a published pack.
             </p>
-            <section id="creators">
+            </div>
+            <ArticleSection id="creators">
                 <h2>Build the pack, right on Modtale</h2>
                 <p>
                     A new modpack starts in the website’s release editor. Search
@@ -49,8 +52,8 @@ export function ModpacksStory() {
                     and publish when you’re ready. Your project gives players a
                     place to discover the pack, read about it, and find its releases.
                 </p>
-            </section>
-            <section id="configs">
+            </ArticleSection>
+            <ArticleSection id="configs">
                 <h2>Give each mod the settings you intended</h2>
                 <p>
                     The difference between a pile of mods and a pack can be a
@@ -68,7 +71,7 @@ export function ModpacksStory() {
                 <p>
                     For Modtale projects, the editor tries to read the mod’s
                     manifest and suggest its folder name. You can correct that
-                    name when needed, and expand <strong>Installation paths</strong>{' '}
+                    name when needed, and expand <strong>File details</strong>{' '}
                     to check where the files will go. There’s no need to construct
                     an entire overrides archive just to include a config file.
                 </p>
@@ -78,8 +81,8 @@ export function ModpacksStory() {
                     kept. Your defaults establish the starting experience
                     without replacing the choices someone has already made.
                 </p>
-            </section>
-            <section id="curseforge">
+            </ArticleSection>
+            <ArticleSection id="curseforge">
                 <h2>Your lineup can reach beyond Modtale</h2>
                 <p>
                     A pack’s best combination might span more than one catalog.
@@ -105,8 +108,8 @@ export function ModpacksStory() {
                     project, with specific files from each source, while players
                     have a single place to start installing it.
                 </p>
-            </section>
-            <section id="sharing">
+            </ArticleSection>
+            <ArticleSection id="sharing">
                 <h2>“What mods are you using?” Send a list.</h2>
                 <p>
                     You don’t always need to publish a project to share a good
@@ -147,8 +150,8 @@ export function ModpacksStory() {
                     of the pack. Importing a list doesn’t publish it: you still
                     decide what’s ready to share more widely.
                 </p>
-            </section>
-            <section id="releases">
+            </ArticleSection>
+            <ArticleSection id="releases">
                 <h2>A release you can come back to</h2>
                 <p>
                     Each pack release records the combination you assembled:
@@ -164,8 +167,8 @@ export function ModpacksStory() {
                     to write that record by hand—it follows from the release
                     you build in the editor.
                 </p>
-            </section>
-            <section id="modpacks">
+            </ArticleSection>
+            <ArticleSection id="modpacks">
                 <h2>From a release to a world</h2>
                 <p>
                     The launcher brings the finished pack into your library,
@@ -180,8 +183,8 @@ export function ModpacksStory() {
                     mods on desktop, read the{' '}
                     <Link to="/news/modtale-launcher">launcher announcement</Link>.
                 </p>
-            </section>
-            <section id="next">
+            </ArticleSection>
+            <ArticleSection id="next">
                 <h2>Make it yours. Make it shareable.</h2>
                 <p>
                     Start with a few favorite mods or a setup you’ve already
@@ -200,7 +203,7 @@ export function ModpacksStory() {
                     <br />
                     <strong>— The Modtale team</strong>
                 </p>
-            </section>
+            </ArticleSection>
         </>
     );
 }

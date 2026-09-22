@@ -40,6 +40,10 @@ public class TrackingService {
         trackingBufferService.logDownload(projectId, versionId, authorId, isApi, clientIp);
     }
 
+    public void logDownload(String projectId, String versionId, String authorId, boolean isApi, String clientIp, boolean isLauncher) {
+        trackingBufferService.logDownload(projectId, versionId, authorId, isApi, clientIp, isLauncher);
+    }
+
     public void logView(String projectId, String authorId, String clientIp) {
         trackingBufferService.logView(projectId, authorId, clientIp);
     }

@@ -131,9 +131,17 @@ public final class LauncherPlayController {
     private final CatalogShelf newReleasesShelf = new CatalogShelf(ProjectBrowseSort.NEWEST);
     private final CatalogShelf trendingShelf = new CatalogShelf(ProjectBrowseSort.TRENDING);
     private final net.modtale.launcher.hytale.HytaleAvatarClient avatarClient;
+    private final net.modtale.launcher.ui.wardrobe.SavedLookThumbnails profileThumbnails = new net.modtale.launcher.ui.wardrobe.SavedLookThumbnails();
+    private java.util.concurrent.CompletableFuture<com.fasterxml.jackson.databind.JsonNode> profileSkin;
+    private String profileSkinId = "";
+    private long profileSkinAt;
+
     private final Map<String, Image> imageCache = new ConcurrentHashMap<>();
 
     private volatile Process hytaleProcess;
+    private boolean launchInProgress;
+    private Supplier<StackPane> overlayHost = () -> null;
+    private net.modtale.launcher.ui.common.TransferLoadingModal gameUpdateModal;
     private boolean versionsLoading;
     private boolean suppressBranchVersionLoad;
     private boolean friendsLoading;
@@ -191,6 +199,16 @@ public final class LauncherPlayController {
         } : onOpenCreator;
         this.onToggleFavorite = onToggleFavorite == null ? project -> {
         } : onToggleFavorite;
+    }
+
+    public void setOverlayHost(Supplier<StackPane> overlayHost) {
+        this.overlayHost = overlayHost;
+    }
+
+    private void finishLaunchPreparation() {
+        launchInProgress = false;
+        if (gameUpdateModal != null) gameUpdateModal.dismiss();
+        gameUpdateModal = null;
     }
 
     public Node view() {
@@ -448,13 +466,29 @@ public final class LauncherPlayController {
     }
 
     public void launchHytale() {
+        if (launchInProgress) return;
         if (isHytaleRunning()) {
             feedback.showToast("Already running", "Hytale is already running.");
             return;
         }
         settingsController.saveFromFields(false);
-        feedback.runAsync("Launching Hytale...", () -> hytaleGameLauncher.launch(settingsController.settings()), result -> {
+        launchInProgress = true;
+        gameUpdateModal = new net.modtale.launcher.ui.common.TransferLoadingModal(
+                "Preparing Hytale", "Checking the selected channel for updates...");
+        StackPane host = overlayHost.get();
+        if (host != null) {
+            host.getChildren().add(gameUpdateModal);
+            gameUpdateModal.requestFocus();
+        }
+        var modal = gameUpdateModal;
+        feedback.runAsync("Preparing Hytale...", () -> hytaleGameLauncher.launch(settingsController.settings(), message -> {
+            modal.update("Preparing Hytale", message);
+            feedback.log(message);
+        }), result -> {
+            finishLaunchPreparation();
+            settingsController.form().reloadFrom(settingsController.settings());
             hytaleProcess = result.process();
+            settingsController.saveCurrentSettings();
             long startedAtMillis = System.currentTimeMillis();
             discordRichPresence.showPlayingHytale(selectedVersionLabel(settingsController.settings()), startedAtMillis);
             monitorHytaleProcess(result, startedAtMillis);
@@ -464,6 +498,9 @@ public final class LauncherPlayController {
             feedback.log("Launched Hytale" + build + " as " + result.username() + ".");
             feedback.showToast("Hytale ready", "Launching as " + result.username() + ".");
             syncMetrics();
+        }, ignored -> {
+            finishLaunchPreparation();
+            settingsController.form().reloadFrom(settingsController.settings());
         });
     }
 
@@ -600,6 +637,10 @@ public final class LauncherPlayController {
         control.setAlignment(Pos.CENTER);
         control.setMaxWidth(Region.USE_PREF_SIZE);
 
+        patchlineMetric.getStyleClass().add("play-launch-patchline");
+        patchlineMetric.setMaxWidth(Double.MAX_VALUE);
+        patchlineMetric.setAlignment(Pos.CENTER);
+
         StackPane split = new StackPane();
         split.getStyleClass().add("play-launch-split");
         split.setAlignment(Pos.CENTER);
@@ -619,7 +660,7 @@ public final class LauncherPlayController {
         StackPane.setMargin(setup, new Insets(0, 7, 0, 0));
 
         split.getChildren().addAll(play, setup);
-        control.getChildren().add(split);
+        control.getChildren().addAll(split, patchlineMetric);
         return control;
     }
 
@@ -689,7 +730,7 @@ public final class LauncherPlayController {
     }
 
     private Node identitySection() {
-        VBox section = sidebarSection("User");
+        VBox section = sidebarSection();
         configureIdentityButton();
         section.getChildren().add(identityButton);
         return section;
@@ -1086,9 +1127,10 @@ public final class LauncherPlayController {
         row.getStyleClass().add("play-friend-row");
         row.setAlignment(Pos.CENTER_LEFT);
 
-        StackPane avatar = friend.username().isBlank()
-                ? avatar(friend.displayName(), FRIEND_AVATAR_SIZE, "play-friend-avatar", friend.avatarUrl())
-                : hytaleProfileAvatar(friend.username(), FRIEND_AVATAR_SIZE, "play-friend-avatar");
+        StackPane avatar = new StackPane();
+        avatar.getStyleClass().add("play-friend-avatar");
+        sizeSquare(avatar, FRIEND_AVATAR_SIZE);
+        updateHytaleProfileAvatar(avatar, friend.displayName(), FRIEND_AVATAR_SIZE, friend.uuid());
         Region presence = new Region();
         presence.getStyleClass().addAll("play-friend-presence", friend.online() ? "online" : "offline");
         StackPane.setAlignment(presence, Pos.BOTTOM_RIGHT);
@@ -1283,15 +1325,19 @@ public final class LauncherPlayController {
         return avatar;
     }
 
-    private StackPane hytaleProfileAvatar(String username, double size, String styleClass) {
+    private StackPane hytaleProfileAvatar(HytaleProfile profile, double size, String styleClass) {
         StackPane avatar = new StackPane();
         avatar.getStyleClass().add(styleClass);
         sizeSquare(avatar, size);
-        updateHytaleProfileAvatar(avatar, username, size);
+        updateHytaleProfileAvatar(avatar, profile.displayName(), size, profile.uuid());
         return avatar;
     }
 
     private void updateHytaleProfileAvatar(StackPane avatar, String username, double size) {
+        updateHytaleProfileAvatar(avatar, username, size, "");
+    }
+
+    private void updateHytaleProfileAvatar(StackPane avatar, String username, double size, String profileUuid) {
         updateImageAvatar(avatar, username, size, PROFILE_AVATAR_RADIUS, "");
         ImageView image = new ImageView();
         image.setFitWidth(size);
@@ -1304,13 +1350,60 @@ public final class LauncherPlayController {
         image.setClip(clip);
         avatar.getChildren().add(image);
         avatarClient.avatarUrl(username).whenComplete((url, error) -> Platform.runLater(() -> {
-            if (error == null && avatar.getChildren().contains(image)) {
+            if (error == null && avatar.getChildren().contains(image) && image.getUserData() == null) {
                 HytaleProfileAvatarImages.load(image, avatar.getChildren().getFirst(), url,
-                        net.modtale.launcher.hytale.HytaleAvatarClient.usernameAvatarUrl(username),
+                        url,
                         source -> cachedImage(source, size, size, true, true),
                         () -> avatar.getChildren().contains(image));
             }
         }));
+        LauncherSettings current = settingsController.settings();
+        HytaleAuthSession active = current.getHytaleAuthSession();
+        if (active == null) return;
+        boolean ownProfile = profileUuid.isBlank()
+                ? username.equalsIgnoreCase(active.getUsername()) : profileUuid.equalsIgnoreCase(active.getUuid());
+        if (!ownProfile && profileUuid.isBlank()) return;
+        var assets = net.modtale.launcher.wardrobe.LocalSkinLibrary.assets(current);
+        if (!java.nio.file.Files.isRegularFile(assets)) return;
+        String profile = active.getUuid();
+        if (!ownProfile) {
+            var skin = CompletableFuture.supplyAsync(() -> {
+                var publicProfile = new net.modtale.launcher.wardrobe.WardrobeApiClient(hytaleAuthService)
+                        .profile(java.util.UUID.fromString(profileUuid), current);
+                try {
+                    var definition = new com.fasterxml.jackson.databind.ObjectMapper().readTree(publicProfile.skin());
+                    if (!definition.isObject() || (!definition.isEmpty() && !definition.has("bodyCharacteristic"))) {
+                        throw new IllegalStateException("Public profile has no character skin");
+                    }
+                    return definition;
+                } catch (java.io.IOException ex) { throw new java.io.UncheckedIOException(ex); }
+            }, executor);
+            HytaleProfileAvatarImages.render(image, avatar.getChildren().getFirst(), skin,
+                    definition -> profileThumbnails.load(assets, definition, "face"),
+                    () -> avatar.getChildren().contains(image)
+                            && settingsController.settings().getHytaleAuthSession() != null
+                            && profile.equals(settingsController.settings().getHytaleAuthSession().getUuid()));
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (profileSkin == null || profileSkin.isCompletedExceptionally() || !profile.equals(profileSkinId) || now - profileSkinAt > 60_000) {
+            profileSkinId = profile; profileSkinAt = now;
+            profileSkin = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                var session = current.getHytaleAuthSession();
+                if (session == null || !profile.equals(session.getUuid())) throw new IllegalStateException("Selected profile changed");
+                var item = new net.modtale.launcher.wardrobe.WardrobeApiClient(hytaleAuthService).currentSkin(current);
+                session = current.getHytaleAuthSession();
+                if (session == null || !profile.equals(session.getUuid())) throw new IllegalStateException("Selected profile changed");
+                try { return new com.fasterxml.jackson.databind.ObjectMapper().readTree(item.payload()).path("skin"); }
+                catch (java.io.IOException ex) { throw new java.io.UncheckedIOException(ex); }
+            }, executor);
+        }
+        HytaleProfileAvatarImages.render(image, avatar.getChildren().getFirst(), profileSkin,
+                skin -> profileThumbnails.load(assets, skin, "face"),
+                () -> avatar.getChildren().contains(image) && profile.equals(profileSkinId)
+                        && settingsController.settings().getHytaleAuthSession() != null
+                        && profile.equals(settingsController.settings().getHytaleAuthSession().getUuid()));
+
     }
 
     private void updateImageAvatar(StackPane avatar, String name, double size, double radius, String imageUrl) {
@@ -1432,7 +1525,7 @@ public final class LauncherPlayController {
         row.getStyleClass().add("play-identity-menu-header");
         row.setAlignment(Pos.CENTER_LEFT);
         HytaleProfile selectedProfile = selectedProfileFor(session);
-        StackPane icon = hytaleProfileAvatar(selectedProfile.displayName(), IDENTITY_MENU_AVATAR_SIZE, "play-identity-menu-avatar");
+        StackPane icon = hytaleProfileAvatar(selectedProfile, IDENTITY_MENU_AVATAR_SIZE, "play-identity-menu-avatar");
 
         VBox copy = new VBox(2);
         Label name = new Label(accountLabel(session));
@@ -1464,7 +1557,7 @@ public final class LauncherPlayController {
             row.getStyleClass().add("selected");
         }
         row.setAlignment(Pos.CENTER_LEFT);
-        StackPane profileAvatar = hytaleProfileAvatar(profile.displayName(), IDENTITY_MENU_AVATAR_SIZE, "play-identity-menu-avatar");
+        StackPane profileAvatar = hytaleProfileAvatar(profile, IDENTITY_MENU_AVATAR_SIZE, "play-identity-menu-avatar");
         if (selected) {
             StackPane badge = new StackPane(LauncherIcons.icon(LauncherIcons.Glyph.CHECK, 8));
             badge.getStyleClass().add("play-identity-menu-avatar-badge");
@@ -1587,10 +1680,8 @@ public final class LauncherPlayController {
 
     private void syncPatchlineMetric(String selectedPatchline) {
         String patchline = HytaleApiClient.normalizeBranch(selectedPatchline);
-        boolean showPatchline = !"release".equals(patchline);
         patchlineMetric.setText(launchPatchlineLabel(patchline));
-        Node container = patchlineMetric.getParent();
-        setVisibleManaged(container == null ? patchlineMetric : container, showPatchline);
+        setVisibleManaged(patchlineMetric, true);
     }
 
     private String launchPatchlineLabel(String patchline) {

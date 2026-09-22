@@ -1,15 +1,21 @@
 package net.modtale.launcher.ui.browse.controls;
 
 import java.util.function.Consumer;
-import javafx.scene.Node;
-import javafx.scene.control.MenuButton;
-import javafx.scene.control.MenuItem;
+import javafx.css.PseudoClass;
+import javafx.geometry.Pos;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import net.modtale.launcher.ui.common.LauncherIcons;
 
 public final class ProjectBrowseSourceSelector {
 
     private final Consumer<ProjectBrowseSource> onSelect;
     private ProjectBrowseSource source = ProjectBrowseSource.MODTALE;
-    private MenuButton picker;
+    private Button picker;
+    private Label caption;
+    private VBox dropdown;
 
     public ProjectBrowseSourceSelector(Consumer<ProjectBrowseSource> onSelect) {
         this.onSelect = onSelect;
@@ -19,25 +25,64 @@ public final class ProjectBrowseSourceSelector {
         return source;
     }
 
-    public Node view() {
+    public Button view() {
         if (picker == null) {
-            picker = new MenuButton();
+            picker = new Button();
             picker.getStyleClass().add("provider-picker");
-            addItem(ProjectBrowseSource.MODTALE);
-            addItem(ProjectBrowseSource.CURSEFORGE);
+            caption = new Label();
+            HBox content = new HBox(6, caption, LauncherIcons.icon(LauncherIcons.Glyph.CHEVRON_DOWN, 12));
+            content.setAlignment(Pos.CENTER);
+            picker.setGraphic(content);
             refresh();
         }
         return picker;
+    }
+
+    public VBox dropdown() {
+        if (dropdown == null) {
+            dropdown = new VBox();
+            dropdown.getStyleClass().add("sort-dropdown-panel");
+            dropdown.setMinWidth(180);
+            dropdown.setPrefWidth(180);
+            dropdown.setMaxWidth(180);
+            dropdown.setManaged(false);
+            dropdown.setVisible(false);
+            for (ProjectBrowseSource candidate : ProjectBrowseSource.values()) {
+                Button item = new Button();
+                Label label = new Label(candidate.label());
+                label.getStyleClass().add("sort-dropdown-item-label");
+                item.setGraphic(label);
+                item.getStyleClass().add("sort-dropdown-item");
+                item.setMaxWidth(Double.MAX_VALUE);
+                item.setOnAction(event -> {
+                    hide();
+                    select(candidate);
+                    picker.requestFocus();
+                });
+                dropdown.getChildren().add(item);
+            }
+        }
+        return dropdown;
+    }
+
+    public void hide() {
+        dropdown().setVisible(false);
+        view().pseudoClassStateChanged(PseudoClass.getPseudoClass("showing"), false);
+    }
+
+    public void show() {
+        dropdown().setVisible(true);
+        dropdown().toFront();
+        view().pseudoClassStateChanged(PseudoClass.getPseudoClass("showing"), true);
     }
 
     public void refresh() {
         if (picker == null) {
             return;
         }
-        picker.setText(source.label());
+        caption.setText(source.label());
         picker.getStyleClass().removeAll("modtale", "curseforge");
         picker.getStyleClass().add(source.name().toLowerCase());
-        picker.setGraphic(null);
         picker.setAccessibleText("Browse source: " + source.label());
     }
 
@@ -49,11 +94,5 @@ public final class ProjectBrowseSourceSelector {
         source = next;
         refresh();
         onSelect.accept(source);
-    }
-
-    private void addItem(ProjectBrowseSource candidate) {
-        MenuItem item = new MenuItem(candidate.label());
-        item.setOnAction(event -> select(candidate));
-        picker.getItems().add(item);
     }
 }

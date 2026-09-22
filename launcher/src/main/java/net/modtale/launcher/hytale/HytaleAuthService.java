@@ -63,6 +63,7 @@ public class HytaleAuthService {
         session.setProfiles(profiles);
         session.setSessionToken(gameSession.sessionToken());
         session.setIdentityToken(gameSession.identityToken());
+        session.setSessionProfileId(session.getUuid());
         settings.upsertHytaleAuthSession(session);
         settingsStore.save(settings);
         return session;
@@ -109,14 +110,15 @@ public class HytaleAuthService {
 
     public List<HytaleVersion> getAvailableVersions(LauncherSettings settings, String branch) {
         HytaleAuthSession session = ensureValidAccessToken(settings);
+        String accessToken = session.getAccessToken();
         try {
             return HytaleGameVersionResolver.labelVersions(settings, branch,
-                    apiClient.getAvailableVersions(session.getAccessToken(), branch));
+                    apiClient.getAvailableVersions(accessToken, branch));
         } catch (HytaleApiException ex) {
             if (!ex.isAuthFailure()) {
                 throw ex;
             }
-            session = refresh(settings, session);
+            session = refresh(settings, session, accessToken);
             return HytaleGameVersionResolver.labelVersions(settings, branch,
                     apiClient.getAvailableVersions(session.getAccessToken(), branch));
         }
@@ -124,14 +126,15 @@ public class HytaleAuthService {
 
     public List<String> getAvailablePatchlines(LauncherSettings settings) {
         HytaleAuthSession session = ensureValidAccessToken(settings);
+        String accessToken = session.getAccessToken();
         List<String> candidates = previousPatchlineCandidates(settings);
         try {
-            return apiClient.getAvailablePatchlines(session.getAccessToken(), candidates);
+            return apiClient.getAvailablePatchlines(accessToken, candidates);
         } catch (HytaleApiException ex) {
             if (!ex.isAuthFailure()) {
                 throw ex;
             }
-            session = refresh(settings, session);
+            session = refresh(settings, session, accessToken);
             return apiClient.getAvailablePatchlines(session.getAccessToken(), candidates);
         }
     }
@@ -152,27 +155,29 @@ public class HytaleAuthService {
         }
 
         HytaleAuthSession session = ensureValidAccessToken(settings);
+        String accessToken = session.getAccessToken();
         try {
             return fetchFriendsWithFreshGameSession(settings, session);
         } catch (HytaleApiException ex) {
             if (!ex.isAuthFailure()) {
                 throw ex;
             }
-            session = refresh(settings, session);
+            session = refresh(settings, session, accessToken);
             return fetchFriendsWithFreshGameSession(settings, session);
         }
     }
 
     public long getProfilePlaytimeSeconds(LauncherSettings settings) {
         HytaleAuthSession session = ensureValidAccessToken(settings);
+        String accessToken = session.getAccessToken();
         try {
-            return refreshProfilesAndGetPlaytime(settings, session);
+            return refreshProfilesAndGetPlaytime(settings, session, accessToken);
         } catch (HytaleApiException ex) {
             if (!ex.isAuthFailure()) {
                 throw ex;
             }
-            session = refresh(settings, session);
-            return refreshProfilesAndGetPlaytime(settings, session);
+            session = refresh(settings, session, accessToken);
+            return refreshProfilesAndGetPlaytime(settings, session, session.getAccessToken());
         }
     }
 
@@ -217,8 +222,8 @@ public class HytaleAuthService {
         );
     }
 
-    private long refreshProfilesAndGetPlaytime(LauncherSettings settings, HytaleAuthSession session) {
-        List<HytaleProfile> profiles = apiClient.fetchProfiles(session.getAccessToken());
+    private long refreshProfilesAndGetPlaytime(LauncherSettings settings, HytaleAuthSession session, String accessToken) {
+        List<HytaleProfile> profiles = apiClient.fetchProfiles(accessToken);
         String selectedUuid = session.getUuid();
         HytaleProfile selectedProfile = profiles.stream()
                 .filter(profile -> profile.uuid().equals(selectedUuid))
@@ -311,20 +316,31 @@ public class HytaleAuthService {
         requireLinkedSession(settings, session);
         session.setSessionToken(gameSession.sessionToken());
         session.setIdentityToken(gameSession.identityToken());
+        session.setSessionProfileId(session.getUuid());
         settingsStore.save(settings);
         return session;
     }
 
     private HytaleGameSession createGameSessionWithRefresh(LauncherSettings settings, HytaleAuthSession session) {
+        String profileId = session.getUuid();
+        String accessToken = session.getAccessToken();
+        HytaleGameSession gameSession;
         try {
-            return apiClient.createGameSession(session.getAccessToken(), session.getUuid());
+            gameSession = apiClient.createGameSession(accessToken, profileId);
         } catch (HytaleApiException ex) {
             if (!ex.isAuthFailure()) {
                 throw ex;
             }
-            HytaleAuthSession refreshed = refresh(settings, session);
-            return apiClient.createGameSession(refreshed.getAccessToken(), refreshed.getUuid());
+            HytaleAuthSession refreshed = refresh(settings, session, accessToken);
+            if (!profileId.equals(refreshed.getUuid())) {
+                throw new HytaleApiException("Selected Hytale profile changed while creating its session.");
+            }
+            gameSession = apiClient.createGameSession(refreshed.getAccessToken(), profileId);
         }
+        if (!profileId.equals(session.getUuid())) {
+            throw new HytaleApiException("Selected Hytale profile changed while creating its session.");
+        }
+        return gameSession;
     }
 
     /** Returns a usable OAuth token, persisting refresh-token rotation before returning. */
@@ -367,18 +383,26 @@ public class HytaleAuthService {
         return saveGameSession(settings, session, gameSession).getSessionToken();
     }
 
-    private HytaleAuthSession ensureValidAccessToken(LauncherSettings settings) {
+    private synchronized HytaleAuthSession ensureValidAccessToken(LauncherSettings settings) {
         HytaleAuthSession session = settings.getHytaleAuthSession();
         if (session == null || !session.hasRefreshToken()) {
             throw new HytaleApiException("Sign in with Hytale before launching or loading Hytale versions.");
         }
         if (!session.hasAccessToken() || session.getExpiresAt().isBefore(Instant.now().plusSeconds(60))) {
-            return refresh(settings, session);
+            return refresh(settings, session, session.getAccessToken());
         }
         return session;
     }
 
-    private HytaleAuthSession refresh(LauncherSettings settings, HytaleAuthSession session) {
+    private synchronized HytaleAuthSession refresh(LauncherSettings settings, HytaleAuthSession session, String rejectedAccessToken) {
+        requireLinkedSession(settings, session);
+        // Another request may have renewed this account while this request was in flight.
+        // Never redeem a rotating refresh token twice or rotate again for an old rejection.
+        if (!java.util.Objects.equals(rejectedAccessToken, session.getAccessToken())
+                && session.hasAccessToken()
+                && session.getExpiresAt().isAfter(Instant.now().plusSeconds(60))) {
+            return session;
+        }
         try {
             HytaleApiClient.TokenResponse token = apiClient.refreshToken(session.getRefreshToken());
             requireLinkedSession(settings, session);
@@ -426,6 +450,7 @@ public class HytaleAuthService {
         return session != null
                 && session.hasRefreshToken()
                 && session.hasLaunchTokens()
+                && session.getUuid().equals(session.getSessionProfileId())
                 && permitsCachedLaunchSession(failure);
     }
 
@@ -437,6 +462,7 @@ public class HytaleAuthService {
     private static boolean canUseCachedFriendsSession(HytaleAuthSession session) {
         return session != null
                 && session.hasLaunchTokens()
+                && session.getUuid().equals(session.getSessionProfileId())
                 && jwtExpiresAfter(session.getSessionToken(), Instant.now().plusSeconds(60));
     }
 

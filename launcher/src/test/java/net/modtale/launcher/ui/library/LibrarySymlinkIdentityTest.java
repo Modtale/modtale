@@ -68,7 +68,7 @@ class LibrarySymlinkIdentityTest {
     @Test
     void verifiedIdentityMatchesAliasAndPreservesInstallConfiguration() throws Exception {
         Path[] files = eyeSpy();
-        InstalledProject cf = project("curseforge:42", "CURSEFORGE", files[0]);
+        InstalledProject cf = project("local:eyespy", "LOCAL", files[0]);
         var match = new ArtifactIdentity.Match(files[1].toString(), "MODTALE", "verified-id", "eyespy",
                 "EyeSpy", "PLUGIN", "1.0", "verified-version", "sha256", 100);
         var result = LibraryArtifactIdentityReconciler.reconcile(List.of(cf), List.of(match));

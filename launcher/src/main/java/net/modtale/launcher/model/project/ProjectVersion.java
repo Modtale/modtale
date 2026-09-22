@@ -37,6 +37,7 @@ public record ProjectVersion(
     }
 
     public boolean supportsGameVersion(String gameVersion) {
-        return gameVersion == null || gameVersion.isBlank() || gameVersions.contains(gameVersion);
+        return gameVersion == null || gameVersion.isBlank()
+                || gameVersions.stream().anyMatch(declared -> GameVersionCompatibility.matches(declared, gameVersion));
     }
 }

@@ -119,6 +119,7 @@ public final class LauncherServices {
         try {
             LauncherCacheService.ClearResult result = cacheService.clear();
             apiClient.clearResponseCache();
+            hytaleApiClient.clearResponseCache();
             accountImageLoader.clearMemory();
             projectPageImageLoader.clearMemory();
             projectCardFactory.clearImageCache();

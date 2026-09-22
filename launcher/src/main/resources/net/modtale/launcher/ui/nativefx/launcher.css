@@ -1256,23 +1256,13 @@
     -fx-border-color: rgba(148, 163, 184, 0.28);
 }
 
-.provider-picker .arrow-button {
-    -fx-padding: 0 0 0 5px;
-    -fx-background-color: transparent;
-}
-
-.provider-picker .arrow {
-    -fx-background-color: #94a3b8;
-    -fx-padding: 2.5px 4px 2.5px 4px;
-}
-
-.provider-picker > .label {
+.provider-picker .label {
     -fx-padding: 0;
     -fx-text-fill: #e2e8f0;
 }
 
-.provider-picker > .label .text {
-    -fx-fill: #e2e8f0;
+.provider-picker .svg-icon {
+    -fx-stroke: #94a3b8;
 }
 
 .toolbar-pill {
@@ -2251,17 +2241,7 @@
     -fx-padding: 0 2px;
 }
 
-.settings-avatar-credit {
-    -fx-text-fill: #94a3b8;
-    -fx-font-size: 11px;
-    -fx-padding: 0 2px;
-}
 
-.settings-avatar-credit:hover,
-.settings-avatar-credit:focused {
-    -fx-text-fill: #cbd5e1;
-    -fx-underline: true;
-}
 
 .btn {
     -fx-min-height: 42px;
@@ -7864,7 +7844,7 @@
 }
 
 .play-sidebar {
-    -fx-padding: 16px;
+    -fx-padding: 4px 16px 16px;
     -fx-spacing: 14px;
     -fx-background-radius: 0;
     -fx-border-radius: 0;
@@ -8325,6 +8305,13 @@
     -fx-background-color: transparent;
     -fx-border-width: 0;
     -fx-effect: none;
+}
+
+.play-launch-patchline {
+    -fx-text-fill: #9ca3af;
+    -fx-font-size: 12px;
+    -fx-font-family: "Inter SemiBold", "Inter", "SF Pro Text", "Segoe UI", "System";
+    -fx-font-weight: 700;
 }
 
 .play-launch-split {
@@ -8878,6 +8865,10 @@
 
 .library-version-metadata-version {
     -fx-text-fill: #cbd5e1;
+}
+
+.library-compatibility-warning .svg-icon {
+    -fx-stroke: #e34d67;
 }
 
 .library-version-divider {

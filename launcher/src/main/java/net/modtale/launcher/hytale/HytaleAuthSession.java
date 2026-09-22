@@ -13,6 +13,7 @@ public class HytaleAuthSession {
     private Instant expiresAt = Instant.EPOCH;
     private String sessionToken = "";
     private String identityToken = "";
+    private String sessionProfileId = "";
     private String username = "";
     private String uuid = "";
     private String accountOwnerId = "";
@@ -50,6 +51,14 @@ public class HytaleAuthSession {
         this.sessionToken = sessionToken == null ? "" : sessionToken;
     }
 
+    public String getSessionProfileId() {
+        return sessionProfileId;
+    }
+
+    public void setSessionProfileId(String sessionProfileId) {
+        this.sessionProfileId = sessionProfileId == null ? "" : sessionProfileId;
+    }
+
     public String getIdentityToken() {
         return identityToken;
     }
@@ -71,7 +80,13 @@ public class HytaleAuthSession {
     }
 
     public void setUuid(String uuid) {
-        this.uuid = uuid == null ? "" : uuid;
+        String next = uuid == null ? "" : uuid;
+        if (!this.uuid.isBlank() && !this.uuid.equals(next)) {
+            sessionToken = "";
+            identityToken = "";
+            sessionProfileId = "";
+        }
+        this.uuid = next;
     }
 
     public String getAccountOwnerId() {

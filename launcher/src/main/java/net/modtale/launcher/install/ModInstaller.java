@@ -1,5 +1,7 @@
 package net.modtale.launcher.install;
 
+import net.modtale.launcher.hytale.HytaleGameVersionResolver;
+import net.modtale.launcher.model.project.GameVersionCompatibility;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -287,15 +289,29 @@ public class ModInstaller {
         return matcher.find() ? numericId(matcher.group(1)) : null;
     }
 
+    private static void validateGameCompatibility(ProjectDetail project, ProjectVersion version, LauncherSettings settings) {
+        String installed = HytaleGameVersionResolver.selectedServerVersion(settings).orElse("");
+        // A broad label like "Early Access" must not override concrete version metadata.
+        if (GameVersionCompatibility.isNumericVersion(installed)
+                && !version.gameVersions().isEmpty()
+                && version.gameVersions().stream().anyMatch(GameVersionCompatibility::isNumericVersion)
+                && !version.supportsGameVersion(installed)) {
+            throw new ModtaleApiException(project.title() + " " + version.versionNumber()
+                    + " targets Hytale " + String.join(", ", version.gameVersions())
+                    + ", but the selected game installation is " + installed
+                    + ". Choose a compatible mod version or update Hytale before installing.");
+        }
+    }
+
     public InstallResult installAndRecord(ProjectDetail project, LauncherSettings settings) {
-        ProjectVersion version = VersionSelector.latestCompatible(project, settings.getGameVersion())
+        String gameVersion = HytaleGameVersionResolver.selectedServerVersion(settings).orElse(settings.getGameVersion());
+        ProjectVersion version = VersionSelector.latestCompatible(project, gameVersion)
                 .orElseThrow(() -> new ModtaleApiException("No compatible version was found for " + project.title()));
-        InstalledProject previous = removePreviousInstall(project.id(), settings);
-        InstallResult result = install(project, version, optionsFrom(settings));
-        return recordInstall(result, settings, previous);
+        return installAndRecord(project, version, settings, gameVersion);
     }
 
     public InstallResult installAndRecord(ProjectDetail project, ProjectVersion version, LauncherSettings settings, String gameVersion) {
+        validateGameCompatibility(project, version, settings);
         InstalledProject previous = removePreviousInstall(project.id(), settings);
         InstallResult result = install(project, version, new InstallOptions(
                 settings.hytaleModsDirectory(),
@@ -315,6 +331,7 @@ public class ModInstaller {
             String gameVersion,
             List<ProjectDependency> selectedDependencies
     ) {
+        validateGameCompatibility(project, version, settings);
         InstalledProject previous = removePreviousInstall(project.id(), settings);
         List<ProjectDependency> dependencies = selectedDependencies == null ? null : List.copyOf(selectedDependencies);
         InstallResult result = install(project, version, new InstallOptions(
@@ -329,6 +346,7 @@ public class ModInstaller {
     }
 
     public InstallResult updateAndRecord(ProjectDetail project, ProjectVersion version, LauncherSettings settings) {
+        validateGameCompatibility(project, version, settings);
         InstalledProject previous = existingInstall(project.id(), settings).orElse(null);
         removePreviousInstall(project.id(), settings);
         InstallResult result = install(project, version, previous == null ? optionsFrom(settings) : optionsFrom(settings, previous));
@@ -354,6 +372,7 @@ public class ModInstaller {
         if (installed == null) {
             return updateAndRecord(project, version, settings);
         }
+        validateGameCompatibility(project, version, settings);
         removePreviousInstall(installed.projectId(), settings);
         InstallResult result = install(project, version, optionsFrom(settings, installed, gameVersion));
         return recordInstall(result, settings, installed);
@@ -373,6 +392,12 @@ public class ModInstaller {
         InstalledProject recorded = mergeInstallMetadata(result.installedProject(), previous);
         settings.upsertInstalledProject(recorded);
         settingsStore.save(settings);
+        try {
+            new net.modtale.launcher.hytale.HytaleModRegistry(settings.hytaleModsDirectory())
+                    .exportProjects(List.of(recorded), apiClient);
+        } catch (IOException | RuntimeException ex) {
+            LOG.warn("Could not sync Hytale mod library after installation", ex);
+        }
         return new InstallResult(recorded, result.installedFiles(), result.warnings());
     }
 
@@ -438,6 +463,11 @@ public class ModInstaller {
                 // Stale files should not block an update; the new install can still succeed.
             }
         });
+        try {
+            new net.modtale.launcher.hytale.HytaleModRegistry(settings.hytaleModsDirectory()).removeFiles(installed.files());
+        } catch (IOException ex) {
+            LOG.warn("Could not remove Hytale mod library entry", ex);
+        }
     }
 
     private static InstallOptions optionsFrom(LauncherSettings settings) {

@@ -1,11 +1,14 @@
+import { modpackDialog } from './modpackDialogStyles';
 import { useDialogFocus } from '@/hooks/useDialogFocus';
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { FileCode2, X } from 'lucide-react';
+import { FileCode2, Pencil, X } from 'lucide-react';
 import { ModalPortal } from '@/components/ui/ModalPortal';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { Input } from './FormShared';
-import { CONFIG_EXTENSIONS, MAX_CONFIG_FILE_BYTES, MAX_CONFIG_FILES, MAX_CONFIG_TOTAL_BYTES, configFileName, configPath, readConfigBytes, validateModConfigs, type ModConfig } from '../utils/modpackConfigs';
+import { CONFIG_EXTENSIONS, MAX_CONFIG_FILES, configFileName, configPath, safeConfigSegment, readConfigBytes, validateModConfigs, type ModConfig } from '../utils/modpackConfigs';
 import { projectClient } from '../api/projectClient';
+import { ModConfigEditor } from './ModConfigEditor';
+import { readSettings, type SettingsDocument } from '../utils/configSettings';
 import { theme } from '@/styles/theme';
 
 export function ModConfigFields({ projectId, title, source = 'MODTALE', versionNumber, configs, onChange, disabled }: {
@@ -15,20 +18,21 @@ export function ModConfigFields({ projectId, title, source = 'MODTALE', versionN
     const [open, setOpen] = useState(false);
     const dialogId = useId();
     const dialogRef = useRef<HTMLDivElement>(null);
+    const [editing, setEditing] = useState<{ config: ModConfig; document: SettingsDocument } | null>(null);
     useScrollLock(open);
     useDialogFocus(open, dialogRef);
     useEffect(() => {
-        if (!open) return;
+        if (!open || editing) return;
         const keydown = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
         document.addEventListener('keydown', keydown);
         return () => document.removeEventListener('keydown', keydown);
-    }, [open]);
+    }, [open, editing]);
     const [draft, setDraft] = useState<ModConfig[]>([]);
     const [folder, setFolder] = useState('');
     const [suggestedFolder, setSuggestedFolder] = useState('');
+    const [override, setOverride] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [preview, setPreview] = useState<{ name: string; text: string } | null>(null);
     const fileInput = useRef<HTMLInputElement>(null);
     const folderInput = useRef<HTMLInputElement>(null);
     const folderEdited = useRef(false);
@@ -42,9 +46,11 @@ export function ModConfigFields({ projectId, title, source = 'MODTALE', versionN
         setLoading(true);
         projectClient.getProjectFull(projectId).then(project => {
             if (!active) return;
-            const version = project.versions?.find(item => item.versionNumber === versionNumber);
+            const version = versionNumber
+                ? project.versions?.find(item => item.versionNumber === versionNumber)
+                : [...(project.versions || [])].sort((a, b) => Date.parse(b.releaseDate) - Date.parse(a.releaseDate))[0];
             const identity = version?.manifestId?.split(':');
-            if (identity?.length === 2 && identity.every(part => part && !/[\\/]/.test(part))) {
+            if (identity?.length === 2 && identity.every(part => safeConfigSegment(part) && !part.includes('/'))) {
                 const suggestion = identity.join('_');
                 setSuggestedFolder(suggestion);
                 if (!folderEdited.current) setFolder(suggestion);
@@ -59,8 +65,9 @@ export function ModConfigFields({ projectId, title, source = 'MODTALE', versionN
         setFolder(parts[0] === 'Universe' ? parts[2] : parts[0] === 'Mods' ? parts[1] : parts[3] || '');
         folderEdited.current = configs.length > 0;
         setSuggestedFolder('');
+        setOverride(false);
         setError(null);
-        setPreview(null);
+        setEditing(null);
         setOpen(true);
     };
     const addFiles = async (files: File[], fromFolder = false) => {
@@ -84,27 +91,39 @@ export function ModConfigFields({ projectId, title, source = 'MODTALE', versionN
     };
 
     return <>
-        <button type="button" disabled={disabled} onClick={startEditing} aria-label={`${configs.length ? 'Edit configs' : 'Add config'} for ${title}`} className={`inline-flex w-28 justify-start items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors ${configs.length ? theme.colors.accent : theme.colors.textMuted} ${theme.colors.bgSurfaceHover}`}><FileCode2 className="w-3.5 h-3.5" /><span>{configs.length ? `Configs (${configs.length})` : 'Config'}</span></button>
-        {open && <ModalPortal><div className={theme.components.modalOverlay} onMouseDown={event => { if (event.target === event.currentTarget) setOpen(false); }}>
-            <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={dialogId} className={`${theme.components.modalContent} w-full max-w-md max-h-[90dvh]`}>
-                <div className={theme.components.modalHeader}><div><h3 id={dialogId} className={`font-bold ${theme.colors.textPrimary}`}>{title} configs</h3><p className={`mt-1 text-xs ${theme.colors.textMuted}`}>Defaults for each universe using this pack.</p></div><button type="button" onClick={() => setOpen(false)} aria-label="Cancel config changes" className={theme.components.iconButton}><X className="w-4 h-4" /></button></div>
-                <div className={`${theme.components.modalBody} !space-y-5`}>
+        <button type="button" disabled={disabled} onClick={startEditing} aria-label={`${configs.length ? 'Edit configs' : 'Add config'} for ${title}`} className={`inline-flex w-fit shrink-0 whitespace-nowrap items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors ${configs.length ? theme.colors.accent : theme.colors.textMuted} ${disabled ? 'cursor-default' : theme.colors.bgSurfaceHover}`}><FileCode2 className="w-3.5 h-3.5" /><span>{configs.length ? `Configs (${configs.length})` : 'Config'}</span></button>
+        {open && <ModalPortal><div className={theme.components.modalOverlay} onMouseDown={event => { if (event.target === event.currentTarget && !editing) setOpen(false); }}>
+            <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={dialogId} className={editing ? `${theme.components.modalContent} w-full max-w-5xl h-[min(720px,85dvh)]` : modpackDialog.content}>
+                {editing ? <ModConfigEditor headingId={dialogId} title={title} filename={configFileName(editing.config)} document={editing.document} onCancel={() => setEditing(null)} onSave={text => {
+                    const file = new File([text], editing.config.file.name, { type: editing.config.file.type || 'text/plain' });
+                    const next = draft.map(item => item.id === editing.config.id ? { ...item, file } : item);
+                    const validation = validateModConfigs(next.map(item => ({ ...item, destination })));
+                    if (validation) throw new Error(validation);
+                    setDraft(next); setEditing(null);
+                }} /> : <>
+                <div className={modpackDialog.header}><div><h3 id={dialogId} className={modpackDialog.title}><FileCode2 className={`w-5 h-5 shrink-0 ${theme.colors.accent}`} /><span className="truncate">{title} configs</span></h3></div><button type="button" onClick={() => setOpen(false)} aria-label="Cancel config changes" className={modpackDialog.close}><X className="w-5 h-5" /></button></div>
+                <div className={`${modpackDialog.body} !space-y-5`}>
                     <div>
                         <div className="flex items-center justify-between mb-2"><span className={`text-xs font-bold ${theme.colors.textSecondary}`}>Files</span><div className="flex gap-3"><button type="button" onClick={() => fileInput.current?.click()} className={`text-xs ${theme.colors.accent} hover:underline`}>Add files</button><button type="button" onClick={() => folderInput.current?.click()} className={`text-xs ${theme.colors.textMuted} hover:underline`}>Add folder</button></div></div>
-                        <p className={`mb-3 text-[11px] leading-relaxed ${theme.colors.textMuted}`}>Supported types: {CONFIG_EXTENSIONS.split(',').join(', ')} · maximum {MAX_CONFIG_FILE_BYTES / (1024 * 1024)} MiB per file, {MAX_CONFIG_TOTAL_BYTES / (1024 * 1024)} MiB total, and {MAX_CONFIG_FILES} files.</p>
+
                         <div onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void addFiles(Array.from(event.dataTransfer.files)); }}>
-                            {draft.length ? <div className={`divide-y divide-slate-200 dark:divide-white/10`}>{draft.map(config => <div key={config.id} className="flex items-center gap-2 py-2 min-w-0"><FileCode2 className={`w-4 h-4 shrink-0 ${theme.colors.textMuted}`} /><button type="button" className={`min-w-0 flex-1 text-left text-sm truncate ${theme.colors.textPrimary}`} onClick={async () => { try { setPreview(preview?.name === configFileName(config) ? null : { name: configFileName(config), text: await config.file.text() }); } catch { setError('Could not preview this file.'); } }}>{configFileName(config)}</button><span className={`text-[11px] ${theme.colors.textMuted}`}>{config.file.size < 1024 ? `${config.file.size} B` : `${(config.file.size / 1024).toFixed(1)} KiB`}</span><button type="button" aria-label={`Remove ${configFileName(config)}`} onClick={() => { setDraft(items => items.filter(item => item.id !== config.id)); setPreview(null); }} className={theme.components.iconButton}><X className="w-3.5 h-3.5" /></button></div>)}</div> : <button type="button" onClick={() => fileInput.current?.click()} className={`w-full rounded-xl border border-dashed ${theme.colors.border} px-4 py-6 text-sm ${theme.colors.textMuted} hover:border-modtale-accent`}>Choose config files or drop them here</button>}
+                            {draft.length ? <div className="space-y-2">{draft.map(config => <div key={config.id} className={`${modpackDialog.row} flex items-center gap-3 min-w-0`}><FileCode2 className={`w-4 h-4 shrink-0 ${theme.colors.textMuted}`} /><button type="button" aria-label={`Edit ${configFileName(config)}`} title="Edit settings" className={`min-w-0 flex-1 flex items-center gap-2 text-left text-sm ${theme.colors.textPrimary} hover:text-modtale-accent transition-colors`} onClick={async () => { try { setEditing({ config, document: readSettings(config.file.name, await config.file.text()) }); setError(null); } catch (e) { setError((e as Error).message); } }}><span className="truncate">{configFileName(config)}</span><Pencil aria-hidden="true" className={`w-3.5 h-3.5 shrink-0 ${theme.colors.accent}`} /></button><span className={`text-[11px] ${theme.colors.textMuted}`}>{config.file.size < 1024 ? `${config.file.size} B` : `${(config.file.size / 1024).toFixed(1)} KiB`}</span><button type="button" aria-label={`Remove ${configFileName(config)}`} onClick={() => { setDraft(items => items.filter(item => item.id !== config.id)); setEditing(null); }} className={theme.components.iconButton}><X className="w-3.5 h-3.5" /></button></div>)}</div> : <button type="button" onClick={() => fileInput.current?.click()} className={`w-full rounded-xl border border-dashed ${theme.colors.border} px-4 py-6 text-sm ${theme.colors.textMuted} hover:border-modtale-accent`}>Choose config files or drop them here</button>}
                         </div>
                         <input ref={fileInput} type="file" multiple accept={CONFIG_EXTENSIONS} className="hidden" onChange={event => { void addFiles(Array.from(event.target.files || [])); event.target.value = ''; }} />
                         <input ref={folderInput} type="file" multiple {...{ webkitdirectory: '', directory: '' }} className="hidden" onChange={event => { void addFiles(Array.from(event.target.files || []), true); event.target.value = ''; }} />
-                        {preview && <pre className={`mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-all text-xs ${theme.colors.textSecondary}`}>{preview.text}</pre>}
                     </div>
-                    <label className={`block text-xs font-bold ${theme.colors.textSecondary}`}>Mod folder<Input value={folder} onChange={event => { folderEdited.current = true; setFolder(event.target.value); }} placeholder="Group_PluginName" className="mt-2 !font-normal" /><span className={`block mt-1.5 text-[11px] font-normal ${theme.colors.textMuted}`}>{loading ? 'Checking the mod’s manifest…' : suggestedFolder === folder && folder ? 'From the mod’s manifest. Change it only if needed.' : 'Use the exact folder name created by the mod.'}</span></label>
-                    <details><summary className={`cursor-pointer text-xs ${theme.colors.textMuted}`}>Installation paths</summary><div className="mt-2 space-y-1">{draft.length ? prepared.map(item => <p key={item.id} className={`text-xs font-mono break-all ${theme.colors.textSecondary}`}>Universe / mods / {folder}/{configFileName(item)}</p>) : <p className={`text-xs ${theme.colors.textMuted}`}>Add files to preview their paths.</p>}</div></details>
+                    <div className={`border-t ${theme.colors.border} pt-4 space-y-2`}>
+                        <div className="flex items-center justify-between gap-3"><span className={`text-xs font-bold ${theme.colors.textSecondary}`}>Install location</span><button type="button" onClick={() => setOverride(value => !value)} className={`text-xs ${theme.colors.accent} hover:underline`}>{override ? 'Hide override' : 'Change'}</button></div>
+                        {loading && !folder && <p className={`text-sm ${theme.colors.textMuted}`}>Finding install location…</p>}
+                        {folder && <p className={`text-xs break-all ${theme.colors.textMuted}`}>{folder}</p>}
+                        {!loading && !folder && <button type="button" onClick={() => folderInput.current?.click()} className={`text-xs ${theme.colors.accent} hover:underline`}>Import config folder</button>}
+                        {override && <label className={`block text-xs ${theme.colors.textSecondary}`}>Custom mod folder<Input value={folder} onChange={event => { folderEdited.current = true; setFolder(event.target.value); }} placeholder="Group_PluginName" className="mt-2 !font-normal" />{suggestedFolder && folder !== suggestedFolder && <button type="button" onClick={() => { folderEdited.current = false; setFolder(suggestedFolder); setOverride(false); }} className={`mt-2 text-xs ${theme.colors.accent} hover:underline`}>Use detected folder</button>}</label>}
+                    </div>
                     {(error || pathError) && <p role="alert" className={`text-xs ${theme.colors.dangerText}`}>{error || pathError}</p>}
-                    <p className={`text-xs ${theme.colors.textMuted}`}>Applied when the pack is enabled in a universe. Existing settings are kept.</p>
+
                 </div>
-                <div className={`${theme.components.modalFooter} !justify-end gap-3`}><button type="button" onClick={() => setOpen(false)} className={theme.components.buttonGhost}>Cancel</button><button type="button" disabled={!!pathError || disabled} onClick={() => { onChange(prepared); setOpen(false); }} className={theme.components.buttonPrimary}>Save configs</button></div>
+                <div className={`${modpackDialog.footer} !justify-end gap-3`}><button type="button" onClick={() => setOpen(false)} className={theme.components.buttonGhost}>Cancel</button><button type="button" disabled={loading || !!pathError || disabled} onClick={() => { onChange(prepared); setOpen(false); }} className={theme.components.buttonPrimary}>Save configs</button></div>
+                </>}
             </div>
         </div></ModalPortal>}
     </>;

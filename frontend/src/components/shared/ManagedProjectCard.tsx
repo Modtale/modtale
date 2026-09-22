@@ -1,3 +1,4 @@
+import { ModpackCountBadge } from '@/modules/project/components/ModpackCountBadge';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import type { Project } from '@/types';
@@ -25,8 +26,9 @@ export const ManagedProjectCard: React.FC<ManagedProjectCardProps> = ({
 
     return (
         <div className="p-4 flex flex-col sm:flex-row items-center gap-4 group relative w-full h-full">
-            <div className="w-16 h-16 rounded-xl bg-slate-200/50 dark:bg-white/5 overflow-hidden flex-shrink-0 border border-slate-200 dark:border-white/10 shadow-sm">
+            <div className="relative w-16 h-16 rounded-xl bg-slate-200/50 dark:bg-white/5 overflow-hidden flex-shrink-0 border border-slate-200 dark:border-white/10 shadow-sm">
                 <img src={project.imageUrl} alt="" className="w-full h-full object-cover" />
+                <ModpackCountBadge count={project.classification === 'MODPACK' ? (project.childProjectIds || []).length : undefined} />
             </div>
 
             <div className="flex-1 text-center sm:text-left">

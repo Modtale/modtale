@@ -14,6 +14,7 @@ import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -38,6 +39,10 @@ import java.util.regex.Pattern;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import net.modtale.launcher.api.ApiResponseCache;
+import net.modtale.launcher.cache.LauncherCachePaths;
+import net.modtale.launcher.http.RateLimitHandler;
+import net.modtale.launcher.http.ResponseCache;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -75,6 +80,15 @@ public class HytaleApiClient {
             .appendPattern("MMMM d, yyyy")
             .toFormatter(Locale.ENGLISH);
 
+    private static final long PATCH_CACHE_MILLIS = 30_000;
+    private final Clock clock;
+    private final ApiResponseCache usernameCache;
+    private final ResponseCache<ResponseKey, String> readCache;
+    private record ResponseKey(URI uri, String authorization) { }
+    private final ResponseCache<URI, OfficialPatchesResponse> patchCache;
+    private final RateLimitHandler<URI> rateLimits;
+    private String patchCacheToken;
+
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
     private volatile String launcherVersion;
@@ -86,13 +100,36 @@ public class HytaleApiClient {
         this(HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(15))
                 .followRedirects(HttpClient.Redirect.NORMAL)
-                .build());
+                .build(), Clock.systemUTC(), new ApiResponseCache(LauncherCachePaths.cacheDirectory("hytale-usernames")));
     }
 
     HytaleApiClient(HttpClient httpClient) {
+        this(httpClient, Clock.systemUTC());
+    }
+
+    HytaleApiClient(HttpClient httpClient, Clock clock) {
+        this(httpClient, clock, new ApiResponseCache(null));
+    }
+
+    HytaleApiClient(HttpClient httpClient, Clock clock, ApiResponseCache usernameCache) {
+        this.usernameCache = usernameCache;
+        this.clock = clock;
+        this.readCache = new ResponseCache<>(128, clock);
+        this.patchCache = new ResponseCache<>(128, clock);
+        this.rateLimits = new RateLimitHandler<>(clock, Duration.ofMinutes(1),
+                HytaleApiClient::retryAfterMillis);
         this.httpClient = httpClient;
         this.mapper = new ObjectMapper()
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    }
+
+    public synchronized void clearResponseCache() {
+        usernameCache.clear();
+        readCache.clear();
+        patchCache.clear();
+        blogPostCache = List.of();
+        blogPostFetchedAt = 0;
+        // Cache clearing does not cancel a server's Retry-After instruction.
     }
 
     public TokenResponse exchangeCode(String code, String codeVerifier) {
@@ -134,10 +171,19 @@ public class HytaleApiClient {
                 .GET()
                 .header("Authorization", "Bearer " + sessionToken)
                 .build();
-        return parseFriends(sendJson(request, JsonNode.class));
+        List<HytaleFriend> friends = parseFriends(sendJson(request, JsonNode.class));
+        for (HytaleFriend friend : friends) {
+            if (!friend.uuid().isBlank() && !friend.username().isBlank()) {
+                URI uri = publicProfileUri(friend.uuid());
+                if (!usernameCache.getFresh(uri, Duration.ofHours(6)).filter(friend.username()::equals).isPresent()) {
+                    usernameCache.put(uri, friend.username());
+                }
+            }
+        }
+        return friends;
     }
 
-    public Map<String, String> fetchPublicProfileUsernames(String sessionToken, List<String> uuids) {
+    public synchronized Map<String, String> fetchPublicProfileUsernames(String sessionToken, List<String> uuids) {
         if (sessionToken == null || sessionToken.isBlank() || uuids == null || uuids.isEmpty()) {
             return Map.of();
         }
@@ -149,19 +195,31 @@ public class HytaleApiClient {
             if (normalizedUuid.isBlank() || !seen.add(key)) {
                 continue;
             }
+            URI profileUri = publicProfileUri(normalizedUuid);
+            Optional<String> cached = usernameCache.getFresh(profileUri, Duration.ofHours(6));
+            if (cached.isPresent()) {
+                usernames.put(key, cached.get());
+                continue;
+            }
             try {
                 HttpRequest request = officialRequestBuilder(
-                        URI.create(PUBLIC_PROFILE_BY_UUID_URL + "/" + encodePathSegment(normalizedUuid)),
+                        profileUri,
                         "release")
                         .GET()
                         .header("Authorization", "Bearer " + sessionToken)
                         .build();
                 parsePublicProfileUsername(sendJson(request, JsonNode.class))
-                        .ifPresent(username -> usernames.put(key, username));
+                        .ifPresent(username -> {
+                            usernameCache.put(profileUri, username);
+                            usernames.put(key, username);
+                        });
             } catch (HytaleApiException ex) {
-                if (ex.isAuthFailure()) {
+                if (ex.isAuthFailure() && usernameCache.getStaleFallback(profileUri).isEmpty()) {
                     throw ex;
                 }
+            }
+            if (!usernames.containsKey(key)) {
+                usernameCache.getStaleFallback(profileUri).ifPresent(name -> usernames.put(key, name));
             }
         }
         return usernames;
@@ -334,13 +392,21 @@ public class HytaleApiClient {
                 .toList();
     }
 
-    private OfficialPatchesResponse fetchPatches(String accessToken, String os, String arch, String branch, int fromBuild) {
+    private synchronized OfficialPatchesResponse fetchPatches(String accessToken, String os, String arch, String branch, int fromBuild) {
         URI uri = URI.create(PATCHES_BASE_URL + "/" + os + "/" + arch + "/" + normalizeBranch(branch) + "/" + fromBuild);
+        if (!java.util.Objects.equals(patchCacheToken, accessToken)) {
+            patchCache.clear();
+            patchCacheToken = accessToken;
+        }
+        Optional<OfficialPatchesResponse> cached = patchCache.get(uri, Duration.ofMillis(PATCH_CACHE_MILLIS));
+        if (cached.isPresent()) return cached.get();
         HttpRequest request = officialRequestBuilder(uri, branch)
                 .GET()
                 .header("Authorization", "Bearer " + accessToken)
                 .build();
-        return sendJson(request, OfficialPatchesResponse.class);
+        OfficialPatchesResponse response = sendJson(request, OfficialPatchesResponse.class);
+        patchCache.put(uri, response);
+        return response;
     }
 
     private void addAvailablePatchline(
@@ -458,24 +524,47 @@ public class HytaleApiClient {
         return sendJson(request, type);
     }
 
-    private <T> T sendJson(HttpRequest request, Class<T> type) {
-        String body = sendString(request);
+    private static URI publicProfileUri(String uuid) {
+        return URI.create(PUBLIC_PROFILE_BY_UUID_URL + "/" + encodePathSegment(uuid.trim().toLowerCase(Locale.ROOT)));
+    }
+
+    private synchronized <T> T sendJson(HttpRequest request, Class<T> type) {
+        long ttl = 0;
+        if (request.method().equals("GET")) {
+            if (request.uri().equals(launcherDataUrl())) ttl = 60_000;
+            else if (request.uri().toString().equals(SOCIAL_FRIENDS_URL)) ttl = 15_000;
+        }
+        ResponseKey key = new ResponseKey(request.uri(), request.headers().firstValue("Authorization").orElse(""));
+        Optional<String> cached = readCache.get(key, Duration.ofMillis(ttl));
+        String body = cached.isPresent() ? cached.get() : sendString(request);
         try {
-            return mapper.readValue(body, type);
+            T result = mapper.readValue(body, type);
+            if (ttl > 0 && cached.isEmpty()) {
+                readCache.put(key, body);
+            }
+            return result;
         } catch (IOException ex) {
             throw new HytaleApiException("Could not read Hytale API response from " + request.uri(), ex);
         }
     }
 
-    private String sendString(HttpRequest request) {
+    private synchronized String sendString(HttpRequest request) {
+        URI endpoint = request.uri();
+        long remaining = rateLimits.remainingMillis(endpoint);
+        if (remaining > 0) {
+            throw rateLimited(remaining);
+        }
         try {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            if (response.statusCode() == 429) {
+                throw rateLimited(rateLimits.record(endpoint, response.headers()));
+            }
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new HytaleApiException("Hytale API returned HTTP " + response.statusCode()
                         + " for " + request.uri() + responseSnippet(response.body()),
                         response.statusCode(),
                         null,
-                        retryAfterMillis(response.headers(), Instant.now()));
+                        retryAfterMillis(response.headers(), clock.instant()));
             }
             return response.body();
         } catch (IOException ex) {
@@ -484,6 +573,12 @@ public class HytaleApiClient {
             Thread.currentThread().interrupt();
             throw new HytaleApiException("Hytale API request was interrupted.", ex);
         }
+    }
+
+    private static HytaleApiException rateLimited(long delay) {
+        long seconds = Math.max(1, (long) Math.ceil(delay / 1000.0));
+        return new HytaleApiException("Hytale is temporarily limiting requests. Try again in "
+                + seconds + " seconds.", 429, null, delay);
     }
 
     private static String formEncode(Map<String, String> values) {
@@ -557,21 +652,7 @@ public class HytaleApiClient {
     }
 
     private static long parseRetryAfterMillis(String value, Instant now) {
-        if (value == null || value.isBlank()) {
-            return 0;
-        }
-        String trimmed = value.trim();
-        try {
-            return Math.max(0, Long.parseLong(trimmed) * 1000L);
-        } catch (NumberFormatException ignored) {
-            // Retry-After may be an HTTP-date.
-        }
-        try {
-            Instant resetAt = ZonedDateTime.parse(trimmed, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant();
-            return Math.max(0, resetAt.toEpochMilli() - now.toEpochMilli());
-        } catch (DateTimeParseException ignored) {
-            return 0;
-        }
+        return RateLimitHandler.parseDelay(value, now);
     }
 
     private static long parseRateLimitResetMillis(String value, Instant now) {
@@ -582,9 +663,9 @@ public class HytaleApiClient {
             long parsed = Long.parseLong(value.trim());
             long epochSeconds = now.getEpochSecond();
             if (parsed > epochSeconds) {
-                return Math.max(0, (parsed - epochSeconds) * 1000L);
+                return parseRetryAfterMillis(Long.toString(parsed - epochSeconds), now);
             }
-            return Math.max(0, parsed * 1000L);
+            return parseRetryAfterMillis(value, now);
         } catch (NumberFormatException ex) {
             return parseRetryAfterMillis(value, now);
         }

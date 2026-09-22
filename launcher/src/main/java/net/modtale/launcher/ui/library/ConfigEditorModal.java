@@ -41,10 +41,18 @@ final class ConfigEditorModal {
     private final List<Row> rows = new ArrayList<>();
     private String category = "All settings";
     private boolean busy;
+    private boolean worldSettings;
+    private Path worldDirectory;
     private int unavailable;
 
     ConfigEditorModal(StackPane host, Executor executor, Runnable onSaved) {
         this.host = host; this.executor = executor; this.onSaved = onSaved;
+    }
+
+    void showWorldSettings(Path world, String name) {
+        worldSettings = true;
+        worldDirectory = world;
+        show(name + " — World settings", () -> files.discoverWorldSettings(world));
     }
 
     void show(Path globalMods, Path world, String name) {
@@ -101,6 +109,17 @@ final class ConfigEditorModal {
         status.setWrapText(true); status.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(status, Priority.ALWAYS);
         HBox footer = new HBox(12, status, reset, save);
+        if (worldSettings) {
+            Button folder = secondaryButton("Open folder");
+            folder.setOnAction(event -> {
+                if (busy) return;
+                work("Opening world folder…", () -> {
+                    net.modtale.launcher.platform.SystemFileOpener.openDirectory(worldDirectory);
+                    return true;
+                }, ignored -> status.setText(""), "Could not open the world folder.");
+            });
+            footer.getChildren().addFirst(folder);
+        }
         footer.setAlignment(Pos.CENTER_LEFT); footer.getStyleClass().add("mod-settings-footer");
         VBox modal = new VBox(header, body, footer);
         modal.getStyleClass().addAll("post-download-modal", "mod-settings-modal");
@@ -116,7 +135,7 @@ final class ConfigEditorModal {
             var loaded = new ArrayList<ConfigSettingsDocument>();
             for (var file : discover.run()) {
                 try {
-                    var document = new ConfigSettingsDocument(files.read(file));
+                    var document = new ConfigSettingsDocument(files.read(file), worldSettings);
                     if (loaded.stream().mapToInt(doc -> doc.settings().size()).sum() + document.settings().size() > 1500)
                         throw new java.io.IOException("Too many settings");
                     loaded.add(document);
@@ -126,7 +145,7 @@ final class ConfigEditorModal {
             return loaded;
         }, loaded -> {
             documents.addAll(loaded); buildRows(); buildNavigation(); filter();
-            status.setText(unavailable > 0 ? "Some settings cannot be edited here yet." : "Close Hytale before making changes.");
+            status.setText(unavailable > 0 ? "Some settings cannot be edited here yet." : worldSettings ? "" : "Close Hytale before making changes.");
         }, "Settings couldn't be loaded. Try refreshing the library.");
     }
 
@@ -139,6 +158,11 @@ final class ConfigEditorModal {
             title.getStyleClass().add("settings-card-title"); title.setWrapText(true);
             VBox copy = new VBox(5, title); copy.setAlignment(Pos.CENTER_LEFT);
             copy.setMinWidth(0); HBox.setHgrow(copy, Priority.ALWAYS);
+            if (!setting.hint().isBlank()) {
+                Label hint = new Label(setting.hint());
+                hint.getStyleClass().add("library-muted-text"); hint.setWrapText(true);
+                copy.getChildren().add(hint);
+            }
             if (repeatedNames.getOrDefault(setting.name(), 0L) > 1) {
                 String scope = document.snapshot().file().label().startsWith("Global") ? "All worlds" : "This world";
                 Label context = new Label(setting.context().isBlank() ? scope : setting.context() + " · " + scope);
@@ -148,7 +172,31 @@ final class ConfigEditorModal {
             Node control;
             Label error = new Label(); error.getStyleClass().add("mod-settings-error");
             error.setVisible(false); error.setManaged(false);
-            if (setting.toggle()) {
+            if (setting.readOnly()) {
+                Label value = new Label(setting.value());
+                value.getStyleClass().add("mod-settings-muted");
+                control = value;
+            } else if (!setting.choices().isEmpty()) {
+                ComboBox<String> choice = new ComboBox<>();
+                choice.getItems().setAll(setting.choices());
+                if (!choice.getItems().contains(setting.value())) choice.getItems().add(setting.value());
+                choice.setConverter(new javafx.util.StringConverter<>() {
+                    public String toString(String value) {
+                        return value == null || value.isEmpty() ? "Gameplay default" : switch (value) {
+                            case "Configured" -> "Partial drop";
+                            case "All" -> "Drop everything";
+                            case "None" -> "Keep inventory";
+                            default -> value;
+                        };
+                    }
+                    public String fromString(String value) { return value; }
+                });
+                choice.setValue(setting.value());
+                choice.setAccessibleText(setting.name());
+                net.modtale.launcher.ui.common.LauncherUi.styleCombo(choice);
+                choice.setOnAction(event -> { setting.set(choice.getValue()); changed(); });
+                control = choice;
+            } else if (setting.toggle()) {
                 LibraryToggleBox toggle = new LibraryToggleBox();
                 toggle.setSelected(Boolean.parseBoolean(setting.value()));
                 toggle.setAccessibleText(setting.name());
@@ -160,6 +208,7 @@ final class ConfigEditorModal {
             } else {
                 TextField input = new TextField(setting.value());
                 input.getStyleClass().add("input"); input.setAccessibleText(setting.name());
+                input.setPromptText(worldSettings ? "Gameplay default" : "");
                 input.setPrefWidth(setting.number() ? 145 : 245); input.setMaxWidth(setting.number() ? 145 : 245);
                 input.textProperty().addListener((obs, old, value) -> {
                     try {
@@ -199,7 +248,7 @@ final class ConfigEditorModal {
             row.node.setVisible(matches); row.node.setManaged(matches); if (matches) shown++;
         }
         heading.setText(query.isEmpty() ? category : "Search results");
-        subtitle.setText(rows.isEmpty() ? "No editable settings are available for this mod yet." : "No matching settings. Try another search.");
+        subtitle.setText(rows.isEmpty() ? (worldSettings ? "No world settings found. Open this world in Hytale once, then refresh the library." : "No editable settings are available for this mod yet.") : "No matching settings. Try another search.");
         subtitle.setVisible(shown == 0); subtitle.setManaged(shown == 0);
         form.setVisible(shown > 0); form.setManaged(shown > 0);
     }

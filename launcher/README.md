@@ -19,6 +19,21 @@ The launcher uses the production Modtale site and API by default. To use local s
 MODTALE_SITE_BASE_URL=http://localhost:5173 MODTALE_API_BASE_URL=http://localhost:8080/api/v1 ./gradlew run
 ```
 
+## Game updates
+
+Play checks Hytale's authenticated patch service for the latest build of the selected channel,
+including release, pre-release, and versioned channels. The transfer animation shows download,
+installation, and verification progress. A failed update prevents launch.
+
+Verified builds are stored under `~/.modtale/launcher/game/<platform>/<channel>/<build>`;
+existing official installs, mods, and saves are preserved. The next Play checks for updates again
+and reuses a completed build when it is still current. Saved build numbers describe the installed
+build; they do not pin a channel to an old build.
+
+Official Wharf patches are applied and checked against their official content signatures with
+[Butler 15.31.0](https://github.com/itchio/butler/releases/tag/v15.31.0).
+The launcher downloads the platform tool on demand and verifies its pinned SHA-256 before use.
+
 ## Development
 
 ```bash

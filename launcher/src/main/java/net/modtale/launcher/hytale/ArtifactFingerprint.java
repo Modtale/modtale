@@ -18,7 +18,7 @@ public final class ArtifactFingerprint {
         try { digest = MessageDigest.getInstance("SHA-256"); }
         catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
         int normalizedLength = 0;
-        try (InputStream input = Files.newInputStream(file)) {
+        try (InputStream input = new java.io.BufferedInputStream(Files.newInputStream(file))) {
             byte[] buffer = new byte[16 * 1024];
             int read;
             while ((read = input.read(buffer)) >= 0) {
@@ -29,7 +29,7 @@ public final class ArtifactFingerprint {
         int hash = 1 ^ normalizedLength;
         int pending = 0;
         int pendingCount = 0;
-        try (InputStream input = Files.newInputStream(file)) {
+        try (InputStream input = new java.io.BufferedInputStream(Files.newInputStream(file))) {
             int value;
             while ((value = input.read()) >= 0) {
                 if (isWhitespace((byte) value)) continue;

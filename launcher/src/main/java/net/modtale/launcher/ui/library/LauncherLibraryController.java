@@ -77,6 +77,7 @@ public final class LauncherLibraryController {
     private final LauncherAccountController accountController;
     private final LauncherFeedback feedback;
     private final Executor executor;
+    private final CachedImageLoader imageLoader;
     private final Supplier<StackPane> overlayHost;
     private final HytaleWorldManager worldManager = new HytaleWorldManager();
     private final VBox projectList = new VBox(10);
@@ -106,6 +107,7 @@ public final class LauncherLibraryController {
     private StackPane installLoadingOverlay;
     private String identityResolutionSignature = "";
     private boolean identityResolutionInFlight;
+    private boolean nativeRegistryExportInFlight;
 
     public LauncherLibraryController(
             ModtaleApiClient apiClient,
@@ -127,6 +129,7 @@ public final class LauncherLibraryController {
         this.accountController = accountController;
         this.feedback = feedback;
         this.executor = executor;
+        this.imageLoader = imageLoader;
         this.overlayHost = overlayHost == null ? () -> null : overlayHost;
         this.listRenderer = new LibraryProjectListRenderer(ignored -> {
         }, this::updateSelected);
@@ -151,10 +154,17 @@ public final class LauncherLibraryController {
                 this::renderLibrary,
                 this::checkUpdates
         );
+        worldRenderer.setWorldSettingsAction(this::editWorldSettings);
     }
 
     public void setNavigationActions(Consumer<ProjectSummary> openProject, Consumer<ProjectSummary> openCreator) {
         worldRenderer.setNavigationActions(openProject, openCreator);
+    }
+
+    private void editWorldSettings(HytaleWorld world) {
+        StackPane host = overlayHost.get();
+        if (host == null) return;
+        new ConfigEditorModal(host, executor, this::renderLibrary).showWorldSettings(world.directory(), world.name());
     }
 
     private void editConfigs(String modName, List<ConfigFile> configs) {
@@ -169,6 +179,12 @@ public final class LauncherLibraryController {
     public Node libraryView() {
         if (libraryView == null) {
             libraryView = buildLibraryView();
+            libraryView.sceneProperty().flatMap(javafx.scene.Scene::windowProperty)
+                    .flatMap(javafx.stage.Window::focusedProperty).subscribe(focused -> {
+                        if (Boolean.TRUE.equals(focused) && libraryView.isVisible()) {
+                            renderLibrary();
+                        }
+                    });
             renderLibrary();
         }
         return libraryView;
@@ -377,8 +393,10 @@ public final class LauncherLibraryController {
             installedMods = List.of();
             feedback.log(ex.getMessage());
         }
+        importHytaleRegistry();
         recoverLocalInstalls();
         normalizeBundledDependencyInstalls();
+        exportHytaleRegistry();
         resolveInstalledArtifactIdentities();
         installedProjects = settingsController.settings().getInstalledProjects().stream()
                 .sorted(Comparator
@@ -397,6 +415,33 @@ public final class LauncherLibraryController {
         renderWorldRows();
         renderWorldDetail();
         ensureProjectMetadataLoaded();
+    }
+
+    private void importHytaleRegistry() {
+        try {
+            var registry = new net.modtale.launcher.hytale.HytaleModRegistry(worldManager.modsDirectory(settingsController.settings()));
+            var projects = registry.importProjects(settingsController.settings().getInstalledProjects());
+            if (!projects.equals(settingsController.settings().getInstalledProjects())) {
+                settingsController.saveReconciledInstalledProjects(projects);
+            }
+            registry.metadata().forEach(projectMetadata::putIfAbsent);
+        } catch (java.io.IOException | RuntimeException ex) {
+            feedback.log("Could not read Hytale mod library: " + ex.getMessage());
+        }
+    }
+
+    private void exportHytaleRegistry() {
+        if (executor == null || apiClient == null || nativeRegistryExportInFlight) return;
+        var registry = new net.modtale.launcher.hytale.HytaleModRegistry(worldManager.modsDirectory(settingsController.settings()));
+        var projects = List.copyOf(settingsController.settings().getInstalledProjects());
+        nativeRegistryExportInFlight = true;
+        CompletableFuture.runAsync(() -> {
+            try { registry.exportProjects(projects, apiClient); }
+            catch (java.io.IOException ex) { throw new java.io.UncheckedIOException(ex); }
+        }, executor).whenComplete((ignored, error) -> Platform.runLater(() -> {
+            nativeRegistryExportInFlight = false;
+            if (error != null) feedback.log("Could not sync Hytale mod library: " + error.getMessage());
+        }));
     }
 
     private void recoverLocalInstalls() {
@@ -545,6 +590,9 @@ public final class LauncherLibraryController {
     }
 
     private void renderWorldDetail() {
+        worldRenderer.setCurrentGameVersion(settingsController == null ? "" :
+                net.modtale.launcher.hytale.HytaleGameVersionResolver
+                        .selectedServerVersion(settingsController.settings()).orElse(""));
         Optional<HytaleWorld> selected = selectedWorld();
         if (selected.isEmpty()) {
             if (worlds.isEmpty()) {
@@ -582,7 +630,7 @@ public final class LauncherLibraryController {
     }
 
     private LibraryWorldModel worldModel(HytaleWorld world) {
-        HytaleWorldConfig config = worldManager.loadConfig(world.configPath());
+        HytaleWorldConfig config = worldManager.loadConfig(world.configPath(), installedMods);
         List<LibraryWorldProjectModel> projects = installedProjects.stream()
                 .flatMap(project -> worldProjectModels(project, config).stream())
                 .toList();
@@ -599,7 +647,7 @@ public final class LauncherLibraryController {
     }
 
     private LibraryWorldListItem worldListItem(HytaleWorld world) {
-        HytaleWorldConfig config = worldManager.loadConfig(world.configPath());
+        HytaleWorldConfig config = worldManager.loadConfig(world.configPath(), installedMods);
         int enabledProjects = 0;
         int totalProjects = 0;
         for (InstalledProject project : installedProjects) {
@@ -668,9 +716,7 @@ public final class LauncherLibraryController {
                 manifestIds.add(mod.id());
             }
         }
-        return manifestIds.isEmpty()
-                ? LibraryProjectSupport.projectWorldModIds(installed)
-                : List.copyOf(manifestIds);
+        return List.copyOf(manifestIds);
     }
 
     private Optional<HytaleWorld> selectedWorld() {
@@ -792,7 +838,7 @@ public final class LauncherLibraryController {
         }
         boolean installed = installedMods.stream()
                 .anyMatch(mod -> candidate.equals(mod.id()));
-        if (installed || config.enabledByMod().containsKey(candidate)) {
+        if (installed) {
             return List.of(candidate);
         }
         return List.of();
@@ -1038,12 +1084,16 @@ public final class LauncherLibraryController {
             StackPane host = overlayHost.get();
             if (host == null) return;
             Map<String, String> configTitles = new LinkedHashMap<>();
+            Map<String, String> configIcons = new LinkedHashMap<>();
             for (InstalledProject project : installedProjects) {
                 if (!project.isModpack()) {
                     for (String id : worldModIds(project)) configTitles.putIfAbsent(id, project.title());
+                    ProjectMeta meta = projectMetadata.get(project.projectId());
+                    String icon = meta == null ? "" : first(meta.icon(), "");
+                    if (!icon.isBlank()) configIcons.putIfAbsent(project.title(), icon);
                 }
             }
-            ShareConfigSelectionModal.show(host, candidates, configTitles, selected ->
+            ShareConfigSelectionModal.show(host, candidates, configTitles, configIcons, imageLoader, selected ->
                     feedback.runAsync("Creating " + world.name() + " share link...", () -> {
                         accountController.ensureSignedIn();
                         CreateWorldModListRequest request = snapshotRequest(world);
@@ -1074,6 +1124,9 @@ public final class LauncherLibraryController {
 
     private void finishWorldModListInstall(WorldModListInstallResult result) {
         WorldModList list = result.list();
+        settingsController.saveReconciledInstalledProjects(LibrarySharedListRecords.merge(
+                settingsController.settings().getInstalledProjects(), list,
+                worldManager.loadInstalledMods(settingsController.settings()), result.installedFiles()));
         renderLibrary();
         accountController.syncLocalSettings();
         String title = list.title().isBlank() ? "shared mod list" : list.title();
@@ -1109,7 +1162,7 @@ public final class LauncherLibraryController {
     private List<PostDownloadWorldModal.WorldOption> postDownloadWorldOptions(List<String> modIds) {
         return worlds.stream()
                 .map(world -> {
-                    HytaleWorldConfig config = worldManager.loadConfig(world.configPath());
+                    HytaleWorldConfig config = worldManager.loadConfig(world.configPath(), installedMods);
                     int enabled = enabledCount(config, modIds);
                     return new PostDownloadWorldModal.WorldOption(
                             world,
@@ -1130,7 +1183,8 @@ public final class LauncherLibraryController {
         feedback.runAsync("Enabling install in selected worlds...", () -> {
             for (HytaleWorld world : selection.worlds()) {
                 try {
-                    net.modtale.launcher.install.WorldListConfigInstaller.install(selection.configs(), "WORLD", world.directory().resolve("mods"), 32 * 1024 * 1024);
+                    net.modtale.launcher.install.WorldListConfigInstaller.install(selection.configs(), "WORLD", world.directory().resolve("mods"),
+                            32 * 1024 * 1024, conflicts -> confirmConfigReplacement(world, conflicts));
                 } catch (java.io.IOException ex) {
                     throw new ModtaleApiException("Could not apply shared configs to " + world.name(), ex);
                 }
@@ -1139,6 +1193,9 @@ public final class LauncherLibraryController {
             return worldManager.loadWorlds(settingsController.settings());
         }, loadedWorlds -> {
             worlds = loadedWorlds;
+            worldConfigs.clear();
+            loadingWorldConfigs.clear();
+            configScanGeneration++;
             renderWorldRows();
             renderWorldDetail();
             feedback.log("Enabled " + selection.modIds().size() + " mod" + LibraryProjectSupport.plural(selection.modIds().size())
@@ -1146,6 +1203,35 @@ public final class LauncherLibraryController {
             feedback.showToast("Worlds updated", "Enabled the install in selected worlds.");
             accountController.syncLocalSettings();
         });
+    }
+
+    private boolean confirmConfigReplacement(HytaleWorld world,
+            List<net.modtale.launcher.model.worldlist.WorldListConfig> conflicts) {
+        // Config installation runs on a worker; show each decision on the UI thread.
+        var decision = new CompletableFuture<Boolean>();
+        Platform.runLater(() -> {
+            try {
+                Map<String, String> titles = new LinkedHashMap<>();
+                for (HytaleInstalledMod mod : installedMods) titles.putIfAbsent(mod.id(), mod.name());
+                var config = conflicts.getFirst();
+                Path root = world.directory().resolve("mods");
+                String title = ShareConfigSelectionModal.modTitle(
+                        new net.modtale.launcher.config.HytaleConfigFiles.ConfigFile(root, root.resolve(config.path()), "",
+                                config.modIds().isEmpty() ? "" : config.modIds().getFirst()), titles);
+                decision.complete(StatusModal.builder(overlayHost)
+                        .type(StatusModal.Type.INFO)
+                        .title("Replace configs for " + title + "?")
+                        .message(world.name() + " already has " + conflicts.size() + " config file"
+                                + LibraryProjectSupport.plural(conflicts.size()) + " for " + title
+                                + ". Replace them with the included configs? Keeping existing configs preserves your settings.")
+                        .actionLabel("Replace configs")
+                        .secondaryLabel("Keep existing")
+                        .showAndWait() == StatusModal.Result.PRIMARY);
+            } catch (RuntimeException ex) {
+                decision.completeExceptionally(ex);
+            }
+        });
+        return decision.join();
     }
 
     private List<String> modIdsForFiles(List<Path> files) {
@@ -1221,7 +1307,8 @@ public final class LauncherLibraryController {
                     boolean entirePack = !packIds.isEmpty() && ids.containsAll(packIds);
                     var configs = installed.universeConfigs().stream().filter(config -> config.appliesTo(ids, entirePack)).toList();
                     if (!configs.isEmpty()) {
-                        try { net.modtale.launcher.install.WorldListConfigInstaller.install(configs, "WORLD", world.directory().resolve("mods"), 32 * 1024 * 1024); }
+                        try { net.modtale.launcher.install.WorldListConfigInstaller.install(configs, "WORLD", world.directory().resolve("mods"),
+                                32 * 1024 * 1024, conflicts -> confirmConfigReplacement(world, conflicts)); }
                         catch (java.io.IOException ex) { throw new ModtaleApiException("Could not apply world config defaults.", ex); }
                     }
                 }
@@ -1238,10 +1325,14 @@ public final class LauncherLibraryController {
     }
 
     private CreateWorldModListRequest snapshotRequest(HytaleWorld world) {
-        HytaleWorldConfig config = worldManager.loadConfig(world.configPath());
+        List<HytaleInstalledMod> availableMods = worldManager.loadInstalledMods(settingsController.settings());
+        HytaleWorldConfig config = worldManager.loadConfig(world.configPath(), availableMods);
+        Set<String> availableIds = availableMods.stream().map(HytaleInstalledMod::id)
+                .collect(java.util.stream.Collectors.toSet());
         Set<String> enabledModIds = config.enabledByMod().entrySet().stream()
                 .filter(Map.Entry::getValue)
                 .map(Map.Entry::getKey)
+                .filter(availableIds::contains)
                 .filter(id -> id != null && !id.isBlank())
                 .map(String::trim)
                 .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
@@ -1249,9 +1340,6 @@ public final class LauncherLibraryController {
             throw new ModtaleApiException(world.name() + " does not have any enabled mods to share.");
         }
 
-        List<HytaleInstalledMod> availableMods = installedMods.isEmpty()
-                ? worldManager.loadInstalledMods(settingsController.settings())
-                : installedMods;
         List<CreateWorldModListRequest.Item> items = LibraryWorldSnapshotMapper.itemsFor(
                 enabledModIds,
                 installedProjects,

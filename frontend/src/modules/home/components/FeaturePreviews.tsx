@@ -1,8 +1,8 @@
+import { ModpackCountBadge } from '@/modules/project/components/ModpackCountBadge';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Download, List, X, ChevronDown, ChevronRight, Check, Box, AlertCircle, Bell, Search, ArrowUpRight, MessageSquare, Send, Save, PieChart, TrendingUp, Eye, ArrowBigUp, ArrowBigDown, Settings } from 'lucide-react';
-import { LauncherDemo } from '@/modules/launcher/components/LauncherDemo';
-import '@/modules/launcher/styles/launcher-product.css';
+import { LauncherLibraryPreview } from './LauncherLibraryPreview';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { api, BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
@@ -148,6 +148,22 @@ type ModpackPreviewProps = {
     loading?: boolean;
 };
 
+const CURSEFORGE_PREVIEW_DEPENDENCY: ProjectDependency = {
+    projectId: 'curseforge:1430352',
+    projectTitle: 'BetterMap',
+    versionNumber: 'BetterMap-1.3.8.jar',
+    source: 'CURSEFORGE',
+    dependencyType: 'REQUIRED',
+    externalId: '1430352',
+    externalUrl: 'https://www.curseforge.com/hytale/mods/bettermap/files/8747205',
+    externalFileUrl: 'https://www.curseforge.com/hytale/mods/bettermap/files/8747205',
+    externalFileName: 'BetterMap-1.3.8.jar',
+    externalGameVersions: ['0.6'],
+    externalDistributionAllowed: true,
+    hytaleProjectConfirmed: true,
+    icon: 'https://media.forgecdn.net/avatars/thumbnails/1763/122/256/256/639121281719878876.png'
+};
+
 export const InlineModpackBuilderUI = ({ randomProject, projects, loading = false }: ModpackPreviewProps) => {
     const candidates = useMemo(() => Array.from(new Map(
         (projects?.length ? projects : randomProject ? [randomProject] : [])
@@ -158,10 +174,16 @@ export const InlineModpackBuilderUI = ({ randomProject, projects, loading = fals
     const [configs, setConfigs] = useState<Record<string, ModConfig[]>>({});
     const [preparing, setPreparing] = useState(true);
     const initialized = useRef(false);
+    const [retry, setRetry] = useState(0);
 
     useEffect(() => {
         if (initialized.current || (!candidates.length && loading)) return;
+        if (!candidates.length) {
+            setPreparing(false);
+            return;
+        }
         let cancelled = false;
+        setPreparing(true);
         const prepare = async () => {
             const entries = await Promise.all(candidates.map(async project => {
                 try {
@@ -181,13 +203,14 @@ export const InlineModpackBuilderUI = ({ randomProject, projects, loading = fals
                 }
             }));
             if (cancelled) return;
-            setDependencies(entries.filter((entry): entry is ProjectDependency => entry !== null));
-            initialized.current = true;
+            const resolved = entries.filter((entry): entry is ProjectDependency => entry !== null);
+            setDependencies(resolved.length ? [...resolved, { ...CURSEFORGE_PREVIEW_DEPENDENCY }] : []);
+            initialized.current = resolved.length > 0;
             setPreparing(false);
         };
         void prepare();
         return () => { cancelled = true; };
-    }, [candidates, loading]);
+    }, [candidates, loading, retry]);
 
     return (
         <div className="relative">
@@ -196,14 +219,21 @@ export const InlineModpackBuilderUI = ({ randomProject, projects, loading = fals
                     <span className="sr-only">Loading projects</span>
                     {[0, 1, 2].map(index => <div key={index} className="h-20 animate-pulse rounded-xl bg-slate-200/60 dark:bg-white/5" />)}
                 </div>
+            ) : !initialized.current ? (
+                <div className={`${GLASS_CARD} p-6 flex items-center justify-between gap-4`} role="status">
+                    <span className="text-sm text-slate-500 dark:text-slate-400">Projects couldn’t load.</span>
+                    <button type="button" onClick={() => setRetry(value => value + 1)} className={theme.components.buttonPrimary}>Try again</button>
+                </div>
             ) : (
                 <DependencySelector
                     selectedDeps={dependencies}
                     onChange={setDependencies}
                     isModpack
+                    disableExternalReferences
                     label="Modpack Contents"
                     renderDependencyDetails={dependency => (
                         <ModConfigFields
+                            disabled
                             projectId={dependency.projectId}
                             title={dependency.projectTitle}
                             source={dependency.source}
@@ -699,13 +729,14 @@ const CompactFeaturedModCard = ({ project }: { project: Project }) => {
             </div>
 
             <div className="px-3 pb-3 relative flex flex-col flex-1 bg-transparent">
-                <div className="w-10 h-10 rounded-lg absolute -top-5 left-3 group-hover:-translate-y-0.5 transition-transform duration-300 z-20 overflow-hidden border-2 border-white dark:border-slate-800 shadow-md bg-white dark:bg-slate-950">
+                <div className="[container-type:inline-size] w-10 h-10 rounded-lg absolute -top-5 left-3 group-hover:-translate-y-0.5 transition-transform duration-300 z-20 overflow-hidden border-2 border-white dark:border-slate-800 shadow-md bg-white dark:bg-slate-950">
                     <img
                         src={iconUrl}
                         alt={`${project.title} Icon`}
                         loading="lazy"
                         className="w-full h-full bg-transparent object-cover"
                     />
+                    <ModpackCountBadge count={project.classification === 'MODPACK' ? (project.childProjectIds || []).length : undefined} />
                 </div>
 
                 <div className="mt-6 flex-1 relative z-20 pointer-events-none">
@@ -856,7 +887,7 @@ export const ModpackPreviewSection = ({ randomProject, projects, loading }: Modp
         <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
             <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
                 <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
-                    Modpacks v2
+                    Modpacks
                 </h2>
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-emerald-500 dark:from-blue-400 dark:to-emerald-400">
                     Curated packs with dependency intelligence.
@@ -895,7 +926,7 @@ export const DirectDownloadsSection = () => {
     );
 };
 
-export const LauncherPreviewSection = () => (
+export const LauncherPreviewSection = ({ projects, loading }: { projects?: Project[]; loading?: boolean }) => (
     <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
         <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
             <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
@@ -913,15 +944,15 @@ export const LauncherPreviewSection = () => (
         </div>
         <div className="flex-1 w-full max-w-xl relative overflow-visible">
             <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/5 via-transparent to-indigo-500/5 dark:from-blue-500/10 dark:via-transparent dark:to-indigo-500/10 rounded-3xl blur-2xl pointer-events-none" />
-            <LauncherDemo clip="world-library" alt="The real Modtale Launcher switching between Hytale worlds with different enabled mods" />
+            <LauncherLibraryPreview projects={projects} loading={loading} />
         </div>
     </div>
 );
 
 export const SmartDependenciesSection = ({ randomProject, previewProjects }: { randomProject?: Project; previewProjects?: Project[] }) => {
     return (
-        <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
+        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
                 <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Smart Dependencies
                 </h2>
@@ -942,8 +973,8 @@ export const SmartDependenciesSection = ({ randomProject, previewProjects }: { r
 
 export const ProjectAnalyticsSection = ({ showConversionRate = true }: { showConversionRate?: boolean }) => {
     return (
-        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
+        <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
                 <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Project Analytics
                 </h2>
@@ -964,8 +995,8 @@ export const ProjectAnalyticsSection = ({ showConversionRate = true }: { showCon
 
 export const CommunityThreadsSection = ({ project, currentUser }: { project?: Project; currentUser?: User | null }) => {
     return (
-        <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
+        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
                 <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Comment Threads
                 </h2>
@@ -986,8 +1017,8 @@ export const CommunityThreadsSection = ({ project, currentUser }: { project?: Pr
 
 export const RealTimeAlertsSection = () => {
     return (
-        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
+        <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
                 <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Push Notifications
                 </h2>
@@ -1008,8 +1039,8 @@ export const RealTimeAlertsSection = () => {
 
 export const AccountPreferencesSection = () => {
     return (
-        <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
+        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
                 <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Notification Control
                 </h2>

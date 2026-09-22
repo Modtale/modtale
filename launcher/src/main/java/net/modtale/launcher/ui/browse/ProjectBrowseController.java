@@ -372,6 +372,16 @@ public final class ProjectBrowseController {
         controlRow.setMinWidth(Region.USE_PREF_SIZE);
         filterToggleButton = popoverToggle("Filters", LauncherIcons.Glyph.FILTER, filterOptions.popover());
         sortButton = sortControl();
+        sourceSelector.view().setOnAction(event -> {
+            if (sourceSelector.dropdown().isVisible()) {
+                sourceSelector.hide();
+            } else {
+                filterOptions.popover().setVisible(false);
+                hideSortDropdown();
+                sourceSelector.show();
+                positionFilterDropdown(sourceSelector.view(), sourceSelector.dropdown(), false);
+            }
+        });
         controlRow.getChildren().addAll(
                 sourceSelector.view(),
                 pageSizeCombo,
@@ -405,13 +415,20 @@ public final class ProjectBrowseController {
         content.getChildren().addAll(filters, projectResults, paginationNav);
 
         configureSortDropdown();
-        StackPane root = new StackPane(content, filterOptions.popover(), sortDropdown);
+        StackPane root = new StackPane(content, filterOptions.popover(), sortDropdown, sourceSelector.dropdown());
         browseRoot = root;
         root.setUserData(LauncherView.DISCOVER);
         root.getStyleClass().addAll("view", "browse-view");
         root.setMinWidth(0);
         root.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         root.addEventFilter(MouseEvent.MOUSE_PRESSED, this::hideFilterDropdownsOnOutsidePress);
+        root.addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == javafx.scene.input.KeyCode.ESCAPE && sourceSelector.dropdown().isVisible()) {
+                sourceSelector.hide();
+                sourceSelector.view().requestFocus();
+                event.consume();
+            }
+        });
         return root;
     }
 
@@ -696,10 +713,16 @@ public final class ProjectBrowseController {
     private void hideFilterDropdownsOnOutsidePress(MouseEvent event) {
         boolean filtersVisible = filterOptions.popover().isVisible();
         boolean sortVisible = sortDropdown.isVisible();
-        if (!filtersVisible && !sortVisible) {
+        boolean sourceVisible = sourceSelector.dropdown().isVisible();
+        if (!filtersVisible && !sortVisible && !sourceVisible) {
             return;
         }
         EventTarget target = event.getTarget();
+        if (sourceVisible
+                && !eventTargetInside(target, sourceSelector.dropdown())
+                && !eventTargetInside(target, sourceSelector.view())) {
+            sourceSelector.hide();
+        }
         if (filtersVisible
                 && !eventTargetInside(target, filterOptions.popover())
                 && !eventTargetInside(target, filterToggleButton)) {

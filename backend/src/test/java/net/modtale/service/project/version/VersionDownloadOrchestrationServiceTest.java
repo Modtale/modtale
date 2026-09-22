@@ -24,6 +24,8 @@ import net.modtale.service.storage.DownloadTokenService;
 import net.modtale.service.storage.StorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -240,11 +242,12 @@ class VersionDownloadOrchestrationServiceTest {
 
         assertEquals("sky-tools.jar", payload.filename());
         assertArrayEquals(new byte[]{1, 2, 3}, payload.bytes());
-        verify(trackingService).logDownload("project-1", "version-1", "author-name", false, "203.0.113.1");
+        verify(trackingService).logDownload("project-1", "version-1", "author-name", false, "203.0.113.1", false);
     }
 
-    @Test
-    void downloadVersionGeneratesModpackZipAndTracksDependencies() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void downloadVersionGeneratesModpackZipAndTracksDependencies(boolean launcher) throws Exception {
         User user = new User();
         Project pack = project("pack-1", "Sky Pack!", ProjectClassification.MODPACK);
         ProjectVersion version = version("version-1", "1.0.0", "modpacks/pack.zip");
@@ -261,16 +264,17 @@ class VersionDownloadOrchestrationServiceTest {
         when(analyticsEligibilityService.shouldCountProjectEngagement(dependencyProject, user)).thenReturn(true);
         when(downloadService.generateModpackZip(pack, version, user)).thenReturn(new byte[]{9, 8, 7});
 
-        VersionDownloadPayload payload = service.downloadVersion("token", true, null, "198.51.100.9", null, user);
+        VersionDownloadPayload payload = service.downloadVersion("token", true, null, "198.51.100.9", null, user, launcher);
 
         assertEquals("Sky_Pack_-1.0.0.zip", payload.filename());
         assertArrayEquals(new byte[]{9, 8, 7}, payload.bytes());
-        verify(trackingService).logDownload("pack-1", "version-1", "author-name", true, "198.51.100.9");
-        verify(trackingService).logDownload("dep-1", null, "author-name", true, "198.51.100.9");
+        verify(trackingService).logDownload("pack-1", "version-1", "author-name", true, "198.51.100.9", launcher);
+        verify(trackingService).logDownload("dep-1", null, "author-name", true, "198.51.100.9", launcher);
     }
 
-    @Test
-    void downloadBundleTracksOnlySelectedNonEmbeddedDependenciesAndReturnsZipName() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void downloadBundleTracksOnlySelectedNonEmbeddedDependenciesAndReturnsZipName(boolean launcher) throws Exception {
         User user = new User();
         Project project = project("project-1", "Sky Tools", ProjectClassification.PLUGIN);
         ProjectVersion version = version("version-1", "1.0.0", "files/mod.jar");
@@ -291,12 +295,12 @@ class VersionDownloadOrchestrationServiceTest {
         when(analyticsEligibilityService.shouldCountProjectEngagement(dependencyProject, user)).thenReturn(true);
         when(downloadService.generateBundleZip(project, version, List.of("dep-1"), user)).thenReturn(new byte[]{4, 5});
 
-        VersionDownloadPayload payload = service.downloadBundle("token", false, null, "198.51.100.9", null, user);
+        VersionDownloadPayload payload = service.downloadBundle("token", false, null, "198.51.100.9", null, user, launcher);
 
         assertEquals("Sky_Tools-UNZIP-ME.zip", payload.filename());
         assertArrayEquals(new byte[]{4, 5}, payload.bytes());
-        verify(trackingService).logDownload("project-1", "version-1", "author-name", true, "198.51.100.9");
-        verify(trackingService).logDownload("dep-1", null, "author-name", true, "198.51.100.9");
+        verify(trackingService).logDownload("project-1", "version-1", "author-name", true, "198.51.100.9", launcher);
+        verify(trackingService).logDownload("dep-1", null, "author-name", true, "198.51.100.9", launcher);
         verify(projectService, never()).getRawProjectById("dep-2");
         verify(projectService, never()).getRawProjectById("embedded");
     }

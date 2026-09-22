@@ -16,6 +16,16 @@ public final class SystemFileOpener {
         if (!Files.isRegularFile(absolute)) {
             throw new IOException("File does not exist: " + absolute);
         }
+        openExisting(absolute);
+    }
+
+    public static void openDirectory(Path directory) throws IOException {
+        Path absolute = directory.toAbsolutePath().normalize();
+        if (!Files.isDirectory(absolute)) throw new IOException("Directory does not exist: " + absolute);
+        openExisting(absolute);
+    }
+
+    private static void openExisting(Path absolute) throws IOException {
         if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("linux")) {
             IOException failure = null;
             for (List<String> command : linuxCommands(absolute)) {

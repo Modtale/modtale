@@ -15,7 +15,7 @@ import net.modtale.launcher.model.project.*;
 final class CurseForgeClient {
     private static final Map<String, Integer> CLASSES = Map.of(
             "mods", 9137, "prefabs", 9185, "worlds", 9184, "bootstrap", 9281, "translations", 10350);
-    private final ModtaleApiTransport transport;
+    private final JsonApiTransport transport;
     private final URI base;
 
     CurseForgeClient(HttpClient client, ApiResponseCache cache) {
@@ -23,8 +23,12 @@ final class CurseForgeClient {
     }
 
     CurseForgeClient(HttpClient client, ApiResponseCache cache, URI base) {
-        transport = new ModtaleApiTransport(client, cache);
+        transport = new JsonApiTransport(client, cache, "CurseForge");
         this.base = base;
+    }
+
+    JsonNode matchFiles(List<Long> fingerprints) {
+        return transport.post(base.resolve("fingerprints/70216"), Map.of("fingerprints", fingerprints), JsonNode.class);
     }
 
     ProjectPage search(ProjectSearchQuery query) {

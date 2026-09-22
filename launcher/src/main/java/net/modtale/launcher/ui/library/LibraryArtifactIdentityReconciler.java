@@ -20,6 +20,8 @@ final class LibraryArtifactIdentityReconciler {
         for (InstalledProject project : installed == null ? List.<InstalledProject>of() : installed) {
             ArtifactIdentity.Match match = project.files().stream().map(LibraryArtifactIdentityReconciler::normalize)
                     .map(byFile::get).filter(java.util.Objects::nonNull).findFirst().orElse(null);
+            if (match != null && !InstalledProject.SOURCE_LOCAL.equals(project.source())
+                    && !match.source().equalsIgnoreCase(project.source())) match = null;
             boolean sameIdentity = match != null && match.projectId().equals(project.projectId())
                     && match.source().equalsIgnoreCase(project.source());
             boolean sameOrUnknownVersion = match != null && (match.versionId() == null || match.versionId().isBlank()

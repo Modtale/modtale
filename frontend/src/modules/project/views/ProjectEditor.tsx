@@ -432,7 +432,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
 
     const previewTitle = metaData.title.trim() || projectData.title || '';
     const previewSummary = metaData.summary.trim() || projectData.description || '';
-    const previewProject: Project = { ...projectData, title: previewTitle, description: previewSummary };
+    const previewProject: Project = { ...projectData, title: previewTitle, description: previewSummary, ...(isModpack ? { childProjectIds: (versionData.dependencies || []).map(dep => dep.projectId) } : {}) };
 
     const isCustomLicense = typeof metaData.license === 'string' && !LICENSES.some(l => l.id === metaData.license);
     const hasTitle = metaData.title && metaData.title.trim().length > 0;
@@ -893,6 +893,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                 document.body)}
 
             <ProjectLayout
+                modpackCount={isModpack ? (versionData.dependencies || []).length : undefined}
                 isEditing={true}
                 bannerUrl={bannerPreview}
                 iconUrl={metaData.iconPreview}
@@ -979,7 +980,7 @@ export const ProjectEditorView: React.FC<ProjectEditorViewProps> = ({ currentUse
                             </div>
                         )}
                         <input value={metaData.summary} disabled={readOnly} onChange={e => { markDirty(); setMetaData({...metaData, summary: e.target.value}); }} maxLength={MAX_PROJECT_SUMMARY_CHARACTERS} aria-label="Short project summary" className={`text-lg ${theme.colors.textPrimary} font-medium bg-transparent border-b border-transparent outline-none w-full mt-2 hover:border-slate-300 dark:hover:border-white/20 focus:border-modtale-accent pb-1`} placeholder="Short summary..."/>
-                        {!readOnly && <div className={`mt-1 flex justify-between gap-3 text-[10px] tabular-nums ${theme.colors.textMuted}`}><span>{MIN_PROJECT_SUMMARY_CHARACTERS}–{MAX_PROJECT_SUMMARY_CHARACTERS} characters</span><span>{metaData.summary.length}/{MAX_PROJECT_SUMMARY_CHARACTERS}</span></div>}
+                        {!readOnly && <div className={`mt-1 flex justify-between gap-3 pl-3 text-[10px] tabular-nums ${theme.colors.textMuted}`}><span>{MIN_PROJECT_SUMMARY_CHARACTERS}–{MAX_PROJECT_SUMMARY_CHARACTERS} characters</span><span>{metaData.summary.length}/{MAX_PROJECT_SUMMARY_CHARACTERS}</span></div>}
                         {projectData.status === 'PENDING' && (
                             <div className="mt-4 rounded-2xl border border-amber-300/70 dark:border-amber-400/30 bg-amber-50/90 dark:bg-amber-500/10 p-4">
                                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">

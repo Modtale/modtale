@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javafx.application.Platform;
 import javafx.scene.control.Button;
-import javafx.scene.control.MenuButton;
+import javafx.scene.control.Label;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import net.modtale.launcher.ui.browse.ProjectBrowseController;
@@ -44,9 +44,17 @@ class LauncherBrowseMenuTest {
                     () -> {}, searches::add, () -> "Ready", message -> {}, (title, message) -> {},
                     () -> currentView.set(LauncherView.DISCOVER), currentView::get,
                     id -> false, () -> "2026.1", project -> {}, project -> {}, project -> {}, project -> {});
-            var source = (MenuButton) controller.view().lookup(".provider-picker");
-            source.getItems().stream().filter(item -> item.getText().equals("CurseForge"))
-                    .findFirst().orElseThrow().fire();
+            var source = (Button) controller.view().lookup(".provider-picker");
+            source.fire();
+            var curseForge = (Button) controller.view().lookupAll(".sort-dropdown-item").stream()
+                    .filter(node -> node instanceof Button button
+                            && button.getGraphic() instanceof Label label
+                            && label.getText().equals("CurseForge"))
+                    .findFirst().orElseThrow();
+            curseForge.fire();
+            assertEquals("Browse source: CurseForge", source.getAccessibleText());
+            assertTrue(controller.view().lookupAll(".sort-dropdown-panel").stream()
+                    .noneMatch(javafx.scene.Node::isVisible));
             var menu = new LauncherBrowseMenu(controller, () -> layer, currentView::get);
             assertEquals(ProjectBrowseSort.DOWNLOADS, controller.selectedBrowseSort());
             for (var sort : ProjectBrowseSort.curseForgeSorts()) {

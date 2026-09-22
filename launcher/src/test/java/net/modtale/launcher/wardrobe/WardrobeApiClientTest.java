@@ -29,6 +29,7 @@ class WardrobeApiClientTest {
     private Runnable duringSessionRefresh;
     private Runnable duringRejectedSessionRenewal;
     private int renewals;
+    private Runnable afterWrite;
 
     @BeforeEach void start() throws Exception {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -40,7 +41,9 @@ class WardrobeApiClientTest {
             bodies.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             if ((path.startsWith("/player-skins?") || path.equals("/player-skins")) && afterSlots != null) afterSlots.run();
             headers.add(exchange.getRequestHeaders().getFirst("Authorization"));
-            Reply reply = replies.getOrDefault(path, new Reply(404, "application/json", "{}"));
+            Reply reply = replies.getOrDefault(exchange.getRequestMethod() + " " + path,
+                    replies.getOrDefault(path, new Reply(404, "application/json", "{}")));
+            if (!exchange.getRequestMethod().equals("GET") && afterWrite != null) afterWrite.run();
             byte[] bytes = reply.body.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", reply.type);
             exchange.sendResponseHeaders(reply.status, bytes.length);
@@ -60,7 +63,7 @@ class WardrobeApiClientTest {
                 return "renewed-session";
             }
         };
-        api = new WardrobeApiClient(HttpClient.newHttpClient(), auth, base, base);
+        api = new WardrobeApiClient(HttpClient.newHttpClient(), auth, base);
     }
     @AfterEach void stop() { server.stop(0); }
 
@@ -115,71 +118,56 @@ class WardrobeApiClientTest {
         assertEquals(1, requests.size());
     }
 
-    @Test void usernameLookupPreservesCosmeticsAndNeverSendsOfficialTokenToHyTags() throws Exception {
-        json("/api/username/KayNeko", profile(ID, "KayNeko"));
-        archivedSkin();
-        html("/username/KayNeko", "<a class='wardrobe-card is-current' href='/skin/" + HASH + "'>Current</a>");
-        WardrobeItem item = api.lookupSkin("KayNeko");
-        var payload = new ObjectMapper().readTree(item.payload());
-        assertEquals("Muscular.01", payload.path("skin").path("bodyCharacteristic").asText());
-        assertTrue(payload.path("skin").path("cape").isNull());
-        assertEquals(ID, payload.path("playerUuid").asText());
-        assertEquals("https://hyvatar.io/render/full/NPC?size=256&skin_id=" + HASH + "", payload.path("thumbnailUrl").asText());
-        assertEquals(item.id(), api.lookupSkin("KayNeko").id());
-        assertEquals(UUID.fromString(ID), api.profile("KayNeko").uuid());
-        assertEquals(0, tokenCalls);
-        assertTrue(headers.stream().allMatch(Objects::isNull));
-    }
-    @Test void profileWithoutAnArchiveHasADistinctFailureFromLookupErrors() {
-        json("/api/username/Wtrlmn", "{\"username\":\"Wtrlmn\",\"uuid\":\"" + ID + "\",\"skin\":[]}");
-        html("/username/Wtrlmn", "<html><body>No archived skins</body></html>");
-        assertThrows(WardrobeApiClient.MissingArchivedSkinException.class, () -> api.lookupSkin("Wtrlmn"));
-        assertEquals(0, tokenCalls);
-        assertTrue(headers.stream().allMatch(Objects::isNull));
-    }
-
-    @Test void malformedOrWrongProfilesFailInsteadOfProducingEmptySkins() {
-        for (String body : List.of("{}", "null", "[]", "not-json", profile(ID, "OtherName"),
-                "{\"uuid\":\"bad\",\"username\":\"KayNeko\"}",
-                "{\"uuid\":\"" + ID + "\",\"username\":\"KayNeko\",\"skin\":null}")) {
-            json("/api/username/KayNeko", body);
-            assertThrows(RuntimeException.class, () -> api.lookupSkin("KayNeko"));
-        }
-    }
-    @Test void failedSkinLookupsRejectErrorsAndInvalidNames() {
-        for (int status : List.of(401, 403, 404, 429, 500)) {
-            replies.put("/api/username/KayNeko", new Reply(status, "application/json", "secret upstream body"));
-            Exception ex = assertThrows(IllegalStateException.class, () -> api.lookupSkin("KayNeko"));
-            assertFalse(ex.getMessage().contains("secret"));
-        }
-        assertThrows(IllegalArgumentException.class, () -> api.lookupSkin("../../bad"));
-    }
-    @Test void catalogUsesPublishedPaginationAndSortAndDeduplicatesLocalLinks() throws Exception {
-        String body = "<html><body><h2>Skin archive</h2><select name='sort'><option value='users'>Most used</option></select>"
-                + "<a href='/skin/" + HASH + "'>Skin</a><a href='/skin/" + HASH + "'>duplicate</a>"
-                + "<a href='https://evil.test/skin/" + HASH + "'>external</a></body></html>";
-        html("/skins?page=2", body);
-        html("/skins?page=2&sort=users", body);
-        archivedSkin();
-        List<WardrobeItem> items = api.browseSkins(2, "Most used");
-        assertEquals(List.of("/skins?page=2", "/skins?page=2&sort=users"), requests, "Browsing should not fetch every cosmetic definition; hydrate on save or apply");
-        assertEquals(1, items.size());
-        assertEquals(HASH, new ObjectMapper().readTree(items.getFirst().payload()).path("skinId").asText());
-        assertThrows(IllegalArgumentException.class, () -> api.browseSkins(2, "invented"));
-        assertThrows(IllegalArgumentException.class, () -> api.browseSkins(0, "default"));
+    @Test void legacyHashOnlyLookFailsLocallyWithoutContactingAService() {
+        var item = new WardrobeItem(UUID.randomUUID(), WardrobeItem.Kind.SKIN, "Old look", false, "", "{\"skinId\":\"" + HASH + "\"}");
+        assertThrows(IllegalStateException.class, () -> api.hydrate(item));
+        assertThrows(IllegalStateException.class, () -> api.apply(item, settings()));
+        assertTrue(requests.isEmpty());
     }
     @Test void uuidLookupUsesOfficialSessionAndVerifiesIdentity() throws Exception {
         json("/profile/uuid/" + ID, profile(ID, "Renamed"));
-        assertEquals("Renamed", api.profile(UUID.fromString(ID), new LauncherSettings()).username());
+        var friend = api.profile(UUID.fromString(ID), new LauncherSettings());
+        assertEquals("Renamed", friend.username());
+        assertEquals("Muscular.01", new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(friend.skin()).path("bodyCharacteristic").asText());
         assertEquals("Bearer official-session", headers.getFirst());
         assertEquals(1, tokenCalls);
         json("/profile/uuid/" + ID, profile("11111111-1111-1111-1111-111111111111", "WrongPlayer"));
         assertThrows(IllegalStateException.class, () -> api.profile(UUID.fromString(ID), new LauncherSettings()).username());
     }
+    @Test void profileWithoutSavedSkinReturnsEmptyComposition() throws Exception {
+        var response = new ObjectMapper().createObjectNode().put("uuid", ID).put("username", "Wtrlmn");
+        json("/profile/uuid/" + ID, response.toString());
+        assertEquals("{}", api.profile(UUID.fromString(ID), settings()).skin());
+    }
+
+    @Test void publicProfileDecodesSerializedCharacterSkin() throws Exception {
+        var mapper = new ObjectMapper();
+        var skin = mapper.createObjectNode()
+                .put("bodyCharacteristic", "Muscular.01")
+                .put("haircut", "Sideslick.BrownDark")
+                .putNull("cape");
+        var response = mapper.createObjectNode().put("uuid", ID).put("username", "ItsNeil")
+                .put("skin", skin.toString());
+        json("/profile/uuid/" + ID, response.toString());
+        var friend = api.profile(UUID.fromString(ID), settings());
+        assertEquals(skin, mapper.readTree(friend.skin()));
+        assertEquals("Bearer official-session", headers.getFirst());
+
+        json("/profile/uuid/" + ID, mapper.createObjectNode().set("profile", response).toString());
+        assertEquals(skin, mapper.readTree(api.profile(UUID.fromString(ID), settings()).skin()));
+    }
+
+    @Test void malformedSerializedCharacterSkinIsRejected() throws Exception {
+        var response = new ObjectMapper().createObjectNode().put("uuid", ID).put("username", "ItsNeil")
+                .put("skin", "{invalid");
+        json("/profile/uuid/" + ID, response.toString());
+        assertThrows(IllegalStateException.class, () -> api.profile(UUID.fromString(ID), settings()));
+    }
+
     @Test void skinApplyWritesSerializedDefinitionToActiveSlotAndPreservesName() throws Exception {
-        archivedSkin();
         slots();
-        api.apply(api.lookupSkinHash(HASH), settings());
+        api.apply(new WardrobeItem(UUID.randomUUID(), WardrobeItem.Kind.SKIN, "Outfit", false, "", "{\"skin\":{\"bodyCharacteristic\":\"Muscular.01\",\"cape\":null}}"), settings());
         assertEquals("PUT", methods.getLast());
         assertEquals("/player-skins/" + SLOT, requests.getLast());
         assertEquals("Bearer official-session", headers.getLast());
@@ -203,17 +191,11 @@ class WardrobeApiClientTest {
         var restored = new ObjectMapper().readTree(new ObjectMapper().readTree(bodies.getLast()).path("skinData").asText());
         assertEquals(payload.path("skin"), restored);
     }
-    @Test void hydratePreservesLocalMetadataAndDoesNotResolveMovingUsernames() throws Exception {
-        archivedSkin();
-        UUID id = UUID.randomUUID();
-        var input = new WardrobeItem(id, WardrobeItem.Kind.SKIN, "Favorite", true, "Collection", "{\"skinId\":\"" + HASH + "\",\"username\":\"OldName\"}");
-        var saved = api.hydrate(input);
-        assertEquals(id, saved.id()); assertEquals("Favorite", saved.name()); assertTrue(saved.favorite());
-        assertEquals("Collection", saved.collection());
-        assertTrue(new ObjectMapper().readTree(saved.payload()).path("skin").isObject());
-        assertEquals(List.of("/api/skin/" + HASH), requests);
+    @Test void hydratePreservesCompleteSavedLooksWithoutNetworkAccess() {
+        var saved = new WardrobeItem(UUID.randomUUID(), WardrobeItem.Kind.SKIN, "Favorite", true, "Collection",
+                "{\"skinId\":\"legacy\",\"username\":\"OldName\",\"skin\":{\"bodyCharacteristic\":\"Muscular.01\"}}");
         assertEquals(saved, api.hydrate(saved));
-        assertEquals(1, requests.size());
+        assertTrue(requests.isEmpty());
     }
     @Test void targetChangeAndMissingSlotBlockWrites() {
         slots();
@@ -239,12 +221,140 @@ class WardrobeApiClientTest {
         assertTrue(requests.isEmpty());
         assertEquals(0, tokenCalls);
     }
-    @Test void changedUsernameSkinDoesNotPairSavedDefinitionWithWrongPreview() {
-        json("/api/username/KayNeko", profile(ID, "KayNeko"));
-        html("/username/KayNeko", "<a class='wardrobe-card is-current' href='/skin/" + HASH + "'>Current</a>");
-        json("/api/skin/" + HASH, "{\"bodyCharacteristic\":\"Different\",\"cape\":null}");
-        assertThrows(IllegalStateException.class, () -> api.lookupSkin("KayNeko"));
+    @Test void noActiveSlotLoadsInstalledDefaultWithoutWriting(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+        LauncherSettings settings = defaultAssets(directory);
+        for (String active : List.of("null", "\"\"")) {
+            json("/player-skins", "{\"activeSkin\":" + active + ",\"maxSkins\":5,\"skins\":[]}");
+            var look = api.currentSkin(settings);
+            var payload = new ObjectMapper().readTree(look.payload());
+            assertEquals(ID, payload.path("playerUuid").asText());
+            assertEquals(new CosmeticCatalogClient(directory.resolve("Assets.zip")).defaultSkin(), payload.path("skin"));
+            assertEquals(look, api.hydrate(look));
+        }
+        assertEquals(List.of("GET", "GET"), methods);
     }
+
+    @Test void firstSkinIsCreatedAndActivatedWithoutInstalledAssets() throws Exception {
+        noActiveSlots(5);
+        afterWrite = () -> {
+            if (methods.getLast().equals("POST")) createdSlots(bodies.getLast());
+        };
+        api.apply(newLook(), settings());
+        assertEquals(List.of("GET", "POST", "GET", "PUT"), methods);
+        assertEquals(List.of("/player-skins", "/player-skins", "/player-skins", "/player-skins/active"), requests);
+        assertEquals("{\"skinId\":\"" + SLOT + "\"}", bodies.getLast());
+        assertTrue(headers.stream().allMatch("Bearer official-session"::equals));
+        assertEquals("Default.01", new ObjectMapper().readTree(new ObjectMapper().readTree(bodies.get(1)).path("skinData").asText())
+                .path("bodyCharacteristic").asText());
+    }
+
+    @Test void firstCapeUsesDefaultSkin(@org.junit.jupiter.api.io.TempDir java.nio.file.Path directory) throws Exception {
+        LauncherSettings settings = defaultAssets(directory);
+        noActiveSlots(5);
+        afterWrite = () -> { if (methods.getLast().equals("POST")) createdSlots(bodies.getLast()); };
+        api.apply(new WardrobeItem(UUID.randomUUID(), WardrobeItem.Kind.CAPE, "Cape", false, "", "{\"cape\":\"Cape.Green\"}"), settings);
+        var expected = new CosmeticCatalogClient(directory.resolve("Assets.zip")).defaultSkin().put("cape", "Cape.Green");
+        assertEquals(expected, new ObjectMapper().readTree(new ObjectMapper().readTree(bodies.get(1)).path("skinData").asText()));
+        assertEquals(List.of("GET", "POST", "GET", "PUT"), methods);
+    }
+
+    @Test void inactiveSavedSlotsArePreservedWhenApplying() throws Exception {
+        noActiveSlots(5);
+        var mapper = new ObjectMapper();
+        var initial = mapper.readTree(replies.get("/player-skins").body());
+        var saved = ((com.fasterxml.jackson.databind.node.ArrayNode) initial.path("skins")).addObject()
+                .put("id", OTHER_SLOT).put("name", "Saved outfit")
+                .put("skinData", "{\"bodyCharacteristic\":\"Original\"}");
+        json("/player-skins", initial.toString());
+        afterWrite = () -> {
+            if (methods.getLast().equals("POST")) {
+                createdSlots(bodies.getLast());
+                try {
+                    var refreshed = mapper.readTree(replies.get("/player-skins").body());
+                    ((com.fasterxml.jackson.databind.node.ArrayNode) refreshed.path("skins")).add(saved);
+                    json("/player-skins", refreshed.toString());
+                } catch (Exception e) { throw new AssertionError(e); }
+            }
+        };
+        api.apply(newLook(), settings());
+        assertEquals(List.of("GET", "POST", "GET", "PUT"), methods);
+        assertFalse(requests.contains("/player-skins/" + OTHER_SLOT));
+        assertEquals(SLOT, mapper.readTree(bodies.getLast()).path("skinId").asText());
+    }
+
+    @Test void creationFailureIsNotRetriedOrActivated() {
+        noActiveSlots(5);
+        replies.put("POST /player-skins", new Reply(403, "application/json", "{}"));
+        assertThrows(IllegalStateException.class, () -> api.apply(newLook(), settings()));
+        assertEquals(List.of("GET", "POST"), methods);
+        assertEquals(0, renewals);
+    }
+
+    @Test void activationFailureIsReportedWithoutRepeatingCreation() {
+        noActiveSlots(5);
+        afterWrite = () -> { if (methods.getLast().equals("POST")) createdSlots(bodies.getLast()); };
+        replies.put("/player-skins/active", new Reply(403, "application/json", "{}"));
+        assertThrows(IllegalStateException.class, () -> api.apply(newLook(), settings()));
+        assertEquals(List.of("GET", "POST", "GET", "PUT"), methods);
+        assertEquals(0, renewals);
+    }
+
+    @Test void fullSlotsWithoutActiveSkinDoNotOverwriteSavedOutfits() {
+        noActiveSlots(0);
+        assertThrows(IllegalStateException.class, () -> api.apply(newLook(), settings()));
+        assertEquals(List.of("GET"), methods);
+    }
+
+    @Test void profileChangeAfterCreationStopsActivation() {
+        var settings = settings();
+        noActiveSlots(5);
+        afterWrite = settings::removeActiveHytaleAuthSession;
+        assertThrows(IllegalStateException.class, () -> api.apply(newLook(), settings));
+        assertEquals(List.of("GET", "POST"), methods);
+    }
+
+    @Test void unidentifiedCreatedSlotDoesNotActivateAnotherOutfit() {
+        noActiveSlots(5);
+        assertThrows(IllegalStateException.class, () -> api.apply(newLook(), settings()));
+        assertEquals(List.of("GET", "POST", "GET"), methods);
+    }
+
+    private WardrobeItem newLook() {
+        return new WardrobeItem(UUID.randomUUID(), WardrobeItem.Kind.SKIN, "New look", false, "",
+                "{\"skin\":{\"bodyCharacteristic\":\"Default.01\"}}");
+    }
+
+    private void noActiveSlots(int max) {
+        json("/player-skins", "{\"activeSkin\":null,\"maxSkins\":" + max + ",\"skins\":[]}");
+        json("/player-skins/active", "{}");
+    }
+
+    private void createdSlots(String body) {
+        try {
+            var mapper = new ObjectMapper();
+            var root = mapper.createObjectNode().putNull("activeSkin").put("maxSkins", 5);
+            root.putArray("skins").add(((com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(body)).put("id", SLOT));
+            json("/player-skins", root.toString());
+        } catch (Exception e) { throw new AssertionError(e); }
+    }
+
+    private LauncherSettings defaultAssets(java.nio.file.Path directory) throws Exception {
+        Map<String, String> entries = new LinkedHashMap<>();
+        for (var category : CosmeticCatalogClient.categories()) entries.put(CosmeticCatalogClient.assetFile(category.key()), "[]");
+        entries.put("Cosmetics/CharacterCreator/GradientSets.json", "[]");
+        entries.put(CosmeticCatalogClient.assetFile("bodyCharacteristic"), "[{\"Id\":\"Default\",\"IsDefaultAsset\":true}]");
+        try (var zip = new java.util.zip.ZipOutputStream(java.nio.file.Files.newOutputStream(directory.resolve("Assets.zip")))) {
+            for (var entry : entries.entrySet()) {
+                zip.putNextEntry(new java.util.zip.ZipEntry(entry.getKey()));
+                zip.write(entry.getValue().getBytes(StandardCharsets.UTF_8));
+                zip.closeEntry();
+            }
+        }
+        var settings = settings();
+        settings.setHytaleGamePath(directory.toString());
+        return settings;
+    }
+
     private LauncherSettings settings() {
         var settings = new LauncherSettings();
         var session = new net.modtale.launcher.hytale.HytaleAuthSession();
@@ -311,15 +421,10 @@ class WardrobeApiClientTest {
         }
     }
 
-    private void archivedSkin() {
-        json("/api/skin/" + HASH, "{\"bodyCharacteristic\":\"Muscular.01\",\"cape\":null}");
-    }
     @Test void inputAndTransportRejectUntrustedDestinationsAndNonJson() {
-        assertThrows(IllegalArgumentException.class, () -> api.lookupSkin("../../secret"));
-        assertTrue(requests.isEmpty());
-        html("/api/username/KayNeko", "<html>Challenge</html>");
-        assertThrows(IllegalStateException.class, () -> api.lookupSkin("KayNeko"));
-        assertThrows(IllegalArgumentException.class, () -> new WardrobeApiClient(HttpClient.newHttpClient(), new HytaleAuthService(null, null), base, URI.create("https://evil.test/")));
+        html("/profile/uuid/" + ID, "<html>Challenge</html>");
+        assertThrows(IllegalStateException.class, () -> api.profile(UUID.fromString(ID), settings()));
+        assertThrows(IllegalArgumentException.class, () -> new WardrobeApiClient(HttpClient.newHttpClient(), new HytaleAuthService(null, null), URI.create("https://evil.test/")));
         assertThrows(IllegalArgumentException.class, () -> new WardrobeApiClient(HttpClient.newBuilder().followRedirects(HttpClient.Redirect.ALWAYS).build(), new HytaleAuthService(null, null)));
     }
     private static String profile(String uuid, String name) {

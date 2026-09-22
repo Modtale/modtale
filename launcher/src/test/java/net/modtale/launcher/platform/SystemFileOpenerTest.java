@@ -26,5 +26,6 @@ class SystemFileOpenerTest {
     void rejectsMissingInstallersBeforeStartingDesktopIntegration() {
         assertThrows(IOException.class, () -> SystemFileOpener.open(directory.resolve("missing.deb")));
         assertThrows(IOException.class, () -> SystemFileOpener.open(directory));
+        assertThrows(IOException.class, () -> SystemFileOpener.openDirectory(directory.resolve("missing")));
     }
 }

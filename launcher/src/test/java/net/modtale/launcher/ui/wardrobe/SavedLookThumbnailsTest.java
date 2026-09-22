@@ -45,6 +45,30 @@ class SavedLookThumbnailsTest {
         } finally { fx(() -> { thumbnails.close(); return null; }); }
     }
 
+    @Test
+    @EnabledIfEnvironmentVariable(named = "WARDROBE_ASSETS_ZIP", matches = ".+")
+    void profileWithoutSavedSkinRendersDefaultCharacterFace() throws Exception {
+        CountDownLatch started = new CountDownLatch(1);
+        try { Platform.startup(started::countDown); }
+        catch (IllegalStateException alreadyStarted) { started.countDown(); }
+        assertTrue(started.await(10, TimeUnit.SECONDS));
+        Path assets = Path.of(System.getenv("WARDROBE_ASSETS_ZIP"));
+        var defaultSkin = new CosmeticCatalogClient(assets).defaultSkin();
+        var emptySkin = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode();
+        SavedLookThumbnails thumbnails = fx(SavedLookThumbnails::new);
+        try {
+            Image actual = fx(() -> thumbnails.load(assets, emptySkin, "face")).get(30, TimeUnit.SECONDS);
+            Image expected = fx(() -> thumbnails.load(assets, defaultSkin, "face")).get(30, TimeUnit.SECONDS);
+            int visible = 0;
+            for (int y = 0; y < 256; y++) for (int x = 0; x < 256; x++) {
+                int pixel = actual.getPixelReader().getArgb(x, y);
+                assertEquals(expected.getPixelReader().getArgb(x, y), pixel);
+                if ((pixel >>> 24) > 0) visible++;
+            }
+            assertTrue(visible > 2000, "A profile with no saved skin must still show a character face");
+        } finally { fx(() -> { thumbnails.close(); return null; }); }
+    }
+
     private void verifySavedCards(Path assets, com.fasterxml.jackson.databind.JsonNode skin) throws Exception {
         var store = new net.modtale.launcher.wardrobe.WardrobeStore(directory.resolve("looks"));
         var payload = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode().set("skin", skin);

@@ -12,7 +12,7 @@ version = configuredLauncherVersion
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(26)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 }
 
@@ -61,7 +61,7 @@ dependencies {
     implementation 'net.java.dev.jna:jna:5.19.1'
     implementation "org.openjfx:javafx-base:26.0.2:${javafxPlatform()}"
     if (currentOs.isLinux()) {
-        implementation "net.modtale.javafx:javafx-graphics:26.0.2-modtale.1:${javafxPlatform()}"
+        implementation "net.modtale.javafx:javafx-graphics:26.0.2-modtale.2:${javafxPlatform()}"
     } else {
         implementation "org.openjfx:javafx-graphics:26.0.2:${javafxPlatform()}"
     }
@@ -235,6 +235,34 @@ tasks.register('prepareJpackageInput', Sync) {
         exclude 'jna-*.jar'
     }
     from(packagedJna)
+    inputs.property('jarCompressionLevel', 9)
+    doLast {
+        long before = 0
+        long after = 0
+        fileTree(destinationDir) { include '*.jar' }.files.each { archive ->
+            before += archive.length()
+            def optimized = new File(temporaryDir, archive.name)
+            optimized.parentFile.mkdirs()
+            new java.util.zip.ZipFile(archive).withCloseable { source ->
+                new java.util.zip.ZipOutputStream(new FileOutputStream(optimized)).withCloseable { output ->
+                    output.setLevel(9)
+                    source.entries().each { original ->
+                        def entry = new java.util.zip.ZipEntry(original)
+                        entry.setMethod(java.util.zip.ZipEntry.DEFLATED)
+                        entry.setCompressedSize(-1)
+                        output.putNextEntry(entry)
+                        source.getInputStream(original).withCloseable { it.transferTo(output) }
+                        output.closeEntry()
+                    }
+                }
+            }
+            if (optimized.length() < archive.length()) {
+                java.nio.file.Files.move(optimized.toPath(), archive.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            }
+            after += archive.length()
+        }
+        logger.lifecycle("Packaged JARs: ${before} -> ${after} bytes (lossless compression)")
+    }
 }
 
 def jpackageExecutable = packagingJavaLauncher.map {
@@ -310,10 +338,61 @@ def metainfoContent = {
 """
 }
 
+def bootstrapTarget = layout.buildDirectory.dir('bootstrap-target')
+def bootstrapExecutable = bootstrapTarget.map {
+    it.file('release/modtale-bootstrap' + (currentOs.isWindows() ? '.exe' : ''))
+}
+tasks.register('buildBootstrap', Exec) {
+    inputs.dir('bootstrap/src')
+    inputs.files('bootstrap/Cargo.toml', 'bootstrap/Cargo.lock', 'bootstrap/build.rs')
+    outputs.file(bootstrapExecutable)
+    environment 'CARGO_TARGET_DIR', bootstrapTarget.get().asFile.absolutePath
+    commandLine 'cargo', 'build', '--locked', '--release', '--manifest-path', file('bootstrap/Cargo.toml').absolutePath
+}
+tasks.register('testBootstrap', Exec) {
+    environment 'CARGO_TARGET_DIR', bootstrapTarget.get().asFile.absolutePath
+    commandLine 'cargo', 'test', '--locked', '--manifest-path', file('bootstrap/Cargo.toml').absolutePath
+}
+tasks.named('check') { dependsOn tasks.named('testBootstrap') }
+
+// Keep jpackage's native bundle/installer metadata, then replace the VM-dependent entry point.
+def installBootstrap = { File image ->
+    def treeSize = { File root ->
+        long bytes = 0
+        root.eachFileRecurse(groovy.io.FileType.FILES) { bytes += it.length() }
+        bytes
+    }
+    long originalBytes = treeSize(image)
+    def appDir = new File(image, currentOs.isWindows() ? 'app' : currentOs.isMacOsX() ? 'Contents/app' : 'lib/app')
+    def entry = new File(image, currentOs.isWindows() ? "${appDisplayName}.exe"
+            : currentOs.isMacOsX() ? "Contents/MacOS/${appDisplayName}" : "bin/${appDisplayName}")
+    delete entry
+    java.nio.file.Files.copy(bootstrapExecutable.get().asFile.toPath(), entry.toPath())
+    entry.setExecutable(true, false)
+    new File(appDir, 'bootstrap.json').text = groovy.json.JsonOutput.toJson([
+            jvm_args: ['-Dfile.encoding=UTF-8'] + launcherJvmArgs
+    ])
+    delete new File(image, currentOs.isWindows() ? 'runtime' : currentOs.isMacOsX() ? 'Contents/runtime' : 'lib/runtime')
+    if (currentOs.isLinux()) { delete new File(image, 'lib/libapplauncher.so') }
+    if (currentOs.isMacOsX()) {
+        // Replacing the executable invalidates jpackage's ad-hoc signature.
+        runExternalCommand(['codesign', '--force', '--deep', '--sign', '-', image.absolutePath])
+    }
+    long finalBytes = treeSize(image)
+    def report = layout.buildDirectory.file('reports/package-size.json').get().asFile
+    report.parentFile.mkdirs()
+    report.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson([
+            os: System.getProperty('os.name'), arch: System.getProperty('os.arch'),
+            withRuntimeBytes: originalBytes, packageBytes: finalBytes,
+            bootstrapBytes: entry.length(), savedBytes: originalBytes - finalBytes
+    ]))
+    logger.lifecycle("Application image: ${originalBytes} -> ${finalBytes} bytes")
+}
+
 def configureJpackageTask = { TaskProvider<Exec> packageTask, String packageType, Closure<Boolean> hostPredicate, Closure<List<String>> platformArgs ->
     packageTask.configure {
         group = 'distribution'
-        dependsOn tasks.named('prepareJpackageInput')
+        dependsOn tasks.named('jpackageAppImage')
         onlyIf {
             hostPredicate.call()
         }
@@ -330,15 +409,18 @@ def configureJpackageTask = { TaskProvider<Exec> packageTask, String packageType
                     executable.absolutePath,
                     '--type', packageType,
                     '--dest', distributionDirectory.get().asFile.absolutePath,
-                    '--temp', layout.buildDirectory.dir("jpackage/tmp/${name}").get().asFile.absolutePath
-            ] + commonJpackageArgs.call() + installerJpackageArgs.call() + platformArgs.call())
+                    '--temp', layout.buildDirectory.dir("jpackage/tmp/${name}").get().asFile.absolutePath,
+                    '--name', appDisplayName,
+                    '--app-version', jpackageAppVersion,
+                    '--app-image', layout.buildDirectory.dir('jpackage/app-image').get().dir(appDisplayName + (currentOs.isMacOsX() ? '.app' : '')).asFile.absolutePath
+            ] + installerJpackageArgs.call() + platformArgs.call())
         }
     }
 }
 
 configureJpackageTask(
         tasks.register('packageWindows', Exec) {
-            description = 'Builds a self-contained Windows .exe installer with an embedded Java runtime.'
+            description = 'Builds a self-contained Windows .exe installer with automatic Java runtime setup.'
         },
         windowsPackageType,
         { currentOs.isWindows() },
@@ -361,7 +443,7 @@ configureJpackageTask(
 
 configureJpackageTask(
         tasks.register('packageMac', Exec) {
-            description = 'Builds a self-contained macOS .dmg containing a native .app bundle and embedded Java runtime.'
+            description = 'Builds a self-contained macOS .dmg containing a native .app bundle and automatic Java runtime setup.'
         },
         macPackageType,
         { currentOs.isMacOsX() },
@@ -376,7 +458,7 @@ configureJpackageTask(
 tasks.register('prepareLinuxAppImageRuntime', Exec) {
     group = 'distribution'
     description = 'Builds the self-contained Linux runtime image used by the AppImage package.'
-    dependsOn tasks.named('prepareJpackageInput')
+    dependsOn tasks.named('prepareJpackageInput'), tasks.named('buildBootstrap')
     onlyIf {
         currentOs.isLinux()
     }
@@ -458,7 +540,7 @@ exec "$APPDIR/bin/Modtale Launcher" "$@"
 
 tasks.register('packageLinux', Exec) {
     group = 'distribution'
-    description = 'Builds a self-contained Linux AppImage with an embedded Java runtime.'
+    description = 'Builds a self-contained Linux AppImage with automatic Java runtime setup.'
     dependsOn tasks.named('prepareLinuxAppDir')
     onlyIf {
         currentOs.isLinux()
@@ -805,6 +887,7 @@ exec "\$APPDIR/bin/${appDisplayName}" "\$@"
                 '--socket=wayland',
                 '--device=dri',
                 '--filesystem=home',
+                '--filesystem=~/.var/app/com.hypixel.HytaleLauncher/data/Hytale/install:ro',
                 '--talk-name=org.freedesktop.portal.Desktop',
                 buildDir.absolutePath
         ])
@@ -840,7 +923,7 @@ tasks.register('packageAll') {
 tasks.register('jpackageAppImage', Exec) {
     group = 'distribution'
     description = 'Builds a self-contained unpacked app image for the current host OS.'
-    dependsOn tasks.named('prepareJpackageInput')
+    dependsOn tasks.named('prepareJpackageInput'), tasks.named('buildBootstrap')
     doFirst {
         def executable = jpackageExecutable.get()
         if (!executable.exists()) {
@@ -861,10 +944,11 @@ tasks.register('jpackageAppImage', Exec) {
 ['jpackageAppImage', 'prepareLinuxAppImageRuntime'].each { taskName ->
     tasks.named(taskName) {
         doLast {
+            def imageRoot = taskName == 'jpackageAppImage'
+                    ? layout.buildDirectory.dir('jpackage/app-image').get().asFile
+                    : linuxAppImageDirectory.get().asFile
+            installBootstrap(new File(imageRoot, appDisplayName + (currentOs.isMacOsX() ? '.app' : '')))
             if (currentOs.isLinux()) {
-                def imageRoot = taskName == 'jpackageAppImage'
-                        ? layout.buildDirectory.dir('jpackage/app-image').get().asFile
-                        : linuxAppImageDirectory.get().asFile
                 def stripTool = resolveExecutable('strip', 'strip', 'Install binutils to package the Linux runtime.')
                 fileTree(imageRoot) { include '**/*.so' }.files.each { nativeLibrary ->
                     runExternalCommand([stripTool, '--strip-unneeded', nativeLibrary.absolutePath])
@@ -895,6 +979,7 @@ tasks.named('installDist') {
 }
 
 tasks.withType(JavaCompile).configureEach {
+    options.release = 25
     options.encoding = 'UTF-8'
     options.compilerArgs += ['-parameters']
 }

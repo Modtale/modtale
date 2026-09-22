@@ -35,7 +35,7 @@ class LibraryArtifactIdentityReconcilerTest {
     }
 
     @Test
-    void canonicalizesACurseForgeInstallToTheSameModtaleBinary() {
+    void preservesTheSelectedProviderEvenForCrossPublishedBinaries() {
         InstalledProject curseForge = new InstalledProject("curseforge:42", "my-mod", "My Mod", "PLUGIN", "1.0",
                 "99", "", Instant.EPOCH, Instant.EPOCH, List.of("mods/my-mod.jar"), List.of(), List.of(),
                 InstalledProject.SOURCE_CURSEFORGE, InstalledProject.INSTALL_DIRECT, false, List.of());
@@ -44,8 +44,13 @@ class LibraryArtifactIdentityReconcilerTest {
 
         var result = LibraryArtifactIdentityReconciler.reconcile(List.of(curseForge), List.of(canonical));
 
-        assertEquals(1, result.resolvedCount());
-        assertEquals("modtale-id", result.projects().getFirst().projectId());
-        assertEquals(InstalledProject.SOURCE_MODTALE, result.projects().getFirst().source());
+        assertEquals(0, result.resolvedCount());
+        assertEquals(curseForge, result.projects().getFirst());
+
+        InstalledProject modtale = new InstalledProject("modtale-id", "my-mod", "My Mod", "PLUGIN", "1.0",
+                "modtale-version", "", Instant.EPOCH, Instant.EPOCH, List.of("mods/my-mod.jar"), List.of(), List.of());
+        ArtifactIdentity.Match cfMatch = new ArtifactIdentity.Match("mods/my-mod.jar", "CURSEFORGE", "curseforge:42",
+                "my-mod", "My Mod", "MOD", "1.0", "99", "curseforge-fingerprint", 100);
+        assertEquals(modtale, LibraryArtifactIdentityReconciler.reconcile(List.of(modtale), List.of(cfMatch)).projects().getFirst());
     }
 }

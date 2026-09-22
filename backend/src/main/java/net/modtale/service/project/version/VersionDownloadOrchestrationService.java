@@ -134,7 +134,7 @@ public class VersionDownloadOrchestrationService {
     ) throws IOException {
         DownloadTokenService.DownloadToken downloadToken = validateToken(token,
                 "This download link is invalid, expired, or has already been used.");
-        DownloadContext context = resolveDownloadContext(downloadToken, apiRole, referer, remoteAddress, forwardedFor, currentUser);
+        DownloadContext context = resolveDownloadContext(downloadToken, apiRole, referer, remoteAddress, forwardedFor, currentUser, launcherClient);
         Project project = getRawProjectOrThrow(downloadToken.getProjectId(),
                 "We couldn't find the project for this download link.");
         ensureReadable(project, context.currentUser());
@@ -188,7 +188,7 @@ public class VersionDownloadOrchestrationService {
     ) throws IOException {
         DownloadTokenService.DownloadToken downloadToken = validateToken(token,
                 "This bundle download link is invalid, expired, or has already been used.");
-        DownloadContext context = resolveDownloadContext(downloadToken, apiRole, referer, remoteAddress, forwardedFor, currentUser);
+        DownloadContext context = resolveDownloadContext(downloadToken, apiRole, referer, remoteAddress, forwardedFor, currentUser, launcherClient);
         Project project = getRawProjectOrThrow(downloadToken.getProjectId(),
                 "We couldn't find the project for this bundle download link.");
         ensureReadable(project, context.currentUser());
@@ -224,12 +224,13 @@ public class VersionDownloadOrchestrationService {
             String referer,
             String remoteAddress,
             String forwardedFor,
-            User currentUser
+            User currentUser,
+            boolean launcherClient
     ) {
         User effectiveUser = requireTokenUser(downloadToken, currentUser);
         boolean apiRequest = apiRole || referer == null || !referer.startsWith(frontendUrl);
         String clientIp = forwardedFor == null ? remoteAddress : forwardedFor.split(",")[0].trim();
-        return new DownloadContext(apiRequest, clientIp, effectiveUser);
+        return new DownloadContext(apiRequest, clientIp, effectiveUser, launcherClient);
     }
 
     private DownloadTokenService.DownloadToken validateToken(String token, String failureMessage) {
@@ -321,7 +322,7 @@ public class VersionDownloadOrchestrationService {
 
     private void trackDownload(Project project, String versionId, DownloadContext context) {
         if (analyticsEligibilityService.shouldCountProjectEngagement(project, context.currentUser())) {
-            trackingService.logDownload(project.getId(), versionId, project.getAuthor(), context.apiRequest(), context.clientIp());
+            trackingService.logDownload(project.getId(), versionId, project.getAuthor(), context.apiRequest(), context.clientIp(), context.launcherClient());
         }
     }
 
@@ -337,7 +338,8 @@ public class VersionDownloadOrchestrationService {
                     null,
                     dependencyProject != null ? dependencyProject.getAuthor() : null,
                     context.apiRequest(),
-                    context.clientIp()
+                    context.clientIp(),
+                    context.launcherClient()
             );
         }
     }
@@ -360,6 +362,6 @@ public class VersionDownloadOrchestrationService {
         return filename;
     }
 
-    private record DownloadContext(boolean apiRequest, String clientIp, User currentUser) {
+    private record DownloadContext(boolean apiRequest, String clientIp, User currentUser, boolean launcherClient) {
     }
 }

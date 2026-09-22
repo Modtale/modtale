@@ -1,7 +1,8 @@
+import { useNewsPost, useNewsPosts } from '@/modules/news/api/useNews';
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useLocation } from 'react-router-dom';
-import { NEWS_POSTS, getAbsoluteUrl, getNewsPostBySlug } from '@/data/news';
+import { getAbsoluteUrl } from '@/data/news';
 import { DEFAULT_SEO, ROUTE_SEO, generateDynamicSEO } from '@/data/seo-constants';
 import { buildCanonicalUrl, getRobotsDirective, isBrowseRoutePath, normalizeSeoPath } from '@/utils/seo';
 
@@ -30,7 +31,8 @@ export const SEOHead: React.FC = () => {
         description = dynamicSEO.description;
     }
 
-    const newsPost = path.startsWith('/news/') ? getNewsPostBySlug(path.slice('/news/'.length)) : undefined;
+    const { post: newsPost } = useNewsPost(path.startsWith('/news/') ? path.slice('/news/'.length) : undefined);
+    const { posts: newsPosts } = useNewsPosts(path === '/news');
     const isNews = path === '/news' || Boolean(newsPost);
     if (path === '/news') {
         title = 'Modtale News | Product Updates and Creator Notes';
@@ -40,7 +42,7 @@ export const SEOHead: React.FC = () => {
         description = newsPost.description;
         keywords = newsPost.tags.join(', ');
     }
-    const newsImage = isNews ? getAbsoluteUrl((newsPost || NEWS_POSTS[0]).socialImage) : undefined;
+    const newsImage = isNews ? getAbsoluteUrl((newsPost || newsPosts[0])?.socialImage || '/assets/logo_light.svg') : undefined;
     const canonicalUrl = buildCanonicalUrl(path, searchParams);
     const robots = getRobotsDirective(path, searchParams);
 

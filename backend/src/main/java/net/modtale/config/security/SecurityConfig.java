@@ -292,6 +292,8 @@ public class SecurityConfig {
                         .requestMatchers("/client-metadata.json").permitAll()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/projects/**",
+                                "/api/v1/news",
+                                "/api/v1/news/**",
                                 "/api/v1/tags",
                                 "/api/v1/files/**",
                                 "/api/v1/user/profile/**",
@@ -308,7 +310,7 @@ public class SecurityConfig {
                                 "/api/v1/analytics/platform/stats",
                                 "/api/v1/wiki/**"
                         ).permitAll()
-                        .requestMatchers(HttpMethod.HEAD, "/api/v1/projects/**", "/api/v1/tags", "/api/v1/files/**", "/api/v1/user/profile/**", "/api/v1/og/**", "/api/v1/lists/**").permitAll()
+                        .requestMatchers(HttpMethod.HEAD, "/api/v1/news", "/api/v1/news/**", "/api/v1/projects/**", "/api/v1/tags", "/api/v1/files/**", "/api/v1/user/profile/**", "/api/v1/og/**", "/api/v1/lists/**").permitAll()
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/projects/external/identify",
                                 "/api/v1/users/batch"

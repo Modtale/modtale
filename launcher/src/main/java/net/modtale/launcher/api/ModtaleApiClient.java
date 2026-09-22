@@ -41,7 +41,7 @@ public class ModtaleApiClient {
     public static final String DEFAULT_SITE_BASE_URL = "https://modtale.net";
 
     private final CookieManager cookieManager;
-    private final ModtaleApiTransport transport;
+    private final JsonApiTransport transport;
     private final ModtaleDownloadClient downloadClient;
     private final CurseForgeClient curseForgeClient;
     private final CurseForgeCommentsClient curseForgeCommentsClient;
@@ -93,7 +93,7 @@ public class ModtaleApiClient {
             CurseForgeCommentsClient curseForgeCommentsClient
     ) {
         this.cookieManager = cookieManager;
-        this.transport = new ModtaleApiTransport(httpClient, responseCache, this::csrfToken);
+        this.transport = new JsonApiTransport(httpClient, responseCache, this::csrfToken);
         this.downloadClient = new ModtaleDownloadClient(httpClient, this::apiBaseUri);
         this.curseForgeClient = new CurseForgeClient(httpClient, responseCache);
         this.curseForgeCommentsClient = curseForgeCommentsClient == null
@@ -205,6 +205,10 @@ public class ModtaleApiClient {
 
     public DownloadUrlResponse getCurseForgeDownloadUrl(long projectId, long fileId) {
         return curseForgeClient.download(projectId, fileId);
+    }
+
+    public com.fasterxml.jackson.databind.JsonNode matchCurseForgeFiles(List<Long> fingerprints) {
+        return curseForgeClient.matchFiles(fingerprints);
     }
 
     public ArtifactIdentity.Response identifyArtifacts(List<ArtifactIdentity.Artifact> artifacts) {

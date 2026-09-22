@@ -54,8 +54,13 @@ final class LibraryWorldRenderer {
     private static final PseudoClass CONTENTS_HOVERED = PseudoClass.getPseudoClass("contents-hovered");
 
     private List<String> knownGameVersions = List.of();
+    private String currentGameVersion = "";
+    void setCurrentGameVersion(String version) { currentGameVersion = version == null ? "" : version; }
     private String librarySearch = "";
     void setKnownGameVersions(List<String> versions) { knownGameVersions = List.copyOf(versions); }
+
+    private Consumer<HytaleWorld> editWorldSettings = ignored -> {};
+    void setWorldSettingsAction(Consumer<HytaleWorld> action) { editWorldSettings = action; }
 
     private Consumer<ProjectSummary> openProject = ignored -> {};
     private Consumer<ProjectSummary> openCreator = ignored -> {};
@@ -192,14 +197,22 @@ final class LibraryWorldRenderer {
         pack.setMinHeight(40);
         pack.setPrefHeight(40);
         pack.setMaxHeight(40);
-        actions.getChildren().addAll(tools, pack);
+        Button settings = secondaryButton("World settings");
+        settings.getStyleClass().addAll("small", "library-action-emphasis");
+        settings.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.SLIDERS, 14));
+        settings.setMinHeight(40);
+        settings.setPrefHeight(40);
+        settings.setMaxHeight(40);
+        settings.setAccessibleText("World settings");
+        settings.setOnAction(event -> editWorldSettings.accept(model.world()));
+        actions.getChildren().addAll(tools, settings, pack);
         actions.setMinWidth(Region.USE_PREF_SIZE);
 
         row.getChildren().addAll(icon, copy);
         actions.setAlignment(Pos.CENTER_LEFT);
         section.getChildren().addAll(row, actions);
         section.widthProperty().addListener((observable, previous, width) -> {
-            boolean inline = width.doubleValue() >= 720;
+            boolean inline = width.doubleValue() >= 920;
             if (inline && !row.getChildren().contains(actions)) {
                 section.getChildren().remove(actions);
                 row.getChildren().add(actions);
@@ -761,6 +774,18 @@ final class LibraryWorldRenderer {
             Label compatibility = versionMetadata(ManifestVersionLabel.format(requirement, knownGameVersions), "Compatible versions", "build");
             compatibility.setTooltip(new Tooltip("Manifest ServerVersion: " + requirement));
             row.getChildren().add(compatibility);
+            if (ManifestVersionCompatibility.incompatible(requirement, currentGameVersion)) {
+                String message = "This mod targets " + requirement + " but the current game version is "
+                        + currentGameVersion + ". It may not work correctly.";
+                Label warning = new Label(null, LauncherIcons.icon(LauncherIcons.Glyph.ALERT_TRIANGLE, 16));
+                warning.getStyleClass().add("library-compatibility-warning");
+                warning.setAccessibleText(message);
+                Tooltip tooltip = new Tooltip(message);
+                tooltip.setWrapText(true);
+                tooltip.setMaxWidth(440);
+                warning.setTooltip(tooltip);
+                row.getChildren().add(warning);
+            }
         }
     }
 

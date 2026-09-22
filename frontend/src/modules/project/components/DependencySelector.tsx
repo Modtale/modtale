@@ -1,3 +1,6 @@
+import { formatCompatibleVersions } from '@/utils/manifestVersionLabel';
+import { Checkbox } from '@/components/ui/Checkbox';
+import { modpackDialog } from './modpackDialogStyles';
 import { useDialogFocus } from '@/hooks/useDialogFocus';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CheckSquare, ChevronDown, ExternalLink, FileText, Loader2, PackagePlus, Plus, RefreshCw, Search, ShieldCheck, ToggleLeft, ToggleRight, X } from 'lucide-react';
@@ -8,7 +11,7 @@ import { BACKEND_URL } from '@/utils/api';
 import type { DependencySource, DependencyType, ExternalProjectFile, ExternalProjectReference, Project, ProjectDependency, ProjectVersion } from '@/types';
 import { VersionRelationKind } from '@/types';
 import { useScrollLock } from '@/hooks/useScrollLock';
-import { dependencyProjectKey, getDependencyType, isExternalDependency, isOptionalDependency, normalizeDependencyReference } from '../utils/dependencyEntries';
+import { dependencyProjectKey, getDependencyType, isExternalDependency, normalizeDependencyReference } from '../utils/dependencyEntries';
 import { useToast } from '@/components/ui/Toast';
 import { ModalPortal } from '@/components/ui/ModalPortal';
 
@@ -24,6 +27,7 @@ interface DependencySelectorProps {
     currentProjectId?: string;
     isModpack?: boolean;
     disabled?: boolean;
+    disableExternalReferences?: boolean;
     renderDependencyDetails?: (dependency: ProjectDependency) => React.ReactNode;
 }
 
@@ -184,36 +188,58 @@ const DependencyPrompt = ({
 }: {
     projectTitle: string;
     dependencies: ProjectDependency[];
-    onAdd: () => void;
+    onAdd: (dependencies: ProjectDependency[]) => void;
     onClose: () => void;
 }) => {
     useScrollLock(true);
+    const [selected, setSelected] = useState(() => new Set(dependencies.map(dependencyProjectKey)));
+    const [projects, setProjects] = useState<Record<string, Project>>({});
+    useEffect(() => {
+        let cancelled = false;
+        Promise.all(dependencies.filter(dep => !isExternalDependency(dep)).map(async dep => {
+            try {
+                const [project, versions] = await Promise.all([projectClient.getProject(dep.projectId), projectClient.getProjectVersions(dep.projectId)]);
+                return [dep.projectId, { ...project, versions }] as const;
+            }
+            catch { return null; }
+        })).then(entries => {
+            if (!cancelled) setProjects(Object.fromEntries(entries.filter(entry => entry !== null)));
+        });
+        return () => { cancelled = true; };
+    }, [dependencies]);
     return (
         <div className={theme.components.modalOverlay}>
-            <div className="fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] w-[min(92vw,34rem)] max-h-[85dvh] flex flex-col z-[100] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 shadow-xl rounded-3xl overflow-hidden">
-                <div className="p-5 flex items-start justify-between gap-4 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/95">
+            <div role="dialog" aria-modal="true" aria-label={`Add dependencies for ${projectTitle}`} className={modpackDialog.content}>
+                <div className={modpackDialog.header}>
                     <div>
-                        <h3 className={`text-lg font-black ${theme.colors.textPrimary}`}>Add Dependencies</h3>
-                        <p className={`text-sm ${theme.colors.textMuted} mt-1`}>{projectTitle} needs {dependencies.length} project{dependencies.length === 1 ? '' : 's'} that are not in this pack yet.</p>
+                        <h3 className={modpackDialog.title}><PackagePlus className={`w-5 h-5 shrink-0 ${theme.colors.accent}`} />Add dependencies</h3>
                     </div>
                     <button type="button" onClick={onClose} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
                 </div>
-                <div className="p-4 space-y-2 overflow-y-auto">
-                    {dependencies.map(dep => (
-                        <div key={`${dep.projectId}:${dep.versionNumber}`} className={`p-3 rounded-xl border ${theme.colors.border} ${theme.colors.bgBase} flex items-center justify-between gap-3`}>
-                            <div className="min-w-0">
-                                <div className={`font-bold ${theme.colors.textPrimary} truncate`}>{dep.projectTitle || dep.projectId}</div>
-                                <div className={`text-xs ${theme.colors.textMuted} font-mono`}>v{dep.versionNumber}</div>
+                <div className={`${modpackDialog.body} !space-y-2`}>
+                    {dependencies.map(dep => {
+                        const project = projects[dep.projectId];
+                        const version = project?.versions?.find(version => version.versionNumber === dep.versionNumber);
+                        const games = version?.gameVersions || dep.externalGameVersions;
+                        const key = dependencyProjectKey(dep);
+                        return <label key={key} className={`${modpackDialog.row} flex items-center gap-3 cursor-pointer`}>
+                            <Checkbox checked={selected.has(key)} onChange={checked => setSelected(current => {
+                                const next = new Set(current);
+                                if (checked) next.add(key); else next.delete(key);
+                                return next;
+                            })} className="shrink-0" />
+                            <img src={getIconUrl(project?.imageUrl || dep.icon)} alt="" className="w-12 h-12 rounded-xl object-cover shrink-0" onError={event => { event.currentTarget.src = '/assets/favicon.svg'; }} />
+                            <div className="min-w-0 flex-1">
+                                <div className={`font-bold ${theme.colors.textPrimary}`}>{dep.projectTitle || project?.title || dep.projectId}</div>
+                                <div className={`text-xs ${theme.colors.textMuted} mt-1`}>{dep.versionNumber} · {games?.length ? `For ${formatCompatibleVersions(games)}` : 'Game versions unavailable'}</div>
                             </div>
-                            <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${isOptionalDependency(dep) ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'}`}>
-                                {getDependencyType(dep)}
-                            </span>
-                        </div>
-                    ))}
+                            <span className={`shrink-0 text-[10px] font-bold px-2 py-1 rounded-md ${getDependencyType(dep) === 'OPTIONAL' ? 'bg-blue-500/10 text-blue-500' : 'bg-amber-500/10 text-amber-500'}`}>{getDependencyType(dep) === 'OPTIONAL' ? 'Optional' : getDependencyType(dep) === 'EMBEDDED' ? 'Embedded' : 'Required'}</span>
+                        </label>;
+                    })}
                 </div>
-                <div className="p-4 flex justify-end gap-3 border-t border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-800/95">
+                <div className={modpackDialog.footer}>
                     <button type="button" onClick={onClose} className={`px-4 py-2 font-bold rounded-lg ${theme.colors.textMuted} ${theme.colors.bgSurfaceHover}`}>Skip</button>
-                    <button type="button" onClick={onAdd} className={`px-5 py-2 font-bold rounded-lg ${theme.components.buttonPrimary} flex items-center gap-2`}><PackagePlus className="w-4 h-4" /> Add All</button>
+                    <button type="button" disabled={!selected.size} onClick={() => onAdd(dependencies.filter(dep => selected.has(dependencyProjectKey(dep))))} className={`disabled:opacity-50 px-5 py-2 font-bold rounded-lg ${theme.components.buttonPrimary} flex items-center gap-2`}><PackagePlus className="w-4 h-4" /> Add {selected.size === dependencies.length ? 'All' : 'Selected'}</button>
                 </div>
             </div>
         </div>
@@ -230,7 +256,8 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
     currentProjectId,
     isModpack = false,
     renderDependencyDetails,
-    disabled
+    disabled,
+    disableExternalReferences = false
 }) => {
     const [search, setSearch] = useState('');
     const [results, setResults] = useState<Project[]>([]);
@@ -613,9 +640,9 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                     projectTitle={pendingPrompt.projectTitle}
                     dependencies={pendingPrompt.dependencies}
                     onClose={() => setPendingPrompt(null)}
-                    onAdd={() => {
+                    onAdd={selected => {
                         const existingKeys = new Set(pendingPrompt.baseDeps.map(dependencyProjectKey));
-                        const toAdd = pendingPrompt.dependencies.filter(dep => !existingKeys.has(dependencyProjectKey(dep)));
+                        const toAdd = selected.filter(dep => !existingKeys.has(dependencyProjectKey(dep)));
                         onChange([...pendingPrompt.baseDeps, ...toAdd]);
                         setPendingPrompt(null);
                     }}
@@ -625,16 +652,16 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
             {selectedProject && !disabled && !isIncompatibilityMode && (
                 <ModalPortal>
                 <div className={theme.components.modalOverlay}>
-                    <div role="dialog" aria-modal="true" aria-label="Select mod version" className={`${theme.components.modalContent} w-full max-w-md max-h-[90dvh]`} onKeyDown={event => { if (event.key === 'Escape') setSelectedProject(null); }}>
-                        <div className={theme.components.modalHeader}>
+                    <div role="dialog" aria-modal="true" aria-label="Select mod version" className={`${modpackDialog.content}`} onKeyDown={event => { if (event.key === 'Escape') setSelectedProject(null); }}>
+                        <div className={modpackDialog.header}>
                             <div>
-                                <h3 className={`font-bold ${theme.colors.textPrimary}`}>Select Version</h3>
+                                <h3 className={modpackDialog.title}><PackagePlus className={`w-5 h-5 shrink-0 ${theme.colors.accent}`} />Select Version</h3>
                                 <p className={`text-xs ${theme.colors.textMuted} mt-1 truncate max-w-[20rem]`}>{selectedProject.title}</p>
                             </div>
-                            <button type="button" onClick={() => setSelectedProject(null)} aria-label="Close version picker" className={theme.components.iconButton}><X className="w-5 h-5" /></button>
+                            <button type="button" onClick={() => setSelectedProject(null)} aria-label="Close version picker" className={modpackDialog.close}><X className="w-5 h-5" /></button>
                         </div>
 
-                        <div className="px-6 pt-6 space-y-3">
+                        <div className="px-6 py-2 space-y-3">
                             <div className="flex items-center gap-2">
                                 <span className={`text-xs ${theme.colors.textMuted}`}>Show Alpha/Beta</span>
                                 <button type="button" onClick={() => setShowAlphaBeta(!showAlphaBeta)} className={`transition-colors ${showAlphaBeta ? theme.colors.accent : theme.colors.textMuted}`}>
@@ -648,7 +675,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                             </label>
                         </div>
 
-                        <div className={`${theme.components.modalBody} !space-y-2`}>
+                        <div className={`${modpackDialog.body} !pt-2 !pb-4 !space-y-2`}>
                             {loadingProjectVersions ? (
                                 <div className={`p-4 text-center text-xs ${theme.colors.textMuted} flex items-center justify-center gap-2`}>
                                     <Loader2 className="w-4 h-4 animate-spin" /> Loading versions...
@@ -660,7 +687,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                                         key={version.id}
                                         type="button"
                                         onClick={() => addDependency(buildModtaleDependency(selectedProject, version.versionNumber, isModpack ? 'REQUIRED' : dependencyType), selectedProject, version)}
-                                        className={`w-full text-left px-4 py-3 flex justify-between items-center rounded-xl transition-all shadow-sm border ${!isCompatible ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-white/10 hover:border-modtale-accent/40 dark:hover:border-modtale-accent/50'}`}
+                                        className={`w-full text-left px-4 py-3 flex justify-between items-center rounded-xl transition-colors border ${!isCompatible ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30' : `${theme.colors.bgBase} ${theme.colors.border} hover:border-modtale-accent dark:hover:border-modtale-accent` }`}
                                     >
                                         <div>
                                             <div className="flex items-center gap-2">
@@ -679,7 +706,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                             )}
                         </div>
                         {targetGameVersion && (
-                            <div className={`${theme.components.modalFooter} !justify-center`}>
+                            <div className={`${modpackDialog.footer} !justify-center`}>
                                 <button type="button" onClick={() => setShowIncompatibleVersions(!showIncompatibleVersions)} className={`text-xs font-bold ${theme.colors.accent} hover:underline`}>
                                     {showIncompatibleVersions ? 'Hide' : 'Show'} incompatible versions
                                 </button>
@@ -690,20 +717,20 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                 </ModalPortal>
             )}
 
-            {showExternalModal && !disabled && !isIncompatibilityMode && (
+            {showExternalModal && !disabled && !disableExternalReferences && !isIncompatibilityMode && (
                 <ModalPortal><div className={theme.components.modalOverlay} onMouseDown={event => { if (event.target === event.currentTarget) setShowExternalModal(false); }}>
-                    <div ref={externalDialogRef} role="dialog" aria-modal="true" aria-label="Add external mod" className={`${theme.components.modalContent} w-full max-w-md max-h-[90dvh]`} onKeyDown={event => { if (event.key === 'Escape') setShowExternalModal(false); }}>
-                        <div className={theme.components.modalHeader}>
-                            <h3 className={`font-bold ${theme.colors.textPrimary}`}>Add external mod</h3>
-                            <button type="button" onClick={() => setShowExternalModal(false)} aria-label="Close external mod" className={theme.components.iconButton}><X className="w-4 h-4" /></button>
+                    <div ref={externalDialogRef} role="dialog" aria-modal="true" aria-label="Add external mod" className={`${modpackDialog.content}`} onKeyDown={event => { if (event.key === 'Escape') setShowExternalModal(false); }}>
+                        <div className={modpackDialog.header}>
+                            <h3 className={modpackDialog.title}><ExternalLink className={`w-5 h-5 shrink-0 ${theme.colors.accent}`} />Add external mod</h3>
+                            <button type="button" onClick={() => setShowExternalModal(false)} aria-label="Close external mod" className={modpackDialog.close}><X className="w-5 h-5" /></button>
                         </div>
-                        <div className={theme.components.modalBody}>
+                        <div className={modpackDialog.body}>
                             <label className={`block text-xs font-bold ${theme.colors.textSecondary}`}>Project or file link
                                 <input value={externalUrl} onChange={event => { setExternalUrl(event.target.value); setExternalTitle(''); setExternalVersion(''); setExternalConfirmed(false); setExternalSource(''); setExternalError(null); }} className={`${theme.components.inputField} mt-2`} placeholder="https://www.curseforge.com/hytale/…" />
                             </label>
-                            {!externalResolved && <p className={`text-xs ${theme.colors.textMuted}`}>Paste a Hytale mod link from CurseForge, GitHub, or another site.</p>}
+
                             {externalResolved && <>
-                                <div className="flex items-center gap-3 py-1">
+                                <div className={`${modpackDialog.row} flex items-center gap-3`}>
                                     <div className={`w-10 h-10 rounded-lg ${theme.colors.bgSurfaceAlt} flex items-center justify-center shrink-0 overflow-hidden ${theme.colors.textMuted}`}>
                                         {externalResolved.iconUrl ? <img src={externalResolved.iconUrl} alt="" className="w-full h-full object-cover" /> : <ExternalLink className="w-4 h-4" />}
                                     </div>
@@ -722,13 +749,13 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                                         <option value="REQUIRED">Required</option><option value="OPTIONAL">Optional</option>{!isModpack && <option value="EMBEDDED">Embedded</option>}
                                     </select>
                                 </label>
-                                {!externalResolved.hytaleProjectConfirmed && <label className={`flex gap-2 text-xs ${theme.colors.textSecondary}`}><input type="checkbox" checked={externalConfirmed} onChange={event => setExternalConfirmed(event.target.checked)} />This mod is for Hytale.</label>}
+                                {!externalResolved.hytaleProjectConfirmed && <label className={`flex gap-2 text-xs ${theme.colors.textSecondary}`}><input className="themed-checkbox" type="checkbox" checked={externalConfirmed} onChange={event => setExternalConfirmed(event.target.checked)} />This mod is for Hytale.</label>}
                                 {externalSuggestions.length > 0 && <div className={`text-xs ${theme.colors.textMuted}`}>Also on Modtale{externalSuggestions.map(project => <button key={project.id} type="button" onClick={() => { setShowExternalModal(false); void openVersionPicker(project); }} className={`block mt-2 ${theme.colors.accent} hover:underline`}>{project.title}</button>)}</div>}
-                                {externalResolved.source === 'CURSEFORGE' && <p className={`text-xs ${theme.colors.textMuted}`}>Requires Modtale Launcher. Players download this mod directly from CurseForge.</p>}
+                                {externalResolved.source === 'CURSEFORGE' && <p className={`text-xs ${theme.colors.textMuted}`}>Launcher installation only</p>}
                             </>}
                             {externalError && <p role="alert" className={`text-xs ${theme.colors.dangerText}`}>{externalError}</p>}
                         </div>
-                        <div className={`${theme.components.modalFooter} !justify-end gap-3`}>
+                        <div className={`${modpackDialog.footer} !justify-end gap-3`}>
                             <button type="button" onClick={() => setShowExternalModal(false)} className={theme.components.buttonGhost}>Cancel</button>
                             <button type="button" disabled={resolvingExternal || !externalUrl.trim()} onClick={() => { if (externalResolved) void addExternalReference(); else void resolveExternalDetails(); }} className={theme.components.buttonPrimary}>{resolvingExternal && <Loader2 className="w-4 h-4 animate-spin" />}{externalResolved ? 'Add mod' : 'Continue'}</button>
                         </div>
@@ -739,7 +766,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <h3 className={`font-bold ${theme.colors.textPrimary} flex items-center gap-2 text-sm uppercase tracking-wide`}><Search className="w-4 h-4" /> {effectiveLabel}</h3>
                 {!isIncompatibilityMode && (
-                    <button type="button" disabled={disabled} onClick={() => setShowExternalModal(true)} className={`text-xs font-bold px-3 py-2 rounded-lg border ${theme.colors.border} ${theme.colors.bgBase} ${theme.colors.textSecondary} hover:${theme.colors.textPrimary} flex items-center gap-2 ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}>
+                    <button type="button" disabled={disabled || disableExternalReferences} onClick={() => setShowExternalModal(true)} className={`text-xs font-bold px-3 py-2 rounded-lg border ${theme.colors.border} ${theme.colors.bgBase} ${theme.colors.textSecondary} flex items-center gap-2 ${disabled || disableExternalReferences ? 'opacity-60 cursor-not-allowed' : `hover:${theme.colors.textPrimary}`}`}>
                         <ExternalLink className="w-3.5 h-3.5" /> Add External
                     </button>
                 )}
@@ -769,7 +796,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                             <div key={`${dep.projectId}:${dep.versionNumber}`} className={`p-3 rounded-lg border ${theme.colors.border} flex items-center justify-between gap-3`}>
                                 <div className="min-w-0">
                                     <div className={`font-bold ${theme.colors.textPrimary} text-sm truncate`}>{dep.projectTitle || dep.projectId}</div>
-                                    <div className={`text-xs ${theme.colors.textMuted} font-mono`}>v{dep.versionNumber}</div>
+                                    <div className={`text-xs ${theme.colors.textMuted}`}>{dep.versionNumber}</div>
                                 </div>
                                 <button type="button" onClick={() => {
                                     const dependency = cloneDependencyForForm(dep);

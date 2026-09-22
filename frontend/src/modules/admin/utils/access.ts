@@ -1,4 +1,5 @@
 export enum AdminPermission {
+    NEWS_MANAGE = 'NEWS_MANAGE',
     PROJECT_REVIEW_READ = 'PROJECT_REVIEW_READ',
     PROJECT_REVIEW_DECIDE = 'PROJECT_REVIEW_DECIDE',
     PROJECT_MANAGE_READ = 'PROJECT_MANAGE_READ',
@@ -69,6 +70,7 @@ export const ADMIN_PERMISSION_GROUPS = [
     {
         group: 'Platform',
         permissions: [
+            { id: AdminPermission.NEWS_MANAGE, label: 'Manage News' },
             { id: AdminPermission.PLATFORM_ANALYTICS_READ, label: 'Read Platform Analytics' },
             { id: AdminPermission.AUDIT_LOG_READ, label: 'Read Audit Logs' },
             { id: AdminPermission.STATUS_INCIDENT_READ, label: 'Read Status Incidents' },

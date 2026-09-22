@@ -15,6 +15,10 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import net.modtale.launcher.settings.LauncherSettings;
 import net.modtale.launcher.settings.SettingsStore;
 import org.junit.jupiter.api.Test;
@@ -39,6 +43,57 @@ class HytaleAuthServiceTest {
     }
 
     @Test
+    void switchingProfileDiscardsOldTokensAndRequestsSelectedProfile() {
+        FakeHytaleApiClient api = new FakeHytaleApiClient();
+        SettingsStore store = new SettingsStore(tempDir.resolve("switch.json"));
+        HytaleAuthService auth = new HytaleAuthService(api, store);
+        LauncherSettings settings = new LauncherSettings();
+        HytaleAuthSession session = linkedAccount("previous-uuid", true);
+        session.setAccountOwnerId("owner");
+        session.setSessionToken(jwtWithExpiration(Instant.now().plusSeconds(3600)));
+        session.setIdentityToken("previous-identity");
+        session.setSessionProfileId("previous-uuid");
+        settings.setHytaleAuthSession(session);
+        auth.selectProfile(settings, new HytaleProfile("Wtrlmn", "player-uuid", "owner", 0));
+        assertEquals("Wtrlmn", session.getUsername());
+        assertEquals("", session.getSessionToken());
+        assertEquals("", session.getIdentityToken());
+        assertEquals("", store.load().getHytaleAuthSession().getSessionToken());
+        assertEquals("fresh-session-token", auth.freshSessionToken(settings));
+        assertEquals(1, api.createGameSessionCalls);
+        assertEquals("player-uuid", store.load().getHytaleAuthSession().getSessionProfileId());
+    }
+
+    @Test
+    void legacyOrMismatchedCachedSessionIsRefreshed() {
+        for (String binding : List.of("", "previous-uuid")) {
+            FakeHytaleApiClient api = new FakeHytaleApiClient();
+            HytaleAuthService auth = new HytaleAuthService(api, new SettingsStore(tempDir.resolve("legacy.json")));
+            LauncherSettings settings = new LauncherSettings();
+            HytaleAuthSession session = linkedAccount("player-uuid", true);
+            session.setSessionToken(jwtWithExpiration(Instant.now().plusSeconds(3600)));
+            session.setIdentityToken("old-identity");
+            session.setSessionProfileId(binding);
+            settings.setHytaleAuthSession(session);
+            assertEquals("fresh-session-token", auth.freshSessionToken(settings));
+            assertEquals(1, api.createGameSessionCalls);
+        }
+    }
+
+    @Test
+    void profileChangeDuringSessionCreationDoesNotSaveOldProfileTokens() {
+        FakeHytaleApiClient api = new FakeHytaleApiClient();
+        HytaleAuthService auth = new HytaleAuthService(api, new SettingsStore(tempDir.resolve("race.json")));
+        LauncherSettings settings = new LauncherSettings();
+        HytaleAuthSession session = linkedAccount("player-uuid", true);
+        settings.setHytaleAuthSession(session);
+        api.onCreateGameSession = () -> session.setUuid("other-uuid");
+        assertThrows(HytaleApiException.class, () -> auth.freshSessionToken(settings));
+        assertEquals("", session.getSessionToken());
+        assertEquals("", session.getSessionProfileId());
+    }
+
+    @Test
     void freshAccessTokenRefreshesAndPersistsRotationWithoutCreatingGameSession() {
         FakeHytaleApiClient apiClient = new FakeHytaleApiClient();
         SettingsStore store = new SettingsStore(tempDir.resolve("settings.json"));
@@ -57,6 +112,102 @@ class HytaleAuthServiceTest {
         assertEquals("fresh-access", authService.freshAccessToken(settings));
         assertEquals(1, apiClient.refreshTokenCalls);
         assertEquals(0, apiClient.createGameSessionCalls);
+    }
+
+    @Test
+    void concurrentExpiredTokenRequestsShareOnePersistedRefresh() throws Exception {
+        CountDownLatch refreshing = new CountDownLatch(1);
+        CountDownLatch releaseRefresh = new CountDownLatch(1);
+        AtomicInteger calls = new AtomicInteger();
+        HytaleApiClient api = new HytaleApiClient() {
+            @Override public TokenResponse refreshToken(String refreshToken) {
+                if (calls.incrementAndGet() > 1) {
+                    throw new HytaleApiException("invalid_grant", 400, null);
+                }
+                refreshing.countDown();
+                try {
+                    assertTrue(releaseRefresh.await(5, TimeUnit.SECONDS));
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                    throw new AssertionError(ex);
+                }
+                TokenResponse token = new TokenResponse();
+                token.accessToken = "renewed-access";
+                token.refreshToken = "rotated-refresh";
+                token.expiresIn = 3600;
+                return token;
+            }
+        };
+        SettingsStore store = new SettingsStore(tempDir.resolve("concurrent.json"));
+        LauncherSettings settings = new LauncherSettings();
+        settings.setHytaleAuthSession(linkedAccount("player-uuid", false));
+        HytaleAuthService auth = new HytaleAuthService(api, store);
+        FutureTask<String> first = new FutureTask<>(() -> auth.freshAccessToken(settings));
+        FutureTask<String> second = new FutureTask<>(() -> auth.freshAccessToken(settings));
+        Thread firstThread = new Thread(first);
+        Thread secondThread = new Thread(second);
+        firstThread.start();
+        try {
+            assertTrue(refreshing.await(5, TimeUnit.SECONDS));
+            secondThread.start();
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            while (secondThread.getState() != Thread.State.BLOCKED && !second.isDone()
+                    && System.nanoTime() < deadline) {
+                Thread.sleep(5);
+            }
+            assertEquals(Thread.State.BLOCKED, secondThread.getState());
+        } finally {
+            releaseRefresh.countDown();
+            firstThread.join(5000);
+            secondThread.join(5000);
+        }
+        assertEquals("renewed-access", first.get(5, TimeUnit.SECONDS));
+        assertEquals("renewed-access", second.get(5, TimeUnit.SECONDS));
+        assertEquals(1, calls.get());
+        assertEquals("rotated-refresh", store.load().getHytaleAuthSession().getRefreshToken());
+        assertEquals("renewed-access", new HytaleAuthService(api, store).freshAccessToken(store.load()));
+        assertEquals(1, calls.get());
+    }
+
+    @Test
+    void lateAccessTokenRejectionReusesAlreadyRefreshedCredentials() {
+        FakeHytaleApiClient api = new FakeHytaleApiClient();
+        SettingsStore store = new SettingsStore(tempDir.resolve("late-rejection.json"));
+        HytaleAuthService auth = new HytaleAuthService(api, store);
+        LauncherSettings settings = new LauncherSettings();
+        HytaleAuthSession session = linkedAccount("player-uuid", true);
+        settings.setHytaleAuthSession(session);
+        api.onFetchProfiles = () -> {
+            api.onFetchProfiles = () -> {};
+            // Simulate another request renewing while this request is in flight.
+            session.setExpiresAt(Instant.now().minusSeconds(1));
+            assertEquals("fresh-access", auth.freshAccessToken(settings));
+            throw new HytaleApiException("old access token rejected", 401, null);
+        };
+
+        auth.getProfilePlaytimeSeconds(settings);
+
+        assertEquals(1, api.refreshTokenCalls);
+        assertEquals(2, api.fetchProfilesCalls);
+        assertEquals("fresh-access", api.fetchProfilesAccessToken);
+        assertEquals("next-refresh-token", store.load().getHytaleAuthSession().getRefreshToken());
+    }
+
+    @Test
+    void temporaryRefreshFailuresKeepCredentialsForLaterRetry() {
+        for (int status : new int[] {-1, 429, 500, 503}) {
+            FakeHytaleApiClient api = new FakeHytaleApiClient();
+            SettingsStore store = new SettingsStore(tempDir.resolve("retry-" + status + ".json"));
+            LauncherSettings settings = new LauncherSettings();
+            settings.setHytaleAuthSession(linkedAccount("player-uuid", false));
+            store.save(settings);
+            HytaleAuthService auth = new HytaleAuthService(api, store);
+            api.refreshTokenFailure = new HytaleApiException("temporarily unavailable", status, null);
+            assertThrows(HytaleApiException.class, () -> auth.freshAccessToken(settings));
+            assertEquals("refresh-token", store.load().getHytaleAuthSession().getRefreshToken());
+            api.refreshTokenFailure = null;
+            assertEquals("fresh-access", auth.freshAccessToken(settings));
+        }
     }
 
     @Test
@@ -164,6 +315,7 @@ class HytaleAuthServiceTest {
         LauncherSettings settings = new LauncherSettings();
         HytaleAuthSession session = linkedAccount("player-uuid", true);
         String rejected = jwtWithExpiration(Instant.now().plusSeconds(3600));
+        session.setSessionProfileId("player-uuid");
         session.setSessionToken(rejected);
         session.setIdentityToken("identity");
         settings.setHytaleAuthSession(session);
@@ -180,6 +332,7 @@ class HytaleAuthServiceTest {
         LauncherSettings settings = new LauncherSettings();
         HytaleAuthSession session = linkedAccount("player-uuid", true);
         String replacement = jwtWithExpiration(Instant.now().plusSeconds(3600));
+        session.setSessionProfileId("player-uuid");
         session.setSessionToken(replacement);
         session.setIdentityToken("identity");
         settings.setHytaleAuthSession(session);
@@ -195,6 +348,7 @@ class HytaleAuthServiceTest {
         LauncherSettings settings = new LauncherSettings();
         HytaleAuthSession session = linkedAccount("player-uuid", true);
         String rejected = jwtWithExpiration(Instant.now().plusSeconds(3600));
+        session.setSessionProfileId("player-uuid");
         session.setSessionToken(rejected);
         session.setIdentityToken("identity");
         settings.setHytaleAuthSession(session);
@@ -215,6 +369,7 @@ class HytaleAuthServiceTest {
         session.setUuid("player-uuid");
         session.setUsername("Player");
         session.setExpiresAt(Instant.now().plusSeconds(600));
+        session.setSessionProfileId("player-uuid");
         session.setSessionToken("expired-session");
         session.setIdentityToken("expired-identity");
         settings.setHytaleAuthSession(session);
@@ -262,6 +417,7 @@ class HytaleAuthServiceTest {
         session.setUuid("player-uuid");
         session.setUsername("Player");
         session.setIdentityToken("cached-identity-token");
+        session.setSessionProfileId("player-uuid");
         session.setSessionToken("cached-session-token");
         settings.setHytaleAuthSession(session);
 
@@ -309,6 +465,7 @@ class HytaleAuthServiceTest {
         session.setUuid("player-uuid");
         session.setUsername("Player");
         session.setIdentityToken("cached-identity-token");
+        session.setSessionProfileId("player-uuid");
         session.setSessionToken(cachedSessionToken);
         settings.setHytaleAuthSession(session);
 
@@ -364,6 +521,7 @@ class HytaleAuthServiceTest {
         session.setUuid("player-uuid");
         session.setUsername("Player");
         session.setIdentityToken("cached-identity-token");
+        session.setSessionProfileId("player-uuid");
         session.setSessionToken(cachedSessionToken);
         settings.setHytaleAuthSession(session);
 
@@ -483,6 +641,7 @@ class HytaleAuthServiceTest {
     private static final class FakeHytaleApiClient extends HytaleApiClient {
 
         private Runnable onRefreshToken = () -> {};
+        private Runnable onFetchProfiles = () -> {};
         private Runnable onCreateGameSession = () -> {};
         private int createGameSessionCalls;
         private int refreshTokenCalls;
@@ -546,6 +705,7 @@ class HytaleAuthServiceTest {
         @Override
         public List<HytaleProfile> fetchProfiles(String accessToken) {
             fetchProfilesCalls++;
+            onFetchProfiles.run();
             fetchProfilesAccessToken = accessToken;
             return profiles;
         }

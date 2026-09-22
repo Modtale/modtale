@@ -78,6 +78,25 @@ class CosmeticEditorControllerTest {
         }
     }
 
+    @Test void opensSelectedLookOnlyAfterHydration() throws Exception {
+        try (Harness h = new Harness()) {
+            h.gateway.delayLoads = true;
+            var opened = new java.util.concurrent.atomic.AtomicInteger();
+            fx(() -> {
+                h.controller.edit(new WardrobeItem(PLAYER, WardrobeItem.Kind.SKIN,
+                        "Incoming", false, "", "{\"skin\":" + FRESH + "}"), () -> {
+                    assertEquals(json(FRESH), h.controller.draftSnapshot());
+                    opened.incrementAndGet();
+                });
+                return null;
+            });
+            assertTrue(h.gateway.loadStarted.await(5, TimeUnit.SECONDS));
+            assertEquals(0, opened.get());
+            h.gateway.releaseLoad.countDown();
+            await(() -> opened.get() == 1);
+        }
+    }
+
     @Test void lateCurrentSkinAndHydrationCannotReplaceCapeEdits() throws Exception {
         for (boolean hydrate : List.of(false, true)) {
             try (Harness h = new Harness()) {

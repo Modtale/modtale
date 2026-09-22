@@ -35,6 +35,7 @@ class LibraryCompatibilityMetadataTest {
                     Runnable::run, null, () -> null);
             var renderer = new LibraryWorldRenderer(null, null, null, null, null, null, null,
                     null, null, null, null, null, null);
+            renderer.setCurrentGameVersion("0.7.1");
             var makeModel = LauncherLibraryController.class.getDeclaredMethod("worldProjectModel",
                     InstalledProject.class, HytaleWorldConfig.class);
             makeModel.setAccessible(true);
@@ -48,6 +49,10 @@ class LibraryCompatibilityMetadataTest {
                 Label compatibility = (Label) node.lookup(".library-version-metadata-build");
                 assertEquals("0.6.x", compatibility.getText());
                 assertTrue(compatibility.getTooltip().getText().contains("Manifest"));
+                Label warning = (Label) node.lookup(".library-compatibility-warning");
+                assertNotNull(warning);
+                assertEquals("This mod targets >=0.6.0-pre.0 <0.7.0 but the current game version is 0.7.1. It may not work correctly.",
+                        warning.getTooltip().getText());
                 assertEquals("mod-1.2.3.jar", ((Label) node.lookup(".library-version-metadata-version")).getText());
             }
             var childModel = LauncherLibraryController.class.getDeclaredMethod("manifestContentItem",
@@ -59,6 +64,10 @@ class LibraryCompatibilityMetadataTest {
             childRow.setAccessible(true);
             Node node = (Node) childRow.invoke(renderer, child, List.of());
             assertEquals("0.6.x", ((Label) node.lookup(".library-version-metadata-build")).getText());
+
+            assertNotNull(node.lookup(".library-compatibility-warning"));
+            renderer.setCurrentGameVersion("0.6.7");
+            assertNull(((Node) childRow.invoke(renderer, child, List.of())).lookup(".library-compatibility-warning"));
 
             Files.delete(mod.resolve("manifest.json"));
             var model = (LibraryWorldProjectModel) makeModel.invoke(controller,

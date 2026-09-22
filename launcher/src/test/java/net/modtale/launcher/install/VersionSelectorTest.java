@@ -50,6 +50,17 @@ class VersionSelectorTest {
         assertEquals("1.10.0", selected.versionNumber());
     }
 
+    @Test
+    void selectsBetterMapForInstalledPatchVersionFromCurseForgeFamilies() {
+        ProjectVersion current = version("BetterMap-1.3.7.jar", "2026-06-11T08:20:18Z", "RELEASE", "0.5");
+        ProjectVersion next = version("BetterMap-1.3.8.jar", "2026-08-27T14:53:23Z", "RELEASE", "0.6");
+        assertEquals(current, VersionSelector.latestCompatible(List.of(next, current), "0.5.6").orElseThrow());
+        assertEquals(next, VersionSelector.latestCompatible(List.of(next, current), "0.6.0-pre.7").orElseThrow());
+        assertTrue(VersionSelector.latestCompatible(List.of(current), "0.50.0").isEmpty());
+        assertTrue(VersionSelector.latestCompatible(List.of(current), "0.4.9").isEmpty());
+        assertTrue(VersionSelector.latestCompatible(List.of(version("exact", "", "RELEASE", "0.5.5")), "0.5.6").isEmpty());
+    }
+
     private static ProjectVersion version(String number, String releaseDate, String channel, String gameVersion) {
         return new ProjectVersion(number, number, List.of(gameVersion), null, 0, releaseDate, "", List.of(), channel);
     }

@@ -164,7 +164,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 26
+          java-version: 25
           check-latest: true
 
       - name: Set up Gradle
