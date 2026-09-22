@@ -9938,3 +9938,20 @@
     -fx-border-color: #1e2d43;
     -fx-border-radius: 10;
 }
+
+.wardrobe-category-heading {
+    -fx-background-color: #142239; -fx-background-radius: 10; -fx-padding: 10 8;
+    -fx-cursor: hand; -fx-border-color: #26374f; -fx-border-radius: 10;
+}
+.wardrobe-category-heading:hover { -fx-background-color: #1c304b; }
+.wardrobe-category-heading:selected { -fx-background-color: #1c304b; -fx-border-color: #42658b; }
+.wardrobe-category-heading:focused { -fx-border-color: #93c5fd; }
+.wardrobe-category-heading-label { -fx-text-fill: #a9c1df; -fx-font-size: 12px; -fx-font-weight: bold; }
+.wardrobe-category-tiles { -fx-padding: 8 1 10 1; -fx-alignment: top-center; }
+.wardrobe-category-picture {
+    -fx-background-color: #111d30; -fx-border-color: #283950; -fx-border-radius: 10; -fx-background-radius: 10;
+    -fx-padding: 4; -fx-cursor: hand; -fx-text-fill: #cbd5e1; -fx-font-size: 10px;
+}
+.wardrobe-category-picture:hover { -fx-background-color: #203550; -fx-border-color: #577ca5; }
+.wardrobe-category-picture:selected { -fx-background-color: #233e62; -fx-border-color: #60a5fa; -fx-border-width: 2; -fx-padding: 3; }
+.wardrobe-category-picture:focused { -fx-border-color: #bfdbfe; }

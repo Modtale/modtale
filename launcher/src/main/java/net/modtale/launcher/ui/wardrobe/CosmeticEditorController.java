@@ -76,10 +76,7 @@ public final class CosmeticEditorController implements AutoCloseable {
     private boolean loading, browsing, applying, disposed, settingVariants;
     private List<CosmeticOption> combinations = List.of();
     private String pendingCape;
-    private final Map<String, Button> categoryButtons = new LinkedHashMap<>();
-    private final Map<String, VBox> categoryGroups = new LinkedHashMap<>();
-    private final Map<String, Button> groupButtons = new LinkedHashMap<>();
-    private final Map<String, String> lastCategory = new HashMap<>();
+    private WardrobeCategoryNavigation categoryNavigation;
 
     public CosmeticEditorController(WardrobeApiClient api, WardrobeStore store, Supplier<LauncherSettings> settings,
             LauncherFeedback feedback, Executor executor) {
@@ -187,42 +184,21 @@ public final class CosmeticEditorController implements AutoCloseable {
     }
 
     private void renderCategories() {
-        categoryRail.getChildren().clear(); categoryButtons.clear(); categoryGroups.clear(); groupButtons.clear();
-        for (String group : List.of("Head", "Body", "Tops", "Bottoms", "Accessories")) {
-            VBox children = new VBox(3); children.getStyleClass().add("cosmetic-subcategories");
-            Button heading = new Button(group); heading.getStyleClass().add("cosmetic-group");
-            heading.setMaxWidth(Double.MAX_VALUE); heading.setAlignment(Pos.CENTER_LEFT);
-            heading.setOnAction(e -> {
-                category = lastCategory.getOrDefault(group, catalog.categories().stream()
-                        .filter(entry -> CosmeticFraming.forCategory(entry.key()).group().equals(group)).findFirst().orElseThrow().key());
-                page = 1; browse();
-            });
-            categoryGroups.put(group, children); groupButtons.put(group, heading);
-            categoryRail.getChildren().addAll(heading, children);
-        }
-        for (CosmeticCategory entry : catalog.categories()) {
-            Button button = new Button(entry.label()); button.getStyleClass().add("cosmetic-category");
-            button.setMaxWidth(Double.MAX_VALUE); button.setAlignment(Pos.CENTER_LEFT);
-            button.setOnAction(e -> { category = entry.key(); page = 1; browse(); });
-            categoryButtons.put(entry.key(), button); categoryGroups.get(CosmeticFraming.forCategory(entry.key()).group()).getChildren().add(button);
-        }
+        if (categoryNavigation != null) categoryNavigation.close();
+        categoryNavigation = new WardrobeCategoryNavigation(catalog, assets, key -> {
+            category = key; page = 1; browse();
+        });
+        categoryRail.getChildren().setAll(categoryNavigation);
     }
 
     private void browse() {
         if (catalog == null || disposed) return;
-        String activeGroup = CosmeticFraming.forCategory(category).group();
-        lastCategory.put(activeGroup, category);
-        categoryGroups.forEach((group, children) -> {
-            boolean active = group.equals(activeGroup);
-            children.setVisible(active); children.setManaged(active);
-            groupButtons.get(group).pseudoClassStateChanged(SELECTED, active);
-        });
+        categoryNavigation.selectCategory(category);
         preview.focusCategory(category);
         resizePages.stop();
         long ticket = ++generation; String key = category; int requestedPage = page; int pageSize = columns * 4;
         boolean filterOwned = ownedOnly.isSelected(); boolean known = permissionsKnown;
         Map<String, Set<String>> permissions = unlocked;
-        categoryButtons.forEach((id, button) -> button.pseudoClassStateChanged(SELECTED, id.equals(key)));
         browsing = true; state.setText(""); showGridSkeletons(); updatePagination();
         optionsSkeleton.setVisible(false);
         colors.setVisible(false); colors.setManaged(false);
@@ -539,5 +515,5 @@ public final class CosmeticEditorController implements AutoCloseable {
         return button;
     }
     private static String message(Throwable t) { while (t instanceof CompletionException && t.getCause() != null) t = t.getCause(); return t.getMessage() == null ? "Please try again." : t.getMessage(); }
-    @Override public void close() { disposed = true; thumbnails.close(); resizePages.stop(); generation++; accountGeneration++; preview.dispose(); }
+    @Override public void close() { disposed = true; if (categoryNavigation != null) categoryNavigation.close(); thumbnails.close(); resizePages.stop(); generation++; accountGeneration++; preview.dispose(); }
 }
