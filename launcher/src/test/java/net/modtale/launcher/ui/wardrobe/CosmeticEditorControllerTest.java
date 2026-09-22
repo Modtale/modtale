@@ -268,7 +268,7 @@ class CosmeticEditorControllerTest {
     }
 
     private static ButtonBase button(Node root, String text) {
-        return nodes(root, ButtonBase.class).stream().filter(b -> text.equals(b.getText())).findFirst().orElseThrow();
+        return nodes(root, ButtonBase.class).stream().filter(b -> text.equals(b.getText()) || text.equals(b.getAccessibleText())).findFirst().orElseThrow();
     }
     private static JsonNode json(String text) {
         try { return JSON.readTree(text); } catch (IOException e) { throw new UncheckedIOException(e); }

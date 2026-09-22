@@ -58,7 +58,7 @@ public final class CosmeticEditorController implements AutoCloseable {
     private final Label changes = text("Nothing applied yet", "wardrobe-muted");
     private final Button undo = iconButton("Undo", LauncherIcons.Glyph.UNDO, this::undo);
     private final Button redo = iconButton("Redo", LauncherIcons.Glyph.REDO, this::redo);
-    private final Button reset = button("Reset", LauncherIcons.Glyph.RESTORE, this::reset);
+    private final Button reset = iconButton("Reset", LauncherIcons.Glyph.RESTORE, this::reset);
     private final Button remove = secondaryButton("Remove item");
     private final Button apply = primaryButton("Apply outfit");
     private final Button save = secondaryButton("Save");
@@ -106,8 +106,10 @@ public final class CosmeticEditorController implements AutoCloseable {
         root.getStyleClass().add("cosmetic-editor"); root.setMinWidth(0);
         state.setWrapText(true);
         hideWhenEmpty(state); hideWhenEmpty(requirement); hideWhenEmpty(changes);
-        Button current = button("Load current look", LauncherIcons.Glyph.REFRESH_CW, this::loadCurrent);
-        FlowPane toolbar = new FlowPane(8, 8, current, undo, redo, reset, ownedOnly); toolbar.setAlignment(Pos.CENTER_LEFT);
+        Button current = iconButton("Load current look", LauncherIcons.Glyph.REFRESH_CW, this::loadCurrent);
+        Region actionSpacer = new Region(); HBox.setHgrow(actionSpacer, Priority.ALWAYS);
+        HBox lookActions = new HBox(4, current, actionSpacer, undo, redo, reset);
+        lookActions.setAlignment(Pos.CENTER_LEFT);
         ownedOnly.setSelected(true);
         ownedOnly.getStyleClass().add("cosmetic-owned-filter");
         ownedOnly.setOnAction(e -> { page = 1; browse(); });
@@ -125,7 +127,8 @@ public final class CosmeticEditorController implements AutoCloseable {
             if (catalog != null) { generation++; resizePages.playFromStart(); }
         });
         configurePagination();
-        selectionPanel.getChildren().addAll(grid, pagination);
+        HBox filters = new HBox(ownedOnly); filters.setAlignment(Pos.CENTER_RIGHT);
+        selectionPanel.getChildren().addAll(filters, grid, pagination);
         selectionPanel.setMinWidth(0); HBox.setHgrow(selectionPanel, Priority.ALWAYS);
         inspector.getStyleClass().add("wardrobe-inspector"); inspector.setPrefWidth(310); inspector.setMinWidth(270);
         inspector.setMaxHeight(Region.USE_PREF_SIZE);
@@ -152,11 +155,11 @@ public final class CosmeticEditorController implements AutoCloseable {
         optionsSkeleton.managedProperty().bind(optionsSkeleton.visibleProperty());
         optionsSkeleton.setMouseTransparent(true);
         optionsSkeleton.setAccessibleText("Loading colors and styles");
-        inspector.getChildren().addAll(previewNode, choiceName,
+        inspector.getChildren().addAll(lookActions, previewNode, choiceName,
                 optionsSkeleton, colors, variant, requirement, remove, changes, actions);
         HBox workspace = new HBox(18, categories, selectionPanel, inspector); workspace.setAlignment(Pos.TOP_LEFT);
         workspace.setMinWidth(0);
-        root.getChildren().addAll(toolbar, state, workspace);
+        root.getChildren().addAll(state, workspace);
         root.widthProperty().addListener((o, a, b) -> {
             inspector.setPrefWidth(b.doubleValue() < 1100 ? 270 : 310);
         });
@@ -530,8 +533,8 @@ public final class CosmeticEditorController implements AutoCloseable {
     private static Button button(String text, LauncherIcons.Glyph icon, Runnable action) { Button b = secondaryButton(text); b.setGraphic(LauncherIcons.icon(icon, 14)); b.setOnAction(e -> action.run()); return b; }
     private static Button iconButton(String label, LauncherIcons.Glyph icon, Runnable action) {
         Button button = button("", icon, action);
-        button.getStyleClass().add("icon-only-button");
-        button.setMinSize(40, 40); button.setPrefSize(40, 40);
+        button.getStyleClass().addAll("icon-only-button", "cosmetic-quiet-action", "cosmetic-look-action");
+        button.setMinSize(28, 28); button.setPrefSize(28, 28); button.setMaxSize(28, 28);
         button.setAccessibleText(label); button.setTooltip(new Tooltip(label));
         return button;
     }

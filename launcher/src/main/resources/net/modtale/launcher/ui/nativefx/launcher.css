@@ -9604,8 +9604,8 @@
 .cosmetic-swatch:selected { -fx-border-color: #93c5fd; -fx-border-width: 2; -fx-padding: 3; }
 .cosmetic-owned-filter {
     -fx-text-fill: #94a3b8;
-    -fx-font-size: 12;
-    -fx-label-padding: 0 0 0 8;
+    -fx-font-size: 11;
+    -fx-label-padding: 0 0 0 6;
     -fx-cursor: hand;
 }
 .native-check > .box,
@@ -9648,6 +9648,21 @@
 }
 .native-check:disabled,
 .cosmetic-owned-filter:disabled { -fx-opacity: 0.45; }
+.cosmetic-owned-filter > .box {
+    -fx-background-radius: 4;
+    -fx-border-radius: 4;
+    -fx-padding: 3;
+    -fx-min-width: 16;
+    -fx-min-height: 16;
+    -fx-pref-width: 16;
+    -fx-pref-height: 16;
+}
+.cosmetic-owned-filter > .box > .mark { -fx-padding: 4; }
+.btn.secondary.cosmetic-look-action {
+    -fx-padding: 6;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+}
 
 .btn.secondary.cosmetic-quiet-action, .btn.secondary.wardrobe-preview-reset {
     -fx-background-color: transparent;
@@ -9656,6 +9671,7 @@
     -fx-effect: null;
 }
 .wardrobe-preview-reset { -fx-padding: 6; }
+.btn.secondary.cosmetic-look-action:focused { -fx-border-color: #93c5fd; }
 .btn.secondary.cosmetic-quiet-action:hover, .btn.secondary.wardrobe-preview-reset:hover {
     -fx-background-color: #1b3156;
     -fx-text-fill: #e2e8f0;
