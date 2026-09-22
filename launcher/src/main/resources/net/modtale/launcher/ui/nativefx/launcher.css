@@ -9574,6 +9574,9 @@
 }
 /* Wardrobe uses the launcher's navy surfaces, Inter typography and blue actions. */
 .wardrobe-page { -fx-padding: 8 0 12 0; }
+.wardrobe-unavailable { -fx-alignment: center; -fx-padding: 72 36; -fx-spacing: 18; -fx-background-color: #111d30; -fx-background-radius: 18; -fx-border-color: #293950; -fx-border-radius: 18; -fx-min-height: 420; }
+.wardrobe-unavailable-title { -fx-text-fill: #f8fafc; -fx-font-size: 24px; -fx-font-weight: 800; }
+.wardrobe-unavailable-detail { -fx-text-fill: #a9b9d0; -fx-font-size: 14px; -fx-text-alignment: center; -fx-max-width: 560; }
 .wardrobe-section-title { -fx-text-fill: #e2e8f0; -fx-font-size: 16px; -fx-font-weight: 800; }
 .wardrobe-muted { -fx-text-fill: #94a3b8; -fx-font-size: 12px; -fx-line-spacing: 4px; }
 .wardrobe-tabs { -fx-border-color: transparent transparent #1e293b transparent; -fx-padding: 0 0 12 0; }

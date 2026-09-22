@@ -210,6 +210,7 @@ public final class LauncherRuntime {
                     new WardrobeApiClient(services.hytaleAuthService()),
                     new WardrobeStore(services.settingsStore().settingsPath().getParent()),
                     settingsController::settings, feedback, services.executor());
+            wardrobeController.setOpenSettingsAction(() -> navigation.show(LauncherView.SETTINGS));
             shell.attachWardrobe(wardrobeController);
         } catch (IOException ex) {
             shell.attachWardrobeError("The local wardrobe file could not be read. Check wardrobe.json in the launcher settings folder.");

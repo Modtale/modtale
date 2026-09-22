@@ -89,6 +89,8 @@ public final class CosmeticEditorController implements AutoCloseable {
     public Node view() { return root; }
     JsonNode draftSnapshot() { return draft == null ? JSON.createObjectNode() : draft.skin(); }
     Path assetsForPreview() { return assets == null ? findAssets() : assets; }
+    private java.util.function.Consumer<Throwable> catalogFailureHandler = ignored -> {};
+    void onCatalogFailure(java.util.function.Consumer<Throwable> handler) { catalogFailureHandler = handler; }
 
     public void refresh() {
         if (catalog == null && !loading) loadCatalog(findAssets());
@@ -185,7 +187,7 @@ public final class CosmeticEditorController implements AutoCloseable {
         }, executor).whenComplete((value, error) -> Platform.runLater(() -> {
             if (disposed || ticket != generation) return;
             loading = false;
-            if (error != null) { categoryRail.getChildren().clear(); grid.getChildren().clear(); preview.clear(); state.setText("Install Hytale or set its game directory in Settings. " + message(error)); return; }
+            if (error != null) { categoryRail.getChildren().clear(); grid.getChildren().clear(); preview.clear(); catalogFailureHandler.accept(error); return; }
             assets = source; catalog = value;
             if (draft == null) { draft = new OutfitDraft(catalog.defaultSkin()); }
             if (pendingCape != null) { draft.choose("cape", pendingCape); pendingCape = null; category = "cape"; }
