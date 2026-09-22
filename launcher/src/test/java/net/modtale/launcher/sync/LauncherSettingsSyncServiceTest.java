@@ -104,7 +104,7 @@ class LauncherSettingsSyncServiceTest {
                 try {
                     statuses.add(fx(() -> {
                         VBox card = (VBox) progress.getChildren().getFirst();
-                        return ((Label) card.getChildren().getLast()).getText();
+                        return ((Label) card.getChildren().getLast()).getText() + ":" + progress.getProgress();
                     }));
                 } catch (Exception ex) { throw new AssertionError(ex); }
                 throw new IllegalStateException("Provider temporarily unavailable");
@@ -126,7 +126,7 @@ class LauncherSettingsSyncServiceTest {
                 net.modtale.launcher.ui.common.TransferLoadingModal.class);
         restore.setAccessible(true);
         restore.invoke(service, snapshot, progress);
-        assertEquals(java.util.List.of("Checking First mod • 1 of 2", "Checking Second mod • 2 of 2"), statuses);
+        assertEquals(java.util.List.of("Checking First mod:0.0", "Checking Second mod:0.5"), statuses);
     }
 
     private static void runWork(LinkedBlockingQueue<Runnable> work) throws Exception {

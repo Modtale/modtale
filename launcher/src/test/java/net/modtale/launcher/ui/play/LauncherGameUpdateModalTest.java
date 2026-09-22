@@ -71,8 +71,10 @@ class LauncherGameUpdateModalTest {
                     StackPane host = (StackPane) ui[0];
                     TransferLoadingModal modal = (TransferLoadingModal) host.getChildren().getFirst();
                     assertFalse(modal.lookupAll("Canvas").isEmpty());
+                    assertEquals(0.5, modal.getProgress());
                     assertTrue(modal.lookupAll(".status-modal-message").stream()
-                            .map(node -> ((Label) node).getText()).anyMatch(text -> text.contains("50%")));
+                            .map(node -> ((Label) node).getText())
+                            .anyMatch(text -> text.equals("Downloading Hytale release build 29")));
                     return null;
                 });
             } finally { failDownload.countDown(); }

@@ -19,6 +19,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.function.DoubleConsumer;
 import net.modtale.launcher.api.ModtaleApiException;
 import net.modtale.launcher.logging.LogSanitizer;
 import net.modtale.launcher.settings.LauncherConfig;
@@ -92,6 +93,10 @@ public class LauncherUpdateService {
     }
 
     public Path downloadInstaller(LauncherUpdateCandidate update) {
+        return downloadInstaller(update, ignored -> { });
+    }
+
+    public Path downloadInstaller(LauncherUpdateCandidate update, DoubleConsumer progress) {
         if (update == null || !update.hasInstallerAsset()) {
             throw new ModtaleApiException("No compatible automatic launcher update is attached to this release.");
         }
@@ -111,15 +116,24 @@ public class LauncherUpdateService {
                     + response.statusCode() + " in " + Math.max(0, System.currentTimeMillis() - started) + "ms");
             try (InputStream body = response.body()) {
                 ensureSuccess(response.statusCode(), downloadUri.toString());
+                if (update.assetSize() > 0) progress.accept(0);
                 Path temporary = Files.createTempFile(target.getParent(), ".modtale-update-", ".tmp");
                 try {
                     try (var output = Files.newOutputStream(temporary)) {
                         byte[] buffer = new byte[65536];
                         long downloaded = 0;
+                        int lastPercent = 0;
                         for (int read; (read = body.read(buffer)) != -1;) {
                             downloaded += read;
                             if (downloaded > 256L * 1024 * 1024) throw new IOException("Launcher update exceeds the download size limit.");
                             output.write(buffer, 0, read);
+                            if (update.assetSize() > 0) {
+                                int percent = (int) Math.min(100, downloaded * 100 / update.assetSize());
+                                if (percent > lastPercent) {
+                                    lastPercent = percent;
+                                    progress.accept(percent / 100.0);
+                                }
+                            }
                         }
                     }
                     if (update.assetSize() > 0 && Files.size(temporary) != update.assetSize()) {

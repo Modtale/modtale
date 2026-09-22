@@ -227,14 +227,15 @@ public final class LauncherSettingsSyncService {
                 .toList();
         List<String> warnings = new ArrayList<>();
         for (LauncherSettingsSnapshot.InstalledProjectSnapshot projectSnapshot : projects) {
-            String position = " • " + (++attempted) + " of " + projects.size();
+            attempted++;
             String title = projectSnapshot.getTitle().isBlank() ? "mod" : projectSnapshot.getTitle();
-            progress.update("Restoring your mods", "Checking " + title + position);
+            progress.update("Restoring your mods", "Checking " + title,
+                    (attempted - 1) / (double) projects.size());
             try {
                 ProjectDetail project = apiClient.getProject(projectSnapshot.getProjectId());
                 ProjectVersion version = resolveVersion(project, projectSnapshot, settings);
-                progress.update("Restoring your mods", "Downloading " + project.title()
-                        + position);
+                progress.update("Restoring your mods", "Downloading " + project.title(),
+                        (attempted - 1) / (double) projects.size());
                 InstallResult result = installer.install(project, version, installOptions(settings, projectSnapshot, version));
                 settings.upsertInstalledProject(result.installedProject().withModpackUnlocked(projectSnapshot.isModpackUnlocked()));
                 settingsStore.save(settings);
@@ -244,6 +245,8 @@ public final class LauncherSettingsSyncService {
                 LOG.warn("Could not restore installed project {}", projectSnapshot.getProjectId(), ex);
                 warnings.add(projectSnapshot.getProjectId() + ": " + ex.getMessage());
             }
+            progress.update("Restoring your mods", "Restoring your mods",
+                    attempted / (double) projects.size());
         }
 
         if (!warnings.isEmpty()) {

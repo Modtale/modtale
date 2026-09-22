@@ -6,11 +6,47 @@ import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.HexFormat;
 
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class LauncherUpdateServiceTest {
+
+    @Test
+    void reportsVerifiedDownloadProgress() throws Exception {
+        byte[] payload = new byte[150_000];
+        java.util.Arrays.fill(payload, (byte) 42);
+        String digest = "sha256:" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(payload));
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/update", exchange -> {
+            exchange.sendResponseHeaders(200, payload.length);
+            try (var output = exchange.getResponseBody()) { output.write(payload); }
+        });
+        server.start();
+        java.nio.file.Path downloaded = null;
+        try {
+            var service = new LauncherUpdateService(HttpClient.newHttpClient(), "Modtale/modtale");
+            var update = new LauncherUpdateCandidate("1.2.0", "launcher-v1.2.0", "", "",
+                    "launcher-windows-x86_64-update.zip",
+                    "http://127.0.0.1:" + server.getAddress().getPort() + "/update", false, payload.length, digest);
+            var progress = new ArrayList<Double>();
+            downloaded = service.downloadInstaller(update, progress::add);
+            assertArrayEquals(payload, Files.readAllBytes(downloaded));
+            assertEquals(0, progress.getFirst());
+            assertEquals(1, progress.getLast());
+            for (int i = 1; i < progress.size(); i++) assertTrue(progress.get(i) >= progress.get(i - 1));
+        } finally {
+            server.stop(0);
+            if (downloaded != null) {
+                Files.deleteIfExists(downloaded);
+                Files.deleteIfExists(downloaded.getParent());
+            }
+        }
+    }
 
     @Test
     void isolatesReleaseChannels() {

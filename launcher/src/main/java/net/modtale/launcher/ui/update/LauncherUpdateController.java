@@ -172,8 +172,9 @@ public final class LauncherUpdateController {
         if (host != null) host.getChildren().add(progress);
         settingsController.setLauncherUpdateStatus("Downloading " + update.displayVersion() + "...");
         feedback.runAsync("Downloading launcher " + update.displayVersion() + "...", () -> {
-            Path installer = updateService.downloadInstaller(update);
-            progress.update("Updating Modtale Launcher", updateService.installationMessage());
+            Path installer = updateService.downloadInstaller(update,
+                    fraction -> progress.update("Updating Modtale Launcher", "Downloading launcher update", fraction));
+            progress.update("Updating Modtale Launcher", "Installing launcher update");
             updateService.installUpdate(installer, update);
             return installer;
         }, installer -> {

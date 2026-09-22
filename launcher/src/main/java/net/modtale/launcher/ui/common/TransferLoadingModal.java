@@ -19,24 +19,31 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.util.Duration;
+import java.util.regex.Pattern;
 
 /** Shared, lightweight transfer feedback for installs and account restores. */
 public final class TransferLoadingModal extends StackPane {
+    private static final Pattern PERCENT = Pattern.compile("\\s*\\((\\d{1,3})%\\)(?=\\.{0,3}$)");
     private final Label title = new Label();
     private final Label detail = new Label();
+    private final Canvas emblem = new Canvas(180, 120);
     private final Timeline animation;
+    private double phase;
+    private double progress = -1;
 
     public TransferLoadingModal(String heading, String message) {
         getStyleClass().add("install-loading-overlay");
         setFocusTraversable(true);
         setOnMouseClicked(event -> event.consume());
-        Canvas emblem = new Canvas(180, 120);
-        var phase = new SimpleDoubleProperty(0);
-        phase.addListener((observable, before, after) -> drawLoading(emblem.getGraphicsContext2D(), after.doubleValue()));
-        drawLoading(emblem.getGraphicsContext2D(), 0);
+        var animatedPhase = new SimpleDoubleProperty(0);
+        animatedPhase.addListener((observable, before, after) -> {
+            phase = after.doubleValue();
+            drawLoading(emblem.getGraphicsContext2D(), phase, progress);
+        });
+        drawLoading(emblem.getGraphicsContext2D(), 0, -1);
         animation = new Timeline(
-                new KeyFrame(Duration.ZERO, new KeyValue(phase, 0)),
-                new KeyFrame(Duration.seconds(1.8), new KeyValue(phase, 1, Interpolator.LINEAR)));
+                new KeyFrame(Duration.ZERO, new KeyValue(animatedPhase, 0)),
+                new KeyFrame(Duration.seconds(1.8), new KeyValue(animatedPhase, 1, Interpolator.LINEAR)));
         animation.setCycleCount(Animation.INDEFINITE);
         title.getStyleClass().add("status-modal-title");
         title.setWrapText(true);
@@ -67,7 +74,7 @@ public final class TransferLoadingModal extends StackPane {
         return 48 + radius * Math.sin(Math.toRadians(vertex * 60 - 90));
     }
 
-    private static void drawLoading(GraphicsContext graphics, double phase) {
+    private static void drawLoading(GraphicsContext graphics, double phase, double progress) {
         graphics.clearRect(0, 0, 180, 120);
         double[] x = new double[6];
         double[] y = new double[6];
@@ -110,11 +117,12 @@ public final class TransferLoadingModal extends StackPane {
         }
         graphics.setFill(Color.web("#3b82f6"));
         graphics.fillPolygon(x, y, 6);
-        graphics.setFill(Color.web("#22324c"));
-        graphics.fillRoundRect(0, 112, 180, 4, 4, 4);
-        graphics.setFill(Color.web("#3b82f6"));
-        double offset = 126 * (1 - Math.cos(phase * Math.PI * 2)) / 2;
-        graphics.fillRoundRect(offset, 112, 54, 4, 4, 4);
+        if (progress >= 0) {
+            graphics.setFill(Color.web("#22324c"));
+            graphics.fillRoundRect(0, 112, 180, 4, 4, 4);
+            graphics.setFill(Color.web("#3b82f6"));
+            graphics.fillRoundRect(0, 112, 180 * progress, 4, 4, 4);
+        }
     }
 
     public void update(String heading, String message) {
@@ -122,8 +130,36 @@ public final class TransferLoadingModal extends StackPane {
             Platform.runLater(() -> update(heading, message));
             return;
         }
+        String displayMessage = message;
+        var matcher = PERCENT.matcher(message);
+        if (matcher.find()) {
+            setProgress(Math.min(100, Integer.parseInt(matcher.group(1))) / 100.0);
+            displayMessage = matcher.replaceFirst("");
+        } else if (!message.equals(detail.getText())) {
+            setProgress(-1);
+        }
+        title.setText(heading);
+        detail.setText(displayMessage.replaceFirst("\\.{3}$", "").trim());
+    }
+
+    public void update(String heading, String message, double progress) {
+        if (!Platform.isFxApplicationThread()) {
+            Platform.runLater(() -> update(heading, message, progress));
+            return;
+        }
         title.setText(heading);
         detail.setText(message);
+        setProgress(progress);
+    }
+
+    public double getProgress() {
+        return progress;
+    }
+
+    private void setProgress(double value) {
+        progress = value < 0 ? -1 : Math.min(1, value);
+        emblem.setAccessibleText(progress < 0 ? "Loading" : "Loading progress " + Math.round(progress * 100) + "%");
+        drawLoading(emblem.getGraphicsContext2D(), phase, progress);
     }
 
     public void dismiss() {
