@@ -83,6 +83,30 @@ jobs:
           python bootstrap/smoke.py "$launcher" "$JAVA_HOME"
           python bootstrap/smoke.py "$launcher" "$JAVA_HOME" --hytale
           python bootstrap/smoke.py "$launcher"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            python bootstrap/smoke.py "$launcher" --installer
+          fi
+      - name: Install Windows package and verify Java setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./gradlew.bat packageWindows
+          $installer = Get-ChildItem build/distributions -Filter '*.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'Windows installer was not built' }
+          Add-Type -AssemblyName System.Drawing
+          $exe = Join-Path (Get-Location) 'build/jpackage/app-image/Modtale Launcher/Modtale Launcher.exe'
+          $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($exe)
+          $bitmap = $icon.ToBitmap()
+          $alpha = $bitmap.GetPixel(0, 0).A
+          $bitmap.Dispose()
+          $icon.Dispose()
+          if ($alpha -ne 0) { throw "Launcher icon has an opaque corner (alpha $alpha)" }
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList '/quiet', '/norestart' -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Installer exited with $($process.ExitCode)" }
+          $log = Join-Path $HOME '.modtale/launcher/bootstrap.log'
+          if (-not (Select-String -LiteralPath $log -Pattern 'Installer prepared runtime:' -Quiet)) {
+            throw 'Installer did not prepare Java before exiting'
+          }
       - name: Upload validation reports
         if: always()
         uses: actions/upload-artifact@v7.0.1

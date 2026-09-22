@@ -25,6 +25,7 @@ import javafx.scene.control.Labeled;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.image.ImageView;
+import javafx.scene.image.Image;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
@@ -234,6 +235,8 @@ public final class LauncherShell {
     public void start(Stage primaryStage, Application.Parameters parameters) {
         LauncherFonts.load();
         stage = primaryStage;
+        primaryStage.getIcons().add(new Image(Objects.requireNonNull(getClass()
+                .getResourceAsStream("/net/modtale/launcher/ui/nativefx/assets/favicon.png"))));
         launchParameters = parameters;
         undecoratedWindow = shouldUseUndecoratedWindow();
         if (undecoratedWindow) {
@@ -752,7 +755,8 @@ public final class LauncherShell {
         if (customWindowChrome != null && !customWindowChrome.isBlank()) {
             return Boolean.parseBoolean(customWindowChrome);
         }
-        return System.getProperty("os.name", "").toLowerCase().contains("linux");
+        String os = System.getProperty("os.name", "").toLowerCase();
+        return os.contains("linux") || os.contains("win");
     }
 
     private static void configureBrandLogoHoverAnimation(Button brand, Node logo) {
