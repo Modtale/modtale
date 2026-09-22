@@ -13,7 +13,6 @@ export const NewsIndex: React.FC = () => {
             <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 mb-8">
                 <div>
                     <h1 className="text-3xl sm:text-4xl font-extrabold leading-tight">News from Modtale</h1>
-                    <p className="mt-3 text-base text-slate-500 dark:text-slate-400">News, new features, and the things we’re building for your next world.</p>
                 </div>
                 <a href={NEWS_RSS_PATH} className="inline-flex self-start sm:self-auto shrink-0 items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-800 text-sm font-bold text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400 transition-colors focus-visible:outline-2 focus-visible:outline-blue-400 focus-visible:outline-offset-4">
                     <Rss size={16} aria-hidden="true" /> RSS feed
