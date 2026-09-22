@@ -82,6 +82,24 @@ class WardrobeCategoryNavigationTest {
                     var png = new java.awt.image.BufferedImage((int) snapshot.getWidth(), (int) snapshot.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
                     for (int y = 0; y < png.getHeight(); y++) for (int x = 0; x < png.getWidth(); x++) png.setRGB(x, y, snapshot.getPixelReader().getArgb(x, y));
                     javax.imageio.ImageIO.write(png, "png", Path.of(output, "wardrobe-category-pictures.png").toFile());
+                    var grid = new javafx.scene.layout.TilePane(12, 12);
+                    grid.setPrefColumns(5); grid.setPrefTileWidth(100); grid.setPrefTileHeight(90);
+                    grid.setStyle("-fx-background-color: #101b2d; -fx-padding: 16;");
+                    for (var category : CosmeticCatalogClient.categories()) {
+                        var button = (Button) nav.lookup("#wardrobe-category-" + category.key());
+                        if (button == null) continue;
+                        var original = (ImageView) button.getGraphic().lookup("ImageView");
+                        var icon = new ImageView(original.getImage());
+                        icon.setFitWidth(48); icon.setFitHeight(48); icon.setPreserveRatio(true);
+                        var label = new Label(button.getAccessibleText());
+                        label.setStyle("-fx-text-fill: #afc0d4; -fx-font-size: 11px;");
+                        var cell = new javafx.scene.layout.VBox(8, icon, label);
+                        cell.setAlignment(javafx.geometry.Pos.CENTER); grid.getChildren().add(cell);
+                    }
+                    var sheet = new Scene(grid, 580, 450).snapshot(null);
+                    var sheetPng = new java.awt.image.BufferedImage((int) sheet.getWidth(), (int) sheet.getHeight(), java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                    for (int y = 0; y < sheetPng.getHeight(); y++) for (int x = 0; x < sheetPng.getWidth(); x++) sheetPng.setRGB(x, y, sheet.getPixelReader().getArgb(x, y));
+                    javax.imageio.ImageIO.write(sheetPng, "png", Path.of(output, "wardrobe-category-sheet.png").toFile());
                     return null;
                 });
             } finally { fx(() -> { nav.close(); stage.close(); return null; }); }
