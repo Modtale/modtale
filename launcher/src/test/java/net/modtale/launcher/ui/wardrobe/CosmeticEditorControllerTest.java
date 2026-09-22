@@ -189,10 +189,8 @@ class CosmeticEditorControllerTest {
             await(() -> ((CheckBox) button(root(), "Owned only")).isSelected());
         }
         Node root() { return controller.view(); }
-        DialogPane dialog() {
-            return Window.getWindows().stream().filter(Window::isShowing)
-                    .filter(w -> w instanceof Stage s && s.getOwner() == stage)
-                    .flatMap(w -> nodes(w.getScene().getRoot(), DialogPane.class).stream()).findFirst().orElse(null);
+        Node dialog() {
+            return stage.getScene().getRoot().lookup(".status-modal");
         }
         void accept(Runnable trigger, String initial, String replacement) throws Exception {
             FutureTask<Void> opened = submitFx(() -> { trigger.run(); return null; });
@@ -203,7 +201,7 @@ class CosmeticEditorControllerTest {
                     assertEquals(initial, field.getText());
                     field.setText(replacement);
                 }
-                ((Button) dialog().lookupButton(ButtonType.OK)).fire(); return null;
+                ((Button) dialog().lookup(".status-modal-primary")).fire(); return null;
             });
             opened.get(5, TimeUnit.SECONDS);
         }
@@ -218,7 +216,7 @@ class CosmeticEditorControllerTest {
         @Override public void close() throws Exception {
             gateway.releaseLoad.countDown();
             fx(() -> {
-                if (dialog() != null) ((Button) dialog().lookupButton(ButtonType.CANCEL)).fire();
+                if (dialog() != null) ((Button) dialog().lookup(".status-modal-close")).fire();
                 controller.close(); stage.hide(); return null;
             });
             executor.shutdownNow();

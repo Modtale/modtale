@@ -119,15 +119,16 @@ class LauncherWardrobeControllerTest {
             FutureTask<Void> opened = submitFx(() -> { button(h.root(), "Edit saved look").fire(); return null; });
             await(() -> h.dialog() != null);
             fx(() -> {
-                DialogPane dialog = h.dialog();
+                Node dialog = h.dialog();
                 List<TextField> fields = nodes(dialog, TextField.class);
                 assertEquals(2, fields.size());
                 assertEquals(saved.name(), fields.get(0).getText());
                 assertEquals(saved.collection(), fields.get(1).getText());
                 assertTrue(nodes(dialog, CheckBox.class).getFirst().isSelected());
+                fields.get(0).setText("   ");
+                assertTrue(((Button) dialog.lookup(".status-modal-primary")).isDisabled());
                 fields.get(0).setText("Renamed favorite");
-                var save = dialog.getButtonTypes().stream().filter(t -> t.getButtonData() == ButtonBar.ButtonData.OK_DONE).findFirst().orElseThrow();
-                ((Button) dialog.lookupButton(save)).fire();
+                ((Button) dialog.lookup(".status-modal-primary")).fire();
                 return null;
             });
             opened.get(5, TimeUnit.SECONDS);
@@ -143,6 +144,27 @@ class LauncherWardrobeControllerTest {
             assertTrue(persisted.favorite());
             assertEquals(saved.id(), persisted.id());
             assertEquals(saved.payload(), persisted.payload());
+
+            FutureTask<Void> dismissed = submitFx(() -> { button(h.root(), "Edit saved look").fire(); return null; });
+            await(() -> h.dialog() != null);
+            fx(() -> {
+                nodes(h.dialog(), TextField.class).getFirst().setText("Unsaved change");
+                ((Button) h.dialog().lookup(".status-modal-close")).fire();
+                return null;
+            });
+            dismissed.get(5, TimeUnit.SECONDS);
+            assertEquals("Renamed favorite", h.store.items().getFirst().name());
+
+            FutureTask<Void> removed = submitFx(() -> { button(h.root(), "Edit saved look").fire(); return null; });
+            await(() -> h.dialog() != null);
+            fx(() -> {
+                Button remove = (Button) h.dialog().lookup(".status-modal-secondary");
+                assertEquals("Remove saved look", remove.getText());
+                remove.fire();
+                return null;
+            });
+            removed.get(5, TimeUnit.SECONDS);
+            await(() -> h.store.items().isEmpty());
         }
     }
 
@@ -341,17 +363,15 @@ class LauncherWardrobeControllerTest {
             });
         }
         Node root() { return controller.view(); }
-        DialogPane dialog() {
-            return Window.getWindows().stream().filter(Window::isShowing)
-                    .filter(w -> w instanceof Stage s && s.getOwner() == stage)
-                    .flatMap(w -> nodes(w.getScene().getRoot(), DialogPane.class).stream()).findFirst().orElse(null);
+        Node dialog() {
+            return stage.getScene().getRoot().lookup(".status-modal");
         }
         @Override public void close() throws Exception {
             popular.release.countDown();
             gateway.releaseHydration.countDown();
             fx(() -> {
-                DialogPane dialog = dialog();
-                if (dialog != null) ((Button)dialog.lookupButton(ButtonType.CANCEL)).fire();
+                Node dialog = dialog();
+                if (dialog != null) ((Button)dialog.lookup(".status-modal-close")).fire();
                 controller.close(); stage.hide(); return null;
             });
             executor.shutdownNow();

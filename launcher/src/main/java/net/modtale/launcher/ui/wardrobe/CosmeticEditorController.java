@@ -485,8 +485,12 @@ public final class CosmeticEditorController implements AutoCloseable {
     }
 
     private static WardrobeItem item(String name, JsonNode skin) { return new WardrobeItem(UUID.randomUUID(), WardrobeItem.Kind.SKIN, name, false, "Custom outfits", JSON.createObjectNode().set("skin", skin).toString()); }
-    private boolean confirm(String title, String message) { Alert alert = new Alert(Alert.AlertType.CONFIRMATION, message, ButtonType.OK, ButtonType.CANCEL); alert.setTitle(title); alert.setHeaderText(null); style(alert); return alert.showAndWait().orElse(ButtonType.CANCEL) == ButtonType.OK; }
-    private void style(Dialog<?> dialog) { if (root.getScene() != null) dialog.initOwner(root.getScene().getWindow()); dialog.getDialogPane().getStyleClass().add("wardrobe-dialog"); dialog.getDialogPane().getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm()); }
+    private boolean confirm(String title, String message) {
+        if (root.getScene() == null || !(root.getScene().getRoot() instanceof StackPane host)) return false;
+        return StatusModal.builder(() -> host).type(StatusModal.Type.WARNING)
+                .title(title).message(message).actionLabel("Replace draft").secondaryLabel("Cancel")
+                .showAndWait() == StatusModal.Result.PRIMARY;
+    }
     private String activeProfile() { HytaleAuthSession s = settings.get().getHytaleAuthSession(); return s == null ? "" : s.getUuid(); }
     private String activeUsername() { HytaleAuthSession s = settings.get().getHytaleAuthSession(); return s == null ? "" : s.getUsername(); }
     private static String encode(String s) { return java.net.URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20"); }

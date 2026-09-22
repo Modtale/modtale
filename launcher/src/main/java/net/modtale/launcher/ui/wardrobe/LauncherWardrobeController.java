@@ -19,6 +19,7 @@ import net.modtale.launcher.hytale.HytaleAuthSession;
 import net.modtale.launcher.settings.LauncherSettings;
 import net.modtale.launcher.ui.common.LauncherIcons;
 import net.modtale.launcher.ui.common.LauncherView;
+import net.modtale.launcher.ui.common.StatusModal;
 import net.modtale.launcher.ui.feedback.LauncherFeedback;
 import net.modtale.launcher.wardrobe.*;
 import static net.modtale.launcher.ui.common.LauncherUi.*;
@@ -430,43 +431,47 @@ public final class LauncherWardrobeController implements AutoCloseable {
     private void saveSelection() {
         if (selected == null || resolvingPopular) return;
         WardrobeItem item = store.items().stream().filter(saved -> saved.id().equals(selected.id())).findFirst().orElse(selected);
-        Dialog<ButtonType> dialog = new Dialog<>(); dialog.setTitle("Save look");
-        dialog.getDialogPane().getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
-        dialog.getDialogPane().getStyleClass().add("wardrobe-dialog");
-        if (root.getScene() != null) dialog.initOwner(root.getScene().getWindow());
+        if (root.getScene() == null || !(root.getScene().getRoot() instanceof StackPane host)) return;
         TextField name = new TextField(lookName(item).isBlank() ? "My look" : lookName(item)); TextField collection = new TextField(item.collection());
         name.setPromptText("Look name"); collection.setPromptText("Collection (optional)");
+        name.getStyleClass().add("wardrobe-search"); collection.getStyleClass().add("wardrobe-search");
+        name.setAccessibleText("Look name"); collection.setAccessibleText("Collection");
         CheckBox favorite = new CheckBox("Add to favorites"); favorite.setSelected(item.favorite());
-        VBox form = new VBox(12, new Label("Name"), name, new Label("Collection"), collection, favorite);
-        form.setPrefWidth(360); dialog.getDialogPane().setContent(form);
-        ButtonType saveType = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
+        favorite.getStyleClass().add("native-check");
+        VBox form = new VBox(12, label("Name", "wardrobe-muted"), name,
+                label("Collection", "wardrobe-muted"), collection, favorite);
         boolean existing = store.items().stream().anyMatch(i -> i.id().equals(item.id()));
-        ButtonType removeType = new ButtonType("Remove saved look", ButtonBar.ButtonData.LEFT);
-        dialog.getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
-        if (existing) dialog.getDialogPane().getButtonTypes().add(removeType);
-        dialog.getDialogPane().lookupButton(saveType).disableProperty().bind(name.textProperty().isEmpty());
-        dialog.showAndWait().ifPresent(choice -> {
-            try {
-                if (choice == saveType) {
-                    WardrobeItem saved = new WardrobeItem(item.id(), item.kind(), name.getText(), favorite.isSelected(), collection.getText(), item.payload());
-                    feedback.runAsync("Saving look", () -> {
-                        WardrobeItem hydrated = api.hydrate(saved);
-                        try { store.saveItem(hydrated); } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
-                        return hydrated;
-                    }, hydrated -> {
-                        if (selected != null && selected.id().equals(item.id())) {
-                            if (tab == Tab.SAVED) selected = hydrated;
-                            selectedName.setText(displayedLookName(selected));
-                        }
-                        if (tab == Tab.SAVED) load(); updateSelectionActions();
-                        feedback.showToast("Look saved", "Ready whenever you are.");
-                    });
-                } else if (choice == removeType) feedback.runAsync("Removing saved look", () -> {
-                    try { store.removeItem(item.id()); return true; } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
-                }, done -> { if (tab == Tab.SAVED) load(); updateSelectionActions(); });
-                if (tab == Tab.SAVED) load(); updateSelectionActions();
-            } catch (Exception e) { feedback.showToast("Could not save look", message(e)); }
-        });
+        var invalid = javafx.beans.binding.Bindings.createBooleanBinding(
+                () -> name.getText().isBlank(), name.textProperty());
+        Platform.runLater(() -> { name.requestFocus(); name.selectAll(); });
+        StatusModal.Result choice = StatusModal.builder(() -> host)
+                .type(StatusModal.Type.INFO)
+                .title(existing ? "Edit saved look" : "Save look")
+                .message("Keep this outfit in Saved looks.")
+                .content(form).actionLabel("Save").actionIcon(LauncherIcons.Glyph.SAVE)
+                .secondaryLabel(existing ? "Remove saved look" : "Cancel")
+                .actionDisabled(invalid).showAndWait();
+        if (choice == StatusModal.Result.CLOSED || (!existing && choice == StatusModal.Result.SECONDARY)) return;
+        try {
+            if (choice == StatusModal.Result.PRIMARY) {
+                WardrobeItem saved = new WardrobeItem(item.id(), item.kind(), name.getText(), favorite.isSelected(), collection.getText(), item.payload());
+                feedback.runAsync("Saving look", () -> {
+                    WardrobeItem hydrated = api.hydrate(saved);
+                    try { store.saveItem(hydrated); } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
+                    return hydrated;
+                }, hydrated -> {
+                    if (selected != null && selected.id().equals(item.id())) {
+                        if (tab == Tab.SAVED) selected = hydrated;
+                        selectedName.setText(displayedLookName(selected));
+                    }
+                    if (tab == Tab.SAVED) load(); updateSelectionActions();
+                    feedback.showToast("Look saved", "Ready whenever you are.");
+                });
+            } else if (existing && choice == StatusModal.Result.SECONDARY) feedback.runAsync("Removing saved look", () -> {
+                try { store.removeItem(item.id()); return true; } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
+            }, done -> { if (tab == Tab.SAVED) load(); updateSelectionActions(); });
+            if (tab == Tab.SAVED) load(); updateSelectionActions();
+        } catch (Exception e) { feedback.showToast("Could not save look", message(e)); }
     }
 
     private String displayedLookName(WardrobeItem item) { return lookName(item); }
