@@ -39,7 +39,6 @@
     .llp-mod-icon { width:32px; height:32px; }
 }
 @media(prefers-reduced-motion:reduce) { .launcher-library-preview * { transition:none!important; } }
-.llp-demo-note { margin:0; padding:10px 16px; border-top:1px solid #ffffff0a; font-size:10px; color:#94a3b8; }
 .llp-config { padding:16px; width:100%; max-height:100%; overflow:auto; background:#0e1524; border:1px solid #ffffff1a; border-radius:14px; box-shadow:0 16px 48px #02061780; }
 .llp-panel-heading { display:flex; align-items:center; gap:8px; color:#94a3b8; padding-bottom:16px; border-bottom:1px solid #ffffff12; }
 .llp-panel-heading h3 { font-size:14px; font-weight:800; color:#f8fafc; margin:0; min-width:0; }

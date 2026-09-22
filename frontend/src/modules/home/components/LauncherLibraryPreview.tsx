@@ -80,7 +80,6 @@ export function LauncherLibraryPreview({ projects = [], loading = false }: { pro
                 </div>
             </div>
             {configProject && <LauncherConfigPreview key={configProject.id} project={configProject.title} saved={configs[configProject.id] ?? defaultModConfig} onSave={values => setConfigs(current => ({ ...current, [configProject.id]: values }))} onClose={() => setConfigProject(null)} />}
-            <p className="llp-demo-note" role="status">{updating ? 'Updating demo mods…' : Object.keys(updates).length ? 'Mods updated. Ready for your next game.' : 'Try the launcher · Changes stay in this preview.'}</p>
         </div>
     );
 }
