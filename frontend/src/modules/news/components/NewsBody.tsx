@@ -2,6 +2,7 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
+import { PriorityVideo } from '@/components/ui/PriorityVideo';
 import { FeatureDemo } from './FeatureDemo';
 import clips from '@/data/newsMediaVersions.json';
 import './news-body.css';
@@ -24,7 +25,7 @@ export function NewsBody({ content }: { content: string }) {
             if (typeof clip === 'string' && Object.hasOwn(clips, clip)) return <FeatureDemo clip={clip as keyof typeof clips} alt={props['data-demo-alt'] || 'Product walkthrough'} />;
             return <div {...props} />;
         },
-        video: ({ node: _node, ...props }: any) => <video {...props} controls playsInline preload="metadata" />,
+        video: ({ node: _node, children: _children, ...props }: any) => <PriorityVideo {...props} controls playsInline />,
         a: ({ node: _node, ...props }: any) => <a {...props} rel="noopener noreferrer" />,
     }}>{content}</ReactMarkdown></div>;
 }

@@ -5,7 +5,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import net.modtale.launcher.platform.SystemFileOpener;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -17,13 +16,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import net.modtale.launcher.api.ModtaleApiException;
 import net.modtale.launcher.logging.LogSanitizer;
-import net.modtale.launcher.platform.SystemBrowser;
 import net.modtale.launcher.settings.LauncherConfig;
 import net.modtale.launcher.logging.LauncherLog;
 import net.modtale.launcher.logging.LauncherLogger;
@@ -80,6 +77,7 @@ public class LauncherUpdateService {
 
         Optional<GitHubAsset> asset = compatibleAsset(release.assets(), System.getProperty("os.name", ""),
                 System.getProperty("os.arch", ""));
+        if (asset.isEmpty()) return Optional.empty();
         return Optional.of(new LauncherUpdateCandidate(
                 latestVersion,
                 release.tagName(),
@@ -87,13 +85,15 @@ public class LauncherUpdateService {
                 release.htmlUrl(),
                 asset.map(GitHubAsset::name).orElse(null),
                 asset.map(GitHubAsset::browserDownloadUrl).orElse(null),
-                release.prerelease()
+                release.prerelease(),
+                asset.map(GitHubAsset::size).orElse(0L),
+                asset.map(GitHubAsset::digest).orElse(null)
         ));
     }
 
     public Path downloadInstaller(LauncherUpdateCandidate update) {
         if (update == null || !update.hasInstallerAsset()) {
-            throw new ModtaleApiException("No compatible launcher installer is attached to this release.");
+            throw new ModtaleApiException("No compatible automatic launcher update is attached to this release.");
         }
 
         URI downloadUri = URI.create(update.assetDownloadUrl());
@@ -113,14 +113,23 @@ public class LauncherUpdateService {
                 ensureSuccess(response.statusCode(), downloadUri.toString());
                 Path temporary = Files.createTempFile(target.getParent(), ".modtale-update-", ".tmp");
                 try {
-                    Files.copy(body, temporary, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    try (var output = Files.newOutputStream(temporary)) {
+                        byte[] buffer = new byte[65536];
+                        long downloaded = 0;
+                        for (int read; (read = body.read(buffer)) != -1;) {
+                            downloaded += read;
+                            if (downloaded > 256L * 1024 * 1024) throw new IOException("Launcher update exceeds the download size limit.");
+                            output.write(buffer, 0, read);
+                        }
+                    }
+                    if (update.assetSize() > 0 && Files.size(temporary) != update.assetSize()) {
+                        throw new IOException("The launcher update download is incomplete.");
+                    }
+                    verifyDigest(temporary, update.assetDigest());
                     Files.move(temporary, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 } finally {
                     Files.deleteIfExists(temporary);
                 }
-            }
-            if (isLinuxAppImage(target)) {
-                target.toFile().setExecutable(true, false);
             }
             return target;
         } catch (IOException ex) {
@@ -133,29 +142,55 @@ public class LauncherUpdateService {
         }
     }
 
-    public void openInstaller(Path installer) {
-        if (installer == null) {
-            return;
-        }
+    public void installUpdate(Path installer, LauncherUpdateCandidate update) {
         try {
-            SystemFileOpener.open(installer);
+            new LauncherPayloadInstaller().install(installer, update.version());
         } catch (IOException ex) {
-            LOG.warn("Could not open launcher installer " + installer, ex);
-            throw new ModtaleApiException("Could not open launcher installer " + installer, ex);
+            LOG.warn("Could not install launcher update " + installer, ex);
+            throw new ModtaleApiException("Could not install launcher update: " + ex.getMessage(), ex);
         }
     }
 
-    public void openReleasePage(LauncherUpdateCandidate update) {
-        String releaseUrl = update == null ? null : update.releaseUrl();
-        if (releaseUrl == null || releaseUrl.isBlank()) {
-            releaseUrl = "https://github.com/" + repository + "/releases";
+    public String installationMessage() {
+        return "The launcher will download the update and restart automatically. Your settings and library will be preserved.";
+    }
+
+    public Optional<String> consumeUpdateFailure() {
+        String root = System.getenv("MODTALE_UPDATE_ROOT");
+        if (root == null) return Optional.empty();
+        Path failure = Path.of(root).resolve("update-failure");
+        try {
+            if (!Files.exists(failure)) return Optional.empty();
+            String message = Files.readString(failure);
+            Files.delete(failure);
+            return Optional.of(message);
+        } catch (IOException ex) {
+            LOG.warn("Could not read update result", ex);
+            return Optional.empty();
+        }
+    }
+
+    static void verifyDigest(Path file, String expected) throws IOException {
+        if (expected == null || !expected.startsWith("sha256:")) {
+            throw new IOException("The release is missing its update checksum.");
         }
         try {
-            SystemBrowser.open(URI.create(releaseUrl));
-        } catch (IOException ex) {
-            LOG.warn("Could not open launcher release page " + LogSanitizer.url(releaseUrl), ex);
-            throw new ModtaleApiException("Could not open launcher release page " + releaseUrl, ex);
+            var digest = java.security.MessageDigest.getInstance("SHA-256");
+            try (var input = Files.newInputStream(file)) {
+                byte[] buffer = new byte[65536];
+                for (int read; (read = input.read(buffer)) != -1;) digest.update(buffer, 0, read);
+            }
+            String actual = "sha256:" + java.util.HexFormat.of().formatHex(digest.digest());
+            if (!actual.equalsIgnoreCase(expected)) throw new IOException("The launcher update checksum did not match. Try again.");
+        } catch (java.security.NoSuchAlgorithmException ex) {
+            throw new IOException("SHA-256 is unavailable", ex);
         }
+    }
+
+    public boolean canInstallUpdates() {
+        String root = System.getenv("MODTALE_UPDATE_ROOT");
+        String executable = System.getenv("MODTALE_LAUNCHER_EXECUTABLE");
+        return root != null && !root.isBlank() && executable != null && !executable.isBlank();
     }
 
     static Optional<String> compatibleAssetName(List<String> assetNames, String osName, String arch) {
@@ -164,7 +199,7 @@ public class LauncherUpdateService {
         }
         return assetNames.stream()
                 .filter(name -> isCompatibleAssetName(name, osName, arch))
-                .max(Comparator.comparingInt(name -> assetScore(name, osName, arch)));
+                .findFirst();
     }
 
     private Optional<GitHubRelease> latestLauncherRelease(String channel) {
@@ -219,7 +254,10 @@ public class LauncherUpdateService {
         }
         return assets.stream()
                 .filter(asset -> isCompatibleAssetName(asset.name(), osName, arch))
-                .max(Comparator.comparingInt(asset -> assetScore(asset.name(), osName, arch)));
+                .filter(asset -> asset.browserDownloadUrl() != null && !asset.browserDownloadUrl().isBlank())
+                .filter(asset -> asset.size() > 0 && asset.digest() != null
+                        && asset.digest().matches("sha256:[0-9a-fA-F]{64}"))
+                .findFirst();
     }
 
     private static boolean isCompatibleAssetName(String assetName, String osName, String arch) {
@@ -227,80 +265,23 @@ public class LauncherUpdateService {
         String os = osName == null ? "" : osName.toLowerCase(Locale.ROOT);
         String normalizedArch = normalizeArch(arch);
 
-        if (os.contains("win")) {
-            return (name.endsWith(".exe") || name.endsWith(".msi"))
-                    && architectureMatchesOrIsUnspecified(name, normalizedArch);
-        }
-        if (os.contains("mac") || os.contains("darwin")) {
-            return (name.endsWith(".dmg") || name.endsWith(".pkg"))
-                    && architectureMatchesOrIsUnspecified(name, normalizedArch);
-        }
-        if (os.contains("linux")) {
-            return name.endsWith(".appimage")
-                    && architectureMatchesOrIsUnspecified(name, normalizedArch);
-        }
-        return false;
-    }
-
-    private static int assetScore(String assetName, String osName, String arch) {
-        String name = assetName == null ? "" : assetName.toLowerCase(Locale.ROOT);
-        String os = osName == null ? "" : osName.toLowerCase(Locale.ROOT);
-        String normalizedArch = normalizeArch(arch);
-        int score = 0;
-        if (os.contains("win")) {
-            score += name.endsWith(".exe") ? 20 : 10;
-            score += name.contains("windows") || name.contains("win") ? 4 : 0;
-            score += architectureScore(name, normalizedArch);
-        } else if (os.contains("mac") || os.contains("darwin")) {
-            score += name.endsWith(".dmg") ? 20 : 10;
-            score += name.contains("mac") || name.contains("darwin") ? 4 : 0;
-            score += architectureScore(name, normalizedArch);
-        } else if (os.contains("linux")) {
-            score += name.endsWith(".appimage") ? 20 : 0;
-            score += architectureScore(name, normalizedArch);
-        }
-        return score;
-    }
-
-    private static boolean architectureMatchesOrIsUnspecified(String name, String normalizedArch) {
-        boolean armAsset = name.contains("aarch64") || name.contains("arm64");
-        boolean x64Asset = name.contains("x86_64") || name.contains("amd64") || name.contains("x64");
-        if ("aarch64".equals(normalizedArch)) {
-            return !x64Asset;
-        }
-        if ("x86_64".equals(normalizedArch)) {
-            return !armAsset;
-        }
-        return true;
-    }
-
-    private static int architectureScore(String name, String normalizedArch) {
-        if ("aarch64".equals(normalizedArch) && (name.contains("aarch64") || name.contains("arm64"))) {
-            return 8;
-        }
-        if ("x86_64".equals(normalizedArch)
-                && (name.contains("x86_64") || name.contains("amd64") || name.contains("x64"))) {
-            return 8;
-        }
-        return 0;
+        String platform = os.contains("mac") || os.contains("darwin") ? "macos"
+                : os.contains("win") ? "windows" : os.contains("linux") ? "linux" : "unsupported";
+        return name.endsWith("-" + platform + "-" + normalizedArch + "-update.zip");
     }
 
     private Path installerTarget(String assetName) {
-        Path downloads = Path.of(System.getProperty("user.home", "."), "Downloads");
-        Path directory = Files.isDirectory(downloads) && Files.isWritable(downloads)
-                ? downloads
-                : Path.of(System.getProperty("java.io.tmpdir"));
-        return directory.resolve(safeFilename(assetName));
+        try {
+            return Files.createTempDirectory("modtale-update-").resolve(safeFilename(assetName));
+        } catch (IOException ex) {
+            throw new ModtaleApiException("Could not prepare the launcher update download.", ex);
+        }
     }
 
     private HttpRequest.Builder requestBuilder(URI uri) {
         return HttpRequest.newBuilder(uri)
                 .timeout(Duration.ofSeconds(60))
                 .header("User-Agent", "ModtaleLauncher/" + LauncherVersion.current());
-    }
-
-    private static boolean isLinuxAppImage(Path path) {
-        return path != null && path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".appimage");
     }
 
     private static String normalizeArch(String arch) {
@@ -345,7 +326,9 @@ public class LauncherUpdateService {
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record GitHubAsset(
             String name,
-            @JsonProperty("browser_download_url") String browserDownloadUrl
+            @JsonProperty("browser_download_url") String browserDownloadUrl,
+            long size,
+            String digest
     ) {
     }
 }

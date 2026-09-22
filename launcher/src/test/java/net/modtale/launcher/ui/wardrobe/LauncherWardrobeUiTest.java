@@ -24,11 +24,9 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
-import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonBase;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
-import javafx.scene.control.DialogPane;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
@@ -130,15 +128,13 @@ class LauncherWardrobeUiTest {
                 FutureTask<Void> opened = submitFx(() -> { button(harness.root(), "Save look").fire(); return null; });
                 await("native save dialog", () -> dialog() != null);
                 fx(() -> {
-                    DialogPane dialog = dialog();
+                    Node dialog = dialog();
                     List<TextField> fields = nodes(dialog, TextField.class);
                     assertEquals(2, fields.size());
                     fields.get(0).setText("Fixture Ember Favorite");
                     fields.get(1).setText("Fixture Adventures");
                     nodes(dialog, CheckBox.class).getFirst().fire();
-                    var saveType = dialog.getButtonTypes().stream()
-                            .filter(type -> type.getButtonData() == ButtonBar.ButtonData.OK_DONE).findFirst().orElseThrow();
-                    ((Button) dialog.lookupButton(saveType)).fire();
+                    ((Button) dialog.lookup(".status-modal-primary")).fire();
                     return null;
                 });
                 opened.get(10, TimeUnit.SECONDS);
@@ -280,11 +276,11 @@ class LauncherWardrobeUiTest {
         return nodes(root, TextField.class).stream().filter(field -> prompt.equals(field.getPromptText())).findFirst().orElseThrow();
     }
 
-    private static DialogPane dialog() {
+    private static Node dialog() {
         for (Window window : List.copyOf(Window.getWindows())) {
             if (window.isShowing() && window.getScene() != null) {
-                var panes = nodes(window.getScene().getRoot(), DialogPane.class);
-                if (!panes.isEmpty()) return panes.getFirst();
+                Node modal = window.getScene().getRoot().lookup(".status-modal");
+                if (modal != null) return modal;
             }
         }
         return null;

@@ -1,0 +1,15 @@
+.news-skeleton .news-skeleton-media {
+    background-image: radial-gradient(ellipse at 20% 15%, rgb(96 165 250 / 10%), transparent 65%),
+        linear-gradient(135deg, rgb(148 163 184 / 4%), rgb(148 163 184 / 10%));
+}
+.news-skeleton-card {
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgb(15 23 42 / 2%);
+}
+.news-skeleton-title .skeleton {
+    height: clamp(30px, 3.3vw, 42px);
+    border-radius: 8px;
+}
+@media (max-width: 600px) {
+    .news-skeleton-title .skeleton { height: 30px; }
+}

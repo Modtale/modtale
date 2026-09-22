@@ -21,7 +21,8 @@ const Demo = Node.create({
     renderHTML: ({ node }) => ['div', { 'data-demo-clip': node.attrs.clip, 'data-demo-alt': node.attrs.alt }],
     addNodeView: () => ({ node }) => {
         const dom = document.createElement('div'); dom.className = 'news-editor-demo';
-        const image = document.createElement('img'); image.src = `/assets/news/${encodeURIComponent(node.attrs.clip)}.jpg`; image.alt = node.attrs.alt;
+        const version = clips[node.attrs.clip as keyof typeof clips];
+        const image = document.createElement('img'); image.src = `/assets/news/${encodeURIComponent(node.attrs.clip)}.jpg${version ? `?v=${version}` : ''}`; image.alt = node.attrs.alt;
         const caption = document.createElement('span'); caption.textContent = `Demo · ${node.attrs.clip.replaceAll('-', ' ')}`;
         dom.append(image, caption); return { dom };
     },

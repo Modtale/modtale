@@ -821,7 +821,7 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                     {results.map(project => (
                         <button key={project.id} type="button" onClick={event => { event.preventDefault(); void openVersionPicker(project); }} className={`w-full text-left px-4 py-3 ${theme.colors.bgSurfaceHover} flex justify-between items-center text-sm transition-colors group`}>
                             <div className="flex items-center gap-3 min-w-0">
-                                <img src={getIconUrl(project.imageUrl)} className="w-8 h-8 rounded-md bg-slate-200 object-cover shrink-0" alt="" onError={event => event.currentTarget.src='/assets/favicon.svg'} />
+                                <img src={getIconUrl(project.imageUrl)} className="w-8 h-8 rounded-md border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 bg-slate-200 object-cover shrink-0" alt="" onError={event => event.currentTarget.src='/assets/favicon.svg'} />
                                 <div className="min-w-0">
                                     <div className={`font-bold ${theme.colors.textPrimary} group-hover:${theme.colors.accent} truncate`}>{project.title}</div>
                                     <div className={`text-xs ${theme.colors.textMuted}`}>by {project.author}</div>
@@ -872,11 +872,11 @@ export const DependencySelector: React.FC<DependencySelectorProps> = ({
                                             </div>
                                         )}
                                         {isExternal && !meta?.icon ? (
-                                            <div className="w-8 h-8 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-300 flex items-center justify-center shrink-0">
+                                            <div className="w-8 h-8 rounded border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-300 flex items-center justify-center shrink-0">
                                                 <ExternalLink className="w-4 h-4" />
                                             </div>
                                         ) : (
-                                            <img src={getIconUrl(meta?.icon)} alt="" className={`w-8 h-8 rounded ${theme.colors.bgSurfaceAlt} object-cover shrink-0`} onError={event => event.currentTarget.src='/assets/favicon.svg'} />
+                                            <img src={getIconUrl(meta?.icon)} alt="" className={`w-8 h-8 rounded border-2 border-white dark:border-slate-800 ring-1 ring-black/5 dark:ring-white/10 ${theme.colors.bgSurfaceAlt} object-cover shrink-0`} onError={event => event.currentTarget.src='/assets/favicon.svg'} />
                                         )}
                                         <div className="min-w-0">
                                             <div className={`font-bold ${theme.colors.textPrimary} truncate`}>{dependency?.projectTitle || meta?.title || id}</div>
