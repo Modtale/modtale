@@ -3,7 +3,6 @@ type VideoEntry = {
     src: string;
     autoPlay: boolean;
     visible: boolean;
-    time: number;
     onDeactivate: () => void;
 };
 
@@ -20,7 +19,6 @@ function activate(next?: VideoEntry) {
     const previous = current;
     current = next;
     if (previous) {
-        previous.time = previous.element.currentTime;
         previous.element.pause();
         previous.element.removeAttribute('src');
         previous.element.preload = 'none';
@@ -31,6 +29,7 @@ function activate(next?: VideoEntry) {
     if (next) {
         next.element.preload = 'auto';
         next.element.src = next.src;
+        // A fresh load starts each appearance at the beginning.
         next.element.load();
         if (next.autoPlay) void next.element.play().catch(() => {});
     }
@@ -92,17 +91,13 @@ export function registerPriorityVideo(element: HTMLVideoElement, src: string, au
         document.addEventListener('visibilitychange', choose);
         document.addEventListener('fullscreenchange', schedule);
     }
-    const entry: VideoEntry = { element, src, autoPlay, visible: !observer, time: 0, onDeactivate };
-    const restoreTime = () => {
-        if (current === entry && entry.time > 0) element.currentTime = entry.time;
-    };
+    const entry: VideoEntry = { element, src, autoPlay, visible: !observer, onDeactivate };
     const interact = () => {
         if (!autoPlay && !document.hidden) activate(entry);
     };
     entries.add(entry);
     observer?.observe(element);
     resizeObserver?.observe(element);
-    element.addEventListener('loadedmetadata', restoreTime);
     element.addEventListener('pointerdown', interact);
     element.addEventListener('focus', interact);
     element.addEventListener('pause', schedule);
@@ -114,7 +109,6 @@ export function registerPriorityVideo(element: HTMLVideoElement, src: string, au
         entries.delete(entry);
         observer?.unobserve(element);
         resizeObserver?.unobserve(element);
-        element.removeEventListener('loadedmetadata', restoreTime);
         element.removeEventListener('pointerdown', interact);
         element.removeEventListener('focus', interact);
         element.removeEventListener('pause', schedule);

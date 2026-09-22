@@ -13,7 +13,9 @@ let pause: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
     vi.useFakeTimers();
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ top: 200, bottom: 600, left: 100, right: 900, width: 800, height: 400 } as DOMRect);
-    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(function (this: HTMLMediaElement) {
+        this.currentTime = 0;
+    });
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     host = document.createElement('div'); document.body.append(host); root = createRoot(host);
     preference = Object.assign(new EventTarget(), { matches: false });
@@ -34,12 +36,13 @@ async function visible(value: boolean) {
         vi.advanceTimersByTime(20);
     });
 }
-it('loads and plays only on screen, cancels buffering off screen, and restores the playback position', async () => {
+it('loads and plays only on screen, cancels buffering off screen, and restarts on each appearance', async () => {
     await act(async () => root.render(<LauncherDemo clip="world-library" alt="World mod selection" />));
     const video = host.querySelector('video')!;
     expect(video.hasAttribute('src')).toBe(false);
     expect(play).not.toHaveBeenCalled();
     await visible(true);
+    expect(video.currentTime).toBe(0);
     expect(video.src).toContain('world-library.mp4');
     expect(video.playbackRate).toBe(1);
     expect(video.muted).toBe(true); expect(video.loop).toBe(true); expect(video.controls).toBe(false);
@@ -47,10 +50,9 @@ it('loads and plays only on screen, cancels buffering off screen, and restores t
     video.currentTime = 5;
     pause.mockClear(); await visible(false);
     expect(pause).toHaveBeenCalled(); expect(video.hasAttribute('src')).toBe(false);
-    video.currentTime = 0;
     await visible(true);
     video.dispatchEvent(new Event('loadedmetadata'));
-    expect(video.currentTime).toBe(5);
+    expect(video.currentTime).toBe(0);
 });
 it('keeps the poster visible until playback and respects reduced motion', async () => {
     await act(async () => root.render(<LauncherDemo clip="wardrobe" alt="Customize a look" />));
