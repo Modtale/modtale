@@ -345,6 +345,9 @@ def bootstrapExecutable = bootstrapTarget.map {
 tasks.register('buildBootstrap', Exec) {
     inputs.dir('bootstrap/src')
     inputs.files('bootstrap/Cargo.toml', 'bootstrap/Cargo.lock', 'bootstrap/build.rs')
+    if (currentOs.isWindows()) {
+        inputs.file(appIconIco)
+    }
     outputs.file(bootstrapExecutable)
     environment 'CARGO_TARGET_DIR', bootstrapTarget.get().asFile.absolutePath
     commandLine 'cargo', 'build', '--locked', '--release', '--manifest-path', file('bootstrap/Cargo.toml').absolutePath
@@ -421,11 +424,13 @@ def configureJpackageTask = { TaskProvider<Exec> packageTask, String packageType
 configureJpackageTask(
         tasks.register('packageWindows', Exec) {
             description = 'Builds a self-contained Windows .exe installer with automatic Java runtime setup.'
+            inputs.file('packaging/windows/main.wxs')
         },
         windowsPackageType,
         { currentOs.isWindows() },
         {
             def args = [
+                    '--resource-dir', file('packaging/windows').absolutePath,
                     '--win-menu',
                     '--win-menu-group', appDisplayName,
                     '--win-shortcut',

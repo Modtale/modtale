@@ -54,7 +54,7 @@ fn main() {
             {
                 let _ = writeln!(log, "{message}");
             }
-            if !diagnostic() {
+            if !diagnostic() && !install_only() {
                 dialog::message("Modtale Launcher", &message, true);
             }
             std::process::exit(1);
@@ -66,6 +66,11 @@ fn diagnostic() -> bool {
     env::args_os()
         .nth(1)
         .is_some_and(|a| a == "--modtale-bootstrap-check")
+}
+fn install_only() -> bool {
+    env::args_os()
+        .nth(1)
+        .is_some_and(|a| a == "--modtale-install-runtime")
 }
 fn http_agent(timeout: Duration) -> ureq::Agent {
     let config = ureq::Agent::config_builder();
@@ -265,6 +270,10 @@ fn run() -> Result<i32> {
     writeln!(log, "Launcher update directory: {}", update_root.display())?;
     let cache = state.join("runtime-25");
     let java = install_runtime(&state, &cache, &installed_app, &log)?;
+    if install_only() {
+        writeln!(log, "Installer prepared runtime: {}", java.display())?;
+        return Ok(0);
+    }
     let mut app = installed_app.clone();
     if let Some(candidate) = active_update(&update_root) {
         if serde_json::from_slice::<Config>(
@@ -418,7 +427,7 @@ fn install_runtime(state: &Path, cache: &Path, app: &Path, log: &File) -> Result
             }
         }
     }
-    if !diagnostic() {
+    if !diagnostic() && !install_only() {
         dialog::message(
             "Modtale Launcher — Java setup",
             "Modtale needs to download Java before it can start. Hytale does not need to be installed.\n\nClick OK to begin. Setup may take several minutes. Modtale will open automatically when it finishes. Future launches can use this Java installation offline.",
