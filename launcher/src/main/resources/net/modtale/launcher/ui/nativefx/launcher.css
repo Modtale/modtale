@@ -8249,11 +8249,11 @@
     -fx-cursor: hand;
     -fx-min-height: 142px;
     -fx-padding: 0;
-    -fx-background-radius: 16px;
-    -fx-border-radius: 16px;
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
     -fx-border-width: 1px;
-    -fx-border-color: rgba(255, 255, 255, 0.10);
-    -fx-background-color: #0f172a;
+    -fx-border-color: rgba(148, 163, 184, 0.16);
+    -fx-background-color: #101a2b;
     -fx-effect: dropshadow(gaussian, rgba(2, 6, 23, 0.12), 10, 0.10, 0, 4);
     -fx-spacing: 0;
 }
@@ -8265,7 +8265,7 @@
 }
 
 .play-news-thumbnail {
-    -fx-background-radius: 16px 16px 0 0;
+    -fx-background-radius: 12px 12px 0 0;
     -fx-border-radius: 11px;
     -fx-border-width: 0;
     -fx-border-color: rgba(191, 219, 254, 0.14);
@@ -8279,15 +8279,16 @@
 .play-news-initial {
     -fx-text-fill: #e5f4ff;
     -fx-font-size: 22px;
-    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
-    -fx-font-weight: 900;
+    -fx-font-family: "Inter SemiBold", "Inter", "SF Pro Text", "Segoe UI", "System";
+    -fx-font-weight: 600;
 }
 
 .play-news-title {
     -fx-text-fill: #f8fafc;
-    -fx-font-size: 14px;
-    -fx-font-family: "Inter Black", "Inter", "SF Pro Text", "Segoe UI", "System";
-    -fx-font-weight: 900;
+    -fx-font-size: 15px;
+    -fx-line-spacing: 2px;
+    -fx-font-family: "Inter SemiBold", "Inter", "SF Pro Text", "Segoe UI", "System";
+    -fx-font-weight: 600;
 }
 
 .play-news-card:hover .play-news-title {
@@ -8297,8 +8298,8 @@
 .play-news-date {
     -fx-text-fill: #9fb0c6;
     -fx-font-size: 11px;
-    -fx-font-family: "Inter ExtraBold", "Inter", "SF Pro Text", "Segoe UI", "System";
-    -fx-font-weight: 800;
+    -fx-font-family: "Inter", "Inter", "SF Pro Text", "Segoe UI", "System";
+    -fx-font-weight: 500;
 }
 
 .play-selector-label,
@@ -9712,7 +9713,7 @@
 }
 
 .play-news-copy {
-    -fx-padding: 12px;
+    -fx-padding: 14px 16px 18px;
 }
 
 .play-news-source {

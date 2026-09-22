@@ -738,8 +738,7 @@ public final class LauncherPlayController {
 
     private Node friendsSection() {
         VBox section = sidebarSection();
-        section.getChildren().add(sectionHeader("Friends", LauncherIcons.Glyph.REFRESH_CW, "Refresh Hytale friends",
-                () -> loadHytaleFriends(true)));
+        section.getChildren().add(sectionHeader("Friends"));
         friendsList.getStyleClass().add("play-friends-list");
         section.getChildren().add(friendsList);
         return section;
@@ -748,9 +747,7 @@ public final class LauncherPlayController {
     private Node newsSection() {
         VBox section = new VBox(16);
         section.getStyleClass().add("play-news-section");
-        Node header = sectionHeader("News", LauncherIcons.Glyph.REFRESH_CW, "Refresh news", () -> {
-            if (!blogPostsLoading) loadBlogPosts();
-        });
+        Node header = sectionHeader("News");
         header.getStyleClass().add("play-news-header");
         newsList.getStyleClass().add("play-news-grid");
         newsList.setMinWidth(0);
@@ -779,7 +776,7 @@ public final class LauncherPlayController {
         return section;
     }
 
-    private Node sectionHeader(String title, LauncherIcons.Glyph glyph, String tooltip, Runnable action) {
+    private Node sectionHeader(String title) {
         HBox header = new HBox(10);
         header.getStyleClass().add("play-sidebar-header");
         header.setAlignment(Pos.CENTER_LEFT);
@@ -787,14 +784,7 @@ public final class LauncherPlayController {
         label.getStyleClass().add("play-sidebar-section-title");
         label.setMaxHeight(Double.MAX_VALUE);
         label.setAlignment(Pos.CENTER_LEFT);
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        Button button = new Button(null, LauncherIcons.icon(glyph, 15));
-        button.getStyleClass().addAll("icon-btn", "play-sidebar-icon-button");
-        button.setTooltip(new Tooltip(tooltip));
-        button.setAccessibleText(tooltip);
-        button.setOnAction(event -> action.run());
-        header.getChildren().addAll(label, spacer, button);
+        header.getChildren().add(label);
         return header;
     }
 
@@ -1203,7 +1193,7 @@ public final class LauncherPlayController {
                     blogPostsLoading = false;
                     blogPostsLoaded = true;
                     newsStatus.setText(result.failedSources().isEmpty() ? ""
-                            : "Could not load " + String.join(" and ", result.failedSources()) + " news. Refresh to try again.");
+                            : "Could not load " + String.join(" and ", result.failedSources()) + " news.");
                     setVisibleManaged(newsStatus, !result.failedSources().isEmpty());
                     renderInitialBlogPosts(result.posts());
                 }));
@@ -1262,9 +1252,28 @@ public final class LauncherPlayController {
         title.getStyleClass().add("play-news-title");
         title.setWrapText(true);
         title.setMinHeight(Region.USE_PREF_SIZE);
-        VBox copy = new VBox(title);
+        Label source = new Label(value(post.source(), "News"));
+        source.getStyleClass().add("play-news-source");
+        if ("Hytale".equalsIgnoreCase(post.source())) source.getStyleClass().add("hytale");
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox metadata = new HBox(8, source, spacer);
+        metadata.setAlignment(Pos.CENTER_LEFT);
+        if (post.publishedAt() != null) {
+            Label date = new Label(java.time.format.DateTimeFormatter.ofPattern("MMM d, uuuu", java.util.Locale.ENGLISH)
+                    .withZone(java.time.ZoneId.systemDefault()).format(post.publishedAt()));
+            date.getStyleClass().add("play-news-date");
+            metadata.getChildren().add(date);
+        }
+        VBox copy = new VBox(10, metadata, title);
         copy.getStyleClass().add("play-news-copy");
         row.getChildren().addAll(thumbnail, copy);
+        Rectangle cardClip = new Rectangle();
+        cardClip.setArcWidth(24);
+        cardClip.setArcHeight(24);
+        cardClip.widthProperty().bind(row.widthProperty());
+        cardClip.heightProperty().bind(row.heightProperty());
+        row.setClip(cardClip);
         return row;
     }
 
@@ -1288,8 +1297,8 @@ public final class LauncherPlayController {
             ImageView image = containedImageView(post.imageUrl(), NEWS_THUMBNAIL_WIDTH, NEWS_THUMBNAIL_HEIGHT);
             image.getStyleClass().add("play-news-image");
             Rectangle clip = new Rectangle(NEWS_THUMBNAIL_WIDTH, NEWS_THUMBNAIL_HEIGHT);
-            clip.setArcWidth(14);
-            clip.setArcHeight(14);
+            clip.setArcWidth(0);
+            clip.setArcHeight(0);
             image.fitWidthProperty().bind(thumbnail.widthProperty());
             image.fitHeightProperty().bind(thumbnail.heightProperty());
             clip.widthProperty().bind(thumbnail.widthProperty());
