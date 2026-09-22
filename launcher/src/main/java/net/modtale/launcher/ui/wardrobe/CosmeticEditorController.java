@@ -47,6 +47,10 @@ public final class CosmeticEditorController implements AutoCloseable {
     private final javafx.animation.PauseTransition resizePages = new javafx.animation.PauseTransition(javafx.util.Duration.millis(150));
     private int columns = 3, totalPages = 1;
     private final FlowPane colors = new FlowPane(7, 7);
+    private final VBox optionsSkeleton = new VBox(10,
+            new HBox(7, WardrobeSkeleton.line(28, 28), WardrobeSkeleton.line(28, 28),
+                    WardrobeSkeleton.line(28, 28), WardrobeSkeleton.line(28, 28)),
+            WardrobeSkeleton.line(160, 28));
     private final ComboBox<String> variant = new ComboBox<>();
     private final Label state = text("Loading the character creator…", "wardrobe-muted");
     private final Label choiceName = text("Your look", "wardrobe-selected-title");
@@ -69,7 +73,7 @@ public final class CosmeticEditorController implements AutoCloseable {
     private String accountProfileLoaded = "";
     private Map<String, Set<String>> unlocked = Map.of();
     private boolean permissionsKnown, accountLoading;
-    private boolean loading, applying, disposed, settingVariants;
+    private boolean loading, browsing, applying, disposed, settingVariants;
     private List<CosmeticOption> combinations = List.of();
     private String pendingCape;
     private final Map<String, Button> categoryButtons = new LinkedHashMap<>();
@@ -144,8 +148,12 @@ public final class CosmeticEditorController implements AutoCloseable {
         HBox actions = new HBox(8, save, apply);
         HBox.setHgrow(apply, Priority.ALWAYS);
         remove.getStyleClass().add("cosmetic-quiet-action");
+        optionsSkeleton.setVisible(false);
+        optionsSkeleton.managedProperty().bind(optionsSkeleton.visibleProperty());
+        optionsSkeleton.setMouseTransparent(true);
+        optionsSkeleton.setAccessibleText("Loading colors and styles");
         inspector.getChildren().addAll(previewNode, choiceName,
-                colors, variant, requirement, remove, changes, actions);
+                optionsSkeleton, colors, variant, requirement, remove, changes, actions);
         HBox workspace = new HBox(18, categories, selectionPanel, inspector); workspace.setAlignment(Pos.TOP_LEFT);
         workspace.setMinWidth(0);
         root.getChildren().addAll(toolbar, state, workspace);
@@ -157,13 +165,16 @@ public final class CosmeticEditorController implements AutoCloseable {
 
     private void loadCatalog(Path source) {
         if (disposed) return;
-        long ticket = ++generation; loading = true; state.setText("Reading Hytale’s character creator…");
+        long ticket = ++generation; loading = true; state.setText("");
+        categoryRail.getChildren().clear();
+        for (int i = 0; i < 8; i++) categoryRail.getChildren().add(WardrobeSkeleton.line(i % 3 == 0 ? 130 : 95, 24));
+        showGridSkeletons(); preview.showLoading();
         CompletableFuture.supplyAsync(() -> {
             try { return new CosmeticCatalogClient(source); } catch (IOException e) { throw new UncheckedIOException(e); }
         }, executor).whenComplete((value, error) -> Platform.runLater(() -> {
             if (disposed || ticket != generation) return;
             loading = false;
-            if (error != null) { state.setText("Install Hytale or set its game directory in Settings. " + message(error)); return; }
+            if (error != null) { categoryRail.getChildren().clear(); grid.getChildren().clear(); preview.clear(); state.setText("Install Hytale or set its game directory in Settings. " + message(error)); return; }
             assets = source; catalog = value;
             if (draft == null) { draft = new OutfitDraft(catalog.defaultSkin()); }
             if (pendingCape != null) { draft.choose("cape", pendingCape); pendingCape = null; category = "cape"; }
@@ -209,7 +220,11 @@ public final class CosmeticEditorController implements AutoCloseable {
         boolean filterOwned = ownedOnly.isSelected(); boolean known = permissionsKnown;
         Map<String, Set<String>> permissions = unlocked;
         categoryButtons.forEach((id, button) -> button.pseudoClassStateChanged(SELECTED, id.equals(key)));
-        state.setText("Loading cosmetics…");
+        browsing = true; state.setText(""); showGridSkeletons(); updatePagination();
+        optionsSkeleton.setVisible(false);
+        colors.setVisible(false); colors.setManaged(false);
+        variant.setVisible(false); variant.setManaged(false);
+        if (filterOwned && accountLoading && !known) return;
         CompletableFuture.supplyAsync(() -> {
             try {
                 if (!filterOwned) return catalog.browseAssets(key, "", requestedPage, pageSize);
@@ -228,6 +243,7 @@ public final class CosmeticEditorController implements AutoCloseable {
             } catch (IOException e) { throw new UncheckedIOException(e); }
         }, executor).whenComplete((result, error) -> Platform.runLater(() -> {
             if (disposed || ticket != generation) return;
+            browsing = false; updatePagination();
             grid.getChildren().clear();
             if (error != null) { state.setText(message(error)); return; }
             state.setText("");
@@ -242,6 +258,12 @@ public final class CosmeticEditorController implements AutoCloseable {
             String assetId = selected.contains(".") ? selected.substring(0, selected.indexOf('.')) : selected;
             showOptions(assetId); updateActions();
         }));
+    }
+
+    private void showGridSkeletons() {
+        grid.getChildren().clear();
+        for (int i = 0; i < columns * 4; i++) grid.getChildren().add(WardrobeSkeleton.card(145, true));
+        layoutCards();
     }
 
     private void layoutCards() {
@@ -263,11 +285,11 @@ public final class CosmeticEditorController implements AutoCloseable {
     }
 
     private void updatePagination() {
-        pagination.update(page, totalPages, false);
+        pagination.update(page, totalPages, loading || browsing);
     }
 
     private void goToPage(int target) {
-        if (target < 1 || target > totalPages || target == page) return;
+        if (loading || browsing || target < 1 || target > totalPages || target == page) return;
         page = target; browse();
     }
 
@@ -276,11 +298,14 @@ public final class CosmeticEditorController implements AutoCloseable {
         image.setFitWidth(140); image.setFitHeight(135); image.setPreserveRatio(true);
         Label fallback = text(option.label(), "wardrobe-card-fallback"); fallback.setMaxWidth(130); fallback.setWrapText(true);
         var skin = catalog.defaultSkin(); skin.put(option.category(), option.id());
-        thumbnails.load(assetsForPreview(), skin, option.category()).thenAccept(rendered -> {
+        StackPane skeleton = WardrobeSkeleton.portrait();
+        fallback.setVisible(false);
+        thumbnails.load(assetsForPreview(), skin, option.category()).whenComplete((rendered, error) -> {
             if (disposed) return;
-            image.setImage(rendered); fallback.setVisible(false);
+            skeleton.setVisible(false); fallback.setVisible(error != null);
+            if (error == null) image.setImage(rendered);
         });
-        StackPane art = new StackPane(fallback, image); art.getStyleClass().add("cosmetic-card-art"); art.setPrefSize(145, 145);
+        StackPane art = new StackPane(fallback, image, skeleton); art.getStyleClass().add("cosmetic-card-art"); art.setPrefSize(145, 145);
         Label name = text(option.label(), "wardrobe-card-name"); name.setMaxWidth(145);
         VBox contents = new VBox(8, art, name);
         if (permissionsKnown && !owned(option)) contents.getChildren().add(text("Locked", "wardrobe-card-detail"));
@@ -297,6 +322,7 @@ public final class CosmeticEditorController implements AutoCloseable {
 
     private void showOptions(String assetId) {
         colors.setDisable(true); variant.setDisable(true);
+        optionsSkeleton.setVisible(false);
         selectedAsset = assetId; combinations = List.of();
         if (assetId == null || assetId.isBlank() || catalog == null) {
             colors.getChildren().clear(); colors.setVisible(false); colors.setManaged(false);
@@ -304,10 +330,14 @@ public final class CosmeticEditorController implements AutoCloseable {
             choiceName.setText("Your character"); requirement.setText(""); return;
         }
         String key = category; long ticket = generation;
+        optionsSkeleton.setVisible(true);
+        colors.setVisible(false); colors.setManaged(false);
+        variant.setVisible(false); variant.setManaged(false);
         CompletableFuture.supplyAsync(() -> {
             try { return catalog.options(key, assetId); } catch (IOException e) { throw new UncheckedIOException(e); }
         }, executor).whenComplete((options, error) -> Platform.runLater(() -> {
             if (disposed || ticket != generation || !key.equals(category) || !assetId.equals(selectedAsset)) return;
+            optionsSkeleton.setVisible(false);
             if (error != null) { requirement.setText(message(error)); return; }
             colors.getChildren().clear(); settingVariants = true; variant.getItems().clear(); settingVariants = false;
             colors.setDisable(false); variant.setDisable(false);

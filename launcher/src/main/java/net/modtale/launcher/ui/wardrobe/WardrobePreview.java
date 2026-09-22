@@ -13,7 +13,6 @@ import javafx.scene.SceneAntialiasing;
 import javafx.scene.SubScene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.ProgressIndicator;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
@@ -65,7 +64,6 @@ public final class WardrobePreview {
         @Override public String toString() { return option == null ? "Rest pose" :
                 option.id().replaceAll("([a-z])([A-Z])", "$1 $2") + (option.kind().equals("EmotesFace") ? " · Face" : ""); }
     }
-    private final ProgressIndicator progress = new ProgressIndicator();
     private final Rotate yaw = new Rotate(0, Rotate.Y_AXIS);
     private final Rotate pitch = new Rotate(0, Rotate.X_AXIS);
     private PerspectiveCamera camera;
@@ -106,7 +104,6 @@ public final class WardrobePreview {
         clip.widthProperty().bind(viewport.widthProperty());
         clip.heightProperty().bind(viewport.heightProperty());
         viewport.setClip(clip);
-        progress.setMaxSize(32,32);
         status.setWrapText(true);
         status.managedProperty().bind(status.visibleProperty());
         viewport.setAccessibleText("Outfit preview");
@@ -185,8 +182,8 @@ public final class WardrobePreview {
         if (!replacing) controls(false, false);
         if (!replacing) {
             showStatus("Loading preview…");
-            viewport.getChildren().setAll(progress);
-        } else status.setText("Updating preview…");
+            viewport.getChildren().setAll(WardrobeSkeleton.portrait());
+        } else showStatus("Updating preview…");
         var draft = localSkin;
         var localFraming = framing;
         boolean back = focusBack;
@@ -243,6 +240,12 @@ public final class WardrobePreview {
         controls(false, true);
     }
 
+    void showLoading() {
+        clear();
+        showStatus("Loading preview…");
+        viewport.getChildren().setAll(WardrobeSkeleton.portrait());
+    }
+
     public void clear() {
         requireFx();
         cancel();
@@ -297,6 +300,10 @@ public final class WardrobePreview {
 
     private void showStatus(String message) {
         status.setText(message);
+        boolean loading = message.startsWith("Loading") || message.startsWith("Updating");
+        status.setGraphic(loading ? WardrobeSkeleton.line(110, 10) : null);
+        status.setContentDisplay(loading ? javafx.scene.control.ContentDisplay.GRAPHIC_ONLY : javafx.scene.control.ContentDisplay.TEXT_ONLY);
+        status.setAccessibleText(message);
         status.setVisible(true);
         javafx.scene.control.Tooltip.uninstall(viewport, interactionHelp);
         viewport.setAccessibleHelp(message);
@@ -305,6 +312,8 @@ public final class WardrobePreview {
     private void readyStatus(String state, String help) {
         // Keep a stable state string for diagnostics/tests without reserving footer space.
         status.setText(state);
+        status.setGraphic(null);
+        status.setAccessibleText(state);
         status.setVisible(false);
         interactionHelp.setText(help);
         javafx.scene.control.Tooltip.uninstall(viewport, interactionHelp);

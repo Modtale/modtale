@@ -9910,3 +9910,15 @@
 .share-config-file-icon .svg-icon { -fx-stroke: #94a3b8; }
 .share-config-filename { -fx-font-family: "Inter SemiBold"; -fx-font-size: 14px; -fx-text-fill: #f8fafc; }
 .share-config-path { -fx-font-size: 12px; -fx-text-fill: #94a3b8; }
+
+.wardrobe-skeleton-block {
+    -fx-background-color: linear-gradient(to bottom right, #293950, #1e2b40);
+    -fx-background-radius: 7;
+}
+.wardrobe-skeleton-card {
+    -fx-padding: 10;
+    -fx-background-color: #101b2e;
+    -fx-background-radius: 10;
+    -fx-border-color: #1e2d43;
+    -fx-border-radius: 10;
+}

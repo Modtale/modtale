@@ -195,13 +195,15 @@ public final class LauncherWardrobeController implements AutoCloseable {
         long generation = ++request;
         Tab requestedTab = tab; int requestedPage = page; int pageSize = cardColumns * 4;
         String query = search.getText().trim();
-        busy = true; setStatus("Loading looks…"); updateSelectionActions();
+        busy = true; setStatus(""); renderCards(); updateSelectionActions();
+        if (selected == null) preview.showLoading();
         CompletableFuture.supplyAsync(() -> {
             if (requestedTab == Tab.POPULAR) return popularPage(requestedPage, pageSize);
             return pageItems(savedLooks(query), requestedPage, pageSize);
         }, executor).whenComplete((items, error) -> Platform.runLater(() -> {
             if (disposed || generation != request) return;
             busy = false;
+            if (selected == null) preview.clear();
             if (error != null) { totalPages = Math.max(1, page); entries = List.of(); renderCards(); setStatus(message(error) + (requestedTab == Tab.POPULAR ? "  Reopen Popular skins to retry." : "  Try Search again.")); }
             else { entries = items.items(); totalPages = requestedTab == Tab.POPULAR && items.hasNext()
                     ? Math.max(totalPages, items.totalPages()) : items.totalPages(); setStatus(""); renderCards(); if (selected == null && !entries.isEmpty()) select(entries.getFirst()); }
@@ -257,6 +259,11 @@ public final class LauncherWardrobeController implements AutoCloseable {
     private void renderCards() {
         cards.getChildren().clear();
         updatePagination();
+        if (busy) {
+            for (int i = 0; i < cardColumns * 4; i++)
+                cards.add(WardrobeSkeleton.card(170, tab != Tab.SAVED), i % cardColumns, i / cardColumns);
+            return;
+        }
         for (int i = 0; i < entries.size(); i++) cards.add(card(entries.get(i)), i % cardColumns, i / cardColumns);
         if (entries.isEmpty()) {
             VBox empty = new VBox(12, LauncherIcons.icon(tab == Tab.SAVED ? LauncherIcons.Glyph.HEART : LauncherIcons.Glyph.SEARCH, 32),
@@ -273,19 +280,31 @@ public final class LauncherWardrobeController implements AutoCloseable {
         String url = tab == Tab.POPULAR ? popular.thumbnail(payload(item).path("skinId").asText()) : thumbnailResolver.apply(item);
         if (!url.isBlank()) image.setImage(new Image(url, 190, 190, true, true, true));
         Label fallback = label(item.kind() == WardrobeItem.Kind.CAPE ? "CAPE" : "SKIN", "wardrobe-card-fallback");
-        if (image.getImage() != null) fallback.visibleProperty().bind(image.getImage().errorProperty().or(image.getImage().progressProperty().lessThan(1)));
+
         StackPane visual = new StackPane(fallback, image); visual.getStyleClass().add("wardrobe-card-art");
+        StackPane skeleton = WardrobeSkeleton.portrait();
+        visual.getChildren().add(skeleton);
+        skeleton.setVisible(false);
+        if (image.getImage() != null) {
+            Image remote = image.getImage();
+            skeleton.visibleProperty().bind(remote.progressProperty().lessThan(1).and(remote.errorProperty().not()));
+            fallback.visibleProperty().bind(remote.errorProperty());
+        }
         JsonNode savedSkin = payload(item).path("skin");
         java.nio.file.Path assets = editor.assetsForPreview();
         if (url.isBlank() && java.nio.file.Files.isRegularFile(assets)) {
             CompletableFuture<Image> rendered = item.kind() == WardrobeItem.Kind.CAPE
                     ? localThumbnails.loadCape(assets, payload(item).path("cape").asText())
                     : savedSkin.isObject() ? localThumbnails.load(assets, savedSkin) : null;
-            if (rendered != null) rendered.thenAccept(thumbnail -> {
-                if (disposed) return;
-                image.setImage(thumbnail);
-                fallback.setVisible(false);
-            });
+            if (rendered != null) {
+                skeleton.setVisible(true); fallback.setVisible(false);
+                rendered.whenComplete((thumbnail, error) -> {
+                    if (disposed) return;
+                    skeleton.setVisible(false);
+                    fallback.setVisible(error != null);
+                    if (error == null) image.setImage(thumbnail);
+                });
+            }
         }
         visual.setPrefHeight(170); visual.setMinWidth(0); visual.setMaxWidth(Double.MAX_VALUE);
         String displayName = displayedLookName(item);
@@ -312,14 +331,14 @@ public final class LauncherWardrobeController implements AutoCloseable {
         long ticket = ++selectionRequest;
         resolvingPopular = false;
         if (tab == Tab.POPULAR && !payload(item).path("skin").isObject()) {
-            selected = item; resolvingPopular = true; preview.clear(); selectedDetail.setText("Loading popular outfit…");
+            selected = item; resolvingPopular = true; preview.showLoading(); selectedDetail.setText("");
             updateSelectionActions();
             CompletableFuture.supplyAsync(() -> popular.download(payload(item).path("skinId").asText()), executor)
                     .whenComplete((downloaded, error) -> Platform.runLater(() -> {
                         if (disposed || ticket != selectionRequest || tab != Tab.POPULAR) return;
                         resolvingPopular = false;
                         if (error == null) select(downloaded);
-                        else { selected = null; selectedDetail.setText(message(error)); updateSelectionActions(); }
+                        else { preview.clear(); selected = null; selectedDetail.setText(message(error)); updateSelectionActions(); }
                     }));
             return;
         }
@@ -330,7 +349,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
         if (java.nio.file.Files.isRegularFile(assets)) {
             if (item.kind() == WardrobeItem.Kind.SKIN && payload.path("skin").isObject()) { preview.focusCategory(""); preview.showLocal(assets, payload.path("skin")); }
             else if (item.kind() == WardrobeItem.Kind.CAPE) {
-                preview.clear();
+                preview.showLoading();
                 CompletableFuture.supplyAsync(() -> {
                     try {
                         var skin = new CosmeticCatalogClient(assets).defaultSkin();
@@ -339,7 +358,7 @@ public final class LauncherWardrobeController implements AutoCloseable {
                 }, executor).whenComplete((skin, error) -> Platform.runLater(() -> {
                     if (disposed || selected != item) return;
                     if (error == null) { preview.focusCategory("cape"); preview.showLocal(assets, skin); }
-                    else selectedDetail.setText(message(error));
+                    else { preview.clear(); selectedDetail.setText(message(error)); }
                 }));
             } else { preview.clear(); selectedDetail.setText("This old saved look needs an outfit file before it can be previewed."); }
         } else { preview.clear(); selectedDetail.setText("Set your Hytale game directory in Settings to preview this look."); }

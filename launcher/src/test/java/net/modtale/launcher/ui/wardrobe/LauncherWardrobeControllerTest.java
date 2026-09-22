@@ -55,6 +55,25 @@ class LauncherWardrobeControllerTest {
         fx(() -> { Platform.setImplicitExit(false); return null; });
     }
 
+    @Test void loadingCardsReplaceEmptyStateAndDisappearWhenSavedLooksArrive() throws Exception {
+        try (Harness h = new Harness()) {
+            h.store.saveItem(SKIN);
+            fx(() -> {
+                button(h.root(), "Saved looks").fire();
+                var grid = (javafx.scene.layout.GridPane) h.root().lookup("#wardrobe-cards");
+                assertEquals(grid.getColumnConstraints().size() * 4, grid.getChildren().size());
+                assertTrue(grid.getChildren().stream().allMatch(n -> n.getStyleClass().contains("wardrobe-skeleton-card") && n.isMouseTransparent()));
+                assertTrue(gridCards(h).isEmpty());
+                return null;
+            });
+            await(() -> card(h.root(), "Catalog skin") != null);
+            fx(() -> {
+                assertTrue(h.root().lookupAll(".wardrobe-skeleton-card").isEmpty());
+                return null;
+            });
+        }
+    }
+
     @Test void capePreviewTracksAccountSwitchAndMatchesExplicitApplyTarget() throws Exception {
         try (Harness h = new Harness()) {
             h.store.saveItem(CAPE);
@@ -222,13 +241,13 @@ class LauncherWardrobeControllerTest {
                     && !h.root().lookup("#wardrobe-pagination").isDisabled());
             String first = fx(() -> gridCards(h).getFirst().getAccessibleText());
             fx(() -> { button(h.root(), "Page 2").fire(); return null; });
-            await(() -> !gridCards(h).getFirst().getAccessibleText().equals(first)
+            await(() -> !gridCards(h).isEmpty() && !gridCards(h).getFirst().getAccessibleText().equals(first)
                     && !h.root().lookup("#wardrobe-pagination").isDisabled());
             fx(() -> {
                 var input = (TextField) h.root().lookup("#wardrobe-pagination").lookup(".pagination-jump-input");
                 input.setText("1"); button(h.root(), "Go to page").fire(); return null;
             });
-            await(() -> gridCards(h).getFirst().getAccessibleText().equals(first));
+            await(() -> !gridCards(h).isEmpty() && gridCards(h).getFirst().getAccessibleText().equals(first));
             h.gateway.skins = List.of(SKIN);
             fx(() -> { button(h.root(), "Popular skins").fire(); return null; });
             await(() -> h.root().lookup("#wardrobe-look-" + SKIN.id()) != null);
@@ -318,6 +337,7 @@ class LauncherWardrobeControllerTest {
                 .filter(b -> b.getStyleClass().contains("wardrobe-card")).toList();
     }
     private static boolean gridReady(Harness h) {
+        h.root().applyCss(); ((javafx.scene.Parent) h.root()).layout();
         var grid = (javafx.scene.layout.GridPane)h.root().lookup("#wardrobe-cards");
         return gridCards(h).size() == grid.getColumnConstraints().size() * 4 && !button(h.root(), "Next Page").isDisabled();
     }
