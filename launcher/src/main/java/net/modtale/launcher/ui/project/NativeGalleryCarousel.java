@@ -247,9 +247,9 @@ final class NativeGalleryCarousel {
             thumbnailScroller.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
             thumbnailScroller.setFitToHeight(true);
             thumbnailScroller.setPannable(true);
-            thumbnailScroller.setMinHeight(108);
-            thumbnailScroller.setPrefHeight(108);
-            thumbnailScroller.setMaxHeight(108);
+            thumbnailScroller.setMinHeight(128);
+            thumbnailScroller.setPrefHeight(128);
+            thumbnailScroller.setMaxHeight(128);
             thumbnailScroller.setMaxWidth(Double.MAX_VALUE);
             thumbnailScroller.viewportBoundsProperty().addListener(observable ->
                     loadVisibleThumbnails(thumbnailScroller.getHvalue()));

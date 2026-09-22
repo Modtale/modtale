@@ -110,6 +110,10 @@ public final class CosmeticCatalogClient {
         })).toList();
     }
 
+    public List<CosmeticCategory> availableCategories() {
+        return categories().stream().filter(category -> !catalog.get(category.key()).isEmpty()).toList();
+    }
+
     public boolean complete() { return true; }
     /** Published tag definitions; assignment semantics remain in the raw asset metadata. */
     public List<Tag> tags() { return tags; }

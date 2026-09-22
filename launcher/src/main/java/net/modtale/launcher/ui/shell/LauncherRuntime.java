@@ -75,7 +75,7 @@ public final class LauncherRuntime {
                 settingsController,
                 feedback,
                 services.executor(),
-                () -> stage
+                () -> sceneRoot() instanceof StackPane stack ? stack : null
         );
         settingsController.setLauncherUpdateCheckAction(launcherUpdateController::checkManually);
 

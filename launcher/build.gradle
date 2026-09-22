@@ -1112,3 +1112,22 @@ def resolveExecutable(String candidate, String displayName, String installHint =
 
     throw new GradleException("${displayName} was not found on PATH. ${installHint}")
 }
+
+
+tasks.register('packageLauncherUpdate', Zip) {
+    group = 'distribution'
+    dependsOn tasks.named('prepareJpackageInput')
+    def platform = currentOs.isWindows() ? 'windows' : currentOs.isMacOsX() ? 'macos' : 'linux'
+    archiveFileName = "${appSlug}-${packageVersion}-${platform}-${appImageArch()}-update.zip"
+    destinationDirectory = distributionDirectory
+    from(layout.buildDirectory.dir('jpackage/input'))
+    def updateConfig = layout.buildDirectory.file('update/bootstrap.json')
+    inputs.property('jvmArgs', launcherJvmArgs)
+    doFirst {
+        updateConfig.get().asFile.parentFile.mkdirs()
+        updateConfig.get().asFile.text = groovy.json.JsonOutput.toJson([
+                jvm_args: ['-Dfile.encoding=UTF-8'] + launcherJvmArgs
+        ])
+    }
+    from(updateConfig)
+}

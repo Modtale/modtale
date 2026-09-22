@@ -41,4 +41,32 @@ with tempfile.TemporaryDirectory(prefix="modtale bootstrap ü ") as directory:
     environment.pop("JAVA_HOME", None)
     environment.update(offline)
     subprocess.run([executable, "--modtale-bootstrap-check"], env=environment, check=True, timeout=45)
-    print("Packaged runtime setup and offline cache reuse passed")
+    if sys.platform == "win32":
+        app = executable.parent / "app"
+    elif sys.platform == "darwin":
+        app = executable.parent.parent / "app"
+    else:
+        app = executable.parent.parent / "lib" / "app"
+    # Use the bootstrap's actual installation identity. Windows may spell the
+    # same executable path differently from Python's resolved path.
+    log_path = cache.parent / "bootstrap.log"
+    prefix = "Launcher update directory: "
+    roots = [line.removeprefix(prefix) for line in log_path.read_text(encoding="utf-8").splitlines() if line.startswith(prefix)]
+    assert roots, "Bootstrap diagnostics must identify the installation update directory"
+    updates = Path(roots[-1])
+    assert updates.parent.name == "updates" and updates.parent.parent.samefile(cache.parent), "Updates must stay inside the isolated launcher state"
+    assert len(updates.name) == 64 and all(c in "0123456789abcdef" for c in updates.name), "Installation identity must remain a SHA-256 key"
+    payload = updates / "version-smoke"
+    payload.mkdir(parents=True)
+    for file in app.iterdir():
+        if file.name.endswith(".jar") or file.name == "bootstrap.json":
+            shutil.copyfile(file, payload / file.name)
+    (updates / "active").write_text(payload.name)
+    subprocess.run([executable, "--modtale-bootstrap-check"], env=environment, check=True, timeout=45)
+    log = log_path.read_text(encoding="utf-8")
+    assert f"Launcher application: {payload}" in log, "Existing executable must load the activated update"
+    (payload / "bootstrap.json").write_text("invalid")
+    subprocess.run([executable, "--modtale-bootstrap-check"], env=environment, check=True, timeout=45)
+    assert not (updates / "active").exists(), "Broken update must be deactivated"
+    assert (updates / "update-failure").exists(), "Update recovery must be reported to the launcher"
+    print("Packaged runtime setup, offline reuse, automatic updates and recovery passed")

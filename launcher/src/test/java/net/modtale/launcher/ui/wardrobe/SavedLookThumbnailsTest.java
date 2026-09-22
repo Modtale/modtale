@@ -69,6 +69,44 @@ class SavedLookThumbnailsTest {
         } finally { fx(() -> { thumbnails.close(); return null; }); }
     }
 
+    @Test
+    @EnabledIfEnvironmentVariable(named = "WARDROBE_ASSETS_ZIP", matches = ".+")
+    void skeletonUsesInstalledModelAndCachesMatchingCategoryCrops() throws Exception {
+        CountDownLatch started = new CountDownLatch(1);
+        try { Platform.startup(started::countDown); }
+        catch (IllegalStateException alreadyStarted) { started.countDown(); }
+        assertTrue(started.await(10, TimeUnit.SECONDS));
+        Path assets = Path.of(System.getenv("WARDROBE_ASSETS_ZIP"));
+        SavedLookThumbnails thumbnails = fx(SavedLookThumbnails::new);
+        try {
+            var row = fx(() -> new javafx.scene.layout.HBox(14));
+            for (String category : java.util.List.of("haircut", "overtop", "pants", "shoes", "cape")) {
+                var future = fx(() -> thumbnails.loadSkeleton(assets, category));
+                assertSame(future, fx(() -> thumbnails.loadSkeleton(assets, category)));
+                Image image = future.get(30, TimeUnit.SECONDS);
+                int visible = 0;
+                for (int y = 0; y < 256; y++) for (int x = 0; x < 256; x++) {
+                    int pixel = image.getPixelReader().getArgb(x, y);
+                    if (pixel != 0) { visible++; assertEquals(120, pixel >>> 24); }
+                }
+                assertTrue(visible > 500, category);
+                fx(() -> { var card = WardrobeSkeleton.cosmeticCard(future); card.setPrefWidth(175); row.getChildren().add(card); return null; });
+            }
+            assertSame(fx(() -> thumbnails.loadSkeleton(assets, "haircut")), fx(() -> thumbnails.loadSkeleton(assets, "eyes")));
+            String output = System.getenv("MODTALE_WARDROBE_SCREENSHOTS");
+            if (output != null && !output.isBlank()) fx(() -> {
+                row.setPadding(new javafx.geometry.Insets(20)); row.setStyle("-fx-background-color: #0b1220;");
+                var scene = new javafx.scene.Scene(row, 980, 245);
+                scene.getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
+                var snapshot = scene.snapshot(null);
+                var png = new java.awt.image.BufferedImage(980, 245, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                for (int y = 0; y < 245; y++) for (int x = 0; x < 980; x++) png.setRGB(x, y, snapshot.getPixelReader().getArgb(x, y));
+                javax.imageio.ImageIO.write(png, "png", Path.of(output, "hytale-model-skeletons.png").toFile());
+                return null;
+            });
+        } finally { fx(() -> { thumbnails.close(); return null; }); }
+    }
+
     private void verifySavedCards(Path assets, com.fasterxml.jackson.databind.JsonNode skin) throws Exception {
         var store = new net.modtale.launcher.wardrobe.WardrobeStore(directory.resolve("looks"));
         var payload = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode().set("skin", skin);

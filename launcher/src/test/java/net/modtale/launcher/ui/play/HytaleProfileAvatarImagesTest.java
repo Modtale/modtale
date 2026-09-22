@@ -21,6 +21,29 @@ class HytaleProfileAvatarImagesTest {
         catch (IllegalStateException started) { }
     }
 
+    @Test void visibleContentFillsAvatarDespiteTransparentPadding() throws Exception {
+        onFx(() -> {
+            var image = new WritableImage(64, 64);
+            for (int y = 24; y < 60; y++) {
+                for (int x = 20; x < 44; x++) image.getPixelWriter().setArgb(x, y, 0xffabcdef);
+            }
+            var view = new ImageView(image);
+            view.setFitWidth(34);
+            view.setFitHeight(34);
+            view.setPreserveRatio(true);
+            HytaleProfileAvatarImages.fitVisibleContent(view);
+            assertEquals(new javafx.geometry.Rectangle2D(20, 24, 24, 36), view.getViewport());
+            assertEquals(34, view.getBoundsInLocal().getHeight(), .01);
+
+            var replacement = new WritableImage(16, 16);
+            replacement.getPixelWriter().setArgb(2, 3, 0xffffffff);
+            view.setImage(replacement);
+            assertEquals(new javafx.geometry.Rectangle2D(2, 3, 1, 1), view.getViewport());
+            view.setImage(new WritableImage(16, 16));
+            assertNull(view.getViewport());
+        });
+    }
+
     @Test void failedArchiveUsesUsernameAndHidesInitialOnSuccess() throws Exception {
         onFx(() -> {
             var calls = new ArrayList<String>();

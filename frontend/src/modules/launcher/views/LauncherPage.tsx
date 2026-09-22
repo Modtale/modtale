@@ -281,7 +281,7 @@ export const LauncherPage: React.FC = () => {
                     </div>
                 </div>
                 <figure className="launcher-product-cover">
-                    <img src={`/assets/news/launcher-play.jpg?v=${mediaVersions['launcher-play']}`} alt="The Modtale Launcher Play tab with community projects, friends, and Hytale news" width="2560" height="1600" fetchPriority="high" />
+                    <img src={`/assets/news/launcher-play.jpg?v=${mediaVersions['launcher-play']}`} alt="The Modtale Launcher Play tab with community projects, friends, and Hytale news" width="1920" height="1200" fetchPriority="high" />
                 </figure>
             </header>
             </div>

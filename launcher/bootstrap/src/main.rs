@@ -256,11 +256,39 @@ fn run() -> Result<i32> {
         .create(true)
         .append(true)
         .open(state.join("bootstrap.log"))?;
-    let app = app_directory(&env::current_exe()?)?;
-    let config: Config = serde_json::from_reader(File::open(app.join("bootstrap.json"))?)?;
+    let installed_app = app_directory(&env::current_exe()?)?;
+    let base_config = fs::read(installed_app.join("bootstrap.json"))?;
+    let executable = env::var_os("APPIMAGE")
+        .map(PathBuf::from)
+        .unwrap_or(env::current_exe()?);
+    let update_root = update_root(&state, &executable, &base_config);
+    writeln!(log, "Launcher update directory: {}", update_root.display())?;
     let cache = state.join("runtime-25");
-    let java = install_runtime(&state, &cache, &app, &log)?;
+    let java = install_runtime(&state, &cache, &installed_app, &log)?;
+    let mut app = installed_app.clone();
+    if let Some(candidate) = active_update(&update_root) {
+        if serde_json::from_slice::<Config>(
+            &fs::read(candidate.join("bootstrap.json")).unwrap_or_default(),
+        )
+        .is_ok()
+            && probe(&java, &candidate, &log)
+        {
+            app = candidate;
+        } else {
+            writeln!(
+                log,
+                "Update startup check failed; using the installed launcher."
+            )?;
+            let _ = fs::remove_file(update_root.join("active"));
+            let _ = fs::write(
+                update_root.join("update-failure"),
+                "The update failed its startup check. The installed launcher has been restored. Try updating again.",
+            );
+        }
+    }
+    let config: Config = serde_json::from_reader(File::open(app.join("bootstrap.json"))?)?;
     writeln!(log, "Validated runtime: {}", java.display())?;
+    writeln!(log, "Launcher application: {}", app.display())?;
     if diagnostic() {
         return Ok(0);
     }
@@ -268,6 +296,8 @@ fn run() -> Result<i32> {
     // Replace the Unix bootstrap process so the Dock/taskbar does not retain a second launcher.
     let mut launch = application_command(&java, &app, &config);
     launch
+        .env("MODTALE_UPDATE_ROOT", &update_root)
+        .env("MODTALE_LAUNCHER_EXECUTABLE", &executable)
         .args(env::args_os().skip(1))
         .stdout(log.try_clone()?)
         .stderr(log.try_clone()?);
@@ -288,13 +318,38 @@ fn run() -> Result<i32> {
         Ok(0)
     }
 }
+fn update_root(state: &Path, executable: &Path, base_config: &[u8]) -> PathBuf {
+    let mut hash = Sha256::new();
+    hash.update(executable.as_os_str().as_encoded_bytes());
+    hash.update([0]);
+    hash.update(base_config);
+    state.join("updates").join(format!("{:x}", hash.finalize()))
+}
+
+fn active_update(root: &Path) -> Option<PathBuf> {
+    let name = fs::read_to_string(root.join("active")).ok()?;
+    if !name.starts_with("version-")
+        || !name.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-')
+    {
+        return None;
+    }
+    let app = root.join(name);
+    if app.is_dir() { Some(app) } else { None }
+}
+
 fn application_command(java: &Path, app: &Path, config: &Config) -> Command {
     let mut launch = command(java);
     launch.args(&config.jvm_args);
     #[cfg(target_os = "macos")]
     {
         launch.arg("-Xdock:name=Modtale Launcher");
-        if let Ok(icons) = fs::read_dir(app.join("../Resources")) {
+        if let Ok(icons) = fs::read_dir(
+            env::current_exe()
+                .ok()
+                .and_then(|exe| app_directory(&exe).ok())
+                .unwrap_or_else(|| app.to_path_buf())
+                .join("../Resources"),
+        ) {
             if let Some(icon) = icons
                 .filter_map(|entry| entry.ok())
                 .map(|entry| entry.path())
@@ -588,6 +643,43 @@ mod tests {
             size: bytes.len() as u64,
         }
     }
+    #[test]
+    fn updates_are_scoped_to_installation_and_packaged_version() {
+        let state = Path::new("state");
+        let first = update_root(state, Path::new("/apps/launcher"), b"version1");
+        assert_eq!(
+            first,
+            update_root(state, Path::new("/apps/launcher"), b"version1")
+        );
+        assert_ne!(
+            first,
+            update_root(state, Path::new("/apps/launcher"), b"version2")
+        );
+        assert_ne!(
+            first,
+            update_root(state, Path::new("/apps/other"), b"version1")
+        );
+    }
+
+    #[test]
+    fn active_update_rejects_missing_and_unsafe_paths() {
+        let root = tempfile::tempdir().unwrap();
+        assert!(active_update(root.path()).is_none());
+        for name in [
+            "../version-other",
+            "version-../../other",
+            "/version-absolute",
+            "version-missing",
+        ] {
+            fs::write(root.path().join("active"), name).unwrap();
+            assert!(active_update(root.path()).is_none());
+        }
+        let version = root.path().join("version-123");
+        fs::create_dir(&version).unwrap();
+        fs::write(root.path().join("active"), "version-123").unwrap();
+        assert_eq!(active_update(root.path()).unwrap(), version);
+    }
+
     #[test]
     fn preserves_argument_boundaries_for_native_launch() {
         let config = Config {

@@ -4,6 +4,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { handler } from '../dist/server/entry.mjs';
+import { serveVideo } from './serve-video.mjs';
 
 const clientRoot = path.resolve(fileURLToPath(new URL('../dist/client/', import.meta.url)));
 const port = Number(process.env.PORT) || 5173;
@@ -178,6 +179,7 @@ const compressBody = (body, encoding) => {
 };
 
 const sendStaticFile = (req, res, filePath, pathname, stat) => {
+    if (serveVideo(req, res, filePath, path.extname(filePath), stat)) return;
     const contentType = getContentType(filePath);
     const encoding = req.method !== 'HEAD' && isCompressible(contentType) ? chooseEncoding(req) : null;
     const body = req.method === 'HEAD' ? Buffer.alloc(0) : fs.readFileSync(filePath);

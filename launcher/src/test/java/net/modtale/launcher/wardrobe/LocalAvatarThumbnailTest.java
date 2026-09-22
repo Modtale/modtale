@@ -24,6 +24,24 @@ class LocalAvatarThumbnailTest {
         assertTrue(red > 100); assertTrue(green > 100); assertTrue(transparent > 100);
     }
 
+    @Test void skeletonKeepsModelCutoutsButReplacesTextureWithTranslucentGrey() throws Exception {
+        Group model = new Group(plane(0, true));
+        Image original = LocalAvatarThumbnail.render(model, 128, 0, 0, 1);
+        Image skeleton = LocalAvatarThumbnail.renderSkeleton(model, 128, 0, 0, 1);
+        int visible = 0;
+        for (int y = 0; y < 128; y++) for (int x = 0; x < 128; x++) {
+            int pixel = skeleton.getPixelReader().getArgb(x, y);
+            assertEquals(original.getPixelReader().getArgb(x, y) != 0, pixel != 0);
+            if (pixel != 0) {
+                visible++;
+                assertEquals(120, pixel >>> 24);
+                assertEquals(pixel & 255, (pixel >> 8) & 255);
+                assertEquals(pixel & 255, (pixel >> 16) & 255);
+            }
+        }
+        assertTrue(visible > 100);
+    }
+
     @Test void framingAndLimitsAreExplicit() throws Exception {
         Group model = new Group(plane(0, false));
         assertThrows(IllegalArgumentException.class, () -> LocalAvatarThumbnail.render(model, 4096, 0, 0, 1));

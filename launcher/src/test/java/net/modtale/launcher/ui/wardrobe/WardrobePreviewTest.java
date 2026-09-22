@@ -55,9 +55,18 @@ class WardrobePreviewTest {
         var preview = fx(() -> new WardrobePreview(jobs::add, false));
         try {
             var skin = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode().put("bodyCharacteristic", "Default");
-            fx(() -> { preview.showLocal(java.nio.file.Path.of("missing.zip"), skin); return null; });
+            fx(() -> {
+                preview.showLocal(java.nio.file.Path.of("missing.zip"), skin);
+                assertNotNull(preview.view().lookup(".wardrobe-skeleton"));
+                return null;
+            });
             jobs.removeFirst().run(); await(() -> label(preview).startsWith("Preview unavailable:"));
-            fx(() -> { assertTrue(button(preview, "Retry").isVisible()); button(preview, "Retry").fire(); return null; });
+            fx(() -> {
+                assertNull(preview.view().lookup(".wardrobe-skeleton"));
+                assertTrue(button(preview, "Retry").isVisible()); button(preview, "Retry").fire();
+                assertNotNull(preview.view().lookup(".wardrobe-skeleton"));
+                return null;
+            });
             assertEquals(1, jobs.size());
         } finally { fx(() -> { preview.dispose(); return null; }); }
     }

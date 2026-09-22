@@ -6,6 +6,8 @@ import { ManagedProjectCard } from '@/components/shared/ManagedProjectCard';
 import { skeletonProject } from '@/modules/user/skeletons/fixtures';
 import { AuthRouteSkeleton, DocsRouteSkeleton } from './RoutePanelSkeletons';
 import { BannerRouteFrame, BannerRouteSkeleton } from './RouteBannerSkeleton';
+import { NewsArticleLayout, NewsIndexLayout } from '@/modules/news/components/NewsLayout';
+import { NewsArticleSkeleton, NewsFeedSkeleton } from '@/modules/news/components/NewsSkeleton';
 
 // Module-loading frames only. Keep view modules, their hooks, editors, and charts
 // behind App's lazy imports. Data-loading skeletons remain owned by those views.
@@ -101,6 +103,8 @@ function UploadRouteSkeleton() {
  * suspending a production route or mounting a page's data-fetching hooks. */
 export function RouteSkeleton({ pathname, search = '' }: { pathname: string; search?: string }) {
     const path = pathname.toLowerCase().replace(/\/+$/, '') || '/';
+    if (path === '/news') return <NewsIndexLayout><NewsFeedSkeleton /></NewsIndexLayout>;
+    if (/^\/news\/[^/]+$/.test(path)) return <NewsArticleLayout><NewsArticleSkeleton /></NewsArticleLayout>;
     if (path === '/dashboard' || path.startsWith('/dashboard/')) return <DashboardRouteSkeleton section={path.split('/')[2] || 'projects'} />;
     if (path === '/admin') return <DashboardRouteSkeleton admin section="verification" />;
     if (path === '/upload') return <UploadRouteSkeleton />;
