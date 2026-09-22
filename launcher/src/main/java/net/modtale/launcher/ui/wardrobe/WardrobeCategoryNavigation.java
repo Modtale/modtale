@@ -25,7 +25,7 @@ final class WardrobeCategoryNavigation extends VBox implements AutoCloseable {
         setMinWidth(0);
         setSpacing(5);
         for (String group : List.of("Head", "Body", "Tops", "Bottoms", "Accessories")) {
-            var categories = CosmeticCatalogClient.categories().stream()
+            var categories = catalog.availableCategories().stream()
                     .filter(entry -> CosmeticFraming.forCategory(entry.key()).group().equals(group)).toList();
             if (categories.isEmpty()) continue;
             TilePane tiles = new TilePane(6, 6);
@@ -38,6 +38,8 @@ final class WardrobeCategoryNavigation extends VBox implements AutoCloseable {
                 case "Head" -> "face"; case "Tops" -> "overtop"; case "Bottoms" -> "pants";
                 case "Accessories" -> "gloves"; default -> "bodyCharacteristic";
             };
+            String preferredSymbol = symbol;
+            if (categories.stream().noneMatch(entry -> entry.key().equals(preferredSymbol))) symbol = categories.getFirst().key();
             var headingImage = picture(symbol, 24);
             Section pane = new Section(group, headingImage, tiles);
             pane.setMinWidth(0); pane.setMaxWidth(Double.MAX_VALUE);

@@ -39,6 +39,10 @@ class WardrobeCategoryNavigationTest {
             });
             try {
                 fx(() -> {
+                    for (var category : CosmeticCatalogClient.categories()) {
+                        boolean populated = !catalog.browseAssets(category.key(), "", 1, 1).options().isEmpty();
+                        assertEquals(populated, nav.lookup("#wardrobe-category-" + category.key()) != null, category.key());
+                    }
                     var head = (WardrobeCategoryNavigation.Section) nav.lookup("#wardrobe-group-head");
                     assertTrue(head.isExpanded()); assertTrue(head.isAnimated());
                     var hair = (Button) nav.lookup("#wardrobe-category-haircut");

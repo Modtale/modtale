@@ -184,6 +184,10 @@ public final class CosmeticEditorController implements AutoCloseable {
     }
 
     private void renderCategories() {
+        var available = catalog.availableCategories();
+        if (available.stream().noneMatch(entry -> entry.key().equals(category)) && !available.isEmpty()) {
+            category = available.getFirst().key(); page = 1;
+        }
         if (categoryNavigation != null) categoryNavigation.close();
         categoryNavigation = new WardrobeCategoryNavigation(catalog, assets, key -> {
             category = key; page = 1; browse();

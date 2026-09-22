@@ -173,6 +173,17 @@ class CosmeticCatalogClientTest {
         System.out.println("Installed cosmetic catalog: " + assets + " assets, " + selections + " selections; explicit default=" + client.defaultSkin());
     }
 
+    @Test void availableCategoriesExcludeEmptySlotsAndIncludeNewlyPopulatedOnes() throws Exception {
+        var data = definitions();
+        var client = new CosmeticCatalogClient(archive(data));
+        assertEquals(List.of("bodyCharacteristic", "face", "haircut", "cape"),
+                client.availableCategories().stream().map(CosmeticCategory::key).toList());
+        data.put(CosmeticCatalogClient.assetFile("skinFeature"),
+                "[{\"Id\":\"Freckles\",\"Model\":\"Freckles.blockymodel\",\"Textures\":{\"Default\":{\"Texture\":\"Freckles.png\"}}}]");
+        var updated = new CosmeticCatalogClient(archive(data));
+        assertTrue(updated.availableCategories().stream().anyMatch(category -> category.key().equals("skinFeature")));
+    }
+
     private Path archive(Map<String, String> contents) throws IOException {
         Path path = directory.resolve(java.util.UUID.randomUUID() + ".zip");
         try (var zip = new ZipOutputStream(Files.newOutputStream(path))) {
