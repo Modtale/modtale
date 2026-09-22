@@ -29,6 +29,30 @@ class NativeInteractionRegressionTest {
     }
 
     @Test
+    void contextualHelpTracksStateAndCanBeReplaced() throws Exception {
+        fx(() -> {
+            var button = new javafx.scene.control.Button();
+            button.setAccessibleText("Expand versions");
+            LauncherTooltips.install(button, button.accessibleTextProperty());
+            button.setAccessibleText("Collapse versions");
+            assertEquals("Collapse versions", button.getTooltip().getText());
+            assertEquals("Collapse versions", button.getAccessibleHelp());
+            LauncherTooltips.install(button, "Choose a version");
+            button.setAccessibleText("Versions");
+            assertEquals("Choose a version", button.getTooltip().getText());
+            assertEquals("Choose a version", button.getAccessibleHelp());
+            var checkbox = new javafx.scene.control.CheckBox("Include optional dependencies");
+            LauncherTooltips.install(checkbox, "Include optional project dependencies");
+            var card = (javafx.scene.layout.HBox) LauncherUi.toggleCard(checkbox);
+            var caption = (javafx.scene.control.Label) card.getChildren().get(1);
+            assertSame(checkbox.getTooltip(), caption.getTooltip());
+            LauncherTooltips.install(checkbox, "Updated help");
+            assertEquals("Updated help", caption.getTooltip().getText());
+            return null;
+        });
+    }
+
+    @Test
     void preciseScrollUsesPixelsWithCustomRangesAndStopsAtEdges() throws Exception {
         fx(() -> {
             Region content = new Region();

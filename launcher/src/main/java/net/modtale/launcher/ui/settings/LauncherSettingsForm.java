@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.settings;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import static net.modtale.launcher.ui.common.LauncherUi.styleCombo;
 import static net.modtale.launcher.ui.common.LauncherUi.styleInput;
 import static net.modtale.launcher.ui.common.LauncherUi.value;
@@ -64,6 +66,14 @@ public final class LauncherSettingsForm {
                 playHytaleGamePathField, playHytaleUserDataPathField, playHytaleJavaPathField);
         launcherChannelCombo.setItems(FXCollections.observableArrayList("stable", "develop"));
         styleCombo(localeCombo, hytaleBranchCombo, hytaleVersionCombo, launcherChannelCombo);
+        LauncherTooltips.install(localeCombo, "Choose the launcher language");
+        LauncherTooltips.install(hytaleBranchCombo, "Choose the Hytale release or pre-release patchline");
+        LauncherTooltips.install(hytaleVersionCombo, "Choose the Hytale version to install or launch");
+        launcherChannelCombo.setTooltip(i18n.tooltip("settings.launcherUpdates.channelsDescription"));
+        LauncherTooltips.install(includeDependenciesCheck, "Include required dependencies when installing projects");
+        LauncherTooltips.install(includeOptionalCheck, "Also include optional dependencies when installing projects");
+        LauncherTooltips.install(autoUpdatesCheck, "Automatically check installed projects for updates");
+        launcherAutoUpdatesCheck.setTooltip(i18n.tooltip("settings.launcherUpdates.description"));
         includeDependenciesCheck.accessibleTextProperty().bind(includeDependenciesCheck.textProperty());
         includeOptionalCheck.accessibleTextProperty().bind(includeOptionalCheck.textProperty());
         autoUpdatesCheck.accessibleTextProperty().bind(autoUpdatesCheck.textProperty());

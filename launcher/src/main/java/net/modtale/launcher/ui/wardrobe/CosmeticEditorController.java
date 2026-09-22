@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.wardrobe;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -55,14 +57,14 @@ public final class CosmeticEditorController implements AutoCloseable {
     private final Label state = text("Loading the character creator…", "wardrobe-muted");
     private final Label choiceName = text("Your look", "wardrobe-selected-title");
     private final Label requirement = text("", "wardrobe-muted");
-    private final Label changes = text("Nothing applied yet", "wardrobe-muted");
     private final Button undo = iconButton("Undo", LauncherIcons.Glyph.UNDO, this::undo);
     private final Button redo = iconButton("Redo", LauncherIcons.Glyph.REDO, this::redo);
     private final Button reset = iconButton("Reset", LauncherIcons.Glyph.RESTORE, this::reset);
-    private final Button remove = secondaryButton("Remove item");
+    private final Button remove = secondaryButton("Remove");
     private final Button apply = primaryButton("Apply outfit");
-    private final Button save = secondaryButton("Save");
-    private final CheckBox ownedOnly = new CheckBox("Owned only");
+    private final Tooltip applyHelp = new Tooltip();
+    private final Button save = secondaryButton("Save As");
+    private final Circle pendingEdits = new Circle(3, Color.web("#60a5fa"));
     private final SavedLookThumbnails thumbnails = new SavedLookThumbnails();
     private CosmeticCatalogClient catalog;
     private Path assets;
@@ -102,14 +104,11 @@ public final class CosmeticEditorController implements AutoCloseable {
     private void build() {
         root.getStyleClass().add("cosmetic-editor"); root.setMinWidth(0);
         state.setWrapText(true);
-        hideWhenEmpty(state); hideWhenEmpty(requirement); hideWhenEmpty(changes);
-        Button current = iconButton("Load current look", LauncherIcons.Glyph.REFRESH_CW, this::loadCurrent);
-        Region actionSpacer = new Region(); HBox.setHgrow(actionSpacer, Priority.ALWAYS);
-        HBox lookActions = new HBox(4, current, actionSpacer, undo, redo, reset);
-        lookActions.setAlignment(Pos.CENTER_LEFT);
-        ownedOnly.setSelected(true);
-        ownedOnly.getStyleClass().add("cosmetic-owned-filter");
-        ownedOnly.setOnAction(e -> { page = 1; browse(); });
+        hideWhenEmpty(state); hideWhenEmpty(requirement);
+        Button current = iconButton("Load current look", LauncherIcons.Glyph.USER, this::loadCurrent);
+        LauncherTooltips.install(current, "Load the outfit currently equipped on your Hytale account");
+        LauncherTooltips.install(reset, "Discard edits and restore the look you started with");
+        preview.addEditorActions(current, undo, redo, reset);
         categoryRail.setMinWidth(0); categoryRail.setPrefWidth(160); categoryRail.getStyleClass().add("cosmetic-category-rail");
         ScrollPane categories = new ScrollPane(categoryRail); categories.setFitToWidth(true);
         categories.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER); categories.setPrefViewportHeight(670);
@@ -124,8 +123,7 @@ public final class CosmeticEditorController implements AutoCloseable {
             if (catalog != null) { generation++; resizePages.playFromStart(); }
         });
         configurePagination();
-        HBox filters = new HBox(ownedOnly); filters.setAlignment(Pos.CENTER_RIGHT);
-        selectionPanel.getChildren().addAll(filters, grid, pagination);
+        selectionPanel.getChildren().addAll(grid, pagination);
         selectionPanel.setMinWidth(0); HBox.setHgrow(selectionPanel, Priority.ALWAYS);
         inspector.getStyleClass().add("wardrobe-inspector"); inspector.setPrefWidth(310); inspector.setMinWidth(270);
         inspector.setMaxHeight(Region.USE_PREF_SIZE);
@@ -134,26 +132,39 @@ public final class CosmeticEditorController implements AutoCloseable {
                 .and(choiceName.textProperty().isNotEqualTo("Your character"))
                 .and(choiceName.textProperty().isNotEqualTo("Your look")));
         choiceName.managedProperty().bind(choiceName.visibleProperty());
-        choiceName.setWrapText(true); requirement.setWrapText(true); changes.setWrapText(true);
+        choiceName.setWrapText(true); requirement.setWrapText(true);
+        choiceName.setMinWidth(0); choiceName.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(choiceName, Priority.ALWAYS);
+        remove.getStyleClass().add("cosmetic-remove-action");
+        remove.setMinWidth(Region.USE_PREF_SIZE);
+        remove.setAccessibleText("Remove item");
+        remove.setTooltip(new Tooltip("Remove this cosmetic from your look"));
+        HBox selectionHeading = new HBox(8, choiceName, remove);
+        selectionHeading.setAlignment(Pos.CENTER_LEFT);
+        selectionHeading.visibleProperty().bind(choiceName.visibleProperty().or(remove.visibleProperty()));
+        selectionHeading.managedProperty().bind(selectionHeading.visibleProperty());
         variant.getStyleClass().add("wardrobe-filter"); variant.setMaxWidth(Double.MAX_VALUE);
+        LauncherTooltips.install(variant, "Choose a style for the selected cosmetic");
         variant.setConverter(new javafx.util.StringConverter<>() {
             @Override public String toString(String value) { return value == null ? "" : humanize(value); }
             @Override public String fromString(String value) { return value; }
         });
         variant.setOnAction(e -> { if (!settingVariants) chooseVariant(); });
-        remove.setOnAction(e -> { if (draft != null) { draft.remove(category); changed(); showOptions(selectedAsset); } });
-        remove.setMaxWidth(Double.MAX_VALUE);
+        remove.setOnAction(e -> { if (draft != null) { draft.remove(category); changed(); showOptions(""); } });
         save.setOnAction(e -> saveLocal()); save.setMinWidth(Region.USE_PREF_SIZE);
+        apply.setContentDisplay(ContentDisplay.RIGHT); apply.setGraphicTextGap(7);
+        pendingEdits.setMouseTransparent(true);
         apply.setMaxWidth(Double.MAX_VALUE); apply.setOnAction(e -> applyDraft());
-        HBox actions = new HBox(8, save, apply);
-        HBox.setHgrow(apply, Priority.ALWAYS);
-        remove.getStyleClass().add("cosmetic-quiet-action");
+        StackPane applyHost = new StackPane(apply);
+        net.modtale.launcher.ui.common.LauncherTooltips.install(applyHost, applyHelp);
+        HBox actions = new HBox(8, save, applyHost);
+        HBox.setHgrow(applyHost, Priority.ALWAYS);
         optionsSkeleton.setVisible(false);
         optionsSkeleton.managedProperty().bind(optionsSkeleton.visibleProperty());
         optionsSkeleton.setMouseTransparent(true);
         optionsSkeleton.setAccessibleText("Loading colors and styles");
-        inspector.getChildren().addAll(lookActions, previewNode, choiceName,
-                optionsSkeleton, colors, variant, requirement, remove, changes, actions);
+        inspector.getChildren().addAll(previewNode, selectionHeading,
+                optionsSkeleton, colors, variant, requirement, actions);
         HBox workspace = new HBox(18, categories, selectionPanel, inspector); workspace.setAlignment(Pos.TOP_LEFT);
         workspace.setMinWidth(0);
         root.getChildren().addAll(state, workspace);
@@ -201,28 +212,14 @@ public final class CosmeticEditorController implements AutoCloseable {
         preview.focusCategory(category);
         resizePages.stop();
         long ticket = ++generation; String key = category; int requestedPage = page; int pageSize = columns * 4;
-        boolean filterOwned = ownedOnly.isSelected(); boolean known = permissionsKnown;
-        Map<String, Set<String>> permissions = unlocked;
+        Set<String> ownedAssets = permissionsKnown ? Set.copyOf(unlocked.getOrDefault(key, Set.of())) : Set.of();
         browsing = true; state.setText(""); showGridSkeletons(); updatePagination();
         optionsSkeleton.setVisible(false);
         colors.setVisible(false); colors.setManaged(false);
         variant.setVisible(false); variant.setManaged(false);
-        if (filterOwned && accountLoading && !known) return;
         CompletableFuture.supplyAsync(() -> {
             try {
-                if (!filterOwned) return catalog.browseAssets(key, "", requestedPage, pageSize);
-                List<CosmeticOption> choices = new ArrayList<>();
-                if (known) {
-                    int sourcePage = 1;
-                    CosmeticCatalogClient.Page batch;
-                    do {
-                        batch = catalog.browseAssets(key, "", sourcePage++, 100);
-                        for (CosmeticOption option : batch.options())
-                            if (permissions.getOrDefault(key, Set.of()).contains(option.assetId())) choices.add(option);
-                    } while (batch.hasNext());
-                }
-                int from = Math.min(choices.size(), (requestedPage - 1) * pageSize), to = Math.min(choices.size(), from + pageSize);
-                return new CosmeticCatalogClient.Page(List.copyOf(choices.subList(from, to)), requestedPage, pageSize, choices.size(), to < choices.size(), true, catalog.source());
+                return catalog.browseAssets(key, "", requestedPage, pageSize, ownedAssets);
             } catch (IOException e) { throw new UncheckedIOException(e); }
         }, executor).whenComplete((result, error) -> Platform.runLater(() -> {
             if (disposed || ticket != generation) return;
@@ -307,13 +304,22 @@ public final class CosmeticEditorController implements AutoCloseable {
         StackPane art = new StackPane(fallback, image, skeleton); art.getStyleClass().add("cosmetic-card-art"); art.setPrefSize(145, 145);
         Label name = text(option.label(), "wardrobe-card-name"); name.setMaxWidth(145);
         VBox contents = new VBox(8, art, name);
-        if (permissionsKnown && !owned(option)) contents.getChildren().add(text("Locked", "wardrobe-card-detail"));
+        boolean notOwned = permissionsKnown && !owned(option);
+        if (notOwned) {
+            Label badge = text("Not owned", "cosmetic-ownership-badge");
+            badge.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.LOCK, 12));
+            badge.setMouseTransparent(true);
+            StackPane.setAlignment(badge, Pos.BOTTOM_LEFT);
+            StackPane.setMargin(badge, new javafx.geometry.Insets(7));
+            art.getChildren().add(badge);
+        }
         Button button = new Button(); button.setGraphic(contents); button.getStyleClass().add("wardrobe-card");
         button.setMinWidth(0); button.setMaxWidth(Double.MAX_VALUE);
         art.prefWidthProperty().bind(button.widthProperty().subtract(22));
         name.maxWidthProperty().bind(button.widthProperty().subtract(22));
         button.setUserData(option.assetId());
-        button.setAccessibleText("Choose " + option.label()); button.setTooltip(new Tooltip(option.label()));
+        button.setAccessibleText("Choose " + option.label() + (notOwned ? " — Not owned, preview only" : ""));
+        button.setTooltip(new Tooltip(option.label() + (notOwned ? "\nNot owned — preview and save locally. Unlock it to apply." : "")));
         button.setOnAction(e -> { draft.choose(category, option.id()); selectedAsset = option.assetId(); changed(); showOptions(option.assetId()); });
         button.pseudoClassStateChanged(SELECTED, draft != null && (draft.selected(category).equals(option.assetId()) || draft.selected(category).startsWith(option.assetId() + ".")));
         return button;
@@ -344,8 +350,7 @@ public final class CosmeticEditorController implements AutoCloseable {
             CosmeticOption current = options.stream().filter(o -> o.id().equals(draft.selected(key))).findFirst().orElse(options.isEmpty() ? null : options.getFirst());
             if (current == null) return;
             choiceName.setText(current.label());
-            requirement.setText(permissionsKnown && !owned(current) ? "Locked" : "");
-            requirement.setTooltip(new Tooltip("Not unlocked for this account. You can preview and save it locally."));
+            requirement.setText("");
             LinkedHashMap<String, CosmeticOption> shades = new LinkedHashMap<>();
             options.forEach(o -> shades.putIfAbsent(o.colorId(), o));
             colors.setVisible(shades.size() > 1); colors.setManaged(colors.isVisible());
@@ -439,10 +444,17 @@ public final class CosmeticEditorController implements AutoCloseable {
         reset.setDisable(!hasDraft || !draft.dirty() || applying); remove.setDisable(!hasDraft || !OutfitDraft.canRemove(category) || draft.selected(category).isBlank() || applying);
         remove.setVisible(hasDraft && OutfitDraft.canRemove(category) && !draft.selected(category).isBlank()); remove.setManaged(remove.isVisible());
         apply.setDisable(!hasDraft || activeProfile().isBlank() || applying || locked);
-        apply.setTooltip(new Tooltip(locked ? "This outfit contains locked cosmetics." : "Apply to " + activeUsername() + " and save the previous look locally."));
+        String applyHint = applying ? "Applying your outfit…" : !hasDraft ? "Choose a look before applying it."
+                : activeProfile().isBlank() ? "Sign in to Hytale to apply this look."
+                : locked ? "Unlock the unowned cosmetics in this look before applying it. You can still save a local copy."
+                : "Apply to " + activeUsername() + " and save the previous look locally.";
+        applyHelp.setText(applyHint); apply.setAccessibleHelp(applyHint);
         save.setDisable(!hasDraft || applying);
         apply.setText(applying ? "Applying…" : "Apply");
-        changes.setText(locked ? "Contains locked items" : hasDraft && draft.dirty() ? "Unapplied changes" : "");
+        boolean dirty = hasDraft && draft.dirty();
+        apply.setGraphic(dirty ? pendingEdits : null);
+        String saveHint = "Save a local copy of this look.";
+        save.setTooltip(new Tooltip(saveHint)); save.setAccessibleHelp(saveHint);
     }
     private boolean hasLockedSelection() {
         if (!permissionsKnown || draft == null || catalog == null) return false;
@@ -509,7 +521,7 @@ public final class CosmeticEditorController implements AutoCloseable {
             if (disposed || ticket != accountGeneration || !target.equals(activeProfile())) return;
             accountLoading = false;
             permissionsKnown = error == null; unlocked = error == null ? rights : Map.of();
-            if (catalog != null) browse();
+            if (catalog != null) { page = 1; browse(); }
         }));
     }
 
@@ -530,7 +542,7 @@ public final class CosmeticEditorController implements AutoCloseable {
     private static Button iconButton(String label, LauncherIcons.Glyph icon, Runnable action) {
         Button button = button("", icon, action);
         button.getStyleClass().addAll("icon-only-button", "cosmetic-quiet-action", "cosmetic-look-action");
-        button.setMinSize(28, 28); button.setPrefSize(28, 28); button.setMaxSize(28, 28);
+        button.setMinSize(24, 24); button.setPrefSize(24, 24); button.setMaxSize(24, 24);
         button.setAccessibleText(label); button.setTooltip(new Tooltip(label));
         return button;
     }

@@ -73,6 +73,22 @@ class CosmeticCatalogClientTest {
         assertThrows(IllegalArgumentException.class, () -> client.resolve("overtop", "Scarf.Unknown"));
     }
 
+    @Test void ownedAssetsComeFirstBeforePaginationWithoutChangingOrderWithinEachGroup() throws Exception {
+        var client = new CosmeticCatalogClient(archive(definitions()));
+        var owned = java.util.Set.of("Long");
+        var first = client.browseAssets("haircut", "", 1, 1, owned);
+        var second = client.browseAssets("haircut", "", 2, 1, owned);
+        assertEquals("Long", first.options().getFirst().assetId());
+        assertEquals("Short", second.options().getFirst().assetId());
+        assertEquals(2, first.total());
+        assertTrue(first.hasNext());
+        assertFalse(second.hasNext());
+        var original = client.browseAssets("haircut", "", 1, 100).options();
+        assertEquals(original, client.browseAssets("haircut", "", 1, 100, java.util.Set.of()).options());
+        assertEquals(original, client.browseAssets("haircut", "", 1, 100, java.util.Set.of("Short", "Long")).options());
+        assertEquals(1, client.browseAssets("haircut", "Long", 1, 100, owned).total());
+    }
+
     @Test void paginatesUniqueAssetsAndSearchesLabelsIdsAndColors() throws Exception {
         var client = new CosmeticCatalogClient(archive(definitions()));
         var page = client.browseAssets("haircut", "", 1, 1);

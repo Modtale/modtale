@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.library;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import static net.modtale.launcher.ui.common.LauncherUi.classificationLabel;
 import static net.modtale.launcher.ui.common.LauncherUi.dangerButton;
 import static net.modtale.launcher.ui.common.LauncherUi.emptyState;
@@ -230,6 +232,7 @@ final class LibraryProjectRenderer {
         HBox.setHgrow(spacer, Priority.ALWAYS);
         Button lock = secondaryButton("Unlock");
         lock.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.EDIT, 14));
+        LauncherTooltips.install(lock, "Ungroup this project’s bundled content so you can manage items separately");
         lock.setOnAction(event -> unlockProject.unlock(installed));
         header.getChildren().addAll(status, count, spacer, lock);
         section.getChildren().add(header);

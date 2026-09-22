@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.browse.card;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import static net.modtale.launcher.ui.browse.card.ProjectCardFormatter.classificationLabel;
 import static net.modtale.launcher.ui.browse.card.ProjectCardFormatter.number;
 import static net.modtale.launcher.ui.browse.card.ProjectCardFormatter.value;
@@ -357,6 +359,7 @@ public final class ProjectCardFactory {
         button.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.HEART,
                 fullSize ? CARD_STAT_ICON_SIZE : COMPACT_STAT_ICON_SIZE));
         button.pseudoClassStateChanged(SELECTED, favorite);
+        LauncherTooltips.install(button, favorite ? "Remove from favorites" : "Add to favorites");
         button.setOnAction(event -> {
             event.consume();
             onToggleFavorite.accept(project);

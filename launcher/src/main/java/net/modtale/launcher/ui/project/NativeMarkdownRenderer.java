@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.project;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import com.vladsch.flexmark.ast.BlockQuote;
 import com.vladsch.flexmark.ast.AutoLink;
 import com.vladsch.flexmark.ast.BulletList;
@@ -302,6 +304,7 @@ final class NativeMarkdownRenderer {
         HBox.setHgrow(spacer, Priority.ALWAYS);
         String codeContent = content.stripTrailing();
         Button copy = new Button("Copy", LauncherIcons.icon(LauncherIcons.Glyph.COPY, 13));
+        LauncherTooltips.install(copy, "Copy this code block to the clipboard");
         copy.getStyleClass().add("project-detail-markdown-code-copy");
         copy.setMnemonicParsing(false);
         copy.setCursor(Cursor.HAND);

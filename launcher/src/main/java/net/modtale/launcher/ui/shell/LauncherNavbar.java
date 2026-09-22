@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.shell;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import java.util.List;
 import java.util.Objects;
 import javafx.geometry.Pos;
@@ -50,6 +52,7 @@ public final class LauncherNavbar {
     public static Button navigation(String key, LauncherIcons.Glyph icon, Runnable action) {
         Button button = new Button();
         LauncherI18n.get().bind(button, key);
+        LauncherTooltips.install(button, button.textProperty());
         button.getStyleClass().add("nav-btn");
         button.setFont(Font.font("Inter", FontWeight.BOLD, 14));
         button.setGraphic(LauncherIcons.icon(icon, 16));

@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.project;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import static net.modtale.launcher.ui.browse.card.ProjectCardFormatter.number;
 import static net.modtale.launcher.ui.browse.card.ProjectCardFormatter.timeAgo;
 import static net.modtale.launcher.ui.common.LauncherUi.primaryButton;
@@ -1435,6 +1437,7 @@ public final class ProjectPageController {
         author.getStyleClass().addAll("project-detail-author", "project-detail-author-link");
         author.setMnemonicParsing(false);
         author.setAccessibleText("Open creator profile");
+        LauncherTooltips.install(author, "Open creator profile: " + value(textAuthor(summary, detail), "Unknown"));
         author.setDisable(!hasCreatorHandle(creatorTarget));
         author.setOnAction(event -> openCreator(creatorTarget));
         return author;
@@ -1888,6 +1891,7 @@ public final class ProjectPageController {
                 toggle.setGraphic(row);
                 row.prefWidthProperty().bind(toggle.widthProperty().subtract(20));
                 toggle.setAccessibleText("Expand " + group.label() + " versions");
+                LauncherTooltips.install(toggle, toggle.accessibleTextProperty());
                 toggle.selectedProperty().addListener((observable, previous, expanded) -> {
                     children.setVisible(expanded);
                     children.setManaged(expanded);
@@ -2510,6 +2514,7 @@ public final class ProjectPageController {
         Button close = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.X, 20));
         close.getStyleClass().add("project-gallery-floating-close");
         close.setAccessibleText("Close gallery");
+        LauncherTooltips.install(close, close.accessibleTextProperty());
         close.setOnAction(event -> hideGalleryOverlay());
         StackPane.setAlignment(close, Pos.TOP_RIGHT);
         StackPane.setMargin(close, new Insets(12, 12, 0, 0));
@@ -2801,6 +2806,7 @@ public final class ProjectPageController {
         Button close = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.X, 20));
         close.getStyleClass().add("project-changelog-close");
         close.setAccessibleText("Close Changelog");
+        LauncherTooltips.install(close, close.accessibleTextProperty());
         close.setOnAction(event -> hideChangelogOverlay());
 
         header.getChildren().addAll(copy, spacer, close);

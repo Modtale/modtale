@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.project;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -280,6 +282,7 @@ final class NativeGalleryCarousel {
                 loadThumbnailImage(itemIndex);
             }
             button.setAccessibleText(item.alt().isBlank() ? "Gallery thumbnail" : item.alt());
+        LauncherTooltips.install(button, button.accessibleTextProperty());
             button.setOnAction(event -> show(itemIndex));
             return button;
         }

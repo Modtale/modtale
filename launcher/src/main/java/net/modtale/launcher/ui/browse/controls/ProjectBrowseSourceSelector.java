@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.browse.controls;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import java.util.function.Consumer;
 import javafx.css.PseudoClass;
 import javafx.geometry.Pos;
@@ -84,6 +86,7 @@ public final class ProjectBrowseSourceSelector {
         picker.getStyleClass().removeAll("modtale", "curseforge");
         picker.getStyleClass().add(source.name().toLowerCase());
         picker.setAccessibleText("Browse source: " + source.label());
+        LauncherTooltips.install(picker, "Choose where to browse projects. Current source: " + source.label());
     }
 
     void select(ProjectBrowseSource selected) {

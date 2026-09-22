@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.project;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -206,6 +208,7 @@ final class NativeWikiView {
         HBox row = new HBox(6);
         row.setAlignment(Pos.CENTER_LEFT);
         Button page = new Button(node.title());
+        LauncherTooltips.install(page, node.title());
         page.getStyleClass().add("project-wiki-page-link");
         page.setMaxWidth(Double.MAX_VALUE);
         page.setAlignment(Pos.CENTER_LEFT);

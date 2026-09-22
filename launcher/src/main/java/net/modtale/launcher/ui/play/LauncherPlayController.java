@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.play;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import static net.modtale.launcher.ui.common.LauncherUi.dangerButton;
 import static net.modtale.launcher.ui.common.LauncherUi.setVisibleManaged;
 import static net.modtale.launcher.ui.common.LauncherUi.value;
@@ -683,6 +685,7 @@ public final class LauncherPlayController {
     private Node setupActions() {
         Button stop = dangerButton("Stop");
         stop.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.X, 15));
+        LauncherTooltips.install(stop, "Stop the running Hytale game");
         stop.setOnAction(event -> stopHytale());
 
         FlowPane utilities = new FlowPane(10, 10, stop);

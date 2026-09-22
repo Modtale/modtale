@@ -1,5 +1,6 @@
 package net.modtale.launcher.ui.settings;
 
+
 import static net.modtale.launcher.ui.common.LauncherUi.primaryButton;
 import static net.modtale.launcher.ui.common.LauncherUi.secondaryButton;
 import static net.modtale.launcher.ui.common.LauncherUi.toggleCard;
@@ -221,6 +222,7 @@ public final class LauncherSettingsController {
         actions.setAlignment(Pos.CENTER_RIGHT);
         Button save = primaryButton("");
         I18N.bind(save, "action.saveSettings");
+        save.setTooltip(I18N.tooltip("action.saveSettings"));
         save.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.SAVE, 14));
         save.setOnAction(event -> saveFromFields(true));
         actions.getChildren().add(save);
@@ -278,6 +280,7 @@ public final class LauncherSettingsController {
         launcherToggles.getStyleClass().add("settings-toggle-row");
         Button checkLauncher = secondaryButton("");
         I18N.bind(checkLauncher, "action.checkNow");
+        checkLauncher.setTooltip(I18N.tooltip("settings.launcherUpdates.description"));
         checkLauncher.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.REFRESH_CW, 14));
         checkLauncher.setOnAction(event -> {
             if (launcherUpdateCheckAction != null) {
@@ -296,6 +299,7 @@ public final class LauncherSettingsController {
                 LauncherIcons.Glyph.DATABASE);
         Button clearCache = secondaryButton("");
         I18N.bind(clearCache, "action.clearCache");
+        clearCache.setTooltip(I18N.tooltip("settings.cache.description"));
         clearCache.setGraphic(LauncherIcons.icon(LauncherIcons.Glyph.DATABASE, 14));
         clearCache.setOnAction(event -> clearCache(clearCache));
         cache.getChildren().add(clearCache);

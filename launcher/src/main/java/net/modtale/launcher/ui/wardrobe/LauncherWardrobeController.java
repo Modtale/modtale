@@ -460,6 +460,6 @@ public final class LauncherWardrobeController implements AutoCloseable {
     private static String message(Throwable e) { while (e.getCause() != null && e instanceof CompletionException) e = e.getCause(); return e.getMessage() == null ? "Please try again." : e.getMessage(); }
     private static Label label(String text, String style) { Label l = new Label(text); l.getStyleClass().add(style); return l; }
     private static void hideWhenEmpty(Label label) { label.visibleProperty().bind(label.textProperty().isNotEmpty()); label.managedProperty().bind(label.visibleProperty()); }
-    private static Button iconButton(String title, LauncherIcons.Glyph glyph, Runnable action) { Button b = secondaryButton(title); b.setGraphic(LauncherIcons.icon(glyph, 15)); b.setOnAction(e -> action.run()); return b; }
+    private static Button iconButton(String title, LauncherIcons.Glyph glyph, Runnable action) { Button b = secondaryButton(title); b.setGraphic(LauncherIcons.icon(glyph, 15)); b.setOnAction(e -> action.run()); b.setTooltip(new Tooltip(title)); return b; }
     @Override public void close() { disposed = true; request++; resizeReload.stop(); localThumbnails.close(); preview.dispose(); editor.close(); }
 }

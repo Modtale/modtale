@@ -279,6 +279,7 @@ public final class LauncherShell {
         scene.getStylesheets().add(Objects.requireNonNull(getClass()
                 .getResource("/net/modtale/launcher/ui/nativefx/launcher.css")).toExternalForm());
         LauncherPerformanceProbe.install(scene);
+        net.modtale.launcher.ui.common.LauncherTooltipOverlay.install(scene, root);
         scene.addEventFilter(MouseEvent.MOUSE_PRESSED, this::hideDropdownsOnOutsidePress);
         if (undecoratedWindow) {
             configureWindowResize(scene);

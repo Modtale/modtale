@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.project;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import static net.modtale.launcher.ui.common.LauncherUi.value;
 
 import java.util.List;
@@ -166,6 +168,8 @@ final class NativeReportModal {
         HBox.setHgrow(titleRow, Priority.ALWAYS);
 
         Button close = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.X, 16));
+        LauncherTooltips.install(close, "Close report");
+        close.setAccessibleText("Close report");
         close.getStyleClass().add("report-modal-close");
         close.setOnAction(event -> hide());
         header.getChildren().addAll(titleRow, close);

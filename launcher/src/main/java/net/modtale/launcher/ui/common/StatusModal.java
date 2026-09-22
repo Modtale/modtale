@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.common;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -153,6 +155,8 @@ public final class StatusModal {
         layout.getChildren().addAll(body(), footer());
 
         Button close = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.X, 20));
+        LauncherTooltips.install(close, "Close dialog");
+        close.setAccessibleText("Close dialog");
         close.getStyleClass().add("status-modal-close");
         close.setOnAction(event -> complete(Result.CLOSED));
         StackPane.setAlignment(close, Pos.TOP_RIGHT);

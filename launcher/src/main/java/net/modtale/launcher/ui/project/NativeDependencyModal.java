@@ -1,5 +1,7 @@
 package net.modtale.launcher.ui.project;
 
+import net.modtale.launcher.ui.common.LauncherTooltips;
+
 import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -166,6 +168,8 @@ final class NativeDependencyModal {
         HBox.setHgrow(title, Priority.ALWAYS);
 
         Button close = new Button(null, LauncherIcons.icon(LauncherIcons.Glyph.X, 18));
+        LauncherTooltips.install(close, "Close dependency selection");
+        close.setAccessibleText("Close dependency selection");
         close.getStyleClass().add("dependency-modal-close");
         close.setOnAction(event -> hide());
         header.getChildren().addAll(title, close);
