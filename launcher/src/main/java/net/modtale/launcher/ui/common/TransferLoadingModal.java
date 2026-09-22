@@ -12,6 +12,7 @@ import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.shape.FillRule;
 import javafx.scene.shape.StrokeLineJoin;
 import javafx.application.Platform;
+import javafx.scene.AccessibleRole;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
 import javafx.scene.layout.Region;
@@ -35,6 +36,7 @@ public final class TransferLoadingModal extends StackPane {
         getStyleClass().add("install-loading-overlay");
         setFocusTraversable(true);
         setOnMouseClicked(event -> event.consume());
+        emblem.setAccessibleRole(AccessibleRole.PROGRESS_INDICATOR);
         var animatedPhase = new SimpleDoubleProperty(0);
         animatedPhase.addListener((observable, before, after) -> {
             phase = after.doubleValue();

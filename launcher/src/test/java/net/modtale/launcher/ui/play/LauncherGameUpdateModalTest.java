@@ -8,6 +8,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import javafx.application.Platform;
 import javafx.scene.Scene;
+import javafx.scene.AccessibleRole;
+import javafx.scene.canvas.Canvas;
 import javafx.scene.control.Label;
 import javafx.scene.layout.StackPane;
 import net.modtale.launcher.api.ModtaleApiClient;
@@ -72,6 +74,9 @@ class LauncherGameUpdateModalTest {
                     TransferLoadingModal modal = (TransferLoadingModal) host.getChildren().getFirst();
                     assertFalse(modal.lookupAll("Canvas").isEmpty());
                     assertEquals(0.5, modal.getProgress());
+                    Canvas indicator = (Canvas) modal.lookupAll("Canvas").iterator().next();
+                    assertEquals(AccessibleRole.PROGRESS_INDICATOR, indicator.getAccessibleRole());
+                    assertEquals("Loading progress 50%", indicator.getAccessibleText());
                     assertTrue(modal.lookupAll(".status-modal-message").stream()
                             .map(node -> ((Label) node).getText())
                             .anyMatch(text -> text.equals("Downloading Hytale release build 29")));
