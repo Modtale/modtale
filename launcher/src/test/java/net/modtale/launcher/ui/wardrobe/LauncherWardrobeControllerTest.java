@@ -119,15 +119,15 @@ class LauncherWardrobeControllerTest {
     @Test void selectingALookKeepsLoadedThumbnailNodes() throws Exception {
         try (Harness h = new Harness()) {
             fx(() -> { button(h.root(), "Popular skins").fire(); return null; });
-            await(() -> h.root().lookup("#wardrobe-look-" + SKIN.id()) != null);
-            fx(() -> {
+            await(() -> {
                 Button original = (Button) h.root().lookup("#wardrobe-look-" + SKIN.id());
+                if (original == null || original.getGraphic() == null) return false;
                 Node artwork = original.getGraphic();
                 original.fire();
                 assertSame(original, h.root().lookup("#wardrobe-look-" + SKIN.id()));
                 assertSame(artwork, original.getGraphic());
                 assertTrue(original.getPseudoClassStates().contains(javafx.css.PseudoClass.getPseudoClass("selected")));
-                return null;
+                return true;
             });
         }
     }
