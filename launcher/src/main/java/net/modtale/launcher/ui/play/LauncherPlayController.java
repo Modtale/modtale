@@ -1121,6 +1121,10 @@ public final class LauncherPlayController {
         avatar.getStyleClass().add("play-friend-avatar");
         sizeSquare(avatar, FRIEND_AVATAR_SIZE);
         updateHytaleProfileAvatar(avatar, friend.displayName(), FRIEND_AVATAR_SIZE, friend.uuid());
+        avatar.getChildren().stream()
+                .filter(ImageView.class::isInstance)
+                .map(ImageView.class::cast)
+                .forEach(HytaleProfileAvatarImages::fitVisibleContent);
         Region presence = new Region();
         presence.getStyleClass().addAll("play-friend-presence", friend.online() ? "online" : "offline");
         StackPane.setAlignment(presence, Pos.BOTTOM_RIGHT);

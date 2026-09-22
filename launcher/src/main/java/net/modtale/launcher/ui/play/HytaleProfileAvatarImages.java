@@ -7,12 +7,46 @@ import java.util.function.Function;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.scene.Node;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 
 /** Tries the username render once if an archived avatar cannot be decoded or downloaded. */
 final class HytaleProfileAvatarImages {
     private HytaleProfileAvatarImages() { }
+
+    static void fitVisibleContent(ImageView view) {
+        Runnable fit = () -> {
+            Image image = view.getImage();
+            view.setViewport(null);
+            if (image == null || image.getPixelReader() == null) return;
+            var pixels = image.getPixelReader();
+            int width = (int) image.getWidth(), height = (int) image.getHeight();
+            int left = width, top = height, right = -1, bottom = -1;
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    if ((pixels.getArgb(x, y) >>> 24) < 16) continue;
+                    left = Math.min(left, x);
+                    top = Math.min(top, y);
+                    right = Math.max(right, x);
+                    bottom = Math.max(bottom, y);
+                }
+            }
+            if (right >= left && bottom >= top) {
+                view.setViewport(new Rectangle2D(left, top, right - left + 1, bottom - top + 1));
+            }
+        };
+        javafx.beans.value.ChangeListener<Number> loaded = (observable, previous, progress) -> {
+            if (progress.doubleValue() == 1) fit.run();
+        };
+        view.imageProperty().addListener((observable, previous, image) -> {
+            if (previous != null) previous.progressProperty().removeListener(loaded);
+            if (image != null) image.progressProperty().addListener(loaded);
+            fit.run();
+        });
+        if (view.getImage() != null) view.getImage().progressProperty().addListener(loaded);
+        fit.run();
+    }
 
     static void render(ImageView view, Node initial, CompletableFuture<JsonNode> skin,
                        Function<JsonNode, CompletableFuture<Image>> renderer, BooleanSupplier current) {
