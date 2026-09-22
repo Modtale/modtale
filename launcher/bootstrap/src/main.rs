@@ -262,6 +262,7 @@ fn run() -> Result<i32> {
         .map(PathBuf::from)
         .unwrap_or(env::current_exe()?);
     let update_root = update_root(&state, &executable, &base_config);
+    writeln!(log, "Launcher update directory: {}", update_root.display())?;
     let cache = state.join("runtime-25");
     let java = install_runtime(&state, &cache, &installed_app, &log)?;
     let mut app = installed_app.clone();

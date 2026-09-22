@@ -1,6 +1,5 @@
 """Exercise the packaged bootstrap with isolated runtime locations."""
 import os
-import hashlib
 from pathlib import Path
 import shutil
 import subprocess
@@ -48,8 +47,15 @@ with tempfile.TemporaryDirectory(prefix="modtale bootstrap ü ") as directory:
         app = executable.parent.parent / "app"
     else:
         app = executable.parent.parent / "lib" / "app"
-    key = hashlib.sha256(os.fsencode(str(executable)) + b"\0" + (app / "bootstrap.json").read_bytes()).hexdigest()
-    updates = cache.parent / "updates" / key
+    # Use the bootstrap's actual installation identity. Windows may spell the
+    # same executable path differently from Python's resolved path.
+    log_path = cache.parent / "bootstrap.log"
+    prefix = "Launcher update directory: "
+    roots = [line.removeprefix(prefix) for line in log_path.read_text(encoding="utf-8").splitlines() if line.startswith(prefix)]
+    assert roots, "Bootstrap diagnostics must identify the installation update directory"
+    updates = Path(roots[-1])
+    assert updates.parent.name == "updates" and updates.parent.parent.samefile(cache.parent), "Updates must stay inside the isolated launcher state"
+    assert len(updates.name) == 64 and all(c in "0123456789abcdef" for c in updates.name), "Installation identity must remain a SHA-256 key"
     payload = updates / "version-smoke"
     payload.mkdir(parents=True)
     for file in app.iterdir():
@@ -57,7 +63,7 @@ with tempfile.TemporaryDirectory(prefix="modtale bootstrap ü ") as directory:
             shutil.copyfile(file, payload / file.name)
     (updates / "active").write_text(payload.name)
     subprocess.run([executable, "--modtale-bootstrap-check"], env=environment, check=True, timeout=45)
-    log = (cache.parent / "bootstrap.log").read_text()
+    log = log_path.read_text(encoding="utf-8")
     assert f"Launcher application: {payload}" in log, "Existing executable must load the activated update"
     (payload / "bootstrap.json").write_text("invalid")
     subprocess.run([executable, "--modtale-bootstrap-check"], env=environment, check=True, timeout=45)
