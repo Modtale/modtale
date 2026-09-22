@@ -1,29 +1,16 @@
-import fs from 'node:fs';
+import { defaultFixtureDirectory, readFixtureCollections } from './fixture-files.mjs';
 import path from 'node:path';
 import process from 'node:process';
 import { connectMongo } from './mongo-connection.mjs';
 
-const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
 const fixtureDir = process.env.MOCK_DB_COLLECTION_DIR
   ? path.resolve(process.env.MOCK_DB_COLLECTION_DIR)
-  : path.join(repoRoot, 'mock-db', 'generated', 'collections');
+  : defaultFixtureDirectory;
 
 const targetUri = process.env.MOCK_TEMPLATE_MONGODB_URI;
 const targetDbName = process.env.MOCK_TEMPLATE_DATABASE_NAME || 'modtale-mock-template';
 const sourceDbName = process.env.MOCK_SOURCE_DATABASE_NAME || 'modtale';
-const collections = [
-  'users',
-  'projects',
-  'project_monthly_stats',
-  'platform_monthly_stats',
-  'admin_logs',
-  'reports',
-  'notifications',
-  'api_keys',
-  'banned_emails',
-  'status_incidents',
-  'status_history',
-];
+
 
 if (!targetUri) {
   console.error('MOCK_TEMPLATE_MONGODB_URI is required.');
@@ -54,16 +41,10 @@ function reviveExtendedJson(value) {
   return value;
 }
 
-function readCollection(collectionName) {
-  const filePath = path.join(fixtureDir, `${collectionName}.json`);
-  const docs = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  if (!Array.isArray(docs)) {
-    throw new Error(`${filePath} must contain a JSON array.`);
-  }
-  return docs.map(reviveExtendedJson);
-}
-
 async function main() {
+  // Validate and decode every input before connecting or deleting existing data.
+  const fixtures = new Map([...readFixtureCollections(fixtureDir)]
+    .map(([name, documents]) => [name, documents.map(reviveExtendedJson)]));
   const client = await connectMongo(targetUri, {
     appName: 'modtale-mock-template-load',
     label: 'template'
@@ -72,8 +53,7 @@ async function main() {
   try {
     const db = client.db(targetDbName);
 
-    for (const collectionName of collections) {
-      const docs = readCollection(collectionName);
+    for (const [collectionName, docs] of fixtures) {
       const collection = db.collection(collectionName);
       await collection.deleteMany({});
       if (docs.length > 0) {

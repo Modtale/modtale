@@ -1,3 +1,4 @@
+import { SkeletonSurface } from '@/components/ui/Skeleton';
 import React, { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -167,28 +168,8 @@ function FilterSelect({
     );
 }
 
-function AuditLogsSkeleton() {
-    return (
-        <div className="space-y-6 animate-pulse">
-            <div className="rounded-3xl border border-slate-200 bg-slate-200/60 p-6 dark:border-white/10 dark:bg-white/5">
-                <div className="mb-4 h-6 w-40 rounded-xl bg-slate-300/70 dark:bg-white/10" />
-                <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr),minmax(0,0.6fr),minmax(0,0.6fr),auto,auto]">
-                    {[...Array(5)].map((_, index) => (
-                        <div key={index} className="h-12 rounded-2xl bg-slate-300/70 dark:bg-white/10" />
-                    ))}
-                </div>
-            </div>
-            <div className="rounded-3xl border border-slate-200 bg-slate-200/60 dark:border-white/10 dark:bg-white/5">
-                {[...Array(5)].map((_, index) => (
-                    <div key={index} className="h-20 border-b border-slate-300/70 dark:border-white/10 last:border-b-0" />
-                ))}
-            </div>
-        </div>
-    );
-}
-
 export function AuditLogs() {
-    const [logs, setLogs] = useState<AdminLog[]>([]);
+    const [loadedLogs, setLogs] = useState<AdminLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [query, setQuery] = useState('');
     const [appliedQuery, setAppliedQuery] = useState('');
@@ -241,12 +222,16 @@ export function AuditLogs() {
         setPage(0);
     };
 
-    if (loading && logs.length === 0) {
-        return <AuditLogsSkeleton />;
-    }
+    const pending = loading && loadedLogs.length === 0;
+    const Surface = pending ? SkeletonSurface : React.Fragment;
+    const logs: AdminLog[] = pending ? Array.from({ length: 5 }, (_, index) => ({
+        id: `00000000-0000-0000-0000-00000000000${index}`, adminUsername: 'Administrator',
+        action: 'PUBLISH_PROJECT', targetId: '00000000-0000-0000-0000-000000000000',
+        targetType: 'PROJECT', details: 'Administrative action and review details.', timestamp: '2026-01-01T12:00:00Z',
+    })) : loadedLogs;
 
     return (
-        <div className="space-y-6">
+        <Surface><div className="space-y-6">
             {errorMessage && (
                 <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300">
                     {errorMessage}
@@ -456,6 +441,6 @@ export function AuditLogs() {
                     </div>
                 </div>
             )}
-        </div>
+        </div></Surface>
     );
 }

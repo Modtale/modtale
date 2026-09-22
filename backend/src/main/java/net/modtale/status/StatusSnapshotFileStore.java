@@ -33,7 +33,7 @@ public class StatusSnapshotFileStore {
 
         try {
             SnapshotState state = objectMapper.readValue(path.toFile(), SnapshotState.class);
-            return state.history() != null ? state.history() : List.of();
+            return state != null && state.history() != null ? state.history() : List.of();
         } catch (IOException e) {
             logger.warn("Could not read detached status snapshot cache at {}", path, e);
             return List.of();

@@ -16,13 +16,16 @@ public final class PublicApiEndpointMatcher {
 
     private static final List<String> PUBLIC_READ_EXACT_PATHS = List.of(
             "/api/v1/tags",
+            "/api/v1/news",
             "/api/v1/status",
+            "/api/v1/auth/csrf",
             "/api/v1/analytics/platform/stats",
             "/api/v1/projects"
     );
 
     private static final List<String> PUBLIC_READ_PREFIXES = List.of(
             "/api/v1/projects/",
+            "/api/v1/news/",
             "/api/v1/files/",
             "/api/v1/user/profile/",
             "/api/v1/users/",
@@ -30,6 +33,7 @@ public final class PublicApiEndpointMatcher {
             "/api/v1/og/",
             "/api/v1/download/",
             "/api/v1/download-bundle/",
+            "/api/v1/lists/",
             "/api/v1/meta/",
             "/api/v1/version/",
             "/api/v1/wiki/"
@@ -46,7 +50,8 @@ public final class PublicApiEndpointMatcher {
         String normalizedPath = path.trim();
         String normalizedMethod = method.toUpperCase(Locale.ROOT);
 
-        if (normalizedMethod.equals("POST") && normalizedPath.equals("/api/v1/users/batch")) {
+        if (normalizedMethod.equals("POST") && (normalizedPath.equals("/api/v1/users/batch")
+                || normalizedPath.equals("/api/v1/projects/external/identify"))) {
             return true;
         }
 

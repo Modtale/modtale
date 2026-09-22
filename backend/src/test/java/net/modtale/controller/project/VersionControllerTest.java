@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import net.modtale.config.properties.AppFrontendProperties;
+import net.modtale.model.dto.request.project.DependencyReferenceRequest;
 import net.modtale.model.dto.request.project.CreateVersionRequest;
 import net.modtale.model.dto.project.ProjectVersionDTO;
 import net.modtale.model.project.Project;
@@ -103,15 +104,18 @@ class VersionControllerTest {
     }
 
     @Test
-    void addVersionSplitsCommaSeparatedDependencyIdsBeforeDelegating() throws Exception {
+    void addVersionDelegatesStructuredDependenciesAndSplitsIncompatibleIds() throws Exception {
         User currentUser = user("user-1");
         Authentication authentication = mock(Authentication.class);
         MockMultipartFile file = new MockMultipartFile("file", "mod.jar", "application/java-archive", new byte[]{1, 2, 3});
+        DependencyReferenceRequest dependencyA = dependency("dep-a", "1.0.0");
+        DependencyReferenceRequest dependencyB = dependency("dep-b", "2.0.0");
         CreateVersionRequest requestPayload = new CreateVersionRequest();
         requestPayload.setVersionNumber("1.0.0");
         requestPayload.setGameVersions(List.of("1.0.0"));
         requestPayload.setFile(file);
-        requestPayload.setModIds(List.of("dep-a, dep-b, , dep-c"));
+        requestPayload.setDependencies(List.of(dependencyA, dependencyB));
+        requestPayload.setIncompatibleProjectIds(List.of("dep-a, dep-b, , dep-c"));
         requestPayload.setChangelog("Release notes");
         requestPayload.setChannel(ProjectVersion.Channel.BETA);
         requestPayload.setReplaceExisting(true);
@@ -127,8 +131,8 @@ class VersionControllerTest {
                 eq(List.of("1.0.0")),
                 eq(file),
                 eq("Release notes"),
+                eq(List.of(dependencyA, dependencyB)),
                 eq(List.of("dep-a", "dep-b", "dep-c")),
-                isNull(),
                 eq(ProjectVersion.Channel.BETA),
                 eq(true),
                 eq(currentUser)
@@ -202,8 +206,8 @@ class VersionControllerTest {
         ByteArrayResource body = assertInstanceOf(ByteArrayResource.class, response.getBody());
         assertArrayEquals(new byte[]{9, 8, 7}, body.getByteArray());
 
-        verify(trackingService).logDownload("project-1", "version-1", "Ada", false, "198.51.100.8");
-        verify(trackingService).logDownload("dep-1", null, null, false, "198.51.100.8");
+        verify(trackingService).logDownload("project-1", "version-1", "Ada", false, "198.51.100.8", false);
+        verify(trackingService).logDownload("dep-1", null, null, false, "198.51.100.8", false);
     }
 
     @Test
@@ -235,7 +239,7 @@ class VersionControllerTest {
         assertArrayEquals(new byte[]{1, 2, 3, 4}, body.getByteArray());
 
         verify(storageService).download(version.getFileUrl());
-        verify(trackingService).logDownload("project-1", "version-1", "Ada", false, "203.0.113.5");
+        verify(trackingService).logDownload("project-1", "version-1", "Ada", false, "203.0.113.5", false);
     }
 
     @Test
@@ -267,18 +271,18 @@ class VersionControllerTest {
         assertEquals("no-referrer", response.getHeaders().getFirst("Referrer-Policy"));
         org.junit.jupiter.api.Assertions.assertNull(response.getBody());
         verify(storageService, never()).download(anyString());
-        verify(trackingService).logDownload("project-1", "version-1", "Ada", false, "203.0.113.5");
+        verify(trackingService).logDownload("project-1", "version-1", "Ada", false, "203.0.113.5", false);
     }
 
     @Test
     void downloadBundleTracksOnlySelectedDependencies() throws Exception {
         User currentUser = user("user-1");
-        Project project = project("project-1", "Sky Tools", ProjectClassification.MODPACK);
+        Project project = project("project-1", "Sky Tools", ProjectClassification.DATA);
         ProjectVersion version = version("version-1", "1.0.0");
         version.setDependencies(List.of(
                 new ProjectDependency("dep-a", "Dependency A", "1.0.0"),
                 new ProjectDependency("dep-b", "Dependency B", "2.0.0"),
-                new ProjectDependency("dep-c", "Dependency C", "3.0.0", false, true)
+                new ProjectDependency("dep-c", "Dependency C", "3.0.0", ProjectDependency.DependencyType.EMBEDDED)
         ));
 
         when(downloadTokenService.validateAndConsume("bundle-token")).thenReturn(
@@ -305,10 +309,10 @@ class VersionControllerTest {
         ByteArrayResource body = assertInstanceOf(ByteArrayResource.class, response.getBody());
         assertArrayEquals(new byte[]{6, 5, 4}, body.getByteArray());
 
-        verify(trackingService).logDownload("project-1", "version-1", "Ada", true, "192.0.2.11");
-        verify(trackingService).logDownload("dep-b", null, "Ada", true, "192.0.2.11");
-        verify(trackingService, never()).logDownload(eq("dep-a"), isNull(), isNull(), anyBoolean(), anyString());
-        verify(trackingService, never()).logDownload(eq("dep-c"), isNull(), isNull(), anyBoolean(), anyString());
+        verify(trackingService).logDownload("project-1", "version-1", "Ada", true, "192.0.2.11", false);
+        verify(trackingService).logDownload("dep-b", null, "Ada", true, "192.0.2.11", false);
+        verify(trackingService, never()).logDownload(eq("dep-a"), isNull(), isNull(), anyBoolean(), anyString(), anyBoolean());
+        verify(trackingService, never()).logDownload(eq("dep-c"), isNull(), isNull(), anyBoolean(), anyString(), anyBoolean());
     }
 
     @Test
@@ -334,7 +338,7 @@ class VersionControllerTest {
         var response = controller.downloadWithToken("token", null, request);
 
         assertEquals(200, response.getStatusCode().value());
-        verify(trackingService, never()).logDownload(eq("project-1"), any(), any(), anyBoolean(), anyString());
+        verify(trackingService, never()).logDownload(eq("project-1"), any(), any(), anyBoolean(), anyString(), anyBoolean());
     }
 
     private static Project project(String id, String title, ProjectClassification classification) {
@@ -358,5 +362,12 @@ class VersionControllerTest {
         User user = new User();
         user.setId(id);
         return user;
+    }
+
+    private static DependencyReferenceRequest dependency(String projectId, String versionNumber) {
+        DependencyReferenceRequest request = new DependencyReferenceRequest();
+        request.setProjectId(projectId);
+        request.setVersionNumber(versionNumber);
+        return request;
     }
 }

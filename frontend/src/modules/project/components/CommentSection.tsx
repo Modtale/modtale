@@ -12,6 +12,7 @@ import { SiteRoutes } from '@/utils/routes';
 import type { Comment, User, Project } from '@/types';
 import { getCommentRoleBadge } from '../utils/commentRoles';
 import { AdminPermission } from '@/modules/admin/utils/access';
+import { MAX_COMMENT_CHARACTERS } from '@/utils/siteLimits';
 
 interface VoteWidgetProps {
     score: number;
@@ -261,12 +262,14 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
                                 aria-label="Comment content"
                                 value={text}
                                 onChange={e => setText(e.target.value)}
+                                maxLength={MAX_COMMENT_CHARACTERS}
                                 className="w-full bg-transparent border-none text-slate-900 dark:text-white outline-none font-medium text-sm min-h-[60px] resize-y placeholder-slate-400 dark:placeholder-slate-500 pt-1.5"
                                 placeholder="What are your thoughts?"
                                 required
                             />
                         </div>
-                        <div className="flex justify-end pt-1">
+                        <div className="flex items-center justify-between gap-3 pt-1">
+                            <span className="text-[10px] text-slate-500 tabular-nums">{text.length.toLocaleString()} / {MAX_COMMENT_CHARACTERS.toLocaleString()} characters</span>
                             <button type="submit" disabled={submitting} className="bg-modtale-accent hover:bg-modtale-accentHover text-white px-5 py-1.5 rounded-lg font-bold flex items-center gap-1.5 disabled:opacity-50 transition-colors text-xs shadow-md">
                                 <Send className="w-3.5 h-3.5" aria-hidden="true" /> {editingCommentId ? 'Update' : 'Post Comment'}
                             </button>
@@ -383,15 +386,19 @@ export const CommentSection: React.FC<CommentSectionProps> = React.memo(({
                                             aria-label="Developer reply content"
                                             value={replyText}
                                             onChange={e => setReplyText(e.target.value)}
+                                            maxLength={MAX_COMMENT_CHARACTERS}
                                             className="w-full bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 rounded-xl p-4 text-base focus:outline-none focus:ring-2 focus:ring-modtale-accent text-slate-900 dark:text-white transition-all shadow-inner resize-y"
                                             placeholder="Write a reply..."
                                             rows={3}
                                         />
-                                        <div className="mt-2 flex justify-end gap-2">
+                                        <div className="mt-2 flex items-center justify-between gap-2">
+                                            <span className="text-[10px] text-slate-500 tabular-nums">{replyText.length.toLocaleString()} / {MAX_COMMENT_CHARACTERS.toLocaleString()} characters</span>
+                                            <div className="flex gap-2">
                                             <button type="button" onClick={() => setReplyingCommentId(null)} className="text-sm font-bold px-4 py-2 text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">Cancel</button>
                                             <button type="submit" disabled={submitting} className="text-sm font-bold bg-modtale-accent text-white px-5 py-2 rounded-lg flex items-center gap-2 hover:bg-modtale-accentHover transition-colors shadow-sm">
                                                 <CornerDownRight className="w-4 h-4" aria-hidden="true"/> Post Reply
                                             </button>
+                                            </div>
                                         </div>
                                     </form>
                                 )}

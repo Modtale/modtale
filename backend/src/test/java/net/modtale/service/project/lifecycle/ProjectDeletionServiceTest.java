@@ -110,10 +110,10 @@ class ProjectDeletionServiceTest {
         assertTrue(project.getTags().isEmpty());
         assertNull(project.getDeletedAt());
 
-        verify(storageService).deleteFile("https://cdn.modtale.net/icon.png");
-        verify(storageService).deleteFile("https://cdn.modtale.net/banner.png");
-        verify(storageService).deleteFile("https://cdn.modtale.net/one.png");
-        verify(storageService).deleteFile("https://cdn.modtale.net/two.png");
+        verify(storageService).deleteOwnedProjectMedia(eq("project-1"), eq("https://cdn.modtale.net/icon.png"), any());
+        verify(storageService).deleteOwnedProjectMedia(eq("project-1"), eq("https://cdn.modtale.net/banner.png"), any());
+        verify(storageService).deleteOwnedProjectMedia(eq("project-1"), eq("https://cdn.modtale.net/one.png"), any());
+        verify(storageService).deleteOwnedProjectMedia(eq("project-1"), eq("https://cdn.modtale.net/two.png"), any());
         verify(projectRepository).save(project);
         verify(projectService).evictProjectCache(project);
         verify(projectRepository, never()).delete(project);
@@ -126,10 +126,11 @@ class ProjectDeletionServiceTest {
         project.setImageUrl("https://cdn.modtale.net/icon.png");
         project.setBannerUrl("https://cdn.modtale.net/banner.png");
         project.setGalleryImages(new ArrayList<>(List.of("https://cdn.modtale.net/one.png")));
-        project.setModIds(new ArrayList<>(List.of("dep-2")));
+        project.setChildProjectIds(new ArrayList<>(List.of("dep-2")));
 
         ProjectVersion version = version("1.0.0");
         version.setFileUrl("files/project-1/main.jar");
+        version.setOverrideFileUrl("modpack-overrides/project-1/overrides.zip");
         version.setDependencies(List.of(new ProjectDependency("dep-1", "Dependency One", "2.0.0")));
         project.setVersions(new ArrayList<>(List.of(version)));
 
@@ -144,9 +145,10 @@ class ProjectDeletionServiceTest {
 
         verify(trackingService).deleteProjectAnalytics("project-1");
         verify(storageService).deleteFile("files/project-1/main.jar");
-        verify(storageService).deleteFile("https://cdn.modtale.net/icon.png");
-        verify(storageService).deleteFile("https://cdn.modtale.net/banner.png");
-        verify(storageService).deleteFile("https://cdn.modtale.net/one.png");
+        verify(storageService).deleteFile("modpack-overrides/project-1/overrides.zip");
+        verify(storageService).deleteOwnedProjectMedia(eq("project-1"), eq("https://cdn.modtale.net/icon.png"), any());
+        verify(storageService).deleteOwnedProjectMedia(eq("project-1"), eq("https://cdn.modtale.net/banner.png"), any());
+        verify(storageService).deleteOwnedProjectMedia(eq("project-1"), eq("https://cdn.modtale.net/one.png"), any());
         verify(mongoTemplate, times(2)).updateMulti(any(Query.class), any(Update.class), eq(net.modtale.model.user.User.class));
         verify(projectRepository).delete(project);
         verify(projectService).evictProjectCache(project);

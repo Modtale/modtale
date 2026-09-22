@@ -39,6 +39,14 @@ describe('useScrollLock', () => {
         expect(document.body.style.overflow).toBe('');
     });
 
+    it('restores the prior overflow style and ignores unlocked consumers', async () => {
+        document.body.style.overflow = 'clip';
+        await act(async () => root.render(<><Harness lock={true} /><Harness lock={false} /></>));
+        expect(document.body.style.overflow).toBe('hidden');
+        await act(async () => root.render(<Harness lock={false} />));
+        expect(document.body.style.overflow).toBe('clip');
+    });
+
     it('keeps the body locked until the last consumer releases it', async () => {
         const renderLocks = (count: number) => (
             <>

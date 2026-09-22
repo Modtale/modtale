@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { Search, Upload, Code } from 'lucide-react';
 import { GitHubBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { api } from '@/utils/api';
+import { HomeNewsSection } from '../components/HomeNewsSection';
 import { ROUTE_SEO } from '@/data/seo-constants';
 import type { Project, User } from '@/types';
 import { SiteRoutes } from '@/utils/routes';
@@ -14,7 +15,9 @@ import { MarqueeColumn } from '../components/HeroMarquee';
 import {
     TrendingProjectsSection,
     NewReleasesSection,
+    ModpackPreviewSection,
     DirectDownloadsSection,
+    LauncherPreviewSection,
     SmartDependenciesSection,
     ProjectAnalyticsSection,
     CommunityThreadsSection,
@@ -67,7 +70,6 @@ const WIDE_DESKTOP_COPY_CLASSES = '[@media(min-width:1260px)_and_(min-height:720
 const WIDE_DESKTOP_PRIMARY_CLASSES = '[@media(min-width:1260px)_and_(min-height:720px)]:items-start';
 const WIDE_DESKTOP_ACTIONS_CLASSES = '[@media(min-width:1260px)_and_(min-height:720px)]:items-start [@media(min-width:1260px)_and_(min-height:720px)]:self-start';
 const WIDE_DESKTOP_MARQUEE_CLASSES = '[@media(min-width:1260px)_and_(min-height:720px)]:block';
-
 const getViewportSize = () => {
     if (typeof window === 'undefined') {
         return { width: 0, height: 0 };
@@ -77,11 +79,13 @@ const getViewportSize = () => {
 };
 
 const FeatureShowcaseSection = ({
+    id,
     children,
     glowFrom,
     glowTo,
     align = 'left',
 }: {
+    id?: string;
     children: React.ReactNode;
     glowFrom: string;
     glowTo: string;
@@ -95,7 +99,7 @@ const FeatureShowcaseSection = ({
         : { left: '-6rem', right: 'auto' };
 
     return (
-        <section className="relative isolate overflow-hidden py-20 sm:py-28 border-t border-slate-200/60 dark:border-white/[0.04]">
+        <section id={id} className="relative isolate overflow-hidden scroll-mt-24 py-20 sm:py-28 border-t border-slate-200/60 dark:border-white/[0.04]">
             <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-slate-100/70 to-slate-50 dark:from-[#0b1220] dark:via-[#08111d] dark:to-[#070e19]" />
             <div
                 className="absolute top-[-4rem] h-56 sm:h-72 w-56 sm:w-72 rounded-full blur-3xl opacity-35 pointer-events-none"
@@ -592,7 +596,6 @@ export const Home: React.FC<{
     return (
         <div
             className="min-h-screen bg-slate-50 dark:bg-[#0B1120] text-slate-900 dark:text-slate-300 relative selection:bg-blue-500 selection:text-white overflow-x-hidden transition-colors duration-300"
-            style={{ fontFamily: '"Inter Variable", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' }}
         >
             <Helmet>
                 <title>{homeSeo.title}</title>
@@ -1036,7 +1039,7 @@ export const Home: React.FC<{
                                     />
                                 </div>
 
-                                <h1 className={`text-4xl sm:text-5xl ${shouldUseSplitHeroLayout ? 'lg:text-6xl 2xl:text-[5.5rem] 2xl:mb-8' : ''} font-black text-slate-900 dark:text-white tracking-tighter leading-[1.05] mb-3 sm:mb-6 ${shouldUseSplitHeroLayout ? 'lg:self-start' : ''}`}>
+                                <h1 className={`text-4xl sm:text-5xl ${shouldUseSplitHeroLayout ? 'lg:text-6xl 2xl:text-[5.5rem] 2xl:mb-8' : ''} font-black text-slate-900 dark:text-white tracking-normal leading-[1.05] mb-3 sm:mb-6 ${shouldUseSplitHeroLayout ? 'lg:self-start' : ''}`}>
                                     The Hytale<br />
                                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-500 to-blue-500 dark:from-blue-400 dark:via-indigo-400 dark:to-blue-300">
                                         Community<br />Repository
@@ -1067,21 +1070,21 @@ export const Home: React.FC<{
 
                             <div className={`${GLASS_CARD} home-hero-stats flex flex-row items-center justify-between sm:justify-start gap-2 sm:gap-10 2xl:gap-14 w-full sm:w-fit p-3.5 sm:p-6 lg:p-8 shadow-sm lg:-ml-1.5 contain-content`}>
                                 <div className="home-hero-stat-group flex flex-col items-center lg:items-start flex-1 sm:flex-none">
-                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-normal">
                                         {formatMetric(stats.totalProjects)}
                                     </span>
                                     <span className="home-hero-stat-label text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Projects</span>
                                 </div>
                                 <div className="home-hero-stat-divider w-px h-8 sm:h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
                                 <div className="home-hero-stat-group flex flex-col items-center lg:items-start flex-1 sm:flex-none">
-                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-normal">
                                         {formatMetric(stats.totalDownloads)}
                                     </span>
                                     <span className="home-hero-stat-label text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Downloads</span>
                                 </div>
                                 <div className="home-hero-stat-divider w-px h-8 sm:h-12 bg-slate-200 dark:bg-white/10" aria-hidden="true" />
                                 <div className="home-hero-stat-group flex flex-col items-center lg:items-start flex-1 sm:flex-none">
-                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
+                                    <span className="home-hero-stat-value text-xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-normal">
                                         {formatMetric(stats.totalUsers)}
                                     </span>
                                     <span className="home-hero-stat-label text-[9px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1 sm:mt-2">Creators</span>
@@ -1116,6 +1119,7 @@ export const Home: React.FC<{
                     <div className="absolute bottom-0 left-0 right-0 h-[150px] bg-gradient-to-t from-slate-100/30 dark:from-[#080d19] to-transparent pointer-events-none z-10" />
                 </section>
 
+
                 <div className="w-full bg-slate-50 dark:bg-[#080d19] relative overflow-hidden z-20">
                     <FeatureShowcaseSection glowFrom="rgba(59, 130, 246, 0.08)" glowTo="rgba(148, 163, 184, 0.07)" align="left">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 xl:gap-24 items-start">
@@ -1136,27 +1140,35 @@ export const Home: React.FC<{
                         </div>
                     </FeatureShowcaseSection>
 
+                    <FeatureShowcaseSection glowFrom="rgba(59, 130, 246, 0.1)" glowTo="rgba(16, 185, 129, 0.08)" align="right">
+                        <ModpackPreviewSection randomProject={previewProject} projects={combinedProjectPool} loading={isTrendingProjectsLoading || isNewestProjectsLoading} />
+                    </FeatureShowcaseSection>
+
                     <FeatureShowcaseSection glowFrom="rgba(168, 85, 247, 0.1)" glowTo="rgba(236, 72, 153, 0.08)" align="left">
                         <DirectDownloadsSection />
                     </FeatureShowcaseSection>
 
-                    <FeatureShowcaseSection glowFrom="rgba(16, 185, 129, 0.1)" glowTo="rgba(20, 184, 166, 0.08)" align="right">
+                    <FeatureShowcaseSection id="launcher-preview" glowFrom="rgba(37, 99, 235, 0.1)" glowTo="rgba(16, 185, 129, 0.08)" align="right">
+                        <LauncherPreviewSection projects={combinedProjectPool} loading={isTrendingProjectsLoading || isNewestProjectsLoading} />
+                    </FeatureShowcaseSection>
+
+                    <FeatureShowcaseSection glowFrom="rgba(16, 185, 129, 0.1)" glowTo="rgba(20, 184, 166, 0.08)" align="left">
                         <SmartDependenciesSection randomProject={previewProject} previewProjects={dependencyPreviewProjects} />
                     </FeatureShowcaseSection>
 
-                    <FeatureShowcaseSection glowFrom="rgba(59, 130, 246, 0.1)" glowTo="rgba(99, 102, 241, 0.08)" align="left">
+                    <FeatureShowcaseSection glowFrom="rgba(59, 130, 246, 0.1)" glowTo="rgba(99, 102, 241, 0.08)" align="right">
                         <ProjectAnalyticsSection showConversionRate={isDesktopHeroLayout && validFeaturedProjects.length > 0} />
                     </FeatureShowcaseSection>
 
-                    <FeatureShowcaseSection glowFrom="rgba(99, 102, 241, 0.1)" glowTo="rgba(168, 85, 247, 0.08)" align="right">
+                    <FeatureShowcaseSection glowFrom="rgba(99, 102, 241, 0.1)" glowTo="rgba(168, 85, 247, 0.08)" align="left">
                         <CommunityThreadsSection project={previewProject} currentUser={currentUser} />
                     </FeatureShowcaseSection>
 
-                    <FeatureShowcaseSection glowFrom="rgba(245, 158, 11, 0.1)" glowTo="rgba(249, 115, 22, 0.08)" align="left">
+                    <FeatureShowcaseSection glowFrom="rgba(245, 158, 11, 0.1)" glowTo="rgba(249, 115, 22, 0.08)" align="right">
                         <RealTimeAlertsSection />
                     </FeatureShowcaseSection>
 
-                    <FeatureShowcaseSection glowFrom="rgba(148, 163, 184, 0.12)" glowTo="rgba(100, 116, 139, 0.08)" align="right">
+                    <FeatureShowcaseSection glowFrom="rgba(148, 163, 184, 0.12)" glowTo="rgba(100, 116, 139, 0.08)" align="left">
                         <AccountPreferencesSection />
                     </FeatureShowcaseSection>
                 </div>
@@ -1195,7 +1207,7 @@ export const Home: React.FC<{
                                 />
                             </div>
 
-                            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white mb-6 sm:mb-8 tracking-tighter leading-[1.05]">
+                            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white mb-6 sm:mb-8 tracking-normal leading-[1.05]">
                                 Built by the community,<br />
                                 <span className="text-modtale-accent">
                                     for the community.
@@ -1222,9 +1234,11 @@ export const Home: React.FC<{
                                     <Code className="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" /> View API Docs
                                 </Link>
                             </nav>
+
                         </div>
                     </section>
                 </LazySection>
+                <HomeNewsSection />
             </main>
         </div>
     );

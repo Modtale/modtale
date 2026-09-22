@@ -18,7 +18,7 @@ class ProjectCacheServiceTest {
         project.setId("project-1");
         project.setSlug("sky-tools");
         for (String name : java.util.List.of("projectDetails", "projectDetailDtos", "projectPageDtos", "projectVersionDtos", "projectMetaDtos",
-                "projectCommentDtos", "projectPermissionSnapshots", "wikiPageJson")) {
+                "projectCommentDtos", "projectPermissionSnapshots", "wikiPageJson", "projectVersionChangelogPages")) {
             manager.getCache(name).put("public:project-1", "cached");
         }
         manager.getCache("projectPageDtos").put("public:sky-tools", "cached");
@@ -27,11 +27,12 @@ class ProjectCacheServiceTest {
             assertNull(manager.getCache(name).get("public:project-1"));
         }
         assertNull(manager.getCache("projectPageDtos").get("public:sky-tools"));
-        for (String name : java.util.List.of("projectCommentDtos", "projectPermissionSnapshots", "wikiPageJson")) {
+        for (String name : java.util.List.of("projectCommentDtos", "projectPermissionSnapshots", "wikiPageJson", "projectVersionChangelogPages")) {
             assertNotNull(manager.getCache(name).get("public:project-1"));
         }
         service.evictProjectDetailsCache(project);
         assertNull(manager.getCache("wikiPageJson").get("public:project-1"));
+        assertNull(manager.getCache("projectVersionChangelogPages").get("public:project-1"));
     }
 
 

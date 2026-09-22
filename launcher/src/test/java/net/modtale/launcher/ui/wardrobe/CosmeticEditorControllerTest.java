@@ -1,0 +1,291 @@
+package net.modtale.launcher.ui.wardrobe;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import javafx.application.Platform;
+import javafx.scene.Node;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
+import javafx.stage.Window;
+import net.modtale.launcher.hytale.HytaleAuthService;
+import net.modtale.launcher.hytale.HytaleAuthSession;
+import net.modtale.launcher.settings.LauncherSettings;
+import net.modtale.launcher.ui.feedback.LauncherFeedback;
+import net.modtale.launcher.wardrobe.WardrobeApiClient;
+import net.modtale.launcher.wardrobe.WardrobeItem;
+import net.modtale.launcher.wardrobe.WardrobeStore;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.*;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
+/** Offline slot workflows through real FX controls and modal dialogs; requires a display. */
+class CosmeticEditorControllerTest {
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final UUID PLAYER = UUID.fromString("00000000-0000-4000-8000-000000000001");
+    private static final String ACTIVE = "00000000-0000-4000-8000-000000000011";
+    private static final String OTHER = "00000000-0000-4000-8000-000000000012";
+    private static final String CREATED = "00000000-0000-4000-8000-000000000013";
+    private static final String STALE = "{\"bodyCharacteristic\":\"Default.01\",\"haircut\":\"Short.Black\",\"cape\":null}";
+    private static final String FRESH = "{\"bodyCharacteristic\":\"Default.02\",\"haircut\":\"Long.Red.Variant\",\"cape\":\"Cape_Fresh.Blue\"}";
+    @TempDir Path directory;
+
+    @BeforeAll static void toolkit() throws Exception {
+        if (System.getProperty("os.name", "").toLowerCase().contains("linux"))
+            assumeTrue(!System.getenv().getOrDefault("WAYLAND_DISPLAY", "").isBlank(), "JavaFX controller tests require WAYLAND_DISPLAY");
+        try { Platform.startup(() -> Platform.setImplicitExit(false)); }
+        catch (IllegalStateException alreadyStarted) { /* Shared toolkit. */ }
+        catch (UnsupportedOperationException unavailable) {
+            org.junit.jupiter.api.Assumptions.abort("JavaFX display unavailable: " + unavailable.getMessage());
+        }
+        fx(() -> { Platform.setImplicitExit(false); return null; });
+    }
+
+    @Test void openingLoadsCurrentLookAndPreservesUnappliedEdits() throws Exception {
+        try (Harness h = new Harness()) {
+            fx(() -> { h.controller.loadCurrentOnOpen(); return null; });
+            await(() -> h.controller.draftSnapshot().equals(json(FRESH)));
+            fx(() -> { h.controller.edit(new WardrobeItem(PLAYER, WardrobeItem.Kind.SKIN,
+                    "Saved look", false, "", "{\"skin\":" + STALE + "}")); return null; });
+            await(() -> h.controller.draftSnapshot().equals(json(STALE)));
+            fx(() -> { h.controller.loadCurrentOnOpen(); return null; });
+            await(() -> h.controller.draftSnapshot().equals(json(FRESH)));
+            assertEquals(2, h.gateway.currentLoads.get());
+            fx(() -> {
+                h.controller.editCape("Cape_UserEdit.Green");
+                h.controller.loadCurrentOnOpen();
+                assertEquals("Cape_UserEdit.Green", h.controller.draftSnapshot().path("cape").asText());
+                return null;
+            });
+            assertEquals(2, h.gateway.currentLoads.get());
+            assertTrue(h.gateway.mutations.isEmpty());
+        }
+    }
+
+    @Test void opensSelectedLookOnlyAfterHydration() throws Exception {
+        try (Harness h = new Harness()) {
+            h.gateway.delayLoads = true;
+            var opened = new java.util.concurrent.atomic.AtomicInteger();
+            fx(() -> {
+                h.controller.edit(new WardrobeItem(PLAYER, WardrobeItem.Kind.SKIN,
+                        "Incoming", false, "", "{\"skin\":" + FRESH + "}"), () -> {
+                    assertEquals(json(FRESH), h.controller.draftSnapshot());
+                    opened.incrementAndGet();
+                });
+                return null;
+            });
+            assertTrue(h.gateway.loadStarted.await(5, TimeUnit.SECONDS));
+            assertEquals(0, opened.get());
+            h.gateway.releaseLoad.countDown();
+            await(() -> opened.get() == 1);
+        }
+    }
+
+    @Test void lateCurrentSkinAndHydrationCannotReplaceCapeEdits() throws Exception {
+        for (boolean hydrate : List.of(false, true)) {
+            try (Harness h = new Harness()) {
+                fx(() -> { h.controller.edit(new WardrobeItem(PLAYER, WardrobeItem.Kind.SKIN,
+                        "Saved look", false, "", "{\"skin\":" + STALE + "}")); return null; });
+                await(() -> h.controller.draftSnapshot().equals(json(STALE)));
+                h.gateway.delayLoads = true;
+                fx(() -> {
+                    if (hydrate) h.controller.edit(new WardrobeItem(PLAYER, WardrobeItem.Kind.SKIN,
+                            "Incoming", false, "", "{\"skin\":" + FRESH + "}"));
+                    else button(h.root(), "Load current look").fire();
+                    return null;
+                });
+                assertTrue(h.gateway.loadStarted.await(5, TimeUnit.SECONDS), "Load must be in flight before editing");
+                await(() -> !"Ready".equals(h.status.getText()));
+                fx(() -> { h.controller.editCape("Cape_UserEdit.Green"); return null; });
+                JsonNode expected = json(STALE);
+                ((com.fasterxml.jackson.databind.node.ObjectNode) expected).put("cape", "Cape_UserEdit.Green");
+                assertEquals(expected, fx(h.controller::draftSnapshot));
+                h.gateway.releaseLoad.countDown();
+                // Feedback resets status in the same FX callback that delivers the loaded skin.
+                await(() -> "Ready".equals(h.status.getText()));
+                assertEquals(expected, fx(h.controller::draftSnapshot),
+                        (hydrate ? "Hydration" : "Current skin") + " must not overwrite edits made while loading");
+            }
+        }
+    }
+
+    @Test void savesLocallyThroughStatusModalWithValidationAndCancel() throws Exception {
+        try (Harness h = new Harness()) {
+            fx(() -> { button(h.root(), "Load current look").fire(); return null; });
+            await(() -> h.controller.draftSnapshot().equals(json(FRESH)));
+            FutureTask<Void> opened = submitFx(() -> { button(h.root(), "Save").fire(); return null; });
+            await(() -> h.stage.getScene().lookup(".status-modal-primary") != null);
+            fx(() -> {
+                TextField name = (TextField) h.stage.getScene().lookup(".status-modal-custom-content");
+                Button primary = (Button) h.stage.getScene().lookup(".status-modal-primary");
+                assertEquals("My look", name.getText());
+                name.setText(" "); assertTrue(primary.isDisabled());
+                name.setText("x".repeat(121)); assertTrue(primary.isDisabled());
+                name.setText("My saved look"); assertFalse(primary.isDisabled()); primary.fire(); return null;
+            });
+            opened.get(5, TimeUnit.SECONDS);
+            await(() -> new WardrobeStore(directory).items().size() == 1);
+            var saved = new WardrobeStore(directory).items().getFirst();
+            assertEquals("My saved look", saved.name());
+            assertEquals(json(FRESH), json(saved.payload()).path("skin"));
+            FutureTask<Void> cancelled = submitFx(() -> { button(h.root(), "Save").fire(); return null; });
+            await(() -> h.stage.getScene().lookup(".status-modal-secondary") != null);
+            fx(() -> { ((Button) h.stage.getScene().lookup(".status-modal-secondary")).fire(); return null; });
+            cancelled.get(5, TimeUnit.SECONDS);
+            assertEquals(List.of(saved), new WardrobeStore(directory).items());
+            assertTrue(h.gateway.mutations.isEmpty());
+        }
+    }
+
+    @Test void editorHasNoHytaleOutfitsSection() throws Exception {
+        try (Harness h = new Harness()) {
+            fx(() -> {
+                assertTrue(nodes(h.root(), Label.class).stream().noneMatch(label ->
+                        List.of("Hytale outfits", "Wearing", "Main", "Adventure").contains(label.getText())));
+                assertTrue(nodes(h.root(), MenuButton.class).isEmpty());
+                return null;
+            });
+        }
+    }
+
+    private final class Harness implements AutoCloseable {
+        final ExecutorService executor = Executors.newFixedThreadPool(2);
+        final Gateway gateway = new Gateway(directory);
+        final CosmeticEditorController controller;
+        final Stage stage;
+        final Label status;
+        Harness() throws Exception {
+            LauncherSettings settings = new LauncherSettings();
+            HytaleAuthSession session = new HytaleAuthSession();
+            session.setUsername("Alice"); session.setUuid(PLAYER.toString()); session.setAccountOwnerId(PLAYER.toString());
+            settings.setHytaleAuthSession(session);
+            settings.setHytaleGamePath(directory.resolve("missing-game").toString());
+            WardrobeStore store = new WardrobeStore(directory);
+            status = fx(Label::new);
+            controller = fx(() -> new CosmeticEditorController(gateway, store, () -> settings,
+                    new LauncherFeedback(executor, status, new StackPane(), new Label(), new Label(), () -> "Ready"), executor));
+            stage = fx(() -> {
+                Stage result = new Stage();
+                Scene scene = new Scene(new StackPane(controller.view()), 1100, 800);
+                scene.getStylesheets().add(getClass().getResource("/net/modtale/launcher/ui/nativefx/launcher.css").toExternalForm());
+                result.setScene(scene); result.show(); controller.refresh(); return result;
+            });
+            await(() -> ((CheckBox) button(root(), "Owned only")).isSelected());
+        }
+        Node root() { return controller.view(); }
+        DialogPane dialog() {
+            return Window.getWindows().stream().filter(Window::isShowing)
+                    .filter(w -> w instanceof Stage s && s.getOwner() == stage)
+                    .flatMap(w -> nodes(w.getScene().getRoot(), DialogPane.class).stream()).findFirst().orElse(null);
+        }
+        void accept(Runnable trigger, String initial, String replacement) throws Exception {
+            FutureTask<Void> opened = submitFx(() -> { trigger.run(); return null; });
+            await(() -> dialog() != null);
+            fx(() -> {
+                if (initial != null) {
+                    TextField field = nodes(dialog(), TextField.class).getFirst();
+                    assertEquals(initial, field.getText());
+                    field.setText(replacement);
+                }
+                ((Button) dialog().lookupButton(ButtonType.OK)).fire(); return null;
+            });
+            opened.get(5, TimeUnit.SECONDS);
+        }
+        Mutation mutation(String action) throws Exception {
+            Mutation value = gateway.mutations.poll(5, TimeUnit.SECONDS);
+            assertNotNull(value, "Expected " + action + " API call");
+            assertEquals(action, value.action());
+            assertEquals(PLAYER, value.expected());
+            assertEquals(PLAYER.toString(), value.actual());
+            return value;
+        }
+        @Override public void close() throws Exception {
+            gateway.releaseLoad.countDown();
+            fx(() -> {
+                if (dialog() != null) ((Button) dialog().lookupButton(ButtonType.CANCEL)).fire();
+                controller.close(); stage.hide(); return null;
+            });
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+            fx(() -> null);
+        }
+    }
+
+    private record Mutation(String action, String id, String name, JsonNode skin, UUID expected,
+                            String actual, List<WardrobeItem> backups) {}
+    private static final class Gateway extends WardrobeApiClient {
+        final Path directory;
+        final java.util.concurrent.atomic.AtomicInteger currentLoads = new java.util.concurrent.atomic.AtomicInteger();
+        volatile boolean delayLoads;
+        final CountDownLatch loadStarted = new CountDownLatch(1), releaseLoad = new CountDownLatch(1);
+        final BlockingQueue<Mutation> mutations = new LinkedBlockingQueue<>();
+        volatile SkinSlots snapshot = new SkinSlots(ACTIVE, 3,
+                List.of(new SkinSlot(ACTIVE, "Main", STALE), new SkinSlot(OTHER, "Adventure", STALE)));
+        Gateway(Path directory) {
+            super(new HytaleAuthService(null, null) {
+                @Override public String freshAccessToken(LauncherSettings settings) { throw new AssertionError("No real auth in slot tests"); }
+                @Override public String freshSessionToken(LauncherSettings settings) { throw new AssertionError("No real auth in slot tests"); }
+            });
+            this.directory = directory;
+        }
+        @Override public SkinSlots slots(LauncherSettings settings) { assertFalse(Platform.isFxApplicationThread()); return snapshot; }
+        @Override public Map<String, Set<String>> unlockedCosmetics(LauncherSettings settings) { assertFalse(Platform.isFxApplicationThread()); return Map.of(); }
+        private void delayLoad() {
+            assertFalse(Platform.isFxApplicationThread());
+            if (!delayLoads) return;
+            loadStarted.countDown();
+            try { assertTrue(releaseLoad.await(5, TimeUnit.SECONDS), "Test must release the delayed load"); }
+            catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new AssertionError(e); }
+        }
+        @Override public WardrobeItem hydrate(WardrobeItem item) { delayLoad(); return item; }
+        @Override public WardrobeItem currentSkin(LauncherSettings settings) {
+            currentLoads.incrementAndGet();
+            delayLoad();
+            return new WardrobeItem(PLAYER, WardrobeItem.Kind.SKIN, "Current", false, "", "{\"skin\":" + FRESH + "}");
+        }
+        private void record(String action, String id, String name, JsonNode skin, LauncherSettings settings, UUID expected) {
+            assertFalse(Platform.isFxApplicationThread(), "Slot I/O must stay off the FX thread");
+            try {
+                // Reopen from disk at the write boundary: the controller's in-memory store alone is insufficient.
+                mutations.add(new Mutation(action, id, name, skin == null ? null : skin.deepCopy(), expected,
+                        settings.getHytaleAuthSession().getUuid(), new WardrobeStore(directory).items()));
+            } catch (IOException e) { throw new UncheckedIOException(e); }
+        }
+    }
+
+    private static ButtonBase button(Node root, String text) {
+        return nodes(root, ButtonBase.class).stream().filter(b -> text.equals(b.getText())).findFirst().orElseThrow();
+    }
+    private static JsonNode json(String text) {
+        try { return JSON.readTree(text); } catch (IOException e) { throw new UncheckedIOException(e); }
+    }
+    private static <T> List<T> nodes(Node node, Class<T> type) {
+        List<T> result = new ArrayList<>();
+        if (type.isInstance(node)) result.add(type.cast(node));
+        if (node instanceof Parent parent) for (Node child : parent.getChildrenUnmodifiable()) result.addAll(nodes(child, type));
+        return result;
+    }
+    private static void await(Callable<Boolean> condition) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) { if (fx(condition)) return; Thread.sleep(10); }
+        fail("Controller did not reach expected state");
+    }
+    private static <T> FutureTask<T> submitFx(Callable<T> action) { FutureTask<T> task = new FutureTask<>(action); Platform.runLater(task); return task; }
+    private static <T> T fx(Callable<T> action) throws Exception { return submitFx(action).get(5, TimeUnit.SECONDS); }
+}

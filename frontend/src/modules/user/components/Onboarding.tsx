@@ -3,6 +3,7 @@ import { Camera, Check, Sparkles } from 'lucide-react';
 import { api, extractApiErrorMessage } from '@/utils/api';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { ModalPortal } from '@/components/ui/ModalPortal';
+import { ACCOUNT_NAME_FORMAT_LABEL, MAX_USERNAME_CHARACTERS, MIN_USERNAME_CHARACTERS } from '@/utils/siteLimits';
 
 interface OnboardingProps {
     isOpen: boolean;
@@ -108,8 +109,12 @@ export function Onboarding({
                                 type="text"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
+                                minLength={MIN_USERNAME_CHARACTERS}
+                                maxLength={MAX_USERNAME_CHARACTERS}
+                                aria-label="Username"
                                 className="w-full p-3 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl font-bold dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none shadow-inner"
                             />
+                            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{MIN_USERNAME_CHARACTERS}–{MAX_USERNAME_CHARACTERS} characters; {ACCOUNT_NAME_FORMAT_LABEL}.</p>
                             {suggestedUsername && username !== suggestedUsername && (
                                 <button
                                     type="button"

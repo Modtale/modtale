@@ -57,7 +57,7 @@ public final class ErrorMessageUtils {
     }
 
     public static ResponseEntity<ProblemDetail> response(HttpStatus status, Throwable throwable, String fallback) {
-        return response(status, describe(throwable, fallback));
+        return response(status, status.is5xxServerError() ? fallback : describe(throwable, fallback));
     }
 
     public static ResponseEntity<ProblemDetail> badRequest(String message) {

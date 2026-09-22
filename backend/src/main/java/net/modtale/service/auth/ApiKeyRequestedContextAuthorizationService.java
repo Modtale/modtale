@@ -97,22 +97,23 @@ final class ApiKeyRequestedContextAuthorizationService {
                 continue;
             }
 
+            var original=ApiKeyContextSnapshot.copy(key.getContextPermissions());
             Set<ApiKey.ApiPermission> currentPerms = new HashSet<>(key.getContextPermissions().get(projectId));
             int originalSize = currentPerms.size();
 
             if (allowedPerms.isEmpty()) {
                 key.getContextPermissions().remove(projectId);
-                apiKeyRepository.save(key);
+                apiKeyRepository.restrictContexts(key.getId(),key.getUserId(),key.getKeyHash(),original,ApiKeyContextSnapshot.copy(key.getContextPermissions()));
                 continue;
             }
 
             currentPerms.retainAll(allowedPerms);
             if (currentPerms.isEmpty()) {
                 key.getContextPermissions().remove(projectId);
-                apiKeyRepository.save(key);
+                apiKeyRepository.restrictContexts(key.getId(),key.getUserId(),key.getKeyHash(),original,ApiKeyContextSnapshot.copy(key.getContextPermissions()));
             } else if (currentPerms.size() != originalSize) {
                 key.getContextPermissions().put(projectId, currentPerms);
-                apiKeyRepository.save(key);
+                apiKeyRepository.restrictContexts(key.getId(),key.getUserId(),key.getKeyHash(),original,ApiKeyContextSnapshot.copy(key.getContextPermissions()));
             }
         }
     }

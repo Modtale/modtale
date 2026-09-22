@@ -1,9 +1,9 @@
+import { ManagedProjectsSkeleton } from '@/modules/user/skeletons/fixtures';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ManagedProjectCard } from '@/components/shared/ManagedProjectCard';
 import { TransferProjectModal } from '@/components/shared/TransferProjectModal';
 import { StatusModal } from '@/components/ui/StatusModal';
-import { Spinner } from '@/components/ui/Spinner';
 import { theme } from '@/styles/theme';
 import { organizationClient, hasOrgPermission } from '../api/organizationClient';
 import { Permission } from '@/modules/permissions/permissions';
@@ -50,7 +50,10 @@ export const Projects: React.FC<ProjectsProps> = ({ org, currentUser, userOrgs }
         }
     };
 
-    if (loading) return <div className="p-12 flex justify-center"><Spinner /></div>;
+    if (loading) return <div className="space-y-4">
+        <ManagedProjectsSkeleton canManage={canManage}
+            cardClassName={`${theme.colors.bgSurface} border ${theme.colors.border} rounded-2xl overflow-hidden shadow-sm`} />
+    </div>;
 
     return (
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">

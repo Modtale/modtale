@@ -1,3 +1,4 @@
+import { DiagramSkeleton } from './DiagramSkeleton';
 import React, { useEffect, useMemo, useState } from 'react';
 import mermaid from 'mermaid';
 
@@ -79,7 +80,7 @@ export const MermaidChart: React.FC<{ chart: string }> = ({ chart }) => {
                 </div>
             );
         }
-        return <div className="animate-pulse h-32 bg-slate-100 dark:bg-slate-800 rounded-xl my-4" />;
+        return <DiagramSkeleton />;
     }
 
     return (

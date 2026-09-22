@@ -1,3 +1,9 @@
+export const isGifImage = (url: string, file?: File | null): boolean =>
+    file?.type.toLowerCase() === 'image/gif'
+    || /\.gif$/i.test(file?.name ?? '')
+    || /\.gif(?:[?#]|$)/i.test(url)
+    || /^data:image\/gif[;,]/i.test(url);
+
 export const getSteppedWidth = (width: number) => {
     if (width <= 64) return 64;
     if (width <= 128) return 128;
@@ -13,14 +19,19 @@ const isLocalEnvironment = () => {
     return hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.');
 };
 
+const isCloudflareImageHost = (hostname: string) =>
+    hostname === 'modtale.net' || hostname.endsWith('.modtale.net');
+
 export const getCloudflareUrl = (url: string, width: number, quality: number) => {
-    if (!url || url.includes('.svg') || url.startsWith('blob:')) {
+    if (!url || url.includes('.svg') || url.startsWith('blob:') || url.startsWith('data:') || isGifImage(url)) {
         return url;
     }
 
     const isLocal = isLocalEnvironment();
+    const appHost = typeof window !== 'undefined' ? window.location.hostname : 'modtale.net';
+    const canUseImageProxyHost = !isLocal && isCloudflareImageHost(appHost);
     const cloudflareOrigin = 'https://modtale.net';
-    let canUseCloudflareProxy = !isLocal;
+    let canUseCloudflareProxy = canUseImageProxyHost;
 
     if (url.startsWith('http')) {
         try {
@@ -28,19 +39,18 @@ export const getCloudflareUrl = (url: string, width: number, quality: number) =>
             const isFirstPartyCdn = srcHost === 'cdn.modtale.net';
 
             if (typeof window !== 'undefined') {
-                const appHost = window.location.hostname;
                 const isSameHost = srcHost === appHost;
                 const isSubdomainOfAppHost = srcHost.endsWith(`.${appHost}`);
 
                 if (!isSameHost && !isSubdomainOfAppHost && !isFirstPartyCdn) return url;
-                canUseCloudflareProxy = !isLocal || isFirstPartyCdn;
+                canUseCloudflareProxy = canUseImageProxyHost;
             } else {
                 canUseCloudflareProxy = isFirstPartyCdn;
             }
         } catch {
             return url;
         }
-    } else if (isLocal) {
+    } else if (isLocal || !canUseImageProxyHost) {
         return url;
     }
 

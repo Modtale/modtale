@@ -1,7 +1,8 @@
+import { PROJECT_LOADING_PROSE } from './projectLoadingData';
+import { SkeletonSurface } from '@/components/ui/Skeleton';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BookOpen, ExternalLink, ChevronDown, ChevronRight, ListTree, Search, X } from 'lucide-react';
-import { Spinner } from '@/components/ui/Spinner';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import { SidebarSection } from '@/modules/project/components/ProjectLayout';
 import { theme } from '@/styles/theme';
@@ -413,7 +414,7 @@ export const WikiMobileNavigation: React.FC<{ tree: any[], projectUrl: string, c
 };
 
 export const Wiki: React.FC<{ wikiLoading: boolean; wikiError: boolean; wikiData: any; wikiPageSlug?: string; mod: any }> = ({ wikiLoading, wikiError, wikiData, wikiPageSlug, mod }) => {
-    if (wikiLoading) return <div className="flex justify-center p-12"><Spinner /></div>;
+    if (wikiLoading) return <WikiSkeleton />;
     if (wikiError || !wikiData) {
         return (
             <div className="text-center py-12 text-slate-500">
@@ -447,3 +448,10 @@ export const Wiki: React.FC<{ wikiLoading: boolean; wikiError: boolean; wikiData
 };
 
 export { Wiki as WikiContent };
+
+/** Standalone prose fixture, rendered through the loaded wiki itself. */
+export function WikiSkeleton({ title = 'Getting started' }: { title?: string }) {
+    return <SkeletonSurface label="Loading wiki page"><Wiki wikiLoading={false} wikiError={false}
+        wikiData={{ mod: { name: title, index: { slug: 'index' } }, content: { title, content: PROJECT_LOADING_PROSE } }}
+        mod={{ hmWikiSlug: 'loading-project' }} /></SkeletonSurface>;
+}

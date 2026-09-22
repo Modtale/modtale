@@ -152,6 +152,25 @@ class LifecycleServiceTest {
     }
 
     @Test
+    void importedDetailsAreSavedTogetherInAnUnpublishedDraft() {
+        User creator = user("user-1", "Creator", User.AccountType.USER, true);
+        when(projectRepository.save(any(Project.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        String source = "https://www.curseforge.com/hytale/mods/my-mod";
+        String icon = "https://media.forgecdn.net/avatars/1/icon.png";
+
+        Project draft = lifecycleService.createDraft("My Mod", "A Hytale mod", ProjectClassification.PLUGIN,
+                creator, "user-1", null, "<h2>Features</h2>", source, icon);
+
+        assertEquals(ProjectStatus.DRAFT, draft.getStatus());
+        assertEquals("user-1", draft.getAuthorId());
+        assertEquals("<h2>Features</h2>", draft.getAbout());
+        assertEquals(source, draft.getLinks().get("CurseForge"));
+        assertEquals(icon, draft.getImageUrl());
+        assertTrue(draft.getVersions().isEmpty());
+        verify(projectRepository).save(draft);
+    }
+
+    @Test
     void submitProjectMarksVersionsPendingAndTriggersAdminWebhookWhenNoScanIsRunning() {
         User user = user("user-1", "ItsNeil17", User.AccountType.USER, true);
         Project project = editableProject("project-1", ProjectClassification.DATA, ProjectStatus.DRAFT);

@@ -7,6 +7,8 @@ import { SSRProvider } from '@/context/SSRContext';
 import { Home } from '@/modules/home/views/Home';
 import { api } from '@/utils/api';
 
+vi.mock('@/modules/news/api/newsClient', () => ({ newsClient: { list: vi.fn().mockResolvedValue([]) } }));
+
 vi.mock('@/utils/api', () => ({
     api: {
         get: vi.fn(),
@@ -25,7 +27,9 @@ vi.mock('@/modules/home/components/HeroMarquee', () => ({
 vi.mock('@/modules/home/components/FeaturePreviews', () => ({
     TrendingProjectsSection: () => <div data-testid="trending-projects-section" />,
     NewReleasesSection: () => <div data-testid="new-releases-section" />,
+    ModpackPreviewSection: () => <div data-testid="modpack-preview-section" />,
     DirectDownloadsSection: () => <div data-testid="direct-downloads-section" />,
+    LauncherPreviewSection: () => <div data-testid="launcher-preview-section" />,
     SmartDependenciesSection: () => <div data-testid="smart-dependencies-section" />,
     ProjectAnalyticsSection: () => <div data-testid="project-analytics-section" />,
     CommunityThreadsSection: () => <div data-testid="community-threads-section" />,

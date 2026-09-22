@@ -21,15 +21,21 @@ public class DownloadTokenService {
         private final String projectId;
         private final String version;
         private final String gameVersion;
+        private final String userId;
         private final Instant expiresAt;
         private final List<String> selectedDependencies;
         private boolean used;
 
         public DownloadToken(String projectId, String version, String gameVersion, List<String> selectedDependencies, Instant expiresAt) {
+            this(projectId, version, gameVersion, selectedDependencies, null, expiresAt);
+        }
+
+        public DownloadToken(String projectId, String version, String gameVersion, List<String> selectedDependencies, String userId, Instant expiresAt) {
             this.projectId = projectId;
             this.version = version;
             this.gameVersion = gameVersion;
-            this.selectedDependencies = selectedDependencies;
+            this.selectedDependencies = selectedDependencies == null ? null : List.copyOf(selectedDependencies);
+            this.userId = userId;
             this.expiresAt = expiresAt;
             this.used = false;
         }
@@ -37,17 +43,22 @@ public class DownloadTokenService {
         public String getProjectId() { return projectId; }
         public String getVersion() { return version; }
         public String getGameVersion() { return gameVersion; }
+        public String getUserId() { return userId; }
         public List<String> getSelectedDependencies() { return selectedDependencies; }
         public Instant getExpiresAt() { return expiresAt; }
         public boolean isUsed() { return used; }
         public void markAsUsed() { this.used = true; }
 
         public boolean isExpired() {
-            return Instant.now().isAfter(expiresAt);
+            return !Instant.now().isBefore(expiresAt);
         }
     }
 
     public String generateToken(String projectId, String version, String gameVersion, List<String> selectedDependencies) {
+        return generateToken(projectId, version, gameVersion, selectedDependencies, null);
+    }
+
+    public String generateToken(String projectId, String version, String gameVersion, List<String> selectedDependencies, String userId) {
         cleanExpiredTokens();
 
         byte[] randomBytes = new byte[TOKEN_LENGTH];
@@ -55,7 +66,7 @@ public class DownloadTokenService {
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
 
         Instant expiresAt = Instant.now().plusSeconds(TOKEN_VALIDITY_MINUTES * 60);
-        tokens.put(token, new DownloadToken(projectId, version, gameVersion, selectedDependencies, expiresAt));
+        tokens.put(token, new DownloadToken(projectId, version, gameVersion, selectedDependencies, userId, expiresAt));
 
         return token;
     }
@@ -69,24 +80,15 @@ public class DownloadTokenService {
     }
 
     public DownloadToken validateAndConsume(String token) {
-        DownloadToken downloadToken = tokens.get(token);
-
-        if (downloadToken == null) {
+        if (token == null || token.isBlank()) {
             return null;
         }
-
-        if (downloadToken.isExpired()) {
-            tokens.remove(token);
+        // Removal is the atomic claim: concurrent requests cannot both consume it.
+        DownloadToken downloadToken = tokens.remove(token);
+        if (downloadToken == null || downloadToken.isExpired() || downloadToken.isUsed()) {
             return null;
         }
-
-        if (downloadToken.isUsed()) {
-            return null;
-        }
-
         downloadToken.markAsUsed();
-        tokens.remove(token);
-
         return downloadToken;
     }
 

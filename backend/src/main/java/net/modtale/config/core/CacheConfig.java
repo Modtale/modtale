@@ -27,6 +27,7 @@ public class CacheConfig {
             "projectGalleryDtos",
             "projectTeamDtos",
             "projectVersionChangelogs",
+            "projectVersionChangelogPages",
             "projectMetaDtos",
             "projectPermissionSnapshots",
             "modpackZips",

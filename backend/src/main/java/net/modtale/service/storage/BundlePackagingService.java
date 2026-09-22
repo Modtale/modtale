@@ -48,10 +48,13 @@ final class BundlePackagingService {
         }
 
         for (ProjectDependency dependency : mainVersion.getDependencies()) {
+            if (dependency.isExternal()) {
+                continue;
+            }
             if (dependency.isEmbedded()) {
                 continue;
             }
-            if (selectedDependencies != null && !selectedDependencies.contains(dependency.getModId())) {
+            if (selectedDependencies != null && !selectedDependencies.contains(dependency.getProjectId())) {
                 continue;
             }
 

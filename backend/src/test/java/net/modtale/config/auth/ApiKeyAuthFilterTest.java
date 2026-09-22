@@ -62,7 +62,7 @@ class ApiKeyAuthFilterTest {
     }
 
     @Test
-    void ignoresBlankApiKeyHeaders() throws Exception {
+    void rejectsBlankApiKeyHeaders() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/projects");
         request.addHeader("X-MODTALE-KEY", "   ");
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -71,7 +71,8 @@ class ApiKeyAuthFilterTest {
         filter.doFilterInternal(request, response, chain);
 
         verifyNoInteractions(apiKeyService);
-        verify(chain).doFilter(request, response);
+        verifyNoInteractions(chain);
+        verify(exceptionResolver).resolveException(eq(request), eq(response), isNull(), any(UnauthorizedException.class));
         assertNull(SecurityContextHolder.getContext().getAuthentication());
     }
 

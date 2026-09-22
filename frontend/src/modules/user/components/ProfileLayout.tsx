@@ -1,3 +1,4 @@
+import { LoadingSurface } from '../skeletons/fixtures';
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, Upload, Plus, Image as ImageIcon, Globe, Check, Copy, ExternalLink, UserPlus, UserCheck, Building2, Settings, Flag, LogIn } from 'lucide-react';
 import { theme } from '@/styles/theme';
@@ -11,10 +12,10 @@ import { BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
 import { Link } from 'react-router-dom';
 import { getConnectedAccountProfileUrl } from '@/modules/user/utils/connectedAccountLinks';
+import { IMAGE_ACCEPT, IMAGE_DIMENSION_LABEL, IMAGE_FORMAT_LABEL, isSupportedImageFile, MAX_IMAGE_UPLOAD_BYTES } from '@/utils/siteLimits';
 
-const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
-const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
-const isFileOverUploadLimit = (file: File) => file.size > MAX_UPLOAD_BYTES;
+const MAX_UPLOAD_ERROR_MESSAGE = 'Images must be 10 MB or smaller.';
+const isFileOverUploadLimit = (file: File) => file.size > MAX_IMAGE_UPLOAD_BYTES;
 
 export const Badge = ({ type }: { type: string | ProfileBadge }) => {
     if (typeof type !== 'string') {
@@ -41,6 +42,8 @@ interface ProfileLayoutProps {
         projects: number;
     };
     isEditing?: boolean;
+    loading?: boolean;
+    loadingStats?: boolean;
     isSelf?: boolean;
     isFollowing?: boolean;
     isLoggedIn?: boolean;
@@ -56,7 +59,7 @@ interface ProfileLayoutProps {
 }
 
 export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
-                                                                user, stats, isEditing = false, isSelf = false, isFollowing = false, isLoggedIn = false,
+                                                                user, stats, loading = false, loadingStats = loading, isEditing = false, isSelf = false, isFollowing = false, isLoggedIn = false,
                                                                 onBack, onToggleFollow, onReport, onBannerUpload, onAvatarUpload, headerInput, bioInput, actionInput, children
                                                             }) => {
     const [bannerToCrop, setBannerToCrop] = useState<string | null>(null);
@@ -136,6 +139,11 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
         const file = e.target.files[0];
         if (isFileOverUploadLimit(file)) {
             setUploadError(MAX_UPLOAD_ERROR_MESSAGE);
+            e.target.value = '';
+            return;
+        }
+        if (!isSupportedImageFile(file)) {
+            setUploadError(`Unsupported image type. Use ${IMAGE_FORMAT_LABEL}.`);
             e.target.value = '';
             return;
         }
@@ -267,8 +275,8 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                     </div>
                 )}
                 {isEditing && (
-                    <label className={`absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-[2px] z-30 cursor-pointer text-white`}>
-                        <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileSelect(e, 'avatar')} disabled={uploadingAvatar} />
+                    <label title={`Avatar upload: max 10 MB · ${IMAGE_FORMAT_LABEL} · ${IMAGE_DIMENSION_LABEL} · square`} className={`absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-[2px] z-30 cursor-pointer text-white`}>
+                        <input type="file" className="hidden" accept={IMAGE_ACCEPT} onChange={(e) => handleFileSelect(e, 'avatar')} disabled={uploadingAvatar} />
                         {uploadingAvatar ? (
                             <Spinner className="w-6 h-6 text-white" />
                         ) : (
@@ -323,12 +331,12 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                 />
 
                 {isEditing && (
-                    <label className={`cursor-pointer transition-all duration-300 pointer-events-auto ${
+                    <label title={`Banner upload: max 10 MB · ${IMAGE_FORMAT_LABEL} · ${IMAGE_DIMENSION_LABEL} · 3:1`} className={`cursor-pointer transition-all duration-300 pointer-events-auto ${
                         resolvedBanner
                             ? "absolute top-6 right-6 z-30 bg-black/60 hover:bg-black/80 text-white px-4 py-2 rounded-xl text-xs font-bold border border-white/20 backdrop-blur-sm shadow-lg hover:scale-105"
                             : "absolute inset-0 z-30 flex flex-col items-center justify-center m-6 rounded-2xl border-2 border-dashed border-white/10 hover:border-white/30 bg-white/5 hover:bg-white/10 group/banner"
                     }`}>
-                        <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileSelect(e, 'banner')} disabled={uploadingBanner} />
+                        <input type="file" className="hidden" accept={IMAGE_ACCEPT} onChange={(e) => handleFileSelect(e, 'banner')} disabled={uploadingBanner} />
                         {resolvedBanner ? (
                             <div className="flex flex-col items-end">
                                 <div className="flex items-center gap-2 drop-shadow-sm">
@@ -341,7 +349,8 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                             <div className="flex flex-col items-center">
                                 <Plus className="w-8 h-8 text-white/50 mb-2" />
                                 <span className="text-lg font-bold text-white/80">Upload Banner</span>
-                                <span className="text-xs font-medium text-white/40 mt-1">Recommended: 1920x640</span>
+                                <span className="text-xs font-medium text-white/40 mt-1">Recommended: 1920x640 · Max 10 MB · {IMAGE_DIMENSION_LABEL}</span>
+                                <span className="text-[10px] font-medium text-white/40 mt-1">{IMAGE_FORMAT_LABEL}</span>
                             </div>
                         )}
                     </label>
@@ -367,12 +376,12 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                 }`}>
 
                     <div className={`hidden md:block flex-shrink-0 self-start relative z-20 ${avatarMargin}`}>
-                        <Avatar />
+                        <LoadingSurface loading={loading} label="Loading avatar"><Avatar /></LoadingSurface>
                     </div>
 
                     <div className="flex-1 w-full min-w-0 md:pt-0">
                         <div className={`md:hidden -mt-16 flex justify-start relative z-50 ${isEditing ? 'mb-4 ml-2' : 'mb-3'}`}>
-                            <Avatar isMobile />
+                            <LoadingSurface loading={loading} label="Loading avatar"><Avatar isMobile /></LoadingSurface>
                         </div>
 
                         <div className="mb-4 relative z-10">
@@ -381,7 +390,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                     <div className="flex flex-col md:flex-row md:items-center justify-start gap-1 md:gap-3">
                                         <div className="flex items-center gap-2 flex-wrap">
                                             {headerInput ? headerInput : (
-                                                <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight overflow-visible break-words pb-1 min-h-[1.2em]">{displayTitle}</h1>
+                                                <LoadingSurface loading={loading} label="Loading profile"><h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-normal leading-tight overflow-visible break-words pb-1 min-h-[1.2em]">{displayTitle}</h1></LoadingSurface>
                                             )}
 
                                             {!isEditing && (
@@ -406,15 +415,15 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                                 <Settings className="w-5 h-5" /> Manage Profile
                                             </a>
                                         ) : (
-                                            <button onClick={onToggleFollow} className={`px-8 py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500 backdrop-blur-md' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover'}`}>
+                                            <button disabled={loading} onClick={onToggleFollow} className={`px-8 py-3 rounded-xl font-black text-base flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500 backdrop-blur-md' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover'}`}>
                                                 {isLoggedIn ? (isFollowing ? <><UserCheck className="w-5 h-5" /> Following</> : <><UserPlus className="w-5 h-5" /> Follow</>) : <><LogIn className="w-5 h-5" /> Sign in to follow</>}
                                             </button>
                                         )}
-                                        <button onClick={copyId} className="p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all backdrop-blur-md" title="Copy ID">
+                                        <button disabled={loading} onClick={copyId} className="p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all backdrop-blur-md" title="Copy ID">
                                             {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
                                         </button>
                                         {onReport && (
-                                            <button onClick={onReport} className="p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-red-600 hover:border-red-500/20 transition-all backdrop-blur-md" title="Report User">
+                                            <button disabled={loading} onClick={onReport} className="p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-red-600 hover:border-red-500/20 transition-all backdrop-blur-md" title="Report User">
                                                 <Flag className="w-5 h-5" />
                                             </button>
                                         )}
@@ -426,15 +435,15 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                         {!isEditing && stats && (
                             <div className="md:hidden grid grid-cols-3 gap-3 mb-5 relative z-10">
                                 <div className="bg-white/50 dark:bg-white/5 rounded-2xl p-3 flex flex-col items-center justify-center text-center shadow-sm border border-slate-200 dark:border-white/5 backdrop-blur-md">
-                                    <span className="text-slate-900 dark:text-white font-black text-lg leading-none mb-1">{stats.downloads < 1000 ? stats.downloads : (stats.downloads / 1000).toFixed(1) + 'k'}</span>
+                                    <div className="text-slate-900 dark:text-white font-black text-lg leading-none mb-1"><LoadingSurface loading={loadingStats} className="inline-block min-w-[2ch]" label="Loading statistic"><span>{stats.downloads < 1000 ? stats.downloads : (stats.downloads / 1000).toFixed(1) + 'k'}</span></LoadingSurface></div>
                                     <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Downloads</span>
                                 </div>
                                 <div className="bg-white/50 dark:bg-white/5 rounded-2xl p-3 flex flex-col items-center justify-center text-center shadow-sm border border-slate-200 dark:border-white/5 backdrop-blur-md">
-                                    <span className="text-slate-900 dark:text-white font-black text-lg line-clamp-1 mb-1">{stats.favorites.toLocaleString()}</span>
+                                    <div className="text-slate-900 dark:text-white font-black text-lg line-clamp-1 mb-1"><LoadingSurface loading={loadingStats} className="inline-block min-w-[2ch]" label="Loading statistic"><span>{stats.favorites.toLocaleString()}</span></LoadingSurface></div>
                                     <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Likes</span>
                                 </div>
                                 <div className="bg-white/50 dark:bg-white/5 rounded-2xl p-3 flex flex-col items-center justify-center text-center shadow-sm border border-slate-200 dark:border-white/5 backdrop-blur-md">
-                                    <span className="text-slate-900 dark:text-white font-black text-lg leading-none mb-1">{stats.projects}</span>
+                                    <div className="text-slate-900 dark:text-white font-black text-lg leading-none mb-1"><LoadingSurface loading={loadingStats} className="inline-block min-w-[2ch]" label="Loading statistic"><span>{stats.projects}</span></LoadingSurface></div>
                                     <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Projects</span>
                                 </div>
                             </div>
@@ -447,15 +456,15 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                                         <Settings className="w-4 h-4" /> Manage Profile
                                     </a>
                                 ) : (
-                                    <button onClick={onToggleFollow} className={`flex-1 h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500 backdrop-blur-md' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover'}`}>
+                                    <button disabled={loading} onClick={onToggleFollow} className={`flex-1 h-12 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${isFollowing ? 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-red-500 backdrop-blur-md' : 'bg-modtale-accent text-white hover:bg-modtale-accentHover'}`}>
                                         {isLoggedIn ? (isFollowing ? <><UserCheck className="w-4 h-4" /> Following</> : <><UserPlus className="w-4 h-4" /> Follow</>) : <><LogIn className="w-4 h-4" /> Sign in to follow</>}
                                     </button>
                                 )}
-                                <button onClick={copyId} className="h-12 w-12 flex items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all flex-shrink-0 backdrop-blur-md" title="Copy ID">
+                                <button disabled={loading} onClick={copyId} className="h-12 w-12 flex items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-modtale-accent transition-all flex-shrink-0 backdrop-blur-md" title="Copy ID">
                                     {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
                                 </button>
                                 {onReport && (
-                                    <button onClick={onReport} className="h-12 w-12 flex items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-red-500 transition-all flex-shrink-0 backdrop-blur-md" title="Report User">
+                                    <button disabled={loading} onClick={onReport} className="h-12 w-12 flex items-center justify-center rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-white/5 text-slate-400 hover:text-red-500 transition-all flex-shrink-0 backdrop-blur-md" title="Report User">
                                         <Flag className="w-5 h-5" />
                                     </button>
                                 )}
@@ -464,7 +473,7 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
 
                         <div className="mb-4 md:mb-6 relative z-10">
                             {bioInput ? bioInput : (
-                                user.bio && <p className="text-slate-600 dark:text-slate-300 leading-snug md:leading-relaxed text-sm md:text-lg text-left line-clamp-3 md:line-clamp-none">{user.bio}</p>
+                                user.bio && <LoadingSurface loading={loading} label="Loading biography"><p className="text-slate-600 dark:text-slate-300 leading-snug md:leading-relaxed text-sm md:text-lg text-left line-clamp-3 md:line-clamp-none">{user.bio}</p></LoadingSurface>
                             )}
                         </div>
 
@@ -472,19 +481,19 @@ export const ProfileLayout: React.FC<ProfileLayoutProps> = ({
                             <div className="hidden pt-4 md:pt-6 border-t border-slate-200 dark:border-white/10 md:flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6 relative z-10">
                                 <div className="flex justify-between w-full md:w-auto md:flex md:gap-8 text-left">
                                     <div className="text-center md:text-left">
-                                        <div className="text-sm md:text-2xl font-black text-slate-900 dark:text-white">{stats.downloads < 1000 ? stats.downloads : (stats.downloads / 1000).toFixed(1) + 'k'}</div>
+                                        <div className="text-sm md:text-2xl font-black text-slate-900 dark:text-white"><LoadingSurface loading={loadingStats} className="inline-block min-w-[2ch]" label="Loading statistic"><span>{stats.downloads < 1000 ? stats.downloads : (stats.downloads / 1000).toFixed(1) + 'k'}</span></LoadingSurface></div>
                                         <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Downloads</div>
                                     </div>
                                     <div className="text-center md:text-left">
-                                        <div className="text-sm md:text-2xl font-black text-slate-900 dark:text-white">{stats.favorites.toLocaleString()}</div>
+                                        <div className="text-sm md:text-2xl font-black text-slate-900 dark:text-white"><LoadingSurface loading={loadingStats} className="inline-block min-w-[2ch]" label="Loading statistic"><span>{stats.favorites.toLocaleString()}</span></LoadingSurface></div>
                                         <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Favorites</div>
                                     </div>
                                     <div className="text-center md:text-left">
-                                        <div className="text-sm md:text-2xl font-black text-slate-900 dark:text-white">{stats.followers >= 1000 ? (stats.followers / 1000).toFixed(1) + 'k' : stats.followers}</div>
+                                        <div className="text-sm md:text-2xl font-black text-slate-900 dark:text-white"><LoadingSurface loading={loading} className="inline-block min-w-[2ch]" label="Loading statistic"><span>{stats.followers >= 1000 ? (stats.followers / 1000).toFixed(1) + 'k' : stats.followers}</span></LoadingSurface></div>
                                         <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Followers</div>
                                     </div>
                                     <div className="text-center md:text-left">
-                                        <div className="text-sm md:text-2xl font-black text-slate-900 dark:text-white">{stats.projects}</div>
+                                        <div className="text-sm md:text-2xl font-black text-slate-900 dark:text-white"><LoadingSurface loading={loadingStats} className="inline-block min-w-[2ch]" label="Loading statistic"><span>{stats.projects}</span></LoadingSurface></div>
                                         <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Projects</div>
                                     </div>
                                 </div>

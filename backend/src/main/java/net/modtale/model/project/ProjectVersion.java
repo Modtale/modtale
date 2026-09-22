@@ -3,11 +3,18 @@ package net.modtale.model.project;
 import java.util.List;
 
 public class ProjectVersion {
+    private List<net.modtale.model.project.ModpackConfigReference> modpackConfigs;
+    public List<net.modtale.model.project.ModpackConfigReference> getModpackConfigs() { return modpackConfigs; }
+    public void setModpackConfigs(List<net.modtale.model.project.ModpackConfigReference> value) { modpackConfigs = value; }
     private String id;
     private String versionNumber;
     private List<String> gameVersions;
     private String fileUrl;
+    private String overrideFileUrl;
     private String hash;
+    private String manifestId;
+    private String manifestVersion;
+    private Long curseForgeFingerprint;
     private int downloadCount;
     private String releaseDate;
     private String changelog;
@@ -83,8 +90,20 @@ public class ProjectVersion {
     public String getFileUrl() { return fileUrl; }
     public void setFileUrl(String fileUrl) { this.fileUrl = fileUrl; }
 
+    public String getOverrideFileUrl() { return overrideFileUrl; }
+    public void setOverrideFileUrl(String overrideFileUrl) { this.overrideFileUrl = overrideFileUrl; }
+
     public String getHash() { return hash; }
     public void setHash(String hash) { this.hash = hash; }
+
+    public String getManifestId() { return manifestId; }
+    public void setManifestId(String manifestId) { this.manifestId = manifestId; }
+
+    public String getManifestVersion() { return manifestVersion; }
+    public void setManifestVersion(String manifestVersion) { this.manifestVersion = manifestVersion; }
+
+    public Long getCurseForgeFingerprint() { return curseForgeFingerprint; }
+    public void setCurseForgeFingerprint(Long curseForgeFingerprint) { this.curseForgeFingerprint = curseForgeFingerprint; }
 
     public int getDownloadCount() { return downloadCount; }
     public void setDownloadCount(int downloadCount) { this.downloadCount = downloadCount; }

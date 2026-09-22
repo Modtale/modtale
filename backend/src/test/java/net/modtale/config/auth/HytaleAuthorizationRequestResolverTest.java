@@ -18,20 +18,28 @@ class HytaleAuthorizationRequestResolverTest {
     void addsS256PkceToConfidentialHytaleAuthorizationRequest() {
         HytaleAuthorizationRequestResolver resolver = resolver();
 
-        OAuth2AuthorizationRequest authorizationRequest = resolver.resolve(requestFor("hytale"));
+        OAuth2AuthorizationRequest authorizationRequest =
+                resolver.resolve(requestFor("hytale"));
 
         assertNotNull(authorizationRequest);
         assertNotNull(authorizationRequest.getAttribute(PkceParameterNames.CODE_VERIFIER));
         assertEquals(
                 "S256",
-                authorizationRequest.getAdditionalParameters().get(PkceParameterNames.CODE_CHALLENGE_METHOD)
+                authorizationRequest.getAdditionalParameters()
+                        .get(PkceParameterNames.CODE_CHALLENGE_METHOD)
         );
-        assertNotNull(authorizationRequest.getAdditionalParameters().get(PkceParameterNames.CODE_CHALLENGE));
+        assertNotNull(
+                authorizationRequest.getAdditionalParameters()
+                        .get(PkceParameterNames.CODE_CHALLENGE)
+        );
     }
 
     private static HytaleAuthorizationRequestResolver resolver() {
         return new HytaleAuthorizationRequestResolver(
-                new InMemoryClientRegistrationRepository(registration("hytale"), registration("other"))
+                new InMemoryClientRegistrationRepository(
+                        registration("hytale"),
+                        registration("other")
+                )
         );
     }
 

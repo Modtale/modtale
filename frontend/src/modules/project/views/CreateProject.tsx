@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Building2, User as UserIcon, ChevronDown, Check } from 'lucide-react';
 
 import { api, extractApiErrorMessage } from '@/utils/api';
@@ -10,6 +10,8 @@ import { SiteRoutes } from '@/utils/routes';
 import { Spinner } from '@/components/ui/Spinner';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { SignInModal } from '@/modules/auth/components/SignInModal';
+import { worldListClient } from '@/modules/worldlist/api/worldListClient';
+import { MAX_PROJECT_SUMMARY_CHARACTERS, MAX_PROJECT_TITLE_CHARACTERS, MIN_PROJECT_SUMMARY_CHARACTERS } from '@/utils/siteLimits';
 
 interface CreateProjectProps {
     onNavigate: (page: string) => void;
@@ -19,6 +21,10 @@ interface CreateProjectProps {
 
 export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const params = new URLSearchParams(location.search);
+    const seedListId = params.get('fromList') || '';
+    const requestedType = params.get('type') || '';
 
     const [step, setStep] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
@@ -33,6 +39,35 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
     const [myOrgs, setMyOrgs] = useState<User[]>([]);
     const [ownerDropdownOpen, setOwnerDropdownOpen] = useState(false);
     const ownerDropdownRef = useRef<HTMLDivElement>(null);
+    const hydratedSeedListRef = useRef('');
+
+    useEffect(() => {
+        if (!seedListId && requestedType !== 'MODPACK') {
+            return;
+        }
+        setClassification('MODPACK');
+        setStep(1);
+
+        if (!seedListId || hydratedSeedListRef.current === seedListId) {
+            return;
+        }
+
+        hydratedSeedListRef.current = seedListId;
+        worldListClient.get(seedListId)
+            .then(list => {
+                const baseName = list.worldName || list.title || 'Shared List';
+                setTitle(current => current.trim() ? current : `${baseName} Modpack`);
+                setSummary(current => current.trim()
+                    ? current
+                    : `A modpack started from ${baseName}'s shared mod list.`);
+            })
+            .catch(() => {
+                setTitle(current => current.trim() ? current : 'Shared List Modpack');
+                setSummary(current => current.trim()
+                    ? current
+                    : 'A modpack started from a shared Modtale list.');
+            });
+    }, [requestedType, seedListId]);
 
     useEffect(() => {
         if (!currentUser) {
@@ -150,7 +185,8 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
 
             const res = await api.post('/projects', formData, uploadConfig);
 
-            navigate(SiteRoutes.projectEdit(res.data));
+            const seedQuery = seedListId ? `?seedList=${encodeURIComponent(seedListId)}` : '';
+            navigate(`${SiteRoutes.projectEdit(res.data)}${seedQuery}`);
 
         } catch (e: unknown) {
             setStatusModal({
@@ -183,7 +219,7 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
                     {type.label}
                 </h3>
                 <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors relative z-10">
-                    {type.id === 'MODPACK' ? 'Bundle multiple mods into a pack.' : type.id === 'SAVE' ? 'Share worlds, schematics, or lobbies.' : type.id === 'PLUGIN' ? 'Server-side logic, tools, and scripts.' : 'Custom models, textures, and art.'}
+                    {type.id === 'MODPACK' ? 'Bundle multiple mods into a pack.' : type.id === 'SAVE' ? 'Share worlds, schematics, or lobbies.' : type.id === 'PLUGIN' ? 'Hytale logic, tools, and scripts.' : 'Custom models, textures, and art.'}
                 </p>
             </button>
         );
@@ -213,7 +249,7 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
 
                         <div className="text-center pb-8 md:pb-16">
                             <div className="mb-12">
-                                <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tight mb-4 leading-none">What are you creating?</h1>
+                                <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-normal mb-4 leading-none">What are you creating?</h1>
                                 <p className="text-lg md:text-xl text-slate-500 dark:text-slate-400 font-medium">Select a project type to get started.</p>
                             </div>
 
@@ -259,7 +295,7 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
                     <div className="flex flex-col items-center">
                         <div className="w-full max-w-2xl flex flex-col">
                             <div className="text-center mb-10">
-                                <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-none">Let's give it a name.</h1>
+                                <h1 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-none">Let's give it a name.</h1>
                                 <p className="text-slate-500 dark:text-slate-400 font-bold mt-10 uppercase tracking-widest text-xs">You can always change this later.</p>
                             </div>
 
@@ -312,18 +348,22 @@ export const CreateProject: React.FC<CreateProjectProps> = ({ currentUser }) => 
                                 )}
 
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest mb-2 ml-1">Project Title</label>
-                                    <input value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-white/90 dark:bg-black/60 border border-slate-300/50 dark:border-white/20 rounded-2xl px-6 py-4 font-black text-2xl dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner backdrop-blur-md placeholder:text-slate-400 dark:placeholder:text-slate-500" placeholder="My Awesome Project"/>
+                                    <div className="flex items-center justify-between mb-2 ml-1 pr-1">
+                                        <label className="block text-[10px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest">Project Title</label>
+                                        <span className="text-[10px] text-slate-500 dark:text-slate-300 font-bold tabular-nums">{title.length}/{MAX_PROJECT_TITLE_CHARACTERS}</span>
+                                    </div>
+                                    <input maxLength={MAX_PROJECT_TITLE_CHARACTERS} value={title} onChange={e => setTitle(e.target.value)} aria-label="Project title" className="w-full bg-white/90 dark:bg-black/60 border border-slate-300/50 dark:border-white/20 rounded-2xl px-6 py-4 font-black text-2xl dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner backdrop-blur-md placeholder:text-slate-400 dark:placeholder:text-slate-500" placeholder="My Awesome Project"/>
                                 </div>
                                 <div>
                                     <div className="flex justify-between items-end mb-2 ml-1 pr-1">
                                         <label className="block text-[10px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest">Short Summary</label>
-                                        <p className="text-[10px] text-slate-500 dark:text-slate-300 font-bold uppercase tracking-tighter">{summary.length}/250</p>
+                                        <p className="text-[10px] text-slate-500 dark:text-slate-300 font-bold uppercase tracking-normal tabular-nums">{summary.length}/{MAX_PROJECT_SUMMARY_CHARACTERS}</p>
                                     </div>
-                                    <input value={summary} onChange={e => setSummary(e.target.value)} className="w-full bg-white/90 dark:bg-black/60 border border-slate-300/50 dark:border-white/20 rounded-2xl px-6 py-4 dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner backdrop-blur-md font-medium text-sm placeholder:text-slate-400 dark:placeholder:text-slate-500" placeholder="A brief description of what this does..."/>
+                                    <input maxLength={MAX_PROJECT_SUMMARY_CHARACTERS} value={summary} onChange={e => setSummary(e.target.value)} aria-label="Short project summary" className="w-full bg-white/90 dark:bg-black/60 border border-slate-300/50 dark:border-white/20 rounded-2xl px-6 py-4 dark:text-white focus:ring-2 focus:ring-modtale-accent outline-none transition-all shadow-inner backdrop-blur-md font-medium text-sm placeholder:text-slate-400 dark:placeholder:text-slate-500" placeholder="A brief description of what this does..."/>
+                                    <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-300">Write at least {MIN_PROJECT_SUMMARY_CHARACTERS} characters, up to {MAX_PROJECT_SUMMARY_CHARACTERS}.</p>
                                 </div>
 
-                                <button onClick={handleCreateDraft} disabled={isLoading || !title || !summary || summary.length < 10} className="w-full h-16 mt-4 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-2xl font-black text-xl flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-modtale-accent/20 active:scale-95 group">
+                                <button onClick={handleCreateDraft} disabled={isLoading || !title || !summary || summary.length < MIN_PROJECT_SUMMARY_CHARACTERS} className="w-full h-16 mt-4 bg-modtale-accent hover:bg-modtale-accentHover text-white rounded-2xl font-black text-xl flex items-center justify-center gap-3 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-modtale-accent/20 active:scale-95 group">
                                     {isLoading ? <Spinner className="w-6 h-6 text-white" fullScreen={false} /> : <>Start Building <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform"/></>}
                                 </button>
                             </div>

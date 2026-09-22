@@ -1,0 +1,253 @@
+name: Launcher Release
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'launcher/**'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Optional numeric launcher version (otherwise generated from the run number)
+        required: false
+        type: string
+
+concurrency:
+  group: launcher-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  detect-changes:
+    name: Detect Launcher Changes
+    if: github.repository == 'Modtale/modtale' && github.event.deleted != true
+    runs-on: ubuntu-latest
+    outputs:
+      launcher_build: ${{ steps.filter.outputs.launcher_build }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed components
+        id: filter
+        if: github.event_name == 'push'
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: bash .github/scripts/detect-component-changes.sh
+
+  metadata:
+    name: Resolve Release Metadata
+    needs: detect-changes
+    if: github.event_name == 'workflow_dispatch' || needs.detect-changes.outputs.launcher_build == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+      channel: ${{ steps.version.outputs.channel }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Resolve launcher version and channel
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: bash .github/scripts/launcher-release-metadata.sh
+
+  package:
+    name: Package Launcher (${{ matrix.name }})
+    needs: metadata
+    if: github.repository == 'Modtale/modtale'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux Packages
+            os: ubuntu-latest
+            artifact: launcher-linux
+          - name: Windows Installer
+            os: windows-latest
+            artifact: launcher-windows
+          - name: macOS DMG
+            os: macos-latest
+            artifact: launcher-macos
+    defaults:
+      run:
+        working-directory: launcher
+        shell: bash
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Java
+        uses: actions/setup-java@v6.0.1
+        with:
+          distribution: temurin
+          java-version: |
+            25
+            26
+          check-latest: true
+
+      - name: Set up Rust
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6.3.0
+
+      - name: Set up Linux packaging tooling
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            libgtk-3-0t64 libopengl0 libegl1 libpango-1.0-0 libasound2t64 \
+            libudev1 libwayland-client0 libwayland-egl1
+          sudo apt-get install -y \
+            binutils \
+            flatpak \
+            rpm \
+            tar \
+            xz-utils \
+            zstd
+          sudo apt-get install -y libfuse2 || sudo apt-get install -y libfuse2t64 || true
+          sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          sudo flatpak install -y flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
+          curl -L \
+            -o "$RUNNER_TEMP/appimagetool" \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x "$RUNNER_TEMP/appimagetool"
+          echo "APPIMAGETOOL=$RUNNER_TEMP/appimagetool" >> "$GITHUB_ENV"
+          echo "APPIMAGE_EXTRACT_AND_RUN=1" >> "$GITHUB_ENV"
+
+      - name: Set up Windows installer tooling
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install wixtoolset -y --no-progress
+          $wix = Get-ChildItem "C:\Program Files (x86)" -Directory -Filter "WiX Toolset*" |
+            Sort-Object Name -Descending |
+            Select-Object -First 1
+          if ($null -eq $wix) {
+            throw "WiX Toolset was not installed."
+          }
+          "$($wix.FullName)\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Ensure Gradle wrapper is executable
+        run: chmod +x gradlew
+
+      - name: Build native launcher package
+        run: |
+          package_task="packageAll"
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            package_task="packageLinuxAll"
+          fi
+
+          ./gradlew clean "$package_task" -PlauncherVersion="${{ needs.metadata.outputs.version }}"
+
+      - name: Upload Linux AppImage package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: launcher-linux-appimage
+          path: launcher/build/distributions/*.AppImage
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Linux Debian package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: launcher-linux-deb
+          path: launcher/build/distributions/*.deb
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Linux RPM package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: launcher-linux-rpm
+          path: launcher/build/distributions/*.rpm
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Linux Flatpak package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: launcher-linux-flatpak
+          path: launcher/build/distributions/*.flatpak
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Linux pacman package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: launcher-linux-pacman
+          path: launcher/build/distributions/*.pkg.tar.zst
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload launcher package
+        if: runner.os != 'Linux'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: ${{ matrix.artifact }}
+          path: launcher/build/distributions/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish Launcher Release
+    needs:
+      - metadata
+      - package
+    if: github.repository == 'Modtale/modtale'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ needs.metadata.outputs.tag }}
+      LAUNCHER_VERSION: ${{ needs.metadata.outputs.version }}
+      RELEASE_CHANNEL: ${{ needs.metadata.outputs.channel }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Download packaged launchers
+        uses: actions/download-artifact@v8.0.1
+        with:
+          path: launcher-dist
+
+      - name: Create checksums
+        run: |
+          find launcher-dist -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+
+      - name: Publish GitHub release
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            if [ "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)" != true ]; then
+              echo "::error::Release $RELEASE_TAG is already published; choose a new version."
+              exit 1
+            fi
+          else
+            gh release create "$RELEASE_TAG" \
+              --target "$GITHUB_SHA" \
+              --title "Modtale Launcher $LAUNCHER_VERSION ($RELEASE_CHANNEL)" \
+              --draft \
+              --generate-notes
+          fi
+
+          mapfile -d '' release_files < <(find launcher-dist -type f -print0)
+          gh release upload "$RELEASE_TAG" "${release_files[@]}" SHA256SUMS --clobber
+          if [ "$RELEASE_CHANNEL" = develop ]; then
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest
+          fi

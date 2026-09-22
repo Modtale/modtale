@@ -1,0 +1,77 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import App from '../../App';
+import { fetchNewsPosts } from '@/modules/news/api/newsClient';
+import {
+    NEWS_INDEX_PATH,
+    SITE_URL,
+    getAbsoluteUrl,
+    getNewsPostUrl,
+} from '../../data/news';
+
+const { slug } = Astro.params;
+if (slug === 'fresh-feature-showcase' || slug === 'launcher-and-modpacks') {
+    return Astro.redirect('/news', 301);
+}
+let posts;
+try { posts = await fetchNewsPosts(); } catch { return new Response('News is temporarily unavailable.', { status: 503 }); }
+const post = posts.find(post => post.slug === slug);
+
+if (!post) {
+    return Astro.redirect(NEWS_INDEX_PATH, 302);
+}
+
+const path = Astro.url.pathname;
+const canonicalUrl = getNewsPostUrl(post);
+
+const initialData = { newsPost: post };
+
+
+const articleSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'NewsArticle',
+    headline: post.title,
+    description: post.description,
+    image: [getAbsoluteUrl(post.socialImage)],
+    datePublished: post.publishedAt,
+    dateModified: post.updatedAt,
+    author: {
+        '@type': 'Organization',
+        name: post.author,
+        url: SITE_URL,
+    },
+    publisher: {
+        '@type': 'Organization',
+        name: 'Modtale',
+        logo: {
+            '@type': 'ImageObject',
+            url: `${SITE_URL}/assets/logo.svg`,
+        },
+    },
+    mainEntityOfPage: {
+        '@type': 'WebPage',
+        '@id': canonicalUrl,
+    },
+    keywords: post.tags.join(', '),
+};
+---
+
+<BaseLayout
+    title={`${post.title} | Modtale News`}
+    description={post.description}
+    keywords={post.tags.join(', ')}
+    image={getAbsoluteUrl(post.socialImage)}
+    imageAlt={post.socialImageAlt}
+    imageWidth="2400"
+    imageHeight="1260"
+    imageType="image/png"
+    ogType="article"
+    publishedTime={post.publishedAt}
+    modifiedTime={post.updatedAt}
+    author={post.author}
+    jsonLd={articleSchema}
+    canonicalOverride={canonicalUrl}
+    initialData={initialData}
+>
+    <App client:load initialPath={path} ssrData={initialData} />
+</BaseLayout>

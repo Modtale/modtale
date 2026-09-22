@@ -80,7 +80,7 @@ class ApiKeyStaleContextPruningServiceTest {
         assertEquals(EnumSet.of(ApiKey.ApiPermission.PROFILE_READ), key.getContextPermissions().get("PERSONAL"));
         assertEquals(EnumSet.of(ApiKey.ApiPermission.ORG_MEMBER_READ), key.getContextPermissions().get("org-1"));
         assertFalse(key.getContextPermissions().containsKey("deleted-project"));
-        verify(apiKeyRepository).save(key);
+        verify(apiKeyRepository).restrictContexts(org.mockito.ArgumentMatchers.eq(key.getId()),org.mockito.ArgumentMatchers.eq(key.getUserId()),org.mockito.ArgumentMatchers.eq(key.getKeyHash()),org.mockito.ArgumentMatchers.anyMap(),org.mockito.ArgumentMatchers.eq(key.getContextPermissions()));
     }
 
     @Test
@@ -99,7 +99,7 @@ class ApiKeyStaleContextPruningServiceTest {
         service.pruneInvalidContexts(key);
 
         assertEquals(EnumSet.of(ApiKey.ApiPermission.VERSION_CREATE), key.getContextPermissions().get("project-1"));
-        verify(apiKeyRepository).save(key);
+        verify(apiKeyRepository).restrictContexts(org.mockito.ArgumentMatchers.eq(key.getId()),org.mockito.ArgumentMatchers.eq(key.getUserId()),org.mockito.ArgumentMatchers.eq(key.getKeyHash()),org.mockito.ArgumentMatchers.anyMap(),org.mockito.ArgumentMatchers.eq(key.getContextPermissions()));
     }
 
     @Test

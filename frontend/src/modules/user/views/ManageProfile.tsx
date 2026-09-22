@@ -10,6 +10,7 @@ import { ConnectionsSettings } from '../tabs/ConnectionsSettings';
 import { SiteRoutes } from '@/utils/routes';
 import { extractApiErrorMessage } from '@/utils/api';
 import type { User } from '@/types';
+import { ACCOUNT_NAME_FORMAT_LABEL, MAX_PROFILE_BIO_CHARACTERS, MAX_USERNAME_CHARACTERS, MIN_USERNAME_CHARACTERS } from '@/utils/siteLimits';
 
 interface ManageProfileProps {
     user: User;
@@ -33,7 +34,7 @@ export function ManageProfile({ user, onUpdate }: ManageProfileProps) {
         if (oauthError) {
             setStatusModal({
                 title: 'Account Connection Failed',
-                msg: decodeURIComponent(oauthError).replace(/\+/g, ' ')
+                msg: oauthError
             });
             setSearchParams({});
         }
@@ -109,18 +110,18 @@ export function ManageProfile({ user, onUpdate }: ManageProfileProps) {
                 <div className="flex items-center gap-2">
                     {isEditingUsername ? (
                         <div className="relative flex-1 max-w-full">
-                            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white bg-white/80 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none w-full placeholder-slate-300 dark:placeholder-white/20 shadow-inner rounded-xl px-4 py-2 transition-all" placeholder="Username" autoFocus />
+                            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} minLength={MIN_USERNAME_CHARACTERS} maxLength={MAX_USERNAME_CHARACTERS} aria-label="Username" className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white bg-white/80 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none w-full placeholder-slate-300 dark:placeholder-white/20 shadow-inner rounded-xl px-4 py-2 transition-all" placeholder="Username" autoFocus />
                             <button onClick={() => { setUsername(user.username); setIsEditingUsername(false); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"><XCircle className="w-5 h-5" /></button>
                         </div>
                     ) : (
                         <div className="flex items-center gap-3 group cursor-pointer hover:bg-white/60 dark:hover:bg-white/5 px-4 py-2 -ml-4 rounded-2xl transition-colors" onClick={() => setIsEditingUsername(true)}>
-                            <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter truncate">{user.username}</h1>
+                            <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-normal truncate">{user.username}</h1>
                             <Edit3 className="w-5 h-5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </div>
                     )}
                 </div>
             </div>
-            {isEditingUsername && <p className="text-xs text-orange-600 dark:text-orange-400 font-bold mt-2 ml-1">Changing your username updates the profile label in your URL, but the link stays ID-backed.</p>}
+            {isEditingUsername && <p className="text-xs text-orange-600 dark:text-orange-400 font-bold mt-2 ml-1">{MIN_USERNAME_CHARACTERS}–{MAX_USERNAME_CHARACTERS} characters; {ACCOUNT_NAME_FORMAT_LABEL}. Changing your username updates the profile label in your URL, but the link stays ID-backed.</p>}
         </div>
     );
 
@@ -147,7 +148,7 @@ export function ManageProfile({ user, onUpdate }: ManageProfileProps) {
         <div className="mt-2">
             <div className="flex justify-between items-center mb-2 px-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Biography</label>
-                <span className={`text-[10px] font-bold ${bio.length > 280 ? 'text-red-500' : 'text-slate-400'}`}>{bio.length}/300</span>
+                <span className={`text-[10px] font-bold ${bio.length > MAX_PROFILE_BIO_CHARACTERS - 20 ? 'text-red-500' : 'text-slate-400'}`}>{bio.length}/{MAX_PROFILE_BIO_CHARACTERS}</span>
             </div>
             <textarea
                 value={bio}
@@ -155,7 +156,7 @@ export function ManageProfile({ user, onUpdate }: ManageProfileProps) {
                 rows={4}
                 className="w-full bg-white/80 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-modtale-accent outline-none transition-all dark:text-white placeholder:text-slate-400 resize-none shadow-inner"
                 placeholder="Write something about yourself..."
-                maxLength={300}
+                maxLength={MAX_PROFILE_BIO_CHARACTERS}
             />
         </div>
     );

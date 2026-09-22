@@ -3,15 +3,25 @@ import { useDropzone, type Accept, type FileRejection } from 'react-dropzone';
 import { UploadCloud, CheckCircle2, AlertCircle, ChevronDown, Check, Beaker, Zap, Loader2 } from 'lucide-react';
 import { Label, Input } from './FormShared';
 import type { VersionFormData } from './FormShared';
+import { configOwnerKey } from '../utils/modpackConfigs';
+import { ModConfigFields } from './ModConfigFields';
 import { DependencySelector } from './DependencySelector';
 import { projectClient } from '../api/projectClient';
 import { theme } from '@/styles/theme';
 import { VersionRelationKind, type GameVersionCatalog, type ManifestDependencySuggestion, type ProjectDependency } from '@/types';
+import { MAX_CHANGELOG_CHARACTERS } from '../utils/changelogLimits';
+import { MAX_PROJECT_UPLOAD_BYTES } from '@/utils/siteLimits';
 
-const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 const MAX_UPLOAD_ERROR_MESSAGE = 'File exceeds 100MB limit. Cloudflare only supports uploads up to 100MB.';
 
 const STRICT_VERSION_REGEX = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
+
+const createDependencyId = () => {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+        return crypto.randomUUID();
+    }
+    return `dep-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
 
 const uniqueVersions = (versions: string[]) => Array.from(new Set(versions.filter(Boolean)));
 
@@ -99,6 +109,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
     const isDuplicate = existingVersions.some(existingVersion => existingVersion.toLowerCase() === versionNum.toLowerCase());
     const isValid = versionNum.length > 0 && isFormatValid && !isDuplicate;
     const allowsAutoSwitch = projectType === 'PLUGIN' || projectType === 'DATA' || projectType === 'ART';
+    const changelogLength = data.changelog.length;
 
     const getAcceptTypes = (): Accept => {
         switch (projectType) {
@@ -112,6 +123,12 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
             default: return { 'application/java-archive': ['.jar'], 'application/zip': ['.zip'], 'application/json': ['.json'] };
         }
     };
+
+    const acceptedFileTypes = projectType === 'SAVE' || projectType === 'MODPACK'
+        ? '.zip'
+        : projectType
+            ? '.jar or .zip'
+            : '.jar, .zip, or .json';
 
     const onFileDrop = useCallback((acceptedFiles: File[]) => {
         const nextFile = acceptedFiles[0];
@@ -149,14 +166,14 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
 
     const onFileDropRejected = useCallback((rejections: FileRejection[]) => {
         const tooLarge = rejections.some(r => r.errors.some(e => e.code === 'file-too-large'));
-        setFileError(tooLarge ? MAX_UPLOAD_ERROR_MESSAGE : 'Invalid file type. Please upload a supported file.');
-    }, []);
+        setFileError(tooLarge ? MAX_UPLOAD_ERROR_MESSAGE : `Invalid file type. Accepted file types: ${acceptedFileTypes}.`);
+    }, [acceptedFileTypes]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop: onFileDrop,
         onDropRejected: onFileDropRejected,
         maxFiles: 1,
-        maxSize: MAX_UPLOAD_BYTES,
+        maxSize: MAX_PROJECT_UPLOAD_BYTES,
         accept: getAcceptTypes(),
         disabled: disabled
     });
@@ -169,13 +186,21 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
     };
 
     const addManifestSuggestions = (suggestions: ManifestDependencySuggestion[]) => {
-        const existingIds = new Set((data.projectIds || []).map(dep => dep.split(':')[0]));
+        const existingIds = new Set((data.dependencies || []).map(dep => dep.projectId));
         const nextSuggestions = suggestions
             .filter(suggestion => !existingIds.has(suggestion.projectId))
-            .map(suggestion => suggestion.dependencyEntry);
+            .map<ProjectDependency>(suggestion => ({
+                id: createDependencyId(),
+                projectId: suggestion.projectId,
+                projectTitle: suggestion.projectTitle,
+                versionNumber: suggestion.versionNumber,
+                dependencyType: suggestion.optional ? 'OPTIONAL' : 'REQUIRED',
+                source: 'MODTALE'
+            }));
         if (nextSuggestions.length === 0) return;
-        onChange({ ...data, projectIds: [...(data.projectIds || []), ...nextSuggestions] });
-        setManifestSuggestions(prev => prev.filter(suggestion => !nextSuggestions.includes(suggestion.dependencyEntry)));
+        onChange({ ...data, dependencies: [...(data.dependencies || []), ...nextSuggestions] });
+        const addedIds = new Set(nextSuggestions.map(suggestion => suggestion.projectId));
+        setManifestSuggestions(prev => prev.filter(suggestion => !addedIds.has(suggestion.projectId)));
     };
 
     useEffect(() => {
@@ -186,11 +211,9 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    return (
-        <div className={`space-y-8 ${disabled ? 'opacity-60 pointer-events-none' : ''}`}>
-            {!isModpack && !hideFilePicker && (
-                <div>
-                    <Label required>Project File <span className={`${theme.colors.textSecondary} font-normal normal-case ml-1`}>{allowsAutoSwitch ? '(.jar or .zip)' : '(.zip)'}</span></Label>
+    const filePicker = (!hideFilePicker && (
+                <div className="group/upload">
+                    <Label required={!isModpack}>Project File <span className={`${theme.colors.textSecondary} font-normal normal-case ml-1`}>({acceptedFileTypes})</span></Label>
                     <div
                         {...getRootProps()}
                         className={`border-2 border-dashed rounded-2xl p-10 text-center transition-all group shadow-sm ${
@@ -222,9 +245,9 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                             <div>
                                 <div className={`font-bold ${theme.colors.textPrimary}`}>Click or drag file here</div>
                                 <div className={`text-xs ${theme.colors.textSecondary} mt-1`}>
-                                    {allowsAutoSwitch ? 'Supports .jar and .zip (type auto-switches when needed)' : 'Supports .zip archives'}
+                                    {isModpack ? 'Config defaults and resources; existing files are preserved by the launcher' : allowsAutoSwitch ? 'Supports .jar and .zip (type auto-switches when needed)' : 'Supports .zip archives'}
                                 </div>
-                                <div className={`text-xs ${theme.colors.textSecondary} mt-1`}>Maximum file size: 100MB</div>
+                                <div className={`text-xs ${theme.colors.textSecondary} mt-1`}>Maximum file size: 100 MB · Accepted file types: {acceptedFileTypes}</div>
                             </div>
                         )}
                     </div>
@@ -241,7 +264,11 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                         </div>
                     )}
                 </div>
-            )}
+            ));
+
+    return (
+        <div className={`space-y-8 ${disabled ? 'opacity-60 pointer-events-none' : ''}`}>
+            {!isModpack && filePicker}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
@@ -358,8 +385,8 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                         </div>
                     )}
                     <DependencySelector
-                        selectedDeps={data.projectIds || []}
-                        onChange={(deps) => onChange({ ...data, projectIds: deps })}
+                        selectedDeps={data.dependencies || []}
+                        onChange={(deps) => onChange({ ...data, dependencies: (deps as ProjectDependency[]).map(dep => ({ ...dep, dependencyType: 'REQUIRED' })) })}
                         targetGameVersion={data.gameVersions?.[0]}
                         label="Add Dependency"
                         previousDependencies={previousDependencies}
@@ -373,15 +400,25 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
             {isModpack && (
                 <div className="mt-4">
                     <Label required>Included Projects</Label>
-                    <p className={`text-xs ${theme.colors.textSecondary} mb-2`}>Select the projects to include in this modpack version.</p>
+                    <p className={`text-xs ${theme.colors.textSecondary} mb-2`}>All included mods are installed together. Add config defaults where needed.</p>
                     <DependencySelector
-                        selectedDeps={data.projectIds || []}
-                        onChange={(deps) => onChange({ ...data, projectIds: deps })}
+                        selectedDeps={data.dependencies || []}
+                        onChange={(deps) => onChange({ ...data, dependencies: (deps as ProjectDependency[]).map(dep => ({ ...dep, dependencyType: 'REQUIRED' })), modConfigs: (data.modConfigs || []).filter(config => deps.some(dep => configOwnerKey(dep.projectId, dep.source) === configOwnerKey(config.projectId, config.source))) })}
                         targetGameVersion={data.gameVersions?.[0]}
                         label="Add Projects"
                         isModpack={true}
+                        renderDependencyDetails={hideFilePicker ? undefined : dependency => <ModConfigFields
+                            projectId={dependency.projectId}
+                            title={dependency.projectTitle || dependency.projectId}
+                            source={dependency.source}
+                            versionNumber={dependency.versionNumber}
+                            configs={(data.modConfigs || []).filter(config => configOwnerKey(config.projectId, config.source) === configOwnerKey(dependency.projectId, dependency.source))}
+                            onChange={configs => onChange({ ...data, modConfigs: [...(data.modConfigs || []).filter(config => configOwnerKey(config.projectId, config.source) !== configOwnerKey(dependency.projectId, dependency.source)), ...configs] })}
+                            disabled={disabled}
+                        />}
                         disabled={disabled}
                     />
+
                 </div>
             )}
 
@@ -391,7 +428,7 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
                     <p className={`text-xs ${theme.colors.textSecondary} mb-2`}>Mark mods that should not be used alongside this version.</p>
                     <DependencySelector
                         selectedDeps={data.incompatibleProjectIds || []}
-                        onChange={(deps) => onChange({ ...data, incompatibleProjectIds: deps })}
+                        onChange={(deps) => onChange({ ...data, incompatibleProjectIds: deps as string[] })}
                         label="Add Incompatible Mod"
                         mode={VersionRelationKind.INCOMPATIBILITY}
                         currentProjectId={currentProjectId}
@@ -401,18 +438,28 @@ export const VersionFields: React.FC<VersionFieldsProps> = ({ data, onChange, is
             )}
 
             <div>
-                <div className="flex justify-between items-center mb-2">
-                    <Label>Changelog</Label>
-                    <span className={`text-[10px] uppercase font-bold ${theme.colors.textSecondary} ${theme.colors.bgSurfaceAlt} px-2 py-0.5 rounded border ${theme.colors.border}`}>Markdown Only</span>
+                <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                        <Label className="mb-0">Changelog</Label>
+                        <span className={`text-[10px] uppercase font-bold ${theme.colors.textSecondary} ${theme.colors.bgSurfaceAlt} px-2 py-0.5 rounded border ${theme.colors.border}`}>Markdown Only</span>
+                    </div>
+                    <span className={`text-xs tabular-nums ${changelogLength >= MAX_CHANGELOG_CHARACTERS ? theme.colors.warningText : theme.colors.textSecondary}`}>
+                        {changelogLength.toLocaleString()} / {MAX_CHANGELOG_CHARACTERS.toLocaleString()}
+                    </span>
                 </div>
                 <textarea
+                    aria-label="Changelog"
                     value={data.changelog}
                     disabled={disabled}
                     onChange={e => onChange({...data, changelog: e.target.value})}
+                    maxLength={MAX_CHANGELOG_CHARACTERS}
                     rows={6}
                     className={`w-full ${theme.colors.bgBase} border ${theme.colors.border} rounded-xl px-4 py-3 font-mono text-sm outline-none transition-all placeholder:text-slate-400 dark:text-white shadow-sm ${disabled ? 'cursor-not-allowed opacity-70' : 'focus:ring-2 focus:ring-modtale-accent focus:border-modtale-accent hover:border-modtale-accent'}`}
                     placeholder="- Fixed bugs&#10;- Added new items"
                 />
+                <p className={`mt-1 text-xs ${theme.colors.textSecondary}`}>
+                    Changelogs are limited to {MAX_CHANGELOG_CHARACTERS.toLocaleString()} characters.
+                </p>
             </div>
         </div>
     );

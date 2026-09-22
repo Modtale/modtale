@@ -1,12 +1,14 @@
+import { useScrollLock } from '@/hooks/useScrollLock';
 import React, { useState, useEffect } from 'react';
 import { X, ArrowRight, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { DiscordBrandIcon, GitHubBrandIcon, GoogleBrandIcon, HytaleBrandIcon } from '@/components/ui/icons/BrandIcons';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
+import { API_BASE_URL, extractApiErrorMessage } from '@/utils/api';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { ModalPortal } from '@/components/ui/ModalPortal';
 import { useToast } from '@/components/ui/Toast';
 import { SiteRoutes } from '@/utils/routes';
+import { ACCOUNT_NAME_FORMAT_LABEL, MAX_USERNAME_CHARACTERS, MIN_PASSWORD_CHARACTERS, MIN_USERNAME_CHARACTERS } from '@/utils/siteLimits';
 import {
     authClient,
     completeSignInMethod,
@@ -34,14 +36,14 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
-    const [statusModal, setStatusModal] = useState<{ title: string; msg: string } | null>(null);
+    const [statusModal, setStatusModal] = useState<{ type?: 'error' | 'info'; title: string; msg: string } | null>(null);
     const [lastSignInMethod, setLastSignInMethod] = useState<SignInMethod | null>(null);
+
+    useScrollLock(isOpen);
 
     useEffect(() => {
         setMounted(true);
         if (isOpen) setLastSignInMethod(getLastSignInMethod());
-        if (isOpen) document.body.style.overflow = 'hidden';
-        return () => { document.body.style.overflow = ''; };
     }, [isOpen]);
 
     if (!isOpen || !mounted) return null;
@@ -79,7 +81,10 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
 
     const handleOAuthLogin = (provider: OAuthSignInMethod) => {
         stageSignInMethod(provider);
-        window.location.href = `${BACKEND_URL}/oauth2/authorization/${provider}`;
+        const params = new URLSearchParams();
+        if (redirectTo) params.set('redirect', redirectTo);
+        const query = params.toString();
+        window.location.href = `${API_BASE_URL}/auth/oauth/${provider}${query ? `?${query}` : ''}`;
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -151,20 +156,20 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={onClose}>
             {statusModal && (
                 <StatusModal
-                    type="error"
+                    type={statusModal.type ?? 'error'}
                     title={statusModal.title}
                     message={statusModal.msg}
                     onClose={() => setStatusModal(null)}
                 />
             )}
-            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl max-w-sm w-full shadow-2xl relative scale-100 animate-in zoom-in-95 duration-200 overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl max-w-sm w-full max-h-[calc(100vh-2rem)] shadow-2xl relative scale-100 animate-in zoom-in-95 duration-200 overflow-x-hidden overflow-y-auto" onClick={e => e.stopPropagation()}>
                 <div className="p-6">
                     <button type="button" onClick={onClose} aria-label="Close sign-in modal" className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors">
                         <X className="w-5 h-5" />
                     </button>
 
-                    <div className="text-center mb-6">
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2">
+                    <div className="text-center mb-3">
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-normal mb-2">
                             {mode === 'signin' ? 'Welcome Back' : (mode === 'register' ? 'Create Account' : 'Reset Password')}
                         </h2>
                         <p className="text-slate-600 dark:text-slate-400 text-sm">
@@ -180,11 +185,18 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
 
                     {mode !== 'forgot-password' && (
                         <>
+                            <div className="relative mb-6 flex items-center gap-3">
+                                <div className="flex-1 border-t border-slate-200 dark:border-white/10"></div>
+                                <span className="text-sm text-slate-500 dark:text-slate-400 font-medium">sign in with</span>
+                                <div className="flex-1 border-t border-slate-200 dark:border-white/10"></div>
+                            </div>
+
                             <div className="space-y-3 mb-6">
                                 <button
                                     type="button"
                                     onClick={() => handleOAuthLogin('hytale')}
-                                    className={`relative w-full bg-slate-500 text-white py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-slate-600 transition-colors active:scale-95 duration-200 shadow-lg shadow-cyan-950/20 ${lastMethodHighlightClass('hytale')}`}
+                                    disabled={loading}
+                                    className={`relative w-full bg-slate-500 text-white py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-slate-600 disabled:opacity-70 disabled:cursor-not-allowed transition-colors active:scale-95 duration-200 shadow-lg shadow-cyan-950/20 ${lastMethodHighlightClass('hytale')}`}
                                     title={providerTitle('hytale')}
                                     aria-label={providerTitle('hytale')}
                                 >
@@ -197,7 +209,8 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                                     <button
                                         type="button"
                                         onClick={() => handleOAuthLogin('github')}
-                                        className={`relative w-full bg-[#24292e] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#2f363d] transition-colors active:scale-95 duration-200 shadow-lg shadow-black/10 ${lastMethodHighlightClass('github')}`}
+                                        disabled={loading}
+                                        className={`relative w-full bg-[#24292e] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#2f363d] disabled:opacity-70 disabled:cursor-not-allowed transition-colors active:scale-95 duration-200 shadow-lg shadow-black/10 ${lastMethodHighlightClass('github')}`}
                                         title={providerTitle('github')}
                                         aria-label={providerTitle('github')}
                                     >
@@ -207,7 +220,8 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                                     <button
                                         type="button"
                                         onClick={() => handleOAuthLogin('discord')}
-                                        className={`relative w-full bg-[#5865F2] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#4752c4] transition-colors active:scale-95 duration-200 shadow-lg shadow-indigo-500/20 ${lastMethodHighlightClass('discord')}`}
+                                        disabled={loading}
+                                        className={`relative w-full bg-[#5865F2] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-[#4752c4] disabled:opacity-70 disabled:cursor-not-allowed transition-colors active:scale-95 duration-200 shadow-lg shadow-indigo-500/20 ${lastMethodHighlightClass('discord')}`}
                                         title={providerTitle('discord')}
                                         aria-label={providerTitle('discord')}
                                     >
@@ -217,7 +231,8 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                                     <button
                                         type="button"
                                         onClick={() => handleOAuthLogin('google')}
-                                        className={`relative w-full bg-white text-slate-700 border border-slate-200 py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-slate-50 transition-colors active:scale-95 duration-200 shadow-lg shadow-black/5 ${lastMethodHighlightClass('google')}`}
+                                        disabled={loading}
+                                        className={`relative w-full bg-white text-slate-700 border border-slate-200 py-3 px-4 rounded-xl font-bold flex items-center justify-center hover:bg-slate-50 disabled:opacity-70 disabled:cursor-not-allowed transition-colors active:scale-95 duration-200 shadow-lg shadow-black/5 ${lastMethodHighlightClass('google')}`}
                                         title={providerTitle('google')}
                                         aria-label={providerTitle('google')}
                                     >
@@ -244,9 +259,13 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                                     required
                                     value={username}
                                     onChange={e => setUsername(e.target.value)}
+                                    minLength={MIN_USERNAME_CHARACTERS}
+                                    maxLength={MAX_USERNAME_CHARACTERS}
+                                    aria-label="Username"
                                     className="w-full px-4 py-3 rounded-xl bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm text-slate-900 dark:text-white shadow-inner backdrop-blur-md"
                                     placeholder="Display name"
                                 />
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400">{MIN_USERNAME_CHARACTERS}–{MAX_USERNAME_CHARACTERS} characters; {ACCOUNT_NAME_FORMAT_LABEL}.</p>
                             </div>
                         )}
 
@@ -289,19 +308,20 @@ export function SignInModal({ isOpen, onClose }: SignInModalProps) {
                                 <input
                                     type="password"
                                     required
-                                    minLength={6}
+                                    minLength={mode === 'register' ? MIN_PASSWORD_CHARACTERS : undefined}
                                     value={password}
                                     onChange={e => setPassword(e.target.value)}
                                     className="w-full px-4 py-3 rounded-xl bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:ring-2 focus:ring-modtale-accent focus:border-transparent outline-none transition-all text-sm text-slate-900 dark:text-white shadow-inner backdrop-blur-md"
                                     placeholder="••••••••"
                                 />
+                                {mode === 'register' && <p className="text-[11px] text-slate-500 dark:text-slate-400">At least {MIN_PASSWORD_CHARACTERS} characters.</p>}
                             </div>
                         )}
 
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-modtale-accent text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-modtale-accentHover transition-colors active:scale-95 duration-200 shadow-lg shadow-modtale-accent/20 mt-2"
+                            className="w-full bg-modtale-accent text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-modtale-accentHover disabled:opacity-70 disabled:cursor-not-allowed transition-colors active:scale-95 duration-200 shadow-lg shadow-modtale-accent/20 mt-2"
                         >
                             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
                                 <>

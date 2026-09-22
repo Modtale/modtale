@@ -17,6 +17,7 @@ public class PlatformMonthlyStats {
 
     private long totalViews;
     private long totalDownloads;
+    private long launcherDownloads;
     private long apiDownloads;
     private long frontendDownloads;
     private long newProjects;
@@ -42,6 +43,9 @@ public class PlatformMonthlyStats {
     public long getTotalDownloads() { return totalDownloads; }
     public void setTotalDownloads(long totalDownloads) { this.totalDownloads = totalDownloads; }
 
+    public long getLauncherDownloads() { return launcherDownloads; }
+    public void setLauncherDownloads(long launcherDownloads) { this.launcherDownloads = launcherDownloads; }
+
     public long getApiDownloads() { return apiDownloads; }
     public void setApiDownloads(long apiDownloads) { this.apiDownloads = apiDownloads; }
 
@@ -63,6 +67,7 @@ public class PlatformMonthlyStats {
     public static class DayStats {
         private int v;
         private int d;
+        private int l;
         private int a;
         private int f;
         private int n;
@@ -73,6 +78,8 @@ public class PlatformMonthlyStats {
         public void setV(int v) { this.v = v; }
         public int getD() { return d; }
         public void setD(int d) { this.d = d; }
+        public int getL() { return l; }
+        public void setL(int l) { this.l = l; }
         public int getA() { return a; }
         public void setA(int a) { this.a = a; }
         public int getF() { return f; }

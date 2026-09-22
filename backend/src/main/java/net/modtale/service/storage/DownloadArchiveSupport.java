@@ -19,7 +19,11 @@ final class DownloadArchiveSupport {
     }
 
     ResolvedDependency resolveDependency(ProjectDependency dependency) {
-        Project project = projectService.getRawProjectById(dependency.getModId());
+        if (dependency == null || dependency.isExternal()) {
+            return null;
+        }
+
+        Project project = projectService.getRawProjectById(dependency.getProjectId());
         if (project == null) {
             return null;
         }

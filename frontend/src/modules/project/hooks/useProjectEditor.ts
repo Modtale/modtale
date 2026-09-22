@@ -75,8 +75,9 @@ export const useProjectEditor = (
     const handleCancelInvite = async (userId: string) => {
         if (!projectData?.id) return;
         try {
-            await projectClient.cancelInvite(projectData.id, userId);
-            setProjectData(prev => prev ? ({ ...prev, teamInvites: (prev.teamInvites || []).filter(m => m.userId !== userId) }) : null);
+            const requestId = projectData.teamInvites?.find(invite => invite.userId === userId)?.requestId ?? 'legacy';
+            await projectClient.cancelInvite(projectData.id, userId, requestId);
+            setProjectData(prev => prev?.id === projectData.id ? ({ ...prev, teamInvites: (prev.teamInvites || []).filter(m => m.userId !== userId || (m.requestId ?? 'legacy') !== requestId) }) : prev);
         } catch (e: unknown) {
             onShowStatus('error', 'Invite Cancel Failed', extractApiErrorMessage(e, 'We could not cancel that project invite.'));
         }

@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 class VersionArtifactServiceTest {
 
@@ -58,6 +59,23 @@ class VersionArtifactServiceTest {
                 "Failed to read the uploaded file while calculating its checksum: checksum boom",
                 error.getMessage()
         );
+    }
+
+    @Test
+    void prepareVersionArtifactValidatesAndStoresModpackOverridesSeparately() {
+        StorageService storageService = mock(StorageService.class);
+        FileValidationService fileValidationService = mock(FileValidationService.class);
+        service = new VersionArtifactService(storageService, fileValidationService, mongoTemplate);
+        MultipartFile file = mock(MultipartFile.class);
+        when(file.isEmpty()).thenReturn(false);
+        when(storageService.upload(file, "modpack-overrides")).thenReturn("modpack-overrides/source.zip");
+        Project project = new Project();
+        project.setClassification(ProjectClassification.MODPACK);
+
+        VersionArtifactService.PreparedVersionArtifact artifact = service.prepareVersionArtifact(project, file);
+
+        assertEquals("modpack-overrides/source.zip", artifact.filePath());
+        verify(fileValidationService).validateProjectFile(file, "MODPACK");
     }
 
     private static final class BrokenInputStream extends InputStream {

@@ -9,7 +9,8 @@ import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
-import net.modtale.repository.project.ProjectRepository;
+import net.modtale.service.project.team.ProjectTeamPersistence;
+import net.modtale.service.project.team.ProjectTeamSnapshot;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.auth.ApiKeyService;
 import net.modtale.service.project.access.ProjectAccessService;
@@ -21,7 +22,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class TeamMembershipService {
 
-    private final ProjectRepository projectRepository;
+    private final ProjectTeamPersistence reviewPersistence;
     private final UserRepository userRepository;
     private final ProjectService projectService;
     private final ProjectAccessService projectAccessService;
@@ -31,7 +32,7 @@ public class TeamMembershipService {
     private final AccessControlService accessControlService;
 
     public TeamMembershipService(
-            ProjectRepository projectRepository,
+            ProjectTeamPersistence reviewPersistence,
             UserRepository userRepository,
             ProjectService projectService,
             ProjectAccessService projectAccessService,
@@ -40,7 +41,7 @@ public class TeamMembershipService {
             ApiKeyService apiKeyService,
             AccessControlService accessControlService
     ) {
-        this.projectRepository = projectRepository;
+        this.reviewPersistence = reviewPersistence;
         this.userRepository = userRepository;
         this.projectService = projectService;
         this.projectAccessService = projectAccessService;
@@ -54,7 +55,9 @@ public class TeamMembershipService {
         Project project = projectAccessService.requireProjectPermission(id, requester, "PROJECT_TEAM_INVITE",
                 "You do not have permission to invite contributors to this project.");
         projectMutationGuard.ensureEditable(project);
-        requireRole(project, roleId);
+        var snapshot = reviewPersistence.capture(id, ProjectTeamSnapshot.token(project));
+        project = snapshot.project();
+        var role = requireRole(project, roleId);
 
         User invitee = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("We couldn't find the contributor you tried to invite."));
@@ -71,24 +74,33 @@ public class TeamMembershipService {
             throw new InvalidProjectRequestException("That contributor already has a pending invite.");
         }
 
-        project.getTeamInvites().add(new Project.ProjectMember(invitee.getId(), roleId));
-        saveProject(project);
+        var invitation = new Project.ProjectMember(invitee.getId(), roleId);
+        invitation.setRequestId(java.util.UUID.randomUUID().toString());
+        invitation.setRequestOwnerId(project.getAuthorId());
+        invitation.setRequestExpiresAt(System.currentTimeMillis() + java.time.Duration.ofDays(7).toMillis());
+        invitation.setRequestPermissions(role.getPermissions() == null || role.getPermissions().isEmpty()
+                ? EnumSet.noneOf(ApiKey.ApiPermission.class) : EnumSet.copyOf(role.getPermissions()));
+        project.getTeamInvites().add(invitation);
+        saveProject(snapshot);
         teamNotificationService.sendContributorInvite(project, invitee);
     }
 
-    public void cancelInvite(String id, String targetUserId, User requester) {
+    public void cancelInvite(String id, String targetUserId, String requestId, User requester) {
         Project project = projectAccessService.requireProjectPermission(id, requester, "PROJECT_TEAM_INVITE",
                 "You do not have permission to manage contributor invites for this project.");
-        if (project.getTeamInvites() != null) {
-            project.getTeamInvites().removeIf(member -> member.getUserId().equals(targetUserId));
-            saveProject(project);
-        }
+        var snapshot = reviewPersistence.capture(id, ProjectTeamSnapshot.token(project));
+        project = snapshot.project();
+        var invite = ProjectInvitationPolicy.require(project, targetUserId, requestId, false);
+        project.getTeamInvites().remove(invite);
+        saveInvitation(snapshot, targetUserId, requestId, false);
     }
 
     public void updateContributorRole(String id, String targetUserId, String roleId, User requester) {
         Project project = projectAccessService.requireProjectPermission(id, requester, "PROJECT_MEMBER_EDIT_ROLE",
                 "You do not have permission to update contributor roles for this project.");
         projectMutationGuard.ensureEditable(project);
+        var snapshot = reviewPersistence.capture(id, ProjectTeamSnapshot.token(project));
+        project = snapshot.project();
 
         Project.ProjectRole role = project.getProjectRoles().stream()
                 .filter(existingRole -> existingRole.getId().equals(roleId))
@@ -100,7 +112,7 @@ public class TeamMembershipService {
                     .findFirst()
                     .orElseThrow(() -> new ResourceNotFoundException("We couldn't find that contributor on the project team."));
             member.setRoleId(roleId);
-            saveProject(project);
+            saveProject(snapshot);
             apiKeyService.syncUserProjectPermissions(targetUserId, id, role.getPermissions());
             teamNotificationService.sendContributorRoleUpdated(project, targetUserId, role);
         }
@@ -110,45 +122,35 @@ public class TeamMembershipService {
         Project project = projectService.getRawProjectById(id);
         if (project != null && (accessControlService.hasProjectPermission(project, requester, "PROJECT_TEAM_REMOVE") || requester.getId().equals(targetUserId))) {
             projectMutationGuard.ensureEditable(project);
-            if (project.getTeamMembers() != null && project.getTeamMembers().removeIf(member -> member.getUserId().equals(targetUserId))) {
-                apiKeyService.syncUserProjectPermissions(targetUserId, id, EnumSet.noneOf(ApiKey.ApiPermission.class));
-            }
-            saveProject(project);
+            var snapshot = reviewPersistence.capture(id, ProjectTeamSnapshot.token(project));
+            project = snapshot.project();
+            boolean removed = project.getTeamMembers() != null && project.getTeamMembers().removeIf(member -> member.getUserId().equals(targetUserId));
+            saveProject(snapshot);
+            if (removed) apiKeyService.syncUserProjectPermissions(targetUserId, id, EnumSet.noneOf(ApiKey.ApiPermission.class));
             return;
         }
         throw new ProjectOperationForbiddenException("You do not have permission to remove that contributor.");
     }
 
-    public void acceptInvite(String id, String userId) {
+    public void acceptInvite(String id, String userId, String requestId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("We couldn't find that user."));
         Project project = projectService.getRawProjectById(id);
         if (project == null) {
             throw new ResourceNotFoundException("We couldn't find the project for that invite.");
         }
+        var snapshot = reviewPersistence.capture(id, ProjectTeamSnapshot.token(project));
+        project = snapshot.project();
 
-        if (project.getTeamMembers() != null
-                && project.getTeamMembers().stream().anyMatch(member -> userId.equals(member.getUserId()))) {
-            return;
-        }
-
-        Project.ProjectMember invite = project.getTeamInvites() != null
-                ? project.getTeamInvites().stream()
-                        .filter(member -> userId.equals(member.getUserId()))
-                        .findFirst()
-                        .orElse(null)
-                : null;
-        if (invite == null) {
-            throw new InvalidProjectRequestException("We couldn't find a pending project invite for your account.");
-        }
-
+        projectMutationGuard.ensureEditable(project);
+        var invite = ProjectInvitationPolicy.require(project, userId, requestId, true);
         Project.ProjectRole role = requireRole(project, invite.getRoleId());
         project.getTeamInvites().remove(invite);
         if (project.getTeamMembers() == null) {
             project.setTeamMembers(new ArrayList<>());
         }
-        project.getTeamMembers().add(invite);
-        saveProject(project);
+        project.getTeamMembers().add(new Project.ProjectMember(invite.getUserId(), invite.getRoleId()));
+        saveInvitation(snapshot, userId, requestId, true);
         apiKeyService.syncUserProjectPermissions(userId, id, role.getPermissions() != null
                 ? role.getPermissions()
                 : EnumSet.noneOf(ApiKey.ApiPermission.class));
@@ -157,17 +159,24 @@ public class TeamMembershipService {
         teamNotificationService.sendInviteAccepted(project, owner, user);
     }
 
-    public void declineInvite(String id, String userId) {
+    public void declineInvite(String id, String userId, String requestId) {
         Project project = projectService.getRawProjectById(id);
-        if (project != null && project.getTeamInvites() != null) {
-            project.getTeamInvites().removeIf(member -> member.getUserId().equals(userId));
-            saveProject(project);
-        }
+        if (project == null) throw new ResourceNotFoundException("Project not found.");
+        var snapshot = reviewPersistence.capture(id, ProjectTeamSnapshot.token(project));
+        project = snapshot.project();
+        var invite = ProjectInvitationPolicy.require(project, userId, requestId, false);
+        project.getTeamInvites().remove(invite);
+        saveInvitation(snapshot, userId, requestId, false);
     }
 
-    private void saveProject(Project project) {
-        projectRepository.save(project);
-        projectService.evictProjectCache(project);
+    private void saveInvitation(ProjectTeamPersistence.Snapshot snapshot, String userId, String requestId, boolean accepting) {
+        if (!reviewPersistence.resolveContributorInvite(snapshot, userId, requestId, accepting)) throw ProjectTeamSnapshot.conflict();
+        projectService.evictProjectCache(snapshot.project());
+    }
+
+    private void saveProject(ProjectTeamPersistence.Snapshot snapshot) {
+        if (!reviewPersistence.applyTeam(snapshot)) throw ProjectTeamSnapshot.conflict();
+        projectService.evictProjectCache(snapshot.project());
     }
 
     private Project.ProjectRole requireRole(Project project, String roleId) {

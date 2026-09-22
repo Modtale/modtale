@@ -1,6 +1,12 @@
 import { api } from '@/utils/api';
-import type { Comment, GalleryImage, ManifestInspectionResult, Project, ProjectMember, ProjectVersion, ProjectVersionChangelog, User, ProjectRole, GameVersionCatalog } from '@/types';
+import type { Comment, DependencySource, ExternalProjectReference, GalleryImage, GameVersionCatalog, ManifestInspectionResult, Project, ProjectMember, ProjectRole, ProjectVersion, ProjectVersionChangelog, User } from '@/types';
 import { normalizeUser, normalizeUsers } from '@/utils/users';
+
+interface ChangelogPageOptions {
+    offset?: number;
+    limit?: number;
+    signal?: AbortSignal;
+}
 
 export const projectClient = {
     getProject: async (id: string) => {
@@ -15,8 +21,24 @@ export const projectClient = {
         const res = await api.get<{ versions?: ProjectVersion[] }>(`/projects/${id}/versions`);
         return res.data?.versions || [];
     },
-    getProjectVersionChangelogs: async (id: string) => {
-        const res = await api.get<ProjectVersionChangelog[]>(`/projects/${id}/versions/changelogs`);
+    getProjectVersionChangelogs: async (id: string, options: ChangelogPageOptions = {}) => {
+        const { offset, limit, signal } = options;
+        const path = `/projects/${id}/versions/changelogs`;
+
+        // Keep the unpaged request intact for launcher/API consumers that still
+        // ask for the complete history in one call.
+        if (offset === undefined && limit === undefined && signal === undefined) {
+            const res = await api.get<ProjectVersionChangelog[]>(path);
+            return res.data || [];
+        }
+
+        const res = await api.get<ProjectVersionChangelog[]>(path, {
+            params: {
+                ...(offset === undefined ? {} : { offset }),
+                ...(limit === undefined ? {} : { limit })
+            },
+            ...(signal === undefined ? {} : { signal })
+        });
         return res.data || [];
     },
     getProjectGallery: async (id: string) => {
@@ -68,6 +90,12 @@ export const projectClient = {
             params: { ids: ids.join(',') }
         });
         return res.data || {};
+    },
+    resolveExternalProject: async (url: string, source?: DependencySource) => {
+        const res = await api.get<ExternalProjectReference>('/projects/external/resolve', {
+            params: { url, source }
+        });
+        return res.data;
     },
     followUser: async (targetId: string) => {
         await api.post(`/user/follow/${targetId}`);
@@ -144,8 +172,8 @@ export const projectClient = {
     inviteUser: async (projectId: string, userId: string, roleId: string) => {
         await api.post(`/projects/${projectId}/invite`, { userId, roleId });
     },
-    cancelInvite: async (projectId: string, userId: string) => {
-        await api.delete(`/projects/${projectId}/invites/${userId}`);
+    cancelInvite: async (projectId: string, userId: string, requestId: string) => {
+        await api.delete(`/projects/${projectId}/invites/${userId}`, { params: { requestId } });
     },
     removeContributor: async (projectId: string, userId: string) => {
         await api.delete(`/projects/${projectId}/contributors/${userId}`);

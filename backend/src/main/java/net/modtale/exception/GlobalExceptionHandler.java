@@ -73,8 +73,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(UpstreamServiceException.class)
     public ResponseEntity<ProblemDetail> handleUpstreamServiceException(UpstreamServiceException ex) {
         logger.error("UpstreamServiceException:", ex);
-        return ErrorMessageUtils.response(ex.getStatus(),
-                ErrorMessageUtils.describe(ex, "An upstream service request failed."));
+        return ErrorMessageUtils.response(ex.getStatus(), ex, "An upstream service request failed.");
     }
 
     @ExceptionHandler(ProjectMediaOperationException.class)
@@ -98,8 +97,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ProblemDetail> handleAllOtherExceptions(Exception ex) {
         logger.error("Unhandled Exception:", ex);
-        return ErrorMessageUtils.response(HttpStatus.INTERNAL_SERVER_ERROR,
-                ErrorMessageUtils.describe(ex, "The server could not complete the request."));
+        return ErrorMessageUtils.internalServerError(ex, "The server could not complete the request.");
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)

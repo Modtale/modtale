@@ -79,6 +79,6 @@ class WikiProxyControllerTest {
         var response = controller.handleWikiUpstream(error);
 
         assertEquals(502, response.getStatusCode().value());
-        assertTrue(response.getBody().getDetail().contains("Wiki upstream is unavailable."));
+        assertEquals("Wiki upstream request failed.", response.getBody().getDetail());
     }
 }

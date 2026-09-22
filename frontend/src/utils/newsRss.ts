@@ -1,0 +1,87 @@
+import type { NewsPost } from '@/data/news';
+import {
+    NEWS_INDEX_PATH,
+    NEWS_POSTS,
+    NEWS_RSS_PATH,
+    SITE_URL,
+    getNewsPostUrl,
+    getNewsPostPath,
+} from '@/data/news';
+
+const escapeXml = (value: string) => value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+
+const cdata = (value: string) => `<![CDATA[${value.replace(/]]>/g, ']]]]><![CDATA[>')}]]>`;
+
+export const buildNewsRssXml = (siteUrl = SITE_URL, posts: NewsPost[] = NEWS_POSTS) => {
+    const origin = new URL(siteUrl);
+    const localHost = ['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname);
+    if (!localHost) origin.protocol = 'https:';
+    const absoluteUrl = (path: string) => new URL(path, origin).href;
+    const lastUpdated = Math.max(...posts.map(post => Date.parse(post.updatedAt)));
+    const lastBuildDate = typeof lastUpdated === 'number' && Number.isFinite(lastUpdated)
+        ? new Date(lastUpdated).toUTCString()
+        : new Date().toUTCString();
+
+    const items = posts.map((post) => {
+        const postUrl = absoluteUrl(getNewsPostPath(post));
+        const imageUrl = absoluteUrl(post.socialImage);
+        const categories = post.tags
+            .map((tag) => `      <category>${escapeXml(tag)}</category>`)
+            .join('\n');
+
+        const encodedContent = `
+<figure>
+  <img src="${escapeXml(imageUrl)}" alt="${escapeXml(post.socialImageAlt)}" width="2400" height="1260" />
+</figure>
+<p>${escapeXml(post.excerpt)}</p>
+<p><a href="${escapeXml(postUrl)}">Read the full post on Modtale</a></p>`.trim();
+
+        return `    <item>
+      <title>${escapeXml(post.title)}</title>
+      <link>${escapeXml(postUrl)}</link>
+      <guid isPermaLink="true">${escapeXml(getNewsPostUrl(post))}</guid>
+      <description>${escapeXml(post.description)}</description>
+      <pubDate>${new Date(post.publishedAt).toUTCString()}</pubDate>
+      <dc:creator>${escapeXml(post.author)}</dc:creator>
+${categories}
+      <media:content url="${escapeXml(imageUrl)}" medium="image" width="2400" height="1260" />
+      <content:encoded>${cdata(encodedContent)}</content:encoded>
+    </item>`;
+    }).join('\n');
+
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>Modtale News</title>
+    <link>${escapeXml(absoluteUrl(NEWS_INDEX_PATH))}</link>
+    <description>Product updates, creator notes, and feature tours from Modtale.</description>
+    <language>en-us</language>
+    <lastBuildDate>${lastBuildDate}</lastBuildDate>
+    <atom:link href="${escapeXml(absoluteUrl(NEWS_RSS_PATH))}" rel="self" type="application/rss+xml" />
+    <image>
+      <url>${escapeXml(absoluteUrl("/assets/favicon.png"))}</url>
+      <title>Modtale News</title>
+      <link>${escapeXml(absoluteUrl(NEWS_INDEX_PATH))}</link>
+    </image>
+${items}
+  </channel>
+</rss>`;
+};
+
+const NEWS_RSS_HEADERS = {
+    'Content-Type': 'application/rss+xml; charset=utf-8',
+    'Cache-Control': 'public, max-age=60, s-maxage=60',
+};
+
+export const buildNewsRssHeadResponse = () => new Response(null, {
+    headers: NEWS_RSS_HEADERS,
+});
+
+export const buildNewsRssResponse = (siteUrl = SITE_URL, posts: NewsPost[] = NEWS_POSTS) => new Response(buildNewsRssXml(siteUrl, posts), {
+    headers: NEWS_RSS_HEADERS,
+});

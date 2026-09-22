@@ -8,7 +8,6 @@ public class ManifestDependencySuggestion {
     private String versionNumber;
     private boolean optional;
     private int confidence;
-    private String dependencyEntry;
 
     public ManifestDependencySuggestion() {}
 
@@ -20,7 +19,6 @@ public class ManifestDependencySuggestion {
         this.versionNumber = versionNumber;
         this.optional = optional;
         this.confidence = confidence;
-        this.dependencyEntry = projectId + ":" + versionNumber + (optional ? ":optional" : "");
     }
 
     public String getManifestKey() { return manifestKey; }
@@ -43,7 +41,4 @@ public class ManifestDependencySuggestion {
 
     public int getConfidence() { return confidence; }
     public void setConfidence(int confidence) { this.confidence = confidence; }
-
-    public String getDependencyEntry() { return dependencyEntry; }
-    public void setDependencyEntry(String dependencyEntry) { this.dependencyEntry = dependencyEntry; }
 }

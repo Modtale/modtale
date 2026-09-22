@@ -1,0 +1,65 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import App from '../../App';
+import { fetchNewsPosts } from '@/modules/news/api/newsClient';
+import {
+    NEWS_INDEX_PATH,
+    SITE_URL,
+    getAbsoluteUrl,
+    getNewsPostUrl,
+} from '../../data/news';
+
+let posts;
+try { posts = await fetchNewsPosts(); } catch { return new Response('News is temporarily unavailable.', { status: 503 }); }
+const [featuredPost] = posts;
+const title = 'Modtale News | Product Updates and Creator Notes';
+const description = 'Read Modtale product updates, creator notes, feature tours, and platform news for Hytale mods, plugins, worlds, assets, and modpacks.';
+const image = getAbsoluteUrl(featuredPost?.socialImage || '/assets/logo_light.svg');
+const path = Astro.url.pathname;
+
+const initialData = { newsPosts: posts };
+
+
+const jsonLd = [
+    {
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        name: 'Modtale News',
+        url: getAbsoluteUrl(NEWS_INDEX_PATH),
+        description,
+        publisher: {
+            '@type': 'Organization',
+            name: 'Modtale',
+            logo: {
+                '@type': 'ImageObject',
+                url: `${SITE_URL}/assets/logo.svg`,
+            },
+        },
+        hasPart: posts.map((post) => ({
+            '@type': 'NewsArticle',
+            headline: post.title,
+            description: post.description,
+            datePublished: post.publishedAt,
+            dateModified: post.updatedAt,
+            author: { '@type': 'Organization', name: post.author },
+            url: getNewsPostUrl(post),
+            image: getAbsoluteUrl(post.socialImage),
+        })),
+    },
+];
+---
+
+<BaseLayout
+    title={title}
+    description={description}
+    image={image}
+    imageAlt="Modtale news feature preview"
+    imageWidth="2400"
+    imageHeight="1260"
+    imageType="image/png"
+    jsonLd={jsonLd}
+    canonicalOverride={getAbsoluteUrl(NEWS_INDEX_PATH)}
+    initialData={initialData}
+>
+    <App client:load initialPath={path} ssrData={initialData} />
+</BaseLayout>

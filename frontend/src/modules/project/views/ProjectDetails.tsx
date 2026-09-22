@@ -1,3 +1,8 @@
+import { openLauncherInstallOrFallback } from '@/modules/launcher/utils/launcherProtocol';
+import { ProjectPageSkeleton } from '../components/ProjectPageSkeleton';
+import { ProjectGallerySkeleton } from '../components/ProjectGallerySkeleton';
+import { DownloadModalSkeleton } from '../components/dialogs/DownloadModal';
+import { HistoryModalSkeleton } from '../components/dialogs/HistoryModal';
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
@@ -27,12 +32,12 @@ import { WikiMobileNavigation, WikiSidebar } from '../components/HMWiki';
 
 import { ProjectLayout } from '../components/ProjectLayout';
 import { GalleryCarouselViewer } from '../components/GalleryCarouselViewer';
-import { Spinner } from '@/components/ui/Spinner';
 import NotFound from '@/components/ui/error/NotFound';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { api, extractApiErrorMessage } from '@/utils/api';
 import { projectClient } from '../api/projectClient';
 import { mergeProjectVersionChangelogs, projectNeedsChangelogHydration } from '../utils/changelogHydration';
+import { getSelectableBundleDependencies, hasCurseForgeDependencies } from '../utils/dependencyEntries';
 import { resolveGalleryImages } from '../utils/galleryImages';
 import { countGalleryCarouselMarkers } from '../utils/galleryCarouselMarker';
 import { useScrollLock } from '@/hooks/useScrollLock';
@@ -48,7 +53,7 @@ const DependencyModal = lazy(() => import('../components/dialogs/DependencyModal
 interface ProjectDetailViewProps {
     currentUser: User | null;
     isLiked: (id: string) => boolean;
-    onToggleFavorite: (id: string) => void;
+    onToggleFavorite: (id: string, options?: { onError?: () => void }) => boolean | undefined;
     onDownload: (id: string) => void;
     downloadedSessionIds: Set<string>;
     onRefresh: () => Promise<void>;
@@ -58,6 +63,12 @@ type DownloadChannel = 'RELEASE' | 'BETA' | 'ALPHA';
 
 const normalizeDownloadChannel = (channel?: string): DownloadChannel => (
     channel === 'BETA' || channel === 'ALPHA' ? channel : 'RELEASE'
+);
+
+const CHANGELOG_PAGE_SIZE = 12;
+
+const changelogVersionKey = (version: { id?: string; versionNumber?: string }) => (
+    version.id || version.versionNumber || ''
 );
 
 export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
@@ -92,6 +103,11 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const [gameVersionCatalogPending, setGameVersionCatalogPending] = useState(false);
     const [gameVersionCatalogReady, setGameVersionCatalogReady] = useState(false);
     const [gameVersionCatalogError, setGameVersionCatalogError] = useState(false);
+    const [changelogLoading, setChangelogLoading] = useState(false);
+    const [changelogLoadingMore, setChangelogLoadingMore] = useState(false);
+    const [changelogError, setChangelogError] = useState(false);
+    const [changelogHasMore, setChangelogHasMore] = useState(false);
+    const [hydratedChangelogKeys, setHydratedChangelogKeys] = useState<Set<string>>(new Set());
 
     const [isDepModalOpen, setIsDepModalOpen] = useState(false);
     const [pendingDownload, setPendingDownload] = useState<{ versionNumber: string; gameVersion: string; dependencies: any[]; channel: DownloadChannel } | null>(null);
@@ -128,7 +144,12 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const prevPathnameRef = useRef(location.pathname);
     const scrollPosRef = useRef(0);
     const downloadFxTimeoutRef = useRef<number | null>(null);
-    const changelogFetchKeyRef = useRef('');
+    const changelogStateKeyRef = useRef('');
+    const changelogStartedKeyRef = useRef('');
+    const changelogOffsetRef = useRef(0);
+    const changelogRequestRef = useRef(0);
+    const changelogBusyRef = useRef(false);
+    const changelogAbortRef = useRef<AbortController | null>(null);
     const gameVersionCatalogProjectRef = useRef<string | null>(null);
     const [galleryIndex, setGalleryIndex] = useState(0);
     const galleryItems = useMemo(
@@ -136,6 +157,10 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         [project?.galleryImageCaptions, project?.galleryImages]
     );
     const projectUrl = project ? SiteRoutes.project(project) : '';
+    const projectChangelogUrl = project ? SiteRoutes.projectChangelog(project) : '';
+    const navigateToChangelog = useCallback(() => {
+        if (projectChangelogUrl) navigate(projectChangelogUrl);
+    }, [navigate, projectChangelogUrl]);
 
     const isStableBuild = useCallback((version: any) => {
         if (!version) return false;
@@ -249,29 +274,102 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         return projectNeedsChangelogHydration(project);
     }, [project]);
 
+    const projectVersionCount = project?.versions?.length || 0;
+    const changelogRouteKey = id || project?.id || '';
+    const changelogStateKey = project?.id
+        ? `${project.id}:${changelogRouteKey}:${projectVersionCount}`
+        : '';
+
     useEffect(() => {
-        if (!isHistoryOpen || !project || !needsChangelogHydration) return;
-        if (changelogFetchKeyRef.current === project.id) return;
+        if (changelogStateKeyRef.current === changelogStateKey) return;
 
-        let isCancelled = false;
-        changelogFetchKeyRef.current = project.id;
+        changelogAbortRef.current?.abort();
+        changelogAbortRef.current = null;
+        changelogRequestRef.current += 1;
+        changelogBusyRef.current = false;
+        changelogStateKeyRef.current = changelogStateKey;
+        changelogStartedKeyRef.current = '';
+        changelogOffsetRef.current = 0;
+        setChangelogLoading(false);
+        setChangelogLoadingMore(false);
+        setChangelogError(false);
+        setChangelogHasMore(false);
+        setHydratedChangelogKeys(new Set(
+            (project?.versions || [])
+                .filter(version => version.changelog != null)
+                .map(changelogVersionKey)
+                .filter(Boolean)
+        ));
+    }, [changelogStateKey, project?.versions]);
 
-        projectClient.getProjectVersionChangelogs(id || project.id)
-            .then((changelogs) => {
-                if (isCancelled) return;
-                setProject((previous) => {
-                    if (!previous || previous.id !== project.id) return previous;
-                    return mergeProjectVersionChangelogs(previous, changelogs);
+    const loadChangelogPage = useCallback(async (reset = false) => {
+        const projectId = project?.id;
+        if (!projectId || changelogBusyRef.current) return;
+
+        const pageOffset = reset ? 0 : changelogOffsetRef.current;
+        const requestId = ++changelogRequestRef.current;
+        const controller = new AbortController();
+        changelogAbortRef.current?.abort();
+        changelogAbortRef.current = controller;
+        changelogBusyRef.current = true;
+
+        if (reset) {
+            changelogOffsetRef.current = 0;
+            setChangelogLoading(true);
+            setChangelogLoadingMore(false);
+            setChangelogHasMore(false);
+        } else {
+            setChangelogLoadingMore(true);
+        }
+        setChangelogError(false);
+
+        try {
+            const changelogs = await projectClient.getProjectVersionChangelogs(
+                changelogRouteKey || projectId,
+                { offset: pageOffset, limit: CHANGELOG_PAGE_SIZE, signal: controller.signal }
+            );
+            if (requestId !== changelogRequestRef.current) return;
+
+            setProject((previous) => {
+                if (!previous || previous.id !== projectId) return previous;
+                return mergeProjectVersionChangelogs(previous, changelogs);
+            });
+            setHydratedChangelogKeys((previous) => {
+                const next = new Set(previous);
+                changelogs.forEach(changelog => {
+                    const key = changelogVersionKey(changelog);
+                    if (key) next.add(key);
                 });
-            })
-            .catch(() => {
-                if (!isCancelled) changelogFetchKeyRef.current = '';
+                return next;
             });
 
-        return () => {
-            isCancelled = true;
-        };
-    }, [isHistoryOpen, project?.id, needsChangelogHydration, id, setProject]);
+            const nextOffset = pageOffset + CHANGELOG_PAGE_SIZE;
+            changelogOffsetRef.current = nextOffset;
+            // The offset follows the version metadata list, so unpublished
+            // versions filtered by the API cannot make us stop early.
+            setChangelogHasMore(
+                changelogs.length <= CHANGELOG_PAGE_SIZE && nextOffset < projectVersionCount
+            );
+        } catch {
+            if (requestId !== changelogRequestRef.current || controller.signal.aborted) return;
+            setChangelogError(true);
+        } finally {
+            if (requestId === changelogRequestRef.current) {
+                changelogBusyRef.current = false;
+                changelogAbortRef.current = null;
+                setChangelogLoading(false);
+                setChangelogLoadingMore(false);
+            }
+        }
+    }, [changelogRouteKey, project?.id, projectVersionCount, setProject]);
+
+    useEffect(() => {
+        if (!isHistoryOpen || !project?.id || !needsChangelogHydration) return;
+        if (changelogStartedKeyRef.current === changelogStateKey) return;
+
+        changelogStartedKeyRef.current = changelogStateKey;
+        void loadChangelogPage(true);
+    }, [isHistoryOpen, needsChangelogHydration, project?.id, changelogStateKey, loadChangelogPage]);
 
     useEffect(() => {
         if (prevPathnameRef.current.includes('/wiki') && isWikiRoute && prevPathnameRef.current !== location.pathname) {
@@ -377,13 +475,6 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         }
     }, [project, id, location.pathname, location.search, location.hash, navigate]);
 
-    const getDependencyId = (dep: any) => {
-        if (typeof dep === 'string') return dep;
-        if (dep && typeof dep === 'object') {
-            return dep.modId || dep.projectId || dep.id || '';
-        }
-        return '';
-    };
     const showDownloadError = useCallback((error: unknown, fallback: string) => {
         setStatusModal({
             type: 'error',
@@ -394,16 +485,29 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const handleProjectFavoriteToggle = useCallback(() => {
         if (!project) return;
-        const wasLiked = isLiked(project.id);
+        let nextLiked: boolean | undefined;
+        const rollbackFavoriteCount = () => {
+            if (typeof nextLiked !== 'boolean') return;
+            setProject(previous => {
+                if (!previous || previous.id !== project.id) return previous;
+                return {
+                    ...previous,
+                    favoriteCount: Math.max(0, (previous.favoriteCount || 0) + (nextLiked ? -1 : 1))
+                };
+            });
+        };
+
+        nextLiked = onToggleFavorite(project.id, { onError: rollbackFavoriteCount });
+        if (typeof nextLiked !== 'boolean') return;
+
         setProject(previous => {
             if (!previous || previous.id !== project.id) return previous;
             return {
                 ...previous,
-                favoriteCount: Math.max(0, (previous.favoriteCount || 0) + (wasLiked ? -1 : 1))
+                favoriteCount: Math.max(0, (previous.favoriteCount || 0) + (nextLiked ? 1 : -1))
             };
         });
-        onToggleFavorite(project.id);
-    }, [isLiked, onToggleFavorite, project, setProject]);
+    }, [onToggleFavorite, project, setProject]);
 
     const handleMobileWikiNavigate = useCallback((slug: string) => {
         if (!projectUrl) return;
@@ -424,7 +528,9 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     const resolveDownloadedFileName = (projectData: any, versionNumber: string, gameVersion: string, isBundle: boolean) => {
         if (!projectData) return '';
         if (isBundle) return `${sanitizeDownloadName(projectData.title)}-UNZIP-ME.zip`;
-        if (projectData.classification === 'MODPACK') return `${sanitizeDownloadName(projectData.title)}-${versionNumber}.zip`;
+        if (projectData.classification === 'MODPACK') {
+            return `${sanitizeDownloadName(projectData.title)}-${versionNumber}.zip`;
+        }
 
         const matchedVersion = (projectData.versions || []).find((v: any) => {
             if (v.versionNumber !== versionNumber) return false;
@@ -490,6 +596,10 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
 
     const handleDownloadClick = async (url: string, versionNumber: string, gameVersion: string, deps: any[], channel: string) => {
         try {
+            if (project?.classification === 'MODPACK' && hasCurseForgeDependencies(deps)) {
+                if (project) openLauncherInstallOrFallback({ projectId: project.id, versionNumber, gameVersion }, () => { window.location.href = SiteRoutes.launcher(); });
+                return;
+            }
             const downloadChannel = normalizeDownloadChannel(channel);
 
             if (!versionNumber) {
@@ -517,9 +627,12 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                 return;
             }
 
-            const selectableDeps = (deps || []).filter(dep => getDependencyId(dep) && !dep?.isEmbedded);
-            if (selectableDeps.length > 0) {
-                setPendingDownload({ versionNumber, gameVersion, dependencies: selectableDeps, channel: downloadChannel });
+            // A modpack download is already a complete, validated pack plan. Routing it
+            // through the generic project bundle endpoint nests the generated pack ZIP
+            // inside another ZIP and loses reference-only metadata.
+            const selectableDeps = getSelectableBundleDependencies(project?.classification, deps);
+            if (selectableDeps.length > 0 || (project?.classification !== 'MODPACK' && hasCurseForgeDependencies(deps))) {
+                setPendingDownload({ versionNumber, gameVersion, dependencies: (deps || []).filter(dep => selectableDeps.includes(dep) || dep.source === 'CURSEFORGE'), channel: downloadChannel });
                 setIsDepModalOpen(true);
                 return;
             }
@@ -549,6 +662,18 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
         return [...(project?.versions || [])].sort((a: any, b: any) => new Date(b.releaseDate).getTime() - new Date(a.releaseDate).getTime());
     }, [project?.versions]);
 
+    const changelogHistory = useMemo(() => {
+        return sortedHistory.filter((version: any) => (
+            version.changelog != null || hydratedChangelogKeys.has(changelogVersionKey(version))
+        ));
+    }, [hydratedChangelogKeys, sortedHistory]);
+
+    const hasExperimentalBuilds = useMemo(() => {
+        return (project?.versions || []).some((version: any) => (
+            version.channel === 'ALPHA' || version.channel === 'BETA'
+        ));
+    }, [project?.versions]);
+
     const versionPayloadPending = Boolean((isHistoryOpen || isDownloadOpen) && !project?.versions);
     const downloadModalPending = versionPayloadPending || (isDownloadOpen && (!gameVersionCatalogReady || gameVersionCatalogPending));
     const galleryPayloadPending = Boolean(isGalleryRoute && !project?.galleryImages);
@@ -560,7 +685,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
     }, []);
 
     if (isNotFound) return <NotFound />;
-    if (loading || !project) return <div className={`min-h-screen ${theme.colors.bgBase} flex items-center justify-center`}><Spinner /></div>;
+    if (loading || !project) return <ProjectPageSkeleton project={project} wiki={isWikiRoute} />;
 
     const canEdit = project.canEdit ?? Boolean(
         currentUser && (
@@ -620,29 +745,31 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             </Helmet>
 
             {statusModal && <StatusModal {...statusModal} onClose={() => setStatusModal(null)} />}
-            <Suspense fallback={null}>
+            <Suspense fallback={isDownloadOpen ? <DownloadModalSkeleton onClose={() => navigate(projectUrl)} onViewHistory={navigateToChangelog} /> : isHistoryOpen ? <HistoryModalSkeleton onClose={() => navigate(projectUrl)} /> : null}>
                 {isShareOpen && <ShareModal isOpen={isShareOpen} onClose={() => setIsShareOpen(false)} url={window.location.href} title={project.title} author={project.author} />}
                 {isReportOpen && <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} targetId={project.id} targetType="PROJECT" targetTitle={project.title} />}
                 {showPostDownloadModal && <PostDownloadModal isOpen={showPostDownloadModal} onClose={() => setShowPostDownloadModal(false)} classification={project.classification!} title={project.title} channel={lastDownloadChannel} isBundle={lastDownloadWasBundle} fileName={lastDownloadedFileName} tags={project.tags} />}
 
-                {(isHistoryOpen || isDownloadOpen) && downloadModalPending && (
-                    <div className={theme.components.modalOverlay}>
-                        <div className={`${theme.components.modalContent} max-w-md`}>
-                            <div className="flex items-center justify-center p-12">
-                                <Spinner />
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {isHistoryOpen && versionPayloadPending && <HistoryModalSkeleton onClose={() => navigate(projectUrl)} />}
+                {isDownloadOpen && downloadModalPending && <DownloadModalSkeleton onClose={() => navigate(projectUrl)} onViewHistory={navigateToChangelog} />}
                 {isHistoryOpen && !versionPayloadPending && (
                     <HistoryModal
+                        loading={changelogLoading}
+                        keepHistoryVisibleWhenLoading
                         show={isHistoryOpen}
                         onClose={() => navigate(projectUrl)}
-                        history={sortedHistory}
+                        history={changelogHistory}
                         showExperimental={showExperimental}
                         onToggleExperimental={toggleExperimental}
                         onDownload={handleDownloadClick}
+                        hasExperimentalVersions={hasExperimentalBuilds}
                         hasStableVersions={hasStableBuilds}
+                        isModpack={project.classification === 'MODPACK'}
+                        changelogError={changelogError}
+                        onRetry={() => { void loadChangelogPage(true); }}
+                        loadingMore={changelogLoadingMore}
+                        hasMore={changelogHasMore}
+                        onLoadMore={() => { void loadChangelogPage(false); }}
                     />
                 )}
                 {isDownloadOpen && gameVersionCatalogError && !downloadModalPending && (
@@ -663,7 +790,11 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                         onDownload={handleDownloadClick}
                         showExperimental={showExperimental}
                         onToggleExperimental={toggleExperimental}
-                        onViewHistory={() => navigate(projectUrl + '/changelog')}
+                        onViewHistory={navigateToChangelog}
+                        isModpack={project.classification === 'MODPACK'}
+                        projectId={project.id}
+                        projectHandle={SiteRoutes.projectHandle(project)}
+                        onLauncherFallback={() => navigate(SiteRoutes.launcher())}
                     />
                 )}
                 {isDepModalOpen && pendingDownload && (
@@ -688,6 +819,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
             </Suspense>
 
             <ProjectLayout
+                modpackCount={project.classification === 'MODPACK' ? (project.childProjectIds || []).length : undefined}
                 bannerUrl={project.bannerUrl}
                 iconUrl={project.imageUrl}
                 onBack={() => navigate(browseBackTarget)}
@@ -731,11 +863,7 @@ export const ProjectDetails: React.FC<ProjectDetailViewProps> = ({
                         onClick={(e) => e.stopPropagation()}
                     >
                         {galleryPayloadPending ? (
-                            <div className={`${theme.components.modalContent} mx-auto max-w-md`}>
-                                <div className="flex items-center justify-center p-12">
-                                    <Spinner />
-                                </div>
-                            </div>
+                            <ProjectGallerySkeleton isInline onClose={() => navigate(projectUrl)} />
                         ) : galleryItems.length > 0 ? (
                             <>
                                 <button

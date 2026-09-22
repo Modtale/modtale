@@ -77,12 +77,16 @@ public class ProjectDeletionService {
             project.getVersions().forEach(version -> {
                 projectArtifactDeletionService.deleteVersionFile(version);
                 if (version.getDependencies() != null) {
-                    version.getDependencies().forEach(dependency -> dependencyIds.add(dependency.getModId()));
+                    version.getDependencies().forEach(dependency -> {
+                        if (!dependency.isExternal()) {
+                            dependencyIds.add(dependency.getProjectId());
+                        }
+                    });
                 }
             });
         }
-        if (project.getModIds() != null) {
-            dependencyIds.addAll(project.getModIds());
+        if (project.getChildProjectIds() != null) {
+            dependencyIds.addAll(project.getChildProjectIds());
         }
 
         projectArtifactDeletionService.deleteProjectMedia(project);
@@ -100,6 +104,10 @@ public class ProjectDeletionService {
 
     public void deleteVersionFile(String fileUrl) {
         projectArtifactDeletionService.deleteVersionFile(fileUrl);
+    }
+
+    public void deleteProjectMediaFile(Project project, String location) {
+        projectArtifactDeletionService.deleteProjectMediaFile(project, location);
     }
 
     public void deleteStoredFile(String fileUrl) {

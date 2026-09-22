@@ -1,3 +1,4 @@
+import { ModpackCountBadge } from '@/modules/project/components/ModpackCountBadge';
 import React, { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { Download } from 'lucide-react';
@@ -45,7 +46,7 @@ export const FeaturedModCard = memo(({ project, priority = false }: { project: P
             </div>
 
             <div className="px-4 sm:px-6 pb-4 sm:pb-6 relative flex flex-col flex-1 bg-transparent">
-                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl absolute -top-6 sm:-top-8 group-hover:-translate-y-1 transition-transform duration-500 z-20 overflow-hidden border-4 border-white dark:border-slate-800 shadow-xl bg-transparent backdrop-blur-md">
+                <div className="[container-type:inline-size] w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl absolute -top-6 sm:-top-8 group-hover:-translate-y-1 transition-transform duration-500 z-20 overflow-hidden border-4 border-white dark:border-slate-800 shadow-xl bg-transparent backdrop-blur-md">
                     <img
                         src={iconUrl}
                         alt={`${project.title} Icon`}
@@ -54,10 +55,11 @@ export const FeaturedModCard = memo(({ project, priority = false }: { project: P
                         decoding="async"
                         className="w-full h-full bg-transparent object-cover"
                     />
+                    <ModpackCountBadge count={project.classification === 'MODPACK' ? (project.childProjectIds || []).length : undefined} />
                 </div>
 
                 <div className="mt-8 sm:mt-10 flex-1 relative z-20 pointer-events-none">
-                    <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight">
+                    <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-normal">
                         {project.title}
                     </h3>
                     <div className="flex items-center gap-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium truncate mt-1">

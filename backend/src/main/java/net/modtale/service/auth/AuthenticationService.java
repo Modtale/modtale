@@ -125,12 +125,6 @@ public class AuthenticationService {
             throw new UnauthorizedException("We couldn't sign you in with that username and password. Double-check both fields and try again.");
         }
 
-        if (user.isMfaEnabled() && (user.getMfaSecret() == null || user.getMfaSecret().isBlank())) {
-            logger.warn("User {} has MFA enabled but missing secret. Auto-disabling MFA to prevent lockout.", user.getId());
-            user.setMfaEnabled(false);
-            user = userRepository.save(user);
-        }
-
         return user;
     }
 
@@ -156,7 +150,9 @@ public class AuthenticationService {
             if (System.currentTimeMillis() > expiry) return null;
 
             String expectedSignature = hmacSha256(userId + ":" + expiry, securityProperties.preAuthSecret());
-            if (!expectedSignature.equals(providedSignature)) return null;
+            if (!java.security.MessageDigest.isEqual(
+                    expectedSignature.getBytes(StandardCharsets.UTF_8),
+                    providedSignature.getBytes(StandardCharsets.UTF_8))) return null;
 
             User user = userRepository.findById(userId).orElse(null);
             if (user != null && user.isDeleted()) return null;

@@ -47,9 +47,8 @@ public class CurrentUserResolutionService {
 
             if (userId != null) {
                 User user = userRepository.findById(userId).orElse(null);
-                if (user != null && !user.isDeleted()) {
-                    return user;
-                }
+                // A stable ID must never fall back to a reused username.
+                return user != null && !user.isDeleted() ? user : null;
             }
 
             if (username != null) {

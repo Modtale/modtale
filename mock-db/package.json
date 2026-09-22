@@ -6,7 +6,8 @@
     "generate": "node scripts/generate-from-mongo.mjs",
     "collect-r2-keys": "node scripts/collect-r2-seed-keys.mjs",
     "load-template": "node scripts/load-template-db.mjs",
-    "validate": "node scripts/validate-fixtures.mjs"
+    "validate": "node scripts/validate-fixtures.mjs",
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "mongodb": "^7.6.0"

@@ -6,6 +6,12 @@ import net.modtale.model.project.ProjectVersion;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ProjectVersionDTO {
+    private List<net.modtale.model.project.ModpackConfigReference> modpackConfigs;
+    public List<net.modtale.model.project.ModpackConfigReference> getModpackConfigs() { return modpackConfigs; }
+    public void setModpackConfigs(List<net.modtale.model.project.ModpackConfigReference> value) { modpackConfigs = value; }
+    private String manifestId;
+    public String getManifestId() { return manifestId; }
+    public void setManifestId(String value) { manifestId = value; }
     private String id;
     private String versionNumber;
     private List<String> gameVersions;

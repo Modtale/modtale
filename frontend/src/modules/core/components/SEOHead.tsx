@@ -1,6 +1,8 @@
+import { useNewsPost, useNewsPosts } from '@/modules/news/api/useNews';
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useLocation } from 'react-router-dom';
+import { getAbsoluteUrl } from '@/data/news';
 import { DEFAULT_SEO, ROUTE_SEO, generateDynamicSEO } from '@/data/seo-constants';
 import { buildCanonicalUrl, getRobotsDirective, isBrowseRoutePath, normalizeSeoPath } from '@/utils/seo';
 
@@ -29,6 +31,18 @@ export const SEOHead: React.FC = () => {
         description = dynamicSEO.description;
     }
 
+    const { post: newsPost } = useNewsPost(path.startsWith('/news/') ? path.slice('/news/'.length) : undefined);
+    const { posts: newsPosts } = useNewsPosts(path === '/news');
+    const isNews = path === '/news' || Boolean(newsPost);
+    if (path === '/news') {
+        title = 'Modtale News | Product Updates and Creator Notes';
+        description = 'Read Modtale product updates, creator notes, feature tours, and platform news for Hytale mods, plugins, worlds, assets, and modpacks.';
+    } else if (newsPost) {
+        title = `${newsPost.title} | Modtale News`;
+        description = newsPost.description;
+        keywords = newsPost.tags.join(', ');
+    }
+    const newsImage = isNews ? getAbsoluteUrl((newsPost || newsPosts[0])?.socialImage || '/assets/logo_light.svg') : undefined;
     const canonicalUrl = buildCanonicalUrl(path, searchParams);
     const robots = getRobotsDirective(path, searchParams);
 
@@ -44,6 +58,13 @@ export const SEOHead: React.FC = () => {
             <meta property="og:description" content={description} />
             <meta property="og:url" content={canonicalUrl} />
             <meta property="og:site_name" content="Modtale" />
+
+            {isNews && <meta property="og:type" content={newsPost ? 'article' : 'website'} />}
+            {newsImage && <meta property="og:image" content={newsImage} />}
+            {newsImage && <meta name="twitter:image" content={newsImage} />}
+            {newsPost && <meta property="article:published_time" content={newsPost.publishedAt} />}
+            {newsPost && <meta property="article:modified_time" content={newsPost.updatedAt} />}
+            {newsPost && <meta property="article:author" content={newsPost.author} />}
 
             <meta name="twitter:title" content={title} />
             <meta name="twitter:description" content={description} />

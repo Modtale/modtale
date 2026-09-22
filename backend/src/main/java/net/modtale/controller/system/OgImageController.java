@@ -12,7 +12,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URI;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -21,6 +20,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import javax.imageio.ImageIO;
+import net.modtale.config.properties.AppR2Properties;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectClassification;
 import net.modtale.service.project.query.ProjectService;
@@ -51,6 +51,9 @@ public class OgImageController {
     private final Cache<String, CachedRender> renderCache;
     private final Cache<String, BufferedImage> assetCache;
     private final SVGDocument logoDocument;
+    private final OgAssetPolicy assetPolicy;
+    private static final int MAX_ASSET_BYTES = 10 * 1024 * 1024;
+    private static final long MAX_RASTER_PIXELS = 16_000_000;
 
     private static final Color BRAND_ACCENT = new Color(59, 130, 246);
     private static final Color BRAND_DARK = new Color(11, 17, 32);
@@ -100,7 +103,8 @@ public class OgImageController {
             </svg>
     """;
 
-    public OgImageController(ProjectService ProjectService) {
+    public OgImageController(ProjectService ProjectService, AppR2Properties r2Properties) {
+        this.assetPolicy = new OgAssetPolicy(r2Properties);
         this.ProjectService = ProjectService;
         this.renderCache = Caffeine.newBuilder()
                 .maximumSize(5000)
@@ -217,21 +221,24 @@ public class OgImageController {
             BufferedImage cached = assetCache.getIfPresent(url);
             if (cached != null) return cached;
 
-            String fetchUrl = url.startsWith("/") ? "http://localhost:8080" + url : url;
-            URL targetUrl = new URL(fetchUrl);
-            HttpURLConnection connection = (HttpURLConnection) targetUrl.openConnection();
+            URI target = assetPolicy.resolve(url);
+            if (target == null) return null;
+            HttpURLConnection connection = (HttpURLConnection) target.toURL().openConnection();
             connection.setConnectTimeout(1000);
             connection.setReadTimeout(1000);
-            connection.connect();
-
-            try (var is = connection.getInputStream()) {
-                String contentType = connection.getContentType();
-                byte[] data = is.readAllBytes();
-                BufferedImage img = decodeFetchedImage(data, contentType, fetchUrl);
-                if (img != null) {
-                    assetCache.put(url, img);
+            // Redirects must not turn an approved storage origin into an internal fetch.
+            connection.setInstanceFollowRedirects(false);
+            try {
+                if (connection.getResponseCode() != 200 || connection.getContentLengthLong() > MAX_ASSET_BYTES) return null;
+                try (var input = connection.getInputStream()) {
+                    byte[] data = input.readNBytes(MAX_ASSET_BYTES + 1);
+                    if (data.length > MAX_ASSET_BYTES) return null;
+                    BufferedImage img = decodeFetchedImage(data, connection.getContentType(), target.toString());
+                    if (img != null) assetCache.put(url, img);
+                    return img;
                 }
-                return img;
+            } finally {
+                connection.disconnect();
             }
         } catch (IOException | IllegalArgumentException e) {
             logger.debug("Failed to fetch OG asset from {}", url, e);
@@ -242,9 +249,18 @@ public class OgImageController {
     private BufferedImage decodeFetchedImage(byte[] data, String contentType, String sourceUrl) {
         if (data == null || data.length == 0) return null;
 
-        try {
-            BufferedImage raster = ImageIO.read(new ByteArrayInputStream(data));
-            if (raster != null) return raster;
+        try (var input = ImageIO.createImageInputStream(new ByteArrayInputStream(data))) {
+            var readers = ImageIO.getImageReaders(input);
+            if (readers.hasNext()) {
+                var reader = readers.next();
+                try {
+                    reader.setInput(input);
+                    if ((long) reader.getWidth(0) * reader.getHeight(0) > MAX_RASTER_PIXELS) return null;
+                    return reader.read(0);
+                } finally {
+                    reader.dispose();
+                }
+            }
         } catch (IOException | RuntimeException ex) {
             logger.debug("Failed to decode fetched raster image from {}", sourceUrl, ex);
         }

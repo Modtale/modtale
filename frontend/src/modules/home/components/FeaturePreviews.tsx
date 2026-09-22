@@ -1,6 +1,8 @@
+import { ModpackCountBadge } from '@/modules/project/components/ModpackCountBadge';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Download, List, X, ChevronDown, ChevronRight, Check, Box, Link as LinkIcon, AlertCircle, Bell, Search, ArrowUpRight, MessageSquare, Send, Save, PieChart, TrendingUp, Eye, ArrowBigUp, ArrowBigDown, Settings } from 'lucide-react';
+import { Download, List, X, ChevronDown, ChevronRight, Check, Box, AlertCircle, Bell, Search, ArrowUpRight, MessageSquare, Send, Save, PieChart, TrendingUp, Eye, ArrowBigUp, ArrowBigDown, Settings } from 'lucide-react';
+import { LauncherLibraryPreview } from './LauncherLibraryPreview';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { api, BACKEND_URL } from '@/utils/api';
 import { SiteRoutes } from '@/utils/routes';
@@ -13,6 +15,9 @@ import { LineChart } from '@/components/ui/charts/LineChart';
 import { useChartVisibility } from '@/components/ui/charts/chartVisibility';
 import { FeaturedModCard } from './HeroMarquee';
 import { getCommentRoleBadge } from '@/modules/project/utils/commentRoles';
+import { ModConfigFields } from '@/modules/project/components/ModConfigFields';
+import type { ModConfig } from '@/modules/project/utils/modpackConfigs';
+import { DependencySelector } from '@/modules/project/components/DependencySelector';
 import { DependencyModal } from '@/modules/project/components/dialogs/DependencyModal';
 import { DownloadModal } from '@/modules/project/components/dialogs/DownloadModal';
 import { HistoryModal } from '@/modules/project/components/dialogs/HistoryModal';
@@ -46,8 +51,7 @@ const getPreviewVersionNumber = (project: Project, versionCache: Record<string, 
     return versionCache[project.id] || 'latest';
 };
 
-export const InlineDependencyUI = ({ randomProject, projects }: { randomProject?: Project; projects?: Project[] }) => {
-    const previewProjects = useMemo(() => getDependencyPreviewProjects(projects, randomProject), [projects, randomProject]);
+const usePreviewVersions = (previewProjects: Project[]) => {
     const [versionCache, setVersionCache] = useState<Record<string, string>>({});
 
     useEffect(() => {
@@ -85,6 +89,13 @@ export const InlineDependencyUI = ({ randomProject, projects }: { randomProject?
             isCancelled = true;
         };
     }, [previewProjects, versionCache]);
+
+    return versionCache;
+};
+
+export const InlineDependencyUI = ({ randomProject, projects }: { randomProject?: Project; projects?: Project[] }) => {
+    const previewProjects = useMemo(() => getDependencyPreviewProjects(projects, randomProject), [projects, randomProject]);
+    const versionCache = usePreviewVersions(previewProjects);
 
     const previewDependencies = useMemo<ProjectDependency[]>(() => (
         previewProjects.map((project, index) => ({
@@ -128,6 +139,112 @@ export const InlineDependencyUI = ({ randomProject, projects }: { randomProject?
             initialMetaCache={initialMetaCache}
             initialSelected={initialSelected}
         />
+    );
+};
+
+type ModpackPreviewProps = {
+    randomProject?: Project;
+    projects?: Project[];
+    loading?: boolean;
+};
+
+const CURSEFORGE_PREVIEW_DEPENDENCY: ProjectDependency = {
+    projectId: 'curseforge:1430352',
+    projectTitle: 'BetterMap',
+    versionNumber: 'BetterMap-1.3.8.jar',
+    source: 'CURSEFORGE',
+    dependencyType: 'REQUIRED',
+    externalId: '1430352',
+    externalUrl: 'https://www.curseforge.com/hytale/mods/bettermap/files/8747205',
+    externalFileUrl: 'https://www.curseforge.com/hytale/mods/bettermap/files/8747205',
+    externalFileName: 'BetterMap-1.3.8.jar',
+    externalGameVersions: ['0.6'],
+    externalDistributionAllowed: true,
+    hytaleProjectConfirmed: true,
+    icon: 'https://media.forgecdn.net/avatars/thumbnails/1763/122/256/256/639121281719878876.png'
+};
+
+export const InlineModpackBuilderUI = ({ randomProject, projects, loading = false }: ModpackPreviewProps) => {
+    const candidates = useMemo(() => Array.from(new Map(
+        (projects?.length ? projects : randomProject ? [randomProject] : [])
+            .filter(project => project?.id && project?.title && project.classification !== 'MODPACK' && project.allowModpacks !== false)
+            .map(project => [project.id, project])
+    ).values()).slice(0, 3), [projects, randomProject]);
+    const [dependencies, setDependencies] = useState<ProjectDependency[]>([]);
+    const [configs, setConfigs] = useState<Record<string, ModConfig[]>>({});
+    const [preparing, setPreparing] = useState(true);
+    const initialized = useRef(false);
+    const [retry, setRetry] = useState(0);
+
+    useEffect(() => {
+        if (initialized.current || (!candidates.length && loading)) return;
+        if (!candidates.length) {
+            setPreparing(false);
+            return;
+        }
+        let cancelled = false;
+        setPreparing(true);
+        const prepare = async () => {
+            const entries = await Promise.all(candidates.map(async project => {
+                try {
+                    const versions = project.versions?.length ? project.versions :
+                        (await api.get<{ versions?: Project['versions'] }>(`/projects/${project.id}/versions`, {
+                            timeout: DEPENDENCY_PREVIEW_VERSION_TIMEOUT_MS
+                        })).data.versions;
+                    if (!versions?.length) return null;
+                    return {
+                        projectId: project.id, projectTitle: project.title,
+                        versionNumber: getPreviewVersionNumberFromVersions(versions),
+                        source: 'MODTALE', dependencyType: 'REQUIRED',
+                        isOptional: false, isEmbedded: false
+                    } as ProjectDependency;
+                } catch {
+                    return null;
+                }
+            }));
+            if (cancelled) return;
+            const resolved = entries.filter((entry): entry is ProjectDependency => entry !== null);
+            setDependencies(resolved.length ? [...resolved, { ...CURSEFORGE_PREVIEW_DEPENDENCY }] : []);
+            initialized.current = resolved.length > 0;
+            setPreparing(false);
+        };
+        void prepare();
+        return () => { cancelled = true; };
+    }, [candidates, loading, retry]);
+
+    return (
+        <div className="relative">
+            {preparing ? (
+                <div className={`${GLASS_CARD} p-6 space-y-4`} role="status">
+                    <span className="sr-only">Loading projects</span>
+                    {[0, 1, 2].map(index => <div key={index} className="h-20 animate-pulse rounded-xl bg-slate-200/60 dark:bg-white/5" />)}
+                </div>
+            ) : !initialized.current ? (
+                <div className={`${GLASS_CARD} p-6 flex items-center justify-between gap-4`} role="status">
+                    <span className="text-sm text-slate-500 dark:text-slate-400">Projects couldn’t load.</span>
+                    <button type="button" onClick={() => setRetry(value => value + 1)} className={theme.components.buttonPrimary}>Try again</button>
+                </div>
+            ) : (
+                <DependencySelector
+                    selectedDeps={dependencies}
+                    onChange={setDependencies}
+                    isModpack
+                    disableExternalReferences
+                    label="Modpack Contents"
+                    renderDependencyDetails={dependency => (
+                        <ModConfigFields
+                            disabled
+                            projectId={dependency.projectId}
+                            title={dependency.projectTitle}
+                            source={dependency.source}
+                            versionNumber={dependency.versionNumber}
+                            configs={configs[dependency.projectId] || []}
+                            onChange={next => setConfigs(current => ({ ...current, [dependency.projectId]: next }))}
+                        />
+                    )}
+                />
+            )}
+        </div>
     );
 };
 
@@ -303,7 +420,7 @@ const PreviewSummaryCard = ({ title, value, subValue, trend, icon: Icon, color, 
         </div>
         <div className="relative z-10 mt-3">
             <h3 className="text-slate-500 dark:text-slate-400 text-[9px] font-black uppercase tracking-widest mb-0.5">{title}</h3>
-            <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">
+            <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-normal leading-none">
                 {value}{isPercent && <span className="text-lg text-slate-400 ml-0.5">%</span>}
             </div>
                                             {subValue && <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 font-medium">{subValue}</div>}
@@ -489,7 +606,7 @@ const InlineCommentThreadUI = ({ project, currentUser }: { project?: Project; cu
                     </div>
 
                     <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                        The latest release fixed the dedicated server crash and made setup much smoother.
+                        The latest release fixed the world startup crash and made setup much smoother.
                     </p>
 
                     <div className="mt-3 flex gap-3 relative">
@@ -612,17 +729,18 @@ const CompactFeaturedModCard = ({ project }: { project: Project }) => {
             </div>
 
             <div className="px-3 pb-3 relative flex flex-col flex-1 bg-transparent">
-                <div className="w-10 h-10 rounded-lg absolute -top-5 left-3 group-hover:-translate-y-0.5 transition-transform duration-300 z-20 overflow-hidden border-2 border-white dark:border-slate-800 shadow-md bg-white dark:bg-slate-950">
+                <div className="[container-type:inline-size] w-10 h-10 rounded-lg absolute -top-5 left-3 group-hover:-translate-y-0.5 transition-transform duration-300 z-20 overflow-hidden border-2 border-white dark:border-slate-800 shadow-md bg-white dark:bg-slate-950">
                     <img
                         src={iconUrl}
                         alt={`${project.title} Icon`}
                         loading="lazy"
                         className="w-full h-full bg-transparent object-cover"
                     />
+                    <ModpackCountBadge count={project.classification === 'MODPACK' ? (project.childProjectIds || []).length : undefined} />
                 </div>
 
                 <div className="mt-6 flex-1 relative z-20 pointer-events-none">
-                    <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-tight">
+                    <h3 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate tracking-normal">
                         {project.title}
                     </h3>
                     <div className="flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate mt-0.5">
@@ -678,7 +796,7 @@ export const TrendingProjectsSection = ({
         <section className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end pb-0 gap-4 relative">
                 <div className="space-y-1 flex-1">
-                    <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                    <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                         Trending
                     </h2>
                 </div>
@@ -730,7 +848,7 @@ export const NewReleasesSection = ({
         <section className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end pb-0 gap-4 relative">
                 <div className="space-y-1 flex-1">
-                    <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                    <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                         New Releases
                     </h2>
                 </div>
@@ -764,11 +882,33 @@ export const NewReleasesSection = ({
     );
 };
 
+export const ModpackPreviewSection = ({ randomProject, projects, loading }: ModpackPreviewProps) => {
+    return (
+        <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
+                    Modpacks
+                </h2>
+                <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-emerald-500 dark:from-blue-400 dark:to-emerald-400">
+                    Curated packs with dependency intelligence.
+                </p>
+                <FeatureBodyText>
+                    Build complete Hytale experiences with required dependency prompts, incompatibility warnings, and CurseForge references when a project is not on Modtale yet.
+                </FeatureBodyText>
+            </div>
+            <div className="flex-1 w-full max-w-xl relative overflow-visible">
+                <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/5 via-transparent to-emerald-500/5 dark:from-blue-500/10 dark:via-transparent dark:to-emerald-500/10 rounded-3xl blur-2xl pointer-events-none" />
+                <InlineModpackBuilderUI randomProject={randomProject} projects={projects} loading={loading} />
+            </div>
+        </div>
+    );
+};
+
 export const DirectDownloadsSection = () => {
     return (
         <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
             <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
-                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Direct Downloads
                 </h2>
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500 dark:from-purple-400 dark:to-pink-400">
@@ -786,11 +926,34 @@ export const DirectDownloadsSection = () => {
     );
 };
 
+export const LauncherPreviewSection = ({ projects, loading }: { projects?: Project[]; loading?: boolean }) => (
+    <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
+        <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
+            <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
+                Modtale Launcher
+            </h2>
+            <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-indigo-500 dark:from-blue-400 dark:to-indigo-400">
+                One library. A world of possibilities.
+            </p>
+            <FeatureBodyText>
+                Your building world and your next big adventure don’t need the same mods. Pick what belongs in each save, with everything together in the Modtale Launcher.
+            </FeatureBodyText>
+            <Link to={SiteRoutes.launcher()} className="inline-flex items-center gap-2 font-bold text-blue-600 hover:text-blue-500 dark:text-blue-400">
+                Explore the launcher <ArrowUpRight size={18} />
+            </Link>
+        </div>
+        <div className="flex-1 w-full max-w-xl relative overflow-visible">
+            <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/5 via-transparent to-indigo-500/5 dark:from-blue-500/10 dark:via-transparent dark:to-indigo-500/10 rounded-3xl blur-2xl pointer-events-none" />
+            <LauncherLibraryPreview projects={projects} loading={loading} />
+        </div>
+    </div>
+);
+
 export const SmartDependenciesSection = ({ randomProject, previewProjects }: { randomProject?: Project; previewProjects?: Project[] }) => {
     return (
-        <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
-                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Smart Dependencies
                 </h2>
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-emerald-500 to-teal-500 dark:from-emerald-400 dark:to-teal-400">
@@ -810,9 +973,9 @@ export const SmartDependenciesSection = ({ randomProject, previewProjects }: { r
 
 export const ProjectAnalyticsSection = ({ showConversionRate = true }: { showConversionRate?: boolean }) => {
     return (
-        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
-                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+        <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Project Analytics
                 </h2>
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-indigo-500 dark:from-blue-400 dark:to-indigo-400">
@@ -832,9 +995,9 @@ export const ProjectAnalyticsSection = ({ showConversionRate = true }: { showCon
 
 export const CommunityThreadsSection = ({ project, currentUser }: { project?: Project; currentUser?: User | null }) => {
     return (
-        <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
-                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Comment Threads
                 </h2>
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-violet-500 to-purple-500 dark:from-violet-400 dark:to-purple-400">
@@ -854,9 +1017,9 @@ export const CommunityThreadsSection = ({ project, currentUser }: { project?: Pr
 
 export const RealTimeAlertsSection = () => {
     return (
-        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
-                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+        <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Push Notifications
                 </h2>
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-500 dark:from-amber-400 dark:to-orange-400">
@@ -876,9 +1039,9 @@ export const RealTimeAlertsSection = () => {
 
 export const AccountPreferencesSection = () => {
     return (
-        <div className="flex flex-col lg:flex-row-reverse items-center gap-12 lg:gap-16 2xl:gap-24">
-            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-end lg:text-right">
-                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-16 2xl:gap-24">
+            <div className="flex-1 space-y-5 flex flex-col items-center text-center lg:items-start lg:text-left">
+                <h2 className="text-4xl sm:text-5xl 2xl:text-6xl font-black text-slate-900 dark:text-white tracking-normal leading-tight">
                     Notification Control
                 </h2>
                 <p className="text-lg sm:text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-slate-500 to-slate-400 dark:from-slate-400 dark:to-slate-500">

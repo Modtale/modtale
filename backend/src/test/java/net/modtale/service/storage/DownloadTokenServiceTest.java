@@ -23,8 +23,39 @@ class DownloadTokenServiceTest {
     }
 
     @Test
+    void concurrentRequestsCanConsumeTokenOnlyOnce() throws Exception {
+        String token = downloadTokenService.generateToken("project-1", "1.0");
+        var start = new java.util.concurrent.CountDownLatch(1);
+        try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            var attempts = new java.util.ArrayList<java.util.concurrent.Future<DownloadTokenService.DownloadToken>>();
+            for (int i = 0; i < 32; i++) {
+                attempts.add(executor.submit(() -> {
+                    start.await();
+                    return downloadTokenService.validateAndConsume(token);
+                }));
+            }
+            start.countDown();
+            int successes = 0;
+            for (var attempt : attempts) {
+                if (attempt.get(5, java.util.concurrent.TimeUnit.SECONDS) != null) successes++;
+            }
+            assertEquals(1, successes);
+        }
+    }
+
+    @Test
+    void missingTokensAreRejectedAndDependencySelectionIsSnapshotted() {
+        assertNull(downloadTokenService.validateAndConsume(null));
+        assertNull(downloadTokenService.validateAndConsume(" "));
+        var selected = new java.util.ArrayList<>(List.of("dependency"));
+        String token = downloadTokenService.generateToken("project", "1.0", null, selected);
+        selected.clear();
+        assertEquals(List.of("dependency"), downloadTokenService.validateAndConsume(token).getSelectedDependencies());
+    }
+
+    @Test
     void generateTokenStoresPayloadAndConsumesItOnce() {
-        String token = downloadTokenService.generateToken("project-1", "1.2.3", "1.0.0", List.of("dep-a", "dep-b"));
+        String token = downloadTokenService.generateToken("project-1", "1.2.3", "1.0.0", List.of("dep-a", "dep-b"), "user-1");
 
         assertNotNull(token);
         assertTrue(downloadTokenService.getActiveTokenCount() >= 1);
@@ -35,6 +66,7 @@ class DownloadTokenServiceTest {
         assertEquals("project-1", result.getProjectId());
         assertEquals("1.2.3", result.getVersion());
         assertEquals("1.0.0", result.getGameVersion());
+        assertEquals("user-1", result.getUserId());
         assertEquals(List.of("dep-a", "dep-b"), result.getSelectedDependencies());
         assertTrue(result.isUsed());
         assertNull(downloadTokenService.validateAndConsume(token));

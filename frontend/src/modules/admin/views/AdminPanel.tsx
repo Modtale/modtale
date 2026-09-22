@@ -1,3 +1,4 @@
+import { NewsManagement } from '../components/NewsManagement';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Shield, Users, LayoutDashboard, ShieldAlert, Package, Activity, FileText, CalendarClock } from 'lucide-react';
 import { adminClient } from '../api/adminClient';
@@ -18,7 +19,7 @@ interface AdminPanelProps {
     currentUser: any;
 }
 
-type AdminTab = 'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'logs' | 'status';
+type AdminTab = 'users' | 'verification' | 'reports' | 'projects' | 'analytics' | 'logs' | 'status' | 'news';
 
 export function AdminPanel({ currentUser }: AdminPanelProps) {
     const [activeTab, setActiveTab] = useState<AdminTab>('verification');
@@ -33,6 +34,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     const [loadingReview, setLoadingReview] = useState(false);
     const [loadingReviewId, setLoadingReviewId] = useState<string>();
 
+    const [loadingReports, setLoadingReports] = useState(true);
     const [reports, setReports] = useState<any[]>([]);
     const [reportsError, setReportsError] = useState<string | null>(null);
 
@@ -42,6 +44,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     const canRescanVersions = hasAdminPermission(currentUser, AdminPermission.PROJECT_VERSION_RESCAN);
     const canReadReports = hasAdminPermission(currentUser, AdminPermission.REPORT_READ);
     const canResolveReports = hasAdminPermission(currentUser, AdminPermission.REPORT_RESOLVE);
+    const canManageNews = hasAnyAdminPermission(currentUser, [AdminPermission.NEWS_MANAGE, AdminPermission.USER_PERMISSION_MANAGE]);
     const canReadStatus = hasAnyAdminPermission(currentUser, [AdminPermission.STATUS_INCIDENT_READ, AdminPermission.STATUS_INCIDENT_MANAGE]);
     const canManageStatus = hasAdminPermission(currentUser, AdminPermission.STATUS_INCIDENT_MANAGE);
     const canReadAnalytics = hasAdminPermission(currentUser, AdminPermission.PLATFORM_ANALYTICS_READ);
@@ -66,6 +69,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
     ]);
 
     const tabAccess: Record<AdminTab, boolean> = useMemo(() => ({
+        news: canManageNews,
         verification: canReadReviewQueue,
         reports: canReadReports,
         status: canReadStatus,
@@ -74,6 +78,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
         users: canUseUserManagement,
         logs: canReadLogs
     }), [
+        canManageNews,
         canReadAnalytics,
         canReadLogs,
         canReadReports,
@@ -138,12 +143,15 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
 
     const fetchReports = async () => {
         if (!canReadReports) return;
+        setLoadingReports(true);
         try {
             const data = await adminClient.getReportQueue('OPEN');
             setReports(data);
             setReportsError(null);
         } catch (e) {
             setReportsError(extractApiErrorMessage(e, 'We could not load the report queue.'));
+        } finally {
+            setLoadingReports(false);
         }
     };
 
@@ -236,6 +244,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                             </div>
 
                             <nav className="space-y-1">
+                                {canManageNews && <SidebarButton tab="news" icon={FileText} label="News" />}
                                 {canReadReviewQueue && (
                                     <SidebarButton
                                         tab="verification"
@@ -292,11 +301,11 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                     </aside>
 
                     <div className="flex-1 min-w-0">
-                        <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl p-8 shadow-2xl">
+                        <div className={`bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-3xl ${activeTab === 'news' ? 'p-4 sm:p-8' : 'p-8'} shadow-2xl`}>
                             {activeTab === 'verification' && canReadReviewQueue && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="mb-8">
-                                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Verification Queue</h1>
+                                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-normal">Verification Queue</h1>
                                         <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Review pending projects and updates.</p>
                                     </div>
                                     {queueError && (
@@ -321,7 +330,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                             {activeTab === 'reports' && canReadReports && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="mb-8">
-                                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Report Queue</h1>
+                                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-normal">Report Queue</h1>
                                         <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Handle content violations and user reports.</p>
                                     </div>
                                     {reportsError && (
@@ -329,7 +338,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                             {reportsError}
                                         </div>
                                     )}
-                                    <ReportQueue reports={reports} onRefresh={fetchReports} canResolve={canResolveReports} />
+                                    <ReportQueue loadingReports={loadingReports} reports={reports} onRefresh={fetchReports} canResolve={canResolveReports} />
                                 </div>
                             )}
 
@@ -339,6 +348,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                                 </div>
                             )}
 
+                            {activeTab === 'news' && canManageNews && <NewsManagement userId={currentUser.id} />}
                             {activeTab === 'status' && canReadStatus && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <StatusIncidents setStatus={setStatus} canManage={canManageStatus} />
@@ -348,7 +358,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                             {activeTab === 'projects' && canUseProjectManagement && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="mb-8">
-                                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Project Management</h1>
+                                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-normal">Project Management</h1>
                                         <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Manage, unlist, or delete any project.</p>
                                     </div>
                                     <ProjectManagement setStatus={setStatus} currentAdmin={currentUser} />
@@ -358,7 +368,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                             {activeTab === 'users' && canUseUserManagement && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="mb-8">
-                                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">User Management</h1>
+                                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-normal">User Management</h1>
                                         <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Manage roles, tiers, and user statuses.</p>
                                     </div>
                                     <UserManagement setStatus={setStatus} currentAdmin={currentUser} />
@@ -368,7 +378,7 @@ export function AdminPanel({ currentUser }: AdminPanelProps) {
                             {activeTab === 'logs' && canReadLogs && (
                                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="mb-8">
-                                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Audit Logs</h1>
+                                        <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-normal">Audit Logs</h1>
                                         <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Review all administrative actions.</p>
                                     </div>
                                     <AuditLogs />

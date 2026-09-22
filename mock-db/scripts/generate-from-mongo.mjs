@@ -1,3 +1,4 @@
+import { defaultFixtureDirectory } from './fixture-files.mjs';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -5,10 +6,9 @@ import process from 'node:process';
 import { ObjectId } from 'mongodb';
 import { connectMongo } from './mongo-connection.mjs';
 
-const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
 const outputDir = process.env.MOCK_DB_OUTPUT_DIR
   ? path.resolve(process.env.MOCK_DB_OUTPUT_DIR)
-  : path.join(repoRoot, 'mock-db', 'generated', 'collections');
+  : defaultFixtureDirectory;
 
 const sourceUri = process.env.MOCK_SOURCE_MONGODB_URI;
 const sourceDbName = process.env.MOCK_SOURCE_DATABASE_NAME || 'modtale';

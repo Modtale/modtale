@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { SiteRoutes } from '@/utils/routes';
 
 describe('SiteRoutes', () => {
+    it('returns the launcher route', () => {
+        expect(SiteRoutes.launcher()).toBe('/launcher');
+    });
+
     it('maps browse routes by classification', () => {
         expect(SiteRoutes.browse('PLUGIN')).toBe('/plugins');
         expect(SiteRoutes.browse('MODPACK')).toBe('/modpacks');
@@ -13,6 +17,11 @@ describe('SiteRoutes', () => {
 
     it('returns the home route when a project is missing', () => {
         expect(SiteRoutes.project(null)).toBe('/');
+    });
+
+    it('builds news routes', () => {
+        expect(SiteRoutes.news()).toBe('/news');
+        expect(SiteRoutes.newsPost('fresh-feature-showcase')).toBe('/news/fresh-feature-showcase');
     });
 
     it('uses an explicit slug when one is provided', () => {

@@ -8,6 +8,7 @@ import { StatusModal } from '@/components/ui/StatusModal';
 import { organizationClient, hasOrgPermission } from '../api/organizationClient';
 import { extractApiErrorMessage } from '@/utils/api';
 import type { User, OrganizationRole } from '@/types';
+import { MAX_ROLE_NAME_CHARACTERS } from '@/utils/siteLimits';
 
 interface RolesProps {
     org: User;
@@ -158,9 +159,12 @@ export const Roles: React.FC<RolesProps> = ({ org, currentUser, onUpdateOrg, sho
                                             type="text"
                                             value={editingRole.name || ''}
                                             onChange={e => setEditingRole({...editingRole, name: e.target.value})}
+                                            maxLength={MAX_ROLE_NAME_CHARACTERS}
+                                            aria-label="Role name"
                                             className={theme.components.inputField}
                                             required
                                         />
+                                        <p className={`mt-1 text-[10px] ${theme.colors.textMuted}`}>Up to {MAX_ROLE_NAME_CHARACTERS} characters.</p>
                                     </div>
                                     <div>
                                         <label className={`block text-[10px] font-bold ${theme.colors.textMuted} uppercase tracking-widest mb-1.5 ml-1`}>Role Color</label>
@@ -175,10 +179,13 @@ export const Roles: React.FC<RolesProps> = ({ org, currentUser, onUpdateOrg, sho
                                                 type="text"
                                                 value={editingRole.color || '#3b82f6'}
                                                 onChange={e => setEditingRole({...editingRole, color: e.target.value})}
+                                                maxLength={7}
+                                                aria-label="Role color hex value"
                                                 className={`${theme.components.inputField} flex-1 font-mono`}
                                                 pattern="^#[0-9A-Fa-f]{6}$"
                                             />
                                         </div>
+                                        <p className={`mt-1 text-[10px] ${theme.colors.textMuted}`}>Use a 6-digit hex color, for example #3b82f6.</p>
                                     </div>
                                 </div>
 

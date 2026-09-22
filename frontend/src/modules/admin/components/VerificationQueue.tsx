@@ -1,3 +1,4 @@
+import { SkeletonSurface } from '@/components/ui/Skeleton';
 import React from 'react';
 import type { AdminVerificationQueueItem } from '@/types';
 import { CheckCircle, Clock, Shield, AlertCircle, ShieldAlert } from 'lucide-react';
@@ -14,11 +15,16 @@ interface VerificationQueueProps {
 export const VerificationQueue: React.FC<VerificationQueueProps> = ({
                                                                         pendingProjects, loadingQueue, loadFailed, loadingReview, reviewingId, onReview
                                                                     }) => {
-    if (loadingQueue) {
-        return <div className="text-center py-24 text-slate-400 font-bold animate-pulse">Loading queue...</div>;
+    const Surface = loadingQueue ? SkeletonSurface : React.Fragment;
+    if (loadingQueue && pendingProjects.length === 0) {
+        pendingProjects = Array.from({ length: 3 }, (_, index) => ({
+            id: `pending-${index}`, title: 'Project review title', author: 'Creator name',
+            description: 'Project description and details awaiting review, including the features, content, and changes submitted by the creator.', imageUrl: '/assets/favicon.svg',
+            classification: 'PLUGIN', status: 'PENDING', updatedAt: '2026-01-01',
+        }));
     }
 
-    if (loadFailed && pendingProjects.length === 0) {
+    if (!loadingQueue && loadFailed && pendingProjects.length === 0) {
         return null;
     }
 
@@ -57,15 +63,15 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
                     )}
                 </div>
                 <div className="flex-1 min-w-0 py-1 flex flex-col justify-center">
-                    <div className="flex items-start justify-between mb-3">
-                        <div>
-                            <h3 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3 truncate tracking-tight">
-                                {mod.title}
-                                <span className="text-[10px] uppercase font-bold px-2.5 py-1 bg-modtale-accent/10 text-modtale-accent rounded-lg tracking-wider">{mod.classification}</span>
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="min-w-0 flex-1">
+                            <h3 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3 truncate tracking-normal">
+                                <span className="truncate">{mod.title}</span>
+                                <span className="shrink-0 text-[10px] uppercase font-bold px-2.5 py-1 bg-modtale-accent/10 text-modtale-accent rounded-lg tracking-wider">{mod.classification}</span>
                             </h3>
                             <p className="text-sm text-slate-500 font-bold mb-1">by <span className="text-slate-700 dark:text-slate-300">{mod.author}</span></p>
                         </div>
-                        <div className="flex items-center gap-2 text-xs font-bold text-slate-400 bg-slate-100 dark:bg-white/5 px-3 py-1.5 rounded-lg uppercase tracking-wider">
+                        <div className="shrink-0 flex items-center gap-2 text-xs font-bold text-slate-400 bg-slate-100 dark:bg-white/5 px-3 py-1.5 rounded-lg uppercase tracking-wider">
                             <Clock className="w-3 h-3" />
                             {mod.updatedAt || 'NEW'}
                         </div>
@@ -119,8 +125,8 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
     };
 
     return (
-        <div className="grid gap-4">
+        <Surface><div className="grid gap-4">
             {pendingProjects.map(renderQueueItem)}
-        </div>
+        </div></Surface>
     );
 };

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRoot, type Root } from 'react-dom/client';
 
 import App from '@/App';
+import { api } from '@/utils/api';
 
 const projectRouteStats = vi.hoisted(() => ({
     mounts: 0,
@@ -47,6 +48,7 @@ describe('App project routes', () => {
     let root: Root;
 
     beforeEach(() => {
+        vi.spyOn(api, 'get').mockResolvedValue({ data: null });
         projectRouteStats.mounts = 0;
         projectRouteStats.unmounts = 0;
         vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
@@ -72,6 +74,7 @@ describe('App project routes', () => {
             root.render(<App initialPath="/mod/skyforge/download" ssrData={null} />);
         });
 
+        expect(api.get).toHaveBeenCalledWith(expect.stringMatching(/^\/user\/me\?t=/));
         expect(projectRouteStats.mounts).toBe(1);
         expect(projectRouteStats.unmounts).toBe(0);
         expect(container.querySelector('[data-testid="project-detail"]')?.getAttribute('data-path'))

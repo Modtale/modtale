@@ -46,7 +46,7 @@ export const HeaderContent: React.FC<HeaderProps> = ({ project, currentUser, isF
     return (
     <>
         <div className="flex flex-wrap items-center gap-3 mb-3">
-            <h1 className={`text-3xl md:text-5xl font-black ${theme.colors.textPrimary} tracking-tighter drop-shadow-sm leading-tight break-words`}>{project.title}</h1>
+            <h1 className={`text-3xl md:text-5xl font-black ${theme.colors.textPrimary} tracking-normal drop-shadow-sm leading-tight break-words`}>{project.title}</h1>
             <span className={`${theme.colors.bgSurfaceAlt} border ${theme.colors.border} px-3 py-1 rounded-full text-xs font-bold text-blue-700 dark:text-modtale-accent tracking-widest uppercase flex items-center gap-1.5 shadow-sm whitespace-nowrap`}>
                 {getClassificationIcon(project.classification || 'PLUGIN', "w-3.5 h-3.5")}{toTitleCase(project.classification || 'PLUGIN')}
             </span>

@@ -1,8 +1,9 @@
+import { ManagedProjectsSkeleton } from '../skeletons/fixtures';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { api, extractApiErrorMessage } from '@/utils/api';
 import type { Project, User } from '@/types';
-import { Building2, Plus, Users, Loader2 } from 'lucide-react';
+import { Building2, Plus, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { StatusModal } from '@/components/ui/StatusModal';
 import { ManagedProjectCard } from '@/components/shared/ManagedProjectCard';
@@ -94,7 +95,6 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
         }
     };
 
-    if (loading) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-modtale-accent" /></div>;
 
     return (
         <div className="space-y-8">
@@ -134,7 +134,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                 document.body
             ) : null}
 
-            <div className="space-y-8">
+            {loading ? <ManagedProjectsSkeleton isOwner showAuthor cardClassName="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden backdrop-blur-md shadow-sm" /> : <div className="space-y-8">
                 <div className="grid grid-cols-1 gap-4">
                     {projects.map(project => (
                         <div key={project.id} className="bg-white/40 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden backdrop-blur-md shadow-sm">
@@ -211,7 +211,7 @@ export const ManageProjects: React.FC<ManageProjectsProps> = ({ user }) => {
                         <p>No projects found.</p>
                     </div>
                 )}
-            </div>
+            </div>}
         </div>
     );
 };

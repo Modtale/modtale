@@ -137,4 +137,24 @@ describe('ProjectMetaSections dependencies', () => {
         expect(container.textContent).toContain('0.5.4');
         expect(container.textContent).toContain('0.5.3');
     });
+
+    it('shows optional metadata for modpack entries', async () => {
+        const modpack = { ...project, classification: 'MODPACK' } as Project;
+        const dependencies: ProjectDependency[] = [{
+            projectId: 'optional-mod',
+            projectTitle: 'Optional Mod',
+            versionNumber: '3.0.0',
+            dependencyType: 'OPTIONAL'
+        }];
+
+        await act(async () => {
+            root.render(
+                <MemoryRouter>
+                    <ProjectMetaSections project={modpack} dependencies={dependencies} depMeta={{}} />
+                </MemoryRouter>
+            );
+        });
+
+        expect(container.textContent).toContain('Optional');
+    });
 });
