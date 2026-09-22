@@ -74,7 +74,7 @@ export function LauncherConfigPreview({ project, saved, onSave, onClose }: {
                 </div>
             </div>
             <div className="llp-settings-footer">
-                <p role="status" className={invalid ? 'llp-error' : ''}>{invalid ? 'Enter a number of zero or more.' : status || (dirty ? 'Unsaved changes' : 'Sample mod settings · Preview only')}</p>
+                <p role="status" className={invalid ? 'llp-error' : ''}>{invalid ? 'Enter a number of zero or more.' : status || (dirty ? 'Unsaved changes' : '')}</p>
                 <div><button type="button" className="llp-button" disabled={!dirty} onClick={() => { setDraft({ ...saved }); setStatus('Changes reset.'); }}>Reset changes</button>
                     <button type="button" className="llp-button llp-primary" disabled={!dirty || invalid} onClick={save}>Save changes</button></div>
             </div>
