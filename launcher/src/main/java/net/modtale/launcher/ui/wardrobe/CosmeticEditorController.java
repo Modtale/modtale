@@ -227,9 +227,7 @@ public final class CosmeticEditorController implements AutoCloseable {
             if (error != null) { state.setText(message(error)); return; }
             state.setText("");
             for (CosmeticOption option : result.options()) grid.getChildren().add(optionCard(option));
-            if (grid.getChildren().isEmpty()) grid.getChildren().add(text(ownedOnly.isSelected() && !permissionsKnown
-                    ? "Owned items unavailable."
-                    : "No matching items", "wardrobe-muted"));
+            if (grid.getChildren().isEmpty()) grid.getChildren().add(emptyCategory());
             layoutCards();
             totalPages = Math.max(1, (result.total() + pageSize - 1) / pageSize);
             updatePagination();
@@ -237,6 +235,22 @@ public final class CosmeticEditorController implements AutoCloseable {
             String assetId = selected.contains(".") ? selected.substring(0, selected.indexOf('.')) : selected;
             showOptions(assetId); updateActions();
         }));
+    }
+
+    private VBox emptyCategory() {
+        var symbol = new StackPane(LauncherIcons.icon(LauncherIcons.Glyph.LAYERS, 30));
+        symbol.getStyleClass().add("cosmetic-empty-symbol");
+        symbol.setMinSize(64, 64); symbol.setPrefSize(64, 64); symbol.setMaxSize(64, 64);
+        Label title = text("No cosmetics to show", "cosmetic-empty-title");
+        String categoryName = CosmeticCatalogClient.categories().stream()
+                .filter(entry -> entry.key().equals(category)).map(CosmeticCategory::label).findFirst().orElse("This category");
+        Label detail = text("There are no items to display for " + categoryName + ". Choose another category to keep customizing your look.", "cosmetic-empty-detail");
+        detail.setWrapText(true); detail.setMaxWidth(300); detail.setMinWidth(0);
+        title.setWrapText(true); title.setMinWidth(0);
+        VBox empty = new VBox(12, symbol, title, detail);
+        empty.setId("cosmetic-empty-state"); empty.getStyleClass().add("cosmetic-empty-state");
+        empty.setAlignment(Pos.CENTER); empty.setMinWidth(0); empty.setMaxWidth(Double.MAX_VALUE);
+        return empty;
     }
 
     private void showGridSkeletons() {
@@ -255,6 +269,8 @@ public final class CosmeticEditorController implements AutoCloseable {
         for (int i = 0; i < grid.getChildren().size(); i++) {
             GridPane.setColumnIndex(grid.getChildren().get(i), i % columns);
             GridPane.setRowIndex(grid.getChildren().get(i), i / columns);
+            GridPane.setColumnSpan(grid.getChildren().get(i),
+                    "cosmetic-empty-state".equals(grid.getChildren().get(i).getId()) ? columns : 1);
         }
     }
 

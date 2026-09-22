@@ -9955,3 +9955,11 @@
 .wardrobe-category-picture:hover { -fx-background-color: #203550; -fx-border-color: #577ca5; }
 .wardrobe-category-picture:selected { -fx-background-color: #233e62; -fx-border-color: #60a5fa; -fx-border-width: 2; -fx-padding: 3; }
 .wardrobe-category-picture:focused { -fx-border-color: #bfdbfe; }
+
+.cosmetic-empty-state {
+    -fx-min-height: 320; -fx-padding: 36 20; -fx-background-color: #101b2d;
+    -fx-background-radius: 14; -fx-border-color: #24344b; -fx-border-radius: 14;
+}
+.cosmetic-empty-symbol { -fx-background-color: #192a42; -fx-background-radius: 20; }
+.cosmetic-empty-title { -fx-text-fill: #dce7f5; -fx-font-size: 16px; -fx-font-weight: bold; -fx-text-alignment: center; }
+.cosmetic-empty-detail { -fx-text-fill: #8da2bc; -fx-font-size: 12px; -fx-text-alignment: center; -fx-line-spacing: 4; }
