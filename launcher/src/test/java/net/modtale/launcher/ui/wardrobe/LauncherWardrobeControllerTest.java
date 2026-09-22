@@ -272,10 +272,7 @@ class LauncherWardrobeControllerTest {
             await(() -> h.root().lookup("#wardrobe-look-" + SKIN.id()) != null);
             assertEquals(0, h.popular.pageCalls.get()); assertEquals(0, h.popular.thumbnailCalls.get());
             fx(() -> { button(h.root(), "Popular skins").fire(); return null; });
-            await(() -> h.popular.downloadCalls.get() == 1
-                    && nodes(h.root(), ButtonBase.class).stream().anyMatch(b ->
-                    ("Save look".equals(b.getText()) || "Save look".equals(b.getAccessibleText()))
-                            && !b.isDisabled()));
+            await(() -> h.popular.downloadCalls.get() == 1 && buttonEnabled(h.root(), "Save look"));
             assertTrue(h.popular.thumbnailCalls.get() > 0);
             assertTrue(fx(() -> nodes(h.root(), Label.class).stream().anyMatch(l -> l.isVisible() && l.getText().contains("Images by Hyvatar"))));
             fx(() -> { button(h.root(), "Apply to Alice").fire(); return null; });
@@ -283,7 +280,7 @@ class LauncherWardrobeControllerTest {
             assertNotNull(applied);
             assertTrue(applied.item().payload().contains("bodyCharacteristic"));
             assertFalse(applied.item().payload().contains("username"));
-            await(() -> !button(h.root(), "Apply to Alice").isDisabled());
+            await(() -> buttonEnabled(h.root(), "Apply to Alice"));
             h.store.saveItem(applied.item());
             int thumbnails = h.popular.thumbnailCalls.get(), downloads = h.popular.downloadCalls.get();
             fx(() -> { button(h.root(), "Saved looks").fire(); return null; });
@@ -431,6 +428,10 @@ class LauncherWardrobeControllerTest {
         LauncherSettings settings = new LauncherSettings(); settings.setHytaleAuthSession(session); return settings;
     }
     private static Button card(Node root, String name) { return nodes(root, Button.class).stream().filter(b -> ("Preview " + name).equals(b.getAccessibleText())).findFirst().orElse(null); }
+    private static boolean buttonEnabled(Node root, String text) {
+        return nodes(root, ButtonBase.class).stream().anyMatch(b ->
+                (text.equals(b.getText()) || text.equals(b.getAccessibleText())) && !b.isDisabled());
+    }
     private static ButtonBase button(Node root, String text) { return nodes(root, ButtonBase.class).stream().filter(b -> (text.equals(b.getText()) || text.equals(b.getAccessibleText()))).findFirst().orElseThrow(); }
     private static <T> List<T> nodes(Node node, Class<T> type) {
         List<T> result = new ArrayList<>();
