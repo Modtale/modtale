@@ -272,7 +272,10 @@ class LauncherWardrobeControllerTest {
             await(() -> h.root().lookup("#wardrobe-look-" + SKIN.id()) != null);
             assertEquals(0, h.popular.pageCalls.get()); assertEquals(0, h.popular.thumbnailCalls.get());
             fx(() -> { button(h.root(), "Popular skins").fire(); return null; });
-            await(() -> h.popular.downloadCalls.get() == 1 && !button(h.root(), "Save look").isDisabled());
+            await(() -> h.popular.downloadCalls.get() == 1
+                    && nodes(h.root(), ButtonBase.class).stream().anyMatch(b ->
+                    ("Save look".equals(b.getText()) || "Save look".equals(b.getAccessibleText()))
+                            && !b.isDisabled()));
             assertTrue(h.popular.thumbnailCalls.get() > 0);
             assertTrue(fx(() -> nodes(h.root(), Label.class).stream().anyMatch(l -> l.isVisible() && l.getText().contains("Images by Hyvatar"))));
             fx(() -> { button(h.root(), "Apply to Alice").fire(); return null; });
