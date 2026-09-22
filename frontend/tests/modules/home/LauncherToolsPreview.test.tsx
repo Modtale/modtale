@@ -11,65 +11,65 @@ async function mount() {
     document.body.append(container);
     const root = createRoot(container);
     await act(async () => root.render(<LauncherLibraryPreview projects={projects} />));
-    const button = (text: string, scope: ParentNode = container) => Array.from(scope.querySelectorAll('button')).find(button => button.textContent === text)!;
+    const button = (text: string) => Array.from(container.querySelectorAll('button')).find(button => button.getAttribute('aria-label') === text || button.textContent === text)!;
     return { container, button, cleanup: async () => { await act(async () => root.unmount()); container.remove(); } };
 }
 
-it('saves, resets, and validates settings independently for each world across view changes', async () => {
+it('opens a mod config modal from its row, saves per mod, and guards unsaved changes', async () => {
     const { container, button, cleanup } = await mount();
     try {
-        await act(async () => button('Config editor').click());
-        const editors = container.querySelectorAll('.llp-config');
-        const pvp = (index: number) => editors[index].querySelector<HTMLInputElement>('[role=switch]')!;
-        await act(async () => pvp(0).click());
-        expect(button('Save changes', editors[0]).disabled).toBe(false);
-        await act(async () => button('Save changes', editors[0]).click());
-        await act(async () => pvp(0).click());
-        await act(async () => button('Reset changes', editors[0]).click());
-        expect(pvp(0).checked).toBe(true);
-        await act(async () => button('Greenhaven', container.querySelector('.llp-world-picker')!).click());
-        expect(pvp(1).checked).toBe(false);
-        await act(async () => button('Library').click());
-        await act(async () => button('Config editor').click());
-        await act(async () => button('Emberwild', container.querySelector('.llp-world-picker')!).click());
-        expect(pvp(0).checked).toBe(true);
-        const loss = editors[0].querySelector<HTMLInputElement>('input[type=number]')!;
+        expect(container.querySelector('.llp-toolbar')).toBeNull();
+        expect(container.textContent).not.toContain('World settings');
+        button('Configure Map').focus();
+        await act(async () => button('Configure Map').click());
+        const dialog = () => container.querySelector('[role=dialog]')!;
+        const toggle = () => dialog().querySelector<HTMLInputElement>('[role=switch]')!;
+        expect(dialog().textContent).toContain('Map');
+        expect(document.activeElement).toBe(dialog());
+        expect(container.querySelector('.llp-workspace')?.hasAttribute('inert')).toBe(true);
+        expect(container.textContent).toContain('2 of 3 mods enabled');
+        await act(async () => toggle().click());
+        await act(async () => button('Done').click());
+        expect(dialog().textContent).toContain('Save or reset your changes before closing.');
+        await act(async () => button('Save changes').click());
+        await act(async () => button('Done').click());
+        expect(dialog()).toBeNull();
+        expect(document.activeElement).toBe(button('Configure Map'));
+        await act(async () => button('Configure Tools').click());
+        expect(toggle().checked).toBe(true);
+        await act(async () => button('Done').click());
+        await act(async () => button('Configure Map').click());
+        expect(toggle().checked).toBe(false);
+        const number = dialog().querySelector<HTMLInputElement>('input[type=number]')!;
         await act(async () => {
-            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(loss, '101');
-            loss.dispatchEvent(new Event('input', { bubbles: true }));
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(number, '-1');
+            number.dispatchEvent(new Event('input', { bubbles: true }));
         });
-        expect(loss.getAttribute('aria-invalid')).toBe('true');
-        expect(button('Save changes', editors[0]).disabled).toBe(true);
-        await act(async () => button('Reset changes', editors[0]).click());
-        expect(loss.value).toBe('');
-        const search = editors[0].querySelector<HTMLInputElement>('input:not([type])')!;
-        await act(async () => {
-            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(search, 'unknown setting');
-            search.dispatchEvent(new Event('input', { bubbles: true }));
-        });
-        expect(editors[0].textContent).toContain('No matching settings.');
+        expect(number.getAttribute('aria-invalid')).toBe('true');
+        expect(button('Save changes').disabled).toBe(true);
+        await act(async () => button('Reset changes').click());
+        expect(number.value).toBe('5');
+        await act(async () => dialog().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+        expect(dialog()).toBeNull();
     } finally { await cleanup(); }
 });
 
-it('simulates updates without re-queuing installed versions on a subsequent check', async () => {
+it('updates directly on a mod row without toggling the mod, and keeps progress across worlds', async () => {
     vi.useFakeTimers();
     const { container, button, cleanup } = await mount();
     try {
-        await act(async () => button('Updates').click());
-        const updates = container.querySelector('.llp-updates')!;
-        expect(updates.textContent).toContain('2 updates available');
-        await act(async () => button('Update', updates).click());
+        await act(async () => button('Update Map').click());
+        expect(container.textContent).toContain('2 of 3 mods enabled');
         await act(async () => vi.advanceTimersByTime(440));
-        expect(updates.querySelector('[role=progressbar]')?.getAttribute('aria-valuenow')).toBe('40');
+        expect(container.querySelector('[role=progressbar]')?.getAttribute('aria-valuenow')).toBe('40');
+        expect(button('Updating Map').disabled).toBe(true);
+        await act(async () => button('Greenhaven').click());
         await act(async () => vi.advanceTimersByTime(660));
-        expect(updates.textContent).toContain('1 update available');
-        expect(button('Updated', updates).disabled).toBe(true);
-        await act(async () => button('Update', updates).click());
-        await act(async () => vi.advanceTimersByTime(1100));
-        expect(updates.textContent).toContain('Your library is up to date.');
-        await act(async () => button('Check for updates', updates).click());
-        await act(async () => vi.advanceTimersByTime(800));
-        expect(updates.textContent).toContain('No updates queued');
-        expect(updates.querySelectorAll('.llp-complete')).toHaveLength(2);
+        expect(button('Map updated').disabled).toBe(true);
+        expect(container.querySelector('[role=progressbar]')).toBeNull();
+        await act(async () => button('Emberwild').click());
+        expect(button('Map updated').disabled).toBe(true);
+        expect(button('Update Tools').disabled).toBe(false);
+        expect(container.textContent).toContain('2 of 3 mods enabled');
     } finally { await cleanup(); vi.useRealTimers(); }
 });
