@@ -1,19 +1,13 @@
 package net.modtale.launcher.ui.update;
 
 import java.nio.file.Path;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 import javafx.application.Platform;
-import javafx.scene.control.ButtonBar;
-import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
-import javafx.scene.control.Dialog;
-import javafx.scene.control.DialogPane;
-import javafx.scene.control.Label;
-import javafx.scene.layout.VBox;
-import javafx.stage.Stage;
+import javafx.scene.layout.StackPane;
+import net.modtale.launcher.ui.common.StatusModal;
 import net.modtale.launcher.ui.feedback.LauncherFeedback;
 import net.modtale.launcher.ui.settings.LauncherSettingsController;
 import net.modtale.launcher.update.LauncherUpdateCandidate;
@@ -26,7 +20,7 @@ public final class LauncherUpdateController {
     private final LauncherSettingsController settingsController;
     private final LauncherFeedback feedback;
     private final Executor executor;
-    private final Supplier<Stage> stage;
+    private final Supplier<StackPane> overlayHost;
 
     private boolean checkInFlight;
     private String observedChannel;
@@ -37,13 +31,13 @@ public final class LauncherUpdateController {
             LauncherSettingsController settingsController,
             LauncherFeedback feedback,
             Executor executor,
-            Supplier<Stage> stage
+            Supplier<StackPane> overlayHost
     ) {
         this.updateService = updateService;
         this.settingsController = settingsController;
         this.feedback = feedback;
         this.executor = executor;
-        this.stage = stage;
+        this.overlayHost = overlayHost;
         observedChannel = settingsController.settings().getLauncherChannel();
         settingsController.addSaveListener(() -> {
             String channel = settingsController.settings().getLauncherChannel();
@@ -122,53 +116,29 @@ public final class LauncherUpdateController {
     }
 
     private void promptForUpdate(LauncherUpdateCandidate update, String currentVersion) {
-        Dialog<ButtonType> dialog = new Dialog<>();
-        Stage owner = stage.get();
-        if (owner != null) {
-            dialog.initOwner(owner);
-        }
-        dialog.setTitle("Launcher Update Available");
-        dialog.setHeaderText(null);
-
-        DialogPane pane = dialog.getDialogPane();
-        pane.getStyleClass().add("launcher-update-dialog");
-        if (owner != null && owner.getScene() != null) {
-            pane.getStylesheets().addAll(owner.getScene().getStylesheets());
-        }
-
-        ButtonType updateButton = new ButtonType(
-                update.hasInstallerAsset() ? "Update Launcher" : "Open Release",
-                ButtonBar.ButtonData.OK_DONE
-        );
-        ButtonType laterButton = new ButtonType("Later", ButtonBar.ButtonData.CANCEL_CLOSE);
-        pane.getButtonTypes().setAll(updateButton, laterButton);
-
-        Label title = new Label("Modtale Launcher " + update.displayVersion() + " is available.");
-        title.getStyleClass().add("dialog-title");
-        title.setWrapText(true);
-        Label body = new Label("Current version: " + currentVersion + ". "
-                + (update.hasInstallerAsset()
-                ? "The matching installer can be downloaded and opened now."
-                : "No installer asset matched this OS, but the release page can be opened."));
-        body.getStyleClass().add("dialog-body");
-        body.setWrapText(true);
-
         CheckBox autoUpdates = new CheckBox("Enable launcher auto-updates");
         autoUpdates.getStyleClass().add("native-check");
         autoUpdates.setSelected(settingsController.settings().isLauncherAutoUpdates());
 
-        VBox content = new VBox(12, title, body, autoUpdates);
-        content.setMaxWidth(460);
-        pane.setContent(content);
-
-        Optional<ButtonType> result = dialog.showAndWait();
+        StatusModal.Result result = StatusModal.builder(overlayHost)
+                .type(StatusModal.Type.INFO)
+                .title("Launcher Update Available")
+                .message("Modtale Launcher " + update.displayVersion() + " is available.\n"
+                        + "Current version: " + currentVersion + ".\n\n"
+                        + (update.hasInstallerAsset()
+                        ? "The matching installer can be downloaded and opened now."
+                        : "No installer asset matched this OS, but the release page can be opened."))
+                .actionLabel(update.hasInstallerAsset() ? "Update Launcher" : "Open Release")
+                .secondaryLabel("Later")
+                .content(autoUpdates)
+                .showAndWait();
         boolean autoUpdatesChanged = settingsController.settings().isLauncherAutoUpdates() != autoUpdates.isSelected();
         if (autoUpdatesChanged) {
             settingsController.settings().setLauncherAutoUpdates(autoUpdates.isSelected());
             settingsController.saveCurrentSettings();
             settingsController.reloadControls();
         }
-        if (result.isPresent() && result.get() == updateButton) {
+        if (result == StatusModal.Result.PRIMARY) {
             installUpdate(update);
         }
     }
