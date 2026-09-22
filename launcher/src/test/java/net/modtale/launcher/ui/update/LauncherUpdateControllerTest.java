@@ -48,6 +48,7 @@ class LauncherUpdateControllerTest {
         var jobs = new ArrayDeque<Runnable>();
         List<String> checkedChannels = new ArrayList<>();
         var service = new LauncherUpdateService() {
+            @Override public boolean canInstallUpdates() { return true; }
             @Override public Optional<LauncherUpdateCandidate> latestUpdate(String version, String channel) {
                 checkedChannels.add(channel);
                 if (channel.equals("stable")) throw new IllegalStateException("Stale stable failure");
@@ -78,7 +79,7 @@ class LauncherUpdateControllerTest {
         jobs.remove().run();
         fx(() -> {
             assertEquals(List.of("stable", "develop"), checkedChannels);
-            assertTrue(labels(settings.view()).stream().anyMatch(text -> text.startsWith("No update available on develop.")));
+            assertTrue(labels(settings.view()).stream().anyMatch(text -> text.startsWith("No automatic update available on develop.")));
             assertFalse(labels(settings.view()).stream().anyMatch(text -> text.contains("Stale stable failure")));
             return null;
         });
@@ -93,6 +94,7 @@ class LauncherUpdateControllerTest {
             var update = new LauncherUpdateCandidate("1.2.0", "launcher-v1.2.0", "", "",
                     "launcher-linux-x86_64-update.zip", "https://example.invalid/update", false, 0, null);
             var service = new LauncherUpdateService() {
+            @Override public boolean canInstallUpdates() { return true; }
                 @Override public Optional<LauncherUpdateCandidate> latestUpdate(String version, String channel) {
                     events.add("check");
                     return Optional.of(update);
@@ -134,6 +136,40 @@ class LauncherUpdateControllerTest {
                 return null;
             });
             assertEquals(fail ? 1 : 0, jobs.size());
+        }
+    }
+
+    @Test
+    void sourceSessionsAndReleasesWithoutPayloadNeverOpenAnUpdateModal() throws Exception {
+        for (boolean installed : List.of(false, true)) {
+            var jobs = new ArrayDeque<Runnable>();
+            var events = new ArrayList<String>();
+            StackPane host = fx(StackPane::new);
+            var service = new LauncherUpdateService() {
+                @Override public boolean canInstallUpdates() { return installed; }
+                @Override public Optional<String> consumeUpdateFailure() { return Optional.empty(); }
+                @Override public Optional<LauncherUpdateCandidate> latestUpdate(String version, String channel) {
+                    events.add("check");
+                    return Optional.of(new LauncherUpdateCandidate("0.2.145", "launcher-v0.2.145", "", "",
+                            null, null, false, 0, null));
+                }
+            };
+            var updater = fx(() -> {
+                var settings = new LauncherSettingsController(new SettingsStore(directory.resolve("source-" + installed + ".json")),
+                        new ModtaleApiClient("http://localhost", directory.resolve("session.json")), () -> null, () -> LauncherView.SETTINGS);
+                settings.reloadControls();
+                var feedback = new LauncherFeedback(jobs::add, new Label(), new StackPane(), new Label(), new Label(), () -> "Idle");
+                return new LauncherUpdateController(service, settings, feedback, jobs::add, () -> host,
+                        () -> fail("Must not exit without an installable update"));
+            });
+            fx(() -> { updater.checkOnStartup(); return null; });
+            if (installed) jobs.remove().run();
+            fx(() -> {
+                assertTrue(host.getChildren().isEmpty());
+                assertEquals(installed ? List.of("check") : List.of(), events);
+                assertTrue(jobs.isEmpty());
+                return null;
+            });
         }
     }
 

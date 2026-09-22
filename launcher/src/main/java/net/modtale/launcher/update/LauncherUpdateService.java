@@ -21,7 +21,6 @@ import java.util.Locale;
 import java.util.Optional;
 import net.modtale.launcher.api.ModtaleApiException;
 import net.modtale.launcher.logging.LogSanitizer;
-import net.modtale.launcher.platform.SystemBrowser;
 import net.modtale.launcher.settings.LauncherConfig;
 import net.modtale.launcher.logging.LauncherLog;
 import net.modtale.launcher.logging.LauncherLogger;
@@ -78,6 +77,7 @@ public class LauncherUpdateService {
 
         Optional<GitHubAsset> asset = compatibleAsset(release.assets(), System.getProperty("os.name", ""),
                 System.getProperty("os.arch", ""));
+        if (asset.isEmpty()) return Optional.empty();
         return Optional.of(new LauncherUpdateCandidate(
                 latestVersion,
                 release.tagName(),
@@ -187,17 +187,10 @@ public class LauncherUpdateService {
         }
     }
 
-    public void openReleasePage(LauncherUpdateCandidate update) {
-        String releaseUrl = update == null ? null : update.releaseUrl();
-        if (releaseUrl == null || releaseUrl.isBlank()) {
-            releaseUrl = "https://github.com/" + repository + "/releases";
-        }
-        try {
-            SystemBrowser.open(URI.create(releaseUrl));
-        } catch (IOException ex) {
-            LOG.warn("Could not open launcher release page " + LogSanitizer.url(releaseUrl), ex);
-            throw new ModtaleApiException("Could not open launcher release page " + releaseUrl, ex);
-        }
+    public boolean canInstallUpdates() {
+        String root = System.getenv("MODTALE_UPDATE_ROOT");
+        String executable = System.getenv("MODTALE_LAUNCHER_EXECUTABLE");
+        return root != null && !root.isBlank() && executable != null && !executable.isBlank();
     }
 
     static Optional<String> compatibleAssetName(List<String> assetNames, String osName, String arch) {
@@ -261,6 +254,9 @@ public class LauncherUpdateService {
         }
         return assets.stream()
                 .filter(asset -> isCompatibleAssetName(asset.name(), osName, arch))
+                .filter(asset -> asset.browserDownloadUrl() != null && !asset.browserDownloadUrl().isBlank())
+                .filter(asset -> asset.size() > 0 && asset.digest() != null
+                        && asset.digest().matches("sha256:[0-9a-fA-F]{64}"))
                 .findFirst();
     }
 

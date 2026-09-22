@@ -25,8 +25,8 @@ class LauncherUpdateServiceTest {
     @Test
     void findsChannelsAcrossPagesAndAllowsSwitchingBackToOlderStable() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        String develop = "{\"tag_name\":\"launcher-develop-v2.0.0-develop.10.1\",\"prerelease\":true}";
-        String stable = "{\"tag_name\":\"launcher-stable-v1.0.0\",\"prerelease\":false}";
+        String develop = release("launcher-develop-v2.0.0-develop.10.1", true, automaticAssets());
+        String stable = release("launcher-stable-v1.0.0", false, automaticAssets());
         server.createContext("/repos/Modtale/modtale/releases", exchange -> {
             String body = exchange.getRequestURI().getQuery().endsWith("page=1")
                     ? "[" + String.join(",", java.util.Collections.nCopies(100, develop)) + "]"
@@ -48,6 +48,51 @@ class LauncherUpdateServiceTest {
         } finally {
             server.stop(0);
         }
+    }
+
+    @Test
+    void legacyOrIncompleteReleasesAreNotOfferedAsUpdates() throws Exception {
+        var body = new java.util.concurrent.atomic.AtomicReference<String>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/repos/Modtale/modtale/releases", exchange -> {
+            byte[] bytes = ("[" + body.get() + "]").getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (var output = exchange.getResponseBody()) { output.write(bytes); }
+        });
+        server.start();
+        try {
+            var service = new LauncherUpdateService(HttpClient.newHttpClient(), "Modtale/modtale",
+                    "http://127.0.0.1:" + server.getAddress().getPort());
+            for (String assets : List.of("[]", "[{\"name\":\"launcher.AppImage\"}]",
+                    automaticAssets().replace("sha256:", "unavailable:"),
+                    automaticAssets().replace("https://example.invalid/update", ""))) {
+                body.set(release("launcher-v0.2.145", false, assets));
+                assertTrue(service.latestUpdate("0.1.0-SNAPSHOT", "stable").isEmpty());
+            }
+            body.set(release("launcher-stable-v0.2.160", false, automaticAssets()));
+            var update = service.latestUpdate("0.2.145", "stable").orElseThrow();
+            assertTrue(update.hasInstallerAsset());
+            assertEquals("0.2.160", update.version());
+            assertTrue(service.latestUpdate("0.2.145", "develop").isEmpty());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    private static String release(String tag, boolean prerelease, String assets) {
+        return "{\"tag_name\":\"" + tag + "\",\"prerelease\":" + prerelease + ",\"assets\":" + assets + "}";
+    }
+
+    private static String automaticAssets() {
+        var assets = new java.util.ArrayList<String>();
+        for (String os : List.of("linux", "windows", "macos")) {
+            for (String arch : List.of("x86_64", "aarch64")) {
+                assets.add("{\"name\":\"launcher-" + os + "-" + arch + "-update.zip\","
+                        + "\"browser_download_url\":\"https://example.invalid/update\",\"size\":123,"
+                        + "\"digest\":\"sha256:" + "a".repeat(64) + "\"}");
+            }
+        }
+        return "[" + String.join(",", assets) + "]";
     }
 
     @Test

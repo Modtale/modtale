@@ -75,6 +75,12 @@ public final class LauncherUpdateController {
 
     private void checkForUpdates(boolean manual) {
         if (updateInFlight) return;
+        if (!updateService.canInstallUpdates()) {
+            String message = "Updates are available in the installed launcher. This development session is updated by rebuilding the project.";
+            settingsController.setLauncherUpdateStatus(message);
+            if (manual) feedback.showToast("Development launcher", message);
+            return;
+        }
         if (checkInFlight) {
             pendingManualCheck |= manual;
             return;
@@ -108,11 +114,11 @@ public final class LauncherUpdateController {
                         return;
                     }
 
-                    if (update.isEmpty()) {
-                        settingsController.setLauncherUpdateStatus("No update available on " + channel + ". Current version: " + currentVersion + ".");
+                    if (update.isEmpty() || !update.get().hasInstallerAsset()) {
+                        settingsController.setLauncherUpdateStatus("No automatic update available on " + channel + ". Current version: " + currentVersion + ".");
                         if (announce) {
-                            feedback.log("No launcher update available on " + channel + ".");
-                            feedback.showToast("No launcher update available", "Channel: " + channel + ". Current version: " + currentVersion + ".");
+                            feedback.log("No automatic launcher update available on " + channel + ".");
+                            feedback.showToast("No automatic launcher update available", "Channel: " + channel + ". Current version: " + currentVersion + ".");
                         }
                         return;
                     }
@@ -141,10 +147,8 @@ public final class LauncherUpdateController {
                 .title("Launcher Update Available")
                 .message("Modtale Launcher " + update.displayVersion() + " is available.\n"
                         + "Current version: " + currentVersion + ".\n\n"
-                        + (update.hasInstallerAsset()
-                        ? updateService.installationMessage()
-                        : "This release does not include an automatic update for this platform."))
-                .actionLabel(update.hasInstallerAsset() ? "Update Launcher" : "Open Release")
+                        + updateService.installationMessage())
+                .actionLabel("Update Launcher")
                 .secondaryLabel("Later")
                 .content(autoUpdates)
                 .showAndWait();
@@ -160,14 +164,6 @@ public final class LauncherUpdateController {
     }
 
     private void installUpdate(LauncherUpdateCandidate update) {
-        if (!update.hasInstallerAsset()) {
-            feedback.runAsync("Opening launcher release page...", () -> {
-                updateService.openReleasePage(update);
-                return update;
-            }, opened -> feedback.log("Opened launcher release page for " + opened.displayVersion() + "."));
-            return;
-        }
-
         if (updateInFlight) return;
         updateInFlight = true;
         var progress = new TransferLoadingModal("Updating Modtale Launcher",
