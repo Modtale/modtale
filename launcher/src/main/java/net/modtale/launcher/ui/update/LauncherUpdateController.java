@@ -8,6 +8,7 @@ import javafx.application.Platform;
 import javafx.scene.control.CheckBox;
 import javafx.scene.layout.StackPane;
 import net.modtale.launcher.ui.common.StatusModal;
+import net.modtale.launcher.ui.common.TransferLoadingModal;
 import net.modtale.launcher.ui.feedback.LauncherFeedback;
 import net.modtale.launcher.ui.settings.LauncherSettingsController;
 import net.modtale.launcher.update.LauncherUpdateCandidate;
@@ -21,8 +22,10 @@ public final class LauncherUpdateController {
     private final LauncherFeedback feedback;
     private final Executor executor;
     private final Supplier<StackPane> overlayHost;
+    private final Runnable exitLauncher;
 
     private boolean checkInFlight;
+    private boolean updateInFlight;
     private String observedChannel;
     private boolean pendingManualCheck;
 
@@ -33,6 +36,12 @@ public final class LauncherUpdateController {
             Executor executor,
             Supplier<StackPane> overlayHost
     ) {
+        this(updateService, settingsController, feedback, executor, overlayHost, Platform::exit);
+    }
+
+    LauncherUpdateController(LauncherUpdateService updateService, LauncherSettingsController settingsController,
+            LauncherFeedback feedback, Executor executor, Supplier<StackPane> overlayHost, Runnable exitLauncher) {
+        this.exitLauncher = exitLauncher;
         this.updateService = updateService;
         this.settingsController = settingsController;
         this.feedback = feedback;
@@ -50,6 +59,12 @@ public final class LauncherUpdateController {
     }
 
     public void checkOnStartup() {
+        var failure = updateService.consumeUpdateFailure();
+        if (failure.isPresent()) {
+            settingsController.setLauncherUpdateStatus("Update failed. The previous version has been restored.");
+            feedback.showToast("Launcher update failed", failure.get());
+            return;
+        }
         checkForUpdates(false);
     }
 
@@ -59,6 +74,7 @@ public final class LauncherUpdateController {
     }
 
     private void checkForUpdates(boolean manual) {
+        if (updateInFlight) return;
         if (checkInFlight) {
             pendingManualCheck |= manual;
             return;
@@ -126,8 +142,8 @@ public final class LauncherUpdateController {
                 .message("Modtale Launcher " + update.displayVersion() + " is available.\n"
                         + "Current version: " + currentVersion + ".\n\n"
                         + (update.hasInstallerAsset()
-                        ? "The matching installer can be downloaded and opened now."
-                        : "No installer asset matched this OS, but the release page can be opened."))
+                        ? updateService.installationMessage()
+                        : "This release does not include an automatic update for this platform."))
                 .actionLabel(update.hasInstallerAsset() ? "Update Launcher" : "Open Release")
                 .secondaryLabel("Later")
                 .content(autoUpdates)
@@ -152,14 +168,25 @@ public final class LauncherUpdateController {
             return;
         }
 
+        if (updateInFlight) return;
+        updateInFlight = true;
+        var progress = new TransferLoadingModal("Updating Modtale Launcher",
+                "Downloading version " + update.displayVersion() + "...");
+        StackPane host = overlayHost.get();
+        if (host != null) host.getChildren().add(progress);
+        settingsController.setLauncherUpdateStatus("Downloading " + update.displayVersion() + "...");
         feedback.runAsync("Downloading launcher " + update.displayVersion() + "...", () -> {
             Path installer = updateService.downloadInstaller(update);
-            updateService.openInstaller(installer);
+            progress.update("Updating Modtale Launcher", updateService.installationMessage());
+            updateService.installUpdate(installer, update);
             return installer;
         }, installer -> {
-            String filename = installer.getFileName().toString();
-            feedback.log("Launcher installer opened: " + filename + ".");
-            feedback.showToast("Launcher update ready", "Close Modtale Launcher after the installer opens to finish updating.");
+            progress.dismiss();
+            exitLauncher.run();
+        }, error -> {
+            progress.dismiss();
+            updateInFlight = false;
+            settingsController.setLauncherUpdateStatus("Update failed. Check for updates to try again.");
         });
     }
 }

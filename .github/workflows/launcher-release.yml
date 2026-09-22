@@ -148,7 +148,16 @@ jobs:
             package_task="packageLinuxAll"
           fi
 
-          ./gradlew clean "$package_task" -PlauncherVersion="${{ needs.metadata.outputs.version }}"
+          ./gradlew clean "$package_task" packageLauncherUpdate -PlauncherVersion="${{ needs.metadata.outputs.version }}"
+
+      - name: Upload Linux automatic update
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: launcher-linux-update
+          path: launcher/build/distributions/*-update.zip
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Upload Linux AppImage package
         if: runner.os == 'Linux'

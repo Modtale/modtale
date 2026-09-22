@@ -7,7 +7,9 @@ public record LauncherUpdateCandidate(
         String releaseUrl,
         String assetName,
         String assetDownloadUrl,
-        boolean prerelease
+        boolean prerelease,
+        long assetSize,
+        String assetDigest
 ) {
 
     public boolean hasInstallerAsset() {

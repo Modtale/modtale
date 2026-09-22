@@ -85,6 +85,58 @@ class LauncherUpdateControllerTest {
         assertEquals("develop", new SettingsStore(directory.resolve("settings.json")).load().getLauncherChannel());
     }
 
+    @Test
+    void usesTransferOverlayPreventsDuplicateUpdatesAndExitsOnlyAfterSuccessfulHandoff() throws Exception {
+        for (boolean fail : List.of(false, true)) {
+            var jobs = new ArrayDeque<Runnable>();
+            var events = new ArrayList<String>();
+            var update = new LauncherUpdateCandidate("1.2.0", "launcher-v1.2.0", "", "",
+                    "launcher-linux-x86_64-update.zip", "https://example.invalid/update", false, 0, null);
+            var service = new LauncherUpdateService() {
+                @Override public Optional<LauncherUpdateCandidate> latestUpdate(String version, String channel) {
+                    events.add("check");
+                    return Optional.of(update);
+                }
+                @Override public Optional<String> consumeUpdateFailure() { return Optional.empty(); }
+                @Override public Path downloadInstaller(LauncherUpdateCandidate candidate) {
+                    events.add("download");
+                    return directory.resolve("update.zip");
+                }
+                @Override public void installUpdate(Path path, LauncherUpdateCandidate candidate) {
+                    events.add("install");
+                    if (fail) throw new IllegalStateException("Download could not be installed");
+                }
+            };
+            StackPane host = fx(StackPane::new);
+            var updater = fx(() -> {
+                var settings = new LauncherSettingsController(new SettingsStore(directory.resolve("auto-" + fail + ".json")),
+                        new ModtaleApiClient("http://localhost", directory.resolve("session.json")), () -> null, () -> LauncherView.SETTINGS);
+                settings.settings().setLauncherAutoUpdates(true);
+                settings.reloadControls();
+                var feedback = new LauncherFeedback(jobs::add, new Label(), new StackPane(), new Label(), new Label(), () -> "Idle");
+                return new LauncherUpdateController(service, settings, feedback, jobs::add, () -> host, () -> events.add("exit"));
+            });
+            fx(() -> { updater.checkOnStartup(); return null; });
+            jobs.remove().run();
+            fx(() -> {
+                assertEquals(1, host.getChildren().size());
+                assertInstanceOf(net.modtale.launcher.ui.common.TransferLoadingModal.class, host.getChildren().getFirst());
+                updater.checkOnStartup();
+                assertFalse(events.contains("exit"));
+                return null;
+            });
+            assertEquals(1, jobs.size());
+            jobs.remove().run();
+            fx(() -> {
+                assertTrue(host.getChildren().isEmpty());
+                assertEquals(fail ? List.of("check", "download", "install") : List.of("check", "download", "install", "exit"), events);
+                if (fail) updater.checkOnStartup();
+                return null;
+            });
+            assertEquals(fail ? 1 : 0, jobs.size());
+        }
+    }
+
     private static List<String> labels(Node node) {
         List<String> result = new ArrayList<>();
         if (node instanceof Label label) result.add(label.getText());

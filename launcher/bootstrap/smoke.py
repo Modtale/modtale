@@ -1,5 +1,6 @@
 """Exercise the packaged bootstrap with isolated runtime locations."""
 import os
+import hashlib
 from pathlib import Path
 import shutil
 import subprocess
@@ -41,4 +42,25 @@ with tempfile.TemporaryDirectory(prefix="modtale bootstrap ü ") as directory:
     environment.pop("JAVA_HOME", None)
     environment.update(offline)
     subprocess.run([executable, "--modtale-bootstrap-check"], env=environment, check=True, timeout=45)
-    print("Packaged runtime setup and offline cache reuse passed")
+    if sys.platform == "win32":
+        app = executable.parent / "app"
+    elif sys.platform == "darwin":
+        app = executable.parent.parent / "app"
+    else:
+        app = executable.parent.parent / "lib" / "app"
+    key = hashlib.sha256(os.fsencode(str(executable)) + b"\0" + (app / "bootstrap.json").read_bytes()).hexdigest()
+    updates = cache.parent / "updates" / key
+    payload = updates / "version-smoke"
+    payload.mkdir(parents=True)
+    for file in app.iterdir():
+        if file.name.endswith(".jar") or file.name == "bootstrap.json":
+            shutil.copyfile(file, payload / file.name)
+    (updates / "active").write_text(payload.name)
+    subprocess.run([executable, "--modtale-bootstrap-check"], env=environment, check=True, timeout=45)
+    log = (cache.parent / "bootstrap.log").read_text()
+    assert f"Launcher application: {payload}" in log, "Existing executable must load the activated update"
+    (payload / "bootstrap.json").write_text("invalid")
+    subprocess.run([executable, "--modtale-bootstrap-check"], env=environment, check=True, timeout=45)
+    assert not (updates / "active").exists(), "Broken update must be deactivated"
+    assert (updates / "update-failure").exists(), "Update recovery must be reported to the launcher"
+    print("Packaged runtime setup, offline reuse, automatic updates and recovery passed")

@@ -51,54 +51,26 @@ class LauncherUpdateServiceTest {
     }
 
     @Test
-    void selectsWindowsInstallerAsset() {
-        assertEquals("Modtale Launcher-1.2.0.exe", LauncherUpdateService.compatibleAssetName(List.of(
-                "modtale-launcher-1.2.0-x86_64.AppImage",
-                "Modtale Launcher-1.2.0.dmg",
-                "Modtale Launcher-1.2.0.exe"
-        ), "Windows 11", "amd64").orElseThrow());
-    }
-
-    @Test
-    void selectsMacInstallerAsset() {
-        assertEquals("Modtale Launcher-1.2.0.dmg", LauncherUpdateService.compatibleAssetName(List.of(
-                "modtale-launcher-1.2.0-x86_64.AppImage",
-                "Modtale Launcher-1.2.0.dmg",
-                "Modtale Launcher-1.2.0.exe"
-        ), "Mac OS X", "aarch64").orElseThrow());
-    }
-
-    @Test
-    void selectsLinuxAssetForCurrentArchitecture() {
-        assertEquals("modtale-launcher-1.2.0-aarch64.AppImage", LauncherUpdateService.compatibleAssetName(List.of(
-                "modtale-launcher-1.2.0-x86_64.AppImage",
-                "modtale-launcher-1.2.0-aarch64.AppImage"
-        ), "Linux", "aarch64").orElseThrow());
-    }
-
-    @Test
-    void doesNotOfferArmLinuxInstallerToX64Users() {
-        assertEquals("modtale-launcher-1.2.0-x86_64.AppImage", LauncherUpdateService.compatibleAssetName(List.of(
-                "modtale-launcher-1.2.0-x86_64.AppImage",
-                "modtale-launcher-1.2.0-arm64.AppImage"
-        ), "Linux", "amd64").orElseThrow());
-    }
-
-    @Test
-    void selectsArchitectureSpecificWindowsInstaller() {
-        assertEquals("modtale-launcher-1.2.0-arm64.exe", LauncherUpdateService.compatibleAssetName(List.of(
-                "modtale-launcher-1.2.0-x64.exe",
-                "modtale-launcher-1.2.0-arm64.exe",
-                "modtale-launcher-1.2.0.exe"
-        ), "Windows 11", "aarch64").orElseThrow());
-    }
-
-    @Test
-    void selectsArchitectureSpecificMacInstaller() {
-        assertEquals("modtale-launcher-1.2.0-x64.dmg", LauncherUpdateService.compatibleAssetName(List.of(
-                "modtale-launcher-1.2.0-x64.dmg",
-                "modtale-launcher-1.2.0-arm64.dmg",
-                "modtale-launcher-1.2.0.dmg"
-        ), "Mac OS X", "x86_64").orElseThrow());
+    void selectsOnlyAutomaticPayloadsForEachPlatformAndArchitecture() {
+        List<String> assets = List.of(
+                "modtale-launcher-1.2.0-linux-x86_64-update.zip",
+                "modtale-launcher-1.2.0-linux-aarch64-update.zip",
+                "modtale-launcher-1.2.0-windows-x86_64-update.zip",
+                "modtale-launcher-1.2.0-windows-aarch64-update.zip",
+                "modtale-launcher-1.2.0-macos-x86_64-update.zip",
+                "modtale-launcher-1.2.0-macos-aarch64-update.zip",
+                "modtale-launcher-1.2.0-x86_64.AppImage", "Modtale Launcher.exe", "Modtale Launcher.dmg");
+        for (String os : List.of("Linux", "Windows 11", "Mac OS X", "Darwin")) {
+            String platform = os.equals("Linux") ? "linux" : os.equals("Windows 11") ? "windows" : "macos";
+            for (String arch : List.of("amd64", "x86_64", "aarch64", "arm64")) {
+                String normalized = arch.equals("amd64") || arch.equals("x86_64") ? "x86_64" : "aarch64";
+                assertEquals("modtale-launcher-1.2.0-" + platform + "-" + normalized + "-update.zip",
+                        LauncherUpdateService.compatibleAssetName(assets, os, arch).orElseThrow());
+            }
+        }
+        assertTrue(LauncherUpdateService.compatibleAssetName(assets, "Linux", "riscv64").isEmpty());
+        assertTrue(LauncherUpdateService.compatibleAssetName(assets, "FreeBSD", "x86_64").isEmpty());
+        assertTrue(LauncherUpdateService.compatibleAssetName(List.of("launcher.AppImage", "launcher.exe", "launcher.dmg"),
+                "Linux", "amd64").isEmpty());
     }
 }
