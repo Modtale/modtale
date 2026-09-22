@@ -76,6 +76,7 @@ public final class WardrobePreview {
     private double dragX, dragY, zoom = 1;
     private CosmeticFraming framing = CosmeticFraming.forCategory("");
     private boolean focusBack;
+    private CosmeticFraming headFraming = CosmeticFraming.forCategory("haircut");
 
     void focusCategory(String category) {
         CosmeticFraming next = CosmeticFraming.forCategory(category);
@@ -190,8 +191,9 @@ public final class WardrobePreview {
         FutureTask<Void> task = new FutureTask<>(() -> {
             try {
                 Group model = net.modtale.launcher.wardrobe.LocalAvatarRenderer.load(assetsZip, draft);
+                var fitted = localFraming.fit(model);
                 var thumbnail = supports3d ? null : net.modtale.launcher.wardrobe.LocalAvatarThumbnail.render(
-                        model, 512, back ? 180 : -20, localFraming.centerY(), localFraming.scale());
+                        model, 512, back ? 180 : -20, fitted.centerY(), fitted.scale());
                 if (!Thread.currentThread().isInterrupted()) Platform.runLater(() -> {
                     if (!current(ticket)) return;
                     pending = null;
@@ -270,6 +272,7 @@ public final class WardrobePreview {
 
     private void installModel(Group model) {
         removeContent();
+        headFraming = CosmeticFraming.forCategory("haircut").fit(model);
         Bounds bounds;
         try { bounds = net.modtale.launcher.wardrobe.LocalAvatarRenderer.bounds(model); }
         catch (IOException ex) { throw new IllegalArgumentException(ex.getMessage(), ex); }
@@ -332,8 +335,9 @@ public final class WardrobePreview {
         if (camera == null) return;
         double aspect = Math.max(0.1, viewport.getWidth()/Math.max(1, viewport.getHeight()));
         double halfAngle = Math.atan(Math.tan(Math.toRadians(camera.getFieldOfView()/2))*Math.min(1,aspect));
-        camera.setTranslateY(framing.centerY());
-        camera.setTranslateZ(-1.15/Math.sin(halfAngle)*zoom*framing.scale());
+        var fitted = framing.group().equals("Head") ? headFraming : framing;
+        camera.setTranslateY(fitted.centerY());
+        camera.setTranslateZ(-1.15/Math.sin(halfAngle)*zoom*fitted.scale());
     }
 
     private void stopAnimation() {

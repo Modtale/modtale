@@ -62,7 +62,7 @@ public final class SavedLookThumbnails implements AutoCloseable {
                     var baseline = catalog.defaultSkin(); baseline.set("cape", composition.path("cape")); composition = baseline;
                 }
                 Group model = LocalAvatarRenderer.load(key.assets(), composition, catalog);
-                var framing = CosmeticFraming.forCategory(category);
+                var framing = CosmeticFraming.forCategory(category).fit(model);
                 Image image = net.modtale.launcher.wardrobe.LocalAvatarThumbnail.render(model, 256,
                         "cape".equals(category) ? 180 : -20, framing.centerY(), framing.scale());
                 Platform.runLater(() -> {
@@ -94,8 +94,9 @@ public final class SavedLookThumbnails implements AutoCloseable {
                     skeletonModel = LocalAvatarRenderer.load(source, sourceCatalog.defaultSkin(), sourceCatalog);
                     skeletonAssets = source;
                 }
+                var fitted = framing.fit(skeletonModel);
                 Image image = net.modtale.launcher.wardrobe.LocalAvatarThumbnail.renderSkeleton(skeletonModel, 256,
-                        yaw, framing.centerY(), framing.scale());
+                        yaw, fitted.centerY(), fitted.scale());
                 Platform.runLater(() -> { if (closed) result.cancel(false); else result.complete(image); });
             } catch (Exception error) {
                 Platform.runLater(() -> { skeletons.remove(key, result); result.completeExceptionally(error); });
