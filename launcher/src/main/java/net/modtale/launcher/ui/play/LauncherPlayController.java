@@ -93,8 +93,8 @@ public final class LauncherPlayController {
     private static final double SIDEBAR_PREF_HEIGHT = 672;
     private static final double NEWS_THUMBNAIL_WIDTH = 264;
     private static final double NEWS_THUMBNAIL_HEIGHT = 149;
-    private static final double FRIEND_AVATAR_SIZE = 34;
-    private static final double IDENTITY_AVATAR_SIZE = 40;
+    private static final double FRIEND_AVATAR_SIZE = 32;
+    private static final double IDENTITY_AVATAR_SIZE = 44;
     private static final double IDENTITY_MENU_AVATAR_SIZE = 28;
     private static final double PROFILE_AVATAR_RADIUS = 8;
     private static final double PLAY_BUTTON_FONT_SIZE = 22;
@@ -1362,6 +1362,7 @@ public final class LauncherPlayController {
         clip.setArcHeight(PROFILE_AVATAR_RADIUS * 2);
         image.setClip(clip);
         avatar.getChildren().add(image);
+        if (avatar == identityAvatar) HytaleProfileAvatarImages.fitVisibleContent(image);
         avatarClient.avatarUrl(username).whenComplete((url, error) -> Platform.runLater(() -> {
             if (error == null && avatar.getChildren().contains(image) && image.getUserData() == null) {
                 HytaleProfileAvatarImages.load(image, avatar.getChildren().getFirst(), url,

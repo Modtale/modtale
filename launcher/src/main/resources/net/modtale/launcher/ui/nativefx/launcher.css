@@ -7939,12 +7939,12 @@
 }
 
 .play-identity-avatar {
-    -fx-min-width: 40px;
-    -fx-pref-width: 40px;
-    -fx-max-width: 40px;
-    -fx-min-height: 40px;
-    -fx-pref-height: 40px;
-    -fx-max-height: 40px;
+    -fx-min-width: 44px;
+    -fx-pref-width: 44px;
+    -fx-max-width: 44px;
+    -fx-min-height: 44px;
+    -fx-pref-height: 44px;
+    -fx-max-height: 44px;
     -fx-background-radius: 8px;
     -fx-background-color: transparent;
     -fx-border-radius: 8px;
