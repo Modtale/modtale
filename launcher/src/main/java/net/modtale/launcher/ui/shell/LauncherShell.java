@@ -24,7 +24,6 @@ import javafx.scene.control.Label;
 import javafx.scene.control.Labeled;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
-import javafx.scene.image.ImageView;
 import javafx.scene.image.Image;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
@@ -518,7 +517,7 @@ public final class LauncherShell {
 
     private Node navbar() {
         Button brand = LauncherNavbar.brand(() -> showView(LauncherView.PLAY));
-        configureBrandLogoHoverAnimation(brand, (ImageView) brand.getGraphic());
+        configureBrandLogoHoverAnimation(brand, brand.getGraphic());
         HBox navigation = new HBox();
         addLocalizedNav(navigation, LauncherView.PLAY, "nav.play", LauncherIcons.Glyph.ZAP);
         addLocalizedNav(navigation, LauncherView.LIBRARY, "nav.library", LauncherIcons.Glyph.SAVE);

@@ -46,6 +46,7 @@ public final class LauncherScrollSupport {
     private final Supplier<Node> rootSupplier;
     private final InteractionIdleTimer interactionIdleTimer;
     private final LauncherScrollAnimator animator;
+    private final LauncherAutoScroll autoScroll;
     private final LongSupplier nanoTime;
     private WheelSequence wheelSequence;
     private final EventHandler<ScrollEvent> scrollHandler = this::observeNativeScroll;
@@ -61,6 +62,7 @@ public final class LauncherScrollSupport {
     public LauncherScrollSupport(Supplier<Node> rootSupplier) {
         this.rootSupplier = rootSupplier;
         this.animator = new LauncherScrollAnimator();
+        this.autoScroll = new LauncherAutoScroll(animator, this::activateAutoScroll, this::revealScrollbars);
         this.nanoTime = System::nanoTime;
         PauseTransition transition = new PauseTransition(INTERACTION_IDLE_DELAY);
         transition.setOnFinished(event -> clearScrollInteraction());
@@ -86,6 +88,7 @@ public final class LauncherScrollSupport {
         this.rootSupplier = rootSupplier;
         this.interactionIdleTimer = interactionIdleTimer;
         this.animator = animator;
+        this.autoScroll = new LauncherAutoScroll(animator, this::activateAutoScroll, this::revealScrollbars);
         this.nanoTime = nanoTime;
     }
 
@@ -122,6 +125,7 @@ public final class LauncherScrollSupport {
             configuredNodes.clear();
         }
         configureNode(root);
+        autoScroll.install(root);
         installedRoots.add(root);
         Platform.runLater(() -> configureScrollbars(root));
         if (!observingWindows) {
@@ -273,7 +277,7 @@ public final class LauncherScrollSupport {
         }
     }
 
-    private static boolean horizontalScrollingEnabled(ScrollPane pane) {
+    static boolean horizontalScrollingEnabled(ScrollPane pane) {
         return !Boolean.FALSE.equals(pane.getProperties().get(HORIZONTAL_SCROLL_PROPERTY));
     }
 
@@ -387,6 +391,11 @@ public final class LauncherScrollSupport {
             root.getProperties().put(ProjectCardFactory.SCROLL_ACTIVE_PROPERTY, Boolean.TRUE);
             root.pseudoClassStateChanged(SCROLLING, true);
         }
+    }
+
+    private void activateAutoScroll() {
+        activateScrollInteraction();
+        interactionIdleTimer.restart();
     }
 
     private void clearScrollInteraction() {

@@ -15,7 +15,6 @@ import java.util.function.Function;
 import javafx.css.PseudoClass;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.CacheHint;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -121,7 +120,6 @@ public final class ProjectCardFactory {
 
         VBox card = new VBox(0);
         card.getStyleClass().addAll("project-card", "project-card-grid");
-        cacheCardSurface(card);
         lockWidth(card, width);
         lockHeight(card, height);
 
@@ -175,7 +173,6 @@ public final class ProjectCardFactory {
     ) {
         HBox card = new HBox(18);
         card.getStyleClass().addAll("project-card", "project-card-list");
-        cacheCardSurface(card);
         card.setAlignment(Pos.TOP_LEFT);
         card.setMaxWidth(Double.MAX_VALUE);
         ProjectCardInteraction.openOnCardClick(card, project, onOpenPage);
@@ -219,7 +216,6 @@ public final class ProjectCardFactory {
     ) {
         HBox card = new HBox(16);
         card.getStyleClass().addAll("project-card", "project-card-compact");
-        cacheCardSurface(card);
         card.setAlignment(Pos.CENTER_LEFT);
         lockWidth(card, cardWidth > 0 ? cardWidth : COMPACT_WIDTH);
         if (cardHeight > 0) {
@@ -263,11 +259,6 @@ public final class ProjectCardFactory {
                 text(classificationLabel(classification), "classification-label")
         );
         return badge;
-    }
-
-    private static void cacheCardSurface(Region card) {
-        card.setCache(true);
-        card.setCacheHint(CacheHint.SPEED);
     }
 
     private Node installStatsRow(

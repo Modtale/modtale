@@ -2,6 +2,11 @@
     -fx-font-family: "Inter";
 }
 
+/* Avoid colored subpixel fringes on Windows dark surfaces. */
+.text {
+    -fx-font-smoothing-type: gray;
+}
+
 .app-root {
     -fx-background-color: #0B1120;
     -fx-font-family: "Inter", "SF Pro Text", "Segoe UI", "System";
