@@ -7434,11 +7434,6 @@
     -fx-padding: 14px 18px 14px 18px;
 }
 
-.project-card-grid .project-card-body {
-    -fx-background-color: #0f172a;
-    -fx-background-radius: 0 0 16px 16px;
-}
-
 .project-copy {
     -fx-padding: 0;
 }
