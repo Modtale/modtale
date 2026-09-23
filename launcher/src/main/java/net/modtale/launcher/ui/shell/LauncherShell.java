@@ -126,6 +126,7 @@ public final class LauncherShell {
     private final LauncherScrollSupport scrollSupport;
     private final LauncherHytaleAuthGate hytaleAuthGate;
     private final LauncherBrowseMenu browseMenu;
+    private final LauncherWardrobeMenu wardrobeMenu;
     private final LauncherAccountMenu accountMenu;
     private final LauncherToolbarActions toolbarActions;
     private final Map<LauncherView, Node> navButtons = new LinkedHashMap<>();
@@ -204,6 +205,8 @@ public final class LauncherShell {
                 this::unlock
         );
         this.browseMenu = new LauncherBrowseMenu(browseController, () -> sceneLayer, navigation::currentView);
+        this.wardrobeMenu = new LauncherWardrobeMenu(() -> sceneLayer, navigation::currentView,
+                () -> wardrobeController, this::showView);
         this.browseController.addControlStateListener(this::refreshBrowseRail);
         this.accountMenu = new LauncherAccountMenu(
                 accountController,
@@ -214,6 +217,7 @@ public final class LauncherShell {
                 followingController::showModal,
                 () -> {
                     browseMenu.hide();
+                    wardrobeMenu.hide();
                     notificationsMenu.hide();
                     followingController.hideModal();
                 }
@@ -222,6 +226,7 @@ public final class LauncherShell {
                 () -> sceneLayer,
                 () -> {
                     browseMenu.hide();
+                    wardrobeMenu.hide();
                     accountMenu.hide();
                     followingController.hideModal();
                 }
@@ -261,6 +266,7 @@ public final class LauncherShell {
         if (browseMenu.panel() != null) {
             root.getChildren().add(browseMenu.panel());
         }
+        root.getChildren().add(wardrobeMenu.panel());
         if (notificationsMenu.panel() != null) {
             root.getChildren().add(notificationsMenu.panel());
         }
@@ -387,6 +393,7 @@ public final class LauncherShell {
             return;
         }
         browseMenu.hide();
+        wardrobeMenu.hide();
         notificationsMenu.hide();
         accountMenu.hide();
         followingController.hideModal();
@@ -446,6 +453,7 @@ public final class LauncherShell {
         navButtons.forEach((key, button) -> pseudo(button, "selected", key.equals(nextView)
                 || (nextView == LauncherView.PROJECT && key == LauncherView.DISCOVER)));
         browseMenu.updateSelected(nextView);
+        wardrobeMenu.updateSelected(nextView);
         accountMenu.updateSelected();
         updateRailButtons();
         pageTitle.setText(LauncherShellTitles.titleFor(nextView, browseController));
@@ -522,7 +530,9 @@ public final class LauncherShell {
         HBox navigation = new HBox();
         addLocalizedNav(navigation, LauncherView.PLAY, "nav.play", LauncherIcons.Glyph.ZAP);
         addLocalizedNav(navigation, LauncherView.LIBRARY, "nav.library", LauncherIcons.Glyph.SAVE);
-        addLocalizedNav(navigation, LauncherView.WARDROBE, "nav.wardrobe", LauncherIcons.Glyph.PALETTE);
+        Button wardrobeButton = wardrobeMenu.button();
+        navButtons.put(LauncherView.WARDROBE, wardrobeButton);
+        navigation.getChildren().add(wardrobeButton);
         Button browseButton = browseMenu.button();
         navButtons.put(LauncherView.DISCOVER, browseButton);
         List<Button> buttons = new ArrayList<>(navigation.getChildren().stream().map(Button.class::cast).toList());
@@ -1046,6 +1056,7 @@ public final class LauncherShell {
 
     private void hideDropdownsOnOutsidePress(MouseEvent event) {
         browseMenu.hideOnOutsidePress(event.getTarget());
+        wardrobeMenu.hideOnOutsidePress(event.getTarget());
         notificationsMenu.hideOnOutsidePress(event.getTarget());
         accountMenu.hideOnOutsidePress(event.getTarget());
     }

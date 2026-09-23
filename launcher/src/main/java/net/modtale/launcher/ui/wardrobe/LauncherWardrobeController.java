@@ -30,7 +30,7 @@ import static net.modtale.launcher.ui.common.LauncherUi.*;
 /** Native wardrobe. Network work never blocks the application thread. */
 public final class LauncherWardrobeController implements AutoCloseable {
     private static final LauncherLogger LOG = LauncherLog.getLogger(LauncherWardrobeController.class);
-    private enum Tab { CUSTOMIZE, POPULAR, SAVED }
+    public enum Tab { CUSTOMIZE, POPULAR, SAVED }
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final PseudoClass SELECTED = PseudoClass.getPseudoClass("selected");
     private final PopularSkinClient popular;
@@ -95,6 +95,11 @@ public final class LauncherWardrobeController implements AutoCloseable {
 
     public Node view() { return root; }
     public void setOpenSettingsAction(Runnable action) { openSettings = Objects.requireNonNull(action); }
+    public void showTab(Tab value) {
+        if (unavailable || tab == value) return;
+        tabs.get(value).setSelected(true);
+        selectTab(value);
+    }
     CosmeticEditorController editorForTesting() { return editor; }
 
     public void open() {
