@@ -31,7 +31,7 @@ public final class LauncherNavbar {
     }
 
     public static Button brand(Runnable action) {
-        javafx.scene.Node logo = LauncherVectorLogo.create();
+        javafx.scene.Node logo = LauncherVectorLogo.create(36);
         Button brand = new Button(null, logo);
         brand.getStyleClass().add("brand");
         brand.setMinWidth(142);

@@ -18,14 +18,13 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
 /** Renders the site logo as paths at the launcher window's actual pixel scale. */
-final class LauncherVectorLogo {
+public final class LauncherVectorLogo {
     private static final String RESOURCE = "/net/modtale/launcher/ui/nativefx/assets/logo_light.svg";
-    private static final double HEIGHT = 36;
     private static final Pattern TRANSFORM = Pattern.compile("(translate|matrix)\\(([^)]*)\\)");
 
     private LauncherVectorLogo() { }
 
-    static Node create() {
+    public static Node create(double height) {
         try (InputStream input = Objects.requireNonNull(LauncherVectorLogo.class.getResourceAsStream(RESOURCE))) {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
@@ -34,7 +33,7 @@ final class LauncherVectorLogo {
             factory.setXIncludeAware(false);
             Group artwork = group(factory.newDocumentBuilder().parse(input).getDocumentElement());
             Bounds source = artwork.getBoundsInLocal();
-            double scale = HEIGHT / source.getHeight();
+            double scale = height / source.getHeight();
             artwork.getTransforms().add(new Scale(scale, scale));
             Bounds scaled = artwork.getBoundsInParent();
             artwork.setTranslateX(-scaled.getMinX());
@@ -42,9 +41,9 @@ final class LauncherVectorLogo {
             artwork.setMouseTransparent(true);
 
             Pane viewport = new Pane(artwork);
-            viewport.setMinSize(scaled.getWidth(), HEIGHT);
-            viewport.setPrefSize(scaled.getWidth(), HEIGHT);
-            viewport.setMaxSize(scaled.getWidth(), HEIGHT);
+            viewport.setMinSize(scaled.getWidth(), height);
+            viewport.setPrefSize(scaled.getWidth(), height);
+            viewport.setMaxSize(scaled.getWidth(), height);
             return viewport;
         } catch (Exception ex) {
             throw new IllegalStateException("Could not render the launcher logo", ex);

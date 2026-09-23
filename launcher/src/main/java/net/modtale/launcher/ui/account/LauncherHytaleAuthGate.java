@@ -2,13 +2,11 @@ package net.modtale.launcher.ui.account;
 
 import static net.modtale.launcher.ui.common.LauncherUi.primaryButton;
 
-import java.util.Objects;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
+import net.modtale.launcher.ui.shell.LauncherVectorLogo;
 import javafx.scene.layout.VBox;
 import net.modtale.launcher.hytale.HytaleAuthService;
 import net.modtale.launcher.ui.common.LauncherIcons;
@@ -62,10 +60,7 @@ public final class LauncherHytaleAuthGate {
         gate.getStyleClass().add("auth-gate");
         gate.setAlignment(Pos.CENTER);
 
-        ImageView logo = new ImageView(new Image(Objects.requireNonNull(getClass()
-                .getResource("/net/modtale/launcher/ui/nativefx/assets/logo_light.png")).toExternalForm(), true));
-        logo.setFitHeight(42);
-        logo.setPreserveRatio(true);
+        Node logo = LauncherVectorLogo.create(42);
 
         Label title = new Label("Link a Hytale account");
         title.getStyleClass().add("auth-title");
