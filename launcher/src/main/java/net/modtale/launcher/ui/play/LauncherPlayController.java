@@ -1317,7 +1317,7 @@ public final class LauncherPlayController {
     }
 
     private ImageView containedImageView(String imageUrl, double width, double height) {
-        Image image = cachedImage(imageUrl, 0, 0, true, false);
+        Image image = cachedImage(imageUrl, width * 2, height * 2, true, true);
         ImageView imageView = new ImageView(image);
         imageView.setFitWidth(width);
         imageView.setFitHeight(height);
