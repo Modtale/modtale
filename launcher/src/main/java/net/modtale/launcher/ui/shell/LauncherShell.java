@@ -471,7 +471,8 @@ public final class LauncherShell {
                 || view == LauncherView.DISCOVER
                 || view == LauncherView.LIBRARY
                 || view == LauncherView.UPDATES
-                || view == LauncherView.WARDROBE;
+                || view == LauncherView.WARDROBE
+                || view == LauncherView.SETTINGS;
     }
 
     static Insets workspaceInsetsFor(LauncherView view) {
