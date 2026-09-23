@@ -5,11 +5,17 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 import javafx.application.Platform;
+import javafx.geometry.Pos;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.Label;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import net.modtale.launcher.ui.common.StatusModal;
 import net.modtale.launcher.ui.common.TransferLoadingModal;
 import net.modtale.launcher.ui.feedback.LauncherFeedback;
+import net.modtale.launcher.ui.library.LibraryToggleBox;
 import net.modtale.launcher.ui.settings.LauncherSettingsController;
 import net.modtale.launcher.update.LauncherUpdateCandidate;
 import net.modtale.launcher.update.LauncherUpdateService;
@@ -138,9 +144,26 @@ public final class LauncherUpdateController {
     }
 
     private void promptForUpdate(LauncherUpdateCandidate update, String currentVersion) {
-        CheckBox autoUpdates = new CheckBox("Enable launcher auto-updates");
-        autoUpdates.getStyleClass().add("native-check");
+        CheckBox autoUpdates = new LibraryToggleBox();
+        autoUpdates.setAccessibleText("Enable launcher auto-updates");
         autoUpdates.setSelected(settingsController.settings().isLauncherAutoUpdates());
+
+        Label toggleTitle = new Label("Automatic updates");
+        toggleTitle.getStyleClass().add("launcher-update-toggle-title");
+        toggleTitle.setLabelFor(autoUpdates);
+        Label toggleDescription = new Label("Install future launcher updates automatically.");
+        toggleDescription.getStyleClass().add("launcher-update-toggle-description");
+        toggleDescription.setWrapText(true);
+        VBox toggleCopy = new VBox(3, toggleTitle, toggleDescription);
+        HBox.setHgrow(toggleCopy, Priority.ALWAYS);
+
+        HBox toggleRow = new HBox(16, toggleCopy, autoUpdates);
+        toggleRow.getStyleClass().add("launcher-update-toggle-row");
+        toggleRow.setAlignment(Pos.CENTER_LEFT);
+        toggleRow.setPrefWidth(400);
+        toggleRow.setOnMouseClicked(event -> {
+            if (event.getTarget() != autoUpdates) autoUpdates.fire();
+        });
 
         StatusModal.Result result = StatusModal.builder(overlayHost)
                 .type(StatusModal.Type.INFO)
@@ -150,7 +173,7 @@ public final class LauncherUpdateController {
                         + updateService.installationMessage())
                 .actionLabel("Update Launcher")
                 .secondaryLabel("Later")
-                .content(autoUpdates)
+                .content(toggleRow)
                 .showAndWait();
         boolean autoUpdatesChanged = settingsController.settings().isLauncherAutoUpdates() != autoUpdates.isSelected();
         if (autoUpdatesChanged) {

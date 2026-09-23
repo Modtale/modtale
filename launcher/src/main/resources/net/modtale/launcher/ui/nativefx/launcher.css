@@ -9437,6 +9437,31 @@
     -fx-text-alignment: center;
 }
 
+.launcher-update-toggle-row {
+    -fx-padding: 14px 16px;
+    -fx-background-color: rgba(15, 23, 42, 0.55);
+    -fx-background-radius: 12px;
+    -fx-border-color: rgba(148, 163, 184, 0.20);
+    -fx-border-radius: 12px;
+    -fx-cursor: hand;
+}
+
+.launcher-update-toggle-row:hover {
+    -fx-background-color: rgba(30, 41, 59, 0.72);
+    -fx-border-color: rgba(96, 165, 250, 0.34);
+}
+
+.launcher-update-toggle-title {
+    -fx-text-fill: #f8fafc;
+    -fx-font-size: 14px;
+    -fx-font-weight: 700;
+}
+
+.launcher-update-toggle-description {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 12px;
+}
+
 .status-modal-footer {
     -fx-padding: 16px;
     -fx-background-color: #1e293b;
