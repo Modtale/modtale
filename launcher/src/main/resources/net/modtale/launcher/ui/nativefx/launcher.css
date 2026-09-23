@@ -9839,7 +9839,7 @@
 .settings-category {
     -fx-alignment: center-left;
     -fx-graphic-text-gap: 14px;
-    -fx-padding: 14px;
+    -fx-padding: 14px 14px 14px 8px;
     -fx-background-color: transparent;
     -fx-background-radius: 18px;
     -fx-border-color: transparent;
