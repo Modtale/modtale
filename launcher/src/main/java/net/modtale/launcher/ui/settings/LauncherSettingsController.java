@@ -289,11 +289,8 @@ public final class LauncherSettingsController {
         });
         GridPane channelGrid = settingsGrid();
         addField(channelGrid, 0, I18N.binding("settings.launcherUpdates.channel"), form.launcherChannelCombo());
-        Label channelDescription = new Label();
-        I18N.bind(channelDescription, "settings.launcherUpdates.channelsDescription");
-        channelDescription.setWrapText(true);
         launcherUpdateStatus.setWrapText(true);
-        launcherUpdates.getChildren().addAll(channelGrid, channelDescription, launcherToggles, launcherUpdateStatus, checkLauncher);
+        launcherUpdates.getChildren().addAll(channelGrid, launcherToggles, launcherUpdateStatus, checkLauncher);
 
         VBox cache = settingsActionCard("settings.cache.title", "settings.cache.description",
                 LauncherIcons.Glyph.DATABASE);

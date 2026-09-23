@@ -69,7 +69,6 @@ public final class LauncherSettingsForm {
         LauncherTooltips.install(localeCombo, "Choose the launcher language");
         LauncherTooltips.install(hytaleBranchCombo, "Choose the Hytale release or pre-release patchline");
         LauncherTooltips.install(hytaleVersionCombo, "Choose the Hytale version to install or launch");
-        launcherChannelCombo.setTooltip(i18n.tooltip("settings.launcherUpdates.channelsDescription"));
         LauncherTooltips.install(includeDependenciesCheck, "Include required dependencies when installing projects");
         LauncherTooltips.install(includeOptionalCheck, "Also include optional dependencies when installing projects");
         LauncherTooltips.install(autoUpdatesCheck, "Automatically check installed projects for updates");
