@@ -37,13 +37,13 @@ final class WardrobeCategoryImages implements AutoCloseable {
                     } while (batch.hasNext());
                     String preferred = switch (modelCategory) {
                         case "face" -> key.equals("skinFeature") ? "Face_Neutral_Freckles" : "Face_Neutral";
-                        case "haircut" -> "Mohawk"; case "ears" -> "Ogre_Ears";
+                        case "haircut" -> "MagicalPonytail"; case "ears" -> "Elf_Ears_Large_Down";
                         case "mouth" -> "Mouth_Makeup";
                         case "headAccessory" -> "WitchHat"; case "faceAccessory" -> "RoundGlasses";
                         case "earAccessory" -> "EarHoops"; case "facialHair" -> "TwirlyMoustache";
                         case "overtop" -> "PuffyJacket"; case "undertop" -> "Short_Sleeves_Shirt";
                         case "pants" -> "ApprenticePants"; case "overpants" -> "KneePads";
-                        case "underwear" -> "Boxer"; case "shoes" -> "Boots_Thick"; case "gloves" -> "BoxingGloves";
+                        case "underwear" -> "Boxer"; case "shoes" -> "HeeledBoots_Popstar"; case "gloves" -> "BoxingGloves";
                         case "cape" -> "Cape_Royal_Emissary"; default -> "";
                     };
                     var choice = options.stream().filter(o -> o.assetId().equals(preferred))
