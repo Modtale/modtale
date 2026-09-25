@@ -43,6 +43,8 @@ describe('external link protection', () => {
         `${releaseBase}launcher-stable-v1.2.3/Modtale.dmg`,
         `${releaseBase}launcher-stable-v1.2.3/Modtale.pkg`,
         `${releaseBase}launcher-develop-v1.2.4-develop.10.1/Modtale.AppImage`,
+        `${releaseBase}launcher-v0.2.175/modtale-launcher-0.2.175-x86_64.AppImage`,
+        `${releaseBase}launcher-develop-v0.2.193-develop.193.1/modtale-launcher-0.2.193-develop.193.1-x86_64.AppImage`,
         'https://modtale.net/launcher',
         'https://dev.modtale.net/launcher',
     ])('allows official downloads and first-party links: %s', async (href) => {
