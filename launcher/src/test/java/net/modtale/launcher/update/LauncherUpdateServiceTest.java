@@ -59,7 +59,7 @@ class LauncherUpdateServiceTest {
     }
 
     @Test
-    void findsChannelsAcrossPagesAndAllowsSwitchingBackToOlderStable() throws Exception {
+    void findsChannelsAcrossPagesWithoutDowngradingOnChannelSwitch() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         String develop = release("launcher-develop-v2.0.0-develop.10.1", true, automaticAssets());
         String stable = release("launcher-stable-v1.0.0", false, automaticAssets());
@@ -75,8 +75,10 @@ class LauncherUpdateServiceTest {
         try {
             LauncherUpdateService service = new LauncherUpdateService(HttpClient.newHttpClient(), "Modtale/modtale",
                     "http://127.0.0.1:" + server.getAddress().getPort());
-            assertEquals("1.0.0", service.latestUpdate("2.0.0-develop.10.1", "stable").orElseThrow().version());
-            assertEquals("2.0.0-develop.10.1", service.latestUpdate("3.0.0", "develop").orElseThrow().version());
+            assertTrue(service.latestUpdate("2.0.0-develop.10.1", "stable").isEmpty());
+            assertTrue(service.latestUpdate("3.0.0", "develop").isEmpty());
+            assertEquals("1.0.0", service.latestUpdate("0.9.0-develop.1.1", "stable").orElseThrow().version());
+            assertEquals("2.0.0-develop.10.1", service.latestUpdate("1.0.0", "develop").orElseThrow().version());
             assertTrue(service.latestUpdate("1.0.0", "stable").isEmpty());
             assertTrue(service.latestUpdate("2.0.0-develop.10.1", "develop").isEmpty());
             assertTrue(service.latestUpdate("2.0.0", "stable").isEmpty());

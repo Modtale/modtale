@@ -71,8 +71,7 @@ public class LauncherUpdateService {
 
         GitHubRelease release = latestRelease.get();
         String latestVersion = LauncherVersion.normalizeTagVersion(release.tagName());
-        boolean switchingChannel = currentVersion.contains("-develop.") != "develop".equals(channel);
-        if (!switchingChannel && !LauncherVersion.isNewer(latestVersion, currentVersion)) {
+        if (!LauncherVersion.isNewer(latestVersion, currentVersion)) {
             return Optional.empty();
         }
 
