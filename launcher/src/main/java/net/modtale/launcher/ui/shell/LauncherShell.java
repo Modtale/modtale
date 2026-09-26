@@ -156,6 +156,8 @@ public final class LauncherShell {
     private boolean startupProtocolHandled;
     private boolean undecoratedWindow;
     private boolean nativeWindowMoveInProgress;
+    private WindowsWindowManager windowsWindowManager;
+    private MacWindowManager macWindowManager;
     private LinuxWindowManagerSupport.ResizeDirection fallbackResizeDirection;
     private double windowDragOffsetX;
     private double windowDragOffsetY;
@@ -553,12 +555,16 @@ public final class LauncherShell {
         controls.setAlignment(Pos.CENTER);
         controls.setMaxSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
         Button minimize = windowControl("window.minimize", LauncherIcons.Glyph.MINUS);
-        minimize.setOnAction(event -> stage.setIconified(true));
+        minimize.setOnAction(event -> {
+            if (windowsWindowManager != null) windowsWindowManager.minimize();
+            else if (macWindowManager != null) macWindowManager.minimize();
+            else stage.setIconified(true);
+        });
         Button maximize = windowControl("window.maximize", LauncherIcons.Glyph.MAXIMIZE);
-        maximize.setOnAction(event -> stage.setMaximized(!stage.isMaximized()));
+        maximize.setOnAction(event -> toggleWindowMaximized());
         stage.maximizedProperty().addListener((observable, wasMaximized, isMaximized) ->
-                updateMaximizeControl(maximize, isMaximized));
-        updateMaximizeControl(maximize, stage.isMaximized());
+                updateMaximizeControl(maximize, isWindowMaximized()));
+        updateMaximizeControl(maximize, isWindowMaximized());
         Button close = windowControl("window.close", LauncherIcons.Glyph.X);
         close.getStyleClass().add("close");
         close.setOnAction(event -> stage.close());
@@ -591,12 +597,22 @@ public final class LauncherShell {
             if (!isPrimaryButtonEvent(event) || isWindowControlEvent(event) || event.getClickCount() > 1) {
                 return;
             }
+            if (windowsWindowManager != null && windowsWindowManager.beginMove()) {
+                nativeWindowMoveInProgress = true;
+                event.consume();
+                return;
+            }
+            if (macWindowManager != null && macWindowManager.beginMove()) {
+                nativeWindowMoveInProgress = true;
+                event.consume();
+                return;
+            }
             if (LinuxWindowManagerSupport.beginMove(stage, event)) {
                 nativeWindowMoveInProgress = true;
                 event.consume();
                 return;
             }
-            if (stage.isMaximized()) {
+            if (isWindowMaximized()) {
                 return;
             }
             windowDragOffsetX = event.getSceneX();
@@ -607,18 +623,54 @@ public final class LauncherShell {
                 event.consume();
                 return;
             }
-            if (isWindowControlEvent(event) || stage.isMaximized()) {
+            if (isWindowControlEvent(event) || isWindowMaximized()) {
                 return;
             }
             stage.setX(event.getScreenX() - windowDragOffsetX);
             stage.setY(event.getScreenY() - windowDragOffsetY);
         });
-        dragSurface.setOnMouseReleased(event -> nativeWindowMoveInProgress = false);
+        dragSurface.setOnMouseReleased(event -> {
+            nativeWindowMoveInProgress = false;
+        });
         dragSurface.setOnMouseClicked(event -> {
             if (event.getClickCount() == 2 && !isWindowControlEvent(event)) {
-                stage.setMaximized(!stage.isMaximized());
+                toggleWindowMaximized();
             }
         });
+    }
+
+    private boolean isWindowMaximized() {
+        return stage.isMaximized() || (macWindowManager != null && macWindowManager.isMaximized());
+    }
+
+    private void toggleWindowMaximized() {
+        if (windowsWindowManager != null) {
+            windowsWindowManager.toggleMaximized();
+        } else if (macWindowManager != null) {
+            macWindowManager.toggleMaximized(stage);
+        } else {
+            stage.setMaximized(!stage.isMaximized());
+        }
+        Platform.runLater(this::refreshMaximizeControl);
+    }
+
+    private void refreshMaximizeControl() {
+        if (windowControlsNode instanceof HBox controls && controls.getChildren().size() > 1
+                && controls.getChildren().get(1) instanceof Button maximize) {
+            updateMaximizeControl(maximize, isWindowMaximized());
+        }
+    }
+
+    private static boolean isWindows() {
+        return System.getProperty("os.name", "").toLowerCase().contains("win");
+    }
+
+    private static boolean isMac() {
+        return System.getProperty("os.name", "").toLowerCase().contains("mac");
+    }
+
+    private static boolean isLinux() {
+        return System.getProperty("os.name", "").toLowerCase().contains("linux");
     }
 
     private void configureWindowResize(Scene scene) {
@@ -631,11 +683,15 @@ public final class LauncherShell {
 
     private void startWindowResize(MouseEvent event) {
         fallbackResizeDirection = null;
-        if (!isPrimaryButtonEvent(event) || stage.isMaximized() || isWindowControlEvent(event)) {
+        if (!isPrimaryButtonEvent(event) || isWindowMaximized() || isWindowControlEvent(event)) {
             return;
         }
         LinuxWindowManagerSupport.ResizeDirection direction = resizeDirection(event);
         if (direction == null) {
+            return;
+        }
+        if (windowsWindowManager != null && windowsWindowManager.beginResize(direction)) {
+            event.consume();
             return;
         }
         if (LinuxWindowManagerSupport.beginResize(stage, event, direction)) {
@@ -696,7 +752,7 @@ public final class LauncherShell {
     }
 
     private void updateResizeCursor(MouseEvent event) {
-        if (stage.isMaximized() || isWindowControlEvent(event)) {
+        if (isWindowMaximized() || isWindowControlEvent(event)) {
             stage.getScene().setCursor(Cursor.DEFAULT);
             return;
         }
@@ -775,8 +831,7 @@ public final class LauncherShell {
         if (customWindowChrome != null && !customWindowChrome.isBlank()) {
             return Boolean.parseBoolean(customWindowChrome);
         }
-        String os = System.getProperty("os.name", "").toLowerCase();
-        return os.contains("linux") || os.contains("win");
+        return true;
     }
 
     private static void configureBrandLogoHoverAnimation(Button brand, Node logo) {
@@ -818,10 +873,16 @@ public final class LauncherShell {
         if (!primaryStage.isShowing()) {
             primaryStage.show();
         }
+        if (undecoratedWindow && isWindows() && windowsWindowManager == null) {
+            windowsWindowManager = WindowsWindowManager.attach(primaryStage);
+        }
+        if (undecoratedWindow && isMac() && macWindowManager == null) {
+            macWindowManager = MacWindowManager.attach(primaryStage);
+        }
         primaryStage.setIconified(false);
         primaryStage.toFront();
         primaryStage.requestFocus();
-        if (undecoratedWindow) {
+        if (undecoratedWindow && isLinux()) {
             primaryStage.setAlwaysOnTop(true);
             Platform.runLater(() -> primaryStage.setAlwaysOnTop(false));
         }
@@ -1048,10 +1109,7 @@ public final class LauncherShell {
         }
         pageTitle.setText(LauncherShellTitles.titleFor(current, browseController));
         pageSubtitle.setText(LauncherShellTitles.subtitleFor(current, browseController));
-        if (stage != null && stage.isMaximized() && windowControlsNode instanceof HBox controls
-                && controls.getChildren().size() > 1 && controls.getChildren().get(1) instanceof Button maximize) {
-            updateMaximizeControl(maximize, true);
-        }
+        if (stage != null) refreshMaximizeControl();
     }
 
     private void hideDropdownsOnOutsidePress(MouseEvent event) {

@@ -74,10 +74,27 @@
                   Execute="deferred" Impersonate="yes" Return="check" />
 
     <!-- Standard required root -->
-    <Directory Id="TARGETDIR" Name="SourceDir"/>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ModtaleStartMenuFolder" Name="$(var.JpAppName)"/>
+      </Directory>
+    </Directory>
 
+    <!-- The app runs in Java, but pinned shortcuts must relaunch the bootstrap EXE. -->
+    <DirectoryRef Id="ModtaleStartMenuFolder">
+        <Component Id="ModtaleStartMenuShortcut" Guid="*" Win64="yes">
+          <Shortcut Id="ModtaleStartMenuLink" Name="$(var.JpAppName)"
+                    Target="[INSTALLDIR]$(var.JpAppName).exe" WorkingDirectory="INSTALLDIR" Advertise="no">
+            <ShortcutProperty Key="System.AppUserModel.ID" Value="net.modtale.launcher"/>
+          </Shortcut>
+          <RemoveFolder Id="RemoveModtaleStartMenuFolder" On="uninstall"/>
+          <RegistryValue Root="HKCU" Key="Software\Modtale\Launcher" Name="StartMenuShortcut"
+                         Type="integer" Value="1" KeyPath="yes"/>
+        </Component>
+    </DirectoryRef>
     <Feature Id="DefaultFeature" Title="!(loc.MainFeatureTitle)" Level="1">
       <ComponentGroupRef Id="Shortcuts"/>
+      <ComponentRef Id="ModtaleStartMenuShortcut"/>
       <ComponentGroupRef Id="Files"/>
       <ComponentGroupRef Id="FileAssociations"/>
       <ComponentGroupRef Id="FragmentOsCondition"/>
