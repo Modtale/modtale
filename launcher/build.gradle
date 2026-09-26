@@ -431,8 +431,6 @@ configureJpackageTask(
         {
             def args = [
                     '--resource-dir', file('packaging/windows').absolutePath,
-                    '--win-menu',
-                    '--win-menu-group', appDisplayName,
                     '--win-shortcut',
                     '--win-upgrade-uuid', '3d6c6852-fc6f-4a7e-a617-988263243f90'
             ]
