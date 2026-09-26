@@ -9,8 +9,8 @@ import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
-import net.modtale.service.project.team.ProjectTeamPersistence;
-import net.modtale.service.project.team.ProjectTeamSnapshot;
+import net.modtale.service.admin.review.ProjectReviewPersistence;
+import net.modtale.service.admin.review.ProjectReviewSnapshot;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.auth.ApiKeyService;
 import net.modtale.service.project.access.ProjectAccessService;
@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class TeamMembershipService {
 
-    private final ProjectTeamPersistence reviewPersistence;
+    private final ProjectReviewPersistence reviewPersistence;
     private final UserRepository userRepository;
     private final ProjectService projectService;
     private final ProjectAccessService projectAccessService;
@@ -32,7 +32,7 @@ public class TeamMembershipService {
     private final AccessControlService accessControlService;
 
     public TeamMembershipService(
-            ProjectTeamPersistence reviewPersistence,
+            ProjectReviewPersistence reviewPersistence,
             UserRepository userRepository,
             ProjectService projectService,
             ProjectAccessService projectAccessService,
@@ -55,7 +55,7 @@ public class TeamMembershipService {
         Project project = projectAccessService.requireProjectPermission(id, requester, "PROJECT_TEAM_INVITE",
                 "You do not have permission to invite contributors to this project.");
         projectMutationGuard.ensureEditable(project);
-        var snapshot = reviewPersistence.capture(id, ProjectTeamSnapshot.token(project));
+        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
         project = snapshot.project();
         var role = requireRole(project, roleId);
 
@@ -88,7 +88,7 @@ public class TeamMembershipService {
     public void cancelInvite(String id, String targetUserId, String requestId, User requester) {
         Project project = projectAccessService.requireProjectPermission(id, requester, "PROJECT_TEAM_INVITE",
                 "You do not have permission to manage contributor invites for this project.");
-        var snapshot = reviewPersistence.capture(id, ProjectTeamSnapshot.token(project));
+        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
         project = snapshot.project();
         var invite = ProjectInvitationPolicy.require(project, targetUserId, requestId, false);
         project.getTeamInvites().remove(invite);
@@ -99,7 +99,7 @@ public class TeamMembershipService {
         Project project = projectAccessService.requireProjectPermission(id, requester, "PROJECT_MEMBER_EDIT_ROLE",
                 "You do not have permission to update contributor roles for this project.");
         projectMutationGuard.ensureEditable(project);
-        var snapshot = reviewPersistence.capture(id, ProjectTeamSnapshot.token(project));
+        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
         project = snapshot.project();
 
         Project.ProjectRole role = project.getProjectRoles().stream()
@@ -122,7 +122,7 @@ public class TeamMembershipService {
         Project project = projectService.getRawProjectById(id);
         if (project != null && (accessControlService.hasProjectPermission(project, requester, "PROJECT_TEAM_REMOVE") || requester.getId().equals(targetUserId))) {
             projectMutationGuard.ensureEditable(project);
-            var snapshot = reviewPersistence.capture(id, ProjectTeamSnapshot.token(project));
+            var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
             project = snapshot.project();
             boolean removed = project.getTeamMembers() != null && project.getTeamMembers().removeIf(member -> member.getUserId().equals(targetUserId));
             saveProject(snapshot);
@@ -139,7 +139,7 @@ public class TeamMembershipService {
         if (project == null) {
             throw new ResourceNotFoundException("We couldn't find the project for that invite.");
         }
-        var snapshot = reviewPersistence.capture(id, ProjectTeamSnapshot.token(project));
+        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
         project = snapshot.project();
 
         projectMutationGuard.ensureEditable(project);
@@ -162,20 +162,20 @@ public class TeamMembershipService {
     public void declineInvite(String id, String userId, String requestId) {
         Project project = projectService.getRawProjectById(id);
         if (project == null) throw new ResourceNotFoundException("Project not found.");
-        var snapshot = reviewPersistence.capture(id, ProjectTeamSnapshot.token(project));
+        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
         project = snapshot.project();
         var invite = ProjectInvitationPolicy.require(project, userId, requestId, false);
         project.getTeamInvites().remove(invite);
         saveInvitation(snapshot, userId, requestId, false);
     }
 
-    private void saveInvitation(ProjectTeamPersistence.Snapshot snapshot, String userId, String requestId, boolean accepting) {
-        if (!reviewPersistence.resolveContributorInvite(snapshot, userId, requestId, accepting)) throw ProjectTeamSnapshot.conflict();
+    private void saveInvitation(ProjectReviewPersistence.Snapshot snapshot, String userId, String requestId, boolean accepting) {
+        if (!reviewPersistence.resolveContributorInvite(snapshot, userId, requestId, accepting)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(snapshot.project());
     }
 
-    private void saveProject(ProjectTeamPersistence.Snapshot snapshot) {
-        if (!reviewPersistence.applyTeam(snapshot)) throw ProjectTeamSnapshot.conflict();
+    private void saveProject(ProjectReviewPersistence.Snapshot snapshot) {
+        if (!reviewPersistence.applyTeam(snapshot)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(snapshot.project());
     }
 

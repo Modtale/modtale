@@ -208,6 +208,17 @@ public class StorageService {
         }
     }
 
+    public byte[] downloadBounded(String fileName,int maxBytes) {
+        if(maxBytes<1 || maxBytes>100*1024*1024)throw new IllegalArgumentException("Invalid download limit");
+        try (ResponseInputStream<GetObjectResponse> response=s3Client.getObject(GetObjectRequest.builder().bucket(bucketName).key(fileName).build())) {
+            Long size=response.response().contentLength();
+            if(size!=null && (size<0 || size>maxBytes)){response.abort();throw new IOException("Stored artifact exceeds download limit");}
+            byte[] bytes=response.readNBytes(maxBytes+1);
+            if(bytes.length>maxBytes || size!=null && size!=bytes.length){response.abort();throw new IOException("Stored artifact length is invalid");}
+            return bytes;
+        } catch(IOException | SdkException failure) {throw StorageDownloadException.from(failure,"Failed to download the requested artifact.");}
+    }
+
     public java.util.Set<String> findExistingKeys(java.util.Set<String> requiredKeys) {
         java.util.Set<String> found = new java.util.HashSet<>();
         if (requiredKeys.isEmpty()) return found;

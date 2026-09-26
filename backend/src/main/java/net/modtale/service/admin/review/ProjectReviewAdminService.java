@@ -1,8 +1,6 @@
 package net.modtale.service.admin.review;
 
-import java.util.List;
 import net.modtale.model.dto.admin.AdminProjectReviewDTO;
-import net.modtale.model.dto.admin.AdminVerificationQueueItemDTO;
 import net.modtale.model.user.User;
 import org.springframework.stereotype.Service;
 
@@ -20,27 +18,23 @@ public class ProjectReviewAdminService {
         this.projectReviewDecisionService = projectReviewDecisionService;
     }
 
-    public List<AdminVerificationQueueItemDTO> getVerificationQueue() {
-        return projectReviewQueryService.getVerificationQueue();
-    }
-
     public AdminProjectReviewDTO getProjectReviewDetails(String id) {
         return projectReviewQueryService.getProjectReviewDetails(id);
     }
 
-    public void publishProject(User adminUser, String id) {
-        projectReviewDecisionService.publishProject(adminUser, id);
+    public void publishProject(User adminUser, String id, String reviewToken, String versionId) {
+        projectReviewDecisionService.publishProject(adminUser, id, reviewToken, versionId);
     }
 
-    public void approveVersion(User adminUser, String id, String versionId) {
-        projectReviewDecisionService.approveVersion(adminUser, id, versionId);
+    public void approveVersion(User adminUser, String id, String versionId, String reviewToken) {
+        projectReviewDecisionService.approveVersion(adminUser, id, versionId, reviewToken);
     }
 
-    public void rejectVersion(User adminUser, String id, String versionId, String reason) {
-        projectReviewDecisionService.rejectVersion(adminUser, id, versionId, reason);
+    public void rejectVersion(User adminUser, String id, String versionId, String reason, String reviewToken) {
+        projectReviewDecisionService.rejectVersion(adminUser, id, versionId, reason, reviewToken);
     }
 
-    public void rejectProject(User adminUser, String id, String reason) {
-        projectReviewDecisionService.rejectProject(adminUser, id, reason);
+    public void rejectProject(User adminUser, String id, String reason, String reviewToken) {
+        projectReviewDecisionService.rejectProject(adminUser, id, reason, reviewToken);
     }
 }

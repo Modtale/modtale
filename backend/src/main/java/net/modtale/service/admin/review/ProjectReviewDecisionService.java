@@ -17,26 +17,26 @@ public class ProjectReviewDecisionService {
         this.projectReviewEffectService = projectReviewEffectService;
     }
 
-    public void publishProject(User adminUser, String id) {
-        projectReviewTransitionService.publishProject(adminUser, id);
+    public void publishProject(User adminUser, String id, String reviewToken, String versionId) {
+        projectReviewTransitionService.publishProject(adminUser, id, reviewToken, versionId);
         projectReviewEffectService.onProjectPublished(adminUser, id);
     }
 
-    public void approveVersion(User adminUser, String id, String versionId) {
+    public void approveVersion(User adminUser, String id, String versionId, String reviewToken) {
         ProjectReviewTransitionService.VersionReviewDecision decision =
-                projectReviewTransitionService.approveVersion(id, versionId);
+                projectReviewTransitionService.approveVersion(id, versionId, reviewToken);
         projectReviewEffectService.onVersionApproved(adminUser, id, versionId, decision);
     }
 
-    public void rejectVersion(User adminUser, String id, String versionId, String reason) {
+    public void rejectVersion(User adminUser, String id, String versionId, String reason, String reviewToken) {
         ProjectReviewTransitionService.VersionReviewDecision decision =
-                projectReviewTransitionService.rejectVersion(id, versionId, reason);
+                projectReviewTransitionService.rejectVersion(id, versionId, reason, reviewToken);
         projectReviewEffectService.onVersionRejected(adminUser, id, versionId, decision);
     }
 
-    public void rejectProject(User adminUser, String id, String reason) {
+    public void rejectProject(User adminUser, String id, String reason, String reviewToken) {
         ProjectReviewTransitionService.ProjectRejectionDecision decision =
-                projectReviewTransitionService.rejectProject(id, reason);
+                projectReviewTransitionService.rejectProject(id, reason, reviewToken);
         projectReviewEffectService.onProjectRejected(adminUser, id, decision);
     }
 }

@@ -9,8 +9,8 @@ import net.modtale.exception.ResourceNotFoundException;
 import net.modtale.model.project.Project;
 import net.modtale.model.user.ApiKey;
 import net.modtale.model.user.User;
-import net.modtale.service.project.team.ProjectTeamPersistence;
-import net.modtale.service.project.team.ProjectTeamSnapshot;
+import net.modtale.service.admin.review.ProjectReviewPersistence;
+import net.modtale.service.admin.review.ProjectReviewSnapshot;
 import net.modtale.repository.user.UserRepository;
 import net.modtale.service.auth.ApiKeyService;
 import net.modtale.service.project.access.ProjectAccessService;
@@ -22,7 +22,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class TeamTransferService {
 
-    private final ProjectTeamPersistence reviewPersistence;
+    private final ProjectReviewPersistence reviewPersistence;
     private final UserRepository userRepository;
     private final ProjectService projectService;
     private final ProjectAccessService projectAccessService;
@@ -32,7 +32,7 @@ public class TeamTransferService {
     private final AccessControlService accessControlService;
 
     public TeamTransferService(
-            ProjectTeamPersistence reviewPersistence,
+            ProjectReviewPersistence reviewPersistence,
             UserRepository userRepository,
             ProjectService projectService,
             ProjectAccessService projectAccessService,
@@ -55,7 +55,7 @@ public class TeamTransferService {
         Project project = projectAccessService.requireProjectPermission(id, requester, "PROJECT_TRANSFER_REQUEST",
                 "You do not have permission to transfer this project.");
         projectMutationGuard.ensureEditable(project);
-        var snapshot = reviewPersistence.capture(id, ProjectTeamSnapshot.token(project));
+        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
         project = snapshot.project();
 
         User target = userRepository.findById(targetUserId)
@@ -68,7 +68,7 @@ public class TeamTransferService {
         project.setPendingTransferRequestId(java.util.UUID.randomUUID().toString());
         project.setPendingTransferOwnerId(project.getAuthorId());
         project.setPendingTransferExpiresAt(System.currentTimeMillis() + java.time.Duration.ofDays(7).toMillis());
-        if (!reviewPersistence.applyTeam(snapshot)) throw ProjectTeamSnapshot.conflict();
+        if (!reviewPersistence.applyTeam(snapshot)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(project);
 
         User author = userRepository.findById(project.getAuthorId()).orElse(null);
@@ -81,7 +81,7 @@ public class TeamTransferService {
             throw new InvalidProjectRequestException("We couldn't find a pending transfer request for that project.");
         }
         projectMutationGuard.ensureEditable(project);
-        var snapshot = reviewPersistence.capture(id, ProjectTeamSnapshot.token(project));
+        var snapshot = reviewPersistence.capture(id, ProjectReviewSnapshot.token(project));
         project = snapshot.project();
 
         if (requestId == null || requestId.isBlank() || !requestId.equals(project.getPendingTransferRequestId())
@@ -112,7 +112,7 @@ public class TeamTransferService {
                 project.getTeamMembers().removeIf(member -> member.getUserId().equals(newOwner.getId()));
             }
 
-            if (!reviewPersistence.resolveTransfer(snapshot, requestId)) throw ProjectTeamSnapshot.conflict();
+            if (!reviewPersistence.resolveTransfer(snapshot, requestId)) throw ProjectReviewSnapshot.conflict();
             projectService.evictProjectCache(project);
             if (oldOwner != null) {
                 if (oldOwner.getAccountType() == User.AccountType.ORGANIZATION && oldOwner.getOrganizationMembers() != null) {
@@ -128,7 +128,7 @@ public class TeamTransferService {
         }
 
         project.setPendingTransferTo(null);
-        if (!reviewPersistence.resolveTransfer(snapshot, requestId)) throw ProjectTeamSnapshot.conflict();
+        if (!reviewPersistence.resolveTransfer(snapshot, requestId)) throw ProjectReviewSnapshot.conflict();
         projectService.evictProjectCache(project);
         User oldOwner = userRepository.findById(project.getAuthorId()).orElse(null);
         teamNotificationService.sendTransferDeclined(project, oldOwner);

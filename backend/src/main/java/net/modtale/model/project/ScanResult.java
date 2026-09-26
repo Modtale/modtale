@@ -6,6 +6,56 @@ import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ScanResult {
+    private boolean manualRescan;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isManualRescan() { return manualRescan; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public void setManualRescan(boolean value) { manualRescan = value; }
+    private RemoteReviewStatus remoteStatus;
+    public record RemoteReviewStatus(String jobId,String state,boolean artifactRetained,long createdAt,long expiresAt,String workState) {}
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public RemoteReviewStatus getRemoteStatus() { return remoteStatus; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public void setRemoteStatus(RemoteReviewStatus value) { remoteStatus = value; }
+    private RemoteReviewPoll remotePoll;
+    public record RemoteReviewPoll(String token, java.util.Date leaseUntil, java.util.Date nextPollAt) {}
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public RemoteReviewPoll getRemotePoll() { return remotePoll; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public void setRemotePoll(RemoteReviewPoll value) { remotePoll = value; }
+    private RemoteReviewBinding remoteReview;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public RemoteReviewBinding getRemoteReview() { return remoteReview; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public void setRemoteReview(RemoteReviewBinding value) { remoteReview = value; }
+    private SecurityEvidence securityEvidence;
+    private boolean artifactVerified;
+    private String reviewedContextSha256;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public String getReviewedContextSha256() { return reviewedContextSha256; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public void setReviewedContextSha256(String value) { reviewedContextSha256 = value; }
+    private java.util.Map<String, String> reusedReviewOrigins;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public java.util.Map<String, String> getReusedReviewOrigins() { return reusedReviewOrigins; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public void setReusedReviewOrigins(java.util.Map<String, String> value) { reusedReviewOrigins = value; }
+    private long reusedReviewApprovedAt;
+    public long getReusedReviewApprovedAt() { return reusedReviewApprovedAt; }
+    public void setReusedReviewApprovedAt(long value) { reusedReviewApprovedAt = value; }
+    private String reusedReviewVersion;
+    public SecurityEvidence getSecurityEvidence() { return securityEvidence; }
+    public void setSecurityEvidence(SecurityEvidence value) { securityEvidence = value; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isArtifactVerified() { return artifactVerified; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public void setArtifactVerified(boolean value) { artifactVerified = value; }
+    public String getReusedReviewVersion() { return reusedReviewVersion; }
+    public void setReusedReviewVersion(String value) { reusedReviewVersion = value; if (value == null) reusedReviewOrigins = null; }
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record SecurityEvidence(String policyVersion, String artifactSha256, String contentSha256,
+            boolean complete, boolean clearanceGranted, String reviewState, java.util.Map<String, String> entryHashes) {}
+
     private ScanStatus status;
     private String verdict;
     private String riskLevel;
@@ -14,6 +64,11 @@ public class ScanResult {
     private int riskScore;
     private int confidenceScore;
     private int scanAttempt;
+    private String scanRequestId;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public String getScanRequestId() { return scanRequestId; }
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public void setScanRequestId(String value) { scanRequestId = value; }
 
     private long scanTimestamp;
     private long holdUntilTimestamp;
@@ -204,6 +259,7 @@ public class ScanResult {
         private boolean resolved;
         private String fingerprint;
         private boolean knownIssue;
+        private boolean historicalFileEvidenceIdentical;
         private boolean escalated;
         private String baselineVersion;
         private int baselineScoreImpact;
@@ -258,6 +314,9 @@ public class ScanResult {
 
         public String getFingerprint() { return fingerprint; }
         public void setFingerprint(String fingerprint) { this.fingerprint = fingerprint; }
+
+        public boolean isHistoricalFileEvidenceIdentical() { return historicalFileEvidenceIdentical; }
+        public void setHistoricalFileEvidenceIdentical(boolean value) { historicalFileEvidenceIdentical = value; }
 
         public boolean isKnownIssue() { return knownIssue; }
         public void setKnownIssue(boolean knownIssue) { this.knownIssue = knownIssue; }

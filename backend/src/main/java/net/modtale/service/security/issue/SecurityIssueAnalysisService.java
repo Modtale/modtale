@@ -56,8 +56,14 @@ public class SecurityIssueAnalysisService {
             String versionId,
             String versionNumber,
             long lastSeenTimestamp,
-            int seenCount
+            int seenCount,
+            String evidenceIdentity
     ) {
+        public IssueBaseline(String fingerprint, String looseFingerprint, String severity, int scoreImpact,
+                int confidence, String versionId, String versionNumber, long lastSeenTimestamp, int seenCount) {
+            this(fingerprint, looseFingerprint, severity, scoreImpact, confidence, versionId, versionNumber,
+                    lastSeenTimestamp, seenCount, null);
+        }
         IssueBaseline mergeWith(IssueBaseline other) {
             if (other == null) return this;
 
@@ -74,7 +80,8 @@ public class SecurityIssueAnalysisService {
                     thisLatest ? this.versionId : other.versionId,
                     thisLatest ? this.versionNumber : other.versionNumber,
                     Math.max(this.lastSeenTimestamp, other.lastSeenTimestamp),
-                    this.seenCount + other.seenCount
+                    this.seenCount + other.seenCount,
+                    thisLatest ? this.evidenceIdentity : other.evidenceIdentity
             );
         }
 
