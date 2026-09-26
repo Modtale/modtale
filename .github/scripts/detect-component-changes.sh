@@ -106,7 +106,7 @@ while IFS= read -r path; do
       launcher=true
       launcher_build=true
       ;;
-    .github/workflows/ci-cd.yml|.github/scripts/build-container.sh|.github/scripts/sync-preview-r2.py)
+    .github/workflows/ci-cd.yml|.github/scripts/build-container.sh|.github/scripts/sync-preview-r2.py|.github/scripts/invalidate-frontend-cache.mjs)
       frontend=true
       backend=true
       status=true
