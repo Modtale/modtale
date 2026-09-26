@@ -45,6 +45,12 @@ describe('external link protection', () => {
         `${releaseBase}launcher-develop-v1.2.4-develop.10.1/Modtale.AppImage`,
         `${releaseBase}launcher-v0.2.175/modtale-launcher-0.2.175-x86_64.AppImage`,
         `${releaseBase}launcher-develop-v0.2.193-develop.193.1/modtale-launcher-0.2.193-develop.193.1-x86_64.AppImage`,
+        `${releaseBase}launcher-v0.2.175/modtale-launcher_0.2.175-1_amd64.deb`,
+        `${releaseBase}launcher-v0.2.175/modtale-launcher-0.2.175-1.x86_64.rpm`,
+        `${releaseBase}launcher-v0.2.175/modtale-launcher-0.2.175-1-x86_64.pkg.tar.zst`,
+        `${releaseBase}launcher-v0.2.175/net.modtale.launcher-0.2.175-x86_64.flatpak`,
+        `${releaseBase}launcher-v0.2.175/modtale-launcher-0.2.175-linux-x86_64-update.zip`,
+        `${releaseBase}launcher-v0.2.175/SHA256SUMS`,
         'https://modtale.net/launcher',
         'https://dev.modtale.net/launcher',
     ])('allows official downloads and first-party links: %s', async (href) => {
