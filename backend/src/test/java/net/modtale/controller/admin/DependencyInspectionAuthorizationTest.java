@@ -23,7 +23,8 @@ class DependencyInspectionAuthorizationTest {
         @Bean ProjectService projects(){return mock(ProjectService.class);}
         @Bean DependencyReviewSource source(){return mock(DependencyReviewSource.class);}
         @Bean(name="apiSecurity") PermissionEvaluator permissions(){return new PermissionEvaluator();}
-        @Bean DependencyInspectionController controller(ProjectService projects,DependencyReviewSource source){return new DependencyInspectionController(projects,()->source,mock(net.modtale.service.security.scan.DependencyArtifactVerifier.class));}
+        @Bean DependencyInspectionController controller(ProjectService projects,DependencyReviewSource source){return new DependencyInspectionController(projects,()->source,
+                mock(net.modtale.service.security.scan.DependencyArtifactVerifier.class),mock(net.modtale.service.security.scan.ModpackOverrideInspector.class));}
     }
     public static class PermissionEvaluator {
         public boolean hasAdminPermission(String permission,Authentication auth) {
@@ -39,6 +40,7 @@ class DependencyInspectionAuthorizationTest {
             SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken("user",null,List.of(new SimpleGrantedAuthority(permission))));
             assertThrows(AccessDeniedException.class,()->controller.inspect("p","v",null));
             assertThrows(AccessDeniedException.class,()->controller.verifyBytes("p","v","a".repeat(64),null));
+            assertThrows(AccessDeniedException.class,()->controller.inspectOverrideContents("p","v","a".repeat(64),null));
         }
         verifyNoInteractions(projects,source);
     }

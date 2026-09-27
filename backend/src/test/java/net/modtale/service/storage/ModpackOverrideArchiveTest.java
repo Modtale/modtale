@@ -51,6 +51,19 @@ class ModpackOverrideArchiveTest {
         assertThrows(IOException.class, () -> ModpackOverrideArchive.readBundle(new ByteArrayInputStream(zip(Map.of(path, "{\"changed\":true}", ModpackOverrideArchive.CONFIG_MANIFEST, manifest)))));
     }
 
+    @Test
+    void rejectsImpossibleBundlesAtTheActualConfigLimitsBeforeRetainingTheirContents() throws Exception {
+        String path = "overrides/Universe/mods/Example/config.json";
+        var oversized = assertThrows(IOException.class, () -> ModpackOverrideArchive.readBundle(
+                new ByteArrayInputStream(zip(Map.of(path, " ".repeat(1024 * 1024 + 1))))));
+        assertTrue(oversized.getMessage().contains("1 MiB"));
+
+        var entries = new LinkedHashMap<String, String>();
+        for (int i = 0; i < 101; i++) entries.put("overrides/Universe/mods/Example/config-" + i + ".json", "{}");
+        var tooMany = assertThrows(IOException.class, () -> ModpackOverrideArchive.readBundle(new ByteArrayInputStream(zip(entries))));
+        assertTrue(tooMany.getMessage().contains("too many files"));
+    }
+
     private static byte[] zip(Map<String, String> entries) throws IOException {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(output)) {

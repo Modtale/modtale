@@ -1,11 +1,11 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { DependencyInspection, type DependencyInspectionResult, type DependencyByteResult, type RootByteResult } from '@/modules/admin/views/DependencyInspection';
+import { DependencyInspection, type DependencyInspectionResult, type DependencyByteResult, type RootByteResult, type OverrideContentResult } from '@/modules/admin/views/DependencyInspection';
 import { adminClient } from '@/modules/admin/api/adminClient';
-vi.mock('@/modules/admin/api/adminClient', () => ({ adminClient: { getDependencyInspection: vi.fn(), verifyDependencyBytes: vi.fn(), verifyUploadedBytes: vi.fn() } }));
+vi.mock('@/modules/admin/api/adminClient', () => ({ adminClient: { getDependencyInspection: vi.fn(), verifyDependencyBytes: vi.fn(), verifyUploadedBytes: vi.fn(), inspectOverrideContents: vi.fn() } }));
 let container: HTMLDivElement, root: Root;
-const result: DependencyInspectionResult = { reviewToken: 'token', artifactBytesVerified: false, inventory: {
+const result: DependencyInspectionResult = { reviewToken: 'token', artifactBytesVerified: false, modpackOverrideAvailable: false, inventory: {
     root: { projectId: 'p', versionId: 'v' }, identity: null,
     nodes: [{ projectId: 'p', versionId: 'v', versionNumber: '<script>untrusted</script>', artifactSha256: 'a'.repeat(64) }],
     edges: [], gaps: [{ from: { projectId: 'p', versionId: 'v' }, reference: { projectId: 'missing', versionNumber: '1' }, reason: 'MISSING' }],
@@ -46,6 +46,20 @@ const verifyRoot = async () => act(async () => [...container.querySelectorAll('b
 const rootByteResult: RootByteResult = { reviewToken: 'token', artifactSha256: 'a'.repeat(64), verification: {
     state: 'MATCHED', bytes: 3, artifacts: [{ fileReference: 'modpack-overrides/upload.zip', expectedSha256: 'a'.repeat(64), actualSha256: 'a'.repeat(64), bytes: 3, state: 'MATCHED' }],
 } };
+const overrideResult: OverrideContentResult = { reviewToken: 'token', artifactSha256: 'a'.repeat(64), observation: {
+    state: 'MATCHED', observedArchiveSha256: 'a'.repeat(64), archiveBytes: 50,
+    files: [{ path: 'overrides/Universe/mods/Example/config.json', sha256: 'b'.repeat(64), bytes: 2, source: 'MODTALE', projectId: 'child' }],
+} };
+it('inspects saved override contents on demand while keeping review holds visible', async () => {
+    vi.mocked(adminClient.getDependencyInspection).mockResolvedValue({ ...result, modpackOverrideAvailable: true });
+    vi.mocked(adminClient.inspectOverrideContents).mockResolvedValue(overrideResult);
+    await render(); await load();
+    await act(async () => [...container.querySelectorAll('button')].find(button => button.textContent === 'Inspect override contents')!.click());
+    expect(adminClient.inspectOverrideContents).toHaveBeenCalledWith('p', 'v', 'token', 'a'.repeat(64));
+    expect(container.textContent).toContain('Their behavior still needs security review');
+    expect(container.textContent).toContain('Pinned version not found');
+    expect(container.textContent).toContain('Recorded config files (1)');
+});
 it('checks uploaded bytes on a held graph without presenting dependency clearance', async () => {
     vi.mocked(adminClient.getDependencyInspection).mockResolvedValue(result);
     vi.mocked(adminClient.verifyUploadedBytes).mockResolvedValue(rootByteResult);

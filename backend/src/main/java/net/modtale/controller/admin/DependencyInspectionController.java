@@ -1,6 +1,7 @@
 package net.modtale.controller.admin;
 
 import net.modtale.model.project.Project;
+import net.modtale.model.project.ProjectClassification;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.service.admin.review.ProjectReviewSnapshot;
 import net.modtale.service.project.query.ProjectService;
@@ -21,11 +22,45 @@ public class DependencyInspectionController {
     private final ProjectService projects;
     private final Supplier<DependencyReviewSource> sources;
     private final DependencyArtifactVerifier verifier;
+    private final ModpackOverrideInspector overrideInspector;
     @Autowired public DependencyInspectionController(ProjectService projects,MongoTemplate mongo,net.modtale.service.storage.StorageService storage) {
-        this(projects,()->new DependencyReviewSource(mongo),new DependencyArtifactVerifier(storage));
+        this(projects,()->new DependencyReviewSource(mongo),new DependencyArtifactVerifier(storage),new ModpackOverrideInspector(storage));
     }
-    DependencyInspectionController(ProjectService projects,Supplier<DependencyReviewSource> sources,DependencyArtifactVerifier verifier) {
-        this.projects=projects;this.sources=sources;this.verifier=verifier;
+    DependencyInspectionController(ProjectService projects,Supplier<DependencyReviewSource> sources,DependencyArtifactVerifier verifier,
+            ModpackOverrideInspector overrideInspector) {
+        this.projects=projects;this.sources=sources;this.verifier=verifier;this.overrideInspector=overrideInspector;
+    }
+    public record OverrideInspection(String reviewToken,String artifactSha256,ModpackOverrideInspector.Result observation) {}
+    @GetMapping("/override-contents")
+    public ResponseEntity<OverrideInspection> inspectOverrideContents(@PathVariable String id,@PathVariable String versionId,
+            @RequestParam String artifactSha256,@RequestHeader(value="If-Match",required=false) String expected) {
+        if(artifactSha256==null||!artifactSha256.matches("[0-9a-f]{64}"))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid uploaded artifact identity");
+        var before=inspect(id,versionId,expected).getBody();
+        var project=projects.getRawProjectById(id);
+        if(project==null||project.getClassification()!=ProjectClassification.MODPACK||project.getVersions()==null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"No modpack override is available");
+        ProjectReviewSnapshot.requireCurrent(project,before.reviewToken());
+        var versions=project.getVersions().stream().filter(Objects::nonNull).filter(v->versionId.equals(v.getId())).toList();
+        if(versions.size()!=1)throw ProjectReviewSnapshot.conflict();
+        var version=versions.getFirst();
+        if(version.getOverrideFileUrl()==null||version.getOverrideFileUrl().isBlank()
+                ||!artifactSha256.equals(version.getHash())
+                ||version.getModpackConfigs()!=null&&version.getModpackConfigs().size()>100
+                ||version.getDependencies()!=null&&version.getDependencies().size()>256
+                ||before.inventory().gaps().stream().anyMatch(gap->gap.reason()==DependencyReviewGraph.Reason.CHANGED))
+            throw ProjectReviewSnapshot.conflict();
+        var observation=overrideInspector.inspect(version.getOverrideFileUrl(),artifactSha256,
+                version.getModpackConfigs(),version.getDependencies());
+        var after=inspect(id,versionId,expected).getBody();
+        if(observation==null||!before.reviewToken().equals(after.reviewToken())
+                ||!before.inventory().root().equals(after.inventory().root())
+                ||!before.inventory().nodes().equals(after.inventory().nodes())
+                ||!before.inventory().edges().equals(after.inventory().edges())
+                ||!before.inventory().gaps().equals(after.inventory().gaps()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"Modpack override changed during inspection");
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff")
+                .body(new OverrideInspection(after.reviewToken(),artifactSha256,observation));
     }
     public record ByteInspection(String reviewToken,String inventoryIdentity,DependencyArtifactVerifier.Result verification) {}
     public record RootByteInspection(String reviewToken,String artifactSha256,DependencyArtifactVerifier.Result verification) {}
@@ -79,7 +114,8 @@ public class DependencyInspectionController {
             return declarations.equals(root.dependencies());
         } catch(RuntimeException invalid) {return false;}
     }
-    public record Inspection(String reviewToken,boolean artifactBytesVerified,DependencyReviewGraph.Inventory inventory) {}
+    public record Inspection(String reviewToken,boolean artifactBytesVerified,boolean modpackOverrideAvailable,
+            DependencyReviewGraph.Inventory inventory) {}
     @GetMapping("/dependencies")
     public ResponseEntity<Inspection> inspect(@PathVariable String id,@PathVariable String versionId,
             @RequestHeader(value="If-Match",required=false) String expected) {
@@ -107,6 +143,7 @@ public class DependencyInspectionController {
         if(current==null||current.getVersions()==null)throw ProjectReviewSnapshot.conflict();
         ProjectReviewSnapshot.requireCurrent(current,token);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff")
-                .body(new Inspection(token,false,inventory));
+                .body(new Inspection(token,false,project.getClassification()==ProjectClassification.MODPACK
+                        &&version.getOverrideFileUrl()!=null&&!version.getOverrideFileUrl().isBlank(),inventory));
     }
 }

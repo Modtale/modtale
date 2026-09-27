@@ -6,6 +6,7 @@ type Key = { projectId: string; versionId: string };
 export interface DependencyInspectionResult {
     reviewToken: string;
     artifactBytesVerified: boolean;
+    modpackOverrideAvailable: boolean;
     inventory: {
         root: Key;
         identity: string | null;
@@ -24,6 +25,12 @@ export interface RootByteResult {
     artifactSha256: string;
     verification: { state: string; bytes: number; artifacts: { fileReference: string; expectedSha256: string; actualSha256: string | null; bytes: number; state: string }[] };
 }
+export interface OverrideContentResult {
+    reviewToken: string;
+    artifactSha256: string;
+    observation: { state: string; observedArchiveSha256: string | null; archiveBytes: number;
+        files: { path: string; sha256: string; bytes: number; source: string; projectId: string }[] };
+}
 const byteStates: Record<string, string> = {
     MATCHED: 'Stored files matched the recorded hashes during this check. Security approval is still separate.',
     MISMATCH: 'Stored file bytes do not match the recorded inventory. Review the mismatch before deciding.',
@@ -38,19 +45,29 @@ const reasons: Record<string, string> = {
     CHANGED: 'Record changed during inspection', INVALID_IDENTITY: 'Artifact identity mismatch',
     UNRESOLVED_CONTEXT: 'Runtime context is unresolved', SUPPLEMENTAL_CONTENT: 'Separate content requires inspection',
 };
+const overrideStates: Record<string, string> = {
+    MATCHED: 'Stored override entries and config associations match the saved version. Their behavior still needs security review.',
+    HASH_MISMATCH: 'Stored override archive bytes differ from the recorded SHA-256.',
+    INVALID_ARCHIVE: 'Stored override archive could not be safely parsed.',
+    CONFIG_MISMATCH: 'Config entries or associations differ from the saved version.',
+    OWNER_MISMATCH: 'A config owner is not in the current dependency declarations.',
+    UNAVAILABLE: 'Stored override inspection is unavailable.', BYTE_LIMIT: 'Stored override exceeds the inspection byte limit.',
+    TIME_LIMIT: 'Stored override inspection timed out.', BUSY: 'Override inspection capacity is occupied. Try again later.',
+};
 export function DependencyInspection({ projectId, versionId, reviewToken }: { projectId: string; versionId: string; reviewToken: string }) {
     const [result, setResult] = useState<DependencyInspectionResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [bytes, setBytes] = useState<DependencyByteResult | null>(null);
     const [rootBytes, setRootBytes] = useState<RootByteResult | null>(null);
+    const [overrideContents, setOverrideContents] = useState<OverrideContentResult | null>(null);
     const generation = useRef(0);
     useEffect(() => {
-        generation.current++; setResult(null); setBytes(null); setRootBytes(null); setLoading(false); setError('');
+        generation.current++; setResult(null); setBytes(null); setRootBytes(null); setOverrideContents(null); setLoading(false); setError('');
         return () => { generation.current++; };
     }, [projectId, versionId, reviewToken]);
     const load = async () => {
-        const request = ++generation.current; setResult(null); setBytes(null); setRootBytes(null); setError(''); setLoading(true);
+        const request = ++generation.current; setResult(null); setBytes(null); setRootBytes(null); setOverrideContents(null); setError(''); setLoading(true);
         try {
             const next = await adminClient.getDependencyInspection(projectId, versionId, reviewToken);
             if (next.reviewToken !== reviewToken || next.inventory.root.projectId !== projectId || next.inventory.root.versionId !== versionId)
@@ -87,6 +104,20 @@ export function DependencyInspection({ projectId, versionId, reviewToken }: { pr
             if (request === generation.current) { setResult(null); setError(extractApiErrorMessage(failure, 'Uploaded artifact verification is unavailable.')); }
         } finally { if (request === generation.current) setLoading(false); }
     };
+    const inspectOverride = async () => {
+        const root = result?.inventory.nodes.find(node => node.projectId === projectId && node.versionId === versionId);
+        if (!result?.modpackOverrideAvailable || !root) return;
+        const hash = root.artifactSha256;
+        const request = ++generation.current; setOverrideContents(null); setError(''); setLoading(true);
+        try {
+            const next = await adminClient.inspectOverrideContents(projectId, versionId, reviewToken, hash);
+            if (next.reviewToken !== reviewToken || next.artifactSha256 !== hash)
+                throw new Error('Override inspection no longer matches this review. Inspect dependencies again.');
+            if (request === generation.current) setOverrideContents(next);
+        } catch (failure) {
+            if (request === generation.current) { setResult(null); setError(extractApiErrorMessage(failure, 'Override inspection is unavailable.')); }
+        } finally { if (request === generation.current) setLoading(false); }
+    };
     return <section aria-label="Dependency inventory" className="rounded-2xl border border-slate-200 dark:border-slate-700 p-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
             <h4 className="font-bold dark:text-white">Dependency inventory</h4>
@@ -107,6 +138,18 @@ export function DependencyInspection({ projectId, versionId, reviewToken }: { pr
                     ? 'Uploaded artifact bytes matched the recorded SHA-256. Dependencies and supplemental content still require separate review.'
                     : `Uploaded artifact: ${byteStates[rootBytes.verification.state] || 'Verification is incomplete.'}`}
                 {rootBytes.verification.artifacts[0] && <p className="break-all font-mono text-xs mt-1">Observed SHA-256: {rootBytes.verification.artifacts[0].actualSha256 || 'Unavailable'}</p>}
+            </div>}
+            {result.modpackOverrideAvailable && <button type="button" onClick={inspectOverride} disabled={loading}
+                className="block text-sm font-semibold text-indigo-600 dark:text-indigo-400 disabled:opacity-50">
+                {loading ? 'Inspecting override contents…' : 'Inspect override contents'}
+            </button>}
+            {overrideContents && <div className="text-sm dark:text-slate-200" role="status">
+                <p>{overrideStates[overrideContents.observation.state] || 'Override inspection is incomplete.'}</p>
+                {overrideContents.observation.files.length > 0 && <details>
+                    <summary className="cursor-pointer">Recorded config files ({overrideContents.observation.files.length})</summary>
+                    <ul className="max-h-60 overflow-auto text-xs space-y-2 mt-3">{overrideContents.observation.files.map(file =>
+                        <li key={file.path} className="break-all">{file.path} · {file.source}:{file.projectId} · {file.bytes} bytes<br />SHA-256: {file.sha256}</li>)}</ul>
+                </details>}
             </div>}
             {result.inventory.identity && result.inventory.gaps.length === 0 && <button type="button" onClick={verify} disabled={loading}
                 className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 disabled:opacity-50">{loading ? 'Checking stored files…' : 'Verify stored files'}</button>}

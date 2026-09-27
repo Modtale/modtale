@@ -135,6 +135,42 @@ class DependencyReviewSourceTest {
                 new Document("$set",new Document("classification","MODPACK")));
         assertEquals(State.UNAVAILABLE,new DependencyReviewSource(mongo).readRoot("legacy-modpack","v").state());
     }
+    @Test void overrideContentsAreCheckedAgainstSavedConfigIdentityWithoutClearingGraphHolds() throws Exception {
+        String path="overrides/Universe/mods/Example/config.json";
+        byte[] config="{}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        String configHash=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(config));
+        String manifest="{\"format\":\"modtale-configs\",\"formatVersion\":1,\"configs\":[{\"projectId\":\"mod-1\",\"source\":\"MODTALE\",\"path\":\""
+                +path+"\",\"sha256\":\""+configHash+"\"}]}";
+        var output=new java.io.ByteArrayOutputStream();
+        try(var zip=new java.util.zip.ZipOutputStream(output)) {
+            zip.putNextEntry(new java.util.zip.ZipEntry(path));zip.write(config);zip.closeEntry();
+            zip.putNextEntry(new java.util.zip.ZipEntry("modtale.configs.json"));
+            zip.write(manifest.getBytes(java.nio.charset.StandardCharsets.UTF_8));zip.closeEntry();
+        }
+        byte[] bytes=output.toByteArray();String archiveHash=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        var version=new net.modtale.model.project.ProjectVersion();version.setId("v");version.setVersionNumber("1");
+        version.setGameVersions(List.of("1"));version.setHash(archiveHash);version.setOverrideFileUrl("modpack-overrides/v.zip");
+        version.setDependencies(List.of(new net.modtale.model.project.ProjectDependency("mod-1",null,"1")));
+        version.setModpackConfigs(List.of(new net.modtale.model.project.ModpackConfigReference("mod-1","MODTALE",path,configHash)));
+        var pack=new net.modtale.model.project.Project();pack.setId("pack");pack.setClassification(net.modtale.model.project.ProjectClassification.MODPACK);
+        pack.setVersions(List.of(version));mongo.save(pack);
+        var projects=org.mockito.Mockito.mock(net.modtale.service.project.query.ProjectService.class);
+        org.mockito.Mockito.when(projects.getRawProjectById("pack")).thenAnswer(i->mongo.findById("pack",net.modtale.model.project.Project.class));
+        var storage=org.mockito.Mockito.mock(net.modtale.service.storage.StorageService.class);
+        org.mockito.Mockito.when(storage.getStream("modpack-overrides/v.zip"))
+                .thenAnswer(i->new java.io.ByteArrayInputStream(bytes));
+        var controller=new net.modtale.controller.admin.DependencyInspectionController(projects,mongo,storage);
+        String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(projects.getRawProjectById("pack"));
+        assertFalse(controller.inspect("pack","v",token).getBody().inventory().resolved());
+        var observed=controller.inspectOverrideContents("pack","v",archiveHash,token).getBody().observation();
+        assertEquals(ModpackOverrideInspector.State.MATCHED,observed.state());
+        assertEquals(path,observed.files().getFirst().path());
+        assertFalse(controller.inspect("pack","v",token).getBody().inventory().resolved());
+        org.mockito.Mockito.when(storage.getStream("modpack-overrides/v.zip"))
+                .thenAnswer(i->new java.io.ByteArrayInputStream(new byte[]{1,2,3}));
+        assertNotEquals(ModpackOverrideInspector.State.MATCHED,
+                controller.inspectOverrideContents("pack","v",archiveHash,token).getBody().observation().state());
+    }
     @Test void duplicatePinsDuplicateIdsAndMixedProjectStorageIdentitiesAreAmbiguous() {
         project("labels",version("one","V1"),version("two","v1"));
         assertEquals(State.AMBIGUOUS,new DependencyReviewSource(mongo).read(new Reference("labels","v1")).state());

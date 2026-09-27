@@ -18,7 +18,8 @@ class DependencyInspectionControllerTest {
     final Supplier<DependencyReviewSource> sources=mock(Supplier.class);
     final Project project=new Project();final ProjectVersion version=new ProjectVersion();
     final DependencyArtifactVerifier verifier=mock(DependencyArtifactVerifier.class);
-    final DependencyInspectionController controller=new DependencyInspectionController(projects,sources,verifier);
+    final ModpackOverrideInspector overrideInspector=mock(ModpackOverrideInspector.class);
+    final DependencyInspectionController controller=new DependencyInspectionController(projects,sources,verifier,overrideInspector);
     DependencyInspectionControllerTest() {
         project.setId("p");version.setId("v");version.setVersionNumber("1");version.setHash("a".repeat(64));version.setFileUrl("files/v");
         project.setVersions(List.of(version));when(projects.getRawProjectById("p")).thenReturn(project);when(sources.get()).thenReturn(source);
@@ -122,6 +123,25 @@ class DependencyInspectionControllerTest {
         assertEquals(409,assertThrows(ResponseStatusException.class,
                 ()->controller.verifyRootBytes("p","v","b".repeat(64),token)).getStatusCode().value());
         verify(verifier).verifyRoot(root);
+        when(overrideInspector.inspect(eq("modpack-overrides/v.zip"),eq("a".repeat(64)),isNull(),any()))
+                .thenReturn(new ModpackOverrideInspector.Result(ModpackOverrideInspector.State.MATCHED,"a".repeat(64),3,List.of()));
+        var contents=controller.inspectOverrideContents("p","v","a".repeat(64),token);
+        assertEquals("no-store",contents.getHeaders().getCacheControl());
+        assertEquals(ModpackOverrideInspector.State.MATCHED,contents.getBody().observation().state());
+        assertFalse(controller.inspect("p","v",token).getBody().inventory().resolved());
+    }
+    @Test void overrideObservationIsDiscardedIfConfigAssociationsChangeDuringStorageRead() {
+        project.setClassification(ProjectClassification.MODPACK);
+        version.setFileUrl(null);version.setOverrideFileUrl("modpack-overrides/v.zip");
+        var root=new Snapshot("p","v","1","modpack-overrides/v.zip","a".repeat(64),null,null,true,List.of());
+        when(source.readRoot("p","v")).thenReturn(new Lookup(State.FOUND,root));
+        when(source.read(any())).thenReturn(new Lookup(State.FOUND,root));
+        when(overrideInspector.inspect(any(),any(),any(),any())).thenAnswer(i->{
+            version.setModpackConfigs(List.of(new ModpackConfigReference("child","MODTALE","path","b".repeat(64))));
+            return new ModpackOverrideInspector.Result(ModpackOverrideInspector.State.MATCHED,"a".repeat(64),3,List.of());
+        });
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->controller.inspectOverrideContents("p","v","a".repeat(64),
+                ProjectReviewSnapshot.token(project))).getStatusCode().value());
     }
     @Test void rootByteObservationIsDiscardedWhenReviewChangesDuringStorageRead() {
         var root=snapshot();String token=ProjectReviewSnapshot.token(project);

@@ -25,9 +25,10 @@ import java.util.zip.ZipInputStream;
 public final class ModpackOverrideArchive {
     public static final String CONFIG_MANIFEST = "modtale.configs.json";
     private static final ObjectMapper JSON = new ObjectMapper().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
-    private static final int MAX_FILES = 10_000;
-    private static final long MAX_FILE_SIZE = 32L * 1024 * 1024;
-    private static final long MAX_TOTAL_SIZE = 512L * 1024 * 1024;
+    // Every accepted override file must have a config owner; enforce the eventual config limits while streaming.
+    private static final int MAX_FILES = 100;
+    private static final int MAX_FILE_SIZE = 1024 * 1024;
+    private static final long MAX_TOTAL_SIZE = 32L * 1024 * 1024;
     private static final Set<String> BLOCKED_EXTENSIONS = Set.of(
             ".exe", ".dll", ".so", ".dylib", ".sh", ".bat", ".cmd", ".ps1",
             ".vbs", ".js", ".jsp", ".php", ".py", ".pl", ".html", ".htm",
@@ -65,10 +66,10 @@ public final class ModpackOverrideArchive {
                 if (!paths.add(parsed.path().toLowerCase(Locale.ROOT))) {
                     throw new IOException("Override bundle contains duplicate or case-colliding paths.");
                 }
-                byte[] bytes = zip.readNBytes((int) MAX_FILE_SIZE + 1);
-                if (bytes.length > MAX_FILE_SIZE) throw new IOException("An override file exceeds the 32 MiB limit.");
+                byte[] bytes = zip.readNBytes(MAX_FILE_SIZE + 1);
+                if (bytes.length > MAX_FILE_SIZE) throw new IOException("An override config exceeds the 1 MiB limit.");
                 total += bytes.length;
-                if (total > MAX_TOTAL_SIZE) throw new IOException("Override bundle exceeds the 512 MiB expanded limit.");
+                if (total > MAX_TOTAL_SIZE) throw new IOException("Override bundle exceeds the 32 MiB expanded limit.");
                 files.add(new OverrideFile(parsed.path(), bytes));
             }
         }
