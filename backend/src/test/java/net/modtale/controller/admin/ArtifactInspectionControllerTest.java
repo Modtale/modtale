@@ -28,6 +28,23 @@ class ArtifactInspectionControllerTest {
                 .when(f.inspector).inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt());
         assertEquals(409,assertThrows(ResponseStatusException.class,()->f.controller.window("project","2","file.json",0,2,0,null,token)).getStatusCode().value());
     }
+    @Test void inspectionAcceptsCurrentEvidenceKindsButNeverTreatsAudioSummaryAsComplete() throws Exception {
+        var f=new Fixture();String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
+        for(String format:List.of("STRUCTURED_JSON","KOTLIN_MODULE")) {
+            var response=new WardenClientService.InspectionWindow(f.after.getHash(),"file.json","a".repeat(64),"policy","b".repeat(64),
+                    format,0,2,2,1,true,true,"{}",List.of());
+            when(f.inspector.inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt())).thenReturn(response);
+            assertEquals(format,f.controller.window("project","2","file.json",0,2,0,null,token).getBody().format());
+        }
+        var audio=new WardenClientService.InspectionWindow(f.after.getHash(),"file.json","a".repeat(64),"policy","b".repeat(64),
+                "AUDIO_SUMMARY",0,2,2,1,true,false,"{}",List.of("Decoded samples unavailable"));
+        when(f.inspector.inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt())).thenReturn(audio);
+        assertFalse(f.controller.window("project","2","file.json",0,2,0,null,token).getBody().representationComplete());
+        var forged=new WardenClientService.InspectionWindow(f.after.getHash(),"file.json","a".repeat(64),"policy","b".repeat(64),
+                "AUDIO_SUMMARY",0,2,2,1,true,true,"{}",List.of());
+        when(f.inspector.inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt())).thenReturn(forged);
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->f.controller.window("project","2","file.json",0,2,0,null,token)).getStatusCode().value());
+    }
     @Test void invalidWindowRequestsStopBeforeArtifactAccessAndMalformedRepliesAreRejected() throws Exception {
         var f=new Fixture();String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
         assertEquals(409,assertThrows(ResponseStatusException.class,()->f.controller.window("project","2","file.json",0,2,0,null,"stale")).getStatusCode().value());
