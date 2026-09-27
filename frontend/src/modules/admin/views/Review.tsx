@@ -480,8 +480,20 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-8">
+                        {pendingVersion && <div className={currentStep === 2 ? 'max-w-3xl mx-auto mb-8' : 'hidden'}>
+                            <ArtifactChanges projectId={mod.id} version={pendingVersion.versionNumber} reviewToken={mod.reviewToken || ''}
+                                autoLoad={scanResult?.scanState === 'COMPLETED' && priorSources.length > 0}
+                                onCompared={onCompared}
+                                onInspect={(version, path, token) => openInspector(version, version === pendingVersion.versionNumber ? scanIssues : [], path, undefined, undefined, token)} />
+                        </div>}
                         {currentStep === 0 && (
                             <div className="max-w-3xl mx-auto space-y-8 animate-in slide-in-from-right-4 duration-300">
+                                {activeComparison?.baselineVersion && <div role="status" className="rounded-2xl border border-indigo-200 bg-indigo-50 p-5 text-sm text-indigo-950 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-100">
+                                    <p className="font-bold">Changes since approved version {activeComparison.baselineVersion}</p>
+                                    <p>{activeComparison.added} added, {activeComparison.modified} modified, {activeComparison.removed} removed, {activeComparison.unchanged} unchanged.</p>
+                                    {(!activeComparison.contextComparable || activeComparison.contextChanged) && <p className="mt-1">Version or dependency context also needs review.</p>}
+                                    <p className="mt-1">This comparison helps navigation; related behavior still needs review.</p>
+                                </div>}
                                 <div className="grid grid-cols-2 gap-6">
                                     <div className="p-5 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/5">
                                         <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Title</label>
@@ -691,10 +703,6 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                 )}
 
                                 {pendingVersion?.id && <DependencyInspection projectId={mod.id} versionId={pendingVersion.id} reviewToken={mod.reviewToken || ''} />}
-                                {pendingVersion && <ArtifactChanges projectId={mod.id} version={pendingVersion.versionNumber} reviewToken={mod.reviewToken || ''}
-                                    autoLoad={scanResult?.scanState === 'COMPLETED' && mod.versions.some((candidate: ProjectVersion) => candidate.id !== pendingVersion.id && candidate.reviewStatus === 'APPROVED')}
-                                    onCompared={onCompared}
-                                    onInspect={(version, path, token) => openInspector(version, version === pendingVersion.versionNumber ? scanIssues : [], path, undefined, undefined, token)} />}
                                 {pendingVersion && <FindingDecisions key={`${pendingVersion.id}:${pendingVersion.reviewToken}`}
                                     projectId={mod.id} versionId={pendingVersion.id} token={pendingVersion.reviewToken}
                                     issues={scanIssues} canDecide={canDecide} onSaved={() => setDecisionWritten(true)} />}

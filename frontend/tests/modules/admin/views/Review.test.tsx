@@ -166,6 +166,22 @@ describe('Review security clearance status', () => {
         expect(adminClient.getFileWindow).toHaveBeenLastCalledWith('project', '0.9', 'removed.txt', 'snapshot', 0, undefined, 0);
         expect(container.textContent).toContain('Previously approved file contents');
     });
+    it('shows the authenticated update comparison when review opens and reuses it in Files', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: false, added: 1, modified: 0, removed: 0, unchanged: 1,
+            files: [{ path: 'New.class', change: 'ADDED' }, { path: 'Prior.class', change: 'UNCHANGED' }] });
+        await render(clear, true, 'snapshot', 0, [{ id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }]);
+        expect(adminClient.getArtifactChanges).toHaveBeenCalledExactlyOnceWith('project', '1.0', 'snapshot');
+        expect(container.textContent).toContain('Changes since approved version 0.9');
+        expect(container.textContent).toContain('1 added, 0 modified, 0 removed, 1 unchanged.');
+        expect(container.textContent).toContain('related behavior still needs review');
+        for (let step = 0; step < 2; step++) {
+            await act(async () => container.querySelectorAll<HTMLInputElement>('input[type=checkbox]').forEach(input => input.click()));
+            await click('Next Step');
+        }
+        expect(container.textContent).toContain('New.class');
+        expect(adminClient.getArtifactChanges).toHaveBeenCalledTimes(1);
+    });
     it('uses the authenticated file comparison to focus changed-file findings without clearing older evidence', async () => {
         vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
             contextComparable: true, contextChanged: false, added: 0, modified: 1, removed: 0, unchanged: 1,
