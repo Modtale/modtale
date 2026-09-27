@@ -23,12 +23,17 @@ import net.modtale.service.storage.StorageService;
 
 /** Bounded observation of a stored override archive and its saved config associations, with no approval authority. */
 public final class ModpackOverrideInspector {
-    public enum State { MATCHED, HASH_MISMATCH, INVALID_ARCHIVE, CONFIG_MISMATCH, OWNER_MISMATCH,
+    public enum State { MATCHED, HASH_MISMATCH, INVALID_ARCHIVE, CONFIG_MISMATCH, OWNER_MISMATCH, INVALID_WINDOW,
         UNAVAILABLE, BYTE_LIMIT, TIME_LIMIT, BUSY }
     public record File(String path, String sha256, int bytes, String source, String projectId) {}
-    public record Result(State state, String observedArchiveSha256, long archiveBytes, List<File> files) {
+    public record Window(String path, String sha256, int start, int end, int totalCharacters, String content) {}
+    public record Result(State state, String observedArchiveSha256, long archiveBytes, List<File> files, Window window) {
         public Result { files = List.copyOf(files); }
+        public Result(State state, String observedArchiveSha256, long archiveBytes, List<File> files) {
+            this(state, observedArchiveSha256, archiveBytes, files, null);
+        }
     }
+    private record WindowRequest(String path, int offset, int characters) {}
     @FunctionalInterface interface Open { InputStream open(String reference) throws IOException; }
     private static final Semaphore CAPACITY = new Semaphore(2);
     private static final long MAX_ARCHIVE_BYTES = 100L * 1024 * 1024;
@@ -43,10 +48,21 @@ public final class ModpackOverrideInspector {
 
     public Result inspect(String reference, String expectedSha256, List<ModpackConfigReference> savedConfigs,
             List<ProjectDependency> dependencies) {
-        return inspect(reference, expectedSha256, savedConfigs, dependencies, Duration.ofSeconds(15));
+        return inspect(reference, expectedSha256, savedConfigs, dependencies, null, Duration.ofSeconds(15));
     }
     Result inspect(String reference, String expectedSha256, List<ModpackConfigReference> savedConfigs,
             List<ProjectDependency> dependencies, Duration timeout) {
+        return inspect(reference, expectedSha256, savedConfigs, dependencies, null, timeout);
+    }
+    public Result inspectWindow(String reference, String expectedSha256, List<ModpackConfigReference> savedConfigs,
+            List<ProjectDependency> dependencies, String path, int offset, int characters) {
+        if(path == null || path.isBlank() || path.length() > 2048 || offset < 0 || characters < 1 || characters > 32768)
+            throw new IllegalArgumentException("Invalid config window request");
+        return inspect(reference, expectedSha256, savedConfigs, dependencies,
+                new WindowRequest(path, offset, characters), Duration.ofSeconds(15));
+    }
+    private Result inspect(String reference, String expectedSha256, List<ModpackConfigReference> savedConfigs,
+            List<ProjectDependency> dependencies, WindowRequest window, Duration timeout) {
         if(reference == null || reference.isBlank() || expectedSha256 == null || !expectedSha256.matches("[0-9a-f]{64}"))
             throw new IllegalArgumentException("Invalid override archive identity");
         long nanos = timeout.toNanos();
@@ -59,7 +75,7 @@ public final class ModpackOverrideInspector {
         Thread worker;
         try {
             worker = Thread.ofVirtual().name("modpack-override-inspection").start(() -> {
-                try { future.complete(read(reference, expectedSha256, configs, owners, started, nanos)); }
+                try { future.complete(read(reference, expectedSha256, configs, owners, window, started, nanos)); }
                 catch(Exception failure) { future.complete(incomplete(State.UNAVAILABLE, 0)); }
                 finally { capacity.release(); }
             });
@@ -77,7 +93,7 @@ public final class ModpackOverrideInspector {
     }
 
     private Result read(String reference, String expected, List<ModpackConfigReference> saved,
-            List<ProjectDependency> dependencies, long started, long nanos) {
+            List<ProjectDependency> dependencies, WindowRequest window, long started, long nanos) {
         InputStream stream = null;
         var counted = new BoundedInputStream(started, nanos);
         try {
@@ -95,6 +111,20 @@ public final class ModpackOverrideInspector {
             if(!bundle.configs().equals(saved)) return new Result(State.CONFIG_MISMATCH, observed, counted.bytes, List.of());
             try { ModpackOverrideArchive.validateOwners(bundle.configs(), dependencies); }
             catch(IOException invalidOwner) { return new Result(State.OWNER_MISMATCH, observed, counted.bytes, List.of()); }
+            if(window != null) {
+                var target = bundle.files().stream().filter(file -> file.path().equals(window.path())).findFirst();
+                if(target.isEmpty()) return new Result(State.INVALID_WINDOW, observed, counted.bytes, List.of());
+                var file = target.get();
+                var config = bundle.configs().stream().filter(candidate -> candidate.path().equals(file.path())).findFirst()
+                        .orElseThrow();
+                String content = new String(file.bytes(), java.nio.charset.StandardCharsets.UTF_8);
+                int total = content.codePointCount(0, content.length());
+                if(window.offset() > total) return new Result(State.INVALID_WINDOW, observed, counted.bytes, List.of());
+                int end = (int) Math.min((long) total, (long) window.offset() + window.characters());
+                String page = content.substring(content.offsetByCodePoints(0, window.offset()), content.offsetByCodePoints(0, end));
+                return new Result(State.MATCHED, observed, counted.bytes, List.of(),
+                        new Window(file.path(), config.sha256(), window.offset(), end, total, page));
+            }
             var files = new ArrayList<File>();
             for(var file : bundle.files()) {
                 var config = bundle.configs().stream().filter(candidate -> candidate.path().equals(file.path())).findFirst()

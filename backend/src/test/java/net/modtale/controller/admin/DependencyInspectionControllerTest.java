@@ -143,6 +143,29 @@ class DependencyInspectionControllerTest {
         assertEquals(409,assertThrows(ResponseStatusException.class,()->controller.inspectOverrideContents("p","v","a".repeat(64),
                 ProjectReviewSnapshot.token(project))).getStatusCode().value());
     }
+    @Test void configWindowRequiresAnAttachedPathAndTheOpenedReview() {
+        project.setClassification(ProjectClassification.MODPACK);
+        version.setFileUrl(null);version.setOverrideFileUrl("modpack-overrides/v.zip");
+        String path="overrides/Universe/mods/Example/config.json";
+        version.setModpackConfigs(List.of(new ModpackConfigReference("child","MODTALE",path,"b".repeat(64))));
+        var root=new Snapshot("p","v","1","modpack-overrides/v.zip","a".repeat(64),null,null,true,List.of());
+        when(source.readRoot("p","v")).thenReturn(new Lookup(State.FOUND,root));
+        when(source.read(any())).thenReturn(new Lookup(State.FOUND,root));
+        String token=ProjectReviewSnapshot.token(project);
+        assertEquals(400,assertThrows(ResponseStatusException.class,()->controller.inspectOverrideConfigWindow("p","v",
+                "a".repeat(64),"missing",0,10,token)).getStatusCode().value());
+        assertEquals(400,assertThrows(ResponseStatusException.class,()->controller.inspectOverrideConfigWindow("p","v",
+                "a".repeat(64),path,-1,10,token)).getStatusCode().value());
+        assertEquals(409,assertThrows(ResponseStatusException.class,()->controller.inspectOverrideConfigWindow("p","v",
+                "a".repeat(64),path,0,10,null)).getStatusCode().value());
+        verifyNoInteractions(overrideInspector);
+        var window=new ModpackOverrideInspector.Window(path,"b".repeat(64),0,2,2,"{}");
+        when(overrideInspector.inspectWindow(eq("modpack-overrides/v.zip"),eq("a".repeat(64)),any(),any(),eq(path),eq(0),eq(10)))
+                .thenReturn(new ModpackOverrideInspector.Result(ModpackOverrideInspector.State.MATCHED,"a".repeat(64),3,List.of(),window));
+        var checked=controller.inspectOverrideConfigWindow("p","v","a".repeat(64),path,0,10,token);
+        assertEquals("{}",checked.getBody().observation().window().content());
+        assertEquals("no-store",checked.getHeaders().getCacheControl());
+    }
     @Test void rootByteObservationIsDiscardedWhenReviewChangesDuringStorageRead() {
         var root=snapshot();String token=ProjectReviewSnapshot.token(project);
         when(verifier.verifyRoot(root)).thenAnswer(i->{version.setFindingReviewHead("changed");

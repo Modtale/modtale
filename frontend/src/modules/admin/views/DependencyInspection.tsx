@@ -29,7 +29,8 @@ export interface OverrideContentResult {
     reviewToken: string;
     artifactSha256: string;
     observation: { state: string; observedArchiveSha256: string | null; archiveBytes: number;
-        files: { path: string; sha256: string; bytes: number; source: string; projectId: string }[] };
+        files: { path: string; sha256: string; bytes: number; source: string; projectId: string }[];
+        window: { path: string; sha256: string; start: number; end: number; totalCharacters: number; content: string } | null };
 }
 const byteStates: Record<string, string> = {
     MATCHED: 'Stored files matched the recorded hashes during this check. Security approval is still separate.',
@@ -50,7 +51,7 @@ const overrideStates: Record<string, string> = {
     HASH_MISMATCH: 'Stored override archive bytes differ from the recorded SHA-256.',
     INVALID_ARCHIVE: 'Stored override archive could not be safely parsed.',
     CONFIG_MISMATCH: 'Config entries or associations differ from the saved version.',
-    OWNER_MISMATCH: 'A config owner is not in the current dependency declarations.',
+    OWNER_MISMATCH: 'A config owner is not in the current dependency declarations.', INVALID_WINDOW: 'Config window is outside the stored file.',
     UNAVAILABLE: 'Stored override inspection is unavailable.', BYTE_LIMIT: 'Stored override exceeds the inspection byte limit.',
     TIME_LIMIT: 'Stored override inspection timed out.', BUSY: 'Override inspection capacity is occupied. Try again later.',
 };
@@ -61,13 +62,14 @@ export function DependencyInspection({ projectId, versionId, reviewToken }: { pr
     const [bytes, setBytes] = useState<DependencyByteResult | null>(null);
     const [rootBytes, setRootBytes] = useState<RootByteResult | null>(null);
     const [overrideContents, setOverrideContents] = useState<OverrideContentResult | null>(null);
+    const [configWindow, setConfigWindow] = useState<OverrideContentResult | null>(null);
     const generation = useRef(0);
     useEffect(() => {
-        generation.current++; setResult(null); setBytes(null); setRootBytes(null); setOverrideContents(null); setLoading(false); setError('');
+        generation.current++; setResult(null); setBytes(null); setRootBytes(null); setOverrideContents(null); setConfigWindow(null); setLoading(false); setError('');
         return () => { generation.current++; };
     }, [projectId, versionId, reviewToken]);
     const load = async () => {
-        const request = ++generation.current; setResult(null); setBytes(null); setRootBytes(null); setOverrideContents(null); setError(''); setLoading(true);
+        const request = ++generation.current; setResult(null); setBytes(null); setRootBytes(null); setOverrideContents(null); setConfigWindow(null); setError(''); setLoading(true);
         try {
             const next = await adminClient.getDependencyInspection(projectId, versionId, reviewToken);
             if (next.reviewToken !== reviewToken || next.inventory.root.projectId !== projectId || next.inventory.root.versionId !== versionId)
@@ -108,7 +110,7 @@ export function DependencyInspection({ projectId, versionId, reviewToken }: { pr
         const root = result?.inventory.nodes.find(node => node.projectId === projectId && node.versionId === versionId);
         if (!result?.modpackOverrideAvailable || !root) return;
         const hash = root.artifactSha256;
-        const request = ++generation.current; setOverrideContents(null); setError(''); setLoading(true);
+        const request = ++generation.current; setOverrideContents(null); setConfigWindow(null); setError(''); setLoading(true);
         try {
             const next = await adminClient.inspectOverrideContents(projectId, versionId, reviewToken, hash);
             if (next.reviewToken !== reviewToken || next.artifactSha256 !== hash)
@@ -116,6 +118,24 @@ export function DependencyInspection({ projectId, versionId, reviewToken }: { pr
             if (request === generation.current) setOverrideContents(next);
         } catch (failure) {
             if (request === generation.current) { setResult(null); setError(extractApiErrorMessage(failure, 'Override inspection is unavailable.')); }
+        } finally { if (request === generation.current) setLoading(false); }
+    };
+    const readConfig = async (path: string, offset: number) => {
+        const root = result?.inventory.nodes.find(node => node.projectId === projectId && node.versionId === versionId);
+        const file = overrideContents?.observation.files.find(item => item.path === path);
+        if (!root || !file || offset < 0) return;
+        const hash = root.artifactSha256;
+        const request = ++generation.current; setConfigWindow(null); setError(''); setLoading(true);
+        try {
+            const next = await adminClient.getOverrideConfigWindow(projectId, versionId, reviewToken, hash, path, offset);
+            const window = next.observation.window;
+            if (next.reviewToken !== reviewToken || next.artifactSha256 !== hash || next.observation.state !== 'MATCHED'
+                || !window || window.path !== path || window.sha256 !== file.sha256 || window.start !== offset
+                || window.end < offset || window.end > window.totalCharacters || [...window.content].length !== window.end - window.start)
+                throw new Error(overrideStates[next.observation.state] || 'Config text no longer matches this review. Refresh its evidence.');
+            if (request === generation.current) setConfigWindow(next);
+        } catch (failure) {
+            if (request === generation.current) { setResult(null); setOverrideContents(null); setError(extractApiErrorMessage(failure, 'Config text is unavailable.')); }
         } finally { if (request === generation.current) setLoading(false); }
     };
     return <section aria-label="Dependency inventory" className="rounded-2xl border border-slate-200 dark:border-slate-700 p-5 space-y-4">
@@ -148,8 +168,24 @@ export function DependencyInspection({ projectId, versionId, reviewToken }: { pr
                 {overrideContents.observation.files.length > 0 && <details>
                     <summary className="cursor-pointer">Recorded config files ({overrideContents.observation.files.length})</summary>
                     <ul className="max-h-60 overflow-auto text-xs space-y-2 mt-3">{overrideContents.observation.files.map(file =>
-                        <li key={file.path} className="break-all">{file.path} · {file.source}:{file.projectId} · {file.bytes} bytes<br />SHA-256: {file.sha256}</li>)}</ul>
+                        <li key={file.path} className="break-all">{file.path} · {file.source}:{file.projectId} · {file.bytes} bytes<br />SHA-256: {file.sha256}<br />
+                            <button type="button" onClick={() => readConfig(file.path, 0)} disabled={loading}
+                                className="font-semibold text-indigo-600 dark:text-indigo-400 disabled:opacity-50">Read config</button>
+                        </li>)}</ul>
                 </details>}
+            </div>}
+            {configWindow?.observation.window && <div className="space-y-2 text-sm dark:text-slate-200">
+                <p className="break-all font-semibold">{configWindow.observation.window.path}</p>
+                <p>{configWindow.observation.window.start + 1}–{configWindow.observation.window.end} of {configWindow.observation.window.totalCharacters} characters · Security review remains separate.</p>
+                <pre aria-label="Config text window" className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-slate-100 p-3 text-xs dark:bg-slate-800">{configWindow.observation.window.content}</pre>
+                <div className="flex gap-4">
+                    {configWindow.observation.window.start > 0 && <button type="button" disabled={loading}
+                        onClick={() => readConfig(configWindow.observation.window!.path, Math.max(0, configWindow.observation.window!.start - 32768))}
+                        className="font-semibold text-indigo-600 dark:text-indigo-400 disabled:opacity-50">Previous config text</button>}
+                    {configWindow.observation.window.end < configWindow.observation.window.totalCharacters && <button type="button" disabled={loading}
+                        onClick={() => readConfig(configWindow.observation.window!.path, configWindow.observation.window!.end)}
+                        className="font-semibold text-indigo-600 dark:text-indigo-400 disabled:opacity-50">Next config text</button>}
+                </div>
             </div>}
             {result.inventory.identity && result.inventory.gaps.length === 0 && <button type="button" onClick={verify} disabled={loading}
                 className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 disabled:opacity-50">{loading ? 'Checking stored files…' : 'Verify stored files'}</button>}

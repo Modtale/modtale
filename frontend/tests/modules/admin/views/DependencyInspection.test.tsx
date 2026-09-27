@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { DependencyInspection, type DependencyInspectionResult, type DependencyByteResult, type RootByteResult, type OverrideContentResult } from '@/modules/admin/views/DependencyInspection';
 import { adminClient } from '@/modules/admin/api/adminClient';
-vi.mock('@/modules/admin/api/adminClient', () => ({ adminClient: { getDependencyInspection: vi.fn(), verifyDependencyBytes: vi.fn(), verifyUploadedBytes: vi.fn(), inspectOverrideContents: vi.fn() } }));
+vi.mock('@/modules/admin/api/adminClient', () => ({ adminClient: { getDependencyInspection: vi.fn(), verifyDependencyBytes: vi.fn(), verifyUploadedBytes: vi.fn(), inspectOverrideContents: vi.fn(), getOverrideConfigWindow: vi.fn() } }));
 let container: HTMLDivElement, root: Root;
 const result: DependencyInspectionResult = { reviewToken: 'token', artifactBytesVerified: false, modpackOverrideAvailable: false, inventory: {
     root: { projectId: 'p', versionId: 'v' }, identity: null,
@@ -48,7 +48,7 @@ const rootByteResult: RootByteResult = { reviewToken: 'token', artifactSha256: '
 } };
 const overrideResult: OverrideContentResult = { reviewToken: 'token', artifactSha256: 'a'.repeat(64), observation: {
     state: 'MATCHED', observedArchiveSha256: 'a'.repeat(64), archiveBytes: 50,
-    files: [{ path: 'overrides/Universe/mods/Example/config.json', sha256: 'b'.repeat(64), bytes: 2, source: 'MODTALE', projectId: 'child' }],
+    files: [{ path: 'overrides/Universe/mods/Example/config.json', sha256: 'b'.repeat(64), bytes: 2, source: 'MODTALE', projectId: 'child' }], window: null,
 } };
 it('inspects saved override contents on demand while keeping review holds visible', async () => {
     vi.mocked(adminClient.getDependencyInspection).mockResolvedValue({ ...result, modpackOverrideAvailable: true });
@@ -59,6 +59,46 @@ it('inspects saved override contents on demand while keeping review holds visibl
     expect(container.textContent).toContain('Their behavior still needs security review');
     expect(container.textContent).toContain('Pinned version not found');
     expect(container.textContent).toContain('Recorded config files (1)');
+});
+it('reads snapshot-bound config text without rendering markup or claiming clearance', async () => {
+    const path = overrideResult.observation.files[0].path;
+    const content = '{"command":"<script>"}';
+    vi.mocked(adminClient.getDependencyInspection).mockResolvedValue({ ...result, modpackOverrideAvailable: true });
+    vi.mocked(adminClient.inspectOverrideContents).mockResolvedValue(overrideResult);
+    vi.mocked(adminClient.getOverrideConfigWindow).mockResolvedValue({ ...overrideResult, observation: { ...overrideResult.observation,
+        files: [], window: { path, sha256: 'b'.repeat(64), start: 0, end: content.length, totalCharacters: content.length, content } } });
+    await render(); await load();
+    await act(async () => [...container.querySelectorAll('button')].find(button => button.textContent === 'Inspect override contents')!.click());
+    await act(async () => [...container.querySelectorAll('button')].find(button => button.textContent === 'Read config')!.click());
+    expect(adminClient.getOverrideConfigWindow).toHaveBeenCalledWith('p', 'v', 'token', 'a'.repeat(64), path, 0);
+    expect(container.querySelector('[aria-label="Config text window"]')?.textContent).toBe(content);
+    expect(container.querySelector('script')).toBeNull();
+    expect(container.textContent).toContain('Security review remains separate');
+    await render('changed'); expect(container.querySelector('[aria-label="Config text window"]')).toBeNull();
+});
+it('pages config text by verified character offsets and discards a mismatched hash', async () => {
+    const path = overrideResult.observation.files[0].path;
+    vi.mocked(adminClient.getDependencyInspection).mockResolvedValue({ ...result, modpackOverrideAvailable: true });
+    vi.mocked(adminClient.inspectOverrideContents).mockResolvedValue(overrideResult);
+    vi.mocked(adminClient.getOverrideConfigWindow).mockResolvedValueOnce({ ...overrideResult, observation: {
+        ...overrideResult.observation, files: [], window: { path, sha256: 'b'.repeat(64), start: 0, end: 32768,
+            totalCharacters: 32769, content: 'x'.repeat(32768) } } });
+    vi.mocked(adminClient.getOverrideConfigWindow).mockResolvedValueOnce({ ...overrideResult, observation: {
+        ...overrideResult.observation, files: [], window: { path, sha256: 'b'.repeat(64), start: 32768, end: 32769,
+            totalCharacters: 32769, content: 'y' } } });
+    await render(); await load();
+    await act(async () => [...container.querySelectorAll('button')].find(button => button.textContent === 'Inspect override contents')!.click());
+    await act(async () => [...container.querySelectorAll('button')].find(button => button.textContent === 'Read config')!.click());
+    await act(async () => [...container.querySelectorAll('button')].find(button => button.textContent === 'Next config text')!.click());
+    expect(adminClient.getOverrideConfigWindow).toHaveBeenLastCalledWith('p', 'v', 'token', 'a'.repeat(64), path, 32768);
+    expect(container.querySelector('[aria-label="Config text window"]')?.textContent).toBe('y');
+    vi.mocked(adminClient.getOverrideConfigWindow).mockResolvedValueOnce({ ...overrideResult, observation: {
+        ...overrideResult.observation, files: [], window: { path, sha256: 'c'.repeat(64), start: 0, end: 1,
+            totalCharacters: 1, content: 'z' } } });
+    await act(async () => [...container.querySelectorAll('button')].find(button => button.textContent === 'Previous config text')!.click());
+    expect(container.querySelector('[aria-label="Config text window"]')).toBeNull();
+    expect(container.querySelector('table')).toBeNull();
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
 });
 it('checks uploaded bytes on a held graph without presenting dependency clearance', async () => {
     vi.mocked(adminClient.getDependencyInspection).mockResolvedValue(result);

@@ -41,6 +41,7 @@ class DependencyInspectionAuthorizationTest {
             assertThrows(AccessDeniedException.class,()->controller.inspect("p","v",null));
             assertThrows(AccessDeniedException.class,()->controller.verifyBytes("p","v","a".repeat(64),null));
             assertThrows(AccessDeniedException.class,()->controller.inspectOverrideContents("p","v","a".repeat(64),null));
+            assertThrows(AccessDeniedException.class,()->controller.inspectOverrideConfigWindow("p","v","a".repeat(64),"config",0,10,null));
         }
         verifyNoInteractions(projects,source);
     }

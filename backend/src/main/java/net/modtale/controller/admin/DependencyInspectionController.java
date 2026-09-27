@@ -13,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 @RestController
@@ -34,6 +35,33 @@ public class DependencyInspectionController {
     @GetMapping("/override-contents")
     public ResponseEntity<OverrideInspection> inspectOverrideContents(@PathVariable String id,@PathVariable String versionId,
             @RequestParam String artifactSha256,@RequestHeader(value="If-Match",required=false) String expected) {
+        var checked=readOverride(id,versionId,artifactSha256,expected,version->overrideInspector.inspect(
+                version.getOverrideFileUrl(),artifactSha256,version.getModpackConfigs(),version.getDependencies()));
+        return overrideResponse(checked,artifactSha256);
+    }
+    @GetMapping("/override-config-window")
+    public ResponseEntity<OverrideInspection> inspectOverrideConfigWindow(@PathVariable String id,@PathVariable String versionId,
+            @RequestParam String artifactSha256,@RequestParam String path,@RequestParam(defaultValue="0") int offset,
+            @RequestParam(defaultValue="32768") int characters,@RequestHeader(value="If-Match",required=false) String expected) {
+        if(path==null||path.isBlank()||path.length()>2048||offset<0||characters<1||characters>32768)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid config window request");
+        var checked=readOverride(id,versionId,artifactSha256,expected,version->{
+            if(version.getModpackConfigs()==null||version.getModpackConfigs().stream()
+                    .noneMatch(config->config!=null&&path.equals(config.path())))
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Config is not attached to this version");
+            return overrideInspector.inspectWindow(version.getOverrideFileUrl(),artifactSha256,
+                    version.getModpackConfigs(),version.getDependencies(),path,offset,characters);
+        });
+        return overrideResponse(checked,artifactSha256);
+    }
+    private static ResponseEntity<OverrideInspection> overrideResponse(CheckedOverride<ModpackOverrideInspector.Result> checked,
+            String artifactSha256) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff")
+                .body(new OverrideInspection(checked.reviewToken(),artifactSha256,checked.observation()));
+    }
+    private record CheckedOverride<T>(String reviewToken,T observation) {}
+    private <T> CheckedOverride<T> readOverride(String id,String versionId,String artifactSha256,String expected,
+            Function<ProjectVersion,T> read) {
         if(artifactSha256==null||!artifactSha256.matches("[0-9a-f]{64}"))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Invalid uploaded artifact identity");
         var before=inspect(id,versionId,expected).getBody();
@@ -50,8 +78,7 @@ public class DependencyInspectionController {
                 ||version.getDependencies()!=null&&version.getDependencies().size()>256
                 ||before.inventory().gaps().stream().anyMatch(gap->gap.reason()==DependencyReviewGraph.Reason.CHANGED))
             throw ProjectReviewSnapshot.conflict();
-        var observation=overrideInspector.inspect(version.getOverrideFileUrl(),artifactSha256,
-                version.getModpackConfigs(),version.getDependencies());
+        var observation=read.apply(version);
         var after=inspect(id,versionId,expected).getBody();
         if(observation==null||!before.reviewToken().equals(after.reviewToken())
                 ||!before.inventory().root().equals(after.inventory().root())
@@ -59,8 +86,7 @@ public class DependencyInspectionController {
                 ||!before.inventory().edges().equals(after.inventory().edges())
                 ||!before.inventory().gaps().equals(after.inventory().gaps()))
             throw new ResponseStatusException(HttpStatus.CONFLICT,"Modpack override changed during inspection");
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff")
-                .body(new OverrideInspection(after.reviewToken(),artifactSha256,observation));
+        return new CheckedOverride<>(after.reviewToken(),observation);
     }
     public record ByteInspection(String reviewToken,String inventoryIdentity,DependencyArtifactVerifier.Result verification) {}
     public record RootByteInspection(String reviewToken,String artifactSha256,DependencyArtifactVerifier.Result verification) {}

@@ -165,11 +165,16 @@ class DependencyReviewSourceTest {
         var observed=controller.inspectOverrideContents("pack","v",archiveHash,token).getBody().observation();
         assertEquals(ModpackOverrideInspector.State.MATCHED,observed.state());
         assertEquals(path,observed.files().getFirst().path());
+        var window=controller.inspectOverrideConfigWindow("pack","v",archiveHash,path,0,2,token).getBody().observation();
+        assertEquals(ModpackOverrideInspector.State.MATCHED,window.state());
+        assertEquals("{}",window.window().content());
+        assertEquals(configHash,window.window().sha256());
         assertFalse(controller.inspect("pack","v",token).getBody().inventory().resolved());
         org.mockito.Mockito.when(storage.getStream("modpack-overrides/v.zip"))
                 .thenAnswer(i->new java.io.ByteArrayInputStream(new byte[]{1,2,3}));
         assertNotEquals(ModpackOverrideInspector.State.MATCHED,
                 controller.inspectOverrideContents("pack","v",archiveHash,token).getBody().observation().state());
+        assertNull(controller.inspectOverrideConfigWindow("pack","v",archiveHash,path,0,2,token).getBody().observation().window());
     }
     @Test void duplicatePinsDuplicateIdsAndMixedProjectStorageIdentitiesAreAmbiguous() {
         project("labels",version("one","V1"),version("two","v1"));

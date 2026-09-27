@@ -50,6 +50,23 @@ class ModpackOverrideInspectorTest {
         assertEquals("mod-1",result.files().getFirst().projectId());
         assertEquals(2,result.files().getFirst().bytes());
     }
+    @Test void returnsBoundedUnicodeSafeConfigWindowsOnlyAfterFullArchiveMatch() throws Exception {
+        String content="\"a😀b\"";byte[] bytes=archive(content);
+        var inspector=new ModpackOverrideInspector(ref->new ByteArrayInputStream(bytes),new Semaphore(1));
+        var first=inspector.inspectWindow("override.zip",sha(bytes),refs(content),owners(),PATH,0,3);
+        assertEquals(MATCHED,first.state());assertEquals("\"a😀",first.window().content());
+        assertEquals(0,first.window().start());assertEquals(3,first.window().end());
+        assertEquals(content.codePointCount(0,content.length()),first.window().totalCharacters());
+        assertEquals(refs(content).getFirst().sha256(),first.window().sha256());
+        var next=inspector.inspectWindow("override.zip",sha(bytes),refs(content),owners(),PATH,3,2);
+        assertEquals("b\"",next.window().content());
+        assertEquals(INVALID_WINDOW,inspector.inspectWindow("override.zip",sha(bytes),refs(content),owners(),PATH,99,2).state());
+        assertEquals(INVALID_WINDOW,inspector.inspectWindow("override.zip",sha(bytes),refs(content),owners(),"missing",0,2).state());
+        var wrong=inspector.inspectWindow("override.zip","a".repeat(64),refs(content),owners(),PATH,0,2);
+        assertEquals(HASH_MISMATCH,wrong.state());assertNull(wrong.window());
+        assertThrows(IllegalArgumentException.class,
+                ()->inspector.inspectWindow("override.zip",sha(bytes),refs(content),owners(),PATH,-1,2));
+    }
     @Test void changedStorageConfigsOrOwnersCannotMatch() throws Exception {
         byte[] bytes=archive("{}");
         var inspector=new ModpackOverrideInspector(ref->new ByteArrayInputStream(bytes),new Semaphore(1));
