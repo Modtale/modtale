@@ -2,6 +2,10 @@ package net.modtale.service.security.issue;
 
 import java.util.*;
 import net.modtale.model.project.ProjectVersion;
+import net.modtale.model.project.ScanResult;
+import net.modtale.model.project.ScanStatus;
+import net.modtale.service.security.scan.ArtifactClearancePolicy;
+import net.modtale.service.security.scan.ArtifactReviewContext;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -47,6 +51,44 @@ public final class FindingReviewHistory {
             older.put(event.id(), event);
         }
         return List.copyOf(events);
+    }
+
+    /** A narrow predicate for a fresh independent clean result; callers must still bind the head in their write. */
+    public static boolean permitsIndependentClean(MongoTemplate mongo, String projectId, ProjectVersion version,
+            ScanResult currentScan, String currentPolicy, long now) {
+        if (version == null || version.getFindingReviewHead() == null) return false;
+        try {
+            return permitsIndependentClean(projectId, version, currentScan,
+                    load(mongo, projectId, version.getId(), version.getFindingReviewHead()), currentPolicy, now);
+        } catch (RuntimeException unavailableHistory) {
+            return false;
+        }
+    }
+
+    static boolean permitsIndependentClean(String projectId, ProjectVersion version, ScanResult currentScan,
+            List<FindingReviewService.Event> events, String currentPolicy, long now) {
+        if (version == null || version.getReplacementSecurityHold() != null || version.getFindingReviewHead() == null
+                || currentPolicy == null || events == null || events.isEmpty()
+                || !version.getFindingReviewHead().equals(events.getFirst().id())
+                || !ArtifactClearancePolicy.complete(currentScan) || currentScan.getReusedReviewVersion() != null
+                || !"AUTO_APPROVE".equals(currentScan.getVerdict()) || currentScan.getStatus() != ScanStatus.CLEAN
+                || !ArtifactClearancePolicy.cleared(currentScan)) return false;
+        var evidence = currentScan.getSecurityEvidence();
+        String context = ArtifactReviewContext.automaticallyReviewableFingerprint(version);
+        if (context == null || !context.equals(currentScan.getReviewedContextSha256())
+                || !Objects.equals(version.getHash(), evidence.artifactSha256())
+                || !currentPolicy.equals(evidence.policyVersion())) return false;
+        var assessments = new FindingDecisionValidity().assess(projectId, version, currentScan, events, currentPolicy, now);
+        boolean activeAcceptance = false;
+        for (var event : events) {
+            if (event.disposition() != FindingReviewService.Disposition.ACCEPT
+                    || !Objects.equals(event.artifactSha256(), evidence.artifactSha256())) return false;
+            var assessment = assessments.get(event.id());
+            if (assessment == null) return false;
+            if (assessment.state() == FindingDecisionValidity.State.APPLICABLE) activeAcceptance = true;
+            else if (assessment.state() != FindingDecisionValidity.State.SUPERSEDED) return false;
+        }
+        return activeAcceptance;
     }
 
     /** This gate removes no findings and grants no automatic clearance. The caller must CAS the head. */

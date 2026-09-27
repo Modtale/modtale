@@ -139,7 +139,11 @@ public class ScanCompletionService {
             notes.add("The current inspection policy could not validate this result. A fresh review is required.");
             scanResult.setReviewerNotes(notes);
         }
-        if (targetVersion.getFindingReviewHead() != null || targetVersion.getReplacementSecurityHold()!=null) {
+        boolean currentCleanHistory = targetVersion.getFindingReviewHead() == null
+                || (routingDecision.action() == ScanRoutingService.RoutingAction.SCHEDULE
+                    || routingDecision.action() == ScanRoutingService.RoutingAction.APPROVE_NOW)
+                    && scanPersistenceService.permitsIndependentClean(projectId, targetVersion, scanResult, warden.currentPolicyVersion());
+        if (!currentCleanHistory || targetVersion.getReplacementSecurityHold()!=null) {
             scanResult.setReusedReviewVersion(null);
             scanResult.setReusedReviewApprovedAt(0);
             if (!"BLOCK".equals(scanResult.getVerdict()) && scanResult.getStatus() != ScanStatus.INFECTED) {

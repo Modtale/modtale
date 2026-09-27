@@ -6,6 +6,7 @@ import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectVersion;
 import net.modtale.model.project.ScanResult;
 import net.modtale.model.project.ScanStatus;
+import net.modtale.service.security.issue.FindingReviewHistory;
 import net.modtale.repository.project.ProjectRepository;
 import net.modtale.service.project.query.ProjectService;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -29,6 +30,11 @@ public class ScanPersistenceService {
         this.mongoTemplate = mongoTemplate;
         this.projectRepository = projectRepository;
         this.projectService = projectService;
+    }
+
+    public boolean permitsIndependentClean(String projectId, ProjectVersion version, ScanResult scan, String currentPolicy) {
+        return FindingReviewHistory.permitsIndependentClean(mongoTemplate, projectId, version, scan, currentPolicy,
+                System.currentTimeMillis());
     }
 
     public boolean markAttemptRunning(String projectId, String versionId, int attempt) {
@@ -76,7 +82,9 @@ public class ScanPersistenceService {
         if (routingDecision.action() == ScanRoutingService.RoutingAction.SCHEDULE
                 || routingDecision.action() == ScanRoutingService.RoutingAction.APPROVE_NOW) {
             String context = ArtifactReviewContext.automaticallyReviewableFingerprint(reviewedVersion);
-            if (reviewedVersion.getReplacementSecurityHold()!=null || reviewedVersion.getFindingReviewHead() != null || context == null || !context.equals(scanResult.getReviewedContextSha256())
+            boolean validHistory = reviewedVersion.getFindingReviewHead() == null || permitsIndependentClean(projectId, reviewedVersion,
+                    scanResult, scanResult.getSecurityEvidence() == null ? null : scanResult.getSecurityEvidence().policyVersion());
+            if (reviewedVersion.getReplacementSecurityHold()!=null || !validHistory || context == null || !context.equals(scanResult.getReviewedContextSha256())
                     || !ArtifactClearancePolicy.cleared(scanResult)) return false;
         }
         if (routingDecision.action() == ScanRoutingService.RoutingAction.DEFER) {
@@ -95,7 +103,7 @@ public class ScanPersistenceService {
                         .set("versions.$.reviewStatus", ProjectVersion.ReviewStatus.APPROVED)
                         .set("versions.$.securityApprovalProjectId", reviewedVersion.getSecurityApprovalProjectId())
                         .set("versions.$.approvedReviewOrigins", reviewedVersion.getApprovedReviewOrigins())
-                        .set("versions.$.approvedFindingReviewHead", null)
+                        .set("versions.$.approvedFindingReviewHead", reviewedVersion.getFindingReviewHead())
                         .set("versions.$.approvedSecurityEvidence", reviewedVersion.getApprovedSecurityEvidence())
                         .set("versions.$.approvedSecurityContextSha256", reviewedVersion.getApprovedSecurityContextSha256())
                         .set("versions.$.securityApprovedAt", reviewedVersion.getSecurityApprovedAt())

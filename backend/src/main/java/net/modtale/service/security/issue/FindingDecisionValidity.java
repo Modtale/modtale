@@ -16,10 +16,14 @@ final class FindingDecisionValidity {
 
     Map<String, Assessment> assess(String projectId, ProjectVersion version, List<FindingReviewService.Event> events,
             String currentPolicy, long now) {
+        return assess(projectId, version, version == null ? null : version.getScanResult(), events, currentPolicy, now);
+    }
+
+    Map<String, Assessment> assess(String projectId, ProjectVersion version, ScanResult scan,
+            List<FindingReviewService.Event> events, String currentPolicy, long now) {
         var results = new LinkedHashMap<String, Assessment>();
         var revoked = new HashSet<String>();
         var superseded = new HashSet<String>();
-        var scan = version == null ? null : version.getScanResult();
         var evidence = scan == null ? null : scan.getSecurityEvidence();
         boolean complete = ArtifactClearancePolicy.complete(scan);
         var identities = IssueEvidenceIdentity.from(scan);

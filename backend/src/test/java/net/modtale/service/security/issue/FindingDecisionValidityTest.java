@@ -32,6 +32,56 @@ class FindingDecisionValidityTest {
     private FindingDecisionValidity.State state(ProjectVersion version, FindingReviewService.Event event, String policy) {
         return evaluator.assess("p", version, List.of(event), policy, NOW).get(event.id()).state();
     }
+    private ScanResult freshClean(ProjectVersion version) {
+        var current = ScanEvidenceFixtures.complete(true);
+        current.setIssues(new ArrayList<>(version.getScanResult().getIssues()));
+        current.setReviewedContextSha256(ArtifactReviewContext.fingerprint(version));
+        return current;
+    }
+    @Test void independentlyCleanExactRescanCanRetainOnlyApplicableAcceptance() {
+        var version = version(); var accepted = acceptance(version);
+        version.setFindingReviewHead(accepted.id());
+        var prior = version.getScanResult(); var current = freshClean(version);
+        assertTrue(FindingReviewHistory.permitsIndependentClean("p", version, current, List.of(accepted), accepted.policyVersion(), NOW));
+        assertSame(prior, version.getScanResult());
+        assertFalse(ArtifactClearancePolicy.cleared(prior));
+    }
+    @Test void independentCleanEligibilityRejectsChangedOrAdverseHistoryAndEvidence() {
+        for (String change : List.of("head", "require", "revoke", "expired", "artifact", "packaging", "caller", "context", "policy",
+                "finding", "reused", "incomplete", "unreviewable-context")) {
+            var version = version(); var accepted = acceptance(version); var current = freshClean(version);
+            version.setFindingReviewHead(accepted.id());
+            var events = List.of(accepted); String policy = accepted.policyVersion(); long now = NOW;
+            switch (change) {
+                case "head" -> version.setFindingReviewHead("different");
+                case "require" -> events = List.of(event(version, "required", FindingReviewService.Disposition.REQUIRE_REVIEW, null, null, NOW - 500, 0));
+                case "revoke" -> events = List.of(event(version, "revoked", FindingReviewService.Disposition.REVOKE, accepted.id(), null, NOW - 500, 0));
+                case "expired" -> now = NOW + 1000;
+                case "artifact" -> version.setHash("d".repeat(64));
+                case "packaging" -> {
+                    var evidence = current.getSecurityEvidence();
+                    version.setHash("d".repeat(64));
+                    current.setSecurityEvidence(new ScanResult.SecurityEvidence(evidence.policyVersion(), version.getHash(),
+                            evidence.contentSha256(), true, true, evidence.reviewState(), evidence.entryHashes()));
+                }
+                case "caller" -> {
+                    var evidence = current.getSecurityEvidence();
+                    var entries = new HashMap<>(evidence.entryHashes());
+                    entries.put("Caller.class", "e".repeat(64));
+                    version.setHash("d".repeat(64));
+                    current.setSecurityEvidence(new ScanResult.SecurityEvidence(evidence.policyVersion(), version.getHash(),
+                            SecurityManifest.identity(entries), true, true, evidence.reviewState(), entries));
+                }
+                case "context" -> current.setReviewedContextSha256("d".repeat(64));
+                case "policy" -> policy = "warden-3.0.0:" + "f".repeat(64);
+                case "finding" -> current.getIssues().getFirst().setLineStart(12);
+                case "reused" -> current.setReusedReviewVersion("older");
+                case "incomplete" -> current.setArtifactVerified(false);
+                case "unreviewable-context" -> version.setOverrideFileUrl("supplement.zip");
+            }
+            assertFalse(FindingReviewHistory.permitsIndependentClean("p", version, current, events, policy, now), change);
+        }
+    }
     @Test void matchingReasoningDoesNotMutateClearanceOrResolveTheFinding() {
         var version = version(); var event = acceptance(version);
         assertEquals(FindingDecisionValidity.State.APPLICABLE, state(version, event, event.policyVersion()));

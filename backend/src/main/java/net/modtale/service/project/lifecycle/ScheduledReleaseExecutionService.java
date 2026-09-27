@@ -44,7 +44,7 @@ public class ScheduledReleaseExecutionService {
                     .and("scanResult.remoteReview").is(scan == null ? null : scan.getRemoteReview());
             ArtifactReviewContext.bindSnapshot(versionMatch, version);
             long now = System.currentTimeMillis();
-            boolean valid = ArtifactClearancePolicy.boundToVersion(version)
+            boolean valid = ArtifactClearancePolicy.boundToScheduledVersion(version, mongo, project.getId(), currentPolicy, now)
                     && currentPolicy.equals(scan.getSecurityEvidence().policyVersion())
                     && scan.getScanTimestamp() > 0
                     && scan.getScanTimestamp() <= now
@@ -67,7 +67,7 @@ public class ScheduledReleaseExecutionService {
                         .set("versions.$.retainedRemoteReview", scan.getRemoteReview()!=null ? scan.getRemoteReview() : version.getRetainedRemoteReview())
                         .set("versions.$.securityApprovalProjectId", version.getSecurityApprovalProjectId())
                         .set("versions.$.approvedReviewOrigins", version.getApprovedReviewOrigins())
-                        .set("versions.$.approvedFindingReviewHead", null)
+                        .set("versions.$.approvedFindingReviewHead", version.getFindingReviewHead())
                         .set("versions.$.approvedSecurityEvidence", version.getApprovedSecurityEvidence())
                         .set("versions.$.approvedSecurityContextSha256", version.getApprovedSecurityContextSha256())
                         .set("versions.$.securityApprovedAt", version.getSecurityApprovedAt())

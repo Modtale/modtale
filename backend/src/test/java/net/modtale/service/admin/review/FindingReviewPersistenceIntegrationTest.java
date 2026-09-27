@@ -2,10 +2,21 @@ package net.modtale.service.admin.review;
 
 import com.mongodb.client.*;
 import java.util.*;
+import java.time.LocalDateTime;
 import net.modtale.config.db.*;
+import net.modtale.config.properties.AppSecurityProperties;
 import net.modtale.model.project.*;
+import net.modtale.repository.project.ProjectRepository;
 import net.modtale.service.project.query.ProjectService;
+import net.modtale.service.project.lifecycle.ScheduledReleaseExecutionService;
+import net.modtale.service.communication.ProjectNotificationService;
+import net.modtale.service.communication.WebhookService;
+import net.modtale.service.security.issue.SecurityIssueAnalysisService;
+import net.modtale.service.security.issue.SecurityIssueClassificationService;
+import net.modtale.service.security.issue.SecurityIssueApprovalService;
+import net.modtale.service.project.access.ProjectVersionAccessService;
 import net.modtale.service.security.issue.FindingReviewService;
+import net.modtale.service.security.issue.FindingReviewHistory;
 import net.modtale.service.security.scan.*;
 import org.bson.Document;
 import org.junit.jupiter.api.*;
@@ -95,6 +106,120 @@ class FindingReviewPersistenceIntegrationTest {
         assertFalse(scans.applyScanOutcome(projectId, "v1", 1, scan, approve, previous));
         assertFalse(scans.applyScanOutcome(projectId, "v1", 1, scan, approve, current));
         assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+    }
+    @Test void independentlyCleanExactRescanSchedulesAndPublishesWithBoundHistory() {
+        var accepted = record(token());
+        var previous = version();
+        var clean = ScanEvidenceFixtures.complete(true);
+        clean.setIssues(new ArrayList<>(previous.getScanResult().getIssues()));
+        clean.setReviewedContextSha256(ArtifactReviewContext.fingerprint(previous));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update()
+                .set("versions.0.scanResult.status", ScanStatus.SCANNING)
+                .set("versions.0.scanResult.scanState", "SCANNING")
+                .set("versions.0.scanResult.scanAttempt", 1), Project.class);
+        var scans = new ScanPersistenceService(mongo, mock(net.modtale.repository.project.ProjectRepository.class), projects);
+        assertTrue(scans.permitsIndependentClean(projectId, version(), clean, clean.getSecurityEvidence().policyVersion()));
+        var properties = new AppSecurityProperties("fixture", 60, 120, 2, 4, 15, 20, 25, 2);
+        var classification = new SecurityIssueClassificationService(properties);
+        var analysis = new SecurityIssueAnalysisService(classification, new SecurityIssueApprovalService(classification));
+        var repository = mock(ProjectRepository.class);
+        when(repository.findById(projectId)).thenAnswer(ignored -> Optional.ofNullable(mongo.findById(projectId, Project.class)));
+        var completion = new ScanCompletionService(repository, projects, mock(ProjectNotificationService.class),
+                mock(WebhookService.class), analysis, new ScanRoutingService(properties), scans,
+                new ProjectVersionAccessService(null), warden);
+        completion.handleCompletedScan(projectId, "v1", 1, false, clean);
+        assertEquals(ProjectVersion.ReviewStatus.SCHEDULED, version().getReviewStatus());
+        assertEquals(accepted.id(), version().getFindingReviewHead());
+        assertTrue(FindingReviewHistory.permitsIndependentClean(mongo, projectId, version(), version().getScanResult(),
+                warden.currentPolicyVersion(), System.currentTimeMillis()));
+        assertTrue(ArtifactClearancePolicy.boundToScheduledVersion(version(), mongo, projectId,
+                warden.currentPolicyVersion(), System.currentTimeMillis()));
+        var publication = new ScheduledReleaseExecutionService(mongo, projects, mock(ProjectNotificationService.class), analysis, warden);
+        assertEquals(List.of("1.0"), publication.publishDueVersions(mongo.findById(projectId, Project.class), LocalDateTime.now().plusDays(1)));
+        assertEquals(ProjectVersion.ReviewStatus.APPROVED, version().getReviewStatus());
+        assertEquals(accepted.id(), version().getApprovedFindingReviewHead());
+        assertNotNull(version().getApprovedSecurityEvidence());
+    }
+    @Test void independentlyCleanManualRescanApprovesWithTheValidatedHead() {
+        var accepted = record(token());
+        var previous = version();
+        var clean = ScanEvidenceFixtures.complete(true);
+        clean.setIssues(new ArrayList<>(previous.getScanResult().getIssues()));
+        clean.setReviewedContextSha256(ArtifactReviewContext.fingerprint(previous));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update()
+                .set("versions.0.scanResult.status", ScanStatus.SCANNING)
+                .set("versions.0.scanResult.scanState", "SCANNING")
+                .set("versions.0.scanResult.scanAttempt", 1), Project.class);
+        var properties = new AppSecurityProperties("fixture", 60, 120, 2, 4, 15, 20, 25, 2);
+        var classifier = new SecurityIssueClassificationService(properties);
+        var analysis = new SecurityIssueAnalysisService(classifier, new SecurityIssueApprovalService(classifier));
+        var repository = mock(ProjectRepository.class);
+        when(repository.findById(projectId)).thenAnswer(ignored -> Optional.ofNullable(mongo.findById(projectId, Project.class)));
+        var completion = new ScanCompletionService(repository, projects, mock(ProjectNotificationService.class),
+                mock(WebhookService.class), analysis, new ScanRoutingService(properties),
+                new ScanPersistenceService(mongo, repository, projects), new ProjectVersionAccessService(null), warden);
+        completion.handleCompletedScan(projectId, "v1", 1, true, clean);
+        assertEquals(ProjectVersion.ReviewStatus.APPROVED, version().getReviewStatus());
+        assertEquals(accepted.id(), version().getApprovedFindingReviewHead());
+        assertNotNull(version().getApprovedSecurityEvidence());
+    }
+    @Test void outstandingRequirementCannotScheduleAnIndependentCleanRescan() {
+        requireFurtherReview();
+        var previous = version();
+        var clean = ScanEvidenceFixtures.complete(true);
+        clean.setIssues(new ArrayList<>(previous.getScanResult().getIssues()));
+        clean.setReviewedContextSha256(ArtifactReviewContext.fingerprint(previous));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update()
+                .set("versions.0.scanResult.status", ScanStatus.SCANNING)
+                .set("versions.0.scanResult.scanState", "SCANNING")
+                .set("versions.0.scanResult.scanAttempt", 1), Project.class);
+        var queued = version();
+        var scans = new ScanPersistenceService(mongo, mock(net.modtale.repository.project.ProjectRepository.class), projects);
+        assertFalse(scans.permitsIndependentClean(projectId, queued, clean, clean.getSecurityEvidence().policyVersion()));
+        assertFalse(scans.applyScanOutcome(projectId, "v1", 1, clean,
+                new ScanRoutingService.RoutingDecision(ScanRoutingService.RoutingAction.SCHEDULE, 0), queued));
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+    }
+    @Test void newerLinkedDecisionWinsOverAnEarlierCleanHistoryAssessment() {
+        record(token());
+        var stale = version();
+        var clean = ScanEvidenceFixtures.complete(true);
+        clean.setIssues(new ArrayList<>(stale.getScanResult().getIssues()));
+        clean.setReviewedContextSha256(ArtifactReviewContext.fingerprint(stale));
+        assertTrue(FindingReviewHistory.permitsIndependentClean(mongo, projectId, stale, clean,
+                clean.getSecurityEvidence().policyVersion(), System.currentTimeMillis()));
+        var newer = record(token());
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update()
+                .set("versions.0.scanResult.status", ScanStatus.SCANNING)
+                .set("versions.0.scanResult.scanState", "SCANNING")
+                .set("versions.0.scanResult.scanAttempt", 1), Project.class);
+        var scans = new ScanPersistenceService(mongo, mock(net.modtale.repository.project.ProjectRepository.class), projects);
+        assertFalse(scans.applyScanOutcome(projectId, "v1", 1, clean,
+                new ScanRoutingService.RoutingDecision(ScanRoutingService.RoutingAction.SCHEDULE, 0), stale));
+        assertEquals(newer.id(), version().getFindingReviewHead());
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+    }
+    @Test void historyReplacementBeforePublicationCancelsTheScheduledRelease() {
+        var accepted = record(token());
+        var previous = version();
+        var clean = ScanEvidenceFixtures.complete(true);
+        clean.setIssues(new ArrayList<>(previous.getScanResult().getIssues()));
+        clean.setReviewedContextSha256(ArtifactReviewContext.fingerprint(previous));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update()
+                .set("versions.0.scanResult.status", ScanStatus.SCANNING)
+                .set("versions.0.scanResult.scanState", "SCANNING")
+                .set("versions.0.scanResult.scanAttempt", 1), Project.class);
+        var scans = new ScanPersistenceService(mongo, mock(net.modtale.repository.project.ProjectRepository.class), projects);
+        assertTrue(scans.applyScanOutcome(projectId, "v1", 1, clean,
+                new ScanRoutingService.RoutingDecision(ScanRoutingService.RoutingAction.SCHEDULE, 0), version()));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(projectId)), new Update()
+                .set("versions.0.findingReviewHead", "missing-replacement"), Project.class);
+        var publication = new ScheduledReleaseExecutionService(mongo, projects, mock(ProjectNotificationService.class),
+                mock(SecurityIssueAnalysisService.class), warden);
+        assertTrue(publication.publishDueVersions(mongo.findById(projectId, Project.class), LocalDateTime.now().plusMinutes(1)).isEmpty());
+        assertEquals(ProjectVersion.ReviewStatus.PENDING, version().getReviewStatus());
+        assertNull(version().getApprovedFindingReviewHead());
+        assertNotEquals(accepted.id(), version().getFindingReviewHead());
     }
     @Test void subsequentConclusionSupersedesOnlyTheSameReviewedScope() {
         var first = record(token());

@@ -26,7 +26,7 @@ public class SecurityIssueApprovalService {
                 org.springframework.http.HttpStatus.CONFLICT,"The changed version is awaiting retained review admission.");
         if(version.getReplacementSecurityHold()!=null)throw new org.springframework.web.server.ResponseStatusException(
                 org.springframework.http.HttpStatus.CONFLICT,"Resolve the retained security block before approving this version.");
-        // Only the conditional manual approval writer may attest a reviewed finding-history head.
+        // This helper never attests a finding-history head; the conditional approval writer supplies its validated head.
         version.setApprovedFindingReviewHead(null);
         if (version.getScanResult() == null) {
             version.setSecurityApprovalProjectId(null);

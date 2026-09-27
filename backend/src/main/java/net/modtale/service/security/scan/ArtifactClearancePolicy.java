@@ -1,6 +1,8 @@
 package net.modtale.service.security.scan;
 
 import net.modtale.model.project.*;
+import net.modtale.service.security.issue.FindingReviewHistory;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import java.util.*;
 
 public final class ArtifactClearancePolicy {
@@ -24,7 +26,18 @@ public final class ArtifactClearancePolicy {
                     && !result.getReusedReviewOrigins().isEmpty();
     }
     public static boolean boundToVersion(ProjectVersion version) {
-        if (version == null || version.getReplacementSecurityHold()!=null || version.getFindingReviewHead() != null || !cleared(version.getScanResult())) return false;
+        return boundToVersion(version, false);
+    }
+    public static boolean boundToScheduledVersion(ProjectVersion version, MongoTemplate mongo, String projectId,
+            String currentPolicy, long now) {
+        if (version == null) return false;
+        boolean validatedHistory = version.getFindingReviewHead() == null || FindingReviewHistory.permitsIndependentClean(
+                mongo, projectId, version, version.getScanResult(), currentPolicy, now);
+        return boundToVersion(version, validatedHistory);
+    }
+    private static boolean boundToVersion(ProjectVersion version, boolean validatedFindingHistory) {
+        if (version == null || version.getReplacementSecurityHold()!=null
+                || version.getFindingReviewHead() != null && !validatedFindingHistory || !cleared(version.getScanResult())) return false;
         String context = ArtifactReviewContext.automaticallyReviewableFingerprint(version);
         return context != null && context.equals(version.getScanResult().getReviewedContextSha256())
                 && Objects.equals(version.getHash(), version.getScanResult().getSecurityEvidence().artifactSha256());
