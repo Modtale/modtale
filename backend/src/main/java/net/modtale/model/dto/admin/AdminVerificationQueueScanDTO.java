@@ -8,6 +8,8 @@ public record AdminVerificationQueueScanDTO(
         ScanStatus status,
         String verdict,
         String scanState,
+        String reviewState,
+        boolean serviceAttention,
         int riskScore,
         int knownIssueCount,
         int newIssueCount,

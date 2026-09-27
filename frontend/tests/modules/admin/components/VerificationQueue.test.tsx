@@ -25,6 +25,23 @@ it('separates service failures without hiding prior findings or inventing a malw
     await act(async () => (operations.querySelector('button') as HTMLButtonElement).click());
     expect(onReview).toHaveBeenCalledWith('Expired', 'v');
 });
+it('routes completed provider failures without new findings to diagnostics', async () => {
+    const service = item('Provider', 'SUSPICIOUS', 'COMPLETED');
+    service.pendingVersion!.scan!.serviceAttention = true;
+    service.pendingVersion!.scan!.reviewState = 'RATE_LIMITED';
+    service.pendingVersion!.scan!.newIssueCount = 0;
+    service.pendingVersion!.scan!.knownIssueCount = 7;
+    const onReview = vi.fn();
+    await act(async () => root.render(<VerificationQueue pendingProjects={[service]} loadingQueue={false} loadingReview={false} onReview={onReview} />));
+    expect(container.querySelector('[aria-label="Content and security review"]')).toBeNull();
+    const operations = container.querySelector('[aria-label="Review service attention"]')!;
+    expect(operations.textContent).toContain('Review service rate limit reached');
+    expect(operations.textContent).toContain('Security clearance withheld');
+    expect(operations.textContent).toContain('New 0 · Known 7');
+    expect(operations.textContent).not.toContain('Risk 75');
+    await act(async () => (operations.querySelector('button') as HTMLButtonElement).click());
+    expect(onReview).toHaveBeenCalledWith('Provider', 'v');
+});
 it.each([['REMOTE_ORIGIN_UNVERIFIED', 'Original review service unverified'], ['REMOTE_CONTEXT_CONFLICT', 'Review service context conflict'], ['REMOTE_ISOLATED', 'Local review isolated'], ['REMOTE_BINDING_MISSING', 'Review state needs repair'], ['REMOTE_BINDING_MISMATCH', 'Review state needs repair'], ['REMOTE_UNSUPPORTED_CONTEXT', 'Review context unsupported'], ['REMOTE_HELD', 'Review held'], ['REMOTE_CANCELLED', 'Review cancelled'], ['UNKNOWN', 'Review unavailable']])(
     'keeps %s failures visible when no content reviews remain', async (state, label) => {
         await act(async () => root.render(<VerificationQueue pendingProjects={[item('Failure', 'FAILED', state)]}

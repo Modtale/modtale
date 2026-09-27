@@ -137,6 +137,17 @@ describe('Review security clearance status', () => {
         await render({ ...clear, securityEvidence: { ...clear.securityEvidence, policyVersion: 'warden-3.0.0' } });
         expect(container.textContent).not.toContain('Artifact Review Completed');
     });
+    it('labels an exhausted provider failure as diagnostics while withholding clearance', async () => {
+        await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', riskScore: 75,
+            newIssueCount: 0, knownIssueCount: 7, escalatedIssueCount: 0,
+            securityEvidence: { ...clear.securityEvidence, clearanceGranted: false, reviewState: 'RATE_LIMITED' } });
+        expect(container.textContent).toContain('Review service attention');
+        expect(container.textContent).toContain('Review Service Diagnostics');
+        expect(container.textContent).toContain('Clearance is withheld');
+        expect(container.textContent).not.toContain('Manual Security Review Required');
+        expect(container.textContent).not.toContain('Score: 75');
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+    });
     it.each([true, false, undefined])('distinguishes identical local evidence without claiming clearance: %s', async identical => {
         await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW',
             issues: [{ type: 'Network', severity: 'LOW', description: 'connect', filePath: 'Mod.class',

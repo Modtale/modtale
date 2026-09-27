@@ -22,3 +22,10 @@ it('binds the returned page and continuation to the selected filter', () => {
     expect(() => validateQueuePage({...empty,filter:'OPERATIONS'},'SECURITY')).toThrow();
     expect(() => validateQueuePage({...empty,filter:'SECURITY',nextCursor:'1.s.0.YQ'},'SECURITY')).toThrow();
 });
+it('accepts bounded service diagnostics and rejects malformed service markers', () => {
+    const row = {id:'project',pendingVersion:{id:'version',reviewStatus:'PENDING',scan:{status:'SUSPICIOUS',verdict:'REVIEW',scanState:'COMPLETED',
+        reviewState:'RATE_LIMITED',serviceAttention:true,riskScore:0,knownIssueCount:7,newIssueCount:0,escalatedIssueCount:0}}};
+    expect(validateQueuePage({...empty,items:[row]}).items[0].pendingVersion?.scan?.serviceAttention).toBe(true);
+    expect(() => validateQueuePage({...empty,items:[{...row,pendingVersion:{...row.pendingVersion,scan:{...row.pendingVersion.scan,serviceAttention:'true'}}}]})).toThrow();
+    expect(() => validateQueuePage({...empty,items:[{...row,pendingVersion:{...row.pendingVersion,scan:{...row.pendingVersion.scan,reviewState:'x'.repeat(65)}}}]})).toThrow();
+});

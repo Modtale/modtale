@@ -83,6 +83,36 @@ class ModerationQueuePageReaderTest {
         assertTrue(reader.page(null,50,ModerationQueuePageReader.Filter.SECURITY).items().isEmpty());
         assertEquals(1,reader.page(null,50).items().size());
     }
+    @Test void completedServiceFailuresWithoutNewRiskMoveToOperationsBeforePagination() {
+        var service=version("service","SUSPICIOUS");
+        service.get("scanResult",Document.class).append("scanState","COMPLETED").append("verdict","REVIEW")
+                .append("newIssueCount",0).append("knownIssueCount",7).append("escalatedIssueCount",0)
+                .append("securityEvidence",new Document("complete",true).append("reviewState","AUTHENTICATION_ERROR"));
+        var adverse=version("adverse","SUSPICIOUS");
+        adverse.get("scanResult",Document.class).append("scanState","COMPLETED").append("verdict","REVIEW")
+                .append("newIssueCount",1).append("escalatedIssueCount",0)
+                .append("securityEvidence",new Document("complete",true).append("reviewState","UPSTREAM_ERROR"));
+        var unknown=version("unknown","SUSPICIOUS");
+        unknown.get("scanResult",Document.class).append("scanState","COMPLETED").append("verdict","REVIEW")
+                .append("securityEvidence",new Document("complete",true).append("reviewState","RATE_LIMITED"));
+        var incomplete=version("incomplete","SUSPICIOUS");
+        incomplete.get("scanResult",Document.class).append("scanState","COMPLETED").append("verdict","REVIEW")
+                .append("newIssueCount",0).append("escalatedIssueCount",0)
+                .append("securityEvidence",new Document("complete",false).append("reviewState","TIMEOUT"));
+        insert("a","PUBLISHED",List.of(service,adverse,unknown,incomplete));
+        var operations=reader.page(null,1,ModerationQueuePageReader.Filter.OPERATIONS);
+        assertEquals("service",operations.items().getFirst().pendingVersion().id());
+        assertTrue(operations.items().getFirst().pendingVersion().scan().serviceAttention());
+        assertEquals("AUTHENTICATION_ERROR",operations.items().getFirst().pendingVersion().scan().reviewState());
+        assertNull(operations.next());
+        var security=reader.page(null,1,ModerationQueuePageReader.Filter.SECURITY);
+        assertEquals("adverse",security.items().getFirst().pendingVersion().id());
+        var next=reader.page(security.next(),1,ModerationQueuePageReader.Filter.SECURITY);
+        assertEquals("unknown",next.items().getFirst().pendingVersion().id());
+        var finalPage=reader.page(next.next(),1,ModerationQueuePageReader.Filter.SECURITY);
+        assertEquals("incomplete",finalPage.items().getFirst().pendingVersion().id());
+        assertNull(finalPage.next());
+    }
     @Test void invalidLimitsAndCursorAreRejectedBeforeRead() {
         assertThrows(IllegalArgumentException.class,()->reader.page(null,0));assertThrows(IllegalArgumentException.class,()->reader.page(null,51));
         assertThrows(IllegalArgumentException.class,()->new ModerationQueuePageReader.Cursor(42,0));

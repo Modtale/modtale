@@ -425,6 +425,8 @@ public class ProjectMapper {
                 scanResult.getStatus(),
                 scanResult.getVerdict(),
                 scanResult.getScanState(),
+                scanResult.getSecurityEvidence() == null ? null : scanResult.getSecurityEvidence().reviewState(),
+                false,
                 scanResult.getRiskScore(),
                 scanResult.getKnownIssueCount(),
                 scanResult.getNewIssueCount(),

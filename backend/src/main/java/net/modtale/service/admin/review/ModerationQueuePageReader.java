@@ -15,6 +15,8 @@ import java.util.concurrent.TimeUnit;
 @Service
 public final class ModerationQueuePageReader {
     public enum Filter { ALL, SECURITY, OPERATIONS }
+    private static final List<String> SERVICE_FAILURES = List.of("RATE_LIMITED", "TIMEOUT", "UPSTREAM_ERROR", "INTERRUPTED",
+            "AUTHENTICATION_ERROR", "DISABLED", "CLOSED", "JOURNAL_REQUIRED", "REQUEST_REJECTED", "REQUEST_BINDING_ERROR", "TOOL_REPLAY_REQUIRED");
     public record Cursor(Object projectId,long versionIndex,Filter filter) {
         public Cursor(Object projectId,long versionIndex) {this(projectId,versionIndex,Filter.ALL);}
         public Cursor {
@@ -49,21 +51,35 @@ public final class ModerationQueuePageReader {
         stages.add(new Document("$unwind",new Document("path","$queueVersion").append("includeArrayIndex","queueIndex").append("preserveNullAndEmptyArrays",true)));
         stages.add(new Document("$match",new Document("$or",List.of(new Document("queueProjectOnly",true),
                 new Document("queueVersion.reviewStatus","PENDING").append("queueVersion.scanResult.status",new Document("$ne","SCANNING"))))));
+        var serviceOnly=new Document("$and",List.of(
+                new Document("$eq",List.of("$queueVersion.scanResult.status","SUSPICIOUS")),
+                new Document("$eq",List.of("$queueVersion.scanResult.verdict","REVIEW")),
+                new Document("$eq",List.of("$queueVersion.scanResult.scanState","COMPLETED")),
+                new Document("$eq",List.of("$queueVersion.scanResult.securityEvidence.complete",true)),
+                new Document("$in",List.of("$queueVersion.scanResult.securityEvidence.reviewState",SERVICE_FAILURES)),
+                new Document("$in",List.of(new Document("$type","$queueVersion.scanResult.newIssueCount"),List.of("int","long"))),
+                new Document("$in",List.of(new Document("$type","$queueVersion.scanResult.escalatedIssueCount"),List.of("int","long"))),
+                new Document("$eq",List.of("$queueVersion.scanResult.newIssueCount",0)),
+                new Document("$eq",List.of("$queueVersion.scanResult.escalatedIssueCount",0))));
+        stages.add(new Document("$set",new Document("queueServiceAttention",new Document("$or",List.of(
+                new Document("$eq",List.of("$queueVersion.scanResult.status","FAILED")),serviceOnly)))));
         if(cursor!=null)stages.add(new Document("$match",new Document("$expr",new Document("$or",List.of(
                 new Document("$gt",List.of("$_id",literal(cursor.projectId()))),new Document("$gt",List.of("$queueIndex",cursor.versionIndex())))))));
-        if(filter==Filter.OPERATIONS)stages.add(new Document("$match",new Document("queueVersion.scanResult.status","FAILED")));
+        if(filter==Filter.OPERATIONS)stages.add(new Document("$match",new Document("queueServiceAttention",true)));
         if(filter==Filter.SECURITY)stages.add(new Document("$match",new Document("$or",List.of(
-                new Document("queueVersion.scanResult.status",new Document("$in",List.of("INFECTED","FLAGGED","SUSPICIOUS"))),
+                new Document("queueVersion.scanResult.status",new Document("$in",List.of("INFECTED","FLAGGED"))),
+                new Document("queueVersion.scanResult.status","SUSPICIOUS").append("queueServiceAttention",false),
                 new Document("queueVersion.scanResult.verdict","BLOCK"),
                 new Document("queueVersion.scanResult.newIssueCount",new Document("$gt",0)),
                 new Document("queueVersion.scanResult.escalatedIssueCount",new Document("$gt",0))))));
         stages.add(new Document("$limit",limit+1));
-        var projection=new Document("_id",1).append("queueIndex",1).append("queueProjectOnly",1)
+        var projection=new Document("_id",1).append("queueIndex",1).append("queueProjectOnly",1).append("queueServiceAttention",1)
                 .append("title",text("$title",256)).append("description",text("$description",1024)).append("author",text("$author",128))
                 .append("imageUrl",text("$imageUrl",2048)).append("classification",text("$classification",32)).append("status",1).append("updatedAt",text("$updatedAt",64))
                 .append("versionId",text("$queueVersion._id",129)).append("versionNumber",text("$queueVersion.versionNumber",128))
                 .append("changelog",text("$queueVersion.changelog",1024)).append("scanStatus",text("$queueVersion.scanResult.status",32))
-                .append("verdict",text("$queueVersion.scanResult.verdict",32)).append("scanState",text("$queueVersion.scanResult.scanState",64));
+                .append("verdict",text("$queueVersion.scanResult.verdict",32)).append("scanState",text("$queueVersion.scanResult.scanState",64))
+                .append("reviewState",text("$queueVersion.scanResult.securityEvidence.reviewState",64));
         for(String field:List.of("riskScore","knownIssueCount","newIssueCount","escalatedIssueCount"))projection.append(field,new Document("$convert",new Document("input","$queueVersion.scanResult."+field).append("to","int").append("onError",0).append("onNull",0)));
         projection.append("idCount",new Document("$size",new Document("$filter",new Document("input",versions).append("as","v")
                 .append("cond",new Document("$eq",List.of("$$v._id","$queueVersion._id"))))));
@@ -80,6 +96,7 @@ public final class ModerationQueuePageReader {
             var status=enumValue(ScanStatus.class,row.getString("scanStatus"));
             if(row.getString("scanStatus")!=null && status==null) {unavailable++;continue;}
             var scan=row.getString("scanStatus")==null?null:new AdminVerificationQueueScanDTO(status,row.getString("verdict"),row.getString("scanState"),
+                    row.getString("reviewState"),Boolean.TRUE.equals(row.getBoolean("queueServiceAttention")),
                     row.getInteger("riskScore",0),row.getInteger("knownIssueCount",0),row.getInteger("newIssueCount",0),row.getInteger("escalatedIssueCount",0));
             items.add(new AdminVerificationQueueItemDTO(projectId,row.getString("title"),row.getString("description"),row.getString("author"),row.getString("imageUrl"),
                     enumValue(ProjectClassification.class,row.getString("classification")),enumValue(ProjectStatus.class,row.getString("status")),row.getString("updatedAt"),

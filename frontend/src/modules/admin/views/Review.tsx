@@ -132,6 +132,13 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
         && scanResult?.scanState === 'COMPLETED' && scanResult?.securityEvidence?.complete === true
         && scanResult?.securityEvidence?.clearanceGranted === true
         && scanResult?.securityEvidence?.reviewState !== 'NEW_SECURITY_EVIDENCE';
+    const serviceReviewStates = ['RATE_LIMITED', 'TIMEOUT', 'UPSTREAM_ERROR', 'INTERRUPTED', 'AUTHENTICATION_ERROR',
+        'DISABLED', 'CLOSED', 'JOURNAL_REQUIRED', 'REQUEST_REJECTED', 'REQUEST_BINDING_ERROR', 'TOOL_REPLAY_REQUIRED'];
+    const serviceAttention = scanResult?.status === 'FAILED' || scanResult?.status === 'SUSPICIOUS'
+        && scanResult.verdict === 'REVIEW' && scanResult.scanState === 'COMPLETED'
+        && scanResult.securityEvidence?.complete === true
+        && serviceReviewStates.includes(scanResult.securityEvidence.reviewState)
+        && scanResult.newIssueCount === 0 && scanResult.escalatedIssueCount === 0;
     const hasScanIssues = !!scanResult && scanResult.status !== 'SCANNING' && !securityCleared;
     const isScanning = scanResult?.status === 'SCANNING';
 
@@ -722,7 +729,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                 {decisionWritten && <p role="status" className="text-sm text-amber-700">A finding decision was saved. Refresh the evidence to inspect the updated history before publishing.</p>}
                                 {decisionWritten && <button type="button" disabled={refreshing} onClick={() => void refreshEvidence()} className="text-sm font-bold text-modtale-accent">{refreshing ? 'Refreshing evidence…' : 'Refresh evidence and restart checklist'}</button>}
                                 {refreshError && <p role="alert" className="text-sm text-red-600">{refreshError}</p>}
-                                {scanResult?.status === 'FAILED' && <div role="status" className="rounded-2xl border border-amber-300 p-5 text-sm text-amber-800 dark:text-amber-200">
+                                {serviceAttention && <div role="status" className="rounded-2xl border border-amber-300 p-5 text-sm text-amber-800 dark:text-amber-200">
                                     <h4 className="font-bold">Review service attention</h4>
                                     <p>Security review did not complete. Clearance is withheld. Check the failure before requesting another scan; existing findings remain unresolved.</p>
                                     <p>{scanResult.scanState === 'REMOTE_ORIGIN_UNVERIFIED' ? 'The original review service identity was not recorded. Reconcile the original job before requesting another scan.' : scanResult.scanState === 'REMOTE_CONTEXT_CONFLICT' ? 'The review service rejected the stored request context or service identity. Reconcile the original job before requesting another scan.' : scanResult.scanState === 'REMOTE_ISOLATED' ? 'The local review was isolated. Findings and blocking decisions remain in place. Resolve the original review operation before starting another scan.' : ['REMOTE_BINDING_MISSING', 'REMOTE_BINDING_MISMATCH'].includes(scanResult.scanState || '') ? 'The stored review job is missing or no longer matches this version. Repair review state before retrying.' : scanResult.scanState === 'REMOTE_UNSUPPORTED_CONTEXT' ? 'The current dependencies, runtime metadata or supplemental content cannot be fully reviewed. Resolve the review context before requesting another scan.' : scanResult.scanState === 'REMOTE_EXPIRED' ? 'The review expired.' : scanResult.scanState === 'REMOTE_CANCELLED' ? 'The review was cancelled.' : scanResult.scanState === 'REMOTE_HELD' ? 'The review was held.' : 'The review is unavailable.'}</p>
@@ -751,14 +758,14 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                 <ShieldAlert className="w-6 h-6" />
                                                 <div>
                                                     <h4 className="font-bold text-lg">
-                                                        {scanResult?.verdict === 'BLOCK' ? 'High-Risk Findings Detected' : 'Manual Security Review Required'}
+                                                        {scanResult?.verdict === 'BLOCK' ? 'High-Risk Findings Detected' : serviceAttention ? 'Review Service Diagnostics' : 'Manual Security Review Required'}
                                                     </h4>
                                                     <p className="text-xs opacity-80 font-medium">
                                                         Status: {scanResult.status}
                                                         {scanResult.verdict ? ` • Verdict: ${scanResult.verdict}` : ''}
-                                                        {scanResult.riskLevel ? ` • Risk: ${scanResult.riskLevel}` : ''}
-                                                        {` • Score: ${scanResult.riskScore}`}
-                                                        {scanResult.confidenceScore ? ` • Confidence: ${scanResult.confidenceScore}%` : ''}
+                                                        {!serviceAttention && scanResult.riskLevel ? ` • Risk: ${scanResult.riskLevel}` : ''}
+                                                        {!serviceAttention ? ` • Score: ${scanResult.riskScore}` : ''}
+                                                        {!serviceAttention && scanResult.confidenceScore ? ` • Confidence: ${scanResult.confidenceScore}%` : ''}
                                                     </p>
                                                     <p className="text-xs opacity-80 font-medium">
                                                         New: {scanResult.newIssueCount || 0} • Known: {scanResult.knownIssueCount || 0} • Escalated: {scanResult.escalatedIssueCount || 0}

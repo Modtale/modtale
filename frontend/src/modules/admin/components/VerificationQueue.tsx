@@ -50,7 +50,7 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
         const isProjectPending = mod.status === 'PENDING';
         const targetVersion = mod.pendingVersion;
         const scan = targetVersion?.scan;
-        const needsService = scan?.status === 'FAILED';
+        const needsService = scan?.status === 'FAILED' || scan?.serviceAttention === true;
         const hasIssues = scan && scan.status !== 'CLEAN' && !needsService;
         const newIssues = scan?.newIssueCount || 0;
         const knownIssues = scan?.knownIssueCount || 0;
@@ -107,7 +107,7 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
                         </div>
                         <div className="flex items-center gap-2">
                             {needsService && <div className="text-sm text-amber-700 dark:text-amber-300">
-                                {scan?.scanState === 'REMOTE_ORIGIN_UNVERIFIED' ? 'Original review service unverified' : scan?.scanState === 'REMOTE_CONTEXT_CONFLICT' ? 'Review service context conflict' : scan?.scanState === 'REMOTE_ISOLATED' ? 'Local review isolated' : ['REMOTE_BINDING_MISSING', 'REMOTE_BINDING_MISMATCH'].includes(scan?.scanState || '') ? 'Review state needs repair' : scan?.scanState === 'REMOTE_UNSUPPORTED_CONTEXT' ? 'Review context unsupported' : scan?.scanState === 'REMOTE_EXPIRED' ? 'Review expired' : scan?.scanState === 'REMOTE_CANCELLED' ? 'Review cancelled' : scan?.scanState === 'REMOTE_HELD' ? 'Review held' : 'Review unavailable'}
+                                {scan?.scanState === 'REMOTE_ORIGIN_UNVERIFIED' ? 'Original review service unverified' : scan?.scanState === 'REMOTE_CONTEXT_CONFLICT' ? 'Review service context conflict' : scan?.scanState === 'REMOTE_ISOLATED' ? 'Local review isolated' : ['REMOTE_BINDING_MISSING', 'REMOTE_BINDING_MISMATCH'].includes(scan?.scanState || '') ? 'Review state needs repair' : scan?.scanState === 'REMOTE_UNSUPPORTED_CONTEXT' ? 'Review context unsupported' : scan?.scanState === 'REMOTE_EXPIRED' ? 'Review expired' : scan?.scanState === 'REMOTE_CANCELLED' ? 'Review cancelled' : scan?.scanState === 'REMOTE_HELD' ? 'Review held' : scan?.reviewState === 'AUTHENTICATION_ERROR' ? 'Review service authentication failed' : scan?.reviewState === 'RATE_LIMITED' ? 'Review service rate limit reached' : scan?.reviewState === 'TIMEOUT' ? 'Review service timed out' : scan?.serviceAttention ? 'Review service unavailable' : 'Review unavailable'}
                                 <span className="block text-xs">Security clearance withheld</span>
                             </div>}
                             {scan?.status === 'SCANNING' && (
@@ -138,14 +138,14 @@ export const VerificationQueue: React.FC<VerificationQueueProps> = ({
 
     return (
         <Surface><div className="grid gap-4">
-            {pendingProjects.some(mod => mod.pendingVersion?.scan?.status !== 'FAILED') && <section aria-label="Content and security review" className="grid gap-4">
+            {pendingProjects.some(mod => mod.pendingVersion?.scan?.status !== 'FAILED' && mod.pendingVersion?.scan?.serviceAttention !== true) && <section aria-label="Content and security review" className="grid gap-4">
                 <h2 className="text-lg font-bold dark:text-white">Content and security review</h2>
-                {pendingProjects.filter(mod => mod.pendingVersion?.scan?.status !== 'FAILED').map(renderQueueItem)}
+                {pendingProjects.filter(mod => mod.pendingVersion?.scan?.status !== 'FAILED' && mod.pendingVersion?.scan?.serviceAttention !== true).map(renderQueueItem)}
             </section>}
-            {pendingProjects.some(mod => mod.pendingVersion?.scan?.status === 'FAILED') && <section aria-label="Review service attention" className="grid gap-4">
+            {pendingProjects.some(mod => mod.pendingVersion?.scan?.status === 'FAILED' || mod.pendingVersion?.scan?.serviceAttention === true) && <section aria-label="Review service attention" className="grid gap-4">
                 <div><h2 className="text-lg font-bold dark:text-white">Review service attention</h2>
                     <p className="text-sm text-slate-600 dark:text-slate-300">These security reviews did not complete. Inspect the failure before requesting another scan. Existing findings still require review.</p></div>
-                {pendingProjects.filter(mod => mod.pendingVersion?.scan?.status === 'FAILED').map(renderQueueItem)}
+                {pendingProjects.filter(mod => mod.pendingVersion?.scan?.status === 'FAILED' || mod.pendingVersion?.scan?.serviceAttention === true).map(renderQueueItem)}
             </section>}
         </div></Surface>
     );

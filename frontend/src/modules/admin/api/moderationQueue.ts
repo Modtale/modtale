@@ -21,7 +21,9 @@ export function validateQueuePage(value: unknown, filter: QueueFilter = 'ALL'): 
             if (version.versionNumber != null && (typeof version.versionNumber !== 'string' || [...version.versionNumber].length > 128)
                 || version.changelog != null && (typeof version.changelog !== 'string' || [...version.changelog].length > 1024)) throw new Error('Invalid moderation queue version.');
             if (version.scan != null) {
-                for (const field of ['status','verdict','scanState'] as const) if (version.scan[field] != null && typeof version.scan[field] !== 'string') throw new Error('Invalid moderation queue status.');
+                for (const field of ['status','verdict','scanState','reviewState'] as const) if (version.scan[field] != null
+                    && (typeof version.scan[field] !== 'string' || [...version.scan[field]].length > (field === 'scanState' || field === 'reviewState' ? 64 : 32))) throw new Error('Invalid moderation queue status.');
+                if (version.scan.serviceAttention != null && typeof version.scan.serviceAttention !== 'boolean') throw new Error('Invalid moderation queue service state.');
                 for (const field of ['riskScore','knownIssueCount','newIssueCount','escalatedIssueCount'] as const) if (!Number.isInteger(version.scan[field])) throw new Error('Invalid moderation queue findings.');
             }
         }

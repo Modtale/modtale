@@ -363,6 +363,8 @@ export interface Project {
 
 export interface AdminVerificationQueueScan {
     scanState?: string;
+    reviewState?: string;
+    serviceAttention?: boolean;
     status?: ScanResult['status'];
     verdict?: ScanResult['verdict'];
     riskScore: number;
