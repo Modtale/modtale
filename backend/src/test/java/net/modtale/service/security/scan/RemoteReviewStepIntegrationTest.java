@@ -29,7 +29,7 @@ class RemoteReviewStepIntegrationTest {
     RemoteReviewOrigin origin=new RemoteReviewOrigin("11111111-1111-1111-1111-111111111111","e".repeat(64));
     AtomicInteger identityGets=new AtomicInteger(),posts=new AtomicInteger(),gets=new AtomicInteger();ObjectMapper mapper=new ObjectMapper();
     interface Handler {void handle(HttpExchange e)throws Exception;}
-    void route(Handler handler){server.createContext("/api/v1/review-jobs",e->{try{if(e.getRequestURI().getPath().endsWith("/identity")){identityGets.incrementAndGet();byte[] body=mapper.writeValueAsBytes(Map.of("contractVersion",1,"deploymentId",origin.deploymentId(),"callerScope",origin.callerScope()));e.sendResponseHeaders(200,body.length);e.getResponseBody().write(body);return;}
+    void route(Handler handler){server.createContext("/api/v1/review-jobs",e->{try{assertEquals(List.of("1"),e.getRequestHeaders().get("X-Warden-Contract-Version"));if(e.getRequestURI().getPath().endsWith("/identity")){identityGets.incrementAndGet();byte[] body=mapper.writeValueAsBytes(Map.of("contractVersion",1,"deploymentId",origin.deploymentId(),"callerScope",origin.callerScope()));e.sendResponseHeaders(200,body.length);e.getResponseBody().write(body);return;}
         assertEquals(origin.deploymentId(),e.getRequestHeaders().getFirst("X-Warden-Deployment-Id"));assertEquals(origin.callerScope(),e.getRequestHeaders().getFirst("X-Warden-Caller-Scope"));if(e.getRequestMethod().equals("POST")){posts.incrementAndGet();e.getRequestBody().readAllBytes();}else gets.incrementAndGet();handler.handle(e);}catch(Exception failure){throw new RuntimeException(failure);}finally{e.close();}});}
     void reply(HttpExchange e,int code,String state)throws Exception {
         reply(e,code,state,null);

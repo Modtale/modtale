@@ -23,6 +23,7 @@ class RemoteReviewClientTest {
     void route(Handler handler) {
         server.createContext("/api/v1/review-jobs",exchange->{calls.incrementAndGet();if(exchange.getRequestMethod().equals("POST"))posts.incrementAndGet();
             try {assertEquals(expectedApiKey,exchange.getRequestHeaders().getFirst("X-Warden-Api-Key"));
+                assertEquals(List.of("1"),exchange.getRequestHeaders().get("X-Warden-Contract-Version"));
                 if(exchange.getRequestURI().getPath().endsWith("/identity")){reply(exchange,200,Map.of("contractVersion",1,"deploymentId",origin.deploymentId(),"callerScope",origin.callerScope()));return;}
                 assertEquals(origin.deploymentId(),exchange.getRequestHeaders().getFirst("X-Warden-Deployment-Id"));assertEquals(origin.callerScope(),exchange.getRequestHeaders().getFirst("X-Warden-Caller-Scope"));handler.handle(exchange);}
             catch(Exception failure){throw new RuntimeException(failure);}finally{exchange.close();}});

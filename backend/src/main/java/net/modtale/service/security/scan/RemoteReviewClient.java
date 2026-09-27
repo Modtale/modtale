@@ -57,6 +57,7 @@ public final class RemoteReviewClient implements AutoCloseable {
                 .option(io.netty.channel.ChannelOption.CONNECT_TIMEOUT_MILLIS,5000).responseTimeout(timeout);
         client=WebClient.builder().baseUrl(base.toString()).clientConnector(new ReactorClientHttpConnector(http))
                 .defaultHeader("X-Warden-Api-Key",properties.apiKey())
+                .defaultHeader("X-Warden-Contract-Version","1")
                 .codecs(c->c.defaultCodecs().maxInMemorySize(16*1024*1024)).build();
     }
     public Configuration configuration() {return configuration(()->true,timeout::toNanos);}
