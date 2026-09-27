@@ -70,9 +70,10 @@ class ArtifactInspectionControllerTest {
     @Test void comparesFullCaseSensitiveNestedPathsAndRemovals() {
         var before=Map.of("nested.jar!/A.class","a", "removed.class","b", "same.json","c");
         var after=Map.of("nested.jar!/A.class","changed", "nested.jar!/a.class","a", "same.json","c");
-        var diff=ArtifactInspectionController.compare("snapshot","1.0",true,true,before,after);
+        var diff=ArtifactInspectionController.compare("snapshot","1.0",true,true,List.of("MANIFEST_VERSION"),before,after);
         assertEquals(1,diff.added()); assertEquals(1,diff.modified()); assertEquals(1,diff.removed()); assertEquals(1,diff.unchanged());
         assertTrue(diff.contextChanged());
+        assertEquals(List.of("MANIFEST_VERSION"),diff.contextChanges());
         assertTrue(diff.files().contains(new ArtifactInspectionController.FileChange("nested.jar!/a.class","ADDED")));
     }
     @Test void refusesStoredArtifactMismatchBeforeRequestingInspection() {
@@ -177,6 +178,56 @@ class ArtifactInspectionControllerTest {
         verify(f.inspector,times(1)).inspectFile(any(),anyString(),nullable(String.class));
         verify(f.storage).downloadBounded("before.zip",StorageService.MAX_REVIEW_ARTIFACT_BYTES);
         verify(f.storage).downloadBounded("after.zip",StorageService.MAX_REVIEW_ARTIFACT_BYTES);
+    }
+    @Test void prefersAnOlderCurrentApprovalOverANewerUnverifiableComparisonBaseline() throws Exception {
+        var f=new Fixture();String policy="warden-3.0.0:"+"f".repeat(64);
+        var entries=Map.of("file.json","a".repeat(64));
+        f.before.setSecurityApprovedAt(System.currentTimeMillis()-2000);
+        f.before.setSecurityApprovalProjectId("project");f.before.setApprovedReviewOrigins(Map.of());
+        f.before.setApprovedSecurityEvidence(new ScanResult.SecurityEvidence(policy,f.before.getHash(),
+                SecurityManifest.identity(entries),true,false,"COMPLETED",entries));
+        var stale=new ProjectVersion();stale.setId("stale");stale.setVersionNumber("1.5");
+        stale.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);stale.setSecurityApprovedAt(System.currentTimeMillis()-1000);
+        stale.setHash(f.before.getHash());stale.setFileUrl("stale.zip");
+        f.project.setVersions(List.of(f.before,stale,f.after));
+        when(f.inspector.inspectFile(any(),anyString(),nullable(String.class))).thenReturn(
+                new WardenClientService.InspectionResponse(f.after.getHash(),List.of("file.json"),"{}","TEXT_RESOURCE",entries,policy));
+        var changes=f.controller.changes("project","2",net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project)).getBody();
+        assertEquals("1",changes.baselineVersion());
+        assertTrue(changes.contextComparable());
+        verify(f.inspector,times(1)).inspectFile(any(),anyString(),nullable(String.class));
+        verify(f.storage,never()).downloadBounded("stale.zip",StorageService.MAX_REVIEW_ARTIFACT_BYTES);
+    }
+    @Test void verifiedComparisonNamesChangedRuntimeContextWithoutGrantingReuse() throws Exception {
+        var f=new Fixture();String policy="warden-3.0.0:"+"f".repeat(64);
+        f.before.setSecurityApprovedAt(System.currentTimeMillis()-1000);
+        var entries=Map.of("file.json","a".repeat(64));
+        f.before.setSecurityApprovalProjectId("project");f.before.setApprovedReviewOrigins(Map.of());
+        f.before.setApprovedSecurityEvidence(new ScanResult.SecurityEvidence(policy,f.before.getHash(),
+                SecurityManifest.identity(entries),true,false,"COMPLETED",entries));
+        f.after.setGameVersions(List.of("new-runtime"));
+        f.after.setManifestVersion("2");
+        when(f.inspector.inspectFile(any(),anyString(),nullable(String.class))).thenReturn(
+                new WardenClientService.InspectionResponse(f.after.getHash(),List.of("file.json"),"{}","TEXT_RESOURCE",entries,policy));
+        var changes=f.controller.changes("project","2",net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project)).getBody();
+        assertTrue(changes.contextComparable());
+        assertTrue(changes.contextChanged());
+        assertEquals(List.of("GAME_VERSIONS","MANIFEST_VERSION"),changes.contextChanges());
+        assertEquals(1,changes.unchanged());
+    }
+    @Test void contextChangesUseTheSameOrderIndependentGameVersionMeaningAsTheApprovalFingerprint() {
+        var before=new ProjectVersion();before.setGameVersions(List.of("game-b","game-a"));
+        var after=new ProjectVersion();after.setGameVersions(List.of("game-a","game-b"));
+        assertEquals(net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(before),
+                net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(after));
+        assertTrue(net.modtale.service.security.scan.ArtifactReviewContext.changedFields(before,after).isEmpty());
+        var first=ProjectDependency.modtale("first","First","1",ProjectDependency.DependencyType.REQUIRED);
+        var second=ProjectDependency.modtale("second","Second","1",ProjectDependency.DependencyType.OPTIONAL);
+        before.setDependencies(List.of(first,second));after.setDependencies(List.of(second,first));
+        assertTrue(net.modtale.service.security.scan.ArtifactReviewContext.changedFields(before,after).isEmpty());
+        var upgraded=ProjectDependency.modtale("second","Second","2",ProjectDependency.DependencyType.OPTIONAL);
+        after.setDependencies(List.of(upgraded,first));
+        assertEquals(List.of("DEPENDENCIES"),net.modtale.service.security.scan.ArtifactReviewContext.changedFields(before,after));
     }
     @Test void changedOrUnaccountedApprovedManifestFallsBackToLiveInspection() throws Exception {
         for(String scenario:List.of("policy","digest","revoked","expired")) {

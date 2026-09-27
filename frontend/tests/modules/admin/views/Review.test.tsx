@@ -166,7 +166,7 @@ describe('Review security clearance status', () => {
     });
     it('carries the opened project token from a removed-file comparison into source inspection', async () => {
         vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
-            contextComparable: true, contextChanged: false, added: 0, modified: 0, removed: 1, unchanged: 0,
+            contextComparable: true, contextChanged: false, contextChanges: [], added: 0, modified: 0, removed: 1, unchanged: 0,
             files: [{ path: 'removed.txt', change: 'REMOVED' }] });
         vi.mocked(adminClient.getStructure).mockResolvedValue(['removed.txt']);
         vi.mocked(adminClient.getFileWindow).mockResolvedValue({identity:'a'.repeat(64),content:'Previously approved file contents',format:'TEXT_RESOURCE',start:0,end:33,totalCharacters:33,firstLine:1,lineMatched:true,representationComplete:true,gaps:[]});
@@ -179,7 +179,7 @@ describe('Review security clearance status', () => {
     });
     it('shows the authenticated update comparison when review opens and reuses it in Files', async () => {
         vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
-            contextComparable: true, contextChanged: false, added: 1, modified: 0, removed: 0, unchanged: 1,
+            contextComparable: true, contextChanged: false, contextChanges: [], added: 1, modified: 0, removed: 0, unchanged: 1,
             files: [{ path: 'New.class', change: 'ADDED' }, { path: 'Prior.class', change: 'UNCHANGED' }] });
         await render(clear, true, 'snapshot', 0, [{ id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }]);
         expect(adminClient.getArtifactChanges).toHaveBeenCalledExactlyOnceWith('project', '1.0', 'snapshot');
@@ -195,7 +195,7 @@ describe('Review security clearance status', () => {
     });
     it('uses the authenticated file comparison to focus changed-file findings without clearing older evidence', async () => {
         vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
-            contextComparable: true, contextChanged: false, added: 0, modified: 1, removed: 0, unchanged: 1,
+            contextComparable: true, contextChanged: false, contextChanges: [], added: 0, modified: 1, removed: 0, unchanged: 1,
             files: [{ path: 'Changed.class', change: 'MODIFIED' }, { path: 'Prior.class', change: 'UNCHANGED' }] });
         const issues = [
             { type: 'Network', severity: 'LOW', description: 'Earlier occurrence', filePath: 'Prior.class', lineStart: 1, knownIssue: true },
@@ -226,7 +226,7 @@ describe('Review security clearance status', () => {
     });
     it('keeps prior findings in review focus when any file changed, including findings in unchanged files', async () => {
         vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
-            contextComparable: true, contextChanged: false, added: 0, modified: 1, removed: 0, unchanged: 1,
+            contextComparable: true, contextChanged: false, contextChanges: [], added: 0, modified: 1, removed: 0, unchanged: 1,
             files: [{ path: 'Changed.class', change: 'MODIFIED' }, { path: 'Prior.class', change: 'UNCHANGED' }] });
         const issues = [
             { type: 'Network', severity: 'LOW', description: 'Changed repeated finding', filePath: 'Changed.class', lineStart: 1,
@@ -247,7 +247,7 @@ describe('Review security clearance status', () => {
             filePath: 'Prior.class', lineStart: 1, knownIssue: true, historicalFileEvidenceIdentical: true,
             reviewCadence: 'WHEN_CHANGED' };
         vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
-            contextComparable: true, contextChanged: true, added: 0, modified: 0, removed: 0, unchanged: 1,
+            contextComparable: true, contextChanged: true, contextChanges: ['GAME_VERSIONS'], added: 0, modified: 0, removed: 0, unchanged: 1,
             files: [{ path: 'Prior.class', change: 'UNCHANGED' }] });
         await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', issues: [issue] }, true, 'snapshot', 2,
             [{ id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }]);
@@ -260,7 +260,7 @@ describe('Review security clearance status', () => {
     });
     it('folds repeated unchanged-file evidence on changed updates without folding urgent or changed findings', async () => {
         vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
-            contextComparable: true, contextChanged: false, added: 0, modified: 1, removed: 0, unchanged: 120,
+            contextComparable: true, contextChanged: false, contextChanges: [], added: 0, modified: 1, removed: 0, unchanged: 120,
             files: [{ path: 'Changed.class', change: 'MODIFIED' }] });
         const prior = Array.from({ length: 120 }, (_, index) => ({ type: 'Network', severity: 'LOW',
             description: `Earlier occurrence ${index}`, filePath: `Prior${index}.class`, lineStart: 1,
@@ -294,7 +294,7 @@ describe('Review security clearance status', () => {
     });
     it('keeps the latest selected comparison file when structure responses arrive out of order', async () => {
         vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
-            contextComparable: true, contextChanged: false, added: 1, modified: 0, removed: 1, unchanged: 0,
+            contextComparable: true, contextChanged: false, contextChanges: [], added: 1, modified: 0, removed: 1, unchanged: 0,
             files: [{ path: 'old.txt', change: 'REMOVED' }, { path: 'new.txt', change: 'ADDED' }] });
         let stale!: (value: string[]) => void;
         vi.mocked(adminClient.getStructure).mockReturnValueOnce(new Promise(done => { stale = done; }))
@@ -427,7 +427,7 @@ describe('Review security clearance status', () => {
     });
     it('keeps escalated and high-severity prior findings in the attention view', async () => {
         vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
-            contextComparable: true, contextChanged: false, added: 0, modified: 0, removed: 0, unchanged: 1,
+            contextComparable: true, contextChanged: false, contextChanges: [], added: 0, modified: 0, removed: 0, unchanged: 1,
             files: [{ path: 'Same.class', change: 'UNCHANGED' }] });
         const issues = [
             { ...twoFindings.issues[0], description: 'Routine prior library', severity: 'LOW', knownIssue: true, historicalFileEvidenceIdentical: true, escalated: false, reviewCadence: 'WHEN_CHANGED' },
@@ -459,7 +459,7 @@ describe('Review security clearance status', () => {
 
     it('filters repeated types without losing original reasoning indices or hiding the scan summary', async () => {
         vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
-            contextComparable: true, contextChanged: false, added: 0, modified: 0, removed: 0, unchanged: 121,
+            contextComparable: true, contextChanged: false, contextChanges: [], added: 0, modified: 0, removed: 0, unchanged: 121,
             files: [] });
         const issues = [
             ...Array.from({ length: 120 }, (_, index) => ({ ...twoFindings.issues[0], type: 'BytecodeManipulator', severity: 'LOW', filePath: `Library${index}.class`, knownIssue: true, historicalFileEvidenceIdentical: true })),

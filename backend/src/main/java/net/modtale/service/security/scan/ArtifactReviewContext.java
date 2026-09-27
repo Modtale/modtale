@@ -31,6 +31,31 @@ public final class ArtifactReviewContext {
             return null;
         }
     }
+    /** Describes only the fields bound by fingerprint; callers must separately establish approval lineage. */
+    public static List<String> changedFields(ProjectVersion baseline, ProjectVersion current) {
+        if (fingerprint(baseline) == null || fingerprint(current) == null) return List.of();
+        var changed = new ArrayList<String>();
+        if (!canonicalGames(baseline).equals(canonicalGames(current))) changed.add("GAME_VERSIONS");
+        if (!canonicalDependencies(baseline).equals(canonicalDependencies(current))) changed.add("DEPENDENCIES");
+        if (!Objects.equals(baseline.getManifestId(), current.getManifestId())) changed.add("MANIFEST_ID");
+        if (!Objects.equals(baseline.getManifestVersion(), current.getManifestVersion())) changed.add("MANIFEST_VERSION");
+        return List.copyOf(changed);
+    }
+    private static List<String> canonicalGames(ProjectVersion version) {
+        var games = new ArrayList<>(version.getGameVersions() == null ? List.<String>of() : version.getGameVersions());
+        Collections.sort(games);
+        return games;
+    }
+    private static List<String> canonicalDependencies(ProjectVersion version) {
+        var dependencies = new ArrayList<String>();
+        if (version.getDependencies() != null) for (var dependency : version.getDependencies()) {
+            try { dependencies.add(MAPPER.writeValueAsString(Arrays.asList(dependency.getProjectId(), dependency.getVersionNumber(),
+                    dependency.getDependencyType().name(), dependency.getSource().name()))); }
+            catch (Exception invalid) { throw new IllegalArgumentException("Invalid review dependency", invalid); }
+        }
+        Collections.sort(dependencies);
+        return dependencies;
+    }
     public static String automaticallyReviewableFingerprint(ProjectVersion version) {
         if (version == null || version.getDependencies() != null && !version.getDependencies().isEmpty()) return null;
         return fingerprint(version);

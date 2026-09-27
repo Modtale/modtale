@@ -7,11 +7,24 @@ export interface ArtifactChangeSummary {
     baselineVersion: string | null;
     contextComparable: boolean;
     contextChanged: boolean;
+    contextChanges: string[];
     added: number;
     modified: number;
     removed: number;
     unchanged: number;
     files: { path: string; change: 'ADDED' | 'MODIFIED' | 'REMOVED' | 'UNCHANGED' }[];
+}
+
+const contextLabels = new Map([
+    ['GAME_VERSIONS', 'game versions'], ['DEPENDENCIES', 'dependencies'],
+    ['MANIFEST_ID', 'manifest identity'], ['MANIFEST_VERSION', 'manifest version'],
+]);
+export function contextChangeMessage(summary: ArtifactChangeSummary): string | null {
+    if (!summary.contextComparable) return 'The earlier approval context cannot be verified for this comparison. Inspect dependency and supplemental content.';
+    if (!summary.contextChanged) return null;
+    const changed = Array.isArray(summary.contextChanges) ? summary.contextChanges
+        .map(field => contextLabels.get(field)).filter((label): label is string => Boolean(label)) : [];
+    return changed.length ? `Review changed ${changed.join(', ')}.` : 'Version metadata changed and needs review.';
 }
 
 export function ArtifactChanges({ projectId, version, reviewToken, onInspect, autoLoad = false, onCompared }: {
@@ -66,9 +79,7 @@ export function ArtifactChanges({ projectId, version, reviewToken, onInspect, au
             <div className="flex flex-wrap gap-3 text-sm dark:text-slate-200">
                 <span>{result.added} added</span><span>{result.modified} modified</span><span>{result.removed} removed</span><span>{result.unchanged} unchanged</span>
             </div>
-            {(!result.contextComparable || result.contextChanged) && <p className="text-sm text-amber-700 dark:text-amber-300">
-                {result.contextChanged ? 'Version metadata changed and needs review.' : 'Separate files or dependency metadata need additional comparison.'}
-            </p>}
+            {contextChangeMessage(result) && <p className="text-sm text-amber-700 dark:text-amber-300">{contextChangeMessage(result)}</p>}
             <div className="flex flex-wrap items-center gap-4">
                 <input aria-label="Filter changed files" value={search} onChange={event => { setSearch(event.target.value); setLimit(100); }} placeholder="Filter paths…" className="min-w-0 rounded-lg border border-slate-200 dark:border-slate-700 bg-transparent px-3 py-2 text-sm dark:text-white" />
                 <label className="flex items-center gap-2 text-sm text-slate-500"><input type="checkbox" checked={showUnchanged} onChange={event => { setShowUnchanged(event.target.checked); setLimit(100); }} />Show unchanged files</label>

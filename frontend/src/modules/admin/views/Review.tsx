@@ -6,7 +6,7 @@ import { Shield, List, FileText, Box, User as UserIcon, Check, ArrowLeft, Copy, 
 import { API_BASE_URL, BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
 import { adminClient } from '../api/adminClient';
 import { SourceInspector } from './SourceInspector';
-import { ArtifactChanges, type ArtifactChangeSummary } from './ArtifactChanges';
+import { ArtifactChanges, contextChangeMessage, type ArtifactChangeSummary } from './ArtifactChanges';
 import { DependencyInspection } from './DependencyInspection';
 import { FindingDecisions } from './FindingDecisions';
 import { SiteRoutes } from '@/utils/routes';
@@ -511,7 +511,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                 {activeComparison?.baselineVersion && <div role="status" className="rounded-2xl border border-indigo-200 bg-indigo-50 p-5 text-sm text-indigo-950 dark:border-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-100">
                                     <p className="font-bold">Changes since approved version {activeComparison.baselineVersion}</p>
                                     <p>{activeComparison.added} added, {activeComparison.modified} modified, {activeComparison.removed} removed, {activeComparison.unchanged} unchanged.</p>
-                                    {(!activeComparison.contextComparable || activeComparison.contextChanged) && <p className="mt-1">Version or dependency context also needs review.</p>}
+                                    {contextChangeMessage(activeComparison) && <p className="mt-1">{contextChangeMessage(activeComparison)}</p>}
                                     <p className="mt-1">This comparison helps navigation; related behavior still needs review.</p>
                                 </div>}
                                 <div className="grid grid-cols-2 gap-6">

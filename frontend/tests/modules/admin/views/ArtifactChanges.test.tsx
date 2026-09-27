@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ArtifactChanges, type ArtifactChangeSummary } from '@/modules/admin/views/ArtifactChanges';
 import { adminClient } from '@/modules/admin/api/adminClient';
 vi.mock('@/modules/admin/api/adminClient', () => ({ adminClient: { getArtifactChanges: vi.fn() } }));
-const summary: ArtifactChangeSummary = { reviewToken: 'snapshot', baselineVersion: '1.0', contextComparable: true, contextChanged: false,
+const summary: ArtifactChangeSummary = { reviewToken: 'snapshot', baselineVersion: '1.0', contextComparable: true, contextChanged: false, contextChanges: [],
     added: 1, modified: 1, removed: 1, unchanged: 1, files: [
         { path: 'added.class', change: 'ADDED' }, { path: 'modified.class', change: 'MODIFIED' },
         { path: 'removed.class', change: 'REMOVED' }, { path: 'unchanged.class', change: 'UNCHANGED' }
@@ -31,6 +31,20 @@ describe('artifact changes', () => {
         expect(inspect).toHaveBeenLastCalledWith('2.0', 'modified.class', 'snapshot');
         await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
         expect(container.textContent).toContain('unchanged.class');
+    });
+    it('names the changed runtime context without implying approval reuse', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ ...summary, contextChanged: true,
+            contextChanges: ['GAME_VERSIONS', 'MANIFEST_VERSION'] });
+        await act(async () => root.render(<ArtifactChanges autoLoad reviewToken="snapshot" projectId="project" version="2.0" onInspect={vi.fn()} />));
+        expect(container.textContent).toContain('Review changed game versions, manifest version.');
+        expect(container.textContent).not.toContain('approved for reuse');
+    });
+    it('does not present unverified approval context as a precise metadata comparison', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ ...summary, contextComparable: false,
+            contextChanged: false, contextChanges: [] });
+        await act(async () => root.render(<ArtifactChanges autoLoad reviewToken="snapshot" projectId="project" version="2.0" onInspect={vi.fn()} />));
+        expect(container.textContent).toContain('earlier approval context cannot be verified');
+        expect(container.textContent).not.toContain('Review changed game versions');
     });
     it('loads a prior-version comparison when an update review opens without requiring a click', async () => {
         vi.mocked(adminClient.getArtifactChanges).mockResolvedValue(summary);

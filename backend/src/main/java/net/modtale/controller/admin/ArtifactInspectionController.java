@@ -85,6 +85,7 @@ public class ArtifactInspectionController {
     }
     public record FileChange(String path, String change) {}
     public record ArtifactChanges(String reviewToken, String baselineVersion, boolean contextComparable, boolean contextChanged,
+            List<String> contextChanges,
             int added, int modified, int removed, int unchanged, List<FileChange> files) {}
 
     @GetMapping("/changes")
@@ -94,14 +95,25 @@ public class ArtifactInspectionController {
         ProjectReviewSnapshot.requireCurrent(project, expected);
         String snapshot = ProjectReviewSnapshot.token(project);
         ProjectVersion current = requireVersion(project, version);
-        ProjectVersion baseline=project.getVersions().stream().filter(Objects::nonNull).filter(v -> v.getReviewStatus()==ProjectVersion.ReviewStatus.APPROVED
+        var candidates=project.getVersions().stream().filter(Objects::nonNull).filter(v -> v.getReviewStatus()==ProjectVersion.ReviewStatus.APPROVED
                 && !Objects.equals(v.getId(),current.getId()))
-                .max(Comparator.comparingLong(ProjectVersion::getSecurityApprovedAt)).orElse(null);
-        if(baseline==null) return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(new ArtifactChanges(snapshot,null,false,false,0,0,0,0,List.of()));
-        requireVersion(project, baseline.getVersionNumber());
+                .sorted(Comparator.comparingLong(ProjectVersion::getSecurityApprovedAt).reversed()).limit(256).toList();
+        if(candidates.isEmpty()) return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(new ArtifactChanges(snapshot,null,false,false,List.of(),0,0,0,0,List.of()));
+        ProjectVersion baseline=candidates.getFirst();
+        requireVersion(project,baseline.getVersionNumber());
         var after=inspect(current,null);
-        var retained=approvedManifest(project,baseline,after.policyVersion());
+        ProjectReviewSnapshot.requireCurrent(project,snapshot);
+        Map<String,String> retained=null;
+        for(var candidate:candidates) {
+            var evidence=candidate.getApprovedSecurityEvidence();
+            if(evidence==null || !Objects.equals(after.policyVersion(),evidence.policyVersion())
+                    || !Objects.equals(candidate.getApprovedSecurityContextSha256(),
+                        net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(candidate))) continue;
+            var manifest=approvedManifest(project,candidate,after.policyVersion());
+            if(manifest!=null) {baseline=candidate;retained=manifest;break;}
+        }
+        requireVersion(project,baseline.getVersionNumber());
         Map<String,String> beforeEntries;
         String beforePolicy;
         if(retained==null) {
@@ -120,7 +132,9 @@ public class ArtifactInspectionController {
         boolean comparable=retained!=null && priorContext!=null && currentContext!=null
                 && priorContext.equals(net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(baseline));
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(compare(snapshot,baseline.getVersionNumber(),
-                comparable, comparable && !priorContext.equals(currentContext),beforeEntries,after.entryHashes()));
+                comparable, comparable && !priorContext.equals(currentContext),
+                comparable ? net.modtale.service.security.scan.ArtifactReviewContext.changedFields(baseline,current) : List.of(),
+                beforeEntries,after.entryHashes()));
     }
     private static Map<String,String> approvedManifest(Project project,ProjectVersion baseline,String currentPolicy) {
         var evidence=baseline.getApprovedSecurityEvidence();
@@ -133,7 +147,7 @@ public class ArtifactInspectionController {
     private static boolean validManifest(Map<String,String> entries) {
         return net.modtale.model.project.SecurityManifest.valid(entries, false);
     }
-    static ArtifactChanges compare(String snapshot, String baseline, boolean comparable, boolean contextChanged,
+    static ArtifactChanges compare(String snapshot, String baseline, boolean comparable, boolean contextChanged, List<String> contextChanges,
             Map<String,String> before, Map<String,String> after) {
         var paths=new TreeSet<String>(); paths.addAll(before.keySet()); paths.addAll(after.keySet());
         var changes=new ArrayList<FileChange>(); int added=0,modified=0,removed=0,unchanged=0;
@@ -145,7 +159,8 @@ public class ArtifactInspectionController {
             else {change="UNCHANGED";unchanged++;}
             changes.add(new FileChange(path,change));
         }
-        return new ArtifactChanges(snapshot,baseline,comparable,contextChanged,added,modified,removed,unchanged,List.copyOf(changes));
+        return new ArtifactChanges(snapshot,baseline,comparable,contextChanged,contextChanged ? List.copyOf(contextChanges) : List.of(),
+                added,modified,removed,unchanged,List.copyOf(changes));
     }
     private WardenClientService.InspectionResponse inspect(String id,String number,String path,String expected) {
         Project project=projects.getRawProjectById(id);
