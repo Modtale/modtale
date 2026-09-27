@@ -73,12 +73,23 @@ class RemoteReviewClientTest {
         route(e->reply(e,503,Map.of()));assertEquals(503,assertThrows(RemoteReviewClient.Unavailable.class,()->client.submitOrFind(binding,bytes)).status());assertEquals(0,posts.get());assertEquals(1,calls.get());
     }
     @Test void boundResultRetainsOriginalContextAndRejectsWrongJob() {
-        var response=new LinkedHashMap<String,Object>();response.put("jobId",job);response.put("requestId",request);response.put("binding",wireBinding());response.put("completedAt",1500L);
+        var response=new LinkedHashMap<String,Object>();response.put("contractVersion",1);response.put("jobId",job);response.put("requestId",request);response.put("binding",wireBinding());response.put("completedAt",1500L);
         var scan=ScanEvidenceFixtures.complete(true);var old=scan.getSecurityEvidence();
         scan.setSecurityEvidence(new ScanResult.SecurityEvidence(binding.policyVersion(),binding.artifactSha256(),old.contentSha256(),true,true,old.reviewState(),old.entryHashes()));response.put("scan",scan);
         route(e->reply(e,200,response));var result=client.result(binding.withJobId(job));
         assertTrue(result.isArtifactVerified());assertEquals(binding.contextSha256(),result.getReviewedContextSha256());assertEquals(request,result.getScanRequestId());
         response.put("jobId",UUID.randomUUID().toString());assertThrows(RemoteReviewClient.Unavailable.class,()->client.result(binding.withJobId(job)));
+    }
+    @Test void missingOrIncompatibleResultContractCannotSupplyAClearance() {
+        var response=new LinkedHashMap<String,Object>();response.put("jobId",job);response.put("requestId",request);response.put("binding",wireBinding());response.put("completedAt",1500L);
+        var scan=ScanEvidenceFixtures.complete(true);var old=scan.getSecurityEvidence();
+        scan.setSecurityEvidence(new ScanResult.SecurityEvidence(binding.policyVersion(),binding.artifactSha256(),old.contentSha256(),true,true,old.reviewState(),old.entryHashes()));response.put("scan",scan);
+        route(e->reply(e,200,response));
+        assertThrows(RemoteReviewClient.Unavailable.class,()->client.result(binding.withJobId(job)));
+        response.put("contractVersion",2);
+        assertThrows(RemoteReviewClient.Unavailable.class,()->client.result(binding.withJobId(job)));
+        response.put("contractVersion",1.0);
+        assertThrows(RemoteReviewClient.Unavailable.class,()->client.result(binding.withJobId(job)));
     }
     @Test void duplicateJsonKeysAndOversizedStatusAreRejected() {
         var raw=new AtomicReference<>("{\"policyVersion\":\"a\",\"policyVersion\":\"b\"}");route(e->{byte[] body=raw.get().getBytes();e.sendResponseHeaders(200,body.length);e.getResponseBody().write(body);});

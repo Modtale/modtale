@@ -114,7 +114,9 @@ public final class RemoteReviewClient implements AutoCloseable {
     }
     public ScanResult result(RemoteReviewBinding binding) {
         requireJob(binding);var body=exchange(scoped(client.get().uri(uri(binding,"/"+binding.jobId()+"/result",true)),binding.origin()),200,16*1024*1024);
-        fields(body,"jobId","requestId","binding","completedAt","scan");identity(body,binding);
+        fields(body,"contractVersion","jobId","requestId","binding","completedAt","scan");
+        if(number(body,"contractVersion")!=1)throw new Unavailable(502);
+        identity(body,binding);
         if(number(body,"completedAt")<=0 || !body.path("scan").isObject())throw new Unavailable(502);
         try {
             var scan=mapper.treeToValue(body.get("scan"),ScanResult.class);var evidence=scan.getSecurityEvidence();
