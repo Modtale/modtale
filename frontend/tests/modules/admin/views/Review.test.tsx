@@ -197,6 +197,26 @@ describe('Review security clearance status', () => {
         expect(container.textContent).toContain('Earlier occurrence');
         expect(container.textContent).toContain('Comparison unavailable');
     });
+    it('keeps findings in changed files in review focus even when an older approval had identical file evidence', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: false, added: 0, modified: 1, removed: 0, unchanged: 1,
+            files: [{ path: 'Changed.class', change: 'MODIFIED' }, { path: 'Prior.class', change: 'UNCHANGED' }] });
+        const issues = [
+            { type: 'Network', severity: 'LOW', description: 'Changed repeated finding', filePath: 'Changed.class', lineStart: 1,
+                knownIssue: true, historicalFileEvidenceIdentical: true, reviewCadence: 'WHEN_CHANGED' },
+            { type: 'Network', severity: 'LOW', description: 'Unchanged repeated finding', filePath: 'Prior.class', lineStart: 2,
+                knownIssue: true, historicalFileEvidenceIdentical: true, reviewCadence: 'WHEN_CHANGED' }
+        ];
+        await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', issues }, true, 'snapshot', 2,
+            [{ id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }]);
+        await showFindings();
+        expect(container.textContent).toContain('Changed repeated finding');
+        expect(container.textContent).not.toContain('Unchanged repeated finding');
+        expect(container.textContent).toContain('1 previously seen findings with identical file evidence are outside this view');
+        await click('Show all findings');
+        expect(container.textContent).toContain('Unchanged repeated finding');
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+    });
     it('keeps the latest selected comparison file when structure responses arrive out of order', async () => {
         vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
             contextComparable: true, contextChanged: false, added: 1, modified: 0, removed: 1, unchanged: 0,

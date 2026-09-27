@@ -63,8 +63,9 @@ const WIZARD_STEPS: WizardStep[] = [
     }
 ];
 
-const isIdenticalPriorFinding = (issue: ScanIssue) => issue.knownIssue
+const isIdenticalPriorFinding = (issue: ScanIssue, changedPaths: Set<string>) => issue.knownIssue
     && issue.historicalFileEvidenceIdentical === true
+    && !changedPaths.has(issue.filePath)
     && !issue.escalated
     && (issue.reviewCadence || '').toUpperCase() !== 'ALWAYS'
     && issue.severity !== 'HIGH' && issue.severity !== 'CRITICAL';
@@ -169,7 +170,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
         const search = findingSearch.trim().toLowerCase();
         return orderedIssues.filter(({ issue }) => {
             if (findingType !== null && issue.type !== findingType) return false;
-            if (findingFocus === 'attention' && isIdenticalPriorFinding(issue)) return false;
+            if (findingFocus === 'attention' && isIdenticalPriorFinding(issue, changedFindingPaths)) return false;
             if (findingFocus === 'new' && issue.knownIssue) return false;
             if (findingFocus === 'seen' && !issue.knownIssue) return false;
             if (findingFocus === 'always' && (issue.reviewCadence || '').toUpperCase() !== 'ALWAYS') return false;
@@ -179,7 +180,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     }, [orderedIssues, findingSearch, findingFocus, findingType, changedFindingPaths]);
     const hiddenHighSeverity = orderedIssues.filter(({ issue }) => ['HIGH', 'CRITICAL'].includes(issue.severity)).length
         - matchingIssues.filter(({ issue }) => ['HIGH', 'CRITICAL'].includes(issue.severity)).length;
-    const identicalPriorCount = orderedIssues.filter(({ issue }) => isIdenticalPriorFinding(issue)).length;
+    const identicalPriorCount = orderedIssues.filter(({ issue }) => isIdenticalPriorFinding(issue, changedFindingPaths)).length;
     const changedFindingCount = orderedIssues.filter(({ issue }) => changedFindingPaths.has(issue.filePath)).length;
     useEffect(() => {
         if (findingFocus === 'changed' && (!activeComparison?.baselineVersion || changedFindingCount === 0)) {
