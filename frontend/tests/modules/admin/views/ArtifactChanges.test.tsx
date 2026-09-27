@@ -32,6 +32,28 @@ describe('artifact changes', () => {
         await act(async () => container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
         expect(container.textContent).toContain('unchanged.class');
     });
+    it('loads a prior-version comparison when an update review opens without requiring a click', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue(summary);
+        await act(async () => root.render(<ArtifactChanges autoLoad reviewToken="snapshot" projectId="project" version="2.0" onInspect={vi.fn()} />));
+        expect(adminClient.getArtifactChanges).toHaveBeenCalledTimes(1);
+        expect(adminClient.getArtifactChanges).toHaveBeenCalledWith('project', '2.0', 'snapshot');
+        expect(container.textContent).toContain('modified.class');
+        expect(container.textContent).not.toContain('unchanged.class');
+        await act(async () => root.render(<ArtifactChanges autoLoad reviewToken="snapshot" projectId="project" version="2.0" onInspect={vi.fn()} />));
+        expect(adminClient.getArtifactChanges).toHaveBeenCalledTimes(1);
+    });
+    it('discards an automatic comparison after the review snapshot changes', async () => {
+        let resolveOld!: (value: ArtifactChangeSummary) => void;
+        vi.mocked(adminClient.getArtifactChanges)
+            .mockReturnValueOnce(new Promise(done => { resolveOld = done; }))
+            .mockResolvedValueOnce({ ...summary, reviewToken: 'new-review', files: [{ path: 'new.class', change: 'ADDED' }] });
+        await act(async () => root.render(<ArtifactChanges autoLoad reviewToken="snapshot" projectId="project" version="2.0" onInspect={vi.fn()} />));
+        await act(async () => root.render(<ArtifactChanges autoLoad reviewToken="new-review" projectId="project" version="2.0" onInspect={vi.fn()} />));
+        await act(async () => resolveOld(summary));
+        expect(adminClient.getArtifactChanges).toHaveBeenCalledTimes(2);
+        expect(container.textContent).toContain('new.class');
+        expect(container.textContent).not.toContain('modified.class');
+    });
     it('does not show a late comparison from a different version', async () => {
         let resolve!: (value: ArtifactChangeSummary) => void;
         vi.mocked(adminClient.getArtifactChanges).mockReturnValue(new Promise(done => { resolve = done; }));

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { adminClient } from '../api/adminClient';
 import { extractApiErrorMessage } from '@/utils/api';
 
@@ -14,11 +14,12 @@ export interface ArtifactChangeSummary {
     files: { path: string; change: 'ADDED' | 'MODIFIED' | 'REMOVED' | 'UNCHANGED' }[];
 }
 
-export function ArtifactChanges({ projectId, version, reviewToken, onInspect }: {
+export function ArtifactChanges({ projectId, version, reviewToken, onInspect, autoLoad = false }: {
     projectId: string;
     version: string;
     reviewToken: string;
     onInspect: (version: string, path: string, reviewToken: string) => void;
+    autoLoad?: boolean;
 }) {
     const [result, setResult] = useState<ArtifactChangeSummary | null>(null);
     const [loading, setLoading] = useState(false);
@@ -27,12 +28,7 @@ export function ArtifactChanges({ projectId, version, reviewToken, onInspect }: 
     const [search, setSearch] = useState('');
     const [limit, setLimit] = useState(100);
     const generation = useRef(0);
-    useEffect(() => {
-        generation.current++;
-        setResult(null); setLoading(false); setError(''); setSearch(''); setLimit(100); setShowUnchanged(false);
-        return () => { generation.current++; };
-    }, [projectId, version, reviewToken]);
-    const load = async () => {
+    const load = useCallback(async () => {
         const request = ++generation.current;
         setLoading(true); setError(''); setResult(null);
         try {
@@ -44,13 +40,19 @@ export function ArtifactChanges({ projectId, version, reviewToken, onInspect }: 
         } finally {
             if (request === generation.current) setLoading(false);
         }
-    };
+    }, [projectId, version, reviewToken]);
+    useEffect(() => {
+        generation.current++;
+        setResult(null); setLoading(false); setError(''); setSearch(''); setLimit(100); setShowUnchanged(false);
+        if (autoLoad) void load();
+        return () => { generation.current++; };
+    }, [projectId, version, reviewToken, autoLoad, load]);
     const visible = useMemo(() => (result?.files || []).filter(file =>
         (showUnchanged || file.change !== 'UNCHANGED') && file.path.toLowerCase().includes(search.toLowerCase())), [result, showUnchanged, search]);
     return <section className="rounded-2xl border border-slate-200 dark:border-slate-700 p-5 space-y-4" aria-label="Changes since approval">
         <div className="flex flex-wrap items-center justify-between gap-3">
             <h4 className="font-bold dark:text-white">Changes since approval</h4>
-            <button type="button" onClick={load} disabled={loading} className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 disabled:opacity-50">
+            <button type="button" onClick={() => void load()} disabled={loading} className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 disabled:opacity-50">
                 {loading ? 'Comparing artifact contents…' : result ? 'Refresh comparison' : 'Compare with approved version'}
             </button>
         </div>

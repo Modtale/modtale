@@ -669,6 +669,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
 
                                 {pendingVersion?.id && <DependencyInspection projectId={mod.id} versionId={pendingVersion.id} reviewToken={mod.reviewToken || ''} />}
                                 {pendingVersion && <ArtifactChanges projectId={mod.id} version={pendingVersion.versionNumber} reviewToken={mod.reviewToken || ''}
+                                    autoLoad={scanResult?.scanState === 'COMPLETED' && mod.versions.some((candidate: ProjectVersion) => candidate.id !== pendingVersion.id && candidate.reviewStatus === 'APPROVED')}
                                     onInspect={(version, path, token) => openInspector(version, version === pendingVersion.versionNumber ? scanIssues : [], path, undefined, undefined, token)} />}
                                 {pendingVersion && <FindingDecisions key={`${pendingVersion.id}:${pendingVersion.reviewToken}`}
                                     projectId={mod.id} versionId={pendingVersion.id} token={pendingVersion.reviewToken}

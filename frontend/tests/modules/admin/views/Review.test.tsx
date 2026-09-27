@@ -159,10 +159,9 @@ describe('Review security clearance status', () => {
             files: [{ path: 'removed.txt', change: 'REMOVED' }] });
         vi.mocked(adminClient.getStructure).mockResolvedValue(['removed.txt']);
         vi.mocked(adminClient.getFileWindow).mockResolvedValue({identity:'a'.repeat(64),content:'Previously approved file contents',format:'TEXT_RESOURCE',start:0,end:33,totalCharacters:33,firstLine:1,lineMatched:true,representationComplete:true,gaps:[]});
-        await render(clear, true, 'snapshot', 2);
-        await click('Compare with approved version');
+        await render(clear, true, 'snapshot', 2, [{ id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }]);
         await click('removed.txt');
-        expect(adminClient.getArtifactChanges).toHaveBeenLastCalledWith('project', '1.0', 'snapshot');
+        expect(adminClient.getArtifactChanges).toHaveBeenCalledExactlyOnceWith('project', '1.0', 'snapshot');
         expect(adminClient.getStructure).toHaveBeenLastCalledWith('project', '0.9', 'snapshot');
         expect(adminClient.getFileWindow).toHaveBeenLastCalledWith('project', '0.9', 'removed.txt', 'snapshot', 0, undefined, 0);
         expect(container.textContent).toContain('Previously approved file contents');
@@ -175,8 +174,8 @@ describe('Review security clearance status', () => {
         vi.mocked(adminClient.getStructure).mockReturnValueOnce(new Promise(done => { stale = done; }))
             .mockResolvedValueOnce(['new.txt']);
         vi.mocked(adminClient.getFileWindow).mockResolvedValue({identity:'a'.repeat(64),content:'Current selection contents',format:'TEXT_RESOURCE',start:0,end:26,totalCharacters:26,firstLine:1,lineMatched:true,representationComplete:true,gaps:[]});
-        await render(clear, true, 'snapshot', 2);
-        await click('Compare with approved version'); await click('old.txt'); await click('new.txt');
+        await render(clear, true, 'snapshot', 2, [{ id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }]);
+        await click('old.txt'); await click('new.txt');
         await act(async () => stale(['old.txt']));
         expect(adminClient.getFileWindow).toHaveBeenLastCalledWith('project', '1.0', 'new.txt', 'snapshot', 0, undefined, 0);
         expect(container.querySelector('code')?.textContent).toBe('Current selection contents');
