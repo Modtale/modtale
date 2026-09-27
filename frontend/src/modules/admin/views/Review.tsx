@@ -63,7 +63,8 @@ const WIZARD_STEPS: WizardStep[] = [
     }
 ];
 
-const isIdenticalPriorFinding = (issue: ScanIssue, changedPaths: Set<string>) => issue.knownIssue
+const isIdenticalPriorFinding = (issue: ScanIssue, canDeprioritize: boolean, changedPaths: Set<string>) => canDeprioritize
+    && issue.knownIssue
     && issue.historicalFileEvidenceIdentical === true
     && !changedPaths.has(issue.filePath)
     && !issue.escalated
@@ -118,6 +119,8 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
         ? comparison.summary : null;
     const changedFindingPaths = useMemo(() => new Set(activeComparison?.files.filter(file => file.change === 'ADDED' || file.change === 'MODIFIED')
         .map(file => file.path) || []), [activeComparison]);
+    const canDeprioritizePriorFindings = activeComparison?.contextComparable === true && activeComparison.contextChanged === false
+        && activeComparison.added === 0 && activeComparison.modified === 0 && activeComparison.removed === 0;
     const currentEvidence = /^warden-3\.0\.0:[0-9a-f]{64}$/.test(scanResult?.securityEvidence?.policyVersion || '')
         && /^[0-9a-f]{64}$/.test(scanResult?.securityEvidence?.artifactSha256 || '')
         && /^[0-9a-f]{64}$/.test(scanResult?.securityEvidence?.contentSha256 || '');
@@ -170,17 +173,17 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
         const search = findingSearch.trim().toLowerCase();
         return orderedIssues.filter(({ issue }) => {
             if (findingType !== null && issue.type !== findingType) return false;
-            if (findingFocus === 'attention' && isIdenticalPriorFinding(issue, changedFindingPaths)) return false;
+            if (findingFocus === 'attention' && isIdenticalPriorFinding(issue, canDeprioritizePriorFindings, changedFindingPaths)) return false;
             if (findingFocus === 'new' && issue.knownIssue) return false;
             if (findingFocus === 'seen' && !issue.knownIssue) return false;
             if (findingFocus === 'always' && (issue.reviewCadence || '').toUpperCase() !== 'ALWAYS') return false;
             if (findingFocus === 'changed' && !changedFindingPaths.has(issue.filePath)) return false;
             return !search || [issue.type, issue.filePath, issue.description].some(value => value?.toLowerCase().includes(search));
         });
-    }, [orderedIssues, findingSearch, findingFocus, findingType, changedFindingPaths]);
+    }, [orderedIssues, findingSearch, findingFocus, findingType, changedFindingPaths, canDeprioritizePriorFindings]);
     const hiddenHighSeverity = orderedIssues.filter(({ issue }) => ['HIGH', 'CRITICAL'].includes(issue.severity)).length
         - matchingIssues.filter(({ issue }) => ['HIGH', 'CRITICAL'].includes(issue.severity)).length;
-    const identicalPriorCount = orderedIssues.filter(({ issue }) => isIdenticalPriorFinding(issue, changedFindingPaths)).length;
+    const identicalPriorCount = orderedIssues.filter(({ issue }) => isIdenticalPriorFinding(issue, canDeprioritizePriorFindings, changedFindingPaths)).length;
     const changedFindingCount = orderedIssues.filter(({ issue }) => changedFindingPaths.has(issue.filePath)).length;
     useEffect(() => {
         if (findingFocus === 'changed' && (!activeComparison?.baselineVersion || changedFindingCount === 0)) {

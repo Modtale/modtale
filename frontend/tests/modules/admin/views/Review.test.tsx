@@ -197,7 +197,7 @@ describe('Review security clearance status', () => {
         expect(container.textContent).toContain('Earlier occurrence');
         expect(container.textContent).toContain('Comparison unavailable');
     });
-    it('keeps findings in changed files in review focus even when an older approval had identical file evidence', async () => {
+    it('keeps prior findings in review focus when any file changed, including findings in unchanged files', async () => {
         vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
             contextComparable: true, contextChanged: false, added: 0, modified: 1, removed: 0, unchanged: 1,
             files: [{ path: 'Changed.class', change: 'MODIFIED' }, { path: 'Prior.class', change: 'UNCHANGED' }] });
@@ -211,11 +211,25 @@ describe('Review security clearance status', () => {
             [{ id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }]);
         await showFindings();
         expect(container.textContent).toContain('Changed repeated finding');
-        expect(container.textContent).not.toContain('Unchanged repeated finding');
-        expect(container.textContent).toContain('1 previously seen findings with identical file evidence are outside this view');
-        await click('Show all findings');
         expect(container.textContent).toContain('Unchanged repeated finding');
+        expect(container.textContent).not.toContain('previously seen findings with identical file evidence are outside this view');
         expect(container.textContent).not.toContain('Artifact Review Completed');
+    });
+    it('keeps prior findings in focus when comparison context changes or cannot be verified', async () => {
+        const issue = { type: 'Network', severity: 'LOW', description: 'Context-dependent prior finding',
+            filePath: 'Prior.class', lineStart: 1, knownIssue: true, historicalFileEvidenceIdentical: true,
+            reviewCadence: 'WHEN_CHANGED' };
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: true, added: 0, modified: 0, removed: 0, unchanged: 1,
+            files: [{ path: 'Prior.class', change: 'UNCHANGED' }] });
+        await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', issues: [issue] }, true, 'snapshot', 2,
+            [{ id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }]);
+        await showFindings();
+        expect(container.textContent).toContain('Context-dependent prior finding');
+        vi.mocked(adminClient.getArtifactChanges).mockRejectedValueOnce(new Error('Comparison unavailable'));
+        await click('Refresh comparison');
+        expect(container.textContent).toContain('Context-dependent prior finding');
+        expect(container.textContent).toContain('Comparison unavailable');
     });
     it('keeps the latest selected comparison file when structure responses arrive out of order', async () => {
         vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
@@ -314,6 +328,9 @@ describe('Review security clearance status', () => {
         expect(container.querySelectorAll('button[aria-label^="Earlier reasoning for finding"]')).toHaveLength(2);
     });
     it('keeps escalated and high-severity prior findings in the attention view', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: false, added: 0, modified: 0, removed: 0, unchanged: 1,
+            files: [{ path: 'Same.class', change: 'UNCHANGED' }] });
         const issues = [
             { ...twoFindings.issues[0], description: 'Routine prior library', severity: 'LOW', knownIssue: true, historicalFileEvidenceIdentical: true, escalated: false, reviewCadence: 'WHEN_CHANGED' },
             { ...twoFindings.issues[0], description: 'Changed prior library', severity: 'LOW', knownIssue: true, historicalFileEvidenceIdentical: false, escalated: false, reviewCadence: 'WHEN_CHANGED' },
@@ -343,6 +360,9 @@ describe('Review security clearance status', () => {
     });
 
     it('filters repeated types without losing original reasoning indices or hiding the scan summary', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: false, added: 0, modified: 0, removed: 0, unchanged: 121,
+            files: [] });
         const issues = [
             ...Array.from({ length: 120 }, (_, index) => ({ ...twoFindings.issues[0], type: 'BytecodeManipulator', severity: 'LOW', filePath: `Library${index}.class`, knownIssue: true, historicalFileEvidenceIdentical: true })),
             { ...twoFindings.issues[1], type: 'RuntimeExec', severity: 'HIGH', filePath: 'Runner.class', knownIssue: false, reviewCadence: 'ALWAYS' }
@@ -371,7 +391,8 @@ describe('Review security clearance status', () => {
         await show('RuntimeExec');
         await render({ ...twoFindings, issues }, true, 'fresh-snapshot', 2, earlierSources);
         expect(container.textContent).not.toContain('Selected type:');
-        expect(container.textContent).toContain('Showing 1–1 of 1 matching findings (121 total)');
+        expect(container.textContent).toContain('Showing 1–100 of 121 matching findings (121 total)');
+        expect(container.textContent).toContain('This comparison no longer matches the opened review');
     });
 
 });
