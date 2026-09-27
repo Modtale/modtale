@@ -166,6 +166,37 @@ describe('Review security clearance status', () => {
         expect(adminClient.getFileWindow).toHaveBeenLastCalledWith('project', '0.9', 'removed.txt', 'snapshot', 0, undefined, 0);
         expect(container.textContent).toContain('Previously approved file contents');
     });
+    it('uses the authenticated file comparison to focus changed-file findings without clearing older evidence', async () => {
+        vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
+            contextComparable: true, contextChanged: false, added: 0, modified: 1, removed: 0, unchanged: 1,
+            files: [{ path: 'Changed.class', change: 'MODIFIED' }, { path: 'Prior.class', change: 'UNCHANGED' }] });
+        const issues = [
+            { type: 'Network', severity: 'LOW', description: 'Earlier occurrence', filePath: 'Prior.class', lineStart: 1, knownIssue: true },
+            { type: 'Network', severity: 'LOW', description: 'Changed occurrence', filePath: 'Changed.class', lineStart: 2, knownIssue: true },
+            { type: 'RuntimeExec', severity: 'HIGH', description: 'High prior occurrence', filePath: 'Prior.class', lineStart: 3, knownIssue: true }
+        ];
+        await render({ ...clear, status: 'SUSPICIOUS', verdict: 'REVIEW', issues }, true, 'snapshot', 2,
+            [{ id: 'baseline', versionNumber: '0.9', reviewStatus: 'APPROVED' }]);
+        await showFindings();
+        const reasoning = container.querySelectorAll<HTMLButtonElement>('button[aria-label^="Earlier reasoning for finding"]');
+        expect(reasoning[0].getAttribute('aria-label')).toBe('Earlier reasoning for finding 3');
+        expect(reasoning[1].getAttribute('aria-label')).toBe('Earlier reasoning for finding 2');
+        expect(container.textContent).toContain('1 finding is in added or modified files');
+        await click('Show changed-file findings');
+        expect(container.textContent).toContain('Changed occurrence');
+        expect(container.textContent).not.toContain('Earlier occurrence');
+        expect(container.textContent).toContain('1 high or critical findings are outside these filters');
+        expect(container.textContent).not.toContain('Artifact Review Completed');
+        await focusFindings('all');
+        expect(container.textContent).toContain('Earlier occurrence');
+        expect(container.textContent).toContain('High prior occurrence');
+        await focusFindings('changed');
+        vi.mocked(adminClient.getArtifactChanges).mockRejectedValueOnce(new Error('Comparison unavailable'));
+        await click('Refresh comparison');
+        expect(container.querySelector<HTMLSelectElement>('select[aria-label="Finding focus"]')?.value).toBe('attention');
+        expect(container.textContent).toContain('Earlier occurrence');
+        expect(container.textContent).toContain('Comparison unavailable');
+    });
     it('keeps the latest selected comparison file when structure responses arrive out of order', async () => {
         vi.mocked(adminClient.getArtifactChanges).mockResolvedValue({ reviewToken: 'snapshot', baselineVersion: '0.9',
             contextComparable: true, contextChanged: false, added: 1, modified: 0, removed: 1, unchanged: 0,

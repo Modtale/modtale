@@ -1,11 +1,11 @@
 import { FindingGroups } from './FindingGroups';
 import { PriorFindingReasoning } from './PriorFindingReasoning';
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Shield, List, FileText, Box, User as UserIcon, Check, ArrowLeft, Copy, ExternalLink, Terminal, Download, ArrowRight, X, ImageIcon, ChevronDown, ChevronUp, ShieldAlert, Eye, RefreshCw, PlayCircle } from 'lucide-react';
 import { API_BASE_URL, BACKEND_URL, extractApiErrorMessage } from '@/utils/api';
 import { adminClient } from '../api/adminClient';
 import { SourceInspector } from './SourceInspector';
-import { ArtifactChanges } from './ArtifactChanges';
+import { ArtifactChanges, type ArtifactChangeSummary } from './ArtifactChanges';
 import { DependencyInspection } from './DependencyInspection';
 import { FindingDecisions } from './FindingDecisions';
 import { SiteRoutes } from '@/utils/routes';
@@ -109,6 +109,14 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
     const priorSources = mod.versions.filter((v: ProjectVersion) => v.id !== pendingVersion?.id && v.reviewStatus === 'APPROVED');
     const scanResult = pendingVersion?.scanResult;
     const scanIssues: ScanIssue[] = scanResult?.issues || [];
+    const [comparison, setComparison] = useState<{ versionId: string; summary: ArtifactChangeSummary } | null>(null);
+    const onCompared = useCallback((summary: ArtifactChangeSummary | null) => {
+        setComparison(summary && pendingVersion?.id ? { versionId: pendingVersion.id, summary } : null);
+    }, [pendingVersion?.id]);
+    const activeComparison = comparison && comparison.versionId === pendingVersion?.id && comparison.summary.reviewToken === mod.reviewToken
+        ? comparison.summary : null;
+    const changedFindingPaths = useMemo(() => new Set(activeComparison?.files.filter(file => file.change === 'ADDED' || file.change === 'MODIFIED')
+        .map(file => file.path) || []), [activeComparison]);
     const currentEvidence = /^warden-3\.0\.0:[0-9a-f]{64}$/.test(scanResult?.securityEvidence?.policyVersion || '')
         && /^[0-9a-f]{64}$/.test(scanResult?.securityEvidence?.artifactSha256 || '')
         && /^[0-9a-f]{64}$/.test(scanResult?.securityEvidence?.contentSha256 || '');
@@ -148,11 +156,15 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             if (escalatedDiff !== 0) return escalatedDiff;
             const newIssueDiff = Number(!b.knownIssue) - Number(!a.knownIssue);
             if (newIssueDiff !== 0) return newIssueDiff;
+            if (severityRank(a.severity) === severityRank(b.severity)) {
+                const changedDiff = Number(changedFindingPaths.has(b.filePath)) - Number(changedFindingPaths.has(a.filePath));
+                if (changedDiff !== 0) return changedDiff;
+            }
             const impactDiff = (b.scoreImpact || 0) - (a.scoreImpact || 0);
             if (impactDiff !== 0) return impactDiff;
             return severityRank(b.severity) - severityRank(a.severity);
         });
-    }, [scanIssues]);
+    }, [scanIssues, changedFindingPaths]);
     const matchingIssues = useMemo(() => {
         const search = findingSearch.trim().toLowerCase();
         return orderedIssues.filter(({ issue }) => {
@@ -161,12 +173,19 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
             if (findingFocus === 'new' && issue.knownIssue) return false;
             if (findingFocus === 'seen' && !issue.knownIssue) return false;
             if (findingFocus === 'always' && (issue.reviewCadence || '').toUpperCase() !== 'ALWAYS') return false;
+            if (findingFocus === 'changed' && !changedFindingPaths.has(issue.filePath)) return false;
             return !search || [issue.type, issue.filePath, issue.description].some(value => value?.toLowerCase().includes(search));
         });
-    }, [orderedIssues, findingSearch, findingFocus, findingType]);
+    }, [orderedIssues, findingSearch, findingFocus, findingType, changedFindingPaths]);
     const hiddenHighSeverity = orderedIssues.filter(({ issue }) => ['HIGH', 'CRITICAL'].includes(issue.severity)).length
         - matchingIssues.filter(({ issue }) => ['HIGH', 'CRITICAL'].includes(issue.severity)).length;
     const identicalPriorCount = orderedIssues.filter(({ issue }) => isIdenticalPriorFinding(issue)).length;
+    const changedFindingCount = orderedIssues.filter(({ issue }) => changedFindingPaths.has(issue.filePath)).length;
+    useEffect(() => {
+        if (findingFocus === 'changed' && (!activeComparison?.baselineVersion || changedFindingCount === 0)) {
+            setFindingFocus('attention'); setFindingPage(0);
+        }
+    }, [findingFocus, activeComparison, changedFindingCount]);
     const findingPages = Math.max(1, Math.ceil(matchingIssues.length / 100));
     const visibleFindingPage = Math.min(findingPage, findingPages - 1);
     const visibleIssues = matchingIssues.slice(visibleFindingPage * 100, (visibleFindingPage + 1) * 100);
@@ -670,6 +689,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                 {pendingVersion?.id && <DependencyInspection projectId={mod.id} versionId={pendingVersion.id} reviewToken={mod.reviewToken || ''} />}
                                 {pendingVersion && <ArtifactChanges projectId={mod.id} version={pendingVersion.versionNumber} reviewToken={mod.reviewToken || ''}
                                     autoLoad={scanResult?.scanState === 'COMPLETED' && mod.versions.some((candidate: ProjectVersion) => candidate.id !== pendingVersion.id && candidate.reviewStatus === 'APPROVED')}
+                                    onCompared={onCompared}
                                     onInspect={(version, path, token) => openInspector(version, version === pendingVersion.versionNumber ? scanIssues : [], path, undefined, undefined, token)} />}
                                 {pendingVersion && <FindingDecisions key={`${pendingVersion.id}:${pendingVersion.reviewToken}`}
                                     projectId={mod.id} versionId={pendingVersion.id} token={pendingVersion.reviewToken}
@@ -782,6 +802,7 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                             className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm dark:text-white">
                                                             <option value="attention">Review focus</option><option value="all">All findings</option><option value="new">Not previously seen</option>
                                                             <option value="seen">Previously seen</option><option value="always">Always review</option>
+                                                            {activeComparison?.baselineVersion && changedFindingCount > 0 && <option value="changed">Changed files</option>}
                                                         </select>
                                                     </div>
                                                     <p className="text-xs text-slate-600 dark:text-slate-300" role="status">
@@ -792,6 +813,11 @@ export const Review: React.FC<ReviewProps> = ({ reviewingProject, onClose, onApp
                                                         <p className="text-xs text-slate-600 dark:text-slate-300">
                                                             {identicalPriorCount} previously seen findings with identical file evidence are outside this view. Changes elsewhere may still affect them.{' '}
                                                             <button type="button" className="font-bold text-indigo-600 dark:text-indigo-300" onClick={() => { setFindingFocus('all'); setFindingPage(0); }}>Show all findings</button>
+                                                        </p>}
+                                                    {activeComparison?.baselineVersion && changedFindingCount > 0 && findingFocus !== 'changed' &&
+                                                        <p className="text-xs text-slate-600 dark:text-slate-300">
+                                                            {changedFindingCount} {changedFindingCount === 1 ? 'finding is' : 'findings are'} in added or modified files.{' '}
+                                                            <button type="button" className="font-bold text-indigo-600 dark:text-indigo-300" onClick={() => { setFindingFocus('changed'); setFindingPage(0); }}>Show changed-file findings</button>
                                                         </p>}
                                                     {hiddenHighSeverity > 0 && <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">{hiddenHighSeverity} high or critical findings are outside these filters.</p>}
                                                     {matchingIssues.length === 0 && <p className="text-sm text-slate-600 dark:text-slate-300">No findings match these filters.</p>}

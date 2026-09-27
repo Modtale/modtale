@@ -14,12 +14,13 @@ export interface ArtifactChangeSummary {
     files: { path: string; change: 'ADDED' | 'MODIFIED' | 'REMOVED' | 'UNCHANGED' }[];
 }
 
-export function ArtifactChanges({ projectId, version, reviewToken, onInspect, autoLoad = false }: {
+export function ArtifactChanges({ projectId, version, reviewToken, onInspect, autoLoad = false, onCompared }: {
     projectId: string;
     version: string;
     reviewToken: string;
     onInspect: (version: string, path: string, reviewToken: string) => void;
     autoLoad?: boolean;
+    onCompared?: (summary: ArtifactChangeSummary | null) => void;
 }) {
     const [result, setResult] = useState<ArtifactChangeSummary | null>(null);
     const [loading, setLoading] = useState(false);
@@ -31,22 +32,24 @@ export function ArtifactChanges({ projectId, version, reviewToken, onInspect, au
     const load = useCallback(async () => {
         const request = ++generation.current;
         setLoading(true); setError(''); setResult(null);
+        onCompared?.(null);
         try {
             const next = await adminClient.getArtifactChanges(projectId, version, reviewToken);
             if (next.reviewToken !== reviewToken) throw new Error('This comparison no longer matches the opened review. Refresh its evidence.');
-            if (request === generation.current) setResult(next);
+            if (request === generation.current) { setResult(next); onCompared?.(next); }
         } catch (failure) {
-            if (request === generation.current) setError(extractApiErrorMessage(failure, 'Artifact comparison is unavailable.'));
+            if (request === generation.current) { setError(extractApiErrorMessage(failure, 'Artifact comparison is unavailable.')); onCompared?.(null); }
         } finally {
             if (request === generation.current) setLoading(false);
         }
-    }, [projectId, version, reviewToken]);
+    }, [projectId, version, reviewToken, onCompared]);
     useEffect(() => {
         generation.current++;
         setResult(null); setLoading(false); setError(''); setSearch(''); setLimit(100); setShowUnchanged(false);
+        onCompared?.(null);
         if (autoLoad) void load();
         return () => { generation.current++; };
-    }, [projectId, version, reviewToken, autoLoad, load]);
+    }, [projectId, version, reviewToken, autoLoad, load, onCompared]);
     const visible = useMemo(() => (result?.files || []).filter(file =>
         (showUnchanged || file.change !== 'UNCHANGED') && file.path.toLowerCase().includes(search.toLowerCase())), [result, showUnchanged, search]);
     return <section className="rounded-2xl border border-slate-200 dark:border-slate-700 p-5 space-y-4" aria-label="Changes since approval">
