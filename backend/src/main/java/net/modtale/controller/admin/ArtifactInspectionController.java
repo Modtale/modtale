@@ -100,18 +100,35 @@ public class ArtifactInspectionController {
         if(baseline==null) return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(new ArtifactChanges(snapshot,null,false,false,0,0,0,0,List.of()));
         requireVersion(project, baseline.getVersionNumber());
-        var before=inspect(baseline,null);
         var after=inspect(current,null);
+        var retained=approvedManifest(project,baseline,after.policyVersion());
+        Map<String,String> beforeEntries;
+        String beforePolicy;
+        if(retained==null) {
+            var before=inspect(baseline,null);
+            beforeEntries=before.entryHashes();beforePolicy=before.policyVersion();
+        } else {
+            verifiedBytes(baseline);
+            beforeEntries=retained;beforePolicy=after.policyVersion();
+        }
         requireUnchanged(id, snapshot);
-        if(!validManifest(before.entryHashes()) || !validManifest(after.entryHashes()) || before.policyVersion()==null
-                || !before.policyVersion().equals(after.policyVersion()))
+        if(!validManifest(beforeEntries) || !validManifest(after.entryHashes()) || beforePolicy==null
+                || !beforePolicy.equals(after.policyVersion()))
             throw new ResponseStatusException(HttpStatus.CONFLICT,"A consistent artifact comparison is unavailable");
         String priorContext=baseline.getApprovedSecurityContextSha256();
         String currentContext=net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(current);
         boolean comparable=priorContext!=null && currentContext!=null
                 && priorContext.equals(net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(baseline));
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(compare(snapshot,baseline.getVersionNumber(),
-                comparable, comparable && !priorContext.equals(currentContext),before.entryHashes(),after.entryHashes()));
+                comparable, comparable && !priorContext.equals(currentContext),beforeEntries,after.entryHashes()));
+    }
+    private static Map<String,String> approvedManifest(Project project,ProjectVersion baseline,String currentPolicy) {
+        var evidence=baseline.getApprovedSecurityEvidence();
+        if(evidence==null || currentPolicy==null || !currentPolicy.equals(evidence.policyVersion())
+                || !evidence.complete() || !Objects.equals(baseline.getHash(),evidence.artifactSha256())
+                || !validManifest(evidence.entryHashes()) || !SecurityManifest.identity(evidence.entryHashes()).equals(evidence.contentSha256())
+                || net.modtale.service.security.scan.ArtifactReviewLineage.extend(project,baseline)==null) return null;
+        return Map.copyOf(evidence.entryHashes());
     }
     private static boolean validManifest(Map<String,String> entries) {
         return net.modtale.model.project.SecurityManifest.valid(entries, false);

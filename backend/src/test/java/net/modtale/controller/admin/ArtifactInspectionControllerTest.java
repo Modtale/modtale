@@ -159,6 +159,43 @@ class ArtifactInspectionControllerTest {
         verify(f.storage).downloadBounded("after.zip",StorageService.MAX_REVIEW_ARTIFACT_BYTES);
         verify(f.storage,never()).download(anyString());
     }
+    @Test void approvedBoundManifestAvoidsReinspectingTheBaselineArtifact() throws Exception {
+        var f=new Fixture();String policy="warden-3.0.0:"+"f".repeat(64);
+        f.before.setSecurityApprovedAt(System.currentTimeMillis()-1000);
+        var entries=Map.of("file.json","a".repeat(64));
+        f.before.setSecurityApprovalProjectId("project");
+        f.before.setApprovedReviewOrigins(Map.of());
+        f.before.setApprovedSecurityEvidence(new ScanResult.SecurityEvidence(policy,f.before.getHash(),
+                SecurityManifest.identity(entries),true,false,"COMPLETED",entries));
+        assertNotNull(net.modtale.service.security.scan.ArtifactReviewLineage.extend(f.project,f.before));
+        var response=new WardenClientService.InspectionResponse(f.after.getHash(),List.of("file.json"),"{}","TEXT_RESOURCE",entries,policy);
+        when(f.inspector.inspectFile(any(),anyString(),nullable(String.class))).thenReturn(response);
+        String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
+        var comparison=f.controller.changes("project","2",token).getBody();
+        assertEquals(1,comparison.unchanged());
+        assertTrue(comparison.contextComparable());
+        verify(f.inspector,times(1)).inspectFile(any(),anyString(),nullable(String.class));
+        verify(f.storage).downloadBounded("before.zip",StorageService.MAX_REVIEW_ARTIFACT_BYTES);
+        verify(f.storage).downloadBounded("after.zip",StorageService.MAX_REVIEW_ARTIFACT_BYTES);
+    }
+    @Test void changedOrUnaccountedApprovedManifestFallsBackToLiveInspection() throws Exception {
+        for(String scenario:List.of("policy","digest","revoked")) {
+            var f=new Fixture();String policy="warden-3.0.0:"+"f".repeat(64);
+            f.before.setSecurityApprovedAt(System.currentTimeMillis()-1000);
+            var entries=Map.of("file.json","a".repeat(64));
+            f.before.setSecurityApprovalProjectId("project");f.before.setApprovedReviewOrigins(Map.of());
+            f.before.setApprovedSecurityEvidence(new ScanResult.SecurityEvidence(
+                    scenario.equals("policy") ? "warden-3.0.0:"+"e".repeat(64) : policy,
+                    f.before.getHash(),scenario.equals("digest") ? "b".repeat(64) : SecurityManifest.identity(entries),
+                    true,false,"COMPLETED",entries));
+            if(scenario.equals("revoked")) f.before.setFindingReviewHead("changed");
+            when(f.inspector.inspectFile(any(),anyString(),nullable(String.class))).thenReturn(
+                    new WardenClientService.InspectionResponse(f.after.getHash(),List.of("file.json"),"{}","TEXT_RESOURCE",entries,policy));
+            String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
+            assertEquals(1,f.controller.changes("project","2",token).getBody().unchanged(),scenario);
+            verify(f.inspector,times(2)).inspectFile(any(),anyString(),nullable(String.class));
+        }
+    }
     @Test void editedBaselineContextCannotBePresentedAsComparableApprovedContext() throws Exception {
         var f=new Fixture();f.before.setGameVersions(List.of("edited-since-approval"));String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
         assertFalse(f.controller.changes("project","2",token).getBody().contextComparable());
