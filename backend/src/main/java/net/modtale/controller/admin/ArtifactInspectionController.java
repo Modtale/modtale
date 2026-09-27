@@ -117,7 +117,7 @@ public class ArtifactInspectionController {
             throw new ResponseStatusException(HttpStatus.CONFLICT,"A consistent artifact comparison is unavailable");
         String priorContext=baseline.getApprovedSecurityContextSha256();
         String currentContext=net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(current);
-        boolean comparable=priorContext!=null && currentContext!=null
+        boolean comparable=retained!=null && priorContext!=null && currentContext!=null
                 && priorContext.equals(net.modtale.service.security.scan.ArtifactReviewContext.fingerprint(baseline));
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(compare(snapshot,baseline.getVersionNumber(),
                 comparable, comparable && !priorContext.equals(currentContext),beforeEntries,after.entryHashes()));

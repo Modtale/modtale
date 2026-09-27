@@ -153,7 +153,7 @@ class ArtifactInspectionControllerTest {
         doAnswer(invocation->{f.after.setDownloadCount(2);return f.response;})
                 .when(f.inspector).inspectFile(any(),anyString(),nullable(String.class));
         var result=f.controller.changes("project","2",token).getBody();
-        assertEquals("1",result.baselineVersion());assertEquals(1,result.unchanged());assertTrue(result.contextComparable());
+        assertEquals("1",result.baselineVersion());assertEquals(1,result.unchanged());assertFalse(result.contextComparable());
         verify(f.projects,times(2)).getRawProjectById("project");
         verify(f.storage).downloadBounded("before.zip",StorageService.MAX_REVIEW_ARTIFACT_BYTES);
         verify(f.storage).downloadBounded("after.zip",StorageService.MAX_REVIEW_ARTIFACT_BYTES);
@@ -179,7 +179,7 @@ class ArtifactInspectionControllerTest {
         verify(f.storage).downloadBounded("after.zip",StorageService.MAX_REVIEW_ARTIFACT_BYTES);
     }
     @Test void changedOrUnaccountedApprovedManifestFallsBackToLiveInspection() throws Exception {
-        for(String scenario:List.of("policy","digest","revoked")) {
+        for(String scenario:List.of("policy","digest","revoked","expired")) {
             var f=new Fixture();String policy="warden-3.0.0:"+"f".repeat(64);
             f.before.setSecurityApprovedAt(System.currentTimeMillis()-1000);
             var entries=Map.of("file.json","a".repeat(64));
@@ -189,10 +189,13 @@ class ArtifactInspectionControllerTest {
                     f.before.getHash(),scenario.equals("digest") ? "b".repeat(64) : SecurityManifest.identity(entries),
                     true,false,"COMPLETED",entries));
             if(scenario.equals("revoked")) f.before.setFindingReviewHead("changed");
+            if(scenario.equals("expired")) f.before.setSecurityApprovedAt(1);
             when(f.inspector.inspectFile(any(),anyString(),nullable(String.class))).thenReturn(
                     new WardenClientService.InspectionResponse(f.after.getHash(),List.of("file.json"),"{}","TEXT_RESOURCE",entries,policy));
             String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
-            assertEquals(1,f.controller.changes("project","2",token).getBody().unchanged(),scenario);
+            var comparison=f.controller.changes("project","2",token).getBody();
+            assertEquals(1,comparison.unchanged(),scenario);
+            assertFalse(comparison.contextComparable(),scenario);
             verify(f.inspector,times(2)).inspectFile(any(),anyString(),nullable(String.class));
         }
     }
