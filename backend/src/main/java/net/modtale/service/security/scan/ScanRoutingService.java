@@ -19,6 +19,9 @@ public class ScanRoutingService {
     }
 
     public ScanResult createQueuedScanResult(int attempt, String note) {
+        if (attempt < 0) {
+            throw new IllegalArgumentException("Scan attempt cannot be negative");
+        }
         ScanResult pending = new ScanResult();
         pending.setScanRequestId(java.util.UUID.randomUUID().toString());
         pending.setStatus(ScanStatus.SCANNING);
@@ -37,8 +40,11 @@ public class ScanRoutingService {
     }
 
     public int nextScanAttempt(ScanResult existing) {
-        if (existing == null || existing.getScanAttempt() <= 0) {
+        if (existing == null || existing.getScanAttempt() == 0) {
             return 1;
+        }
+        if (existing.getScanAttempt() < 0 || existing.getScanAttempt() == Integer.MAX_VALUE) {
+            throw new IllegalStateException("Scan attempt sequence is invalid or exhausted");
         }
         return existing.getScanAttempt() + 1;
     }

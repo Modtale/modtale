@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ScanRoutingServiceTest {
@@ -61,6 +62,17 @@ class ScanRoutingServiceTest {
 
         assertEquals(1, service.nextScanAttempt(null));
         assertEquals(4, service.nextScanAttempt(existing));
+    }
+
+    @Test
+    void scanAttemptSequenceCannotWrapOrRestartFromNegativeState() {
+        ScanResult existing = new ScanResult();
+        existing.setScanAttempt(Integer.MAX_VALUE);
+        assertThrows(IllegalStateException.class, () -> service.nextScanAttempt(existing));
+
+        existing.setScanAttempt(-1);
+        assertThrows(IllegalStateException.class, () -> service.nextScanAttempt(existing));
+        assertThrows(IllegalArgumentException.class, () -> service.createQueuedScanResult(-1, "invalid"));
     }
 
     @Test
