@@ -1,6 +1,7 @@
 package net.modtale.service.admin.review;
 
 import java.util.List;
+import org.bson.Document;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
@@ -8,7 +9,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -40,23 +42,23 @@ class ProjectReviewQueueServiceTest {
         reviewVersion.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
         pendingReviewProject.setVersions(List.of(reviewVersion));
 
-        when(mongoTemplate.find(any(Query.class), eq(Project.class)))
-                .thenReturn(List.of(pendingProject, pendingReviewProject));
+        when(mongoTemplate.aggregate(any(Aggregation.class), eq("projects"), eq(Project.class)))
+                .thenReturn(new AggregationResults<>(List.of(pendingProject, pendingReviewProject), new Document()));
 
         List<Project> queue = projectReviewQueueService.getVerificationQueue();
 
         assertEquals(List.of("pending-1", "published-1"), queue.stream().map(Project::getId).toList());
 
-        ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
-        verify(mongoTemplate, times(1)).find(queryCaptor.capture(), eq(Project.class));
-        Query query = queryCaptor.getValue();
-        String criteria = query.getQueryObject().toString();
-        assertTrue(criteria.contains("$or"));
-        assertTrue(criteria.contains("$not"));
-        assertTrue(criteria.contains("SCANNING"));
-        assertEquals(1, query.getFieldsObject().get("versions.scanResult.riskScore"));
-        assertFalse(query.getFieldsObject().containsKey("versions.scanResult.issues"));
-        assertFalse(query.getFieldsObject().containsKey("comments"));
+        ArgumentCaptor<Aggregation> aggregationCaptor = ArgumentCaptor.forClass(Aggregation.class);
+        verify(mongoTemplate, times(1)).aggregate(aggregationCaptor.capture(), eq("projects"), eq(Project.class));
+        String pipeline = aggregationCaptor.getValue().toPipeline(Aggregation.DEFAULT_CONTEXT).toString();
+        assertTrue(pipeline.contains("$or"));
+        assertTrue(pipeline.contains("$not"));
+        assertTrue(pipeline.contains("SCANNING"));
+        assertTrue(pipeline.contains("$filter"));
+        assertTrue(pipeline.contains("riskScore"));
+        assertFalse(pipeline.contains("issues"));
+        assertFalse(pipeline.contains("comments"));
     }
 
     private static Project project(String id, String title, ProjectStatus status) {

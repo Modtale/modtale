@@ -3,6 +3,8 @@ package net.modtale.service.admin.review;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Optional;
+import com.mongodb.client.result.UpdateResult;
+import org.bson.Document;
 import net.modtale.model.project.Project;
 import net.modtale.model.project.ProjectStatus;
 import net.modtale.model.project.ProjectVersion;
@@ -19,6 +21,12 @@ import net.modtale.service.project.query.ProjectService;
 import net.modtale.service.security.issue.SecurityIssueAnalysisService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -27,6 +35,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 class ProjectReviewDecisionServiceTest {
@@ -41,6 +50,7 @@ class ProjectReviewDecisionServiceTest {
     private SecurityIssueAnalysisService securityIssueAnalysisService;
     private ProjectVersionAccessService projectVersionAccessService;
     private AdminAuditLogger adminAuditLogger;
+    private MongoTemplate mongoTemplate;
 
     @BeforeEach
     void setUp() {
@@ -53,6 +63,7 @@ class ProjectReviewDecisionServiceTest {
         securityIssueAnalysisService = mock(SecurityIssueAnalysisService.class);
         projectVersionAccessService = mock(ProjectVersionAccessService.class);
         adminAuditLogger = mock(AdminAuditLogger.class);
+        mongoTemplate = mock(MongoTemplate.class);
 
         ProjectReviewTransitionService transitionService = new ProjectReviewTransitionService(
                 projectRepository,
@@ -60,7 +71,8 @@ class ProjectReviewDecisionServiceTest {
                 lifecycleService,
                 mock(ScoringService.class),
                 securityIssueAnalysisService,
-                projectVersionAccessService
+                projectVersionAccessService,
+                mongoTemplate
         );
         ProjectReviewEffectService effectService = new ProjectReviewEffectService(
                 userRepository,
@@ -79,8 +91,13 @@ class ProjectReviewDecisionServiceTest {
         version.setReviewStatus(ProjectVersion.ReviewStatus.PENDING);
         version.setRejectionReason("Old reason");
         version.setScheduledPublishDate("2026-06-09T12:00:00");
+        project.getVersions().add(version);
 
         when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(mongoTemplate.aggregate(any(Aggregation.class), eq("projects"), eq(Project.class)))
+                .thenReturn(new AggregationResults<>(java.util.List.of(project), new Document()));
+        when(mongoTemplate.updateFirst(any(Query.class), any(Update.class), eq(Project.class)))
+                .thenReturn(UpdateResult.acknowledged(1, 1L, null));
         when(projectVersionAccessService.requireById(eq(project), eq("version-1"), any())).thenReturn(version);
 
         service.approveVersion(admin, "project-1", "version-1");
@@ -91,11 +108,35 @@ class ProjectReviewDecisionServiceTest {
         assertNotNull(project.getUpdatedAt());
 
         verify(securityIssueAnalysisService).pruneApprovedScanResults(project);
-        verify(projectRepository).save(project);
+        verify(mongoTemplate).updateFirst(any(Query.class), any(Update.class), eq(Project.class));
+        ArgumentCaptor<Update> updateCaptor = ArgumentCaptor.forClass(Update.class);
+        verify(mongoTemplate).updateFirst(any(Query.class), updateCaptor.capture(), eq(Project.class));
+        org.junit.jupiter.api.Assertions.assertTrue(updateCaptor.getValue().getUpdateObject()
+                .get("$set", Document.class).containsKey("versions.$[review0]"));
         verify(projectService).evictProjectCache(project);
         verify(projectNotificationService).notifyUpdates(project, "1.0.0");
         verify(projectNotificationService).notifyDependents(project, "1.0.0");
         verify(adminAuditLogger).logAction("admin-1", "APPROVE_VERSION", "project-1", "VERSION", "VerID: version-1");
+    }
+
+    @Test
+    void repeatedApprovalDoesNotRewriteOrRenotify() {
+        User admin = user("admin-1", "Ada");
+        Project project = project("project-1", "author-1");
+        ProjectVersion version = version("version-1", "1.0.0");
+        version.setReviewStatus(ProjectVersion.ReviewStatus.APPROVED);
+        project.getVersions().add(version);
+        when(projectService.getRawProjectById("project-1")).thenReturn(project);
+        when(mongoTemplate.aggregate(any(Aggregation.class), eq("projects"), eq(Project.class)))
+                .thenReturn(new AggregationResults<>(java.util.List.of(project), new Document()));
+        when(projectVersionAccessService.requireById(eq(project), eq("version-1"), any())).thenReturn(version);
+
+        service.approveVersion(admin, "project-1", "version-1");
+
+        verify(projectRepository, never()).save(any());
+        verify(mongoTemplate, never()).updateFirst(any(Query.class), any(Update.class), eq(Project.class));
+        verify(projectNotificationService, never()).notifyUpdates(any(), any());
+        verify(adminAuditLogger, never()).logAction(any(), any(), any(), any(), any());
     }
 
     @Test

@@ -1,13 +1,10 @@
 package net.modtale.service.admin.review;
 
 import java.util.List;
+import org.bson.Document;
 import net.modtale.model.project.Project;
-import net.modtale.model.project.ProjectStatus;
-import net.modtale.model.project.ProjectVersion;
-import net.modtale.model.project.ScanStatus;
 import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -20,40 +17,63 @@ public class ProjectReviewQueueService {
     }
 
     public List<Project> getVerificationQueue() {
-        Criteria reviewCandidate = new Criteria().orOperator(
-                Criteria.where("status").is(ProjectStatus.PENDING),
-                new Criteria().andOperator(
-                        Criteria.where("status").is(ProjectStatus.PUBLISHED),
-                        Criteria.where("versions").elemMatch(
-                                Criteria.where("reviewStatus").is(ProjectVersion.ReviewStatus.PENDING)
-                        )
-                )
+        Document match = Document.parse("""
+                { "$and": [
+                    { "$or": [
+                        { "status": "PENDING" },
+                        { "status": "PUBLISHED", "versions": {
+                            "$elemMatch": { "reviewStatus": "PENDING" }
+                        } }
+                    ] },
+                    { "versions": { "$not": {
+                        "$elemMatch": { "scanResult.status": "SCANNING" }
+                    } } }
+                ] }
+                """);
+        // Shape the array on the server. A project can have dozens of historical versions, and
+        // projecting dotted version fields still sends every one of them over the network.
+        Document projection = Document.parse("""
+                { "$project": {
+                    "title": 1,
+                    "description": { "$substrCP": [ { "$ifNull": ["$description", ""] }, 0, 240 ] },
+                    "author": 1, "imageUrl": 1,
+                    "classification": 1, "status": 1, "updatedAt": 1,
+                    "versions": { "$let": {
+                        "vars": { "v": { "$ifNull": [
+                            { "$first": { "$filter": {
+                                "input": "$versions", "as": "candidate",
+                                "cond": { "$eq": ["$$candidate.reviewStatus", "PENDING"] }
+                            } } },
+                            { "$first": "$versions" }
+                        ] } },
+                        "in": { "$cond": [
+                            { "$ne": ["$$v", null] },
+                            [{
+                                "_id": "$$v._id", "versionNumber": "$$v.versionNumber",
+                                "changelog": { "$substrCP": [ { "$ifNull": ["$$v.changelog", ""] }, 0, 160 ] },
+                                "reviewStatus": "$$v.reviewStatus",
+                                "scanResult": { "$cond": [
+                                    { "$ne": [ { "$ifNull": ["$$v.scanResult", null] }, null ] },
+                                    {
+                                        "status": "$$v.scanResult.status",
+                                        "verdict": "$$v.scanResult.verdict",
+                                        "riskScore": "$$v.scanResult.riskScore",
+                                        "knownIssueCount": "$$v.scanResult.knownIssueCount",
+                                        "newIssueCount": "$$v.scanResult.newIssueCount",
+                                        "escalatedIssueCount": "$$v.scanResult.escalatedIssueCount"
+                                    },
+                                    null
+                                ] }
+                            }],
+                            []
+                        ] }
+                    } }
+                } }
+                """);
+        Aggregation aggregation = Aggregation.newAggregation(
+                context -> new Document("$match", match),
+                context -> projection
         );
-        Criteria noVersionIsScanning = Criteria.where("versions").not().elemMatch(
-                Criteria.where("scanResult.status").is(ScanStatus.SCANNING)
-        );
-        Query query = new Query(new Criteria().andOperator(reviewCandidate, noVersionIsScanning));
-
-        query.fields()
-                .include("id")
-                .include("title")
-                .include("description")
-                .include("author")
-                .include("imageUrl")
-                .include("classification")
-                .include("status")
-                .include("updatedAt")
-                .include("versions.id")
-                .include("versions.versionNumber")
-                .include("versions.changelog")
-                .include("versions.reviewStatus")
-                .include("versions.scanResult.status")
-                .include("versions.scanResult.verdict")
-                .include("versions.scanResult.riskScore")
-                .include("versions.scanResult.knownIssueCount")
-                .include("versions.scanResult.newIssueCount")
-                .include("versions.scanResult.escalatedIssueCount");
-
-        return mongoTemplate.find(query, Project.class);
+        return mongoTemplate.aggregate(aggregation, "projects", Project.class).getMappedResults();
     }
 }
