@@ -66,7 +66,7 @@ public class ArtifactInspectionController {
         return w != null && Objects.equals(hash,w.artifactSha256()) && path.equals(w.path())
                 && w.entrySha256() != null && w.entrySha256().matches("[0-9a-f]{64}") && w.representationSha256() != null && w.representationSha256().matches("[0-9a-f]{64}")
                 && w.policyVersion() != null && !w.policyVersion().isBlank() && w.policyVersion().length() <= 256 && w.format() != null
-                && Set.of("JVM_BYTECODE","TEXT_RESOURCE","JSON_RESOURCE","STRUCTURED_JSON","VALIDATED_RASTER","AUDIO_SUMMARY","KOTLIN_MODULE","OPAQUE_RESOURCE","UNREPRESENTED").contains(w.format())
+                && Set.of("JVM_BYTECODE","TEXT_RESOURCE","JSON_RESOURCE","STRUCTURED_JSON","VALIDATED_RASTER","AUDIO_SUMMARY","KOTLIN_MODULE","ICC_PROFILE","OPAQUE_RESOURCE","UNREPRESENTED").contains(w.format())
                 && w.start() >= 0 && (sourceLine != 0 || offset == w.start()) && w.end() >= w.start() && w.end() <= w.totalCharacters() && w.totalCharacters() <= 4_000_000
                 && (w.start() == w.totalCharacters() || w.end() > w.start()) && w.firstLine() >= 1 && w.firstLine() <= w.start() + 1
                 && w.content() != null && w.content().length() == w.end()-w.start() && w.content().length() <= characters

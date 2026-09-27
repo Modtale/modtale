@@ -30,7 +30,7 @@ class ArtifactInspectionControllerTest {
     }
     @Test void inspectionAcceptsCurrentEvidenceKindsButNeverTreatsAudioSummaryAsComplete() throws Exception {
         var f=new Fixture();String token=net.modtale.service.admin.review.ProjectReviewSnapshot.token(f.project);
-        for(String format:List.of("STRUCTURED_JSON","KOTLIN_MODULE")) {
+        for(String format:List.of("STRUCTURED_JSON","KOTLIN_MODULE","ICC_PROFILE")) {
             var response=new WardenClientService.InspectionWindow(f.after.getHash(),"file.json","a".repeat(64),"policy","b".repeat(64),
                     format,0,2,2,1,true,true,"{}",List.of());
             when(f.inspector.inspectWindow(any(),anyString(),anyInt(),anyInt(),anyInt())).thenReturn(response);
